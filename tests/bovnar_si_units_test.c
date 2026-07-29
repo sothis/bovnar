@@ -1130,21 +1130,74 @@ static void test_units_compatible_exp_invalid_info(void)
 	            "byte with exp_invalid NOT compatible with byte");
 }
 
-static void test_si_factor_out_of_range_base(void)
+/*
+ * The id space is blocked, so "not a unit" is no longer one region past the
+ * end. There are three shapes of it and a bounds check catches only the last:
+ * the dead space below the first block, a hole inside a block that a
+ * vocabulary has not grown into yet, and the space above every block. All
+ * three must refuse.
+ */
+/*
+ * A factor a double cannot hold is a FAILURE, at both ends.
+ *
+ * Overflow was already refused. Underflow was not, because 0.0 is finite:
+ * q~m^100 is 10^-3000, the product underflowed to exactly zero, and the
+ * function reported success — so every value in that unit converted to 0 and
+ * nothing said it had not. Zero is unreachable for a real unit (every
+ * to_si_factor and every prefix is positive and non-zero), so it can only ever
+ * mean the product fell off the bottom.
+ */
+static void test_si_factor_refuses_what_a_double_cannot_hold(void)
 {
-	printf("  si_factor out-of-range base...\n");
-	bool aff; double off; bool ok = true;
-
-	value_unit_t bad = {
-		.num_components = 1,
-		.components = {
-			{ (value_base_unit_t)BVN_VALUE_BASE_UNIT_COUNT,
-			  exp_linear,
-			  {prefix_si, .id.si = si_none} }
-		}
+	printf("  si_factor over- and underflow...\n");
+	static const struct { const char *unit; bool want_ok; } cases[] = {
+		{ "Q~m^100",     false },   /* 10^3000  -> +inf */
+		{ "q~m^100",     false },   /* 10^-3000 -> 0.0  */
+		{ "Q~m^9",       true  },   /* 10^270, large but representable */
+		{ "q~m^9",       true  },   /* 10^-270, small but representable */
+		{ "m^100/s^100", true  },   /* huge exponents, factor exactly 1 */
 	};
-	bvn_unit_to_si_factor(bad, &aff, &off, &ok);
-	ASSERT_TRUE(!ok, "out-of-range base → ok=false");
+	for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+		bool pok = false;
+		value_unit_t u = bvn_parse_unit((const uint8_t *)cases[i].unit, &pok);
+		ASSERT_TRUE(pok, "the extreme unit parses");
+		bool aff = false, ok = false;
+		double off = 0.0;
+		double f = bvn_unit_to_si_factor(u, &aff, &off, &ok);
+		ASSERT_TRUE(ok == cases[i].want_ok,
+		            "si_factor reports the representability of its answer");
+		if (ok) {
+			ASSERT_TRUE(f != 0.0 && f == f && f - f == 0.0,
+			            "a successful factor is finite and non-zero");
+		}
+	}
+}
+
+static void test_si_factor_undefined_base(void)
+{
+	printf("  si_factor undefined base...\n");
+	static const int UNDEFINED[] = {
+		BVN_UNIT_ID_FIRST - 1,                    /* below every block   */
+		BVN_UNIT_NATIVE_LAST + 1,                 /* hole in block 10    */
+		BVN_PROFILE_UCUM_OPAQUE_LAST + 1,         /* hole in block 20    */
+		70 * BVN_UNIT_BLOCK_SIZE,                 /* an unassigned block */
+		BVN_CURRENCY_LAST + 1,                    /* hole in block 90    */
+		99 * BVN_UNIT_BLOCK_SIZE                  /* above every block   */
+	};
+	for (size_t i = 0; i < sizeof(UNDEFINED) / sizeof(UNDEFINED[0]); i++) {
+		bool aff; double off; bool ok = true;
+		value_unit_t bad = {
+			.num_components = 1,
+			.components = {
+				{ (value_base_unit_t)UNDEFINED[i],
+				  exp_linear,
+				  {prefix_si, .id.si = si_none} }
+			}
+		};
+		bvn_unit_to_si_factor(bad, &aff, &off, &ok);
+		ASSERT_TRUE(!ok, "undefined base → ok=false");
+		ASSERT_TRUE(!bvn_unit_valid(bad), "undefined base → unit invalid");
+	}
 }
 
 /* num_components > BVNR_MAX_UNIT_COMPONENTS: extra entries silently ignored */
@@ -1203,6 +1256,11 @@ static void test_unit_reduce_overflow_flag(void)
 	bvn_unit_reduce(m_nine, &scale, &overflow);
 	ASSERT_TRUE(!overflow, "m^9 reduce: overflow=false (within range)");
 
+	/* Exponent 10 is INSIDE the range. It was refused here for as long as the
+	 * reduction kept a ±9 cap that the exponent type had left behind years
+	 * earlier, and the refusal was not a rejection: m^5*m^5 reduced to the
+	 * DIMENSIONLESS unit with scale 1.0, because metre's SI factor is 1.0 and
+	 * the fold left nothing behind. */
 	value_unit_t m5_m5 = {
 		.num_components = 2,
 		.components = {
@@ -1211,8 +1269,15 @@ static void test_unit_reduce_overflow_flag(void)
 		}
 	};
 	overflow = false;
-	bvn_unit_reduce(m5_m5, &scale, &overflow);
-	ASSERT_TRUE(overflow, "m^5*m^5 reduce: overflow=true (exp 10 exceeds range)");
+	scale    = 1.0;
+	value_unit_t m10 = bvn_unit_reduce(m5_m5, &scale, &overflow);
+	ASSERT_TRUE(!overflow, "m^5*m^5 reduce: overflow=false (exp 10 is in range)");
+	ASSERT_EQ_INT(m10.num_components, 1, "m^5*m^5 reduce: one component");
+	ASSERT_EQ_INT((int)m10.components[0].base, (int)bu_meter,
+	              "m^5*m^5 reduce: still metres");
+	ASSERT_EQ_INT(bvn_exponent_to_int(m10.components[0].exponent), 10,
+	              "m^5*m^5 reduce: exponent 10");
+	ASSERT_EQ_DBL(scale, 1.0, 1e-12, "m^5*m^5 reduce: no scale folded out");
 
 	value_unit_t g5_g5 = {
 		.num_components = 2,
@@ -1223,10 +1288,26 @@ static void test_unit_reduce_overflow_flag(void)
 	};
 	overflow = false;
 	scale    = 1.0;
-	bvn_unit_reduce(g5_g5, &scale, &overflow);
-	ASSERT_TRUE(overflow, "g^5*g^5 reduce: overflow=true (exp 10 exceeds range)");
-	ASSERT_EQ_DBL(scale, 1e-30, 1e-40,
-	              "g^5*g^5 reduce: scale=1e-30 (gram to_si_factor 1e-3 ^ 10)");
+	value_unit_t g10 = bvn_unit_reduce(g5_g5, &scale, &overflow);
+	ASSERT_TRUE(!overflow, "g^5*g^5 reduce: overflow=false (exp 10 is in range)");
+	ASSERT_EQ_INT(bvn_exponent_to_int(g10.components[0].exponent), 10,
+	              "g^5*g^5 reduce: exponent 10");
+	ASSERT_EQ_DBL(scale, 1.0, 1e-12,
+	              "g^5*g^5 reduce: the gram factor stays IN the unit, not in the scale");
+
+	/* Past the range there is genuinely nothing to return, and the component
+	 * IS dropped — which is what *overflow warns about. m^100*m^100 is m^200. */
+	value_unit_t m100_m100 = {
+		.num_components = 2,
+		.components = {
+			{ bu_meter, (unit_exponent_t)BVN_EXPONENT_MAX, {prefix_si, .id.si=si_none} },
+			{ bu_meter, (unit_exponent_t)BVN_EXPONENT_MAX, {prefix_si, .id.si=si_none} }
+		}
+	};
+	overflow = false;
+	scale    = 1.0;
+	bvn_unit_reduce(m100_m100, &scale, &overflow);
+	ASSERT_TRUE(overflow, "m^100*m^100 reduce: overflow=true (exp 200 leaves the range)");
 
 	/*
 	 * NULL overflow pointer: verify the guard inside bvn_unit_reduce
@@ -1479,11 +1560,19 @@ static void test_prefix_unit_valid_out_of_range(void)
 
 	value_unit_prefix_t pfx_si_none = {prefix_si, .id.si = si_none};
 	ASSERT_TRUE(!bvn_prefix_unit_valid(pfx_si_none,
-	                (value_base_unit_t)BVN_VALUE_BASE_UNIT_COUNT),
-	            "out-of-range base: prefix_valid=false");
+	                (value_base_unit_t)(BVN_UNIT_NATIVE_LAST + 1)),
+	            "hole above block 10: prefix_valid=false");
 	ASSERT_TRUE(!bvn_prefix_unit_valid(pfx_si_none,
-	                (value_base_unit_t)(BVN_VALUE_BASE_UNIT_COUNT + 5)),
-	            "far out-of-range base: prefix_valid=false");
+	                (value_base_unit_t)(BVN_UNIT_ID_FIRST - 1)),
+	            "below every block: prefix_valid=false");
+	ASSERT_TRUE(!bvn_prefix_unit_valid(pfx_si_none,
+	                (value_base_unit_t)(99 * BVN_UNIT_BLOCK_SIZE)),
+	            "above every block: prefix_valid=false");
+	/* Negative ids reach the same table index arithmetic. They used to be
+	 * caught by an unsigned cast that made them enormous; the slot map has to
+	 * refuse them on its own terms. */
+	ASSERT_TRUE(!bvn_prefix_unit_valid(pfx_si_none, (value_base_unit_t)(-1)),
+	            "negative base: prefix_valid=false");
 
 	/* out-of-range prefix.system */
 	value_unit_prefix_t pfx_bad_sys = {
@@ -2409,13 +2498,18 @@ static void test_named_si_collapse_never_substitutes_a_named_unit(void)
 			    "a named unit reduces to itself, not to a sibling");
 	}
 	/* An OVERFLOWING reduction is refused, not formatted. bvn_unit_reduce drops
-	 * a component when its summed exponent leaves ±9, so m⁹·m² — which is m¹¹ —
-	 * reduced to nothing and serialised as "no_unit": dimensionless, and not
-	 * compatible with what it replaced. The flag was already raised and was
-	 * being read only to skip the cosmetic collapse. */
+	 * a component when its summed exponent leaves [BVN_EXPONENT_MIN,
+	 * BVN_EXPONENT_MAX], and the result then serialises as "no_unit":
+	 * dimensionless, and not compatible with what it replaced. The flag was
+	 * already raised and was being read only to skip the cosmetic collapse.
+	 *
+	 * These used to be m⁹·m² and friends, because the cap was 9 — stale by the
+	 * whole distance between ±9 and ±100. They are now written at the real
+	 * boundary; the m¹¹ cases below prove the same inputs reduce cleanly. */
 	{
-		static const char *overflowing[] = { "m⁹·m²", "m⁹·m⁹", "s⁹·s³",
-						     "m⁹·m²·s", "k~m⁹·m²" };
+		static const char *overflowing[] = { "m^100·m^100", "m^60·m^60",
+						     "s^99·s^99", "m^100·m^100·s",
+						     "k~m^100·m^100" };
 		for (size_t i = 0; i < sizeof overflowing / sizeof overflowing[0]; i++) {
 			bool pok = false;
 			value_unit_t u = bvn_parse_unit((const uint8_t *)overflowing[i], &pok);
@@ -2428,6 +2522,19 @@ static void test_named_si_collapse_never_substitutes_a_named_unit(void)
 			ASSERT_TRUE(bvn_unit_to_string_ex(u, b, sizeof b,
 							  BVN_UNIT_FLAGS_NONE) > 0,
 				    "the unreduced form is unaffected");
+		}
+		/* And the products that merely leave ±9 reduce and format, which is
+		 * the regression the boundary above is guarding. */
+		static const char *in_range[] = { "m⁹·m²", "m⁹·m⁹", "s⁹·s³",
+						  "m⁹·m²·s", "k~m⁹·m²" };
+		for (size_t i = 0; i < sizeof in_range / sizeof in_range[0]; i++) {
+			bool pok = false;
+			value_unit_t u = bvn_parse_unit((const uint8_t *)in_range[i], &pok);
+			char b[80];
+			ASSERT_TRUE(pok, "the in-range product parses");
+			ASSERT_TRUE(bvn_unit_to_string_ex(u, b, sizeof b,
+							  BVN_UNIT_REDUCE) > 0,
+				    "an in-range reduction is written, not refused");
 		}
 	}
 	/* The guard must be narrow. A lone base at exponent ONE already names its
@@ -2601,7 +2708,8 @@ int main(void)
 	test_parse_and_factor();
 	test_all_derived_dimensions();
 	test_si_factor_degree();
-	test_si_factor_out_of_range_base();
+	test_si_factor_refuses_what_a_double_cannot_hold();
+	test_si_factor_undefined_base();
 	test_si_factor_num_components_overflow();
 	test_parse_unit_n();
 	test_parse_unit_parens();

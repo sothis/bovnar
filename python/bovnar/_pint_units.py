@@ -104,198 +104,198 @@ BOVNAR_PINT_DEFINITIONS: list[str] = [
 # --- bovnar BaseUnit code -> pint unit token ---------------------------------
 BASE_UNIT_TO_PINT: dict[int, str] = {
     # Direct 1:1 — pint native name, dimension AND magnitude verified equal
-      1: 'bvnr_bit',                     # BIT
-      3: 'second',                       # SECOND
-      4: 'meter',                        # METER
-      5: 'gram',                         # GRAM
-      6: 'ampere',                       # AMPERE
-      7: 'kelvin',                       # KELVIN
-      8: 'mole',                         # MOL
-      9: 'candela',                      # CANDELA
-     10: 'hertz',                        # HERTZ
-     11: 'newton',                       # NEWTON
-     12: 'pascal',                       # PASCAL
-     13: 'joule',                        # JOULE
-     14: 'watt',                         # WATT
-     15: 'volt',                         # VOLT
-     16: 'ohm',                          # OHM
-     17: 'farad',                        # FARAD
-     18: 'coulomb',                      # COULOMB
-     19: 'siemens',                      # SIEMENS
-     20: 'weber',                        # WEBER
-     21: 'tesla',                        # TESLA
-     22: 'henry',                        # HENRY
-     23: 'bvnr_lumen',                   # LUMEN
-     24: 'bvnr_lux',                     # LUX
-     25: 'becquerel',                    # BECQUEREL
-     26: 'gray',                         # GRAY
-     27: 'sievert',                      # SIEVERT
-     28: 'katal',                        # KATAL
-     29: 'liter',                        # LITER
-     30: 'minute',                       # MINUTE
-     31: 'hour',                         # HOUR
-     32: 'day',                          # DAY
-     33: 'bvnr_degree',                  # DEGREE
-     35: 'bvnr_radian',                  # RADIAN
-     36: 'bvnr_steradian',               # STERADIAN
-     37: 'metric_ton',                   # TONNE
-     38: 'bar',                          # BAR
-     39: 'electron_volt',                # ELECTRONVOLT
-     40: 'dalton',                       # DALTON
-     41: 'astronomical_unit',            # ASTRONOMICAL_UNIT
-     42: 'hectare',                      # HECTARE
-     43: 'week',                         # WEEK
-     44: 'year',                         # YEAR
-     45: 'inch',                         # INCH
-     46: 'foot',                         # FOOT
-     47: 'yard',                         # YARD
-     48: 'mile',                         # MILE
-     49: 'nautical_mile',                # NAUTICAL_MILE
-     50: 'angstrom',                     # ANGSTROM
-     51: 'light_year',                   # LIGHT_YEAR
-     52: 'parsec',                       # PARSEC
-     53: 'bvnr_furlong',                      # FURLONG
-     54: 'bvnr_fathom',                       # FATHOM
-     55: 'pound',                        # POUND
-     56: 'ounce',                        # OUNCE
-     57: 'grain',                        # GRAIN
-     58: 'stone',                        # STONE
-     59: 'short_ton',                    # SHORT_TON
-     60: 'long_ton',                     # LONG_TON
-     61: 'troy_ounce',                   # TROY_OUNCE
-     62: 'carat',                        # CARAT
-     64: 'atmosphere',                   # ATMOSPHERE
-     65: 'millimeter_Hg',                # MMHG
-     66: 'torr',                         # TORR
-     67: 'psi',                          # PSI
-     68: 'calorie',                      # CALORIE
-     69: 'british_thermal_unit',         # BTU
-     70: 'erg',                          # ERG
-     72: 'horsepower',                   # HORSEPOWER
-     73: 'force_pound',                  # POUND_FORCE
-     74: 'dyne',                         # DYNE
-     75: 'kip',                          # KIP
-     76: 'knot',                         # KNOT
-     77: 'gallon',                       # GALLON
-     78: 'imperial_gallon',              # GALLON_UK
-     79: 'quart',                        # QUART
-     80: 'pint',                         # PINT
-     81: 'cup',                          # CUP
-     82: 'fluid_ounce',                  # FLUID_OUNCE
-     83: 'tablespoon',                   # TABLESPOON
-     84: 'teaspoon',                     # TEASPOON
-     85: 'oil_barrel',                   # BARREL
-     86: 'bvnr_acre',                         # ACRE
-     87: 'barn',                         # BARN
-     88: 'bvnr_arcminute',               # ARCMINUTE
-     89: 'bvnr_arcsecond',               # ARCSECOND
-     90: 'bvnr_gradian',                 # GRAD
-     91: 'poise',                        # POISE
-     92: 'stokes',                       # STOKES
-     96: 'stilb',                        # STILB
-     98: 'galileo',                      # GALILEO
-     99: 'curie',                        # CURIE
-    100: 'roentgen',                     # ROENTGEN
-    101: 'rem',                          # REM
-    104: 'degree_Rankine',               # RANKINE
-    105: 'slug',                         # SLUG
-    106: 'thou',                         # THOU
-    107: 'imperial_pint',                # PINT_UK
-    108: 'imperial_fluid_ounce',         # FLUID_OUNCE_UK
-    109: 'imperial_quart',               # QUART_UK
-    111: 'volt_ampere',                  # VOLT_AMPERE
-    112: 'force_kilogram',               # KILOGRAM_FORCE
-    113: 'inch_Hg',                      # INCH_HG
-    115: 'foot_pound',                   # FOOT_POUND
-    116: 'dram',                         # DRAM
-    117: 'pennyweight',                  # PENNYWEIGHT
-    118: 'bvnr_chain',                        # CHAIN
-    119: 'bvnr_rod',                          # ROD
-    120: 'gill',                         # GILL
-    121: 'imperial_gill',                # GILL_UK
-    122: 'standard_gravity',             # STANDARD_GRAVITY
-    123: 'metric_horsepower',            # METRIC_HORSEPOWER
-    124: 'bvnr_revolution',              # REVOLUTION
-    125: 'month',                        # MONTH
-    126: 'fortnight',                    # FORTNIGHT
-    127: 'technical_atmosphere',         # ATMOSPHERE_TECHNICAL
-    128: 'tex',                          # TEX
-    129: 'denier',                       # DENIER
-    130: 'fluid_dram',                   # FLUID_DRAM
-    131: 'minim',                        # MINIM
-    132: 'peck',                         # PECK
-    133: 'bushel',                       # BUSHEL
-    361: 'survey_foot',                  # SURVEY_FOOT
-    362: 'bvnr_league',                       # LEAGUE
-    364: 'hand',                         # HAND
-    366: 'scruple',                      # SCRUPLE
-    367: 'baud',                         # BAUD
-    372: 'percent',                      # PERCENT
-    373: 'permille',                     # PER_MILLE
-    376: 'ppm',                          # PPM
-    381: 'mile_per_hour',                # MILE_PER_HOUR
-    382: 'kilometer_per_hour',           # KILOMETER_PER_HOUR
+    100000: 'bvnr_bit',                     # BIT
+    100002: 'second',                       # SECOND
+    100003: 'meter',                        # METER
+    100004: 'gram',                         # GRAM
+    100005: 'ampere',                       # AMPERE
+    100006: 'kelvin',                       # KELVIN
+    100007: 'mole',                         # MOL
+    100008: 'candela',                      # CANDELA
+    100009: 'hertz',                        # HERTZ
+    100010: 'newton',                       # NEWTON
+    100011: 'pascal',                       # PASCAL
+    100012: 'joule',                        # JOULE
+    100013: 'watt',                         # WATT
+    100014: 'volt',                         # VOLT
+    100015: 'ohm',                          # OHM
+    100016: 'farad',                        # FARAD
+    100017: 'coulomb',                      # COULOMB
+    100018: 'siemens',                      # SIEMENS
+    100019: 'weber',                        # WEBER
+    100020: 'tesla',                        # TESLA
+    100021: 'henry',                        # HENRY
+    100022: 'bvnr_lumen',                   # LUMEN
+    100023: 'bvnr_lux',                     # LUX
+    100024: 'becquerel',                    # BECQUEREL
+    100025: 'gray',                         # GRAY
+    100026: 'sievert',                      # SIEVERT
+    100027: 'katal',                        # KATAL
+    100028: 'liter',                        # LITER
+    100029: 'minute',                       # MINUTE
+    100030: 'hour',                         # HOUR
+    100031: 'day',                          # DAY
+    100032: 'bvnr_degree',                  # DEGREE
+    100034: 'bvnr_radian',                  # RADIAN
+    100035: 'bvnr_steradian',               # STERADIAN
+    100036: 'metric_ton',                   # TONNE
+    100037: 'bar',                          # BAR
+    100038: 'electron_volt',                # ELECTRONVOLT
+    100039: 'dalton',                       # DALTON
+    100040: 'astronomical_unit',            # ASTRONOMICAL_UNIT
+    100041: 'hectare',                      # HECTARE
+    100042: 'week',                         # WEEK
+    100043: 'year',                         # YEAR
+    100044: 'inch',                         # INCH
+    100045: 'foot',                         # FOOT
+    100046: 'yard',                         # YARD
+    100047: 'mile',                         # MILE
+    100048: 'nautical_mile',                # NAUTICAL_MILE
+    100049: 'angstrom',                     # ANGSTROM
+    100050: 'light_year',                   # LIGHT_YEAR
+    100051: 'parsec',                       # PARSEC
+    100052: 'bvnr_furlong',                      # FURLONG
+    100053: 'bvnr_fathom',                       # FATHOM
+    100054: 'pound',                        # POUND
+    100055: 'ounce',                        # OUNCE
+    100056: 'grain',                        # GRAIN
+    100057: 'stone',                        # STONE
+    100058: 'short_ton',                    # SHORT_TON
+    100059: 'long_ton',                     # LONG_TON
+    100060: 'troy_ounce',                   # TROY_OUNCE
+    100061: 'carat',                        # CARAT
+    100063: 'atmosphere',                   # ATMOSPHERE
+    100064: 'millimeter_Hg',                # MMHG
+    100065: 'torr',                         # TORR
+    100066: 'psi',                          # PSI
+    100067: 'calorie',                      # CALORIE
+    100068: 'british_thermal_unit',         # BTU
+    100069: 'erg',                          # ERG
+    100071: 'horsepower',                   # HORSEPOWER
+    100072: 'force_pound',                  # POUND_FORCE
+    100073: 'dyne',                         # DYNE
+    100074: 'kip',                          # KIP
+    100075: 'knot',                         # KNOT
+    100076: 'gallon',                       # GALLON
+    100077: 'imperial_gallon',              # GALLON_UK
+    100078: 'quart',                        # QUART
+    100079: 'pint',                         # PINT
+    100080: 'cup',                          # CUP
+    100081: 'fluid_ounce',                  # FLUID_OUNCE
+    100082: 'tablespoon',                   # TABLESPOON
+    100083: 'teaspoon',                     # TEASPOON
+    100084: 'oil_barrel',                   # BARREL
+    100085: 'bvnr_acre',                         # ACRE
+    100086: 'barn',                         # BARN
+    100087: 'bvnr_arcminute',               # ARCMINUTE
+    100088: 'bvnr_arcsecond',               # ARCSECOND
+    100089: 'bvnr_gradian',                 # GRAD
+    100090: 'poise',                        # POISE
+    100091: 'stokes',                       # STOKES
+    100095: 'stilb',                        # STILB
+    100097: 'galileo',                      # GALILEO
+    100098: 'curie',                        # CURIE
+    100099: 'roentgen',                     # ROENTGEN
+    100100: 'rem',                          # REM
+    100103: 'degree_Rankine',               # RANKINE
+    100104: 'slug',                         # SLUG
+    100105: 'thou',                         # THOU
+    100106: 'imperial_pint',                # PINT_UK
+    100107: 'imperial_fluid_ounce',         # FLUID_OUNCE_UK
+    100108: 'imperial_quart',               # QUART_UK
+    100110: 'volt_ampere',                  # VOLT_AMPERE
+    100111: 'force_kilogram',               # KILOGRAM_FORCE
+    100112: 'inch_Hg',                      # INCH_HG
+    100114: 'foot_pound',                   # FOOT_POUND
+    100115: 'dram',                         # DRAM
+    100116: 'pennyweight',                  # PENNYWEIGHT
+    100117: 'bvnr_chain',                        # CHAIN
+    100118: 'bvnr_rod',                          # ROD
+    100119: 'gill',                         # GILL
+    100120: 'imperial_gill',                # GILL_UK
+    100121: 'standard_gravity',             # STANDARD_GRAVITY
+    100122: 'metric_horsepower',            # METRIC_HORSEPOWER
+    100123: 'bvnr_revolution',              # REVOLUTION
+    100124: 'month',                        # MONTH
+    100125: 'fortnight',                    # FORTNIGHT
+    100126: 'technical_atmosphere',         # ATMOSPHERE_TECHNICAL
+    100127: 'tex',                          # TEX
+    100128: 'denier',                       # DENIER
+    100129: 'fluid_dram',                   # FLUID_DRAM
+    100130: 'minim',                        # MINIM
+    100131: 'peck',                         # PECK
+    100132: 'bushel',                       # BUSHEL
+    100146: 'survey_foot',                  # SURVEY_FOOT
+    100147: 'bvnr_league',                       # LEAGUE
+    100149: 'hand',                         # HAND
+    100151: 'scruple',                      # SCRUPLE
+    100152: 'baud',                         # BAUD
+    100157: 'percent',                      # PERCENT
+    100158: 'permille',                     # PER_MILLE
+    100161: 'ppm',                          # PPM
+    100164: 'mile_per_hour',                # MILE_PER_HOUR
+    100165: 'kilometer_per_hour',           # KILOMETER_PER_HOUR
 
     # Affine temperature scales mapped to pint native offset units
-     34: 'degC',                         # CELSIUS
-     63: 'degF',                         # FAHRENHEIT
-    370: 'bvnr_reaumur',                 # REAUMUR
+    100033: 'degC',                         # CELSIUS
+    100062: 'degF',                         # FAHRENHEIT
+    100155: 'bvnr_reaumur',                 # REAUMUR
 
     # Affine temperature scales defined from bovnar factor+offset (absent in pint)
-    368: 'bvnr_delisle',                 # DELISLE
-    369: 'bvnr_newton_temp',             # NEWTON_TEMP
-    371: 'bvnr_romer',                   # ROMER
+    100153: 'bvnr_delisle',                 # DELISLE
+    100154: 'bvnr_newton_temp',             # NEWTON_TEMP
+    100156: 'bvnr_romer',                   # ROMER
 
     # Defined from bovnar dimension+factor (absent in pint, or pint name collides)
-     93: 'bvnr_gauss',                   # GAUSS
-     94: 'bvnr_maxwell',                 # MAXWELL
-     95: 'bvnr_oersted',                 # OERSTED
-     97: 'bvnr_phot',                    # PHOT
-    110: 'bvnr_var',                     # VAR
-    348: 'bvnr_pfund',                   # PFUND
-    349: 'bvnr_zentner',                 # ZENTNER
-    350: 'bvnr_doppelzentner',           # DOPPELZENTNER
-    351: 'bvnr_lot',                     # LOT
-    352: 'bvnr_prussian_line',           # PRUSSIAN_LINE
-    353: 'bvnr_prussian_zoll',           # PRUSSIAN_ZOLL
-    354: 'bvnr_prussian_fuss',           # PRUSSIAN_FUSS
-    355: 'bvnr_prussian_elle',           # PRUSSIAN_ELLE
-    356: 'bvnr_prussian_rute',           # PRUSSIAN_RUTE
-    357: 'bvnr_klafter',                 # KLAFTER
-    358: 'bvnr_german_mile',             # GERMAN_MILE
-    359: 'bvnr_morgen',                  # MORGEN
-    360: 'bvnr_scheffel',                # SCHEFFEL
-    363: 'bvnr_cable',                   # CABLE
-    365: 'bvnr_quintal',                 # QUINTAL
-    374: 'bvnr_per_myriad',              # PER_MYRIAD
-    375: 'bvnr_per_cent_mille',          # PER_CENT_MILLE
-    377: 'bvnr_ppb',                     # PPB
-    380: 'bvnr_ph_scale',                # PH_SCALE
-    383: 'bvnr_german_hardness',         # GERMAN_HARDNESS
-    384: 'bvnr_english_hardness',        # ENGLISH_HARDNESS
-    385: 'bvnr_french_hardness',         # FRENCH_HARDNESS
-    386: 'bvnr_russian_hardness',        # RUSSIAN_HARDNESS
-    387: 'bvnr_american_hardness',       # AMERICAN_HARDNESS
-    388: 'bvnr_val',                     # VAL
-    389: 'bvnr_grains_per_gallon',       # GRAINS_PER_GALLON
-    390: 'bvnr_ntu',                     # TURBIDITY_NTU
-    391: 'bvnr_fnu',                     # TURBIDITY_FNU
-    392: 'bvnr_psu',                     # PRACTICAL_SALINITY
-    393: 'bvnr_conductivity_factor',     # CONDUCTIVITY_FACTOR
-    394: 'bvnr_ftu',                     # TURBIDITY_FTU
-    395: 'bvnr_fau',                     # TURBIDITY_FAU
-    396: 'bvnr_jtu',                     # TURBIDITY_JTU
+    100092: 'bvnr_gauss',                   # GAUSS
+    100093: 'bvnr_maxwell',                 # MAXWELL
+    100094: 'bvnr_oersted',                 # OERSTED
+    100096: 'bvnr_phot',                    # PHOT
+    100109: 'bvnr_var',                     # VAR
+    100133: 'bvnr_pfund',                   # PFUND
+    100134: 'bvnr_zentner',                 # ZENTNER
+    100135: 'bvnr_doppelzentner',           # DOPPELZENTNER
+    100136: 'bvnr_lot',                     # LOT
+    100137: 'bvnr_prussian_line',           # PRUSSIAN_LINE
+    100138: 'bvnr_prussian_zoll',           # PRUSSIAN_ZOLL
+    100139: 'bvnr_prussian_fuss',           # PRUSSIAN_FUSS
+    100140: 'bvnr_prussian_elle',           # PRUSSIAN_ELLE
+    100141: 'bvnr_prussian_rute',           # PRUSSIAN_RUTE
+    100142: 'bvnr_klafter',                 # KLAFTER
+    100143: 'bvnr_german_mile',             # GERMAN_MILE
+    100144: 'bvnr_morgen',                  # MORGEN
+    100145: 'bvnr_scheffel',                # SCHEFFEL
+    100148: 'bvnr_cable',                   # CABLE
+    100150: 'bvnr_quintal',                 # QUINTAL
+    100159: 'bvnr_per_myriad',              # PER_MYRIAD
+    100160: 'bvnr_per_cent_mille',          # PER_CENT_MILLE
+    100162: 'bvnr_ppb',                     # PPB
+    100163: 'bvnr_ph_scale',                # PH_SCALE
+    100166: 'bvnr_german_hardness',         # GERMAN_HARDNESS
+    100167: 'bvnr_english_hardness',        # ENGLISH_HARDNESS
+    100168: 'bvnr_french_hardness',         # FRENCH_HARDNESS
+    100169: 'bvnr_russian_hardness',        # RUSSIAN_HARDNESS
+    100170: 'bvnr_american_hardness',       # AMERICAN_HARDNESS
+    100171: 'bvnr_val',                     # VAL
+    100172: 'bvnr_grains_per_gallon',       # GRAINS_PER_GALLON
+    100173: 'bvnr_ntu',                     # TURBIDITY_NTU
+    100174: 'bvnr_fnu',                     # TURBIDITY_FNU
+    100175: 'bvnr_psu',                     # PRACTICAL_SALINITY
+    100176: 'bvnr_conductivity_factor',     # CONDUCTIVITY_FACTOR
+    100177: 'bvnr_ftu',                     # TURBIDITY_FTU
+    100178: 'bvnr_fau',                     # TURBIDITY_FAU
+    100179: 'bvnr_jtu',                     # TURBIDITY_JTU
 
     # Defined to match bovnar magnitude exactly (pint native uses a different convention)
-     71: 'bvnr_therm',                   # THERM
-    114: 'bvnr_rpm',                     # RPM
+    100070: 'bvnr_therm',                   # THERM
+    100113: 'bvnr_rpm',                     # RPM
 
     # Quantity kinds: their own pint dimension (or, for the angle family, the
     # shared [angle] reference) so that pint refuses what bovnar refuses.
     # See KIND_DIMENSIONS above.
-      2: 'bvnr_byte',                    # BYTE
-    102: 'bvnr_neper',                   # NEPER
-    103: 'bvnr_decibel',                 # DECIBEL
+    100001: 'bvnr_byte',                    # BYTE
+    100101: 'bvnr_neper',                   # NEPER
+    100102: 'bvnr_decibel',                 # DECIBEL
 
 }
 
@@ -401,222 +401,222 @@ SEMANTIC_CAVEATS: dict[str, str] = {
 # Each token is BOTH the pint unit name and the basis of its private dimension
 # [currency_<token>] (see CURRENCY_DEFINITIONS / build_registry).
 CURRENCY_TOKENS: dict[int, str] = {
-    134: 'AED',
-    135: 'AFN',
-    136: 'ALL',
-    137: 'AMD',
-    138: 'ANG',
-    139: 'AOA',
-    140: 'ARS',
-    141: 'AUD',
-    142: 'AWG',
-    143: 'AZN',
-    144: 'BAM',
-    145: 'BBD',
-    146: 'BDT',
-    147: 'BGN',
-    148: 'BHD',
-    149: 'BIF',
-    150: 'BMD',
-    151: 'BND',
-    152: 'BOB',
-    153: 'BRL',
-    154: 'BSD',
-    155: 'BTN',
-    156: 'BWP',
-    157: 'BYN',
-    158: 'BZD',
-    159: 'CAD',
-    160: 'CDF',
-    161: 'CHF',
-    162: 'CLF',
-    163: 'CLP',
-    164: 'CNY',
-    165: 'COP',
-    166: 'CRC',
-    167: 'CUP',
-    168: 'CVE',
-    169: 'CZK',
-    170: 'DJF',
-    171: 'DKK',
-    172: 'DOP',
-    173: 'DZD',
-    174: 'EGP',
-    175: 'ERN',
-    176: 'ETB',
-    177: 'EUR',
-    178: 'FJD',
-    179: 'FKP',
-    180: 'GBP',
-    181: 'GEL',
-    182: 'GHS',
-    183: 'GIP',
-    184: 'GMD',
-    185: 'GNF',
-    186: 'GTQ',
-    187: 'GYD',
-    188: 'HKD',
-    189: 'HNL',
-    190: 'HRK',
-    191: 'HTG',
-    192: 'HUF',
-    193: 'IDR',
-    194: 'ILS',
-    195: 'INR',
-    196: 'IQD',
-    197: 'IRR',
-    198: 'ISK',
-    199: 'JMD',
-    200: 'JOD',
-    201: 'JPY',
-    202: 'KES',
-    203: 'KGS',
-    204: 'KHR',
-    205: 'KMF',
-    206: 'KPW',
-    207: 'KRW',
-    208: 'KWD',
-    209: 'KYD',
-    210: 'KZT',
-    211: 'LAK',
-    212: 'LBP',
-    213: 'LKR',
-    214: 'LRD',
-    215: 'LSL',
-    216: 'LYD',
-    217: 'MAD',
-    218: 'MDL',
-    219: 'MGA',
-    220: 'MKD',
-    221: 'MMK',
-    222: 'MNT',
-    223: 'MOP',
-    224: 'MRU',
-    225: 'MUR',
-    226: 'MVR',
-    227: 'MWK',
-    228: 'MXN',
-    229: 'MYR',
-    230: 'MZN',
-    231: 'NAD',
-    232: 'NGN',
-    233: 'NIO',
-    234: 'NOK',
-    235: 'NPR',
-    236: 'NZD',
-    237: 'OMR',
-    238: 'PAB',
-    239: 'PEN',
-    240: 'PGK',
-    241: 'PHP',
-    242: 'PKR',
-    243: 'PLN',
-    244: 'PYG',
-    245: 'QAR',
-    246: 'RON',
-    247: 'RSD',
-    248: 'RUB',
-    249: 'RWF',
-    250: 'SAR',
-    251: 'SBD',
-    252: 'SCR',
-    253: 'SDG',
-    254: 'SEK',
-    255: 'SGD',
-    256: 'SHP',
-    257: 'SLE',
-    258: 'SLL',
-    259: 'SOS',
-    260: 'SSP',
-    261: 'SRD',
-    262: 'STN',
-    263: 'SVC',
-    264: 'SYP',
-    265: 'SZL',
-    266: 'THB',
-    267: 'TJS',
-    268: 'TMT',
-    269: 'TND',
-    270: 'TOP',
-    271: 'TRY',
-    272: 'TTD',
-    273: 'TWD',
-    274: 'TZS',
-    275: 'UAH',
-    276: 'UGX',
-    277: 'USD',
-    278: 'UYU',
-    279: 'UZS',
-    280: 'VES',
-    281: 'VND',
-    282: 'VUV',
-    283: 'WST',
-    284: 'XAF',
-    285: 'XAG',
-    286: 'XAU',
-    287: 'XCD',
-    288: 'XDR',
-    289: 'XOF',
-    290: 'XPD',
-    291: 'XPF',
-    292: 'XPT',
-    293: 'XTS',
-    294: 'YER',
-    295: 'ZAR',
-    296: 'ZMW',
-    297: 'ZWL',
-    298: 'BTC',
-    299: 'ETH',
-    300: 'SOL',
-    301: 'XRP',
-    302: 'BNB',
-    303: 'ADA',
-    304: 'LTC',
-    305: 'DOT',
-    306: 'XMR',
-    307: 'ETC',
-    308: 'BCH',
-    309: 'XLM',
-    310: 'FIL',
-    311: 'ICP',
-    312: 'TRX',
-    313: 'EOS',
-    314: 'VET',
-    315: 'NEO',
-    316: 'ZEC',
-    317: 'UNI',
-    318: 'ARB',
-    319: 'SUI',
-    320: 'TON',
-    321: 'INJ',
-    322: 'SEI',
-    323: 'APT',
-    324: 'TAO',
-    325: 'WIF',
-    326: 'DOGE',
-    327: 'LINK',
-    328: 'USDT',
-    329: 'USDC',
-    330: 'AVAX',
-    331: 'ATOM',
-    332: 'POL',
-    333: 'NEAR',
-    334: 'ALGO',
-    335: 'HBAR',
-    336: 'AAVE',
-    337: 'MKR',
-    338: 'DAI',
-    339: 'STX',
-    340: 'GRT',
-    341: 'LDO',
-    342: 'BONK',
-    343: 'PEPE',
-    344: 'SHIB',
-    345: 'JUP',
-    346: 'PYTH',
-    347: 'RUNE',
-    378: 'ZWG',
-    379: 'XCG',
+    900000: 'AED',
+    900001: 'AFN',
+    900002: 'ALL',
+    900003: 'AMD',
+    900004: 'ANG',
+    900005: 'AOA',
+    900006: 'ARS',
+    900007: 'AUD',
+    900008: 'AWG',
+    900009: 'AZN',
+    900010: 'BAM',
+    900011: 'BBD',
+    900012: 'BDT',
+    900013: 'BGN',
+    900014: 'BHD',
+    900015: 'BIF',
+    900016: 'BMD',
+    900017: 'BND',
+    900018: 'BOB',
+    900019: 'BRL',
+    900020: 'BSD',
+    900021: 'BTN',
+    900022: 'BWP',
+    900023: 'BYN',
+    900024: 'BZD',
+    900025: 'CAD',
+    900026: 'CDF',
+    900027: 'CHF',
+    900028: 'CLF',
+    900029: 'CLP',
+    900030: 'CNY',
+    900031: 'COP',
+    900032: 'CRC',
+    900033: 'CUP',
+    900034: 'CVE',
+    900035: 'CZK',
+    900036: 'DJF',
+    900037: 'DKK',
+    900038: 'DOP',
+    900039: 'DZD',
+    900040: 'EGP',
+    900041: 'ERN',
+    900042: 'ETB',
+    900043: 'EUR',
+    900044: 'FJD',
+    900045: 'FKP',
+    900046: 'GBP',
+    900047: 'GEL',
+    900048: 'GHS',
+    900049: 'GIP',
+    900050: 'GMD',
+    900051: 'GNF',
+    900052: 'GTQ',
+    900053: 'GYD',
+    900054: 'HKD',
+    900055: 'HNL',
+    900056: 'HRK',
+    900057: 'HTG',
+    900058: 'HUF',
+    900059: 'IDR',
+    900060: 'ILS',
+    900061: 'INR',
+    900062: 'IQD',
+    900063: 'IRR',
+    900064: 'ISK',
+    900065: 'JMD',
+    900066: 'JOD',
+    900067: 'JPY',
+    900068: 'KES',
+    900069: 'KGS',
+    900070: 'KHR',
+    900071: 'KMF',
+    900072: 'KPW',
+    900073: 'KRW',
+    900074: 'KWD',
+    900075: 'KYD',
+    900076: 'KZT',
+    900077: 'LAK',
+    900078: 'LBP',
+    900079: 'LKR',
+    900080: 'LRD',
+    900081: 'LSL',
+    900082: 'LYD',
+    900083: 'MAD',
+    900084: 'MDL',
+    900085: 'MGA',
+    900086: 'MKD',
+    900087: 'MMK',
+    900088: 'MNT',
+    900089: 'MOP',
+    900090: 'MRU',
+    900091: 'MUR',
+    900092: 'MVR',
+    900093: 'MWK',
+    900094: 'MXN',
+    900095: 'MYR',
+    900096: 'MZN',
+    900097: 'NAD',
+    900098: 'NGN',
+    900099: 'NIO',
+    900100: 'NOK',
+    900101: 'NPR',
+    900102: 'NZD',
+    900103: 'OMR',
+    900104: 'PAB',
+    900105: 'PEN',
+    900106: 'PGK',
+    900107: 'PHP',
+    900108: 'PKR',
+    900109: 'PLN',
+    900110: 'PYG',
+    900111: 'QAR',
+    900112: 'RON',
+    900113: 'RSD',
+    900114: 'RUB',
+    900115: 'RWF',
+    900116: 'SAR',
+    900117: 'SBD',
+    900118: 'SCR',
+    900119: 'SDG',
+    900120: 'SEK',
+    900121: 'SGD',
+    900122: 'SHP',
+    900123: 'SLE',
+    900124: 'SLL',
+    900125: 'SOS',
+    900127: 'SSP',
+    900126: 'SRD',
+    900128: 'STN',
+    900129: 'SVC',
+    900130: 'SYP',
+    900131: 'SZL',
+    900132: 'THB',
+    900133: 'TJS',
+    900134: 'TMT',
+    900135: 'TND',
+    900136: 'TOP',
+    900137: 'TRY',
+    900138: 'TTD',
+    900139: 'TWD',
+    900140: 'TZS',
+    900141: 'UAH',
+    900142: 'UGX',
+    900143: 'USD',
+    900144: 'UYU',
+    900145: 'UZS',
+    900146: 'VES',
+    900147: 'VND',
+    900148: 'VUV',
+    900149: 'WST',
+    900150: 'XAF',
+    900151: 'XAG',
+    900152: 'XAU',
+    900153: 'XCD',
+    900155: 'XDR',
+    900156: 'XOF',
+    900157: 'XPD',
+    900158: 'XPF',
+    900159: 'XPT',
+    900160: 'XTS',
+    900161: 'YER',
+    900162: 'ZAR',
+    900163: 'ZMW',
+    900165: 'ZWL',
+    900166: 'BTC',
+    900167: 'ETH',
+    900168: 'SOL',
+    900169: 'XRP',
+    900170: 'BNB',
+    900171: 'ADA',
+    900172: 'LTC',
+    900173: 'DOT',
+    900174: 'XMR',
+    900175: 'ETC',
+    900176: 'BCH',
+    900177: 'XLM',
+    900178: 'FIL',
+    900179: 'ICP',
+    900180: 'TRX',
+    900181: 'EOS',
+    900182: 'VET',
+    900183: 'NEO',
+    900184: 'ZEC',
+    900185: 'UNI',
+    900186: 'ARB',
+    900187: 'SUI',
+    900188: 'TON',
+    900189: 'INJ',
+    900190: 'SEI',
+    900191: 'APT',
+    900192: 'TAO',
+    900193: 'WIF',
+    900194: 'DOGE',
+    900195: 'LINK',
+    900196: 'USDT',
+    900197: 'USDC',
+    900198: 'AVAX',
+    900199: 'ATOM',
+    900200: 'POL',
+    900201: 'NEAR',
+    900202: 'ALGO',
+    900203: 'HBAR',
+    900204: 'AAVE',
+    900205: 'MKR',
+    900206: 'DAI',
+    900207: 'STX',
+    900208: 'GRT',
+    900209: 'LDO',
+    900210: 'BONK',
+    900211: 'PEPE',
+    900212: 'SHIB',
+    900213: 'JUP',
+    900214: 'PYTH',
+    900215: 'RUNE',
+    900164: 'ZWG',
+    900154: 'XCG',
 }
 
 # One independent pint dimension per currency => members are non-convertible.

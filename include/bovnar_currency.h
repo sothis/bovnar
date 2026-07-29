@@ -38,21 +38,18 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#define BVN_CURRENCY_FIAT_FIRST    134
-#define BVN_CURRENCY_FIAT_LAST     297
-#define BVN_CURRENCY_CRYPTO_FIRST  298
-#define BVN_CURRENCY_CRYPTO_LAST   347
-#define BVN_VALUE_BASE_UNIT_COUNT_CURRENCY  348
 /*
- * Currency extension range. Currencies added after the 134-347 block was frozen
- * live here, appended past the unit block (see value_base_unit_t in bovnar.h),
- * so that adding one shifts no existing enum value. They are fiat and counted as
- * currencies, but reached via bvn_currency_index() rather than the O(1) 134-base
- * indexing used for the main block. Keep these two macros in lockstep with
- * bu_zwg/bu_xcg.
+ * The currency block of the base-unit id space (block 90; see the layout note
+ * in bovnar.h). BVN_CURRENCY_FIRST/LAST/COUNT are generated from the catalogue
+ * itself, so a bound can no longer be widened without a row behind it.
+ *
+ * The whole block is ONE ascending run, and a currency's catalogue index is its
+ * id minus BVN_CURRENCY_FIRST. Which currencies are crypto is a column of the
+ * catalogue rather than a sub-range of the ids: bvn_unit_is_fiat and
+ * bvn_unit_is_crypto read that column. So a new currency of either kind appends
+ * at the end of currencies.bvnr and renumbers nothing.
  */
-#define BVN_CURRENCY_EXT_FIRST     378
-#define BVN_CURRENCY_EXT_LAST      379
+#include "bovnar_currency.gen.h"
 typedef struct {
     char     code[5];
     uint16_t numeric_code;

@@ -166,7 +166,7 @@ tables wrong in the same way would agree with each other perfectly.</p>
 </ul>
 </li>
 <li><a href="#7-data-model">Data model</a><ul>
-<li>7.1 <a href="#71-the-opaque-block">The opaque block</a></li>
+<li>7.1 <a href="#71-the-opaque-units">The opaque units</a></li>
 <li>7.2 <a href="#72-incommensurability-via-the-mechanism-currencies-already-use">Incommensurability, via the mechanism currencies already use</a></li>
 <li>7.3 <a href="#73-no-new-field-on-the-data-event">No new field on the data event</a></li>
 <li>7.4 <a href="#74-new-error-codes">New error codes</a></li>
@@ -536,7 +536,7 @@ five second authorities to keep in step with the first.</p>
 <tr>
 <td><strong>Profile-only</strong></td>
 <td>The expression is valid UCUM and every atom is known, but one or more atoms are UCUM <em>arbitrary</em> units (§3.6)</td>
-<td>A <code>value_unit_t</code> over the opaque block: comparable, never convertible</td>
+<td>A <code>value_unit_t</code> over UCUM's opaque units: comparable, never convertible</td>
 </tr>
 <tr>
 <td><strong>Refused</strong></td>
@@ -740,8 +740,8 @@ does not appear to need. A named refusal is better than either.</p>
 <p>UCUM's arbitrary units — <code>[IU]</code>, <code>[arb'U]</code>, <code>[PFU]</code>, <code>[CFU]</code>, and the rest of that table — are
 assay-defined. UCUM's own rule is that they are commensurable with nothing, including each other.
 They are also the single largest reason a real clinical code fails to map (§6.4).</p>
-<p>The profile admits all <strong>32</strong> of them, as a contiguous run of <code>value_base_unit_t</code> ids inside the
-shared opaque block (§7.1), one id per UCUM arbitrary atom. Consequences, all of which fall
+<p>The profile admits all <strong>41</strong> of them, as a contiguous run at the bottom of UCUM's own block of the
+<code>value_base_unit_t</code> id space (§7.1), one id per UCUM arbitrary atom. Consequences, all of which fall
 out of the existing machinery:</p>
 <ul>
 <li>they are <strong>profile-only</strong>: no native alias, reachable only through <code>ucum:</code>, and serialised back
@@ -2192,34 +2192,38 @@ The first tells a producer "write it another way", the second tells them "check 
 conflating them is how a legitimate code gets reported as a typo.</p>
 <hr />
 <h2 id="7-data-model">7. Data model</h2>
-<h3 id="71-the-opaque-block">7.1 The opaque block</h3>
-<p>Profile units with no native spelling get a contiguous run of <code>value_base_unit_t</code> ids appended after
-the last native unit. <code>src/utils/bvn_internal_dims.h</code> documents the id layout and pins
-<code>BVN_VALUE_BASE_UNIT_COUNT</code> to one past the last enumerator with a compile-time check, so the
-addition is the ordinary "append and move the check" operation the header describes — the tables
-sized by that count are indexed <em>by</em> the enum value, and an undersized count is an out-of-bounds
-read rather than a cosmetic mismatch.</p>
-<p><strong>The run is shared.</strong> UCUM's arbitrary atoms are not the only units with no native spelling: UNECE's
-package and count codes (§11.3) are the same shape, and a later vocabulary may add more. They all
-occupy one <strong>opaque block</strong>, bracketed so §7.2 can test membership with two comparisons, with a
-second pair of constants per profile so the writer can name the namespace that owns a given id.
-As shipped, in <code>include/bovnar_profiles.gen.h</code>:</p>
-<div class="codehilite"><pre><span></span><code><span class="cp">#define BVN_PROFILE_OPAQUE_FIRST       397</span>
-<span class="cp">#define BVN_PROFILE_OPAQUE_LAST        453</span>
-<span class="cp">#define BVN_PROFILE_OPAQUE_COUNT        57</span>
-
-<span class="cp">#define BVN_PROFILE_UCUM_OPAQUE_FIRST  397   </span><span class="cm">/* 41 arbitrary atoms */</span>
-<span class="cp">#define BVN_PROFILE_UCUM_OPAQUE_LAST   428</span>
-<span class="cp">#define BVN_PROFILE_UNECE_OPAQUE_FIRST 429   </span><span class="cm">/* 5 counts + 20 packages */</span>
-<span class="cp">#define BVN_PROFILE_UNECE_OPAQUE_LAST  453</span>
-<span class="cp">#define BVN_PROFILE_QUDT_OPAQUE_FIRST  454   </span><span class="cm">/* FIRST &gt; LAST: contributes none */</span>
-<span class="cp">#define BVN_PROFILE_QUDT_OPAQUE_LAST   453</span>
-<span class="cm">/* … one pair per profile */</span>
+<h3 id="71-the-opaque-units">7.1 The opaque units</h3>
+<p>Profile units with no native spelling get ids of their own. Each profile owns a <strong>block</strong> of the
+<code>value_base_unit_t</code> id space — 10 000 ids whose leading two decimal digits identify the vocabulary —
+and its opaque units are numbered from the bottom of that block in declaration order. See
+doc/05 §12.1 for the whole layout; <code>src/utils/bvn_internal_dims.h</code> holds the compile-time checks
+that keep the blocks from overlapping.</p>
+<p><strong>A block per profile, not one shared run.</strong> UCUM's arbitrary atoms are not the only units with no
+native spelling: UN/ECE's package and count codes (§11.3) are the same shape, and a later vocabulary
+may add more. They used to share a single run appended after the last native unit, which meant a
+profile that grew a row renumbered every profile below it — and the whole run moved whenever a
+native unit was added. Separate blocks end both. Each is bracketed so §7.2 can test membership with
+two comparisons, and the pair also tells the writer which namespace owns a given id. As shipped, in
+<code>include/bovnar_profiles.gen.h</code>:</p>
+<div class="codehilite"><pre><span></span><code><span class="cp">#define BVN_PROFILE_UCUM_OPAQUE_FIRST  200000   </span><span class="cm">/* 41 arbitrary atoms */</span>
+<span class="cp">#define BVN_PROFILE_UCUM_OPAQUE_LAST   200040</span>
+<span class="cp">#define BVN_PROFILE_UCUM_OPAQUE_COUNT      41</span>
+<span class="cp">#define BVN_PROFILE_UNECE_OPAQUE_FIRST 300000   </span><span class="cm">/* 5 counts + 20 packages */</span>
+<span class="cp">#define BVN_PROFILE_UNECE_OPAQUE_LAST  300024</span>
+<span class="cp">#define BVN_PROFILE_UNECE_OPAQUE_COUNT     25</span>
+<span class="cp">#define BVN_PROFILE_QUDT_OPAQUE_FIRST  400000   </span><span class="cm">/* FIRST &gt; LAST: contributes none */</span>
+<span class="cp">#define BVN_PROFILE_QUDT_OPAQUE_LAST   399999</span>
+<span class="cp">#define BVN_PROFILE_QUDT_OPAQUE_COUNT       0</span>
+<span class="cm">/* … one group per profile, plus a BVN_SLOT_&lt;NS&gt; macro each */</span>
 </code></pre></div>
 
-<p><code>BVN_VALUE_BASE_UNIT_COUNT</code> is therefore 454, and the empty-profile convention (<code>FIRST &gt; LAST</code>) is
-what lets <code>qudt</code>, <code>qudt-qk</code> and <code>udunits</code> share one registry row shape with the two that do
-contribute.</p>
+<p>The empty-profile convention (<code>FIRST &gt; LAST</code>) is what lets <code>qudt</code>, <code>qudt-qk</code> and <code>udunits</code> share one
+registry row shape with the two that do contribute.</p>
+<p>Because the id space is now sparse, the tables the library indexes by base unit are <strong>dense</strong>: one
+row per defined unit, indexed by <code>bvni_unit_slot()</code> rather than by the id. <code>BVN_UNIT_SLOT_COUNT</code> is
+that row count — <code>bu_none</code>, then every native unit, then every opaque unit — and it is <em>not</em> a bound
+on the enum. The generated table rows spell their index as <code>BVN_SLOT_UCUM(bu_ucum_iu)</code> and so on, so
+a row and its enumerator cannot drift apart.</p>
 <p>The per-profile pairs are what stop a unit being spelled in the wrong namespace. A single hardcoded
 <code>"ucum:"</code> in the writer would have printed a UNECE package code as <code>ucum:XBX</code>, which re-parses as
 nothing at all.</p>
@@ -2441,9 +2445,10 @@ disagreeing with the parser it feeds.</p>
 <li>a code appears in more than one of the lists (a code has exactly one outcome);</li>
 <li>a flat profile declares prefixes at all, or a prefix declares a decade with no SI prefix — the
   fold could never discharge it;</li>
-<li>the opaque ids are not one contiguous run across every profile starting one past the last native
-  unit (the tables sized by <code>BVN_VALUE_BASE_UNIT_COUNT</code> are indexed <em>by</em> the enum value, so a gap is
-  a hole of zeroed rows that reads as a valid unit), or an opaque name collides across profiles;</li>
+<li>two profiles claim the same block tag, a profile claims the native units' tag or the currencies',
+  or a profile has more opaque units than its block holds — any of which would make one id answer to
+  two vocabularies;</li>
+<li>an opaque name collides across profiles;</li>
 <li>a <code>.bovnar</code> target names a prefix or a unit this build's registry does not have;</li>
 <li>the longest profile code this table could emit would overflow <code>BVNR_UNIT_STRING_MAX</code> (1024), which
   is what sizes the stack buffers in the writer and the CLI;</li>
@@ -2521,7 +2526,7 @@ collision in §6.2, arbitrary-unit incommensurability including the <code>[IU]/L
 profile-only round-trip, the registry sweep of §5.3, the version gate, and the partiality of
 <code>bvn_unit_to_ucum</code>.</p>
 <p><code>tests/bovnar_unit_ext_test.c</code> pins the block boundary: the last native unit sits below
-<code>BVN_PROFILE_OPAQUE_FIRST</code>, and <code>BVN_VALUE_BASE_UNIT_COUNT</code> tracks one past the last opaque id.</p>
+its profile's <code>_OPAQUE_FIRST</code>, and <code>BVN_UNIT_SLOT_COUNT</code> grows by one dense table row.</p>
 <p><strong>The conformance corpus covers the profiles too.</strong> <code>bvnr_conformance</code> carries a <code>unit_profile</code>
 group of <strong>47 cases</strong> (<code>UPR-001</code> … <code>UPR-047</code>), so a third-party implementation can be held to the
 same rules rather than only the reference one being tested against itself. It covers the three
@@ -2879,7 +2884,7 @@ out by name instead.</p>
 </tr>
 <tr>
 <td>Registry</td>
-<td>Five data files in <code>src/gendata/</code> (§9.1); <code>gen_profiles.py</code> emitting the per-profile and shared tables; one appended <code>value_base_unit_t</code> run (397–453); <code>BVN_VALUE_BASE_UNIT_COUNT</code> 397 → 454</td>
+<td>Five data files in <code>src/gendata/</code> (§9.1); <code>gen_profiles.py</code> emitting the per-profile and shared tables; one <code>value_base_unit_t</code> BLOCK per profile (UCUM 200000–200040, UN/ECE 300000–300024)</td>
 </tr>
 <tr>
 <td>Version gate</td>
@@ -3071,7 +3076,7 @@ for a flat profile where an expression profile needs only one row per base.</p>
 <h3 id="113-rec-21-packages-and-the-rec-20-counts-as-opaque-units">11.3 Rec 21 packages, and the Rec 20 counts, as opaque units</h3>
 <p>Rec 21's X-prefixed codes name countable packages, and Rec 20 has a handful of pure count codes.
 Both become <strong>opaque</strong> units, through exactly the mechanism UCUM's arbitrary atoms use (§7.1, §7.2):
-a <code>value_base_unit_t</code> in the shared opaque block, no SI conversion row, no dimension, and no native
+a <code>value_base_unit_t</code> in its profile's own block, no dimension of its own, and no native
 spelling, so they serialise back as <code>unece:&lt;code&gt;</code>. There are 25: five counts (<code>C62</code>, <code>H87</code>, <code>NAR</code>,
 <code>NPR</code>, <code>SET</code>) and twenty packages (<code>XBX</code>, <code>XPX</code>, <code>XCT</code>, …).</p>
 <div class="codehilite"><pre><code class="language-bovnar">#!bovnar 1.2
@@ -4003,7 +4008,7 @@ refusal strings — and the refusal reasons are written as shared literals per f
 pools them, but a build that wants only one vocabulary still pays for five. A per-profile build
 switch is the obvious answer and does not exist yet.</p>
 <p><code>BVNR_UNIT_STRING_MAX</code> went from 1024 to 1088 to admit <code>astronomical_unit_BIPM_2006</code> (§13.3), and
-<code>BVN_VALUE_BASE_UNIT_COUNT</code> from 454 to 463 for UCUM's nine missing arbitrary units.</p>
+the UCUM block from 32 to 41 arbitrary atoms — which, with a block per profile, moved no other vocabulary's ids.</p>
 <p><strong>What closing the tables did not do.</strong> It did not make the rows better evidenced than §9.5 can
 make them — the "what a code MEANS" gap in §10.2 is untouched, and it is now spread over four times
 as many rows. It did not close <code>unece</code>, which has no publication to close against. It did not add a

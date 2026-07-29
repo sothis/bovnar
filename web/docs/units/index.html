@@ -1777,7 +1777,7 @@ other — see §3.12 and the note under §3.2.</p>
 <p>Every Prussian unit here reproduces its historical definition from the 1816 Fuß (0.313853 m):
 Zoll = Fuß/12, Linie = Zoll/12, Rute = 12 Fuß, Klafter = 6 Fuß, Elle = 25½ Zoll, Morgen = 180
 square Ruten. <code>test_unit_factors_derived.py</code> checks each of them against that definition.</p>
-<p>The enum values for German units occupy positions <strong>348–360</strong>, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions <strong>361–367</strong>. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions <strong>368–371</strong>, and the dimensionless ratio units (<code>bu_percent</code> … <code>bu_ppb</code>) occupy positions <strong>372–377</strong>. The ABI-stable currency extension segment (<code>bu_zwg</code>, <code>bu_xcg</code>) occupies positions <strong>378–379</strong>, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at <strong>380–396</strong> (<code>bu_ph_scale</code> … <code>bu_turbidity_jtu</code>), and a further one would be appended there. The <strong>opaque block</strong> of the unit profiles (under implementation) occupies <strong>397–453</strong>, above every native unit — a range test is what makes those units incommensurable (see <a href="https://www.bovnar.io/docs/profiles/">Unit Profiles</a>), so a native unit appended past 397 would silently join them. The block is shared by every profile that contributes profile-only units: UCUM's arbitrary atoms take <strong>397–428</strong> and UNECE's package and count codes <strong>429–453</strong>, and <code>gen_profiles.py</code> assigns the ids in registry order rather than the data files hand-numbering them. <code>BVN_VALUE_BASE_UNIT_COUNT</code> is a <code>#define</code> equal to <strong>454</strong>, held to the highest enumerator by the static assert <code>BVN_PROFILE_OPAQUE_LAST + 1 == BVN_VALUE_BASE_UNIT_COUNT</code> in <code>src/utils/bvn_internal_dims.h</code>; a second assert there pins <code>bu_turbidity_jtu &lt; BVN_PROFILE_OPAQUE_FIRST</code>. Currencies begin at 134, immediately after the last non-German physical unit.</p>
+<p>The German units carry ids <strong>100133–100145</strong>, inside the native unit block like every other physical unit — see §12.1 for the block layout. They used to sit at 348–360, appended past the whole currency range, because the id space was one flat counter and the currencies had been dropped into the middle of it. The space is blocked now, so a unit's id no longer says anything about when it was added.</p>
 </blockquote>
 <h3 id="321-additional-length-units">3.21 Additional Length Units</h3>
 <table>
@@ -3013,7 +3013,9 @@ whole string fails to resolve.</p>
 </ol>
 <p>Because the sigil is mandatory, a bare uppercase code can never collide with a physical-unit symbol — present or future — so the two namespaces are disjoint by construction. The collision cases this resolves are catalogued for reference in §10.</p>
 <h3 id="92-iso-4217-fiat-currencies-and-precious-metals">9.2 ISO 4217 Fiat Currencies and Precious Metals</h3>
-<p>166 ISO 4217 alphabetic codes are supported, including precious-metal X-codes. The original 164 occupy the <code>value_base_unit_t</code> slot range <strong>134 … 297</strong> in alphabetical order (AED first, ZWL last) with one exception — <code>SSP</code> precedes <code>SRD</code> at slots 260/261. Nothing depends on the ordering (<code>bvn_parse_currency_str</code> scans linearly) and the slots are ABI-frozen, so the pair stays as it is, and — unlike physical units — have <strong>no named <code>bu_*</code> enumerators</strong>: such a currency is resolved from its <code>$</code>-sigil code by <code>bvn_parse_currency_str</code> and carried as the numeric <code>base</code> value (the currency catalogue in <code>bovnar_currency.c</code> is index-aligned to these slots). Currencies added after that range was frozen are <strong>appended past the unit block</strong> at slots <strong>378 … 379</strong> — an <em>extension segment</em> (<code>bu_zwg</code>, <code>bu_xcg</code>) reached via <code>bvn_currency_index</code> rather than the direct 134-based indexing — so that adding a currency never shifts an existing enum value (ABI stability). Four codes are historical and retained for compatibility: <code>HRK</code> (Croatian Kuna, retired 2023-01-01 when Croatia adopted the Euro), <code>SLL</code> (Sierra Leonean Leone (old), replaced by <code>SLE</code> in 2022), <code>ZWL</code> (Zimbabwean Dollar, superseded by <code>ZWG</code> Zimbabwe Gold in 2024), and <code>BGN</code> (Bulgarian Lev, retired 2026-01-01 when Bulgaria adopted the Euro); <code>ANG</code> (Netherlands Antillean Guilder) likewise coexists with its successor <code>XCG</code> (Caribbean Guilder, which inherits ANG's numeric code 532).</p>
+<p>166 ISO 4217 alphabetic codes are supported, including precious-metal X-codes. They occupy the front of <strong>block 90</strong> of the <code>value_base_unit_t</code> id space (§12.1) — ids <strong>900000 … 900165</strong>, alphabetical from <code>AED</code> to <code>ZWL</code> — and, unlike physical units, have <strong>no named <code>bu_*</code> enumerators</strong>: such a currency is resolved from its <code>$</code>-sigil code by <code>bvn_parse_currency_str</code> and carried as the numeric <code>base</code> value. The catalogue in <code>bovnar_currency.c</code> is index-aligned to the block, so a lookup is <code>base - BVN_CURRENCY_FIRST</code>.</p>
+<p>The alphabetical order is a convenience, not a contract. Whether a currency is fiat or crypto is a <strong>column of the catalogue</strong>, read by <code>bvn_unit_is_fiat</code> / <code>bvn_unit_is_crypto</code>, not a sub-range of the ids — so a new currency of either kind appends at the end of <code>currencies.bvnr</code> and renumbers nothing. Before 2.0 it <em>was</em> a sub-range, which is why <code>ZWG</code> and <code>XCG</code> had to be stranded at 378–379 outside the currency range entirely; the block has 10 000 ids and they are ordinary rows now.</p>
+<p>Four codes are historical and retained for compatibility: <code>HRK</code> (Croatian Kuna, retired 2023-01-01 when Croatia adopted the Euro), <code>SLL</code> (Sierra Leonean Leone (old), replaced by <code>SLE</code> in 2022), <code>ZWL</code> (Zimbabwean Dollar, superseded by <code>ZWG</code> Zimbabwe Gold in 2024), and <code>BGN</code> (Bulgarian Lev, retired 2026-01-01 when Bulgaria adopted the Euro); <code>ANG</code> (Netherlands Antillean Guilder) likewise coexists with its successor <code>XCG</code> (Caribbean Guilder, which inherits ANG's numeric code 532).</p>
 <p>The <code>minor_unit</code> field carries the exponent N such that 1 major unit = 10^N minor units (e.g. 1 USD = 100 cents, N=2). Applications reading integer-annotated values (e.g. <code>&lt;uint:64,$KWD&gt;</code>) should call <code>bvn_currency_minor_unit</code> to determine the correct decimal shift. Minor units are <strong>bold</strong> below when they differ from 2. <code>Num</code> is the ISO 4217 numeric identifier.</p>
 <table>
 <thead>
@@ -4027,7 +4029,7 @@ whole string fails to resolve.</p>
 <p><code>CLF</code> (Unidad de Fomento) is the only currency with 4 minor units <strong>in this catalogue</strong>. ISO 4217 also defines <code>UYW</code> with 4, but the catalogue omits the fund and bond codes (<code>BOV CHE CHW COU MXV USN UYI UYW</code>, <code>XBA</code>–<code>XBD</code>, <code>XSU</code>, <code>XUA</code>) and the no-currency code <code>XXX</code>: they denote accounting units and placeholders rather than money a value can be denominated in. The four historical codes <code>HRK</code>, <code>SLL</code>, <code>ZWL</code>, and <code>BGN</code> are retained for compatibility but should not be used for new data.</p>
 </blockquote>
 <h3 id="93-cryptocurrencies">9.3 Cryptocurrencies</h3>
-<p>50 cryptocurrencies are supported, with 3- or 4-letter uppercase tickers. They occupy <code>value_base_unit_t</code> slots <strong>298 … 347</strong> and, like the fiat codes, have <strong>no named <code>bu_*</code> enumerators</strong> — they are resolved by <code>bvn_parse_currency_str</code> and carried as the numeric <code>base</code> value. The <code>minor_unit</code> field holds the canonical on-chain decimal places. <code>numeric_code = 0</code> for all cryptocurrencies.</p>
+<p>50 cryptocurrencies are supported, with 3- or 4-letter uppercase tickers. They occupy ids <strong>900166 … 900215</strong>, after the fiat codes in the same block 90, and like them have <strong>no named <code>bu_*</code> enumerators</strong> — they are resolved by <code>bvn_parse_currency_str</code> and carried as the numeric <code>base</code> value. That they happen to follow the fiat run carries no meaning: <code>bvn_unit_is_crypto</code> reads the catalogue row, not the id (§9.2). The <code>minor_unit</code> field holds the canonical on-chain decimal places. <code>numeric_code = 0</code> for all cryptocurrencies.</p>
 <blockquote>
 <p><strong>Min</strong> = <code>minor_unit</code> = on-chain decimal places. E.g. <code>&lt;uint:64,$BTC&gt;</code> stores satoshis; divide by 10⁸ to obtain whole BTC.</p>
 </blockquote>
@@ -4646,12 +4648,72 @@ whole string fails to resolve.</p>
 </code></pre></div>
 
 <h4 id="value_base_unit_t"><code>value_base_unit_t</code></h4>
-<p>Non-German physical units occupy positions 1–133 (<code>bu_bit</code> … <code>bu_bushel</code>). Currency codes occupy positions 134–347 — an unnamed slot range (no <code>bu_*</code> enumerators; see §9.2/§9.3). German physical units are appended after the entire currency range at positions 348–360 (<code>bu_pfund</code> … <code>bu_scheffel</code>). Additional physical units occupy positions 361–367 (<code>bu_survey_foot</code> … <code>bu_baud</code>), historical temperature scales 368–371 (<code>bu_delisle</code> … <code>bu_romer</code>), and dimensionless ratio units 372–377 (<code>bu_percent</code> … <code>bu_ppb</code>). Physical units resume past the currency extension at 380–396 (<code>bu_ph_scale</code> … <code>bu_turbidity_jtu</code>). <code>bvn_unit_is_currency(base)</code> returns <code>true</code> for any value in the range 134–347 or the extension slots 378–379 (<code>bu_zwg</code>, <code>bu_xcg</code>).</p>
+<p>A base unit's id is <strong>blocked</strong>, not a running counter: the leading two decimal digits name the vocabulary it comes from and the four digits after them its position within that vocabulary. Each block therefore holds 10 000 ids, and a vocabulary that grows shifts nothing outside itself.</p>
+<table>
+<thead>
+<tr>
+<th>Block</th>
+<th>Ids</th>
+<th>Vocabulary</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10</td>
+<td>100000–109999</td>
+<td>native bovnar units</td>
+<td><code>src/gendata/units.bvnr</code></td>
+</tr>
+<tr>
+<td>20</td>
+<td>200000–209999</td>
+<td>UCUM opaque units</td>
+<td><code>src/gendata/ucum.bvnr</code></td>
+</tr>
+<tr>
+<td>30</td>
+<td>300000–309999</td>
+<td>UN/ECE opaque units</td>
+<td><code>src/gendata/unece.bvnr</code></td>
+</tr>
+<tr>
+<td>40</td>
+<td>400000–409999</td>
+<td>QUDT opaque units</td>
+<td><code>src/gendata/qudt.bvnr</code></td>
+</tr>
+<tr>
+<td>50</td>
+<td>500000–509999</td>
+<td>QUDT quantity kinds</td>
+<td><code>src/gendata/qudt-qk.bvnr</code></td>
+</tr>
+<tr>
+<td>60</td>
+<td>600000–609999</td>
+<td>UDUNITS-2 opaque units</td>
+<td><code>src/gendata/udunits.bvnr</code></td>
+</tr>
+<tr>
+<td>90</td>
+<td>900000–909999</td>
+<td>currencies</td>
+<td><code>src/gendata/currencies.bvnr</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>bu_none</code> is 0 and belongs to no block; blocks 70 and 80 are free for a further profile. Within block 10 the 180 native units run contiguously from <code>bu_bit</code> = 100000 to <code>bu_turbidity_jtu</code> = 100179, in the order of <code>units.bvnr</code>. Currencies run contiguously from 900000 and — unlike every other block — have <strong>no named <code>bu_*</code> enumerators</strong> (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a <code>$</code> sigil, resolved by <code>bvn_parse_currency_str</code> and carried as the numeric <code>base</code> value. <code>bvn_unit_is_currency(base)</code> is a bounds check over block 90.</p>
+<p>Only a vocabulary that contributes units of its <em>own</em> takes a block. A unit profile is a spelling for the unit slot, so most of its codes translate to native units and carry native ids; the ones that get a block id of their own are the <strong>opaque</strong> units — codes with no native equivalent and no dimension, such as UCUM's assay-defined <code>[IU]</code> or UN/ECE's package types — which need an identity precisely because nothing else can stand in for them.</p>
+<blockquote>
+<p><strong>Why blocks.</strong> One flat counter makes every vocabulary's ids a function of every other vocabulary's size, and that was not hypothetical. This space previously had physical units at 1–133 <em>and again</em> at 348–396 because the currencies had been dropped in between; two currencies stranded at 378–379, outside their own range, because that range had been frozen; and the profiles' units pinned above all of it. Adding a currency shifted units. The 2.0 renumbering ended that, and made an id self-describing: 200017 is UCUM's, whatever else the build contains.</p>
+<p>The price is a <strong>sparse</strong> space, so do not index an array by a base unit id. The library's own tables are dense, one row per defined unit, indexed by <code>bvni_unit_slot()</code>; <code>BVN_UNIT_SLOT_COUNT</code> is that row count. A bounds check is no longer a membership test either — ask <code>bvn_unit_valid</code> on the unit, or <code>bvn_unit_is_currency</code> on the base.</p>
+</blockquote>
 <div class="codehilite"><pre><span></span><code><span class="k">typedef</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="n">value_base_unit_e</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="n">bu_none</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">            </span><span class="cm">/* dimensionless / no unit        */</span>
+<span class="w">    </span><span class="n">bu_none</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">            </span><span class="cm">/* dimensionless / no unit; in no block */</span>
 
-<span class="w">    </span><span class="cm">/* Digital */</span>
-<span class="w">    </span><span class="n">bu_bit</span><span class="p">,</span><span class="w"> </span><span class="n">bu_byte</span><span class="p">,</span>
+<span class="w">    </span><span class="cm">/* Digital — block 10 opens here */</span>
+<span class="w">    </span><span class="n">bu_bit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">100000</span><span class="p">,</span><span class="w"> </span><span class="n">bu_byte</span><span class="p">,</span>
 
 <span class="w">    </span><span class="cm">/* SI base */</span>
 <span class="w">    </span><span class="n">bu_second</span><span class="p">,</span><span class="w"> </span><span class="n">bu_meter</span><span class="p">,</span><span class="w"> </span><span class="n">bu_gram</span><span class="p">,</span><span class="w"> </span><span class="n">bu_ampere</span><span class="p">,</span><span class="w"> </span><span class="n">bu_kelvin</span><span class="p">,</span>
@@ -4766,36 +4828,41 @@ whole string fails to resolve.</p>
 <span class="w">    </span><span class="cm">/* Apothecary / dry volume */</span>
 <span class="w">    </span><span class="n">bu_fluid_dram</span><span class="p">,</span><span class="w"> </span><span class="n">bu_minim</span><span class="p">,</span><span class="w"> </span><span class="n">bu_peck</span><span class="p">,</span><span class="w"> </span><span class="n">bu_bushel</span><span class="p">,</span>
 
-<span class="w">    </span><span class="cm">/* Slots 134–347 are the ISO 4217 fiat (134–297) and cryptocurrency</span>
-<span class="cm">     * (298–347) ranges. These have NO named enumerators: the enum jumps</span>
-<span class="cm">     * straight from bu_bushel (133) to bu_pfund (348). Currencies are</span>
-<span class="cm">     * resolved by string via bvn_parse_currency_str and carried as the</span>
-<span class="cm">     * numeric base value; the catalogue in bovnar_currency.c is index-</span>
-<span class="cm">     * aligned to slots 134–347 (BVN_CURRENCY_FIAT_FIRST … CRYPTO_LAST). */</span>
-
-<span class="w">    </span><span class="cm">/* Old German — placed after the currency range */</span>
-<span class="w">    </span><span class="n">bu_pfund</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">348</span><span class="p">,</span><span class="w"> </span><span class="n">bu_zentner</span><span class="p">,</span><span class="w"> </span><span class="n">bu_doppelzentner</span><span class="p">,</span><span class="w"> </span><span class="n">bu_lot</span><span class="p">,</span>
+<span class="w">    </span><span class="cm">/* Old German */</span>
+<span class="w">    </span><span class="n">bu_pfund</span><span class="p">,</span><span class="w"> </span><span class="n">bu_zentner</span><span class="p">,</span><span class="w"> </span><span class="n">bu_doppelzentner</span><span class="p">,</span><span class="w"> </span><span class="n">bu_lot</span><span class="p">,</span>
 <span class="w">    </span><span class="n">bu_prussian_line</span><span class="p">,</span><span class="w"> </span><span class="n">bu_prussian_zoll</span><span class="p">,</span><span class="w"> </span><span class="n">bu_prussian_fuss</span><span class="p">,</span>
 <span class="w">    </span><span class="n">bu_prussian_elle</span><span class="p">,</span><span class="w"> </span><span class="n">bu_prussian_rute</span><span class="p">,</span><span class="w"> </span><span class="n">bu_klafter</span><span class="p">,</span>
-<span class="w">    </span><span class="n">bu_german_mile</span><span class="p">,</span><span class="w"> </span><span class="n">bu_morgen</span><span class="p">,</span><span class="w"> </span><span class="n">bu_scheffel</span><span class="p">,</span><span class="w">  </span><span class="cm">/* = 360 */</span>
+<span class="w">    </span><span class="n">bu_german_mile</span><span class="p">,</span><span class="w"> </span><span class="n">bu_morgen</span><span class="p">,</span><span class="w"> </span><span class="n">bu_scheffel</span><span class="p">,</span>
 
 <span class="w">    </span><span class="cm">/* Additional physical units */</span>
 <span class="w">    </span><span class="n">bu_survey_foot</span><span class="p">,</span><span class="w"> </span><span class="n">bu_league</span><span class="p">,</span><span class="w"> </span><span class="n">bu_cable</span><span class="p">,</span><span class="w"> </span><span class="n">bu_hand</span><span class="p">,</span>
-<span class="w">    </span><span class="n">bu_quintal</span><span class="p">,</span><span class="w"> </span><span class="n">bu_scruple</span><span class="p">,</span><span class="w"> </span><span class="n">bu_baud</span><span class="p">,</span><span class="w">  </span><span class="cm">/* = 367 */</span>
+<span class="w">    </span><span class="n">bu_quintal</span><span class="p">,</span><span class="w"> </span><span class="n">bu_scruple</span><span class="p">,</span><span class="w"> </span><span class="n">bu_baud</span><span class="p">,</span>
 
 <span class="w">    </span><span class="cm">/* Historical temperature scales */</span>
-<span class="w">    </span><span class="n">bu_delisle</span><span class="p">,</span><span class="w"> </span><span class="n">bu_newton_temp</span><span class="p">,</span><span class="w"> </span><span class="n">bu_reaumur</span><span class="p">,</span><span class="w"> </span><span class="n">bu_romer</span><span class="p">,</span><span class="w">  </span><span class="cm">/* = 371 */</span>
+<span class="w">    </span><span class="n">bu_delisle</span><span class="p">,</span><span class="w"> </span><span class="n">bu_newton_temp</span><span class="p">,</span><span class="w"> </span><span class="n">bu_reaumur</span><span class="p">,</span><span class="w"> </span><span class="n">bu_romer</span><span class="p">,</span>
 
 <span class="w">    </span><span class="cm">/* Dimensionless ratio units */</span>
 <span class="w">    </span><span class="n">bu_percent</span><span class="p">,</span><span class="w"> </span><span class="n">bu_per_mille</span><span class="p">,</span><span class="w"> </span><span class="n">bu_per_myriad</span><span class="p">,</span>
-<span class="w">    </span><span class="n">bu_per_cent_mille</span><span class="p">,</span><span class="w"> </span><span class="n">bu_ppm</span><span class="p">,</span><span class="w"> </span><span class="n">bu_ppb</span><span class="p">,</span><span class="w">  </span><span class="cm">/* = 377 */</span>
+<span class="w">    </span><span class="n">bu_per_cent_mille</span><span class="p">,</span><span class="w"> </span><span class="n">bu_ppm</span><span class="p">,</span><span class="w"> </span><span class="n">bu_ppb</span><span class="p">,</span>
 
-<span class="w">    </span><span class="cm">/* ABI-stable currency extension segment, appended after the unit block. */</span>
-<span class="w">    </span><span class="n">bu_zwg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">378</span><span class="p">,</span><span class="w"> </span><span class="n">bu_xcg</span><span class="p">,</span><span class="w">               </span><span class="cm">/* = 378, 379 */</span>
+<span class="w">    </span><span class="cm">/* … water hardness, turbidity and the rest of block 10, up to</span>
+<span class="cm">     * bu_turbidity_jtu = 100179. The whole run is generated into</span>
+<span class="cm">     * include/bovnar_units.gen.h from src/gendata/units.bvnr. */</span>
+
+<span class="w">    </span><span class="cm">/* Block 90 — the currencies — has NO named enumerators: a currency is</span>
+<span class="cm">     * resolved by string via bvn_parse_currency_str and carried as the</span>
+<span class="cm">     * numeric base value, and the catalogue in bovnar_currency.c is</span>
+<span class="cm">     * index-aligned to BVN_CURRENCY_FIRST. */</span>
+
+<span class="w">    </span><span class="cm">/* Blocks 20–60 — the profiles&#39; opaque units — are generated into</span>
+<span class="cm">     * include/bovnar_profiles.gen.h: bu_ucum_iu = 200000, bu_unece_one =</span>
+<span class="cm">     * 300000, and so on. */</span>
 <span class="p">}</span><span class="w"> </span><span class="n">value_base_unit_t</span><span class="p">;</span>
 
-<span class="cm">/* Total slot count — defined separately, not an enum member: */</span>
-<span class="cm">/* #define BVN_VALUE_BASE_UNIT_COUNT 380  (bu_xcg + 1) */</span>
+<span class="cm">/* Not a member of the enum, and NOT a bound on it: the number of rows in the</span>
+<span class="cm"> * dense tables the library indexes by bvni_unit_slot(). The id space is</span>
+<span class="cm"> * sparse, so it has no &quot;one past the end&quot;. */</span>
+<span class="cm">/* #define BVN_UNIT_SLOT_COUNT 247 */</span>
 </code></pre></div>
 
 <h4 id="unit_exponent_t"><code>unit_exponent_t</code></h4>

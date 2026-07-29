@@ -109,11 +109,28 @@ def byte_len(s):
     return len(s.encode("utf-8"))
 
 
+# The native units are the "10" block of the base-unit id space: ids
+# NATIVE_FIRST .. NATIVE_FIRST+BLOCK_SIZE-1, and this generator requires them to
+# be CONTIGUOUS from the first. Contiguity is what lets the dense table slot be
+# plain subtraction (BVN_SLOT_NATIVE below) instead of a lookup, and what lets
+# the C side answer "is this id a native unit" in two comparisons. See the
+# id-space layout note in include/bovnar.h.
+NATIVE_FIRST = 100000
+BLOCK_SIZE = 10000
+# Slot 0 of every dense table is bu_none, so the native rows start at 1.
+SLOT_NATIVE_BASE = 1
+
+
 def load_units(path):
     with open(path, "rb") as f:
         doc = bvnr_data.load(f.read())
     units = doc["units"]
-    # Validate the stable-id contract up front: unique, positive, no dups.
+    # Validate the stable-id contract up front. This used to allow any unique
+    # positive id, which is what let the space grow the holes it had; the block
+    # layout replaces that with an exact shape, so a mis-typed id is a build
+    # failure at the file that owns it rather than a silent hole in a table
+    # somewhere downstream.
+    ids = [u["id"] for u in units]
     seen = {}
     for u in units:
         i = u["id"]
@@ -121,13 +138,41 @@ def load_units(path):
             raise SystemExit("duplicate id %d (%s and %s)"
                              % (i, seen[i], u["name"]))
         seen[i] = u["name"]
+    want = list(range(NATIVE_FIRST, NATIVE_FIRST + len(units)))
+    if ids != want:
+        bad = next((n for n, (a, b) in enumerate(zip(ids, want)) if a != b),
+                   len(want))
+        raise SystemExit(
+            "unit ids must be contiguous and ascending from %d: record %d (%s) "
+            "has id %d, expected %d"
+            % (NATIVE_FIRST, bad, units[bad]["name"], ids[bad], want[bad]))
+    if len(units) > BLOCK_SIZE:
+        raise SystemExit("the native unit block holds %d ids; this file has %d"
+                         % (BLOCK_SIZE, len(units)))
     return units
 
 
 def gen_enum(units):
     out = [BANNER]
     for u in units:
-        out.append("\tbu_%-12s = %3d,\n" % (u["name"], u["id"]))
+        out.append("\tbu_%-12s = %6d,\n" % (u["name"], u["id"]))
+    out.append("""
+/* The native block's bounds, and the dense table slot of a unit in it.
+ *
+ * Every table the library indexes by base unit is DENSE — one row per defined
+ * unit, not one row per id — because the id space is deliberately sparse (each
+ * vocabulary gets its own 10000-wide block, so growing one shifts no other).
+ * BVN_SLOT_NATIVE turns an id back into that row index, and is written as
+ * arithmetic on the enumerator so it can be a designated-initialiser index in
+ * the generated table rows: the row and the enum cannot drift apart. */
+""")
+    out.append("#define BVN_UNIT_NATIVE_FIRST     %d\n" % NATIVE_FIRST)
+    out.append("#define BVN_UNIT_NATIVE_LAST      %d\n"
+               % (NATIVE_FIRST + len(units) - 1))
+    out.append("#define BVN_UNIT_NATIVE_COUNT     %d\n" % len(units))
+    out.append("#define BVN_UNIT_SLOT_NATIVE_BASE %d\n" % SLOT_NATIVE_BASE)
+    out.append("#define BVN_SLOT_NATIVE(b) \\\n"
+               "\t(BVN_UNIT_SLOT_NATIVE_BASE + ((int)(b) - BVN_UNIT_NATIVE_FIRST))\n")
     return "".join(out)
 
 
@@ -217,9 +262,9 @@ def gen_conv_table(units):
         of = exact_rational(u, "offset")
         exact = bool(u.get("exact", True))
         out.append(
-            "\t[%-14s] = { %-14s %-22s {%s}, %-6s %-14s "
+            "\t[BVN_SLOT_NATIVE(%-14s] = { %-14s %-22s {%s}, %-6s %-14s "
             "\"%d\", \"%d\", \"%d\", \"%d\", %s },\n" % (
-                nm, nm + ",",
+                nm + ")", nm + ",",
                 c_double_literal(u["factor"]) + ",",
                 dims,
                 ("true," if u["affine"] else "false,"),
@@ -347,8 +392,8 @@ def gen_prefix_policy(units):
         if pol not in POLICY:
             raise SystemExit("unknown prefix policy %r for %s"
                              % (pol, u["name"]))
-        out.append("\t[bu_%-12s = %s,\n"
-                   % (u["name"] + "]", POLICY[pol]))
+        out.append("\t[BVN_SLOT_NATIVE(bu_%-14s = %s,\n"
+                   % (u["name"] + ")]", POLICY[pol]))
     return "".join(out)
 
 

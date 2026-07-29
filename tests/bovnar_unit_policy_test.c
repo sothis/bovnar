@@ -29,6 +29,7 @@
 #include <string.h>
 #include "bovnar.h"
 #include "bovnar_si_units.h"
+#include "bovnar_currency.h"
 #include "bovnar_dom.h"
 #include "bvn_int.h"
 
@@ -539,6 +540,40 @@ static void test_normalise_refuses_a_form_it_cannot_convert(void)
 	ASSERT_TRUE(!c.converted[1], "photometric: lx left alone");
 	ASSERT_TRUE(!c.converted[2], "photometric: ph left alone");
 	ASSERT_TRUE(c.converted[3], "photometric: an ordinary length still converts");
+}
+
+/*
+ * A high exponent is not a reason to have no SI form.
+ *
+ * Two places kept a ±9 bound long after unit_exponent_t's range grew to ±100:
+ * bvn_unit_si_normal_form refused any dimension exponent past 9, and
+ * bvn_unit_reduce dropped the component instead of carrying it. Neither
+ * reported an error — the first said "this unit has no SI form", the second
+ * handed back a DIMENSIONLESS unit — so a normalising policy quietly left every
+ * such value as written, and a formatter under BVN_UNIT_REDUCE serialised a
+ * volume as a plain number.
+ *
+ * k~m^10 is the case in one line: its SI form is m^10, its factor is exactly
+ * 10^30, and every part of that is representable.
+ */
+static void test_normalise_high_exponents(void)
+{
+	bvnr_unit_policy_t p = {0};
+	p.normalise  = bvnr_normalise_si;
+	p.on_inexact = bvnr_inexact_leave;
+
+	pol_ctx_t c = {0};
+	run_policy(
+		".a = <float:64,k~m^10> 1.0;\n"
+		".b = <float:64,m^10> 1.0;\n"
+		".c = <float:64,k~m^100> 1.0;\n",
+		&p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 3, "high exponents: three values, none rejected");
+	if (c.n != 3) return;
+	ASSERT_TRUE(c.converted[0], "k~m^10 normalises");
+	ASSERT_STR(c.unit[0], "m\xc2\xb9\xe2\x81\xb0", "k~m^10 -> m^10");
+	ASSERT_TRUE(!c.converted[1], "m^10 is already its own SI form");
+	ASSERT_TRUE(c.converted[2], "k~m^100 normalises too — 100 is the bound");
 }
 
 /*
@@ -1994,6 +2029,30 @@ static void test_dom_and_reader_agree(void)
 }
 
 /*
+ * Every id this build defines, for the two exhaustive sweeps below.
+ *
+ * The id space is blocked and sparse (see the layout note in bovnar.h), so a
+ * sweep is a walk over the blocks rather than a count from 1. Currencies are in
+ * it because they are base units for every purpose these tests exercise, and a
+ * profile block that contributes nothing has FIRST > LAST, so its loop body
+ * never runs and the table needs no editing when one grows its first entry.
+ */
+static const struct { int first, last; } BU_BLOCKS[] = {
+	{ BVN_UNIT_NATIVE_FIRST,             BVN_UNIT_NATIVE_LAST             },
+	{ BVN_PROFILE_UCUM_OPAQUE_FIRST,     BVN_PROFILE_UCUM_OPAQUE_LAST     },
+	{ BVN_PROFILE_UNECE_OPAQUE_FIRST,    BVN_PROFILE_UNECE_OPAQUE_LAST    },
+	{ BVN_PROFILE_QUDT_OPAQUE_FIRST,     BVN_PROFILE_QUDT_OPAQUE_LAST     },
+	{ BVN_PROFILE_QUDT_QK_OPAQUE_FIRST,  BVN_PROFILE_QUDT_QK_OPAQUE_LAST  },
+	{ BVN_PROFILE_UDUNITS_OPAQUE_FIRST,  BVN_PROFILE_UDUNITS_OPAQUE_LAST  },
+	{ BVN_CURRENCY_FIRST,                BVN_CURRENCY_LAST                },
+};
+#define BU_BLOCK_COUNT (sizeof BU_BLOCKS / sizeof BU_BLOCKS[0])
+/* Both sweeps below are `BU_SWEEP { ... }` over `bu`. */
+#define BU_SWEEP \
+	for (size_t blk_ = 0; blk_ < BU_BLOCK_COUNT; blk_++) \
+		for (int bu = BU_BLOCKS[blk_].first; bu <= BU_BLOCKS[blk_].last; bu++)
+
+/*
  * Every unit in the registry, driven through a real PARSE.
  *
  * The conversion engine had been swept exhaustively by calling it directly,
@@ -2019,10 +2078,10 @@ static void test_every_unit_through_a_parse(void)
 	 * which was provably enough while BVNR_UNIT_STRING_MAX was 192 and became a
 	 * -Wformat-truncation the moment that constant was raised to 1024. Deriving
 	 * the size means the next raise cannot reintroduce it. */
-	char ubuf[BVNR_UNIT_STRING_MAX], doc[BVNR_UNIT_STRING_MAX + 32];
+	char ubuf[BVNR_UNIT_STRING_MAX], doc[BVNR_UNIT_STRING_MAX + 48];
 	char want[256], wunit[128];
 
-	for (int bu = 1; bu < 397; bu++) {
+	BU_SWEEP {
 		value_unit_t u;
 		memset(&u, 0, sizeof u);
 		u.num_components = 1;
@@ -2035,7 +2094,12 @@ static void test_every_unit_through_a_parse(void)
 		if (!ubuf[0] || strcmp(ubuf, "no_unit") == 0) continue;
 		units++;
 
-		snprintf(doc, sizeof doc, ".v = <float:64,%s> 1.0;\n", ubuf);
+		/* Declared 1.2 because the sweep reaches the profiles' opaque
+		 * units, whose only spelling is the profile notation — and that
+		 * notation is gated on the spec version. Every native unit and
+		 * every currency reads the same under 1.2. */
+		snprintf(doc, sizeof doc,
+		         "#!bovnar 1.2\n.v = <float:64,%s> 1.0;\n", ubuf);
 		bvnr_unit_policy_t p = {0};
 		p.normalise  = bvnr_normalise_si;
 		p.on_inexact = bvnr_inexact_leave;
@@ -2113,10 +2177,10 @@ static void test_every_unit_through_the_other_tiers(void)
 	 * which was provably enough while BVNR_UNIT_STRING_MAX was 192 and became a
 	 * -Wformat-truncation the moment that constant was raised to 1024. Deriving
 	 * the size means the next raise cannot reintroduce it. */
-	char ubuf[BVNR_UNIT_STRING_MAX], doc[BVNR_UNIT_STRING_MAX + 32];
+	char ubuf[BVNR_UNIT_STRING_MAX], doc[BVNR_UNIT_STRING_MAX + 48];
 	char wbuf[256];
 
-	for (int bu = 1; bu < 397; bu++) {
+	BU_SWEEP {
 		value_unit_t u;
 		memset(&u, 0, sizeof u);
 		u.num_components = 1;
@@ -2128,7 +2192,12 @@ static void test_every_unit_through_the_other_tiers(void)
 		if (bvn_unit_to_string(u, ubuf, sizeof ubuf) < 0) continue;
 		if (!ubuf[0] || strcmp(ubuf, "no_unit") == 0) continue;
 		units++;
-		snprintf(doc, sizeof doc, ".v = <float:64,%s> 1.0;\n", ubuf);
+		/* Declared 1.2 because the sweep reaches the profiles' opaque
+		 * units, whose only spelling is the profile notation — and that
+		 * notation is gated on the spec version. Every native unit and
+		 * every currency reads the same under 1.2. */
+		snprintf(doc, sizeof doc,
+		         "#!bovnar 1.2\n.v = <float:64,%s> 1.0;\n", ubuf);
 
 		bvnr_unit_policy_t norm = {0};
 		norm.normalise  = bvnr_normalise_si;
@@ -2166,6 +2235,11 @@ static void test_every_unit_through_the_other_tiers(void)
 		if (w) {
 			bvnr_writer_set_unit_policy(w, &req);
 			bvnr_open_write_mem(w, wbuf, sizeof wbuf, false, NULL);
+			/* Same reason the read documents declare 1.2: an opaque unit
+			 * has only the profile spelling, and the writer refuses to
+			 * emit one into a document whose declared version the reader
+			 * would then reject it under. */
+			bvnr_write_version(w, 1, 2);
 			if (!bvnr_write_float_unit(w, "v", 64, 1.0, u)) {
 				bad++;
 				fprintf(stderr, "  writer refused a value in %s\n", ubuf);
@@ -2181,6 +2255,7 @@ static void test_every_unit_through_the_other_tiers(void)
 				bad++;
 			} else {
 				bvnr_open_write_mem(w, wbuf, sizeof wbuf, false, NULL);
+				bvnr_write_version(w, 1, 2);
 				if (!bvnr_write_float_unit(w, "v", 64, 1.0, u)) {
 					bad++;
 					fprintf(stderr, "  %s fails a rule naming itself\n",
@@ -2224,6 +2299,7 @@ int main(void)
 
 	test_normalise_si();
 	test_normalise_refuses_a_form_it_cannot_convert();
+	test_normalise_high_exponents();
 	test_affine_in_compound_never_aborts();
 	test_normalise_irrational_factors();
 	test_normalise_leaves_dimensionless_alone();

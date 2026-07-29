@@ -1564,74 +1564,82 @@ When no unit arguments are supplied to `write_uint`, `write_sint`,
 `write_float`, etc., the unit resolves to `BVN_UNIT_NONE` (zero components),
 matching the C convenience helpers. No unit annotation is emitted in this
 case. Passing `unit_si_base` or `unit_iec_base` produces a unit with one
-component; the `_SENTINEL`-only `no_unit` keyword is only produced when the
+component; the `no_unit` keyword is only produced when the
 caller explicitly constructs a dimensionless `ValueUnit` with `BaseUnit.NONE`.
 
 ---
 
 ## 18. `BaseUnit` enum
 
-The `BaseUnit` enum mirrors the full C `value_base_unit_e`:
+The `BaseUnit` enum mirrors the C `value_base_unit_e` for the two blocks of
+the id space that have Python names: the native units (block 10) and the
+currencies (block 90). See doc/05 §12.1 for the block layout — an id's leading
+two digits name the vocabulary it comes from.
 
 | Range | Members |
 |---|---|
 | 0 | `NONE` |
-| 1–2 | `BIT`, `BYTE` |
-| 3–9 | SI base units (`SECOND` … `CANDELA`) |
-| 10–28 | Named SI derived units (`HERTZ` … `KATAL`) |
-| 29–44 | Non-SI accepted units (`LITER` … `YEAR`) |
-| 45–54 | Imperial/US length (`INCH` … `FATHOM`) |
-| 55–62 | Imperial/US mass (`POUND` … `CARAT`) |
-| 63 | `FAHRENHEIT` |
-| 64–67 | Pressure (`ATMOSPHERE` … `PSI`) |
-| 68–71 | Energy (`CALORIE` … `THERM`) |
-| 72 | `HORSEPOWER` |
-| 73–75 | Force (`POUND_FORCE`, `DYNE`, `KIP`) |
-| 76 | `KNOT` |
-| 77–85 | US volume (`GALLON` … `BARREL`) |
-| 86–87 | Area (`ACRE`, `BARN`) |
-| 88–90 | Angle (`ARCMINUTE`, `ARCSECOND`, `GRAD`) |
-| 91–98 | CGS units (`POISE` … `GALILEO`) |
-| 99–101 | Radiation (`CURIE`, `ROENTGEN`, `REM`) |
-| 102–103 | Logarithmic (`NEPER`, `DECIBEL`) |
-| 104 | `RANKINE` |
-| 105 | `SLUG` |
-| 106 | `THOU` |
-| 107–109 | UK imperial volume (`PINT_UK`, `FLUID_OUNCE_UK`, `QUART_UK`) |
-| 110–111 | Electrical power (`VAR`, `VOLT_AMPERE`) |
-| 112 | `KILOGRAM_FORCE` |
-| 113 | `INCH_HG` |
-| 114 | `RPM` |
-| 115 | `FOOT_POUND` |
-| 116–117 | Mass additional (`DRAM`, `PENNYWEIGHT`) |
-| 118–119 | Length additional (`CHAIN`, `ROD`) |
-| 120–121 | Volume additional (`GILL`, `GILL_UK`) |
-| 122 | `STANDARD_GRAVITY` |
-| 123 | `METRIC_HORSEPOWER` |
-| 124 | `REVOLUTION` |
-| 125–126 | Time additional (`MONTH`, `FORTNIGHT`) |
-| 127 | `ATMOSPHERE_TECHNICAL` |
-| 128–129 | Textile linear density (`TEX`, `DENIER`) |
-| 130–133 | Apothecary/dry volume (`FLUID_DRAM`, `MINIM`, `PECK`, `BUSHEL`) |
-| 134–297 | ISO 4217 fiat currencies (`AED` … `ZWL`) — see `CURRENCY_FIAT_FIRST` / `CURRENCY_FIAT_LAST` |
-| 298–347 | Cryptocurrencies (`BTC` … `RUNE`) — see `CURRENCY_CRYPTO_FIRST` / `CURRENCY_CRYPTO_LAST` |
-| 348–360 | Historical German units (`PFUND`, `ZENTNER`, `DOPPELZENTNER`, `LOT`, Prussian line/zoll/fuss/elle/rute, `KLAFTER`, `GERMAN_MILE`, `MORGEN`, `SCHEFFEL`) |
-| 361–367 | Additional physical units (`SURVEY_FOOT`, `LEAGUE`, `CABLE`, `HAND`, `QUINTAL`, `SCRUPLE`, `BAUD`) |
-| 368–371 | Temperature scales (`DELISLE`, `NEWTON_TEMP`, `REAUMUR`, `ROMER`) |
-| 372–377 | Ratio/proportion units (`PERCENT`, `PER_MILLE`, `PER_MYRIAD`, `PER_CENT_MILLE`, `PPM`, `PPB`) |
-| 378–379 | Appended fiat currencies (`ZWG`, `XCG`) — added past the unit block for ABI stability; see `CURRENCY_EXT_FIRST` / `CURRENCY_EXT_LAST` |
-| 380 | `PH_SCALE` |
-| 381–382 | Named speed units (`MILE_PER_HOUR`, `KILOMETER_PER_HOUR`) |
-| 383–387 | Water hardness (`GERMAN_HARDNESS`, `ENGLISH_HARDNESS`, `FRENCH_HARDNESS`, `RUSSIAN_HARDNESS`, `AMERICAN_HARDNESS`) |
-| 388–389 | Concentration (`VAL`, `GRAINS_PER_GALLON`) |
-| 390–396 | Turbidity, salinity and conductivity (`TURBIDITY_NTU`, `TURBIDITY_FNU`, `PRACTICAL_SALINITY`, `CONDUCTIVITY_FACTOR`, `TURBIDITY_FTU`, `TURBIDITY_FAU`, `TURBIDITY_JTU`) |
-| 397 | `_SENTINEL` (internal bound; do not use) |
+| 100000–100001 | `BIT`, `BYTE` |
+| 100002–100008 | SI base units (`SECOND` … `CANDELA`) |
+| 100009–100027 | Named SI derived units (`HERTZ` … `KATAL`) |
+| 100028–100043 | Non-SI accepted units (`LITER` … `YEAR`) |
+| 100044–100053 | Imperial/US length (`INCH` … `FATHOM`) |
+| 100054–100061 | Imperial/US mass (`POUND` … `CARAT`) |
+| 100062 | `FAHRENHEIT` |
+| 100063–100066 | Pressure (`ATMOSPHERE` … `PSI`) |
+| 100067–100070 | Energy (`CALORIE` … `THERM`) |
+| 100071 | `HORSEPOWER` |
+| 100072–100074 | Force (`POUND_FORCE`, `DYNE`, `KIP`) |
+| 100075 | `KNOT` |
+| 100076–100084 | US volume (`GALLON` … `BARREL`) |
+| 100085–100086 | Area (`ACRE`, `BARN`) |
+| 100087–100089 | Angle (`ARCMINUTE`, `ARCSECOND`, `GRAD`) |
+| 100090–100097 | CGS units (`POISE` … `GALILEO`) |
+| 100098–100100 | Radiation (`CURIE`, `ROENTGEN`, `REM`) |
+| 100101–100102 | Logarithmic (`NEPER`, `DECIBEL`) |
+| 100103 | `RANKINE` |
+| 100104 | `SLUG` |
+| 100105 | `THOU` |
+| 100106–100108 | UK imperial volume (`PINT_UK`, `FLUID_OUNCE_UK`, `QUART_UK`) |
+| 100109–100110 | Electrical power (`VAR`, `VOLT_AMPERE`) |
+| 100111 | `KILOGRAM_FORCE` |
+| 100112 | `INCH_HG` |
+| 100113 | `RPM` |
+| 100114 | `FOOT_POUND` |
+| 100115–100116 | Mass additional (`DRAM`, `PENNYWEIGHT`) |
+| 100117–100118 | Length additional (`CHAIN`, `ROD`) |
+| 100119–100120 | Volume additional (`GILL`, `GILL_UK`) |
+| 100121 | `STANDARD_GRAVITY` |
+| 100122 | `METRIC_HORSEPOWER` |
+| 100123 | `REVOLUTION` |
+| 100124–100125 | Time additional (`MONTH`, `FORTNIGHT`) |
+| 100126 | `ATMOSPHERE_TECHNICAL` |
+| 100127–100128 | Textile linear density (`TEX`, `DENIER`) |
+| 100129–100132 | Apothecary/dry volume (`FLUID_DRAM`, `MINIM`, `PECK`, `BUSHEL`) |
+| 100133–100145 | Historical German units (`PFUND`, `ZENTNER`, `DOPPELZENTNER`, `LOT`, Prussian line/zoll/fuss/elle/rute, `KLAFTER`, `GERMAN_MILE`, `MORGEN`, `SCHEFFEL`) |
+| 100146–100152 | Additional physical units (`SURVEY_FOOT`, `LEAGUE`, `CABLE`, `HAND`, `QUINTAL`, `SCRUPLE`, `BAUD`) |
+| 100153–100156 | Temperature scales (`DELISLE`, `NEWTON_TEMP`, `REAUMUR`, `ROMER`) |
+| 100157–100162 | Ratio/proportion units (`PERCENT`, `PER_MILLE`, `PER_MYRIAD`, `PER_CENT_MILLE`, `PPM`, `PPB`) |
+| 100163 | `PH_SCALE` |
+| 100164–100165 | Named speed units (`MILE_PER_HOUR`, `KILOMETER_PER_HOUR`) |
+| 100166–100170 | Water hardness (`GERMAN_HARDNESS`, `ENGLISH_HARDNESS`, `FRENCH_HARDNESS`, `RUSSIAN_HARDNESS`, `AMERICAN_HARDNESS`) |
+| 100171–100172 | Concentration (`VAL`, `GRAINS_PER_GALLON`) |
+| 100173–100179 | Turbidity, salinity and conductivity (`TURBIDITY_NTU`, `TURBIDITY_FNU`, `PRACTICAL_SALINITY`, `CONDUCTIVITY_FACTOR`, `TURBIDITY_FTU`, `TURBIDITY_FAU`, `TURBIDITY_JTU`) |
+| 900000–900165 | ISO 4217 fiat currencies (`AED` … `ZWL`), block 90 — see `CURRENCY_FIRST` |
+| 900166–900215 | Cryptocurrencies (`BTC` … `RUNE`), the rest of block 90 — see `CURRENCY_LAST` |
 
-> **The profile opaque block is not in this enum.** The C `value_base_unit_t`
-> continues past 397 with the profile-only units — UCUM's arbitrary atoms and
-> UNECE's package and count codes (doc/11 §7.1) — and `BaseUnit` deliberately
-> stops before them, because they have no native spelling for a Python name to
-> mirror. A unit carrying one is still fully usable: `parse_unit`, `unit_to_str`,
+There is **no `_SENTINEL`**. It named one past the highest member, which the C
+tables were once indexed and bounded by; those tables are indexed by a dense
+slot now, and over a blocked, sparse space a "one past the end" number would
+only invite the bounds check it can no longer support. Use `UNIT_NATIVE_FIRST`
+/ `UNIT_NATIVE_LAST` / `CURRENCY_FIRST` / `CURRENCY_LAST`, or ask
+`bovnar.currency.is_currency`.
+
+> **The profiles' opaque units are not in this enum.** The C
+> `value_base_unit_t` also has blocks 20–60 for the profile-only units — UCUM's
+> arbitrary atoms and UN/ECE's package and count codes (doc/11 §7.1) — and
+> `BaseUnit` deliberately omits them, because they have no native spelling for a
+> Python name to mirror. A unit carrying one is still fully usable: `parse_unit`, `unit_to_str`,
 > `unit_is_profile_only` and the comparison helpers all handle it, and
 > `unit_to_str` returns the profile notation (`"unece:XBX"`). Only the
 > `BaseUnit(...)` *constructor* will refuse such a value, so do not call it on a

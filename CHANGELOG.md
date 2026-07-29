@@ -17,6 +17,108 @@ below) — rebuild consumers against the new headers. **SOVERSION is bumped 1 �
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
 
+### Changed — BREAKING (`value_base_unit_t` is renumbered)
+
+Every base unit id changed. **No document changed**: an id is an API number, not
+a wire number — a unit is written by its spelling (`m/s`, `$USD`, `ucum:[IU]`)
+and every existing `.bvnr` file parses to exactly the same values. What changes
+is source and binaries that name a base unit numerically. Rebuild against the new
+headers; a `bu_*` enumerator used by name needs no edit.
+
+**The id space is now blocked.** The leading two decimal digits of an id name the
+vocabulary it comes from and the four after them its position within that
+vocabulary, so each block holds 10 000 ids:
+
+| Block | Ids | Vocabulary |
+|-------|-----|------------|
+| 10 | 100000–100179 | native bovnar units |
+| 20 | 200000–200040 | UCUM opaque units |
+| 30 | 300000–300024 | UN/ECE opaque units |
+| 40 / 50 / 60 | reserved | QUDT, QUDT quantity kinds, UDUNITS |
+| 90 | 900000–900215 | currencies |
+
+`bu_none` is still 0 and belongs to no block; 70 and 80 are free for a further
+profile. See doc/05 §12.1.
+
+*Why.* One flat counter made every vocabulary's ids a function of every other
+vocabulary's size, and the space had the scars: physical units at 1–133 **and
+again** at 348–396 because the currencies had been dropped in between; two
+currencies (`ZWG`, `XCG`) stranded at 378–379 outside the currency range because
+that range had been frozen; the profiles' units pinned above all of it, so
+adding a native unit moved them. Adding a currency shifted units. Blocks end
+that — a vocabulary grows into its own 10 000 ids and nothing outside it moves —
+and they make an id self-describing: 200017 is UCUM's, whatever else the build
+contains.
+
+Consequences, all of which the review of the unit subsystem turned up as
+existing hazards rather than new ones:
+
+- **A base unit id is no longer an array index.** The space is sparse by design.
+  The library's own tables (`si_conv_table`, `bu_prefix_policy`) are dense — one
+  row per defined unit — and indexed by `bvni_unit_slot()`. `BVN_UNIT_SLOT_COUNT`
+  is that row count and replaces `BVN_VALUE_BASE_UNIT_COUNT`, which was a bound
+  on the enum and can no longer be one.
+- **A bounds check is no longer a membership test.** `bvn_unit_valid` on the unit
+  or `bvn_unit_is_currency` on the base is the way to ask.
+- **`bu_zwg` and `bu_xcg` are gone**, and so is the whole `BVN_CURRENCY_EXT_*`
+  extension segment. They existed only because the currency range had no room
+  left. The two currencies are ordinary catalogue rows now, like the other 214,
+  and like them have no `bu_*` enumerator.
+- **`bvn_unit_is_fiat` / `bvn_unit_is_crypto` read the catalogue row**, not a
+  sub-range of the ids. The order of `currencies.bvnr` therefore carries no
+  meaning and a new currency of either kind appends without renumbering
+  anything. `BVN_CURRENCY_FIAT_FIRST` / `_LAST` / `CRYPTO_FIRST` / `_LAST` are
+  replaced by `BVN_CURRENCY_FIRST` / `_LAST` / `_COUNT`, which are now
+  **generated** from the catalogue (`include/bovnar_currency.gen.h`) rather than
+  hand-written beside it — a bound can no longer claim more rows than exist.
+- **Each unit profile owns a block** instead of sharing one appended run, so a
+  profile that grows a row shifts no other profile's ids. `gen_profiles.py`
+  refuses two profiles claiming one block tag, or a profile overflowing its
+  10 000.
+- Python: `BaseUnit` members are renumbered to match, `BaseUnit._SENTINEL` is
+  removed (a "one past the end" over a sparse space is exactly the bounds check
+  that no longer works), and `CURRENCY_FIAT_FIRST` and friends are replaced by
+  `CURRENCY_FIRST` / `CURRENCY_LAST` / `CURRENCY_COUNT` / `UNIT_NATIVE_FIRST` /
+  `UNIT_NATIVE_LAST` / `UNIT_BLOCK_SIZE`.
+
+### Fixed — the unit subsystem (three defects from the same stale bound)
+
+`unit_exponent_t`'s range grew from ±9 to ±100 some releases ago. Three places
+kept the old limit, and none of them reported an error — each produced a wrong
+answer quietly:
+
+- **`bvn_unit_reduce` dropped the component** for any summed exponent past ±9,
+  folding its SI factor into `*scale` instead. For metre, whose factor is 1.0,
+  the fold left no trace: `m¹⁰` reduced to the **dimensionless** unit with scale
+  1.0. Everything from `m¹⁰` to `m¹⁰⁰` — the whole range the exponent type had
+  gained — was affected. The bound is now `BVN_EXPONENT_MAX`, and past *that*
+  the component genuinely cannot be represented, which is what `*overflow` has
+  always been for.
+- **`bvn_unit_si_normal_form` refused any dimension exponent past ±9**, so
+  `k~m¹⁰` reported having no SI form at all and a normalising policy silently
+  left it as written — although its SI form is simply `m¹⁰` and its factor
+  exactly 10³⁰.
+- **The profile writer emitted a multi-digit exponent as one byte.**
+  `(char)('0' + v)` is correct only to 9; `m¹⁰` came out of `bvn_unit_to_ucum`
+  as `"m:"` — a colon, which is the profile namespace separator — and `m¹⁰⁰` as
+  `"m"` plus a raw `0x94`. The profile *parser* had accepted two- and
+  three-digit exponents all along, so these were units the library could read
+  and could not write back.
+
+Also fixed:
+
+- **`bvn_unit_to_si_factor` accepted underflow to zero.** The guard tested
+  `isfinite`, and `0.0` is finite: `q~m¹⁰⁰` is 10⁻³⁰⁰⁰, the product underflowed
+  to exactly zero, and the function reported success — so every value in that
+  unit converted to 0 with nothing to say it had not. No real unit has an SI
+  factor of zero, so zero can only mean the product fell off the bottom, and it
+  is now a failure like `inf` is.
+- **`bovnar_profiles.gen.h` was missing from the install set.** `bovnar.h`
+  includes it, so `make install` produced an include directory whose `bovnar.h`
+  could not even preprocess. Nothing caught it because nothing in the tree ever
+  compiled against an install; a new `bvnr_install_headers` gate walks the
+  include graph and fails when the list is short.
+
 ### Changed — BREAKING (Python bindings)
 
 The Python package is **1.2.0** and two of its API shapes changed. Both were

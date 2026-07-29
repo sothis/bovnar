@@ -1393,7 +1393,7 @@ bool bvn_unit_valid(value_unit_t u)
 		 * helpers had no defined answer. */
 		if (bvn_exponent_to_int(c->exponent) == 0)
 			return false;
-		if ((uint32_t)c->base >= BVN_VALUE_BASE_UNIT_COUNT)
+		if (!bvni_base_defined(c->base))
 			return false;
 		if (!bvn_prefix_unit_valid(c->prefix, c->base))
 			return false;

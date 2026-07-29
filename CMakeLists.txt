@@ -382,6 +382,7 @@ set(BVNR_GEN_OUTPUTS
     ${BVNR_GENERATED_DIR}/bovnar_profile_udunits_reverse.gen.inc
     ${CMAKE_CURRENT_SOURCE_DIR}/include/bovnar_profiles.gen.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/bovnar_units.gen.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/bovnar_currency.gen.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/bovnar_si_prefix.gen.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/bovnar_iec_prefix.gen.h)
 
@@ -570,9 +571,17 @@ if(NOT SKBUILD)
     install(TARGETS bovnar
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+    # Every header a consumer can reach from bovnar.h, INCLUDING the generated
+    # ones it #includes. bovnar_profiles.gen.h was missing from this list, which
+    # made the installed bovnar.h fail to preprocess — the library built, the
+    # tests passed, and only somebody compiling against an install would have
+    # found out. bvnr_install_headers (see CMakeLists_tests.txt) now walks the
+    # include graph and fails if this list is short.
     install(FILES
         include/bovnar.h
         include/bovnar_units.gen.h
+        include/bovnar_profiles.gen.h
+        include/bovnar_currency.gen.h
         include/bovnar_si_prefix.gen.h
         include/bovnar_iec_prefix.gen.h
         include/bovnar_currency.h

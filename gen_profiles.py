@@ -33,13 +33,13 @@ take the longest atom that is a suffix of what it is looking at, the same rule
 the native bu_table uses. A flat profile is matched whole rather than by suffix,
 but the ordering costs nothing and keeps one emitter for both.
 
-OPAQUE IDS ARE ASSIGNED HERE, NOT IN THE DATA FILES. The block runs from one
-past the last native unit id, in registry order and then declaration order. A
-data file that hand-numbered its own rows would have to be renumbered every time
-an earlier profile grew a row, which is a maintenance trap with four profiles in
-the block. The assignment is not invisible: it lands in
-include/bovnar_profiles.gen.h, which is committed, so any shift shows up as a
-reviewable diff rather than a silent ABI change.
+OPAQUE IDS ARE ASSIGNED HERE, NOT IN THE DATA FILES. Each profile owns a BLOCK
+of the base-unit id space -- 10000 ids whose leading two digits identify the
+vocabulary -- and its opaque units are numbered from the bottom of that block in
+declaration order. So a profile that grows a row shifts only its own ids, and a
+data file that hand-numbered its rows would be duplicating a number the block
+already determines. The assignment lands in include/bovnar_profiles.gen.h, which
+is committed, so any shift shows up as a reviewable diff.
 
 Usage:
     [BVNR_GENERATED_DIR=dir] python3 gen_profiles.py [gendata-dir]
@@ -68,16 +68,22 @@ class Profile:
                 "flat" -- the code is one whole token looked up entire
                           (QUDT, UNECE): no operators, no prefixes
     enum_prefix the bu_<prefix>_* namespace for this profile's opaque units
+    block       the two-digit block tag of this profile's id range: its opaque
+                units are numbered from block * BLOCK_SIZE. Frozen per profile
+                (it is the ABI), so it is written here rather than derived from
+                the list order -- reordering the registry must not move ids.
     """
 
-    def __init__(self, ns, data, grammar, enum_prefix):
+    def __init__(self, ns, data, grammar, enum_prefix, block):
         self.ns = ns
         self.data = data
         self.grammar = grammar
         self.enum_prefix = enum_prefix
+        self.block = block
         self.doc = None
-        self.opaque_first = 0
-        self.opaque_last = -1
+        self.opaque_first = block * BLOCK_SIZE
+        self.opaque_last = block * BLOCK_SIZE - 1
+        self.slot_base = 0
 
     @property
     def cname(self):
@@ -88,14 +94,26 @@ class Profile:
         return self.doc.get(name, []) if self.doc else []
 
 
-# The registry. Order fixes the opaque-id assignment, so APPEND -- inserting a
-# profile here renumbers every opaque unit below it.
+# The id-space blocks. 10 is the native units (units.bvnr) and 90 the
+# currencies (currencies.bvnr); a unit profile takes one of the tags between,
+# which leaves room for seven. See the layout note in include/bovnar.h.
+BLOCK_SIZE = 10000
+BLOCK_NATIVE = 10
+BLOCK_CURRENCY = 90
+# Slot 0 of every dense table is bu_none, so the native rows start at 1 and the
+# opaque rows after them. Kept in step with gen_units.py by the static assert in
+# src/utils/bvn_internal_dims.h, which recomputes the total from both halves.
+SLOT_NATIVE_BASE = 1
+
+# The registry. Each profile's BLOCK TAG is what fixes its ids, so this list can
+# be reordered or have a profile inserted without renumbering anything: only the
+# tag is ABI. A new profile takes the next free tag between 10 and 90.
 PROFILES = [
-    Profile("ucum",    "ucum.bvnr",    "expr", "ucum"),
-    Profile("unece",   "unece.bvnr",   "flat", "unece"),
-    Profile("qudt",    "qudt.bvnr",    "flat", "qudt"),
-    Profile("qudt-qk", "qudt-qk.bvnr", "flat", "qudt_qk"),
-    Profile("udunits", "udunits.bvnr", "expr", "udunits"),
+    Profile("ucum",    "ucum.bvnr",    "expr", "ucum",    20),
+    Profile("unece",   "unece.bvnr",   "flat", "unece",   30),
+    Profile("qudt",    "qudt.bvnr",    "flat", "qudt",    40),
+    Profile("qudt-qk", "qudt-qk.bvnr", "flat", "qudt_qk", 50),
+    Profile("udunits", "udunits.bvnr", "expr", "udunits", 60),
 ]
 
 # The decades that have an SI prefix. The fold in bovnar_profiles.c can only
@@ -292,28 +310,45 @@ def check_profile_string_bound(p):
     return worst, declared
 
 
-def assign_opaque_ids(profiles):
-    """Number the opaque block: one past the last native id, registry order.
+def native_unit_count():
+    """How many rows units.bvnr has. Needed only to place the opaque units'
+    DENSE TABLE SLOTS after the native ones — their ids come from their own
+    block and do not depend on it. gen_units.py owns the same number; the static
+    assert in src/utils/bvn_internal_dims.h checks the two agree."""
+    with open(os.path.join(GENDATA, "units.bvnr"), "rb") as f:
+        return len(bvnr_data.load(f.read())["units"])
 
-    The tables sized by BVN_VALUE_BASE_UNIT_COUNT are indexed BY the enum value,
-    so a gap is a hole of zeroed rows that reads as a valid unit, and an overlap
-    with a native id is two units answering to one number. Assigning here rather
-    than trusting hand-written .id fields is what keeps the block contiguous
-    across four profiles."""
-    native_max = 0
-    for fn, key in (("units.bvnr", "units"), ("currencies.bvnr", "currencies")):
-        path = os.path.join(GENDATA, fn)
-        if not os.path.exists(path):
-            continue
-        with open(path, "rb") as f:
-            for rec in bvnr_data.load(f.read())[key]:
-                native_max = max(native_max, int(rec["id"]))
-    nid = native_max + 1
-    names = {}
+
+def assign_opaque_ids(profiles):
+    """Number each profile's opaque units inside ITS OWN block, and lay their
+    dense table slots out after the native units.
+
+    Two separate numberings, and keeping them separate is the point. The ID is
+    block * BLOCK_SIZE + position, so ids are sparse, self-identifying (the
+    leading digits name the vocabulary) and independent -- a profile that grows
+    a row shifts nothing outside itself. The SLOT is the row index in the tables
+    the library indexes by base unit, which stay dense: one row per defined
+    unit, assigned here in registry order.
+
+    A slot is therefore not stable across a profile growing, which is fine: no
+    slot is ever serialised or exposed. Only ids are."""
+    slot = SLOT_NATIVE_BASE + native_unit_count()
+    names, blocks = {}, {}
     for p in profiles:
+        if p.block in (BLOCK_NATIVE, BLOCK_CURRENCY) or not (0 < p.block < 100):
+            die(p, "block tag %d is not free: 10 is the native units, 90 the "
+                   "currencies, and a tag must be two digits" % p.block)
+        if p.block in blocks:
+            die(p, "block tag %d already belongs to the %r profile"
+                   % (p.block, blocks[p.block]))
+        blocks[p.block] = p.ns
         rows = p.list("opaque")
-        p.opaque_first = nid
-        for a in rows:
+        if len(rows) > BLOCK_SIZE:
+            die(p, "block %d holds %d ids; this profile has %d opaque units"
+                   % (p.block, BLOCK_SIZE, len(rows)))
+        p.opaque_first = p.block * BLOCK_SIZE
+        p.slot_base = slot
+        for n, a in enumerate(rows):
             name = a["name"]
             if name in names:
                 die(p, "opaque name %r already used by the %r profile"
@@ -322,10 +357,10 @@ def assign_opaque_ids(profiles):
             if not name.startswith(p.enum_prefix + "_"):
                 die(p, "opaque name %r must start with %r so the enum stays "
                        "namespaced" % (name, p.enum_prefix + "_"))
-            a["id"] = nid
-            nid += 1
-        p.opaque_last = nid - 1          # < first when the profile has none
-    return native_max + 1, nid - 1
+            a["id"] = p.opaque_first + n
+            slot += 1
+        p.opaque_last = p.opaque_first + len(rows) - 1   # < first when none
+    return slot
 
 
 # ── emitters ────────────────────────────────────────────────────────────────
@@ -511,9 +546,10 @@ def gen_conv_rows(profiles):
     for p in profiles:
         for a in p.list("opaque"):
             nm = "bu_" + a["name"]
-            out.append("\t[%-18s] = { %-18s 1.0, {0, 0, 0, 0, 0, 0, 0}, false, "
+            out.append("\t[BVN_SLOT_%s(%-18s] = { %-18s 1.0, "
+                       "{0, 0, 0, 0, 0, 0, 0}, false, "
                        "0.0, \"1\", \"1\", \"0\", \"1\", true },\n"
-                       % (nm, nm + ","))
+                       % (p.cname.upper(), nm + ")", nm + ","))
     return "".join(out)
 
 
@@ -527,8 +563,8 @@ def gen_policy_rows(profiles):
     out = [BANNER % "the profile data files"]
     for p in profiles:
         for a in p.list("opaque"):
-            out.append("\t[bu_%-18s = %s,\n"
-                       % (a["name"] + "]",
+            out.append("\t[BVN_SLOT_%s(bu_%-18s = %s,\n"
+                       % (p.cname.upper(), a["name"] + ")]",
                           "BVN_PFX_DEFAULT" if a.get("metric", False)
                           else "BVN_PFX_NONE"))
     return "".join(out)
@@ -546,7 +582,7 @@ def gen_str_rows(profiles):
     return "".join(out)
 
 
-def gen_enum(profiles, first, last):
+def gen_enum(profiles, slot_count):
     out = [BANNER % "the profile data files"]
     for p in profiles:
         rows = p.list("opaque")
@@ -554,24 +590,53 @@ def gen_enum(profiles, first, last):
             continue
         out.append("\t/* %s */\n" % p.ns)
         for a in rows:
-            out.append("\tbu_%-16s = %3d,\n" % (a["name"], int(a["id"])))
-    out.append("\n")
-    out.append("/* The opaque block: profile-only base units with no native\n"
-               " * spelling and no dimension. Bracketed for the two-comparison\n"
-               " * membership test in bvni_is_opaque(). Contiguity across every\n"
-               " * profile is enforced by gen_profiles.py. */\n")
-    out.append("#define BVN_PROFILE_OPAQUE_FIRST %d\n" % first)
-    out.append("#define BVN_PROFILE_OPAQUE_LAST  %d\n" % last)
-    out.append("#define BVN_PROFILE_OPAQUE_COUNT %d\n" % (last - first + 1))
-    out.append("\n/* Per-profile sub-ranges, so the writer can name the\n"
-               " * namespace that owns an opaque unit. FIRST > LAST means the\n"
-               " * profile contributes none. */\n")
+            out.append("\tbu_%-16s = %6d,\n" % (a["name"], int(a["id"])))
+    out.append("""
+/* The opaque units: profile-only base units with no native spelling and no
+ * dimension, so they are commensurable with nothing -- not even with each
+ * other. Each profile's live in its own block, one contiguous run from
+ * <block>_OPAQUE_FIRST; FIRST > LAST means the profile contributes none.
+ *
+ * Three things are derived from the runs below and must stay in step, which is
+ * why they are emitted together:
+ *
+ *   _OPAQUE_FIRST/_LAST   the membership test, per profile: two comparisons,
+ *                         and the pair also tells the writer which namespace
+ *                         owns an opaque unit it has to spell.
+ *   BVN_SLOT_<NS>         the row index of an opaque unit in the dense tables
+ *                         the library indexes by base unit. Written as
+ *                         arithmetic on the enumerator so it can be a
+ *                         designated-initialiser index in the generated rows.
+ *   BVN_UNIT_SLOT_COUNT   how many rows those tables have in total: bu_none,
+ *                         then the native units, then these. */
+""")
     for p in profiles:
         u = p.cname.upper()
         out.append("#define BVN_PROFILE_%s_OPAQUE_FIRST %d\n"
                    % (u, p.opaque_first))
         out.append("#define BVN_PROFILE_%s_OPAQUE_LAST  %d\n"
                    % (u, p.opaque_last))
+        out.append("#define BVN_PROFILE_%s_OPAQUE_COUNT %d\n"
+                   % (u, p.opaque_last - p.opaque_first + 1))
+        out.append("#define BVN_PROFILE_%s_SLOT_BASE    %d\n" % (u, p.slot_base))
+        out.append("#define BVN_SLOT_%s(b) (BVN_PROFILE_%s_SLOT_BASE + \\\n"
+                   "\t((int)(b) - BVN_PROFILE_%s_OPAQUE_FIRST))\n" % (u, u, u))
+    total = sum(p.opaque_last - p.opaque_first + 1 for p in profiles)
+    out.append("\n#define BVN_PROFILE_OPAQUE_COUNT %d\n" % total)
+    out.append("#define BVN_UNIT_SLOT_COUNT      %d\n" % slot_count)
+    out.append("""
+/* The dense-table slot of any opaque unit, or -1. One ternary chain rather than
+ * a lookup table so it stays usable from a header, in a constant expression,
+ * and from bvni_unit_slot() without a call. */
+""")
+    out.append("#define BVN_PROFILE_OPAQUE_SLOT(v) ( \\\n")
+    for p in profiles:
+        u = p.cname.upper()
+        out.append("\t((v) >= BVN_PROFILE_%s_OPAQUE_FIRST && "
+                   "(v) <= BVN_PROFILE_%s_OPAQUE_LAST) \\\n"
+                   "\t\t? BVN_PROFILE_%s_SLOT_BASE + "
+                   "((v) - BVN_PROFILE_%s_OPAQUE_FIRST) : \\\n" % (u, u, u, u))
+    out.append("\t-1)\n")
     return "".join(out)
 
 
@@ -586,12 +651,12 @@ def main(argv):
     for p in PROFILES:
         check_targets_parse(p, set(units), allpfx)
 
-    first, last = assign_opaque_ids(PROFILES)
+    slot_count = assign_opaque_ids(PROFILES)
 
     os.makedirs(GENDIR, exist_ok=True)
     bvnr_data.write_if_changed(
         os.path.join(REPO, "include", "bovnar_profiles.gen.h"),
-        gen_enum(PROFILES, first, last))
+        gen_enum(PROFILES, slot_count))
     bvnr_data.write_if_changed(
         os.path.join(GENDIR, "bovnar_profiles_conv.gen.inc"),
         gen_conv_rows(PROFILES))
@@ -626,8 +691,8 @@ def main(argv):
                len(p.list("unsupported")), len(p.list("prefixes")), nrev,
                worst, cap))
 
-    print("gen_profiles: %d profile(s), opaque block %d..%d\n%s"
-          % (len(PROFILES), first, last, "\n".join(summary)))
+    print("gen_profiles: %d profile(s), %d dense unit slots\n%s"
+          % (len(PROFILES), slot_count, "\n".join(summary)))
     return 0
 
 

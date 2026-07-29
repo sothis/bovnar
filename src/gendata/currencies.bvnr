@@ -9,10 +9,17 @@
 #
 # STABLE IDS (ABI)
 #   .id is the value_base_unit_t enum value. Append-only: NEVER renumber or
-#   reuse an id. The catalogue is POSITIONAL — a currency's slot IS its enum
-#   value (fiat 134..297, crypto 298..347, extension 378..379) — so records
-#   MUST stay in ascending .id order; the C table's O(1) index depends on it.
-#   New currencies append in the extension range (378+).
+#   reuse an id. Currencies are the 90 BLOCK: ids 900000..909999, contiguous
+#   from 900000, fiat first and then crypto. The catalogue is POSITIONAL — a
+#   currency's slot IS its enum value minus 900000 — so records MUST stay in
+#   ascending .id order; the C table's O(1) index depends on it.
+#
+#   A new currency of EITHER kind appends at the end with the next free id.
+#   Fiat happens to run before crypto here, and the fiat rows happen to be
+#   alphabetical, but neither is a contract: bvn_unit_is_fiat and
+#   bvn_unit_is_crypto read the .is_crypto column of the row rather than
+#   testing which sub-range the id falls in, so the ordering carries no
+#   meaning and appending never renumbers anything.
 #
 # FIELDS (one record per currency)
 #   .id            value_base_unit_t enum value (stable, ordered; see above)
@@ -26,7 +33,7 @@
 
 .currencies = [
   {
-    .id           = 134;
+    .id           = 900000;
     .code         = "AED";
     .numeric_code = 784;
     .minor_unit   = 2;
@@ -34,7 +41,7 @@
     .name         = "UAE Dirham";
   },
   {
-    .id           = 135;
+    .id           = 900001;
     .code         = "AFN";
     .numeric_code = 971;
     .minor_unit   = 2;
@@ -42,7 +49,7 @@
     .name         = "Afghan Afghani";
   },
   {
-    .id           = 136;
+    .id           = 900002;
     .code         = "ALL";
     .numeric_code = 8;
     .minor_unit   = 2;
@@ -50,7 +57,7 @@
     .name         = "Albanian Lek";
   },
   {
-    .id           = 137;
+    .id           = 900003;
     .code         = "AMD";
     .numeric_code = 51;
     .minor_unit   = 2;
@@ -58,7 +65,7 @@
     .name         = "Armenian Dram";
   },
   {
-    .id           = 138;
+    .id           = 900004;
     .code         = "ANG";
     .numeric_code = 532;
     .minor_unit   = 2;
@@ -66,7 +73,7 @@
     .name         = "Netherlands Antillean Guilder";
   },
   {
-    .id           = 139;
+    .id           = 900005;
     .code         = "AOA";
     .numeric_code = 973;
     .minor_unit   = 2;
@@ -74,7 +81,7 @@
     .name         = "Angolan Kwanza";
   },
   {
-    .id           = 140;
+    .id           = 900006;
     .code         = "ARS";
     .numeric_code = 32;
     .minor_unit   = 2;
@@ -82,7 +89,7 @@
     .name         = "Argentine Peso";
   },
   {
-    .id           = 141;
+    .id           = 900007;
     .code         = "AUD";
     .numeric_code = 36;
     .minor_unit   = 2;
@@ -90,7 +97,7 @@
     .name         = "Australian Dollar";
   },
   {
-    .id           = 142;
+    .id           = 900008;
     .code         = "AWG";
     .numeric_code = 533;
     .minor_unit   = 2;
@@ -98,7 +105,7 @@
     .name         = "Aruban Florin";
   },
   {
-    .id           = 143;
+    .id           = 900009;
     .code         = "AZN";
     .numeric_code = 944;
     .minor_unit   = 2;
@@ -106,7 +113,7 @@
     .name         = "Azerbaijani Manat";
   },
   {
-    .id           = 144;
+    .id           = 900010;
     .code         = "BAM";
     .numeric_code = 977;
     .minor_unit   = 2;
@@ -114,7 +121,7 @@
     .name         = "Bosnia-Herzegovina Convertible Mark";
   },
   {
-    .id           = 145;
+    .id           = 900011;
     .code         = "BBD";
     .numeric_code = 52;
     .minor_unit   = 2;
@@ -122,7 +129,7 @@
     .name         = "Barbados Dollar";
   },
   {
-    .id           = 146;
+    .id           = 900012;
     .code         = "BDT";
     .numeric_code = 50;
     .minor_unit   = 2;
@@ -130,7 +137,7 @@
     .name         = "Bangladeshi Taka";
   },
   {
-    .id           = 147;
+    .id           = 900013;
     .code         = "BGN";
     .numeric_code = 975;
     .minor_unit   = 2;
@@ -138,7 +145,7 @@
     .name         = "Bulgarian Lev";
   },
   {
-    .id           = 148;
+    .id           = 900014;
     .code         = "BHD";
     .numeric_code = 48;
     .minor_unit   = 3;
@@ -146,7 +153,7 @@
     .name         = "Bahraini Dinar";
   },
   {
-    .id           = 149;
+    .id           = 900015;
     .code         = "BIF";
     .numeric_code = 108;
     .minor_unit   = 0;
@@ -154,7 +161,7 @@
     .name         = "Burundian Franc";
   },
   {
-    .id           = 150;
+    .id           = 900016;
     .code         = "BMD";
     .numeric_code = 60;
     .minor_unit   = 2;
@@ -162,7 +169,7 @@
     .name         = "Bermudian Dollar";
   },
   {
-    .id           = 151;
+    .id           = 900017;
     .code         = "BND";
     .numeric_code = 96;
     .minor_unit   = 2;
@@ -170,7 +177,7 @@
     .name         = "Brunei Dollar";
   },
   {
-    .id           = 152;
+    .id           = 900018;
     .code         = "BOB";
     .numeric_code = 68;
     .minor_unit   = 2;
@@ -178,7 +185,7 @@
     .name         = "Boliviano";
   },
   {
-    .id           = 153;
+    .id           = 900019;
     .code         = "BRL";
     .numeric_code = 986;
     .minor_unit   = 2;
@@ -186,7 +193,7 @@
     .name         = "Brazilian Real";
   },
   {
-    .id           = 154;
+    .id           = 900020;
     .code         = "BSD";
     .numeric_code = 44;
     .minor_unit   = 2;
@@ -194,7 +201,7 @@
     .name         = "Bahamian Dollar";
   },
   {
-    .id           = 155;
+    .id           = 900021;
     .code         = "BTN";
     .numeric_code = 64;
     .minor_unit   = 2;
@@ -202,7 +209,7 @@
     .name         = "Bhutanese Ngultrum";
   },
   {
-    .id           = 156;
+    .id           = 900022;
     .code         = "BWP";
     .numeric_code = 72;
     .minor_unit   = 2;
@@ -210,7 +217,7 @@
     .name         = "Botswana Pula";
   },
   {
-    .id           = 157;
+    .id           = 900023;
     .code         = "BYN";
     .numeric_code = 933;
     .minor_unit   = 2;
@@ -218,7 +225,7 @@
     .name         = "Belarusian Ruble";
   },
   {
-    .id           = 158;
+    .id           = 900024;
     .code         = "BZD";
     .numeric_code = 84;
     .minor_unit   = 2;
@@ -226,7 +233,7 @@
     .name         = "Belize Dollar";
   },
   {
-    .id           = 159;
+    .id           = 900025;
     .code         = "CAD";
     .numeric_code = 124;
     .minor_unit   = 2;
@@ -234,7 +241,7 @@
     .name         = "Canadian Dollar";
   },
   {
-    .id           = 160;
+    .id           = 900026;
     .code         = "CDF";
     .numeric_code = 976;
     .minor_unit   = 2;
@@ -242,7 +249,7 @@
     .name         = "Congolese Franc";
   },
   {
-    .id           = 161;
+    .id           = 900027;
     .code         = "CHF";
     .numeric_code = 756;
     .minor_unit   = 2;
@@ -250,7 +257,7 @@
     .name         = "Swiss Franc";
   },
   {
-    .id           = 162;
+    .id           = 900028;
     .code         = "CLF";
     .numeric_code = 990;
     .minor_unit   = 4;
@@ -258,7 +265,7 @@
     .name         = "Unidad de Fomento";
   },
   {
-    .id           = 163;
+    .id           = 900029;
     .code         = "CLP";
     .numeric_code = 152;
     .minor_unit   = 0;
@@ -266,7 +273,7 @@
     .name         = "Chilean Peso";
   },
   {
-    .id           = 164;
+    .id           = 900030;
     .code         = "CNY";
     .numeric_code = 156;
     .minor_unit   = 2;
@@ -274,7 +281,7 @@
     .name         = "Chinese Yuan";
   },
   {
-    .id           = 165;
+    .id           = 900031;
     .code         = "COP";
     .numeric_code = 170;
     .minor_unit   = 2;
@@ -282,7 +289,7 @@
     .name         = "Colombian Peso";
   },
   {
-    .id           = 166;
+    .id           = 900032;
     .code         = "CRC";
     .numeric_code = 188;
     .minor_unit   = 2;
@@ -290,7 +297,7 @@
     .name         = "Costa Rican Colon";
   },
   {
-    .id           = 167;
+    .id           = 900033;
     .code         = "CUP";
     .numeric_code = 192;
     .minor_unit   = 2;
@@ -298,7 +305,7 @@
     .name         = "Cuban Peso";
   },
   {
-    .id           = 168;
+    .id           = 900034;
     .code         = "CVE";
     .numeric_code = 132;
     .minor_unit   = 2;
@@ -306,7 +313,7 @@
     .name         = "Cape Verdean Escudo";
   },
   {
-    .id           = 169;
+    .id           = 900035;
     .code         = "CZK";
     .numeric_code = 203;
     .minor_unit   = 2;
@@ -314,7 +321,7 @@
     .name         = "Czech Koruna";
   },
   {
-    .id           = 170;
+    .id           = 900036;
     .code         = "DJF";
     .numeric_code = 262;
     .minor_unit   = 0;
@@ -322,7 +329,7 @@
     .name         = "Djiboutian Franc";
   },
   {
-    .id           = 171;
+    .id           = 900037;
     .code         = "DKK";
     .numeric_code = 208;
     .minor_unit   = 2;
@@ -330,7 +337,7 @@
     .name         = "Danish Krone";
   },
   {
-    .id           = 172;
+    .id           = 900038;
     .code         = "DOP";
     .numeric_code = 214;
     .minor_unit   = 2;
@@ -338,7 +345,7 @@
     .name         = "Dominican Peso";
   },
   {
-    .id           = 173;
+    .id           = 900039;
     .code         = "DZD";
     .numeric_code = 12;
     .minor_unit   = 2;
@@ -346,7 +353,7 @@
     .name         = "Algerian Dinar";
   },
   {
-    .id           = 174;
+    .id           = 900040;
     .code         = "EGP";
     .numeric_code = 818;
     .minor_unit   = 2;
@@ -354,7 +361,7 @@
     .name         = "Egyptian Pound";
   },
   {
-    .id           = 175;
+    .id           = 900041;
     .code         = "ERN";
     .numeric_code = 232;
     .minor_unit   = 2;
@@ -362,7 +369,7 @@
     .name         = "Eritrean Nakfa";
   },
   {
-    .id           = 176;
+    .id           = 900042;
     .code         = "ETB";
     .numeric_code = 230;
     .minor_unit   = 2;
@@ -370,7 +377,7 @@
     .name         = "Ethiopian Birr";
   },
   {
-    .id           = 177;
+    .id           = 900043;
     .code         = "EUR";
     .numeric_code = 978;
     .minor_unit   = 2;
@@ -378,7 +385,7 @@
     .name         = "Euro";
   },
   {
-    .id           = 178;
+    .id           = 900044;
     .code         = "FJD";
     .numeric_code = 242;
     .minor_unit   = 2;
@@ -386,7 +393,7 @@
     .name         = "Fijian Dollar";
   },
   {
-    .id           = 179;
+    .id           = 900045;
     .code         = "FKP";
     .numeric_code = 238;
     .minor_unit   = 2;
@@ -394,7 +401,7 @@
     .name         = "Falkland Islands Pound";
   },
   {
-    .id           = 180;
+    .id           = 900046;
     .code         = "GBP";
     .numeric_code = 826;
     .minor_unit   = 2;
@@ -402,7 +409,7 @@
     .name         = "Pound Sterling";
   },
   {
-    .id           = 181;
+    .id           = 900047;
     .code         = "GEL";
     .numeric_code = 981;
     .minor_unit   = 2;
@@ -410,7 +417,7 @@
     .name         = "Georgian Lari";
   },
   {
-    .id           = 182;
+    .id           = 900048;
     .code         = "GHS";
     .numeric_code = 936;
     .minor_unit   = 2;
@@ -418,7 +425,7 @@
     .name         = "Ghanaian Cedi";
   },
   {
-    .id           = 183;
+    .id           = 900049;
     .code         = "GIP";
     .numeric_code = 292;
     .minor_unit   = 2;
@@ -426,7 +433,7 @@
     .name         = "Gibraltar Pound";
   },
   {
-    .id           = 184;
+    .id           = 900050;
     .code         = "GMD";
     .numeric_code = 270;
     .minor_unit   = 2;
@@ -434,7 +441,7 @@
     .name         = "Gambian Dalasi";
   },
   {
-    .id           = 185;
+    .id           = 900051;
     .code         = "GNF";
     .numeric_code = 324;
     .minor_unit   = 0;
@@ -442,7 +449,7 @@
     .name         = "Guinean Franc";
   },
   {
-    .id           = 186;
+    .id           = 900052;
     .code         = "GTQ";
     .numeric_code = 320;
     .minor_unit   = 2;
@@ -450,7 +457,7 @@
     .name         = "Guatemalan Quetzal";
   },
   {
-    .id           = 187;
+    .id           = 900053;
     .code         = "GYD";
     .numeric_code = 328;
     .minor_unit   = 2;
@@ -458,7 +465,7 @@
     .name         = "Guyanese Dollar";
   },
   {
-    .id           = 188;
+    .id           = 900054;
     .code         = "HKD";
     .numeric_code = 344;
     .minor_unit   = 2;
@@ -466,7 +473,7 @@
     .name         = "Hong Kong Dollar";
   },
   {
-    .id           = 189;
+    .id           = 900055;
     .code         = "HNL";
     .numeric_code = 340;
     .minor_unit   = 2;
@@ -474,7 +481,7 @@
     .name         = "Honduran Lempira";
   },
   {
-    .id           = 190;
+    .id           = 900056;
     .code         = "HRK";
     .numeric_code = 191;
     .minor_unit   = 2;
@@ -482,7 +489,7 @@
     .name         = "Croatian Kuna";
   },
   {
-    .id           = 191;
+    .id           = 900057;
     .code         = "HTG";
     .numeric_code = 332;
     .minor_unit   = 2;
@@ -490,7 +497,7 @@
     .name         = "Haitian Gourde";
   },
   {
-    .id           = 192;
+    .id           = 900058;
     .code         = "HUF";
     .numeric_code = 348;
     .minor_unit   = 2;
@@ -498,7 +505,7 @@
     .name         = "Hungarian Forint";
   },
   {
-    .id           = 193;
+    .id           = 900059;
     .code         = "IDR";
     .numeric_code = 360;
     .minor_unit   = 2;
@@ -506,7 +513,7 @@
     .name         = "Indonesian Rupiah";
   },
   {
-    .id           = 194;
+    .id           = 900060;
     .code         = "ILS";
     .numeric_code = 376;
     .minor_unit   = 2;
@@ -514,7 +521,7 @@
     .name         = "Israeli New Shekel";
   },
   {
-    .id           = 195;
+    .id           = 900061;
     .code         = "INR";
     .numeric_code = 356;
     .minor_unit   = 2;
@@ -522,7 +529,7 @@
     .name         = "Indian Rupee";
   },
   {
-    .id           = 196;
+    .id           = 900062;
     .code         = "IQD";
     .numeric_code = 368;
     .minor_unit   = 3;
@@ -530,7 +537,7 @@
     .name         = "Iraqi Dinar";
   },
   {
-    .id           = 197;
+    .id           = 900063;
     .code         = "IRR";
     .numeric_code = 364;
     .minor_unit   = 2;
@@ -538,7 +545,7 @@
     .name         = "Iranian Rial";
   },
   {
-    .id           = 198;
+    .id           = 900064;
     .code         = "ISK";
     .numeric_code = 352;
     .minor_unit   = 0;
@@ -546,7 +553,7 @@
     .name         = "Icelandic Krona";
   },
   {
-    .id           = 199;
+    .id           = 900065;
     .code         = "JMD";
     .numeric_code = 388;
     .minor_unit   = 2;
@@ -554,7 +561,7 @@
     .name         = "Jamaican Dollar";
   },
   {
-    .id           = 200;
+    .id           = 900066;
     .code         = "JOD";
     .numeric_code = 400;
     .minor_unit   = 3;
@@ -562,7 +569,7 @@
     .name         = "Jordanian Dinar";
   },
   {
-    .id           = 201;
+    .id           = 900067;
     .code         = "JPY";
     .numeric_code = 392;
     .minor_unit   = 0;
@@ -570,7 +577,7 @@
     .name         = "Japanese Yen";
   },
   {
-    .id           = 202;
+    .id           = 900068;
     .code         = "KES";
     .numeric_code = 404;
     .minor_unit   = 2;
@@ -578,7 +585,7 @@
     .name         = "Kenyan Shilling";
   },
   {
-    .id           = 203;
+    .id           = 900069;
     .code         = "KGS";
     .numeric_code = 417;
     .minor_unit   = 2;
@@ -586,7 +593,7 @@
     .name         = "Kyrgyzstani Som";
   },
   {
-    .id           = 204;
+    .id           = 900070;
     .code         = "KHR";
     .numeric_code = 116;
     .minor_unit   = 2;
@@ -594,7 +601,7 @@
     .name         = "Cambodian Riel";
   },
   {
-    .id           = 205;
+    .id           = 900071;
     .code         = "KMF";
     .numeric_code = 174;
     .minor_unit   = 0;
@@ -602,7 +609,7 @@
     .name         = "Comorian Franc";
   },
   {
-    .id           = 206;
+    .id           = 900072;
     .code         = "KPW";
     .numeric_code = 408;
     .minor_unit   = 2;
@@ -610,7 +617,7 @@
     .name         = "North Korean Won";
   },
   {
-    .id           = 207;
+    .id           = 900073;
     .code         = "KRW";
     .numeric_code = 410;
     .minor_unit   = 0;
@@ -618,7 +625,7 @@
     .name         = "South Korean Won";
   },
   {
-    .id           = 208;
+    .id           = 900074;
     .code         = "KWD";
     .numeric_code = 414;
     .minor_unit   = 3;
@@ -626,7 +633,7 @@
     .name         = "Kuwaiti Dinar";
   },
   {
-    .id           = 209;
+    .id           = 900075;
     .code         = "KYD";
     .numeric_code = 136;
     .minor_unit   = 2;
@@ -634,7 +641,7 @@
     .name         = "Cayman Islands Dollar";
   },
   {
-    .id           = 210;
+    .id           = 900076;
     .code         = "KZT";
     .numeric_code = 398;
     .minor_unit   = 2;
@@ -642,7 +649,7 @@
     .name         = "Kazakhstani Tenge";
   },
   {
-    .id           = 211;
+    .id           = 900077;
     .code         = "LAK";
     .numeric_code = 418;
     .minor_unit   = 2;
@@ -650,7 +657,7 @@
     .name         = "Laotian Kip";
   },
   {
-    .id           = 212;
+    .id           = 900078;
     .code         = "LBP";
     .numeric_code = 422;
     .minor_unit   = 2;
@@ -658,7 +665,7 @@
     .name         = "Lebanese Pound";
   },
   {
-    .id           = 213;
+    .id           = 900079;
     .code         = "LKR";
     .numeric_code = 144;
     .minor_unit   = 2;
@@ -666,7 +673,7 @@
     .name         = "Sri Lankan Rupee";
   },
   {
-    .id           = 214;
+    .id           = 900080;
     .code         = "LRD";
     .numeric_code = 430;
     .minor_unit   = 2;
@@ -674,7 +681,7 @@
     .name         = "Liberian Dollar";
   },
   {
-    .id           = 215;
+    .id           = 900081;
     .code         = "LSL";
     .numeric_code = 426;
     .minor_unit   = 2;
@@ -682,7 +689,7 @@
     .name         = "Lesotho Loti";
   },
   {
-    .id           = 216;
+    .id           = 900082;
     .code         = "LYD";
     .numeric_code = 434;
     .minor_unit   = 3;
@@ -690,7 +697,7 @@
     .name         = "Libyan Dinar";
   },
   {
-    .id           = 217;
+    .id           = 900083;
     .code         = "MAD";
     .numeric_code = 504;
     .minor_unit   = 2;
@@ -698,7 +705,7 @@
     .name         = "Moroccan Dirham";
   },
   {
-    .id           = 218;
+    .id           = 900084;
     .code         = "MDL";
     .numeric_code = 498;
     .minor_unit   = 2;
@@ -706,7 +713,7 @@
     .name         = "Moldovan Leu";
   },
   {
-    .id           = 219;
+    .id           = 900085;
     .code         = "MGA";
     .numeric_code = 969;
     .minor_unit   = 2;
@@ -714,7 +721,7 @@
     .name         = "Malagasy Ariary";
   },
   {
-    .id           = 220;
+    .id           = 900086;
     .code         = "MKD";
     .numeric_code = 807;
     .minor_unit   = 2;
@@ -722,7 +729,7 @@
     .name         = "Macedonian Denar";
   },
   {
-    .id           = 221;
+    .id           = 900087;
     .code         = "MMK";
     .numeric_code = 104;
     .minor_unit   = 2;
@@ -730,7 +737,7 @@
     .name         = "Myanmar Kyat";
   },
   {
-    .id           = 222;
+    .id           = 900088;
     .code         = "MNT";
     .numeric_code = 496;
     .minor_unit   = 2;
@@ -738,7 +745,7 @@
     .name         = "Mongolian Togrog";
   },
   {
-    .id           = 223;
+    .id           = 900089;
     .code         = "MOP";
     .numeric_code = 446;
     .minor_unit   = 2;
@@ -746,7 +753,7 @@
     .name         = "Macanese Pataca";
   },
   {
-    .id           = 224;
+    .id           = 900090;
     .code         = "MRU";
     .numeric_code = 929;
     .minor_unit   = 2;
@@ -754,7 +761,7 @@
     .name         = "Mauritanian Ouguiya";
   },
   {
-    .id           = 225;
+    .id           = 900091;
     .code         = "MUR";
     .numeric_code = 480;
     .minor_unit   = 2;
@@ -762,7 +769,7 @@
     .name         = "Mauritian Rupee";
   },
   {
-    .id           = 226;
+    .id           = 900092;
     .code         = "MVR";
     .numeric_code = 462;
     .minor_unit   = 2;
@@ -770,7 +777,7 @@
     .name         = "Maldivian Rufiyaa";
   },
   {
-    .id           = 227;
+    .id           = 900093;
     .code         = "MWK";
     .numeric_code = 454;
     .minor_unit   = 2;
@@ -778,7 +785,7 @@
     .name         = "Malawian Kwacha";
   },
   {
-    .id           = 228;
+    .id           = 900094;
     .code         = "MXN";
     .numeric_code = 484;
     .minor_unit   = 2;
@@ -786,7 +793,7 @@
     .name         = "Mexican Peso";
   },
   {
-    .id           = 229;
+    .id           = 900095;
     .code         = "MYR";
     .numeric_code = 458;
     .minor_unit   = 2;
@@ -794,7 +801,7 @@
     .name         = "Malaysian Ringgit";
   },
   {
-    .id           = 230;
+    .id           = 900096;
     .code         = "MZN";
     .numeric_code = 943;
     .minor_unit   = 2;
@@ -802,7 +809,7 @@
     .name         = "Mozambican Metical";
   },
   {
-    .id           = 231;
+    .id           = 900097;
     .code         = "NAD";
     .numeric_code = 516;
     .minor_unit   = 2;
@@ -810,7 +817,7 @@
     .name         = "Namibian Dollar";
   },
   {
-    .id           = 232;
+    .id           = 900098;
     .code         = "NGN";
     .numeric_code = 566;
     .minor_unit   = 2;
@@ -818,7 +825,7 @@
     .name         = "Nigerian Naira";
   },
   {
-    .id           = 233;
+    .id           = 900099;
     .code         = "NIO";
     .numeric_code = 558;
     .minor_unit   = 2;
@@ -826,7 +833,7 @@
     .name         = "Nicaraguan Cordoba";
   },
   {
-    .id           = 234;
+    .id           = 900100;
     .code         = "NOK";
     .numeric_code = 578;
     .minor_unit   = 2;
@@ -834,7 +841,7 @@
     .name         = "Norwegian Krone";
   },
   {
-    .id           = 235;
+    .id           = 900101;
     .code         = "NPR";
     .numeric_code = 524;
     .minor_unit   = 2;
@@ -842,7 +849,7 @@
     .name         = "Nepalese Rupee";
   },
   {
-    .id           = 236;
+    .id           = 900102;
     .code         = "NZD";
     .numeric_code = 554;
     .minor_unit   = 2;
@@ -850,7 +857,7 @@
     .name         = "New Zealand Dollar";
   },
   {
-    .id           = 237;
+    .id           = 900103;
     .code         = "OMR";
     .numeric_code = 512;
     .minor_unit   = 3;
@@ -858,7 +865,7 @@
     .name         = "Omani Rial";
   },
   {
-    .id           = 238;
+    .id           = 900104;
     .code         = "PAB";
     .numeric_code = 590;
     .minor_unit   = 2;
@@ -866,7 +873,7 @@
     .name         = "Panamanian Balboa";
   },
   {
-    .id           = 239;
+    .id           = 900105;
     .code         = "PEN";
     .numeric_code = 604;
     .minor_unit   = 2;
@@ -874,7 +881,7 @@
     .name         = "Peruvian Sol";
   },
   {
-    .id           = 240;
+    .id           = 900106;
     .code         = "PGK";
     .numeric_code = 598;
     .minor_unit   = 2;
@@ -882,7 +889,7 @@
     .name         = "Papua New Guinean Kina";
   },
   {
-    .id           = 241;
+    .id           = 900107;
     .code         = "PHP";
     .numeric_code = 608;
     .minor_unit   = 2;
@@ -890,7 +897,7 @@
     .name         = "Philippine Peso";
   },
   {
-    .id           = 242;
+    .id           = 900108;
     .code         = "PKR";
     .numeric_code = 586;
     .minor_unit   = 2;
@@ -898,7 +905,7 @@
     .name         = "Pakistani Rupee";
   },
   {
-    .id           = 243;
+    .id           = 900109;
     .code         = "PLN";
     .numeric_code = 985;
     .minor_unit   = 2;
@@ -906,7 +913,7 @@
     .name         = "Polish Zloty";
   },
   {
-    .id           = 244;
+    .id           = 900110;
     .code         = "PYG";
     .numeric_code = 600;
     .minor_unit   = 0;
@@ -914,7 +921,7 @@
     .name         = "Paraguayan Guarani";
   },
   {
-    .id           = 245;
+    .id           = 900111;
     .code         = "QAR";
     .numeric_code = 634;
     .minor_unit   = 2;
@@ -922,7 +929,7 @@
     .name         = "Qatari Riyal";
   },
   {
-    .id           = 246;
+    .id           = 900112;
     .code         = "RON";
     .numeric_code = 946;
     .minor_unit   = 2;
@@ -930,7 +937,7 @@
     .name         = "Romanian Leu";
   },
   {
-    .id           = 247;
+    .id           = 900113;
     .code         = "RSD";
     .numeric_code = 941;
     .minor_unit   = 2;
@@ -938,7 +945,7 @@
     .name         = "Serbian Dinar";
   },
   {
-    .id           = 248;
+    .id           = 900114;
     .code         = "RUB";
     .numeric_code = 643;
     .minor_unit   = 2;
@@ -946,7 +953,7 @@
     .name         = "Russian Ruble";
   },
   {
-    .id           = 249;
+    .id           = 900115;
     .code         = "RWF";
     .numeric_code = 646;
     .minor_unit   = 0;
@@ -954,7 +961,7 @@
     .name         = "Rwandan Franc";
   },
   {
-    .id           = 250;
+    .id           = 900116;
     .code         = "SAR";
     .numeric_code = 682;
     .minor_unit   = 2;
@@ -962,7 +969,7 @@
     .name         = "Saudi Riyal";
   },
   {
-    .id           = 251;
+    .id           = 900117;
     .code         = "SBD";
     .numeric_code = 90;
     .minor_unit   = 2;
@@ -970,7 +977,7 @@
     .name         = "Solomon Islands Dollar";
   },
   {
-    .id           = 252;
+    .id           = 900118;
     .code         = "SCR";
     .numeric_code = 690;
     .minor_unit   = 2;
@@ -978,7 +985,7 @@
     .name         = "Seychellois Rupee";
   },
   {
-    .id           = 253;
+    .id           = 900119;
     .code         = "SDG";
     .numeric_code = 938;
     .minor_unit   = 2;
@@ -986,7 +993,7 @@
     .name         = "Sudanese Pound";
   },
   {
-    .id           = 254;
+    .id           = 900120;
     .code         = "SEK";
     .numeric_code = 752;
     .minor_unit   = 2;
@@ -994,7 +1001,7 @@
     .name         = "Swedish Krona";
   },
   {
-    .id           = 255;
+    .id           = 900121;
     .code         = "SGD";
     .numeric_code = 702;
     .minor_unit   = 2;
@@ -1002,7 +1009,7 @@
     .name         = "Singapore Dollar";
   },
   {
-    .id           = 256;
+    .id           = 900122;
     .code         = "SHP";
     .numeric_code = 654;
     .minor_unit   = 2;
@@ -1010,7 +1017,7 @@
     .name         = "Saint Helena Pound";
   },
   {
-    .id           = 257;
+    .id           = 900123;
     .code         = "SLE";
     .numeric_code = 925;
     .minor_unit   = 2;
@@ -1018,7 +1025,7 @@
     .name         = "Sierra Leonean Leone";
   },
   {
-    .id           = 258;
+    .id           = 900124;
     .code         = "SLL";
     .numeric_code = 694;
     .minor_unit   = 2;
@@ -1026,7 +1033,7 @@
     .name         = "Sierra Leonean Leone (old)";
   },
   {
-    .id           = 259;
+    .id           = 900125;
     .code         = "SOS";
     .numeric_code = 706;
     .minor_unit   = 2;
@@ -1034,15 +1041,7 @@
     .name         = "Somali Shilling";
   },
   {
-    .id           = 260;
-    .code         = "SSP";
-    .numeric_code = 728;
-    .minor_unit   = 2;
-    .is_crypto    = false;
-    .name         = "South Sudanese Pound";
-  },
-  {
-    .id           = 261;
+    .id           = 900126;
     .code         = "SRD";
     .numeric_code = 968;
     .minor_unit   = 2;
@@ -1050,7 +1049,15 @@
     .name         = "Surinamese Dollar";
   },
   {
-    .id           = 262;
+    .id           = 900127;
+    .code         = "SSP";
+    .numeric_code = 728;
+    .minor_unit   = 2;
+    .is_crypto    = false;
+    .name         = "South Sudanese Pound";
+  },
+  {
+    .id           = 900128;
     .code         = "STN";
     .numeric_code = 930;
     .minor_unit   = 2;
@@ -1058,7 +1065,7 @@
     .name         = "Sao Tome and Principe Dobra";
   },
   {
-    .id           = 263;
+    .id           = 900129;
     .code         = "SVC";
     .numeric_code = 222;
     .minor_unit   = 2;
@@ -1066,7 +1073,7 @@
     .name         = "Salvadoran Colon";
   },
   {
-    .id           = 264;
+    .id           = 900130;
     .code         = "SYP";
     .numeric_code = 760;
     .minor_unit   = 2;
@@ -1074,7 +1081,7 @@
     .name         = "Syrian Pound";
   },
   {
-    .id           = 265;
+    .id           = 900131;
     .code         = "SZL";
     .numeric_code = 748;
     .minor_unit   = 2;
@@ -1082,7 +1089,7 @@
     .name         = "Swazi Lilangeni";
   },
   {
-    .id           = 266;
+    .id           = 900132;
     .code         = "THB";
     .numeric_code = 764;
     .minor_unit   = 2;
@@ -1090,7 +1097,7 @@
     .name         = "Thai Baht";
   },
   {
-    .id           = 267;
+    .id           = 900133;
     .code         = "TJS";
     .numeric_code = 972;
     .minor_unit   = 2;
@@ -1098,7 +1105,7 @@
     .name         = "Tajikistani Somoni";
   },
   {
-    .id           = 268;
+    .id           = 900134;
     .code         = "TMT";
     .numeric_code = 934;
     .minor_unit   = 2;
@@ -1106,7 +1113,7 @@
     .name         = "Turkmenistan Manat";
   },
   {
-    .id           = 269;
+    .id           = 900135;
     .code         = "TND";
     .numeric_code = 788;
     .minor_unit   = 3;
@@ -1114,7 +1121,7 @@
     .name         = "Tunisian Dinar";
   },
   {
-    .id           = 270;
+    .id           = 900136;
     .code         = "TOP";
     .numeric_code = 776;
     .minor_unit   = 2;
@@ -1122,7 +1129,7 @@
     .name         = "Tongan Pa'anga";
   },
   {
-    .id           = 271;
+    .id           = 900137;
     .code         = "TRY";
     .numeric_code = 949;
     .minor_unit   = 2;
@@ -1130,7 +1137,7 @@
     .name         = "Turkish Lira";
   },
   {
-    .id           = 272;
+    .id           = 900138;
     .code         = "TTD";
     .numeric_code = 780;
     .minor_unit   = 2;
@@ -1138,7 +1145,7 @@
     .name         = "Trinidad and Tobago Dollar";
   },
   {
-    .id           = 273;
+    .id           = 900139;
     .code         = "TWD";
     .numeric_code = 901;
     .minor_unit   = 2;
@@ -1146,7 +1153,7 @@
     .name         = "New Taiwan Dollar";
   },
   {
-    .id           = 274;
+    .id           = 900140;
     .code         = "TZS";
     .numeric_code = 834;
     .minor_unit   = 2;
@@ -1154,7 +1161,7 @@
     .name         = "Tanzanian Shilling";
   },
   {
-    .id           = 275;
+    .id           = 900141;
     .code         = "UAH";
     .numeric_code = 980;
     .minor_unit   = 2;
@@ -1162,7 +1169,7 @@
     .name         = "Ukrainian Hryvnia";
   },
   {
-    .id           = 276;
+    .id           = 900142;
     .code         = "UGX";
     .numeric_code = 800;
     .minor_unit   = 0;
@@ -1170,7 +1177,7 @@
     .name         = "Ugandan Shilling";
   },
   {
-    .id           = 277;
+    .id           = 900143;
     .code         = "USD";
     .numeric_code = 840;
     .minor_unit   = 2;
@@ -1178,7 +1185,7 @@
     .name         = "US Dollar";
   },
   {
-    .id           = 278;
+    .id           = 900144;
     .code         = "UYU";
     .numeric_code = 858;
     .minor_unit   = 2;
@@ -1186,7 +1193,7 @@
     .name         = "Uruguayan Peso";
   },
   {
-    .id           = 279;
+    .id           = 900145;
     .code         = "UZS";
     .numeric_code = 860;
     .minor_unit   = 2;
@@ -1194,7 +1201,7 @@
     .name         = "Uzbekistani Som";
   },
   {
-    .id           = 280;
+    .id           = 900146;
     .code         = "VES";
     .numeric_code = 928;
     .minor_unit   = 2;
@@ -1202,7 +1209,7 @@
     .name         = "Venezuelan Bolivar Soberano";
   },
   {
-    .id           = 281;
+    .id           = 900147;
     .code         = "VND";
     .numeric_code = 704;
     .minor_unit   = 0;
@@ -1210,7 +1217,7 @@
     .name         = "Vietnamese Dong";
   },
   {
-    .id           = 282;
+    .id           = 900148;
     .code         = "VUV";
     .numeric_code = 548;
     .minor_unit   = 0;
@@ -1218,7 +1225,7 @@
     .name         = "Vanuatu Vatu";
   },
   {
-    .id           = 283;
+    .id           = 900149;
     .code         = "WST";
     .numeric_code = 882;
     .minor_unit   = 2;
@@ -1226,7 +1233,7 @@
     .name         = "Samoan Tala";
   },
   {
-    .id           = 284;
+    .id           = 900150;
     .code         = "XAF";
     .numeric_code = 950;
     .minor_unit   = 0;
@@ -1234,7 +1241,7 @@
     .name         = "CFA Franc BEAC";
   },
   {
-    .id           = 285;
+    .id           = 900151;
     .code         = "XAG";
     .numeric_code = 961;
     .minor_unit   = 0;
@@ -1242,7 +1249,7 @@
     .name         = "Silver";
   },
   {
-    .id           = 286;
+    .id           = 900152;
     .code         = "XAU";
     .numeric_code = 959;
     .minor_unit   = 0;
@@ -1250,7 +1257,7 @@
     .name         = "Gold";
   },
   {
-    .id           = 287;
+    .id           = 900153;
     .code         = "XCD";
     .numeric_code = 951;
     .minor_unit   = 2;
@@ -1258,7 +1265,15 @@
     .name         = "East Caribbean Dollar";
   },
   {
-    .id           = 288;
+    .id           = 900154;
+    .code         = "XCG";
+    .numeric_code = 532;
+    .minor_unit   = 2;
+    .is_crypto    = false;
+    .name         = "Caribbean Guilder";
+  },
+  {
+    .id           = 900155;
     .code         = "XDR";
     .numeric_code = 960;
     .minor_unit   = 0;
@@ -1266,7 +1281,7 @@
     .name         = "Special Drawing Rights";
   },
   {
-    .id           = 289;
+    .id           = 900156;
     .code         = "XOF";
     .numeric_code = 952;
     .minor_unit   = 0;
@@ -1274,7 +1289,7 @@
     .name         = "CFA Franc BCEAO";
   },
   {
-    .id           = 290;
+    .id           = 900157;
     .code         = "XPD";
     .numeric_code = 964;
     .minor_unit   = 0;
@@ -1282,7 +1297,7 @@
     .name         = "Palladium";
   },
   {
-    .id           = 291;
+    .id           = 900158;
     .code         = "XPF";
     .numeric_code = 953;
     .minor_unit   = 0;
@@ -1290,7 +1305,7 @@
     .name         = "CFP Franc";
   },
   {
-    .id           = 292;
+    .id           = 900159;
     .code         = "XPT";
     .numeric_code = 962;
     .minor_unit   = 0;
@@ -1298,7 +1313,7 @@
     .name         = "Platinum";
   },
   {
-    .id           = 293;
+    .id           = 900160;
     .code         = "XTS";
     .numeric_code = 963;
     .minor_unit   = 0;
@@ -1306,7 +1321,7 @@
     .name         = "Test";
   },
   {
-    .id           = 294;
+    .id           = 900161;
     .code         = "YER";
     .numeric_code = 886;
     .minor_unit   = 2;
@@ -1314,7 +1329,7 @@
     .name         = "Yemeni Rial";
   },
   {
-    .id           = 295;
+    .id           = 900162;
     .code         = "ZAR";
     .numeric_code = 710;
     .minor_unit   = 2;
@@ -1322,7 +1337,7 @@
     .name         = "South African Rand";
   },
   {
-    .id           = 296;
+    .id           = 900163;
     .code         = "ZMW";
     .numeric_code = 967;
     .minor_unit   = 2;
@@ -1330,415 +1345,7 @@
     .name         = "Zambian Kwacha";
   },
   {
-    .id           = 297;
-    .code         = "ZWL";
-    .numeric_code = 932;
-    .minor_unit   = 2;
-    .is_crypto    = false;
-    .name         = "Zimbabwean Dollar";
-  },
-  {
-    .id           = 298;
-    .code         = "BTC";
-    .numeric_code = 0;
-    .minor_unit   = 8;
-    .is_crypto    = true;
-    .name         = "Bitcoin";
-  },
-  {
-    .id           = 299;
-    .code         = "ETH";
-    .numeric_code = 0;
-    .minor_unit   = 18;
-    .is_crypto    = true;
-    .name         = "Ethereum";
-  },
-  {
-    .id           = 300;
-    .code         = "SOL";
-    .numeric_code = 0;
-    .minor_unit   = 9;
-    .is_crypto    = true;
-    .name         = "Solana";
-  },
-  {
-    .id           = 301;
-    .code         = "XRP";
-    .numeric_code = 0;
-    .minor_unit   = 6;
-    .is_crypto    = true;
-    .name         = "XRP";
-  },
-  {
-    .id           = 302;
-    .code         = "BNB";
-    .numeric_code = 0;
-    .minor_unit   = 18;
-    .is_crypto    = true;
-    .name         = "BNB";
-  },
-  {
-    .id           = 303;
-    .code         = "ADA";
-    .numeric_code = 0;
-    .minor_unit   = 6;
-    .is_crypto    = true;
-    .name         = "Cardano";
-  },
-  {
-    .id           = 304;
-    .code         = "LTC";
-    .numeric_code = 0;
-    .minor_unit   = 8;
-    .is_crypto    = true;
-    .name         = "Litecoin";
-  },
-  {
-    .id           = 305;
-    .code         = "DOT";
-    .numeric_code = 0;
-    .minor_unit   = 10;
-    .is_crypto    = true;
-    .name         = "Polkadot";
-  },
-  {
-    .id           = 306;
-    .code         = "XMR";
-    .numeric_code = 0;
-    .minor_unit   = 12;
-    .is_crypto    = true;
-    .name         = "Monero";
-  },
-  {
-    .id           = 307;
-    .code         = "ETC";
-    .numeric_code = 0;
-    .minor_unit   = 18;
-    .is_crypto    = true;
-    .name         = "Ethereum Classic";
-  },
-  {
-    .id           = 308;
-    .code         = "BCH";
-    .numeric_code = 0;
-    .minor_unit   = 8;
-    .is_crypto    = true;
-    .name         = "Bitcoin Cash";
-  },
-  {
-    .id           = 309;
-    .code         = "XLM";
-    .numeric_code = 0;
-    .minor_unit   = 7;
-    .is_crypto    = true;
-    .name         = "Stellar";
-  },
-  {
-    .id           = 310;
-    .code         = "FIL";
-    .numeric_code = 0;
-    .minor_unit   = 18;
-    .is_crypto    = true;
-    .name         = "Filecoin";
-  },
-  {
-    .id           = 311;
-    .code         = "ICP";
-    .numeric_code = 0;
-    .minor_unit   = 8;
-    .is_crypto    = true;
-    .name         = "Internet Computer";
-  },
-  {
-    .id           = 312;
-    .code         = "TRX";
-    .numeric_code = 0;
-    .minor_unit   = 6;
-    .is_crypto    = true;
-    .name         = "TRON";
-  },
-  {
-    .id           = 313;
-    .code         = "EOS";
-    .numeric_code = 0;
-    .minor_unit   = 4;
-    .is_crypto    = true;
-    .name         = "EOS";
-  },
-  {
-    .id           = 314;
-    .code         = "VET";
-    .numeric_code = 0;
-    .minor_unit   = 18;
-    .is_crypto    = true;
-    .name         = "VeChain";
-  },
-  {
-    .id           = 315;
-    .code         = "NEO";
-    .numeric_code = 0;
-    .minor_unit   = 0;
-    .is_crypto    = true;
-    .name         = "Neo";
-  },
-  {
-    .id           = 316;
-    .code         = "ZEC";
-    .numeric_code = 0;
-    .minor_unit   = 8;
-    .is_crypto    = true;
-    .name         = "Zcash";
-  },
-  {
-    .id           = 317;
-    .code         = "UNI";
-    .numeric_code = 0;
-    .minor_unit   = 18;
-    .is_crypto    = true;
-    .name         = "Uniswap";
-  },
-  {
-    .id           = 318;
-    .code         = "ARB";
-    .numeric_code = 0;
-    .minor_unit   = 18;
-    .is_crypto    = true;
-    .name         = "Arbitrum";
-  },
-  {
-    .id           = 319;
-    .code         = "SUI";
-    .numeric_code = 0;
-    .minor_unit   = 9;
-    .is_crypto    = true;
-    .name         = "Sui";
-  },
-  {
-    .id           = 320;
-    .code         = "TON";
-    .numeric_code = 0;
-    .minor_unit   = 9;
-    .is_crypto    = true;
-    .name         = "Toncoin";
-  },
-  {
-    .id           = 321;
-    .code         = "INJ";
-    .numeric_code = 0;
-    .minor_unit   = 18;
-    .is_crypto    = true;
-    .name         = "Injective";
-  },
-  {
-    .id           = 322;
-    .code         = "SEI";
-    .numeric_code = 0;
-    .minor_unit   = 6;
-    .is_crypto    = true;
-    .name         = "Sei";
-  },
-  {
-    .id           = 323;
-    .code         = "APT";
-    .numeric_code = 0;
-    .minor_unit   = 8;
-    .is_crypto    = true;
-    .name         = "Aptos";
-  },
-  {
-    .id           = 324;
-    .code         = "TAO";
-    .numeric_code = 0;
-    .minor_unit   = 9;
-    .is_crypto    = true;
-    .name         = "Bittensor";
-  },
-  {
-    .id           = 325;
-    .code         = "WIF";
-    .numeric_code = 0;
-    .minor_unit   = 6;
-    .is_crypto    = true;
-    .name         = "dogwifhat";
-  },
-  {
-    .id           = 326;
-    .code         = "DOGE";
-    .numeric_code = 0;
-    .minor_unit   = 8;
-    .is_crypto    = true;
-    .name         = "Dogecoin";
-  },
-  {
-    .id           = 327;
-    .code         = "LINK";
-    .numeric_code = 0;
-    .minor_unit   = 18;
-    .is_crypto    = true;
-    .name         = "Chainlink";
-  },
-  {
-    .id           = 328;
-    .code         = "USDT";
-    .numeric_code = 0;
-    .minor_unit   = 6;
-    .is_crypto    = true;
-    .name         = "Tether";
-  },
-  {
-    .id           = 329;
-    .code         = "USDC";
-    .numeric_code = 0;
-    .minor_unit   = 6;
-    .is_crypto    = true;
-    .name         = "USD Coin";
-  },
-  {
-    .id           = 330;
-    .code         = "AVAX";
-    .numeric_code = 0;
-    .minor_unit   = 18;
-    .is_crypto    = true;
-    .name         = "Avalanche";
-  },
-  {
-    .id           = 331;
-    .code         = "ATOM";
-    .numeric_code = 0;
-    .minor_unit   = 6;
-    .is_crypto    = true;
-    .name         = "Cosmos";
-  },
-  {
-    .id           = 332;
-    .code         = "POL";
-    .numeric_code = 0;
-    .minor_unit   = 18;
-    .is_crypto    = true;
-    .name         = "Polygon";
-  },
-  {
-    .id           = 333;
-    .code         = "NEAR";
-    .numeric_code = 0;
-    .minor_unit   = 24;
-    .is_crypto    = true;
-    .name         = "NEAR Protocol";
-  },
-  {
-    .id           = 334;
-    .code         = "ALGO";
-    .numeric_code = 0;
-    .minor_unit   = 6;
-    .is_crypto    = true;
-    .name         = "Algorand";
-  },
-  {
-    .id           = 335;
-    .code         = "HBAR";
-    .numeric_code = 0;
-    .minor_unit   = 8;
-    .is_crypto    = true;
-    .name         = "Hedera";
-  },
-  {
-    .id           = 336;
-    .code         = "AAVE";
-    .numeric_code = 0;
-    .minor_unit   = 18;
-    .is_crypto    = true;
-    .name         = "Aave";
-  },
-  {
-    .id           = 337;
-    .code         = "MKR";
-    .numeric_code = 0;
-    .minor_unit   = 18;
-    .is_crypto    = true;
-    .name         = "Maker";
-  },
-  {
-    .id           = 338;
-    .code         = "DAI";
-    .numeric_code = 0;
-    .minor_unit   = 18;
-    .is_crypto    = true;
-    .name         = "Dai";
-  },
-  {
-    .id           = 339;
-    .code         = "STX";
-    .numeric_code = 0;
-    .minor_unit   = 6;
-    .is_crypto    = true;
-    .name         = "Stacks";
-  },
-  {
-    .id           = 340;
-    .code         = "GRT";
-    .numeric_code = 0;
-    .minor_unit   = 18;
-    .is_crypto    = true;
-    .name         = "The Graph";
-  },
-  {
-    .id           = 341;
-    .code         = "LDO";
-    .numeric_code = 0;
-    .minor_unit   = 18;
-    .is_crypto    = true;
-    .name         = "Lido DAO";
-  },
-  {
-    .id           = 342;
-    .code         = "BONK";
-    .numeric_code = 0;
-    .minor_unit   = 5;
-    .is_crypto    = true;
-    .name         = "Bonk";
-  },
-  {
-    .id           = 343;
-    .code         = "PEPE";
-    .numeric_code = 0;
-    .minor_unit   = 18;
-    .is_crypto    = true;
-    .name         = "Pepe";
-  },
-  {
-    .id           = 344;
-    .code         = "SHIB";
-    .numeric_code = 0;
-    .minor_unit   = 18;
-    .is_crypto    = true;
-    .name         = "Shiba Inu";
-  },
-  {
-    .id           = 345;
-    .code         = "JUP";
-    .numeric_code = 0;
-    .minor_unit   = 6;
-    .is_crypto    = true;
-    .name         = "Jupiter";
-  },
-  {
-    .id           = 346;
-    .code         = "PYTH";
-    .numeric_code = 0;
-    .minor_unit   = 6;
-    .is_crypto    = true;
-    .name         = "Pyth Network";
-  },
-  {
-    .id           = 347;
-    .code         = "RUNE";
-    .numeric_code = 0;
-    .minor_unit   = 8;
-    .is_crypto    = true;
-    .name         = "THORChain";
-  },
-  {
-    .id           = 378;
+    .id           = 900164;
     .code         = "ZWG";
     .numeric_code = 924;
     .minor_unit   = 2;
@@ -1746,11 +1353,411 @@
     .name         = "Zimbabwe Gold";
   },
   {
-    .id           = 379;
-    .code         = "XCG";
-    .numeric_code = 532;
+    .id           = 900165;
+    .code         = "ZWL";
+    .numeric_code = 932;
     .minor_unit   = 2;
     .is_crypto    = false;
-    .name         = "Caribbean Guilder";
+    .name         = "Zimbabwean Dollar";
+  },
+  {
+    .id           = 900166;
+    .code         = "BTC";
+    .numeric_code = 0;
+    .minor_unit   = 8;
+    .is_crypto    = true;
+    .name         = "Bitcoin";
+  },
+  {
+    .id           = 900167;
+    .code         = "ETH";
+    .numeric_code = 0;
+    .minor_unit   = 18;
+    .is_crypto    = true;
+    .name         = "Ethereum";
+  },
+  {
+    .id           = 900168;
+    .code         = "SOL";
+    .numeric_code = 0;
+    .minor_unit   = 9;
+    .is_crypto    = true;
+    .name         = "Solana";
+  },
+  {
+    .id           = 900169;
+    .code         = "XRP";
+    .numeric_code = 0;
+    .minor_unit   = 6;
+    .is_crypto    = true;
+    .name         = "XRP";
+  },
+  {
+    .id           = 900170;
+    .code         = "BNB";
+    .numeric_code = 0;
+    .minor_unit   = 18;
+    .is_crypto    = true;
+    .name         = "BNB";
+  },
+  {
+    .id           = 900171;
+    .code         = "ADA";
+    .numeric_code = 0;
+    .minor_unit   = 6;
+    .is_crypto    = true;
+    .name         = "Cardano";
+  },
+  {
+    .id           = 900172;
+    .code         = "LTC";
+    .numeric_code = 0;
+    .minor_unit   = 8;
+    .is_crypto    = true;
+    .name         = "Litecoin";
+  },
+  {
+    .id           = 900173;
+    .code         = "DOT";
+    .numeric_code = 0;
+    .minor_unit   = 10;
+    .is_crypto    = true;
+    .name         = "Polkadot";
+  },
+  {
+    .id           = 900174;
+    .code         = "XMR";
+    .numeric_code = 0;
+    .minor_unit   = 12;
+    .is_crypto    = true;
+    .name         = "Monero";
+  },
+  {
+    .id           = 900175;
+    .code         = "ETC";
+    .numeric_code = 0;
+    .minor_unit   = 18;
+    .is_crypto    = true;
+    .name         = "Ethereum Classic";
+  },
+  {
+    .id           = 900176;
+    .code         = "BCH";
+    .numeric_code = 0;
+    .minor_unit   = 8;
+    .is_crypto    = true;
+    .name         = "Bitcoin Cash";
+  },
+  {
+    .id           = 900177;
+    .code         = "XLM";
+    .numeric_code = 0;
+    .minor_unit   = 7;
+    .is_crypto    = true;
+    .name         = "Stellar";
+  },
+  {
+    .id           = 900178;
+    .code         = "FIL";
+    .numeric_code = 0;
+    .minor_unit   = 18;
+    .is_crypto    = true;
+    .name         = "Filecoin";
+  },
+  {
+    .id           = 900179;
+    .code         = "ICP";
+    .numeric_code = 0;
+    .minor_unit   = 8;
+    .is_crypto    = true;
+    .name         = "Internet Computer";
+  },
+  {
+    .id           = 900180;
+    .code         = "TRX";
+    .numeric_code = 0;
+    .minor_unit   = 6;
+    .is_crypto    = true;
+    .name         = "TRON";
+  },
+  {
+    .id           = 900181;
+    .code         = "EOS";
+    .numeric_code = 0;
+    .minor_unit   = 4;
+    .is_crypto    = true;
+    .name         = "EOS";
+  },
+  {
+    .id           = 900182;
+    .code         = "VET";
+    .numeric_code = 0;
+    .minor_unit   = 18;
+    .is_crypto    = true;
+    .name         = "VeChain";
+  },
+  {
+    .id           = 900183;
+    .code         = "NEO";
+    .numeric_code = 0;
+    .minor_unit   = 0;
+    .is_crypto    = true;
+    .name         = "Neo";
+  },
+  {
+    .id           = 900184;
+    .code         = "ZEC";
+    .numeric_code = 0;
+    .minor_unit   = 8;
+    .is_crypto    = true;
+    .name         = "Zcash";
+  },
+  {
+    .id           = 900185;
+    .code         = "UNI";
+    .numeric_code = 0;
+    .minor_unit   = 18;
+    .is_crypto    = true;
+    .name         = "Uniswap";
+  },
+  {
+    .id           = 900186;
+    .code         = "ARB";
+    .numeric_code = 0;
+    .minor_unit   = 18;
+    .is_crypto    = true;
+    .name         = "Arbitrum";
+  },
+  {
+    .id           = 900187;
+    .code         = "SUI";
+    .numeric_code = 0;
+    .minor_unit   = 9;
+    .is_crypto    = true;
+    .name         = "Sui";
+  },
+  {
+    .id           = 900188;
+    .code         = "TON";
+    .numeric_code = 0;
+    .minor_unit   = 9;
+    .is_crypto    = true;
+    .name         = "Toncoin";
+  },
+  {
+    .id           = 900189;
+    .code         = "INJ";
+    .numeric_code = 0;
+    .minor_unit   = 18;
+    .is_crypto    = true;
+    .name         = "Injective";
+  },
+  {
+    .id           = 900190;
+    .code         = "SEI";
+    .numeric_code = 0;
+    .minor_unit   = 6;
+    .is_crypto    = true;
+    .name         = "Sei";
+  },
+  {
+    .id           = 900191;
+    .code         = "APT";
+    .numeric_code = 0;
+    .minor_unit   = 8;
+    .is_crypto    = true;
+    .name         = "Aptos";
+  },
+  {
+    .id           = 900192;
+    .code         = "TAO";
+    .numeric_code = 0;
+    .minor_unit   = 9;
+    .is_crypto    = true;
+    .name         = "Bittensor";
+  },
+  {
+    .id           = 900193;
+    .code         = "WIF";
+    .numeric_code = 0;
+    .minor_unit   = 6;
+    .is_crypto    = true;
+    .name         = "dogwifhat";
+  },
+  {
+    .id           = 900194;
+    .code         = "DOGE";
+    .numeric_code = 0;
+    .minor_unit   = 8;
+    .is_crypto    = true;
+    .name         = "Dogecoin";
+  },
+  {
+    .id           = 900195;
+    .code         = "LINK";
+    .numeric_code = 0;
+    .minor_unit   = 18;
+    .is_crypto    = true;
+    .name         = "Chainlink";
+  },
+  {
+    .id           = 900196;
+    .code         = "USDT";
+    .numeric_code = 0;
+    .minor_unit   = 6;
+    .is_crypto    = true;
+    .name         = "Tether";
+  },
+  {
+    .id           = 900197;
+    .code         = "USDC";
+    .numeric_code = 0;
+    .minor_unit   = 6;
+    .is_crypto    = true;
+    .name         = "USD Coin";
+  },
+  {
+    .id           = 900198;
+    .code         = "AVAX";
+    .numeric_code = 0;
+    .minor_unit   = 18;
+    .is_crypto    = true;
+    .name         = "Avalanche";
+  },
+  {
+    .id           = 900199;
+    .code         = "ATOM";
+    .numeric_code = 0;
+    .minor_unit   = 6;
+    .is_crypto    = true;
+    .name         = "Cosmos";
+  },
+  {
+    .id           = 900200;
+    .code         = "POL";
+    .numeric_code = 0;
+    .minor_unit   = 18;
+    .is_crypto    = true;
+    .name         = "Polygon";
+  },
+  {
+    .id           = 900201;
+    .code         = "NEAR";
+    .numeric_code = 0;
+    .minor_unit   = 24;
+    .is_crypto    = true;
+    .name         = "NEAR Protocol";
+  },
+  {
+    .id           = 900202;
+    .code         = "ALGO";
+    .numeric_code = 0;
+    .minor_unit   = 6;
+    .is_crypto    = true;
+    .name         = "Algorand";
+  },
+  {
+    .id           = 900203;
+    .code         = "HBAR";
+    .numeric_code = 0;
+    .minor_unit   = 8;
+    .is_crypto    = true;
+    .name         = "Hedera";
+  },
+  {
+    .id           = 900204;
+    .code         = "AAVE";
+    .numeric_code = 0;
+    .minor_unit   = 18;
+    .is_crypto    = true;
+    .name         = "Aave";
+  },
+  {
+    .id           = 900205;
+    .code         = "MKR";
+    .numeric_code = 0;
+    .minor_unit   = 18;
+    .is_crypto    = true;
+    .name         = "Maker";
+  },
+  {
+    .id           = 900206;
+    .code         = "DAI";
+    .numeric_code = 0;
+    .minor_unit   = 18;
+    .is_crypto    = true;
+    .name         = "Dai";
+  },
+  {
+    .id           = 900207;
+    .code         = "STX";
+    .numeric_code = 0;
+    .minor_unit   = 6;
+    .is_crypto    = true;
+    .name         = "Stacks";
+  },
+  {
+    .id           = 900208;
+    .code         = "GRT";
+    .numeric_code = 0;
+    .minor_unit   = 18;
+    .is_crypto    = true;
+    .name         = "The Graph";
+  },
+  {
+    .id           = 900209;
+    .code         = "LDO";
+    .numeric_code = 0;
+    .minor_unit   = 18;
+    .is_crypto    = true;
+    .name         = "Lido DAO";
+  },
+  {
+    .id           = 900210;
+    .code         = "BONK";
+    .numeric_code = 0;
+    .minor_unit   = 5;
+    .is_crypto    = true;
+    .name         = "Bonk";
+  },
+  {
+    .id           = 900211;
+    .code         = "PEPE";
+    .numeric_code = 0;
+    .minor_unit   = 18;
+    .is_crypto    = true;
+    .name         = "Pepe";
+  },
+  {
+    .id           = 900212;
+    .code         = "SHIB";
+    .numeric_code = 0;
+    .minor_unit   = 18;
+    .is_crypto    = true;
+    .name         = "Shiba Inu";
+  },
+  {
+    .id           = 900213;
+    .code         = "JUP";
+    .numeric_code = 0;
+    .minor_unit   = 6;
+    .is_crypto    = true;
+    .name         = "Jupiter";
+  },
+  {
+    .id           = 900214;
+    .code         = "PYTH";
+    .numeric_code = 0;
+    .minor_unit   = 6;
+    .is_crypto    = true;
+    .name         = "Pyth Network";
+  },
+  {
+    .id           = 900215;
+    .code         = "RUNE";
+    .numeric_code = 0;
+    .minor_unit   = 8;
+    .is_crypto    = true;
+    .name         = "THORChain";
   }
 ];

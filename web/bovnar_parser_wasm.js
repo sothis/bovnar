@@ -44,7 +44,7 @@
   };
 
   var wasm = null;
-  import('./bovnar_wasm.js?v=aab87d55405b')
+  import('./bovnar_wasm.js?v=21e443c8de7e')
     .then(function (m) { return m.loadBovnar(); })
     .then(function (b) {
       wasm = b;

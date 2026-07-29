@@ -22,7 +22,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <meta property="article:published_time" content="2026-05-14">
-<meta property="article:modified_time" content="2026-07-28">
+<meta property="article:modified_time" content="2026-07-29">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar Python Bindings">
@@ -32,7 +32,7 @@
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
 <link rel="alternate" type="text/markdown" href="/doc/09_bovnar_python_bindings.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Python Bindings", "description": "The pure-ctypes Bovnar Python package: loads/dumps, the streaming reader, the DOM, Quantity, and the NumPy and Pint bridges.", "url": "https://www.bovnar.io/docs/python/", "mainEntityOfPage": "https://www.bovnar.io/docs/python/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-07-28", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Python Bindings", "item": "https://www.bovnar.io/docs/python/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Python Bindings", "description": "The pure-ctypes Bovnar Python package: loads/dumps, the streaming reader, the DOM, Quantity, and the NumPy and Pint bridges.", "url": "https://www.bovnar.io/docs/python/", "mainEntityOfPage": "https://www.bovnar.io/docs/python/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-07-29", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Python Bindings", "item": "https://www.bovnar.io/docs/python/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
@@ -1843,11 +1843,14 @@ before the <code>Event.DATA</code> event.</p>
 <code>write_float</code>, etc., the unit resolves to <code>BVN_UNIT_NONE</code> (zero components),
 matching the C convenience helpers. No unit annotation is emitted in this
 case. Passing <code>unit_si_base</code> or <code>unit_iec_base</code> produces a unit with one
-component; the <code>_SENTINEL</code>-only <code>no_unit</code> keyword is only produced when the
+component; the <code>no_unit</code> keyword is only produced when the
 caller explicitly constructs a dimensionless <code>ValueUnit</code> with <code>BaseUnit.NONE</code>.</p>
 <hr />
 <h2 id="18-baseunit-enum">18. <code>BaseUnit</code> enum</h2>
-<p>The <code>BaseUnit</code> enum mirrors the full C <code>value_base_unit_e</code>:</p>
+<p>The <code>BaseUnit</code> enum mirrors the C <code>value_base_unit_e</code> for the two blocks of
+the id space that have Python names: the native units (block 10) and the
+currencies (block 90). See doc/05 §12.1 for the block layout — an id's leading
+two digits name the vocabulary it comes from.</p>
 <table>
 <thead>
 <tr>
@@ -1861,213 +1864,211 @@ caller explicitly constructs a dimensionless <code>ValueUnit</code> with <code>B
 <td><code>NONE</code></td>
 </tr>
 <tr>
-<td>1–2</td>
+<td>100000–100001</td>
 <td><code>BIT</code>, <code>BYTE</code></td>
 </tr>
 <tr>
-<td>3–9</td>
+<td>100002–100008</td>
 <td>SI base units (<code>SECOND</code> … <code>CANDELA</code>)</td>
 </tr>
 <tr>
-<td>10–28</td>
+<td>100009–100027</td>
 <td>Named SI derived units (<code>HERTZ</code> … <code>KATAL</code>)</td>
 </tr>
 <tr>
-<td>29–44</td>
+<td>100028–100043</td>
 <td>Non-SI accepted units (<code>LITER</code> … <code>YEAR</code>)</td>
 </tr>
 <tr>
-<td>45–54</td>
+<td>100044–100053</td>
 <td>Imperial/US length (<code>INCH</code> … <code>FATHOM</code>)</td>
 </tr>
 <tr>
-<td>55–62</td>
+<td>100054–100061</td>
 <td>Imperial/US mass (<code>POUND</code> … <code>CARAT</code>)</td>
 </tr>
 <tr>
-<td>63</td>
+<td>100062</td>
 <td><code>FAHRENHEIT</code></td>
 </tr>
 <tr>
-<td>64–67</td>
+<td>100063–100066</td>
 <td>Pressure (<code>ATMOSPHERE</code> … <code>PSI</code>)</td>
 </tr>
 <tr>
-<td>68–71</td>
+<td>100067–100070</td>
 <td>Energy (<code>CALORIE</code> … <code>THERM</code>)</td>
 </tr>
 <tr>
-<td>72</td>
+<td>100071</td>
 <td><code>HORSEPOWER</code></td>
 </tr>
 <tr>
-<td>73–75</td>
+<td>100072–100074</td>
 <td>Force (<code>POUND_FORCE</code>, <code>DYNE</code>, <code>KIP</code>)</td>
 </tr>
 <tr>
-<td>76</td>
+<td>100075</td>
 <td><code>KNOT</code></td>
 </tr>
 <tr>
-<td>77–85</td>
+<td>100076–100084</td>
 <td>US volume (<code>GALLON</code> … <code>BARREL</code>)</td>
 </tr>
 <tr>
-<td>86–87</td>
+<td>100085–100086</td>
 <td>Area (<code>ACRE</code>, <code>BARN</code>)</td>
 </tr>
 <tr>
-<td>88–90</td>
+<td>100087–100089</td>
 <td>Angle (<code>ARCMINUTE</code>, <code>ARCSECOND</code>, <code>GRAD</code>)</td>
 </tr>
 <tr>
-<td>91–98</td>
+<td>100090–100097</td>
 <td>CGS units (<code>POISE</code> … <code>GALILEO</code>)</td>
 </tr>
 <tr>
-<td>99–101</td>
+<td>100098–100100</td>
 <td>Radiation (<code>CURIE</code>, <code>ROENTGEN</code>, <code>REM</code>)</td>
 </tr>
 <tr>
-<td>102–103</td>
+<td>100101–100102</td>
 <td>Logarithmic (<code>NEPER</code>, <code>DECIBEL</code>)</td>
 </tr>
 <tr>
-<td>104</td>
+<td>100103</td>
 <td><code>RANKINE</code></td>
 </tr>
 <tr>
-<td>105</td>
+<td>100104</td>
 <td><code>SLUG</code></td>
 </tr>
 <tr>
-<td>106</td>
+<td>100105</td>
 <td><code>THOU</code></td>
 </tr>
 <tr>
-<td>107–109</td>
+<td>100106–100108</td>
 <td>UK imperial volume (<code>PINT_UK</code>, <code>FLUID_OUNCE_UK</code>, <code>QUART_UK</code>)</td>
 </tr>
 <tr>
-<td>110–111</td>
+<td>100109–100110</td>
 <td>Electrical power (<code>VAR</code>, <code>VOLT_AMPERE</code>)</td>
 </tr>
 <tr>
-<td>112</td>
+<td>100111</td>
 <td><code>KILOGRAM_FORCE</code></td>
 </tr>
 <tr>
-<td>113</td>
+<td>100112</td>
 <td><code>INCH_HG</code></td>
 </tr>
 <tr>
-<td>114</td>
+<td>100113</td>
 <td><code>RPM</code></td>
 </tr>
 <tr>
-<td>115</td>
+<td>100114</td>
 <td><code>FOOT_POUND</code></td>
 </tr>
 <tr>
-<td>116–117</td>
+<td>100115–100116</td>
 <td>Mass additional (<code>DRAM</code>, <code>PENNYWEIGHT</code>)</td>
 </tr>
 <tr>
-<td>118–119</td>
+<td>100117–100118</td>
 <td>Length additional (<code>CHAIN</code>, <code>ROD</code>)</td>
 </tr>
 <tr>
-<td>120–121</td>
+<td>100119–100120</td>
 <td>Volume additional (<code>GILL</code>, <code>GILL_UK</code>)</td>
 </tr>
 <tr>
-<td>122</td>
+<td>100121</td>
 <td><code>STANDARD_GRAVITY</code></td>
 </tr>
 <tr>
-<td>123</td>
+<td>100122</td>
 <td><code>METRIC_HORSEPOWER</code></td>
 </tr>
 <tr>
-<td>124</td>
+<td>100123</td>
 <td><code>REVOLUTION</code></td>
 </tr>
 <tr>
-<td>125–126</td>
+<td>100124–100125</td>
 <td>Time additional (<code>MONTH</code>, <code>FORTNIGHT</code>)</td>
 </tr>
 <tr>
-<td>127</td>
+<td>100126</td>
 <td><code>ATMOSPHERE_TECHNICAL</code></td>
 </tr>
 <tr>
-<td>128–129</td>
+<td>100127–100128</td>
 <td>Textile linear density (<code>TEX</code>, <code>DENIER</code>)</td>
 </tr>
 <tr>
-<td>130–133</td>
+<td>100129–100132</td>
 <td>Apothecary/dry volume (<code>FLUID_DRAM</code>, <code>MINIM</code>, <code>PECK</code>, <code>BUSHEL</code>)</td>
 </tr>
 <tr>
-<td>134–297</td>
-<td>ISO 4217 fiat currencies (<code>AED</code> … <code>ZWL</code>) — see <code>CURRENCY_FIAT_FIRST</code> / <code>CURRENCY_FIAT_LAST</code></td>
-</tr>
-<tr>
-<td>298–347</td>
-<td>Cryptocurrencies (<code>BTC</code> … <code>RUNE</code>) — see <code>CURRENCY_CRYPTO_FIRST</code> / <code>CURRENCY_CRYPTO_LAST</code></td>
-</tr>
-<tr>
-<td>348–360</td>
+<td>100133–100145</td>
 <td>Historical German units (<code>PFUND</code>, <code>ZENTNER</code>, <code>DOPPELZENTNER</code>, <code>LOT</code>, Prussian line/zoll/fuss/elle/rute, <code>KLAFTER</code>, <code>GERMAN_MILE</code>, <code>MORGEN</code>, <code>SCHEFFEL</code>)</td>
 </tr>
 <tr>
-<td>361–367</td>
+<td>100146–100152</td>
 <td>Additional physical units (<code>SURVEY_FOOT</code>, <code>LEAGUE</code>, <code>CABLE</code>, <code>HAND</code>, <code>QUINTAL</code>, <code>SCRUPLE</code>, <code>BAUD</code>)</td>
 </tr>
 <tr>
-<td>368–371</td>
+<td>100153–100156</td>
 <td>Temperature scales (<code>DELISLE</code>, <code>NEWTON_TEMP</code>, <code>REAUMUR</code>, <code>ROMER</code>)</td>
 </tr>
 <tr>
-<td>372–377</td>
+<td>100157–100162</td>
 <td>Ratio/proportion units (<code>PERCENT</code>, <code>PER_MILLE</code>, <code>PER_MYRIAD</code>, <code>PER_CENT_MILLE</code>, <code>PPM</code>, <code>PPB</code>)</td>
 </tr>
 <tr>
-<td>378–379</td>
-<td>Appended fiat currencies (<code>ZWG</code>, <code>XCG</code>) — added past the unit block for ABI stability; see <code>CURRENCY_EXT_FIRST</code> / <code>CURRENCY_EXT_LAST</code></td>
-</tr>
-<tr>
-<td>380</td>
+<td>100163</td>
 <td><code>PH_SCALE</code></td>
 </tr>
 <tr>
-<td>381–382</td>
+<td>100164–100165</td>
 <td>Named speed units (<code>MILE_PER_HOUR</code>, <code>KILOMETER_PER_HOUR</code>)</td>
 </tr>
 <tr>
-<td>383–387</td>
+<td>100166–100170</td>
 <td>Water hardness (<code>GERMAN_HARDNESS</code>, <code>ENGLISH_HARDNESS</code>, <code>FRENCH_HARDNESS</code>, <code>RUSSIAN_HARDNESS</code>, <code>AMERICAN_HARDNESS</code>)</td>
 </tr>
 <tr>
-<td>388–389</td>
+<td>100171–100172</td>
 <td>Concentration (<code>VAL</code>, <code>GRAINS_PER_GALLON</code>)</td>
 </tr>
 <tr>
-<td>390–396</td>
+<td>100173–100179</td>
 <td>Turbidity, salinity and conductivity (<code>TURBIDITY_NTU</code>, <code>TURBIDITY_FNU</code>, <code>PRACTICAL_SALINITY</code>, <code>CONDUCTIVITY_FACTOR</code>, <code>TURBIDITY_FTU</code>, <code>TURBIDITY_FAU</code>, <code>TURBIDITY_JTU</code>)</td>
 </tr>
 <tr>
-<td>397</td>
-<td><code>_SENTINEL</code> (internal bound; do not use)</td>
+<td>900000–900165</td>
+<td>ISO 4217 fiat currencies (<code>AED</code> … <code>ZWL</code>), block 90 — see <code>CURRENCY_FIRST</code></td>
+</tr>
+<tr>
+<td>900166–900215</td>
+<td>Cryptocurrencies (<code>BTC</code> … <code>RUNE</code>), the rest of block 90 — see <code>CURRENCY_LAST</code></td>
 </tr>
 </tbody>
 </table>
+<p>There is <strong>no <code>_SENTINEL</code></strong>. It named one past the highest member, which the C
+tables were once indexed and bounded by; those tables are indexed by a dense
+slot now, and over a blocked, sparse space a "one past the end" number would
+only invite the bounds check it can no longer support. Use <code>UNIT_NATIVE_FIRST</code>
+/ <code>UNIT_NATIVE_LAST</code> / <code>CURRENCY_FIRST</code> / <code>CURRENCY_LAST</code>, or ask
+<code>bovnar.currency.is_currency</code>.</p>
 <blockquote>
-<p><strong>The profile opaque block is not in this enum.</strong> The C <code>value_base_unit_t</code>
-continues past 397 with the profile-only units — UCUM's arbitrary atoms and
-UNECE's package and count codes (doc/11 §7.1) — and <code>BaseUnit</code> deliberately
-stops before them, because they have no native spelling for a Python name to
-mirror. A unit carrying one is still fully usable: <code>parse_unit</code>, <code>unit_to_str</code>,
+<p><strong>The profiles' opaque units are not in this enum.</strong> The C
+<code>value_base_unit_t</code> also has blocks 20–60 for the profile-only units — UCUM's
+arbitrary atoms and UN/ECE's package and count codes (doc/11 §7.1) — and
+<code>BaseUnit</code> deliberately omits them, because they have no native spelling for a
+Python name to mirror. A unit carrying one is still fully usable: <code>parse_unit</code>, <code>unit_to_str</code>,
 <code>unit_is_profile_only</code> and the comparison helpers all handle it, and
 <code>unit_to_str</code> returns the profile notation (<code>"unece:XBX"</code>). Only the
 <code>BaseUnit(...)</code> <em>constructor</em> will refuse such a value, so do not call it on a

@@ -542,7 +542,7 @@ Old German units fall into metric-compatible units (still in use in DACH regions
 > Zoll = Fuß/12, Linie = Zoll/12, Rute = 12 Fuß, Klafter = 6 Fuß, Elle = 25½ Zoll, Morgen = 180
 > square Ruten. `test_unit_factors_derived.py` checks each of them against that definition.
 
-> The enum values for German units occupy positions **348–360**, placed after the entire currency range (134–347). Additional physical units (survey foot, league, cable, hand, quintal, scruple, baud) occupy positions **361–367**. Historical temperature scales (Delisle, Newton, Réaumur, Rømer) occupy positions **368–371**, and the dimensionless ratio units (`bu_percent` … `bu_ppb`) occupy positions **372–377**. The ABI-stable currency extension segment (`bu_zwg`, `bu_xcg`) occupies positions **378–379**, appended after the unit block so adding a currency never shifts an existing enum value. Physical units resume after it at **380–396** (`bu_ph_scale` … `bu_turbidity_jtu`), and a further one would be appended there. The **opaque block** of the unit profiles (under implementation) occupies **397–453**, above every native unit — a range test is what makes those units incommensurable (see [Unit Profiles](11_bovnar_unit_profiles.md)), so a native unit appended past 397 would silently join them. The block is shared by every profile that contributes profile-only units: UCUM's arbitrary atoms take **397–428** and UNECE's package and count codes **429–453**, and `gen_profiles.py` assigns the ids in registry order rather than the data files hand-numbering them. `BVN_VALUE_BASE_UNIT_COUNT` is a `#define` equal to **454**, held to the highest enumerator by the static assert `BVN_PROFILE_OPAQUE_LAST + 1 == BVN_VALUE_BASE_UNIT_COUNT` in `src/utils/bvn_internal_dims.h`; a second assert there pins `bu_turbidity_jtu < BVN_PROFILE_OPAQUE_FIRST`. Currencies begin at 134, immediately after the last non-German physical unit.
+> The German units carry ids **100133–100145**, inside the native unit block like every other physical unit — see §12.1 for the block layout. They used to sit at 348–360, appended past the whole currency range, because the id space was one flat counter and the currencies had been dropped into the middle of it. The space is blocked now, so a unit's id no longer says anything about when it was added.
 
 ### 3.21 Additional Length Units
 
@@ -1098,7 +1098,11 @@ Because the sigil is mandatory, a bare uppercase code can never collide with a p
 
 ### 9.2 ISO 4217 Fiat Currencies and Precious Metals
 
-166 ISO 4217 alphabetic codes are supported, including precious-metal X-codes. The original 164 occupy the `value_base_unit_t` slot range **134 … 297** in alphabetical order (AED first, ZWL last) with one exception — `SSP` precedes `SRD` at slots 260/261. Nothing depends on the ordering (`bvn_parse_currency_str` scans linearly) and the slots are ABI-frozen, so the pair stays as it is, and — unlike physical units — have **no named `bu_*` enumerators**: such a currency is resolved from its `$`-sigil code by `bvn_parse_currency_str` and carried as the numeric `base` value (the currency catalogue in `bovnar_currency.c` is index-aligned to these slots). Currencies added after that range was frozen are **appended past the unit block** at slots **378 … 379** — an *extension segment* (`bu_zwg`, `bu_xcg`) reached via `bvn_currency_index` rather than the direct 134-based indexing — so that adding a currency never shifts an existing enum value (ABI stability). Four codes are historical and retained for compatibility: `HRK` (Croatian Kuna, retired 2023-01-01 when Croatia adopted the Euro), `SLL` (Sierra Leonean Leone (old), replaced by `SLE` in 2022), `ZWL` (Zimbabwean Dollar, superseded by `ZWG` Zimbabwe Gold in 2024), and `BGN` (Bulgarian Lev, retired 2026-01-01 when Bulgaria adopted the Euro); `ANG` (Netherlands Antillean Guilder) likewise coexists with its successor `XCG` (Caribbean Guilder, which inherits ANG's numeric code 532).
+166 ISO 4217 alphabetic codes are supported, including precious-metal X-codes. They occupy the front of **block 90** of the `value_base_unit_t` id space (§12.1) — ids **900000 … 900165**, alphabetical from `AED` to `ZWL` — and, unlike physical units, have **no named `bu_*` enumerators**: such a currency is resolved from its `$`-sigil code by `bvn_parse_currency_str` and carried as the numeric `base` value. The catalogue in `bovnar_currency.c` is index-aligned to the block, so a lookup is `base - BVN_CURRENCY_FIRST`.
+
+The alphabetical order is a convenience, not a contract. Whether a currency is fiat or crypto is a **column of the catalogue**, read by `bvn_unit_is_fiat` / `bvn_unit_is_crypto`, not a sub-range of the ids — so a new currency of either kind appends at the end of `currencies.bvnr` and renumbers nothing. Before 2.0 it *was* a sub-range, which is why `ZWG` and `XCG` had to be stranded at 378–379 outside the currency range entirely; the block has 10 000 ids and they are ordinary rows now.
+
+Four codes are historical and retained for compatibility: `HRK` (Croatian Kuna, retired 2023-01-01 when Croatia adopted the Euro), `SLL` (Sierra Leonean Leone (old), replaced by `SLE` in 2022), `ZWL` (Zimbabwean Dollar, superseded by `ZWG` Zimbabwe Gold in 2024), and `BGN` (Bulgarian Lev, retired 2026-01-01 when Bulgaria adopted the Euro); `ANG` (Netherlands Antillean Guilder) likewise coexists with its successor `XCG` (Caribbean Guilder, which inherits ANG's numeric code 532).
 
 The `minor_unit` field carries the exponent N such that 1 major unit = 10^N minor units (e.g. 1 USD = 100 cents, N=2). Applications reading integer-annotated values (e.g. `<uint:64,$KWD>`) should call `bvn_currency_minor_unit` to determine the correct decimal shift. Minor units are **bold** below when they differ from 2. `Num` is the ISO 4217 numeric identifier.
 
@@ -1275,7 +1279,7 @@ The `minor_unit` field carries the exponent N such that 1 major unit = 10^N mino
 
 ### 9.3 Cryptocurrencies
 
-50 cryptocurrencies are supported, with 3- or 4-letter uppercase tickers. They occupy `value_base_unit_t` slots **298 … 347** and, like the fiat codes, have **no named `bu_*` enumerators** — they are resolved by `bvn_parse_currency_str` and carried as the numeric `base` value. The `minor_unit` field holds the canonical on-chain decimal places. `numeric_code = 0` for all cryptocurrencies.
+50 cryptocurrencies are supported, with 3- or 4-letter uppercase tickers. They occupy ids **900166 … 900215**, after the fiat codes in the same block 90, and like them have **no named `bu_*` enumerators** — they are resolved by `bvn_parse_currency_str` and carried as the numeric `base` value. That they happen to follow the fiat run carries no meaning: `bvn_unit_is_crypto` reads the catalogue row, not the id (§9.2). The `minor_unit` field holds the canonical on-chain decimal places. `numeric_code = 0` for all cryptocurrencies.
 
 > **Min** = `minor_unit` = on-chain decimal places. E.g. `<uint:64,$BTC>` stores satoshis; divide by 10⁸ to obtain whole BTC.
 
@@ -1522,14 +1526,32 @@ typedef enum iec_prefix_id_e {
 
 #### `value_base_unit_t`
 
-Non-German physical units occupy positions 1–133 (`bu_bit` … `bu_bushel`). Currency codes occupy positions 134–347 — an unnamed slot range (no `bu_*` enumerators; see §9.2/§9.3). German physical units are appended after the entire currency range at positions 348–360 (`bu_pfund` … `bu_scheffel`). Additional physical units occupy positions 361–367 (`bu_survey_foot` … `bu_baud`), historical temperature scales 368–371 (`bu_delisle` … `bu_romer`), and dimensionless ratio units 372–377 (`bu_percent` … `bu_ppb`). Physical units resume past the currency extension at 380–396 (`bu_ph_scale` … `bu_turbidity_jtu`). `bvn_unit_is_currency(base)` returns `true` for any value in the range 134–347 or the extension slots 378–379 (`bu_zwg`, `bu_xcg`).
+A base unit's id is **blocked**, not a running counter: the leading two decimal digits name the vocabulary it comes from and the four digits after them its position within that vocabulary. Each block therefore holds 10 000 ids, and a vocabulary that grows shifts nothing outside itself.
+
+| Block | Ids | Vocabulary | Source |
+|-------|-----|------------|--------|
+| 10 | 100000–109999 | native bovnar units | `src/gendata/units.bvnr` |
+| 20 | 200000–209999 | UCUM opaque units | `src/gendata/ucum.bvnr` |
+| 30 | 300000–309999 | UN/ECE opaque units | `src/gendata/unece.bvnr` |
+| 40 | 400000–409999 | QUDT opaque units | `src/gendata/qudt.bvnr` |
+| 50 | 500000–509999 | QUDT quantity kinds | `src/gendata/qudt-qk.bvnr` |
+| 60 | 600000–609999 | UDUNITS-2 opaque units | `src/gendata/udunits.bvnr` |
+| 90 | 900000–909999 | currencies | `src/gendata/currencies.bvnr` |
+
+`bu_none` is 0 and belongs to no block; blocks 70 and 80 are free for a further profile. Within block 10 the 180 native units run contiguously from `bu_bit` = 100000 to `bu_turbidity_jtu` = 100179, in the order of `units.bvnr`. Currencies run contiguously from 900000 and — unlike every other block — have **no named `bu_*` enumerators** (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a `$` sigil, resolved by `bvn_parse_currency_str` and carried as the numeric `base` value. `bvn_unit_is_currency(base)` is a bounds check over block 90.
+
+Only a vocabulary that contributes units of its *own* takes a block. A unit profile is a spelling for the unit slot, so most of its codes translate to native units and carry native ids; the ones that get a block id of their own are the **opaque** units — codes with no native equivalent and no dimension, such as UCUM's assay-defined `[IU]` or UN/ECE's package types — which need an identity precisely because nothing else can stand in for them.
+
+> **Why blocks.** One flat counter makes every vocabulary's ids a function of every other vocabulary's size, and that was not hypothetical. This space previously had physical units at 1–133 *and again* at 348–396 because the currencies had been dropped in between; two currencies stranded at 378–379, outside their own range, because that range had been frozen; and the profiles' units pinned above all of it. Adding a currency shifted units. The 2.0 renumbering ended that, and made an id self-describing: 200017 is UCUM's, whatever else the build contains.
+>
+> The price is a **sparse** space, so do not index an array by a base unit id. The library's own tables are dense, one row per defined unit, indexed by `bvni_unit_slot()`; `BVN_UNIT_SLOT_COUNT` is that row count. A bounds check is no longer a membership test either — ask `bvn_unit_valid` on the unit, or `bvn_unit_is_currency` on the base.
 
 ```c
 typedef enum value_base_unit_e {
-    bu_none = 0,            /* dimensionless / no unit        */
+    bu_none = 0,            /* dimensionless / no unit; in no block */
 
-    /* Digital */
-    bu_bit, bu_byte,
+    /* Digital — block 10 opens here */
+    bu_bit = 100000, bu_byte,
 
     /* SI base */
     bu_second, bu_meter, bu_gram, bu_ampere, bu_kelvin,
@@ -1644,36 +1666,41 @@ typedef enum value_base_unit_e {
     /* Apothecary / dry volume */
     bu_fluid_dram, bu_minim, bu_peck, bu_bushel,
 
-    /* Slots 134–347 are the ISO 4217 fiat (134–297) and cryptocurrency
-     * (298–347) ranges. These have NO named enumerators: the enum jumps
-     * straight from bu_bushel (133) to bu_pfund (348). Currencies are
-     * resolved by string via bvn_parse_currency_str and carried as the
-     * numeric base value; the catalogue in bovnar_currency.c is index-
-     * aligned to slots 134–347 (BVN_CURRENCY_FIAT_FIRST … CRYPTO_LAST). */
-
-    /* Old German — placed after the currency range */
-    bu_pfund = 348, bu_zentner, bu_doppelzentner, bu_lot,
+    /* Old German */
+    bu_pfund, bu_zentner, bu_doppelzentner, bu_lot,
     bu_prussian_line, bu_prussian_zoll, bu_prussian_fuss,
     bu_prussian_elle, bu_prussian_rute, bu_klafter,
-    bu_german_mile, bu_morgen, bu_scheffel,  /* = 360 */
+    bu_german_mile, bu_morgen, bu_scheffel,
 
     /* Additional physical units */
     bu_survey_foot, bu_league, bu_cable, bu_hand,
-    bu_quintal, bu_scruple, bu_baud,  /* = 367 */
+    bu_quintal, bu_scruple, bu_baud,
 
     /* Historical temperature scales */
-    bu_delisle, bu_newton_temp, bu_reaumur, bu_romer,  /* = 371 */
+    bu_delisle, bu_newton_temp, bu_reaumur, bu_romer,
 
     /* Dimensionless ratio units */
     bu_percent, bu_per_mille, bu_per_myriad,
-    bu_per_cent_mille, bu_ppm, bu_ppb,  /* = 377 */
+    bu_per_cent_mille, bu_ppm, bu_ppb,
 
-    /* ABI-stable currency extension segment, appended after the unit block. */
-    bu_zwg = 378, bu_xcg,               /* = 378, 379 */
+    /* … water hardness, turbidity and the rest of block 10, up to
+     * bu_turbidity_jtu = 100179. The whole run is generated into
+     * include/bovnar_units.gen.h from src/gendata/units.bvnr. */
+
+    /* Block 90 — the currencies — has NO named enumerators: a currency is
+     * resolved by string via bvn_parse_currency_str and carried as the
+     * numeric base value, and the catalogue in bovnar_currency.c is
+     * index-aligned to BVN_CURRENCY_FIRST. */
+
+    /* Blocks 20–60 — the profiles' opaque units — are generated into
+     * include/bovnar_profiles.gen.h: bu_ucum_iu = 200000, bu_unece_one =
+     * 300000, and so on. */
 } value_base_unit_t;
 
-/* Total slot count — defined separately, not an enum member: */
-/* #define BVN_VALUE_BASE_UNIT_COUNT 380  (bu_xcg + 1) */
+/* Not a member of the enum, and NOT a bound on it: the number of rows in the
+ * dense tables the library indexes by bvni_unit_slot(). The id space is
+ * sparse, so it has no "one past the end". */
+/* #define BVN_UNIT_SLOT_COUNT 247 */
 ```
 
 #### `unit_exponent_t`

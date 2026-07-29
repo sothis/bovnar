@@ -42,7 +42,7 @@ TestFromCodeCaseFolding     — from_code accepts "usd", "USD", "Usd"
 TestFromCodeUnknown         — from_code raises KeyError for garbage input
 TestCurrencyCodeUnique      — no two entries share the same code string
 TestEnumCoverageComplete    — every BaseUnit in the currency range has a table entry
-TestBaseUnitSentinel        — _SENTINEL value matches expected count
+TestBaseUnitBlocks          — the id space's blocks, and no sentinel
 TestPrefixRulesC            — bvn_currency_prefix_valid contract (pure-C contract)
 TestParseCurrencyStr        — bvn_parse_currency_str contract (pure-C contract)
 TestParseCurrencyStrRejects — parser rejects non-currency tokens
@@ -61,12 +61,12 @@ import pytest
 
 from bovnar.enums import (
     BaseUnit,
-    CURRENCY_FIAT_FIRST,
-    CURRENCY_FIAT_LAST,
-    CURRENCY_CRYPTO_FIRST,
-    CURRENCY_CRYPTO_LAST,
-    CURRENCY_EXT_FIRST,
-    CURRENCY_EXT_LAST,
+    CURRENCY_COUNT,
+    CURRENCY_FIRST,
+    CURRENCY_LAST,
+    UNIT_BLOCK_SIZE,
+    UNIT_NATIVE_FIRST,
+    UNIT_NATIVE_LAST,
 )
 from bovnar.currency import (
     CurrencyInfo,
@@ -87,57 +87,48 @@ from bovnar.currency import (
 # ── helpers ────────────────────────────────────────────────────────────────
 
 def _all_currency_bases() -> list[BaseUnit]:
-    main = range(int(CURRENCY_FIAT_FIRST), int(CURRENCY_CRYPTO_LAST) + 1)
-    ext = range(int(CURRENCY_EXT_FIRST), int(CURRENCY_EXT_LAST) + 1)
-    return [b for b in BaseUnit if int(b) in main or int(b) in ext]
+    block = range(int(CURRENCY_FIRST), int(CURRENCY_LAST) + 1)
+    return [b for b in BaseUnit if int(b) in block]
 
 
 # ── TestEnumContiguity ─────────────────────────────────────────────────────
 
 class TestEnumContiguity:
-    def test_fiat_first_value(self):
-        assert int(CURRENCY_FIAT_FIRST) == 134
+    """Block 90 of the base-unit id space: one contiguous run, ascending.
 
-    def test_fiat_last_value(self):
-        assert int(CURRENCY_FIAT_LAST) == 297
+    The catalogue is positional — a currency's table index is its id minus
+    CURRENCY_FIRST — so a hole in the run is a row that reads back as a
+    currency with no data behind it.
+    """
 
-    def test_crypto_first_value(self):
-        assert int(CURRENCY_CRYPTO_FIRST) == 298
+    def test_block_start(self):
+        assert int(CURRENCY_FIRST) == 900000
 
-    def test_crypto_last_value(self):
-        assert int(CURRENCY_CRYPTO_LAST) == 347
-
-    def test_sentinel_value(self):
-        assert int(BaseUnit._SENTINEL) == 397
-
-    def test_fiat_range_size(self):
-        assert int(CURRENCY_FIAT_LAST) - int(CURRENCY_FIAT_FIRST) + 1 == 164
-
-    def test_crypto_range_size(self):
-        assert int(CURRENCY_CRYPTO_LAST) - int(CURRENCY_CRYPTO_FIRST) + 1 == 50
+    def test_run_is_contiguous(self):
+        bases = sorted(int(b) for b in _all_currency_bases())
+        assert bases == list(range(int(CURRENCY_FIRST), int(CURRENCY_LAST) + 1))
 
     def test_total_currency_count(self):
-        assert len(_all_currency_bases()) == 216  # 214 main block + 2 ext
+        assert len(_all_currency_bases()) == CURRENCY_COUNT == 216
 
-    def test_no_gap_between_fiat_and_crypto(self):
-        assert int(CURRENCY_CRYPTO_FIRST) == int(CURRENCY_FIAT_LAST) + 1
+    def test_fits_inside_its_block(self):
+        assert CURRENCY_COUNT <= UNIT_BLOCK_SIZE
 
-    def test_physical_units_end_before_fiat(self):
-        assert int(BaseUnit.BUSHEL) == 133
-        assert int(CURRENCY_FIAT_FIRST) == 134
+    def test_units_and_currencies_do_not_overlap(self):
+        # Different blocks, so no unit id can also be a currency id — which is
+        # what makes CUP-the-volume and CUP-the-peso structurally distinct
+        # rather than merely distinct today.
+        assert int(UNIT_NATIVE_LAST) < int(CURRENCY_FIRST)
+        assert int(CURRENCY_FIRST) - int(UNIT_NATIVE_FIRST) > UNIT_BLOCK_SIZE
 
-    def test_ext_currency_values(self):
-        assert int(BaseUnit.ZWG) == 378
-        assert int(BaseUnit.XCG) == 379
-        assert int(CURRENCY_EXT_FIRST) == 378
-        assert int(CURRENCY_EXT_LAST) == 379
-
-    def test_ext_segment_follows_unit_block(self):
-        # The extension segment sits just past the last unit (PPB=377), not
-        # inside the 134-347 currency region — that placement is what keeps every
-        # existing enum value stable when a currency is added.
-        assert int(BaseUnit.PPB) == 377
-        assert int(CURRENCY_EXT_FIRST) == int(BaseUnit.PPB) + 1
+    def test_currencies_added_after_release_are_ordinary_rows(self):
+        # ZWG and XCG used to be an "extension segment" outside the currency
+        # range, because that range had been frozen with no room to grow. The
+        # block holds 10000 ids; they are ordinary rows.
+        for code in ("ZWG", "XCG"):
+            base = getattr(BaseUnit, code)
+            assert int(CURRENCY_FIRST) <= int(base) <= int(CURRENCY_LAST)
+            assert is_fiat(base) and not is_crypto(base)
 
 
 # ── TestFiatMetadata ───────────────────────────────────────────────────────
@@ -178,19 +169,19 @@ class TestFiatMetadata:
         assert name_fragment.lower() in info.name.lower()
 
     def test_aed_enum_value(self):
-        assert int(BaseUnit.AED) == 134
+        assert int(BaseUnit.AED) == 900000
 
     def test_zwl_enum_value(self):
-        assert int(BaseUnit.ZWL) == 297
+        assert int(BaseUnit.ZWL) == 900165
 
     def test_usd_enum_value(self):
-        assert int(BaseUnit.USD) == 277
+        assert int(BaseUnit.USD) == 900143
 
     def test_eur_enum_value(self):
-        assert int(BaseUnit.EUR) == 177
+        assert int(BaseUnit.EUR) == 900043
 
     def test_jpy_enum_value(self):
-        assert int(BaseUnit.JPY) == 201
+        assert int(BaseUnit.JPY) == 900067
 
 
 # ── TestCryptoMetadata ─────────────────────────────────────────────────────
@@ -227,13 +218,13 @@ class TestCryptoMetadata:
         assert name_fragment.lower() in info.name.lower()
 
     def test_btc_enum_value(self):
-        assert int(BaseUnit.BTC) == 298
+        assert int(BaseUnit.BTC) == 900166
 
     def test_eth_enum_value(self):
-        assert int(BaseUnit.ETH) == 299
+        assert int(BaseUnit.ETH) == 900167
 
     def test_atom_enum_value(self):
-        assert int(BaseUnit.ATOM) == 331
+        assert int(BaseUnit.ATOM) == 900199
 
     def test_doge_is_4_char(self):
         assert len(BaseUnit.DOGE.name) == 4
@@ -485,9 +476,9 @@ class TestCurrencyCodeUnique:
 
     def test_physical_unit_enum_names_do_not_appear_as_currency_member_names(self):
         physical_names = {m.name for m in BaseUnit
-                          if int(m) < int(CURRENCY_FIAT_FIRST)}
+                          if int(m) <= int(UNIT_NATIVE_LAST)}
         currency_member_names = {m.name for m in BaseUnit
-                                  if int(CURRENCY_FIAT_FIRST) <= int(m) <= int(CURRENCY_CRYPTO_LAST)}
+                                 if int(CURRENCY_FIRST) <= int(m) <= int(CURRENCY_LAST)}
         assert physical_names.isdisjoint(currency_member_names), (
             f"Name collision(s): {physical_names & currency_member_names}"
         )
@@ -506,10 +497,9 @@ class TestEnumCoverageComplete:
         assert not missing, f"Missing table entries: {missing}"
 
     def test_table_size_matches_enum_range(self):
-        n_main = int(CURRENCY_CRYPTO_LAST) - int(CURRENCY_FIAT_FIRST) + 1
-        n_ext = int(CURRENCY_EXT_LAST) - int(CURRENCY_EXT_FIRST) + 1
+        n_block = int(CURRENCY_LAST) - int(CURRENCY_FIRST) + 1
         n_table = sum(1 for _ in all_currencies())
-        assert n_table == n_main + n_ext
+        assert n_table == n_block == CURRENCY_COUNT
 
 
 # ── TestPhysicalUnitCollisions ─────────────────────────────────────────────
@@ -529,14 +519,14 @@ class TestPhysicalUnitCollisions:
     # Physical unit names that collide with ISO 4217 / crypto codes.
     # Key = wire code (string), value = Python enum name with disambiguation.
     KNOWN_DISAMBIGUATIONS: dict[str, str] = {
-        "CUP": "CUP_",   # physical CUP=81 (cup volume); Cuban Peso=166
+        "CUP": "CUP_",   # bu_cup the volume (block 10); the Cuban Peso (block 90)
     }
 
     def test_cup_physical_unit_is_still_present(self):
-        assert BaseUnit.CUP == 81
+        assert BaseUnit.CUP == 100080
 
     def test_cup_cuban_peso_is_cup_underscore(self):
-        assert int(BaseUnit.CUP_) == 167
+        assert int(BaseUnit.CUP_) == 900033
 
     def test_cup_wire_code_is_still_cup(self):
         info = currency_info(BaseUnit.CUP_)
@@ -556,7 +546,7 @@ class TestPhysicalUnitCollisions:
 
     def test_all_known_collisions_are_accounted_for(self):
         physical_names = {m.name for m in BaseUnit
-                          if int(m) < int(CURRENCY_FIAT_FIRST)}
+                          if int(m) <= int(UNIT_NATIVE_LAST)}
         currency_codes = {info.code for info in all_currencies()}
         conflicts = physical_names & currency_codes
         assert conflicts == set(self.KNOWN_DISAMBIGUATIONS.keys()), (
@@ -568,25 +558,35 @@ class TestPhysicalUnitCollisions:
     def test_disambiguated_names_not_in_physical_range(self):
         for wire_code, enum_name in self.KNOWN_DISAMBIGUATIONS.items():
             member = BaseUnit[enum_name]
-            assert int(member) >= int(CURRENCY_FIAT_FIRST), (
+            assert int(member) >= int(CURRENCY_FIRST), (
                 f"{enum_name} is in the physical range"
             )
 
 
 
-class TestBaseUnitSentinel:
-    def test_sentinel_value(self):
-        assert int(BaseUnit._SENTINEL) == 397
+class TestBaseUnitBlocks:
+    """The id space is sparse, so there is no sentinel and no total count.
 
-    def test_sentinel_is_one_past_last_enum_member(self):
-        # Physical units resumed at 380 after the appended currencies, so the
-        # final real enumerator is a unit again, not XCG. Whatever is last, the
-        # sentinel is one beyond it — that is what C's
-        # BVN_VALUE_BASE_UNIT_COUNT asserts, and the tables it sizes are
-        # indexed by the enum value.
-        last = max(int(u) for u in BaseUnit if u is not BaseUnit._SENTINEL)
-        assert int(BaseUnit._SENTINEL) == last + 1
-        assert last == int(BaseUnit.TURBIDITY_JTU)
+    BaseUnit used to end in a _SENTINEL one past the highest member, because
+    the C tables were indexed by the enum value and needed a bound. They are
+    indexed by a dense slot now, and a "one past the end" number over a blocked
+    space would only invite the bounds check it can no longer support.
+    """
+
+    def test_no_sentinel(self):
+        assert not hasattr(BaseUnit, "_SENTINEL")
+
+    def test_native_units_are_one_contiguous_run(self):
+        native = sorted(int(b) for b in BaseUnit
+                        if int(UNIT_NATIVE_FIRST) <= int(b) <= int(UNIT_NATIVE_LAST))
+        assert native == list(range(int(UNIT_NATIVE_FIRST),
+                                    int(UNIT_NATIVE_LAST) + 1))
+
+    def test_every_member_is_none_a_unit_or_a_currency(self):
+        for b in BaseUnit:
+            assert (int(b) == 0
+                    or int(UNIT_NATIVE_FIRST) <= int(b) <= int(UNIT_NATIVE_LAST)
+                    or int(CURRENCY_FIRST) <= int(b) <= int(CURRENCY_LAST)), b
 
 
 # ── TestPrefixRulesC ───────────────────────────────────────────────────────
@@ -603,7 +603,7 @@ class TestPrefixRulesC:
     IEC = 1
 
     def _valid(self, base_int: int, prefix_system: int) -> bool:
-        if int(CURRENCY_FIAT_FIRST) <= base_int <= int(CURRENCY_CRYPTO_LAST):
+        if int(CURRENCY_FIRST) <= base_int <= int(CURRENCY_LAST):
             return prefix_system != self.IEC
         return True
 

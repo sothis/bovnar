@@ -297,7 +297,11 @@ def test_generated_tables_match_the_source(factors):
                  "amount", "luminosity"]
     rows = {}
     for line in open(conv_path, encoding="utf-8"):
-        m = re.match(r'\s*\[(bu_\w+)\s*\]\s*=\s*\{\s*bu_\w+,\s*([^,]+),'
+        # The designated index is BVN_SLOT_NATIVE(bu_x), not bu_x: the table
+        # is dense and indexed by a slot, because the id space is blocked and
+        # sparse. The unit still names itself in the row's .base field.
+        m = re.match(r'\s*\[BVN_SLOT_NATIVE\((bu_\w+)\)\s*\]\s*=\s*'
+                     r'\{\s*bu_\w+,\s*([^,]+),'
                      r'\s*\{([^}]*)\},\s*(true|false),\s*([^,]+),'
                      r'\s*"(-?\d+)",\s*"(\d+)",\s*"(-?\d+)",\s*"(\d+)",'
                      r'\s*(true|false)', line)

@@ -173,53 +173,53 @@ class TestBaseUnit:
 
     def test_si_base_units(self):
 
-        assert BaseUnit.SECOND  == 3
-        assert BaseUnit.METER   == 4
-        assert BaseUnit.GRAM    == 5
-        assert BaseUnit.AMPERE  == 6
-        assert BaseUnit.KELVIN  == 7
-        assert BaseUnit.MOL     == 8
-        assert BaseUnit.CANDELA == 9
+        assert BaseUnit.SECOND  == 100002
+        assert BaseUnit.METER   == 100003
+        assert BaseUnit.GRAM    == 100004
+        assert BaseUnit.AMPERE  == 100005
+        assert BaseUnit.KELVIN  == 100006
+        assert BaseUnit.MOL     == 100007
+        assert BaseUnit.CANDELA == 100008
 
     def test_digital_units(self):
-        assert BaseUnit.BIT  == 1
-        assert BaseUnit.BYTE == 2
+        assert BaseUnit.BIT  == 100000
+        assert BaseUnit.BYTE == 100001
 
     def test_named_derived(self):
-        assert BaseUnit.HERTZ  == 10
-        assert BaseUnit.NEWTON == 11
-        assert BaseUnit.PASCAL == 12
-        assert BaseUnit.JOULE  == 13
-        assert BaseUnit.WATT   == 14
-        assert BaseUnit.VOLT   == 15
-        assert BaseUnit.OHM    == 16
-        assert BaseUnit.FARAD  == 17
+        assert BaseUnit.HERTZ  == 100009
+        assert BaseUnit.NEWTON == 100010
+        assert BaseUnit.PASCAL == 100011
+        assert BaseUnit.JOULE  == 100012
+        assert BaseUnit.WATT   == 100013
+        assert BaseUnit.VOLT   == 100014
+        assert BaseUnit.OHM    == 100015
+        assert BaseUnit.FARAD  == 100016
 
     def test_non_si(self):
-        assert BaseUnit.LITER   == 29
-        assert BaseUnit.MINUTE  == 30
-        assert BaseUnit.HOUR    == 31
-        assert BaseUnit.DAY     == 32
-        assert BaseUnit.DEGREE  == 33
-        assert BaseUnit.CELSIUS == 34
+        assert BaseUnit.LITER   == 100028
+        assert BaseUnit.MINUTE  == 100029
+        assert BaseUnit.HOUR    == 100030
+        assert BaseUnit.DAY     == 100031
+        assert BaseUnit.DEGREE  == 100032
+        assert BaseUnit.CELSIUS == 100033
 
     def test_angular_units(self):
-        assert BaseUnit.RADIAN    == 35
-        assert BaseUnit.STERADIAN == 36
+        assert BaseUnit.RADIAN    == 100034
+        assert BaseUnit.STERADIAN == 100035
 
     def test_mass_pressure(self):
-        assert BaseUnit.TONNE == 37
-        assert BaseUnit.BAR   == 38
+        assert BaseUnit.TONNE == 100036
+        assert BaseUnit.BAR   == 100037
 
     def test_atomic_units(self):
-        assert BaseUnit.ELECTRONVOLT      == 39
-        assert BaseUnit.DALTON            == 40
-        assert BaseUnit.ASTRONOMICAL_UNIT == 41
+        assert BaseUnit.ELECTRONVOLT      == 100038
+        assert BaseUnit.DALTON            == 100039
+        assert BaseUnit.ASTRONOMICAL_UNIT == 100040
 
     def test_area_time_units(self):
-        assert BaseUnit.HECTARE == 42
-        assert BaseUnit.WEEK    == 43
-        assert BaseUnit.YEAR    == 44
+        assert BaseUnit.HECTARE == 100041
+        assert BaseUnit.WEEK    == 100042
+        assert BaseUnit.YEAR    == 100043
 
     def test_all_unique(self):
         values = [int(u) for u in BaseUnit]
@@ -227,10 +227,11 @@ class TestBaseUnit:
 
     def test_count(self):
 
-        # 380 defined codes + NONE + _SENTINEL, minus the 134..347 currency
-        # slots that have no named enumerator. Adding a unit or a currency
+        # NONE, plus every native unit, plus every currency. There is no
+        # sentinel: the id space is blocked and sparse, so nothing can be
+        # bounded by "one past the last member". Adding a unit or a currency
         # moves this by exactly one per addition.
-        assert len(BaseUnit) == 398
+        assert len(BaseUnit) == 1 + 180 + 216
 
 class TestExponent:
     def test_positive_exponents(self):

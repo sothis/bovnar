@@ -1762,12 +1762,18 @@ static void test_write_type_annotation_names_the_real_failure(void)
 	printf("  a unit REDUCE cannot express is illegal, not too long...\n");
 	/* bvn_unit_to_string_ex returns -1 for several reasons, and this helper
 	 * reported every one of them as error_unit_too_long -- sending the caller
-	 * after a buffer that was never the problem. Under BVN_UNIT_REDUCE, m9*m2
-	 * (which is m11) cannot be reduced without dropping a component, so it is
-	 * refused; the diagnostic has to say which refusal it was. */
+	 * after a buffer that was never the problem. Under BVN_UNIT_REDUCE, a
+	 * product whose summed exponent leaves [BVN_EXPONENT_MIN, BVN_EXPONENT_MAX]
+	 * cannot be reduced without dropping a component, so it is refused; the
+	 * diagnostic has to say which refusal it was.
+	 *
+	 * m^100*m^100 is m^200, past the range. It used to be m^9*m^2 -- the cap
+	 * was 9 long after the exponent range had grown to 100, so the case that
+	 * exercised this diagnostic was one the library should have handled. */
 	struct { const char *unit; bvn_unit_flags_t flags; error_code_t want; } cases[] = {
-		{ "m\xe2\x81\xb9" "\xc2\xb7" "m\xc2\xb2", BVN_UNIT_REDUCE, error_unit_illegal },
-		{ "m\xe2\x81\xb9" "\xc2\xb7" "m\xc2\xb2", BVN_UNIT_FLAGS_NONE, error_none },
+		{ "m^100" "\xc2\xb7" "m^100", BVN_UNIT_REDUCE,     error_unit_illegal },
+		{ "m^100" "\xc2\xb7" "m^100", BVN_UNIT_FLAGS_NONE, error_none },
+		{ "m\xe2\x81\xb9" "\xc2\xb7" "m\xc2\xb2", BVN_UNIT_REDUCE, error_none },
 		{ "m/s",                                     BVN_UNIT_REDUCE, error_none },
 	};
 	for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {

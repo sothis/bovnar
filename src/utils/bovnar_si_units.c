@@ -97,29 +97,32 @@ typedef struct {
 	bool              exact;
 } bvn_si_conv_entry_t;
 /*
- * The master conversion table, indexed directly by value_base_unit_t (the
- * designated initialisers make the index == .base, which bvn_verify_conv_table
- * asserts in debug builds). to_si_factor scales the unit to coherent SI (e.g.
- * inch -> 0.0254 m, hour -> 3600 s); dims is its dimension exponent vector;
- * is_affine/affine_offset handle the temperature scales. Currency slots are
- * skipped here — they are handled by bovnar_currency.c, not by SI conversion.
+ * The master conversion table, one row per defined base unit and indexed by
+ * bvni_unit_slot() — NOT by the base unit id, which is blocked and sparse (see
+ * the id-space note in bovnar.h). The designated initialisers spell their index
+ * as BVN_SLOT_*(bu_...) so a row and its enumerator cannot drift apart, and
+ * bvn_verify_conv_table re-checks the mapping in debug builds.
+ *
+ * to_si_factor scales the unit to coherent SI (e.g. inch -> 0.0254 m, hour ->
+ * 3600 s); dims is its dimension exponent vector; is_affine/affine_offset
+ * handle the temperature scales. Currencies have no row at all — they are the
+ * business of bovnar_currency.c, not of SI conversion.
  */
-static const bvn_si_conv_entry_t si_conv_table[BVN_VALUE_BASE_UNIT_COUNT] = {
-	[bu_none]               = { bu_none,               1.0,        {0, 0, 0, 0, 0, 0, 0}, false, 0.0,    "1", "1", "0", "1", true },
+static const bvn_si_conv_entry_t si_conv_table[BVN_UNIT_SLOT_COUNT] = {
+	[0]                     = { bu_none,               1.0,        {0, 0, 0, 0, 0, 0, 0}, false, 0.0,    "1", "1", "0", "1", true },
 	/*
-	 * Physical-unit conversion entries — generated from src/gendata/units.bvnr
-	 * by gen_units.py. Indexed by enum value; the [bu_none] row above
-	 * and the currency slots keep the table's zero defaults.
+	 * The native units — generated from src/gendata/units.bvnr by gen_units.py.
 	 */
 #include "bovnar_si_conv_table.gen.inc"
 	/*
-	 * UCUM arbitrary units — generated from src/gendata/ucum.bvnr by gen_profiles.py.
-	 * These rows exist so the table stays well-formed (bvn_verify_conv_table
-	 * asserts .base == index for every non-currency slot); their VALUES are never
-	 * used, because bvn_unit_to_si_factor and bvn_unit_dimension_vector refuse an
-	 * arbitrary component outright. That refusal is what makes them
-	 * incommensurable — without it the 1.0 factor and zero dimension vector here
-	 * would say [IU] is a dimensionless quantity worth one, i.e. a plain count.
+	 * The profiles' opaque units — generated from the profile data files by
+	 * gen_profiles.py. These rows exist so the table stays well-formed
+	 * (bvn_verify_conv_table asserts every slot's .base maps back to it); their
+	 * VALUES are never used, because bvn_unit_to_si_factor and
+	 * bvn_unit_dimension_vector refuse an opaque component outright. That
+	 * refusal is what makes them incommensurable — without it the 1.0 factor and
+	 * zero dimension vector here would say [IU] is a dimensionless quantity
+	 * worth one, i.e. a plain count.
 	 */
 #include "bovnar_profiles_conv.gen.inc"
 };
@@ -143,30 +146,35 @@ static bool bvn_unit_structurally_valid(value_unit_t u)
 		return false;
 	for (uint32_t i = 0; i < u.num_components; i++) {
 		const value_unit_component_t *c = &u.components[i];
-		if ((uint32_t)c->base >= SI_CONV_TABLE_SIZE)  return false;
+		if (!bvni_base_defined(c->base))              return false;
 		if (c->exponent == exp_invalid)               return false;
 		if (!bvn_prefix_unit_valid(c->prefix, c->base)) return false;
 	}
 	return true;
 }
+/*
+ * Every slot's row names the unit that slot belongs to. A hole would be a row
+ * of zeros — factor 0.0, no dimensions, .base == bu_none — which reads back as
+ * a perfectly plausible unit rather than as missing data, so this is checked
+ * rather than assumed. Slot 0 is bu_none's own row and maps to itself.
+ */
 static void bvn_verify_conv_table(void)
 {
 #ifndef NDEBUG
 	for (uint32_t i = 0; i < SI_CONV_TABLE_SIZE; i++) {
-		if (bvn_unit_is_currency((int)i))
-			continue;
-		assert((uint32_t)si_conv_table[i].base == i &&
-		       "si_conv_table: .base mismatch at index i");
+		assert(bvni_unit_slot(si_conv_table[i].base) == (int32_t)i &&
+		       "si_conv_table: row does not map back to its own slot");
 	}
 #endif
 }
 static const bvn_si_conv_entry_t *bvn_find_si_conv(value_base_unit_t bu)
 {
-	if ((uint32_t)bu >= SI_CONV_TABLE_SIZE)
+	int32_t slot = bvni_unit_slot(bu);
+	/* A currency lands here as slot -1: it has a catalogue row, not a
+	 * conversion row, and asking for its SI factor is a category error. */
+	if (slot < 0 || (uint32_t)slot >= SI_CONV_TABLE_SIZE)
 		return NULL;
-	if (bvn_unit_is_currency((int)bu))
-		return NULL;
-	return &si_conv_table[bu];
+	return &si_conv_table[slot];
 }
 /*
  * Compute the scalar factor that converts a value in unit `u` to SI base units,
@@ -252,8 +260,15 @@ double bvn_unit_to_si_factor(value_unit_t u,
 	 * or produce nan via 0*inf. Surfacing that as a failure — rather than handing
 	 * back a non-finite factor with *ok still true — mirrors how bvn_unit_reduce
 	 * flags isinf, and stops callers like bvn_dom_get_value_in_base_units from
-	 * silently emitting inf/nan values. */
-	if (!isfinite(f)) {
+	 * silently emitting inf/nan values.
+	 *
+	 * Zero is the same failure at the other end and was not caught, because 0.0
+	 * is perfectly finite. q~m^100 is 10^-3000, which underflows to exactly
+	 * 0.0, and the function reported success with a factor of zero — so every
+	 * value in that unit converted to 0 with nothing to say it had not. No real
+	 * unit has an SI factor of zero (every to_si_factor and every prefix is
+	 * positive and non-zero), so a zero here can only be underflow. */
+	if (!isfinite(f) || f == 0.0) {
 		*ok = false;
 	}
 	return f;
@@ -599,7 +614,12 @@ bool bvn_unit_si_normal_form(value_unit_t u, value_unit_t *out)
 		int32_t e = dims[si_base[i].dim];
 		if (e == 0)
 			continue;
-		if (e < -9 || e > 9)
+		/* A dimension exponent unit_exponent_t cannot carry has no SI form to
+		 * build. The bound is the type's own — it was ±9 here too, left behind
+		 * when the exponent range grew to ±100, which meant km^10 (whose SI
+		 * form is simply m^10) reported no SI form at all and a normalising
+		 * policy silently left it alone. */
+		if (e < BVN_EXPONENT_MIN || e > BVN_EXPONENT_MAX)
 			return false;
 		if (r.num_components >= BVNR_MAX_UNIT_COMPONENTS)
 			return false;
@@ -1087,10 +1107,20 @@ done:
  * their exponents (m·m -> m²), fold all the prefix powers into a single scalar
  * *scale (so km -> m with scale 1000), drop components whose exponent cancels to
  * zero, and sort the survivors (numerator before denominator, then by exponent
- * magnitude, then base) for a canonical form. Exponents whose magnitude exceeds
- * the representable range (>9) are folded into *scale instead and flagged via
- * *overflow. This underlies the BVN_UNIT_REDUCE formatting option and the
- * named-SI collapse.
+ * magnitude, then base) for a canonical form. This underlies the
+ * BVN_UNIT_REDUCE formatting option and the named-SI collapse.
+ *
+ * A summed exponent outside [BVN_EXPONENT_MIN, BVN_EXPONENT_MAX] cannot be
+ * carried by unit_exponent_t at all. There is nothing honest to return for it,
+ * so the component's SI factor is folded into *scale and the component is
+ * dropped — which LOSES ITS DIMENSION, and is why *overflow exists. A caller
+ * that ignores *overflow gets a unit that is not the one it asked to reduce;
+ * bvn_unit_to_string_ex refuses to format one.
+ *
+ * That threshold used to be 9, left behind when the exponent range grew from
+ * ±9 to ±100. It made m^10 reduce to the DIMENSIONLESS unit with scale 1.0 —
+ * metre's SI factor being 1.0, the fold left no trace of it — for every
+ * exponent the type had just gained.
  */
 value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overflow)
 {
@@ -1169,7 +1199,7 @@ value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overflow)
 			continue;
 		}
 		int32_t abs_sum = (a->exp_sum < 0) ? -a->exp_sum : a->exp_sum;
-		if (abs_sum > 9) {
+		if (abs_sum > BVN_EXPONENT_MAX) {
 			if (overflow)
 				*overflow = true;
 			const bvn_si_conv_entry_t *conv =
@@ -1221,14 +1251,15 @@ value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overflow)
 }
 /*
  * Per-unit prefix policy, generated from the .prefix field in
- * src/gendata/units.bvnr — which units take which prefixes is now data, not code.
- * Unlisted slots (currencies, bu_none) default to BVN_PFX_DEFAULT; currencies
- * are handled by the currency rule before this table is consulted.
+ * src/gendata/units.bvnr — which units take which prefixes is now data, not
+ * code. Indexed by bvni_unit_slot(), like si_conv_table. Slot 0 (bu_none) keeps
+ * the array's zero default, BVN_PFX_DEFAULT; currencies have no slot and are
+ * handled by the currency rule before this table is consulted.
  */
 typedef enum {
 	BVN_PFX_DEFAULT = 0, BVN_PFX_INFO, BVN_PFX_GERMAN, BVN_PFX_RATIO, BVN_PFX_NONE
 } bvn_prefix_policy_t;
-static const uint8_t bu_prefix_policy[BVN_VALUE_BASE_UNIT_COUNT] = {
+static const uint8_t bu_prefix_policy[BVN_UNIT_SLOT_COUNT] = {
 #include "bovnar_prefix_policy.gen.inc"
 	/* UCUM arbitrary units, from UCUM's own metric flag: [IU] takes prefixes,
 	 * [arb'U] does not. Without these the slots keep the array's zero default,
@@ -1249,7 +1280,7 @@ bool bvn_prefix_unit_valid(value_unit_prefix_t prefix, value_base_unit_t base)
 {
 	if ((uint32_t)prefix.system >= BVN_PREFIX_SYSTEM_COUNT)
 		return false;
-	if ((uint32_t)base >= BVN_VALUE_BASE_UNIT_COUNT)
+	if (!bvni_base_defined(base))
 		return false;
 	/*
 	 * The prefix ID has to be in range before anything else looks at it. Only
@@ -1271,7 +1302,9 @@ bool bvn_prefix_unit_valid(value_unit_prefix_t prefix, value_base_unit_t base)
 	}
 	if (bvn_unit_is_currency((int)base))
 		return bvn_currency_prefix_valid((int)base, (int)prefix.system);
-	bvn_prefix_policy_t pol = (bvn_prefix_policy_t)bu_prefix_policy[base];
+	/* Not a currency and bvni_base_defined() said yes, so the slot is real. */
+	bvn_prefix_policy_t pol =
+		(bvn_prefix_policy_t)bu_prefix_policy[bvni_unit_slot(base)];
 	bool is_info = (pol == BVN_PFX_INFO);
 	if (pol == BVN_PFX_GERMAN || pol == BVN_PFX_RATIO || pol == BVN_PFX_NONE) {
 		if (prefix.system == prefix_iec)

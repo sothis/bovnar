@@ -67,83 +67,102 @@ static int parse(const char *s)
 static void test_enum_range_sentinels(void)
 {
     printf("  enum range sentinels...\n");
-    ASSERT_EQ_INT(BVN_CURRENCY_FIAT_FIRST,    134, "FIAT_FIRST == 134");
-    ASSERT_EQ_INT(BVN_CURRENCY_FIAT_LAST,     297, "FIAT_LAST  == 297");
-    ASSERT_EQ_INT(BVN_CURRENCY_CRYPTO_FIRST,  298, "CRYPTO_FIRST == 298");
-    ASSERT_EQ_INT(BVN_CURRENCY_CRYPTO_LAST,   347, "CRYPTO_LAST == 347");
-    ASSERT_EQ_INT(BVN_VALUE_BASE_UNIT_COUNT_CURRENCY, 348, "TOTAL == 348");
-    ASSERT_EQ_INT(BVN_CURRENCY_FIAT_LAST - BVN_CURRENCY_FIAT_FIRST + 1, 164, "164 fiat entries");
-    ASSERT_EQ_INT(BVN_CURRENCY_CRYPTO_LAST - BVN_CURRENCY_CRYPTO_FIRST + 1, 50, "50 crypto entries");
-    ASSERT_EQ_INT(BVN_CURRENCY_CRYPTO_FIRST, BVN_CURRENCY_FIAT_LAST + 1, "no gap fiat/crypto");
+    /* Block 90 of the base-unit id space: one contiguous run, and the bounds
+     * come from the catalogue itself so they cannot claim more rows than exist. */
+    ASSERT_EQ_INT(BVN_CURRENCY_FIRST, 900000, "currencies are block 90");
+    ASSERT_EQ_INT(BVN_CURRENCY_COUNT, 216,    "216 currencies");
+    ASSERT_EQ_INT(BVN_CURRENCY_LAST - BVN_CURRENCY_FIRST + 1,
+                  BVN_CURRENCY_COUNT, "the run has no holes");
+    ASSERT_TRUE(BVN_CURRENCY_COUNT <= BVN_UNIT_BLOCK_SIZE,
+                "the catalogue fits inside its block");
+    /* Nothing else may reach into the block — a currency id must not also name
+     * a unit, which is what would happen if a block boundary were wrong. */
+    ASSERT_TRUE(BVN_CURRENCY_FIRST > BVN_UNIT_NATIVE_LAST,
+                "currencies sit above the native units");
+    ASSERT_TRUE(BVN_CURRENCY_FIRST > BVN_PROFILE_UCUM_OPAQUE_LAST,
+                "currencies sit above the profile blocks");
 }
 
 static void test_predicates(void)
 {
     printf("  is_currency / is_fiat / is_crypto...\n");
-    ASSERT_TRUE( bvn_unit_is_currency(BVN_CURRENCY_FIAT_FIRST),   "FIAT_FIRST is currency");
-    ASSERT_TRUE( bvn_unit_is_currency(BVN_CURRENCY_FIAT_LAST),    "FIAT_LAST is currency");
-    ASSERT_TRUE( bvn_unit_is_currency(BVN_CURRENCY_CRYPTO_FIRST), "CRYPTO_FIRST is currency");
-    ASSERT_TRUE( bvn_unit_is_currency(BVN_CURRENCY_CRYPTO_LAST),  "CRYPTO_LAST is currency");
+    int usd = parse("USD"), btc = parse("BTC");
+    ASSERT_TRUE( bvn_unit_is_currency(BVN_CURRENCY_FIRST),  "the first slot is a currency");
+    ASSERT_TRUE( bvn_unit_is_currency(BVN_CURRENCY_LAST),   "the last slot is a currency");
+    ASSERT_TRUE( bvn_unit_is_currency(usd),                 "USD is currency");
+    ASSERT_TRUE( bvn_unit_is_currency(btc),                 "BTC is currency");
     ASSERT_TRUE(!bvn_unit_is_currency(0),       "bu_none not currency");
     ASSERT_TRUE(!bvn_unit_is_currency(bu_meter),"bu_meter not currency");
     ASSERT_TRUE(!bvn_unit_is_currency(bu_cup),  "bu_cup (volume) not currency");
-    ASSERT_TRUE(!bvn_unit_is_currency(BVN_CURRENCY_FIAT_FIRST - 1), "below range not currency");
-    ASSERT_TRUE(!bvn_unit_is_currency(BVN_VALUE_BASE_UNIT_COUNT_CURRENCY), "sentinel not currency");
-    ASSERT_TRUE( bvn_unit_is_fiat(BVN_CURRENCY_FIAT_FIRST),    "FIAT_FIRST is fiat");
-    ASSERT_TRUE( bvn_unit_is_fiat(BVN_CURRENCY_FIAT_LAST),     "FIAT_LAST is fiat");
-    ASSERT_TRUE(!bvn_unit_is_fiat(BVN_CURRENCY_CRYPTO_FIRST),  "CRYPTO_FIRST not fiat");
-    ASSERT_TRUE(!bvn_unit_is_fiat(bu_meter),                    "bu_meter not fiat");
-    ASSERT_TRUE( bvn_unit_is_crypto(BVN_CURRENCY_CRYPTO_FIRST),"CRYPTO_FIRST is crypto");
-    ASSERT_TRUE( bvn_unit_is_crypto(BVN_CURRENCY_CRYPTO_LAST), "CRYPTO_LAST is crypto");
-    ASSERT_TRUE(!bvn_unit_is_crypto(BVN_CURRENCY_FIAT_LAST),   "FIAT_LAST not crypto");
-    ASSERT_TRUE(!bvn_unit_is_crypto(bu_second),                 "bu_second not crypto");
+    ASSERT_TRUE(!bvn_unit_is_currency(BVN_CURRENCY_FIRST - 1), "below the block not currency");
+    ASSERT_TRUE(!bvn_unit_is_currency(BVN_CURRENCY_LAST + 1),  "the hole above the last row not currency");
+    ASSERT_TRUE(!bvn_unit_is_currency(-1),      "a negative id is not a currency");
+    /* fiat vs crypto is read from the catalogue row, not from a sub-range, so
+     * it holds wherever in the block a currency happens to sit. */
+    ASSERT_TRUE( bvn_unit_is_fiat(usd),                    "USD is fiat");
+    ASSERT_TRUE(!bvn_unit_is_fiat(btc),                    "BTC not fiat");
+    ASSERT_TRUE(!bvn_unit_is_fiat(bu_meter),               "bu_meter not fiat");
+    ASSERT_TRUE(!bvn_unit_is_fiat(BVN_CURRENCY_LAST + 1),  "a hole is not fiat");
+    ASSERT_TRUE( bvn_unit_is_crypto(btc),                  "BTC is crypto");
+    ASSERT_TRUE(!bvn_unit_is_crypto(usd),                  "USD not crypto");
+    ASSERT_TRUE(!bvn_unit_is_crypto(bu_second),            "bu_second not crypto");
+    ASSERT_TRUE(!bvn_unit_is_crypto(BVN_CURRENCY_LAST + 1),"a hole is not crypto");
+    /* Every slot is exactly one of the two, and nothing outside the block is
+     * either. That is the property the two predicates jointly promise. */
+    for (int b = BVN_CURRENCY_FIRST; b <= BVN_CURRENCY_LAST; b++) {
+        tests++;
+        if (bvn_unit_is_fiat(b) == bvn_unit_is_crypto(b)) {
+            fprintf(stderr, "FAIL: %d is neither or both fiat and crypto\n", b);
+            failures++;
+        }
+    }
 }
 
 static void test_parse_fiat(void)
 {
     printf("  bvn_parse_currency_str: fiat...\n");
-    ASSERT_EQ_INT(parse("AED"), 134, "AED==134");
-    ASSERT_EQ_INT(parse("ZWL"), 297, "ZWL==297");
-    ASSERT_EQ_INT(parse("USD"), 277, "USD==277");
-    ASSERT_EQ_INT(parse("EUR"), 177, "EUR==177");
-    ASSERT_EQ_INT(parse("GBP"), 180, "GBP==180");
-    ASSERT_EQ_INT(parse("JPY"), 201, "JPY==201");
-    ASSERT_EQ_INT(parse("CHF"), 161, "CHF==161");
-    ASSERT_EQ_INT(parse("KWD"), 208, "KWD==208");
-    ASSERT_EQ_INT(parse("BHD"), 148, "BHD==148");
-    ASSERT_EQ_INT(parse("BIF"), 149, "BIF==149");
-    ASSERT_EQ_INT(parse("OMR"), 237, "OMR==237");
-    ASSERT_EQ_INT(parse("JOD"), 200, "JOD==200");
-    ASSERT_EQ_INT(parse("TND"), 269, "TND==269");
-    ASSERT_EQ_INT(parse("CLF"), 162, "CLF==162");
-    ASSERT_EQ_INT(parse("XAU"), 286, "XAU==286");
-    ASSERT_EQ_INT(parse("XDR"), 288, "XDR==288");
-    ASSERT_EQ_INT(parse("CUP"), 167, "CUP (Cuban Peso)==167");
-    ASSERT_EQ_INT(parse("VND"), 281, "VND==281");
-    ASSERT_EQ_INT(parse("CLP"), 163, "CLP==163");
-    ASSERT_EQ_INT(parse("SLE"), 257, "SLE==257");
-    ASSERT_EQ_INT(parse("SSP"), 260, "SSP==260");
+    ASSERT_EQ_INT(parse("AED"), 900000, "AED==900000");
+    ASSERT_EQ_INT(parse("ZWL"), 900165, "ZWL==900165");
+    ASSERT_EQ_INT(parse("USD"), 900143, "USD==900143");
+    ASSERT_EQ_INT(parse("EUR"), 900043, "EUR==900043");
+    ASSERT_EQ_INT(parse("GBP"), 900046, "GBP==900046");
+    ASSERT_EQ_INT(parse("JPY"), 900067, "JPY==900067");
+    ASSERT_EQ_INT(parse("CHF"), 900027, "CHF==900027");
+    ASSERT_EQ_INT(parse("KWD"), 900074, "KWD==900074");
+    ASSERT_EQ_INT(parse("BHD"), 900014, "BHD==900014");
+    ASSERT_EQ_INT(parse("BIF"), 900015, "BIF==900015");
+    ASSERT_EQ_INT(parse("OMR"), 900103, "OMR==900103");
+    ASSERT_EQ_INT(parse("JOD"), 900066, "JOD==900066");
+    ASSERT_EQ_INT(parse("TND"), 900135, "TND==900135");
+    ASSERT_EQ_INT(parse("CLF"), 900028, "CLF==900028");
+    ASSERT_EQ_INT(parse("XAU"), 900152, "XAU==900152");
+    ASSERT_EQ_INT(parse("XDR"), 900155, "XDR==900155");
+    ASSERT_EQ_INT(parse("CUP"), 900033, "CUP (Cuban Peso)==900033");
+    ASSERT_EQ_INT(parse("VND"), 900147, "VND==900147");
+    ASSERT_EQ_INT(parse("CLP"), 900029, "CLP==900029");
+    ASSERT_EQ_INT(parse("SLE"), 900123, "SLE==900123");
+    ASSERT_EQ_INT(parse("SSP"), 900127, "SSP==900127");
 }
 
 static void test_parse_crypto(void)
 {
     printf("  bvn_parse_currency_str: crypto...\n");
-    ASSERT_EQ_INT(parse("BTC"),  298, "BTC==298");
-    ASSERT_EQ_INT(parse("ETH"),  299, "ETH==299");
-    ASSERT_EQ_INT(parse("SOL"),  300, "SOL==300");
-    ASSERT_EQ_INT(parse("XRP"),  301, "XRP==301");
-    ASSERT_EQ_INT(parse("DOT"),  305, "DOT==305");
-    ASSERT_EQ_INT(parse("XMR"),  306, "XMR==306");
-    ASSERT_EQ_INT(parse("XLM"),  309, "XLM==309");
-    ASSERT_EQ_INT(parse("DOGE"), 326, "DOGE==326");
-    ASSERT_EQ_INT(parse("LINK"), 327, "LINK==327");
-    ASSERT_EQ_INT(parse("USDT"), 328, "USDT==328");
-    ASSERT_EQ_INT(parse("USDC"), 329, "USDC==329");
-    ASSERT_EQ_INT(parse("AVAX"), 330, "AVAX==330");
-    ASSERT_EQ_INT(parse("ATOM"), 331, "ATOM==331");
-    ASSERT_EQ_INT(parse("POL"),  332, "POL==332");
-    ASSERT_EQ_INT(parse("NEAR"), 333, "NEAR==333");
-    ASSERT_EQ_INT(parse("RUNE"), 347, "RUNE==347");
+    ASSERT_EQ_INT(parse("BTC"), 900166, "BTC==900166");
+    ASSERT_EQ_INT(parse("ETH"), 900167, "ETH==900167");
+    ASSERT_EQ_INT(parse("SOL"), 900168, "SOL==900168");
+    ASSERT_EQ_INT(parse("XRP"), 900169, "XRP==900169");
+    ASSERT_EQ_INT(parse("DOT"), 900173, "DOT==900173");
+    ASSERT_EQ_INT(parse("XMR"), 900174, "XMR==900174");
+    ASSERT_EQ_INT(parse("XLM"), 900177, "XLM==900177");
+    ASSERT_EQ_INT(parse("DOGE"), 900194, "DOGE==900194");
+    ASSERT_EQ_INT(parse("LINK"), 900195, "LINK==900195");
+    ASSERT_EQ_INT(parse("USDT"), 900196, "USDT==900196");
+    ASSERT_EQ_INT(parse("USDC"), 900197, "USDC==900197");
+    ASSERT_EQ_INT(parse("AVAX"), 900198, "AVAX==900198");
+    ASSERT_EQ_INT(parse("ATOM"), 900199, "ATOM==900199");
+    ASSERT_EQ_INT(parse("POL"), 900200, "POL==900200");
+    ASSERT_EQ_INT(parse("NEAR"), 900201, "NEAR==900201");
+    ASSERT_EQ_INT(parse("RUNE"), 900215, "RUNE==900215");
 }
 
 static void test_parse_rejects(void)
@@ -236,7 +255,7 @@ static void test_info_records(void)
     ASSERT_STR(ci->code, "DOGE", "DOGE 4-char code");
     ASSERT_TRUE(ci->is_crypto,    "DOGE is_crypto");
 
-    ASSERT_EQ_INT((int)parse("RUNE"), BVN_CURRENCY_CRYPTO_LAST, "RUNE==CRYPTO_LAST");
+    ASSERT_EQ_INT((int)parse("RUNE"), BVN_CURRENCY_LAST, "RUNE is the last catalogue row");
 
     ASSERT_TRUE(bvn_currency_info((int)bu_meter) == NULL, "bu_meter info NULL");
     ASSERT_TRUE(bvn_currency_info(0)             == NULL, "bu_none info NULL");
@@ -261,60 +280,63 @@ static void test_prefix_valid(void)
 
 static void test_contiguity(void)
 {
-    printf("  contiguity: every fiat/crypto slot has a valid info record...\n");
-    for (int b = BVN_CURRENCY_FIAT_FIRST; b <= BVN_CURRENCY_FIAT_LAST; b++) {
+    printf("  contiguity: every slot has a valid info record...\n");
+    for (int b = BVN_CURRENCY_FIRST; b <= BVN_CURRENCY_LAST; b++) {
         const bvn_currency_info_t *ci = bvn_currency_info(b);
         tests++;
         if (!ci) { fprintf(stderr,"FAIL: info(%d)==NULL\n",b); failures++; continue; }
         tests++;
-        if (ci->is_crypto)      { fprintf(stderr,"FAIL: fiat %d is_crypto\n",b); failures++; }
+        if (ci->code[0] == '\0') { fprintf(stderr,"FAIL: %d has an empty code\n",b); failures++; }
+        /* An ISO numeric code identifies a fiat currency and no crypto asset
+         * has one, so the column and the numeric field must agree. */
         tests++;
-        if (ci->numeric_code==0){ fprintf(stderr,"FAIL: fiat %d numeric_code=0 (%s)\n",b,ci->code); failures++; }
-    }
-    for (int b = BVN_CURRENCY_CRYPTO_FIRST; b <= BVN_CURRENCY_CRYPTO_LAST; b++) {
-        const bvn_currency_info_t *ci = bvn_currency_info(b);
+        if (ci->is_crypto ? ci->numeric_code != 0 : ci->numeric_code == 0) {
+            fprintf(stderr,"FAIL: %d (%s) numeric_code=%u disagrees with is_crypto=%d\n",
+                    b, ci->code, ci->numeric_code, (int)ci->is_crypto);
+            failures++;
+        }
+        /* And the id round-trips through the code, which is the only handle a
+         * document ever has on a currency. */
         tests++;
-        if (!ci) { fprintf(stderr,"FAIL: info(%d)==NULL\n",b); failures++; continue; }
-        tests++;
-        if (!ci->is_crypto)      { fprintf(stderr,"FAIL: crypto %d not is_crypto (%s)\n",b,ci->code); failures++; }
-        tests++;
-        if (ci->numeric_code!=0) { fprintf(stderr,"FAIL: crypto %d numeric_code=%u (%s)\n",b,ci->numeric_code,ci->code); failures++; }
+        if (parse(ci->code) != b) {
+            fprintf(stderr,"FAIL: %s parses to %d, not %d\n", ci->code, parse(ci->code), b);
+            failures++;
+        }
     }
 }
 
 static void test_cup_collision(void)
 {
     printf("  CUP collision guard: physical bu_cup != Cuban Peso...\n");
-    ASSERT_TRUE((int)bu_cup == 81,        "bu_cup (volume) == 81");
+    ASSERT_TRUE((int)bu_cup == 100080,    "bu_cup (volume) == 100080");
     ASSERT_TRUE(!bvn_unit_is_currency((int)bu_cup), "bu_cup (volume) not currency");
-    ASSERT_EQ_INT(parse("CUP"), 167,      "CUP string -> Cuban Peso (167)");
+    ASSERT_EQ_INT(parse("CUP"), 900033, "CUP string -> Cuban Peso (900033)");
     ASSERT_TRUE(parse("CUP") != (int)bu_cup, "CUP currency != bu_cup physical");
+    /* The two live in different blocks, which is what makes the collision
+     * structurally impossible rather than merely absent today. */
+    ASSERT_TRUE(parse("CUP") - (int)bu_cup > BVN_UNIT_BLOCK_SIZE,
+                "the volume and the peso are blocks apart");
 }
 
-static void test_extension_currencies(void)
+static void test_late_currencies(void)
 {
-    printf("  extension segment (ZWG/XCG appended past the unit block)...\n");
-    /* Enum values are appended after the unit block, so no existing value moved. */
-    ASSERT_EQ_INT(BVN_CURRENCY_EXT_FIRST, 378, "EXT_FIRST == 378");
-    ASSERT_EQ_INT(BVN_CURRENCY_EXT_LAST,  379, "EXT_LAST  == 379");
-    ASSERT_EQ_INT((int)bu_zwg, 378, "bu_zwg == 378");
-    ASSERT_EQ_INT((int)bu_xcg, 379, "bu_xcg == 379");
-    ASSERT_EQ_INT((int)bu_zwg, BVN_CURRENCY_EXT_FIRST, "bu_zwg == EXT_FIRST");
-
-    /* Recognised as fiat currencies despite living outside the 134-347 block. */
-    ASSERT_TRUE( bvn_unit_is_currency((int)bu_zwg), "ZWG is currency");
-    ASSERT_TRUE( bvn_unit_is_currency((int)bu_xcg), "XCG is currency");
-    ASSERT_TRUE( bvn_unit_is_fiat((int)bu_zwg),     "ZWG is fiat");
-    ASSERT_TRUE( bvn_unit_is_fiat((int)bu_xcg),     "XCG is fiat");
-    ASSERT_TRUE(!bvn_unit_is_crypto((int)bu_zwg),   "ZWG not crypto");
-    ASSERT_TRUE(!bvn_unit_is_crypto((int)bu_xcg),   "XCG not crypto");
-    /* The gap between CRYPTO_LAST and EXT_FIRST is not currency space. */
+    printf("  currencies added after the first release (ZWG/XCG)...\n");
+    /* These two used to be an "extension segment" stranded outside the
+     * currency range, because that range had been frozen with no room to grow.
+     * The block has 10000 ids, so they are ordinary rows now — the point of
+     * this test is that nothing about them is special any more. */
+    ASSERT_EQ_INT(parse("ZWG"), 900164, "ZWG is an ordinary catalogue row");
+    ASSERT_EQ_INT(parse("XCG"), 900154, "XCG is an ordinary catalogue row");
+    ASSERT_TRUE( bvn_unit_is_currency(parse("ZWG")), "ZWG is currency");
+    ASSERT_TRUE( bvn_unit_is_currency(parse("XCG")), "XCG is currency");
+    ASSERT_TRUE( bvn_unit_is_fiat(parse("ZWG")),     "ZWG is fiat");
+    ASSERT_TRUE( bvn_unit_is_fiat(parse("XCG")),     "XCG is fiat");
+    ASSERT_TRUE(!bvn_unit_is_crypto(parse("ZWG")),   "ZWG not crypto");
+    ASSERT_TRUE(!bvn_unit_is_crypto(parse("XCG")),   "XCG not crypto");
+    /* No unit is ever currency space, whichever block it is in. */
     ASSERT_TRUE(!bvn_unit_is_currency((int)bu_pfund), "bu_pfund not currency");
     ASSERT_TRUE(!bvn_unit_is_currency((int)bu_ppb),   "bu_ppb not currency");
-
-    /* Round-trip parse -> enum value. */
-    ASSERT_EQ_INT(parse("ZWG"), 378, "ZWG==378");
-    ASSERT_EQ_INT(parse("XCG"), 379, "XCG==379");
+    ASSERT_TRUE(!bvn_unit_is_currency((int)bu_ucum_iu), "bu_ucum_iu not currency");
 
     bool ok;
     ASSERT_EQ_INT(bvn_currency_minor_unit(parse("ZWG"),&ok), 2, "ZWG minor=2"); ASSERT_TRUE(ok,"ZWG ok");
@@ -333,8 +355,8 @@ static void test_extension_currencies(void)
     ASSERT_TRUE(!ci->is_crypto,            "XCG not crypto");
 
     /* SI prefixes allowed on the new fiat; IEC prefixes rejected like all money. */
-    ASSERT_TRUE( bvn_currency_prefix_valid((int)bu_zwg, 0), "SI prefix ZWG valid");
-    ASSERT_TRUE(!bvn_currency_prefix_valid((int)bu_xcg, 1), "IEC prefix XCG invalid");
+    ASSERT_TRUE( bvn_currency_prefix_valid(parse("ZWG"), 0), "SI prefix ZWG valid");
+    ASSERT_TRUE(!bvn_currency_prefix_valid(parse("XCG"), 1), "IEC prefix XCG invalid");
 }
 
 int main(void)
@@ -351,7 +373,7 @@ int main(void)
     test_prefix_valid();
     test_contiguity();
     test_cup_collision();
-    test_extension_currencies();
+    test_late_currencies();
     printf("\n--------------------------------------\n");
     printf("  Results: %d tests, %d failures\n", tests, failures);
     printf("--------------------------------------\n");

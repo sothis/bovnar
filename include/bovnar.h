@@ -317,33 +317,73 @@ typedef enum iec_prefix_id_e {
 	/* IEC prefixes (iec_kibi..iec_quebi) — generated from src/gendata/prefixes.bvnr. */
 #include "bovnar_iec_prefix.gen.h"
 } iec_prefix_id_t;
+/*
+ * ===========================================================================
+ * THE BASE-UNIT ID SPACE
+ * ===========================================================================
+ *
+ * A base unit's id is not a running counter. It is BLOCKED: the leading two
+ * decimal digits name the vocabulary the unit comes from, and the four digits
+ * after them are its position within that vocabulary.
+ *
+ *      block  ids              vocabulary            source
+ *      -----  ---------------  --------------------  ----------------------
+ *         10  100000..109999   native bovnar units   src/gendata/units.bvnr
+ *         20  200000..209999   UCUM                  src/gendata/ucum.bvnr
+ *         30  300000..309999   UN/ECE Rec 20/21      src/gendata/unece.bvnr
+ *         40  400000..409999   QUDT units            src/gendata/qudt.bvnr
+ *         50  500000..509999   QUDT quantity kinds   src/gendata/qudt-qk.bvnr
+ *         60  600000..609999   UDUNITS-2             src/gendata/udunits.bvnr
+ *         90  900000..909999   currencies            src/gendata/currencies.bvnr
+ *
+ * Blocks 70 and 80 are free for a further profile. Only a vocabulary that
+ * contributes units of its OWN takes a block: a profile is a spelling for the
+ * unit slot, so most of its codes translate to native units and carry native
+ * ids. The ones that get a block id are the opaque units — codes with no native
+ * equivalent and no dimension (UCUM's assay-defined [IU], UN/ECE's package
+ * types), which need an identity of their own precisely because nothing else
+ * can stand in for them.
+ *
+ * WHY BLOCKS. One flat counter makes every vocabulary's ids a function of every
+ * other vocabulary's size, and that is not hypothetical: this space previously
+ * had physical units at 1..133 and again at 348..396 because the currencies had
+ * been dropped in between, two currencies stranded at 378..379 outside their own
+ * range because that range had been frozen, and the profile units pinned above
+ * all of it. Adding a currency shifted units. Blocks end that — a vocabulary
+ * grows into its own 10000 ids and nothing outside it moves — and they make an
+ * id self-describing: 200017 is UCUM's, whatever else the build contains.
+ *
+ * The price is a sparse space, so DO NOT index an array by a base unit id. The
+ * library's own tables are dense and one row per defined unit; see
+ * BVN_UNIT_SLOT_COUNT and the BVN_SLOT_* macros in the generated headers.
+ * bu_none is 0 and belongs to no block.
+ *
+ * Currencies get ids but no enumerators, unlike every other block: a currency
+ * is written by its ISO 4217 code behind a '$' sigil, resolved by
+ * bvn_parse_currency_str, and carried as the numeric base value. See
+ * bovnar_currency.h.
+ */
+#define BVN_UNIT_BLOCK_SIZE      10000
+#define BVN_UNIT_BLOCK_FIRST(tag)  ((int)(tag) * BVN_UNIT_BLOCK_SIZE)
+/* The first id of the first block, i.e. the smallest id any real unit can
+ * have — everything below it is bu_none or nothing at all. */
+#define BVN_UNIT_ID_FIRST        BVN_UNIT_BLOCK_FIRST(10)
 typedef enum value_base_unit_e {
 	bu_none = 0,
 	/*
-	 * Physical base units (enum ids 1..133, 348..377) — generated from
-	 * src/gendata/units.bvnr by gen_units.py. Currencies occupy the gap
-	 * 134..347 (bovnar_currency.c); the explicit ids here preserve it.
+	 * The native units, block 10 — generated from src/gendata/units.bvnr by
+	 * gen_units.py, which also emits this block's bounds and BVN_SLOT_NATIVE.
 	 */
 #include "bovnar_units.gen.h"
 	/*
-	 * Appended currencies. New fiat currencies are added here, after the unit
-	 * block, rather than inside the 134-347 currency region, so that adding one
-	 * never shifts an existing enum value (ABI stability). They are recognised
-	 * as currencies via the BVN_CURRENCY_EXT_* range in bovnar_currency.h, not
-	 * by the contiguous 134-347 bounds. They are NOT the highest enumerators —
-	 * physical units resumed at 380 above — so the BVN_VALUE_BASE_UNIT_COUNT
-	 * check in bvn_internal_dims.h tracks the last unit, not the last currency.
-	 */
-	bu_zwg = 378, bu_xcg,
-	/*
-	 * UCUM arbitrary units (spec 1.2) — generated from src/gendata/ucum.bvnr by
-	 * gen_profiles.py. Assay-defined quantities that are commensurable with nothing,
-	 * not even with each other, so each needs its own id: collapsing them onto
-	 * one would make [IU] and [PFU] compare equal. They have no native spelling
-	 * and are reachable only through the "ucum:" notation.
+	 * The unit profiles' opaque units (spec 1.2), one block each — generated
+	 * from the profile data files by gen_profiles.py, which also emits every
+	 * block's bounds, its BVN_SLOT_* macro and BVN_UNIT_SLOT_COUNT.
 	 *
-	 * These ARE the highest enumerators, so BVN_VALUE_BASE_UNIT_COUNT in
-	 * bvn_internal_dims.h now tracks the last of them.
+	 * Assay-defined quantities and package counts that are commensurable with
+	 * nothing, not even with each other, so each needs its own id: collapsing
+	 * them onto one would make [IU] and [PFU] compare equal. They have no
+	 * native spelling and are reachable only through the profile notation.
 	 */
 #include "bovnar_profiles.gen.h"
 } value_base_unit_t;

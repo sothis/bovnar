@@ -405,13 +405,10 @@ static void test_sweep_round_trip(void)
 	long same = 0, no_code = 0, differ = 0, rejected = 0;
 
 	printf("  sweeping the registry for native -> UCUM -> native...\n");
-	for (int b = 1; b < BVN_VALUE_BASE_UNIT_COUNT; b++) {
-		/* physical units only: the 180 of the registry. The currency block
-		 * (134..347) and the UCUM arbitrary block (397..) are not native
-		 * spellings and are covered by their own tests. */
-		if (!((b >= 1 && b <= 133) || (b >= 348 && b <= 377)
-		      || (b >= 380 && b <= 396)))
-			continue;
+	/* Block 10 only: the 180 native units, one contiguous run. Currencies
+	 * (block 90) and the profiles' opaque units (blocks 20+) have no native
+	 * spelling to sweep and are covered by their own tests. */
+	for (int b = BVN_UNIT_NATIVE_FIRST; b <= BVN_UNIT_NATIVE_LAST; b++) {
 		for (size_t p = 0; p < sizeof(PREFIXES) / sizeof(PREFIXES[0]); p++) {
 			value_unit_prefix_t pf;
 			memset(&pf, 0, sizeof(pf));
@@ -503,6 +500,47 @@ static void test_to_ucum(void)
 	/* A too-small buffer is a refusal, not a truncation. */
 	ASSERT_TRUE(bvn_unit_to_ucum(U("m/s"), buf, 3) < 0,
 	            "a short buffer is refused");
+
+	/*
+	 * Exponents past 9 are spelled, not smeared into one byte.
+	 *
+	 * The emitter wrote `(char)('0' + v)`, which was right only while
+	 * unit_exponent_t stopped at ±9. Past that it emitted whatever byte the
+	 * arithmetic produced: m^10 came out as "m:" — a colon, which is the
+	 * profile namespace separator — and m^100 as "m" plus a raw 0x94. The
+	 * profile PARSER had accepted two- and three-digit exponents all along, so
+	 * these were units the library could read and could not write back.
+	 *
+	 * Each case is checked by ROUND TRIP as well as by text, because the way
+	 * this failed was producing something that still looked like a code.
+	 */
+	static const struct { const char *unit; const char *code; } exps[] = {
+		{ "m^9",       "m9"       },
+		{ "m^10",      "m10"      },
+		{ "m^100",     "m100"     },
+		{ "m^-10",     "m-10"     },
+		{ "m^-100",    "m-100"    },
+		{ "k~m^10",    "km10"     },
+		{ "m^10/s^10", "m10.s-10" },
+	};
+	for (size_t i = 0; i < sizeof exps / sizeof exps[0]; i++) {
+		value_unit_t u = U(exps[i].unit);
+		tests++;
+		if (bvn_unit_to_ucum(u, buf, sizeof(buf)) < 0 ||
+		    strcmp(buf, exps[i].code) != 0) {
+			fprintf(stderr, "FAIL: %s -> UCUM gave %s, expected %s\n",
+			        exps[i].unit, buf, exps[i].code);
+			failures++;
+			continue;
+		}
+		char full[BVNR_UNIT_STRING_MAX + 8];
+		snprintf(full, sizeof full, "ucum:%s", buf);
+		bool ok = false;
+		value_unit_t back = bvn_parse_unit((const uint8_t *)full, &ok);
+		ASSERT_TRUE(ok, "the emitted UCUM code re-parses");
+		ASSERT_TRUE(ok && bvn_unit_equal(u, back),
+		            "and re-parses to the unit it came from");
+	}
 }
 
 /* ── regressions ────────────────────────────────────────────────────────── */

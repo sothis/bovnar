@@ -421,7 +421,7 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly
 
 ### 4.24 Old German Units
 
-No Old German unit accepts any SI or IEC prefix (`bvn_prefix_unit_valid` rejects all non-`si_none` prefixes for `bu_pfund` … `bu_scheffel`). Enum values 348–360.
+No Old German unit accepts any SI or IEC prefix (`bvn_prefix_unit_valid` rejects all non-`si_none` prefixes for `bu_pfund` … `bu_scheffel`). Enum values 100133–100145.
 
 #### Mass (metric-compatible)
 
@@ -567,7 +567,7 @@ currency/unit namespace collision (e.g. `$CUP` the Cuban Peso vs `cup` the unit)
 
 ### 5.2 ISO 4217 Fiat Currencies
 
-166 codes: 164 occupying `value_base_unit_t` slots **134 … 297** (`BVN_CURRENCY_FIAT_FIRST … BVN_CURRENCY_FIAT_LAST`), plus `ZWG` and `XCG` appended past the unit block at slots **378 … 379** (`BVN_CURRENCY_EXT_FIRST … BVN_CURRENCY_EXT_LAST`) so that adding them shifted no existing enum value. The 134–297 codes have no named `bu_*` enumerators — they are resolved from the `$`-sigil code by `bvn_parse_currency_str` and carried as the numeric `base` value; query them with `bvn_unit_is_fiat` / `bvn_currency_info`.
+166 codes at ids **900000 … 900165**, the front of block 90 of the `value_base_unit_t` id space (`BVN_CURRENCY_FIRST` …). They have no named `bu_*` enumerators — they are resolved from the `$`-sigil code by `bvn_parse_currency_str` and carried as the numeric `base` value; query them with `bvn_unit_is_fiat` / `bvn_currency_info`, both of which read the catalogue row rather than testing the id's range.
 
 > **Min** = minor unit exponent N: 1 major unit = 10^N minor units (e.g. 1 USD = 100 cents, N=2).
 > Minor units are **bold** when they differ from 2. `numeric_code` is the ISO 4217 numeric identifier.
@@ -746,7 +746,7 @@ currency/unit namespace collision (e.g. `$CUP` the Cuban Peso vs `cup` the unit)
 
 ### 5.3 Cryptocurrencies
 
-50 codes occupying `value_base_unit_t` slots **298 … 347** (`BVN_CURRENCY_CRYPTO_FIRST … BVN_CURRENCY_CRYPTO_LAST`). Like the fiat codes they have no named `bu_*` enumerators — resolved by `bvn_parse_currency_str`, queried with `bvn_unit_is_crypto` / `bvn_currency_info`. `numeric_code = 0` for all.
+50 codes at ids **900166 … 900215**, after the fiat codes in the same block 90. Like them they have no named `bu_*` enumerators — resolved by `bvn_parse_currency_str`, queried with `bvn_unit_is_crypto` / `bvn_currency_info`. `numeric_code = 0` for all.
 
 > **Min** = `minor_unit` = on-chain decimal places. E.g. `<uint:64,$BTC>` stores satoshis; divide by 10⁸ to obtain BTC.
 
@@ -846,8 +846,8 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 
 ---
 
-*Physical unit enum range: 1–133, 348–367, 368–371, 372–377 and 380–396 (180 total) · Fiat: 134–297 and 378–379 (166) · Crypto: 298–347 (50) · profile opaque block: 397–453 (57, under implementation — UCUM arbitrary units 397–428, UNECE package and count codes 429–453)*
-*`BVN_VALUE_BASE_UNIT_COUNT` = 454 (`BVN_PROFILE_OPAQUE_LAST + 1`)*
+*The id space is blocked: the leading two digits of an id name its vocabulary. Native units 100000–100179 (180) · UCUM opaque units 200000–200040 (41) · UN/ECE opaque units 300000–300024 (25) · currencies 900000–900215 (166 fiat, 50 crypto). Blocks 40, 50 and 60 are reserved for QUDT, QUDT quantity kinds and UDUNITS, which contribute no opaque units today; 70 and 80 are free.*
+*The space is SPARSE — do not index an array by an id. `BVN_UNIT_SLOT_COUNT` = 247 is the row count of the library's dense tables, indexed by `bvni_unit_slot()`, and is not a bound on the enum.*
 
 ---
 

@@ -28,11 +28,18 @@
 # STABLE IDS (ABI)
 #   .id is the value_base_unit_t enum value. Append-only: NEVER renumber or
 #   reuse an id — downstream C and the Python bindings are pinned to these
-#   integers. Physical units occupy 1..133, 348..377 and 380..; the gap
-#   134..347 belongs to currencies (see currencies.bvnr), as do 378..379 —
-#   currencies appended after that gap was frozen. A new physical unit goes at
-#   the end (380+) and must move the last-enumerator check in
-#   src/utils/bvn_internal_dims.h with it.
+#   integers.
+#
+#   Native bovnar units are the 10 BLOCK: ids 100000..109999, and they are
+#   CONTIGUOUS from 100000 up. Read an id and its leading two digits name the
+#   vocabulary it belongs to — 10 native, 20 UCUM, 30 UN/ECE, 40 QUDT, 50
+#   QUDT quantity kinds, 60 UDUNITS (all assigned by gen_profiles.py), 90
+#   currencies (currencies.bvnr). No two vocabularies share a block, so
+#   growing one never shifts another; see the layout note in include/bovnar.h.
+#
+#   A new physical unit appends at the end of this file with the next free id
+#   and needs no change anywhere else: the block bounds and the dense table
+#   slots are derived from this file by gen_units.py.
 #
 # FIELDS (one record per unit)
 #   .id       value_base_unit_t enum value (stable; see above)
@@ -60,7 +67,7 @@
 
 .units = [
   {
-    .id      = <uint:16>   1;
+    .id      = <uint:32> 100000;
     .name    = "bit";
     .symbol  = "b";
     .factor  = 1.0;
@@ -71,7 +78,7 @@
     .aliases = ["bits", "bit", "b"];
   },
   {
-    .id      = <uint:16>   2;
+    .id      = <uint:32> 100001;
     .name    = "byte";
     .symbol  = "B";
     .factor  = 1.0;
@@ -82,7 +89,7 @@
     .aliases = ["Bytes", "bytes", "Byte", "byte", "B"];
   },
   {
-    .id      = <uint:16>   3;
+    .id      = <uint:32> 100002;
     .name    = "second";
     .symbol  = "s";
     .factor  = 1.0;
@@ -93,7 +100,7 @@
     .aliases = ["seconds", "second", "sec", "s"];
   },
   {
-    .id      = <uint:16>   4;
+    .id      = <uint:32> 100003;
     .name    = "meter";
     .symbol  = "m";
     .factor  = 1.0;
@@ -104,7 +111,7 @@
     .aliases = ["metres", "meters", "metre", "meter", "m"];
   },
   {
-    .id      = <uint:16>   5;
+    .id      = <uint:32> 100004;
     .name    = "gram";
     .symbol  = "g";
     .factor  = 0.001;
@@ -115,7 +122,7 @@
     .aliases = ["grams", "gram", "g"];
   },
   {
-    .id      = <uint:16>   6;
+    .id      = <uint:32> 100005;
     .name    = "ampere";
     .symbol  = "A";
     .factor  = 1.0;
@@ -126,7 +133,7 @@
     .aliases = ["amperes", "ampere", "amps", "amp", "A"];
   },
   {
-    .id      = <uint:16>   7;
+    .id      = <uint:32> 100006;
     .name    = "kelvin";
     .symbol  = "K";
     .factor  = 1.0;
@@ -137,7 +144,7 @@
     .aliases = ["kelvins", "kelvin", "K"];
   },
   {
-    .id      = <uint:16>   8;
+    .id      = <uint:32> 100007;
     .name    = "mol";
     .symbol  = "mol";
     .factor  = 1.0;
@@ -148,7 +155,7 @@
     .aliases = ["moles", "mole", "mol"];
   },
   {
-    .id      = <uint:16>   9;
+    .id      = <uint:32> 100008;
     .name    = "candela";
     .symbol  = "cd";
     .factor  = 1.0;
@@ -159,7 +166,7 @@
     .aliases = ["candelas", "candela", "cd"];
   },
   {
-    .id      = <uint:16>  10;
+    .id      = <uint:32> 100009;
     .name    = "hertz";
     .symbol  = "Hz";
     .factor  = 1.0;
@@ -170,7 +177,7 @@
     .aliases = ["hertz", "Hz"];
   },
   {
-    .id      = <uint:16>  11;
+    .id      = <uint:32> 100010;
     .name    = "newton";
     .symbol  = "N";
     .factor  = 1.0;
@@ -181,7 +188,7 @@
     .aliases = ["newtons", "newton", "N"];
   },
   {
-    .id      = <uint:16>  12;
+    .id      = <uint:32> 100011;
     .name    = "pascal";
     .symbol  = "Pa";
     .factor  = 1.0;
@@ -192,7 +199,7 @@
     .aliases = ["pascals", "pascal", "Pa"];
   },
   {
-    .id      = <uint:16>  13;
+    .id      = <uint:32> 100012;
     .name    = "joule";
     .symbol  = "J";
     .factor  = 1.0;
@@ -203,7 +210,7 @@
     .aliases = ["joules", "joule", "J"];
   },
   {
-    .id      = <uint:16>  14;
+    .id      = <uint:32> 100013;
     .name    = "watt";
     .symbol  = "W";
     .factor  = 1.0;
@@ -214,7 +221,7 @@
     .aliases = ["watts", "watt", "W"];
   },
   {
-    .id      = <uint:16>  15;
+    .id      = <uint:32> 100014;
     .name    = "volt";
     .symbol  = "V";
     .factor  = 1.0;
@@ -225,7 +232,7 @@
     .aliases = ["volts", "volt", "V"];
   },
   {
-    .id      = <uint:16>  16;
+    .id      = <uint:32> 100015;
     .name    = "ohm";
     .symbol  = "Ω";
     .factor  = 1.0;
@@ -236,7 +243,7 @@
     .aliases = ["ohms", "Ω", "Ω", "ohm", "Ohm"];
   },
   {
-    .id      = <uint:16>  17;
+    .id      = <uint:32> 100016;
     .name    = "farad";
     .symbol  = "F";
     .factor  = 1.0;
@@ -247,7 +254,7 @@
     .aliases = ["farads", "farad", "F"];
   },
   {
-    .id      = <uint:16>  18;
+    .id      = <uint:32> 100017;
     .name    = "coulomb";
     .symbol  = "C";
     .factor  = 1.0;
@@ -258,7 +265,7 @@
     .aliases = ["coulombs", "coulomb", "C"];
   },
   {
-    .id      = <uint:16>  19;
+    .id      = <uint:32> 100018;
     .name    = "siemens";
     .symbol  = "S";
     .factor  = 1.0;
@@ -272,7 +279,7 @@
     .aliases = ["siemens", "mhos", "mho", "S", "℧"];
   },
   {
-    .id      = <uint:16>  20;
+    .id      = <uint:32> 100019;
     .name    = "weber";
     .symbol  = "Wb";
     .factor  = 1.0;
@@ -283,7 +290,7 @@
     .aliases = ["webers", "weber", "Wb"];
   },
   {
-    .id      = <uint:16>  21;
+    .id      = <uint:32> 100020;
     .name    = "tesla";
     .symbol  = "T";
     .factor  = 1.0;
@@ -294,7 +301,7 @@
     .aliases = ["teslas", "tesla", "T"];
   },
   {
-    .id      = <uint:16>  22;
+    .id      = <uint:32> 100021;
     .name    = "henry";
     .symbol  = "H";
     .factor  = 1.0;
@@ -305,7 +312,7 @@
     .aliases = ["henries", "henrys", "henry", "H"];
   },
   {
-    .id      = <uint:16>  23;
+    .id      = <uint:32> 100022;
     .name    = "lumen";
     .symbol  = "lm";
     .factor  = 1.0;
@@ -316,7 +323,7 @@
     .aliases = ["lumens", "lumen", "lm"];
   },
   {
-    .id      = <uint:16>  24;
+    .id      = <uint:32> 100023;
     .name    = "lux";
     .symbol  = "lx";
     .factor  = 1.0;
@@ -327,7 +334,7 @@
     .aliases = ["lux", "lx"];
   },
   {
-    .id      = <uint:16>  25;
+    .id      = <uint:32> 100024;
     .name    = "becquerel";
     .symbol  = "Bq";
     .factor  = 1.0;
@@ -338,7 +345,7 @@
     .aliases = ["becquerels", "becquerel", "Bq"];
   },
   {
-    .id      = <uint:16>  26;
+    .id      = <uint:32> 100025;
     .name    = "gray";
     .symbol  = "Gy";
     .factor  = 1.0;
@@ -349,7 +356,7 @@
     .aliases = ["grays", "gray", "Gy"];
   },
   {
-    .id      = <uint:16>  27;
+    .id      = <uint:32> 100026;
     .name    = "sievert";
     .symbol  = "Sv";
     .factor  = 1.0;
@@ -360,7 +367,7 @@
     .aliases = ["sieverts", "sievert", "Sv"];
   },
   {
-    .id      = <uint:16>  28;
+    .id      = <uint:32> 100027;
     .name    = "katal";
     .symbol  = "kat";
     .factor  = 1.0;
@@ -371,7 +378,7 @@
     .aliases = ["katals", "katal", "kat"];
   },
   {
-    .id      = <uint:16>  29;
+    .id      = <uint:32> 100028;
     .name    = "liter";
     .symbol  = "L";
     .factor  = 0.001;
@@ -382,7 +389,7 @@
     .aliases = ["litres", "liters", "litre", "liter", "L", "l"];
   },
   {
-    .id      = <uint:16>  30;
+    .id      = <uint:32> 100029;
     .name    = "minute";
     .symbol  = "min";
     .factor  = 60.0;
@@ -393,7 +400,7 @@
     .aliases = ["minutes", "minute", "min"];
   },
   {
-    .id      = <uint:16>  31;
+    .id      = <uint:32> 100030;
     .name    = "hour";
     .symbol  = "h";
     .factor  = 3600.0;
@@ -404,7 +411,7 @@
     .aliases = ["hours", "hour", "h"];
   },
   {
-    .id      = <uint:16>  32;
+    .id      = <uint:32> 100031;
     .name    = "day";
     .symbol  = "d";
     .factor  = 86400.0;
@@ -415,7 +422,7 @@
     .aliases = ["days", "day", "d"];
   },
   {
-    .id      = <uint:16>  33;
+    .id      = <uint:32> 100032;
     .name    = "degree";
     .symbol  = "°";
     .factor  = 0.017453292519943295;
@@ -427,7 +434,7 @@
     .aliases = ["degrees", "degree", "degr", "deg", "°"];
   },
   {
-    .id      = <uint:16>  34;
+    .id      = <uint:32> 100033;
     .name    = "celsius";
     .symbol  = "°C";
     .factor  = 1.0;
@@ -438,7 +445,7 @@
     .aliases = ["degreesC", "celsius", "degreeC", "degrC", "degC", "°C"];
   },
   {
-    .id      = <uint:16>  35;
+    .id      = <uint:32> 100034;
     .name    = "radian";
     .symbol  = "rad";
     .factor  = 1.0;
@@ -449,7 +456,7 @@
     .aliases = ["radians", "radian", "rad"];
   },
   {
-    .id      = <uint:16>  36;
+    .id      = <uint:32> 100035;
     .name    = "steradian";
     .symbol  = "sr";
     .factor  = 1.0;
@@ -460,7 +467,7 @@
     .aliases = ["steradians", "steradian", "sr"];
   },
   {
-    .id      = <uint:16>  37;
+    .id      = <uint:32> 100036;
     .name    = "tonne";
     .symbol  = "t";
     .factor  = 1000.0;
@@ -471,7 +478,7 @@
     .aliases = ["tonnes", "tonne", "t"];
   },
   {
-    .id      = <uint:16>  38;
+    .id      = <uint:32> 100037;
     .name    = "bar";
     .symbol  = "bar";
     .factor  = 100000.0;
@@ -486,7 +493,7 @@
   # electronvolt inherits it. No CODATA adjustment moves this value, and none
   # ever will -- it is fixed the way the metre is fixed by the speed of light.
   {
-    .id      = <uint:16>  39;
+    .id      = <uint:32> 100038;
     .name    = "electronvolt";
     .symbol  = "eV";
     .factor  = 1.602176634e-19;
@@ -503,7 +510,7 @@
   # check_profile_factors.py compares publishers at (doc/11 section 9.5), so the
   # change is about being able to NAME the edition rather than about the number.
   {
-    .id      = <uint:16>  40;
+    .id      = <uint:32> 100039;
     .name    = "dalton";
     .symbol  = "Da";
     .factor  = 1.66053906892e-27;
@@ -514,7 +521,7 @@
     .aliases = ["daltons", "dalton", "amu", "Da", "u"];
   },
   {
-    .id      = <uint:16>  41;
+    .id      = <uint:32> 100040;
     .name    = "astronomical_unit";
     .symbol  = "au";
     .factor  = 149597870700.0;
@@ -525,7 +532,7 @@
     .aliases = ["au"];
   },
   {
-    .id      = <uint:16>  42;
+    .id      = <uint:32> 100041;
     .name    = "hectare";
     .symbol  = "ha";
     .factor  = 10000.0;
@@ -536,7 +543,7 @@
     .aliases = ["hectares", "hectare", "ha"];
   },
   {
-    .id      = <uint:16>  43;
+    .id      = <uint:32> 100042;
     .name    = "week";
     .symbol  = "wk";
     .factor  = 604800.0;
@@ -547,7 +554,7 @@
     .aliases = ["weeks", "week", "wk"];
   },
   {
-    .id      = <uint:16>  44;
+    .id      = <uint:32> 100043;
     .name    = "year";
     .symbol  = "yr";
     .factor  = 31557600.0;
@@ -558,7 +565,7 @@
     .aliases = ["years", "year", "yr"];
   },
   {
-    .id      = <uint:16>  45;
+    .id      = <uint:32> 100044;
     .name    = "inch";
     .symbol  = "in";
     .factor  = 0.0254;
@@ -569,7 +576,7 @@
     .aliases = ["inches", "inch", "in"];
   },
   {
-    .id      = <uint:16>  46;
+    .id      = <uint:32> 100045;
     .name    = "foot";
     .symbol  = "ft";
     .factor  = 0.3048;
@@ -580,7 +587,7 @@
     .aliases = ["foot", "feet", "ft"];
   },
   {
-    .id      = <uint:16>  47;
+    .id      = <uint:32> 100046;
     .name    = "yard";
     .symbol  = "yd";
     .factor  = 0.9144;
@@ -591,7 +598,7 @@
     .aliases = ["yards", "yard", "yd"];
   },
   {
-    .id      = <uint:16>  48;
+    .id      = <uint:32> 100047;
     .name    = "mile";
     .symbol  = "mi";
     .factor  = 1609.344;
@@ -602,7 +609,7 @@
     .aliases = ["miles", "mile", "mi"];
   },
   {
-    .id      = <uint:16>  49;
+    .id      = <uint:32> 100048;
     .name    = "nautical_mile";
     .symbol  = "nmi";
     .factor  = 1852.0;
@@ -613,7 +620,7 @@
     .aliases = ["nautical_miles", "nautical_mile", "nmi"];
   },
   {
-    .id      = <uint:16>  50;
+    .id      = <uint:32> 100049;
     .name    = "angstrom";
     .symbol  = "Å";
     .factor  = 1e-10;
@@ -624,7 +631,7 @@
     .aliases = ["angstroms", "angstrom", "Å", "Å", "Å"];
   },
   {
-    .id      = <uint:16>  51;
+    .id      = <uint:32> 100050;
     .name    = "light_year";
     .symbol  = "ly";
     .factor  = 9460730472580800.0;
@@ -635,7 +642,7 @@
     .aliases = ["light_years", "light_year", "ly"];
   },
   {
-    .id      = <uint:16>  52;
+    .id      = <uint:32> 100051;
     .name    = "parsec";
     .symbol  = "pc";
     .factor  = 3.085677581491367e+16;
@@ -647,7 +654,7 @@
     .aliases = ["parsecs", "parsec", "pc"];
   },
   {
-    .id      = <uint:16>  53;
+    .id      = <uint:32> 100052;
     .name    = "furlong";
     .symbol  = "fur";
     .factor  = 201.168;
@@ -658,7 +665,7 @@
     .aliases = ["furlongs", "furlong", "fur"];
   },
   {
-    .id      = <uint:16>  54;
+    .id      = <uint:32> 100053;
     .name    = "fathom";
     .symbol  = "fath";
     .factor  = 1.8288;
@@ -669,7 +676,7 @@
     .aliases = ["fathoms", "fathom", "fath"];
   },
   {
-    .id      = <uint:16>  55;
+    .id      = <uint:32> 100054;
     .name    = "pound";
     .symbol  = "lb";
     .factor  = 0.45359237;
@@ -680,7 +687,7 @@
     .aliases = ["pounds", "pound", "lbs", "lb"];
   },
   {
-    .id      = <uint:16>  56;
+    .id      = <uint:32> 100055;
     .name    = "ounce";
     .symbol  = "oz";
     .factor  = 0.028349523125;
@@ -691,7 +698,7 @@
     .aliases = ["ounces", "ounce", "oz"];
   },
   {
-    .id      = <uint:16>  57;
+    .id      = <uint:32> 100056;
     .name    = "grain";
     .symbol  = "gr";
     .factor  = 6.479891e-05;
@@ -702,7 +709,7 @@
     .aliases = ["grains", "grain", "gr"];
   },
   {
-    .id      = <uint:16>  58;
+    .id      = <uint:32> 100057;
     .name    = "stone";
     .symbol  = "st";
     .factor  = 6.35029318;
@@ -713,7 +720,7 @@
     .aliases = ["stones", "stone", "st"];
   },
   {
-    .id      = <uint:16>  59;
+    .id      = <uint:32> 100058;
     .name    = "short_ton";
     .symbol  = "tn_sh";
     .factor  = 907.18474;
@@ -724,7 +731,7 @@
     .aliases = ["short_tons", "short_ton", "tn_sh"];
   },
   {
-    .id      = <uint:16>  60;
+    .id      = <uint:32> 100059;
     .name    = "long_ton";
     .symbol  = "tn_l";
     .factor  = 1016.0469088;
@@ -735,7 +742,7 @@
     .aliases = ["long_tons", "long_ton", "tn_l"];
   },
   {
-    .id      = <uint:16>  61;
+    .id      = <uint:32> 100060;
     .name    = "troy_ounce";
     .symbol  = "oz_t";
     .factor  = 0.0311034768;
@@ -746,7 +753,7 @@
     .aliases = ["troy_ounces", "troy_ounce", "oz_t"];
   },
   {
-    .id      = <uint:16>  62;
+    .id      = <uint:32> 100061;
     .name    = "carat";
     .symbol  = "ct";
     .factor  = 0.0002;
@@ -757,7 +764,7 @@
     .aliases = ["carats", "carat", "ct"];
   },
   {
-    .id      = <uint:16>  63;
+    .id      = <uint:32> 100062;
     .name    = "fahrenheit";
     .symbol  = "°F";
     .factor  = 0.5555555555555556;
@@ -774,7 +781,7 @@
     .aliases = ["fahrenheit", "degreesF", "degreeF", "degrF", "degF", "°F"];
   },
   {
-    .id      = <uint:16>  64;
+    .id      = <uint:32> 100063;
     .name    = "atmosphere";
     .symbol  = "atm";
     .factor  = 101325.0;
@@ -785,7 +792,7 @@
     .aliases = ["atmospheres", "atmosphere", "atm"];
   },
   {
-    .id      = <uint:16>  65;
+    .id      = <uint:32> 100064;
     .name    = "mmhg";
     .symbol  = "mmHg";
     .factor  = 133.322387415;
@@ -796,7 +803,7 @@
     .aliases = ["mmHg"];
   },
   {
-    .id      = <uint:16>  66;
+    .id      = <uint:32> 100065;
     .name    = "torr";
     .symbol  = "Torr";
     .factor  = 133.32236842105263;
@@ -811,7 +818,7 @@
     .aliases = ["Torr", "torr"];
   },
   {
-    .id      = <uint:16>  67;
+    .id      = <uint:32> 100066;
     .name    = "psi";
     .symbol  = "psi";
     .factor  = 6894.757293168362;
@@ -826,7 +833,7 @@
     .aliases = ["psi"];
   },
   {
-    .id      = <uint:16>  68;
+    .id      = <uint:32> 100067;
     .name    = "calorie";
     .symbol  = "cal";
     .factor  = 4.184;
@@ -837,7 +844,7 @@
     .aliases = ["calories", "calorie", "cal"];
   },
   {
-    .id      = <uint:16>  69;
+    .id      = <uint:32> 100068;
     .name    = "btu";
     .symbol  = "Btu";
     .factor  = 1055.05585262;
@@ -848,7 +855,7 @@
     .aliases = ["Btu", "BTU", "btu"];
   },
   {
-    .id      = <uint:16>  70;
+    .id      = <uint:32> 100069;
     .name    = "erg";
     .symbol  = "erg";
     .factor  = 1e-07;
@@ -859,7 +866,7 @@
     .aliases = ["ergs", "erg"];
   },
   {
-    .id      = <uint:16>  71;
+    .id      = <uint:32> 100070;
     .name    = "therm";
     .symbol  = "thm";
     .factor  = 105480400.0;
@@ -870,7 +877,7 @@
     .aliases = ["therms", "therm", "thm"];
   },
   {
-    .id      = <uint:16>  72;
+    .id      = <uint:32> 100071;
     .name    = "horsepower";
     .symbol  = "hp";
     .factor  = 745.6998715822702;
@@ -885,7 +892,7 @@
     .aliases = ["horsepower", "hp"];
   },
   {
-    .id      = <uint:16>  73;
+    .id      = <uint:32> 100072;
     .name    = "pound_force";
     .symbol  = "lbf";
     .factor  = 4.4482216152605;
@@ -896,7 +903,7 @@
     .aliases = ["pound_force", "lbf"];
   },
   {
-    .id      = <uint:16>  74;
+    .id      = <uint:32> 100073;
     .name    = "dyne";
     .symbol  = "dyn";
     .factor  = 1e-05;
@@ -907,7 +914,7 @@
     .aliases = ["dynes", "dyne", "dyn"];
   },
   {
-    .id      = <uint:16>  75;
+    .id      = <uint:32> 100074;
     .name    = "kip";
     .symbol  = "kip";
     .factor  = 4448.2216152605;
@@ -918,7 +925,7 @@
     .aliases = ["kips", "kip"];
   },
   {
-    .id      = <uint:16>  76;
+    .id      = <uint:32> 100075;
     .name    = "knot";
     .symbol  = "kn";
     .factor  = 0.5144444444444445;
@@ -932,7 +939,7 @@
     .aliases = ["knots", "knot", "kn"];
   },
   {
-    .id      = <uint:16>  77;
+    .id      = <uint:32> 100076;
     .name    = "gallon";
     .symbol  = "gal";
     .factor  = 0.003785411784;
@@ -943,7 +950,7 @@
     .aliases = ["gallons", "gallon", "gal"];
   },
   {
-    .id      = <uint:16>  78;
+    .id      = <uint:32> 100077;
     .name    = "gallon_uk";
     .symbol  = "gal_uk";
     .factor  = 0.00454609;
@@ -954,7 +961,7 @@
     .aliases = ["gallons_uk", "gallon_uk", "gal_uk"];
   },
   {
-    .id      = <uint:16>  79;
+    .id      = <uint:32> 100078;
     .name    = "quart";
     .symbol  = "qt";
     .factor  = 0.000946352946;
@@ -965,7 +972,7 @@
     .aliases = ["quarts", "quart", "qt"];
   },
   {
-    .id      = <uint:16>  80;
+    .id      = <uint:32> 100079;
     .name    = "pint";
     .symbol  = "pt";
     .factor  = 0.000473176473;
@@ -976,7 +983,7 @@
     .aliases = ["pints", "pint", "pt"];
   },
   {
-    .id      = <uint:16>  81;
+    .id      = <uint:32> 100080;
     .name    = "cup";
     .symbol  = "cup";
     .factor  = 0.0002365882365;
@@ -987,7 +994,7 @@
     .aliases = ["cups", "cup"];
   },
   {
-    .id      = <uint:16>  82;
+    .id      = <uint:32> 100081;
     .name    = "fluid_ounce";
     .symbol  = "fl_oz";
     .factor  = 2.95735295625e-05;
@@ -998,7 +1005,7 @@
     .aliases = ["fluid_ounces", "fluid_ounce", "fl_oz"];
   },
   {
-    .id      = <uint:16>  83;
+    .id      = <uint:32> 100082;
     .name    = "tablespoon";
     .symbol  = "tbsp";
     .factor  = 1.478676478125e-05;
@@ -1009,7 +1016,7 @@
     .aliases = ["tablespoons", "tablespoon", "tbsp"];
   },
   {
-    .id      = <uint:16>  84;
+    .id      = <uint:32> 100083;
     .name    = "teaspoon";
     .symbol  = "tsp";
     .factor  = 4.92892159375e-06;
@@ -1020,7 +1027,7 @@
     .aliases = ["teaspoons", "teaspoon", "tsp"];
   },
   {
-    .id      = <uint:16>  85;
+    .id      = <uint:32> 100084;
     .name    = "barrel";
     .symbol  = "bbl";
     .factor  = 0.158987294928;
@@ -1031,7 +1038,7 @@
     .aliases = ["barrels", "barrel", "bbl"];
   },
   {
-    .id      = <uint:16>  86;
+    .id      = <uint:32> 100085;
     .name    = "acre";
     .symbol  = "ac";
     .factor  = 4046.8564224;
@@ -1042,7 +1049,7 @@
     .aliases = ["acres", "acre", "ac"];
   },
   {
-    .id      = <uint:16>  87;
+    .id      = <uint:32> 100086;
     .name    = "barn";
     .symbol  = "barn";
     .factor  = 1e-28;
@@ -1053,7 +1060,7 @@
     .aliases = ["barns", "barn"];
   },
   {
-    .id      = <uint:16>  88;
+    .id      = <uint:32> 100087;
     .name    = "arcminute";
     .symbol  = "arcmin";
     .factor  = 0.0002908882086657216;
@@ -1065,7 +1072,7 @@
     .aliases = ["arcminutes", "arcminute", "arcmin"];
   },
   {
-    .id      = <uint:16>  89;
+    .id      = <uint:32> 100088;
     .name    = "arcsecond";
     .symbol  = "arcsec";
     .factor  = 4.84813681109536e-06;
@@ -1077,7 +1084,7 @@
     .aliases = ["arcseconds", "arcsecond", "arcsec"];
   },
   {
-    .id      = <uint:16>  90;
+    .id      = <uint:32> 100089;
     .name    = "grad";
     .symbol  = "grad";
     .factor  = 0.015707963267948967;
@@ -1089,7 +1096,7 @@
     .aliases = ["gradians", "gradian", "grad", "gon"];
   },
   {
-    .id      = <uint:16>  91;
+    .id      = <uint:32> 100090;
     .name    = "poise";
     .symbol  = "P";
     .factor  = 0.1;
@@ -1100,7 +1107,7 @@
     .aliases = ["poises", "poise", "P"];
   },
   {
-    .id      = <uint:16>  92;
+    .id      = <uint:32> 100091;
     .name    = "stokes";
     .symbol  = "St";
     .factor  = 0.0001;
@@ -1111,7 +1118,7 @@
     .aliases = ["stokes", "stoke", "St"];
   },
   {
-    .id      = <uint:16>  93;
+    .id      = <uint:32> 100092;
     .name    = "gauss";
     .symbol  = "G";
     .factor  = 0.0001;
@@ -1122,7 +1129,7 @@
     .aliases = ["gauss", "G"];
   },
   {
-    .id      = <uint:16>  94;
+    .id      = <uint:32> 100093;
     .name    = "maxwell";
     .symbol  = "Mx";
     .factor  = 1e-08;
@@ -1133,7 +1140,7 @@
     .aliases = ["maxwells", "maxwell", "Mx"];
   },
   {
-    .id      = <uint:16>  95;
+    .id      = <uint:32> 100094;
     .name    = "oersted";
     .symbol  = "Oe";
     .factor  = 79.57747154594767;
@@ -1145,7 +1152,7 @@
     .aliases = ["oersteds", "oersted", "Oe"];
   },
   {
-    .id      = <uint:16>  96;
+    .id      = <uint:32> 100095;
     .name    = "stilb";
     .symbol  = "sb";
     .factor  = 10000.0;
@@ -1156,7 +1163,7 @@
     .aliases = ["stilbs", "stilb", "sb"];
   },
   {
-    .id      = <uint:16>  97;
+    .id      = <uint:32> 100096;
     .name    = "phot";
     .symbol  = "ph";
     .factor  = 10000.0;
@@ -1167,7 +1174,7 @@
     .aliases = ["phots", "phot", "ph"];
   },
   {
-    .id      = <uint:16>  98;
+    .id      = <uint:32> 100097;
     .name    = "galileo";
     .symbol  = "Gal";
     .factor  = 0.01;
@@ -1178,7 +1185,7 @@
     .aliases = ["galileos", "galileo", "Gal"];
   },
   {
-    .id      = <uint:16>  99;
+    .id      = <uint:32> 100098;
     .name    = "curie";
     .symbol  = "Ci";
     .factor  = 37000000000.0;
@@ -1189,7 +1196,7 @@
     .aliases = ["curies", "curie", "Ci"];
   },
   {
-    .id      = <uint:16> 100;
+    .id      = <uint:32> 100099;
     .name    = "roentgen";
     .symbol  = "R";
     .factor  = 0.000258;
@@ -1200,7 +1207,7 @@
     .aliases = ["roentgens", "roentgen", "R"];
   },
   {
-    .id      = <uint:16> 101;
+    .id      = <uint:32> 100100;
     .name    = "rem";
     .symbol  = "rem";
     .factor  = 0.01;
@@ -1211,7 +1218,7 @@
     .aliases = ["rems", "rem"];
   },
   {
-    .id      = <uint:16> 102;
+    .id      = <uint:32> 100101;
     .name    = "neper";
     .symbol  = "Np";
     .factor  = 1.0;
@@ -1222,7 +1229,7 @@
     .aliases = ["nepers", "neper", "Np"];
   },
   {
-    .id      = <uint:16> 103;
+    .id      = <uint:32> 100102;
     .name    = "decibel";
     .symbol  = "dB";
     .factor  = 1.0;
@@ -1233,7 +1240,7 @@
     .aliases = ["decibels", "decibel", "dB"];
   },
   {
-    .id      = <uint:16> 104;
+    .id      = <uint:32> 100103;
     .name    = "rankine";
     .symbol  = "°Ra";
     .factor  = 0.5555555555555556;
@@ -1247,7 +1254,7 @@
     .aliases = ["degreesRa", "degreeRa", "rankine", "degrRa", "degRa", "°Ra", "Ra"];
   },
   {
-    .id      = <uint:16> 105;
+    .id      = <uint:32> 100104;
     .name    = "slug";
     .symbol  = "slug";
     .factor  = 14.593902937206364;
@@ -1262,7 +1269,7 @@
     .aliases = ["slugs", "slug"];
   },
   {
-    .id      = <uint:16> 106;
+    .id      = <uint:32> 100105;
     .name    = "thou";
     .symbol  = "thou";
     .factor  = 2.54e-05;
@@ -1273,7 +1280,7 @@
     .aliases = ["thou", "mils", "mil"];
   },
   {
-    .id      = <uint:16> 107;
+    .id      = <uint:32> 100106;
     .name    = "pint_uk";
     .symbol  = "pt_uk";
     .factor  = 0.00056826125;
@@ -1284,7 +1291,7 @@
     .aliases = ["pints_uk", "pint_uk", "pt_uk"];
   },
   {
-    .id      = <uint:16> 108;
+    .id      = <uint:32> 100107;
     .name    = "fluid_ounce_uk";
     .symbol  = "fl_oz_uk";
     .factor  = 2.84130625e-05;
@@ -1295,7 +1302,7 @@
     .aliases = ["fluid_ounces_uk", "fluid_ounce_uk", "fl_oz_uk"];
   },
   {
-    .id      = <uint:16> 109;
+    .id      = <uint:32> 100108;
     .name    = "quart_uk";
     .symbol  = "qt_uk";
     .factor  = 0.0011365225;
@@ -1306,7 +1313,7 @@
     .aliases = ["quarts_uk", "quart_uk", "qt_uk"];
   },
   {
-    .id      = <uint:16> 110;
+    .id      = <uint:32> 100109;
     .name    = "var";
     .symbol  = "var";
     .factor  = 1.0;
@@ -1317,7 +1324,7 @@
     .aliases = ["vars", "var"];
   },
   {
-    .id      = <uint:16> 111;
+    .id      = <uint:32> 100110;
     .name    = "volt_ampere";
     .symbol  = "VA";
     .factor  = 1.0;
@@ -1328,7 +1335,7 @@
     .aliases = ["volt_amperes", "volt_ampere", "VA"];
   },
   {
-    .id      = <uint:16> 112;
+    .id      = <uint:32> 100111;
     .name    = "kilogram_force";
     .symbol  = "kgf";
     .factor  = 9.80665;
@@ -1339,7 +1346,7 @@
     .aliases = ["kilogram_force", "kgf"];
   },
   {
-    .id      = <uint:16> 113;
+    .id      = <uint:32> 100112;
     .name    = "inch_hg";
     .symbol  = "inHg";
     # Exactly 25.4 conventional millimetres of mercury: 25.4·133.322387415 Pa.
@@ -1353,7 +1360,7 @@
     .aliases = ["inch_mercury", "inch_hg", "inHg"];
   },
   {
-    .id      = <uint:16> 114;
+    .id      = <uint:32> 100113;
     .name    = "rpm";
     .symbol  = "rpm";
     .factor  = 0.016666666666666666;
@@ -1375,7 +1382,7 @@
     .aliases = ["rpm"];
   },
   {
-    .id      = <uint:16> 115;
+    .id      = <uint:32> 100114;
     .name    = "foot_pound";
     .symbol  = "ft_lb";
     .factor  = 1.3558179483314004;
@@ -1391,7 +1398,7 @@
     .aliases = ["foot_pounds", "foot_pound", "ft_lb"];
   },
   {
-    .id      = <uint:16> 116;
+    .id      = <uint:32> 100115;
     .name    = "dram";
     .symbol  = "dr";
     .factor  = 0.0017718451953125;
@@ -1402,7 +1409,7 @@
     .aliases = ["drams", "dram", "dr"];
   },
   {
-    .id      = <uint:16> 117;
+    .id      = <uint:32> 100116;
     .name    = "pennyweight";
     .symbol  = "dwt";
     .factor  = 0.00155517384;
@@ -1413,7 +1420,7 @@
     .aliases = ["pennyweights", "pennyweight", "dwt"];
   },
   {
-    .id      = <uint:16> 118;
+    .id      = <uint:32> 100117;
     .name    = "chain";
     .symbol  = "ch";
     .factor  = 20.1168;
@@ -1424,7 +1431,7 @@
     .aliases = ["chains", "chain", "ch"];
   },
   {
-    .id      = <uint:16> 119;
+    .id      = <uint:32> 100118;
     .name    = "rod";
     .symbol  = "rd";
     .factor  = 5.0292;
@@ -1435,7 +1442,7 @@
     .aliases = ["rods", "rod", "rd"];
   },
   {
-    .id      = <uint:16> 120;
+    .id      = <uint:32> 100119;
     .name    = "gill";
     .symbol  = "gi";
     .factor  = 0.00011829411825;
@@ -1446,7 +1453,7 @@
     .aliases = ["gills", "gill", "gi"];
   },
   {
-    .id      = <uint:16> 121;
+    .id      = <uint:32> 100120;
     .name    = "gill_uk";
     .symbol  = "gi_uk";
     .factor  = 0.0001420653125;
@@ -1457,7 +1464,7 @@
     .aliases = ["gill_uk", "gills_uk", "gi_uk"];
   },
   {
-    .id      = <uint:16> 122;
+    .id      = <uint:32> 100121;
     .name    = "standard_gravity";
     .symbol  = "gn";
     .factor  = 9.80665;
@@ -1468,7 +1475,7 @@
     .aliases = ["standard_gravity", "gn"];
   },
   {
-    .id      = <uint:16> 123;
+    .id      = <uint:32> 100122;
     .name    = "metric_horsepower";
     .symbol  = "PS";
     .factor  = 735.49875;
@@ -1479,7 +1486,7 @@
     .aliases = ["metric_horsepower", "PS", "CV"];
   },
   {
-    .id      = <uint:16> 124;
+    .id      = <uint:32> 100123;
     .name    = "revolution";
     .symbol  = "rev";
     .factor  = 6.283185307179586;
@@ -1491,7 +1498,7 @@
     .aliases = ["revolutions", "revolution", "turns", "turn", "rev"];
   },
   {
-    .id      = <uint:16> 125;
+    .id      = <uint:32> 100124;
     .name    = "month";
     .symbol  = "mo";
     .factor  = 2629800.0;
@@ -1502,7 +1509,7 @@
     .aliases = ["months", "month", "mo"];
   },
   {
-    .id      = <uint:16> 126;
+    .id      = <uint:32> 100125;
     .name    = "fortnight";
     .symbol  = "fn";
     .factor  = 1209600.0;
@@ -1513,7 +1520,7 @@
     .aliases = ["fortnights", "fortnight", "fn"];
   },
   {
-    .id      = <uint:16> 127;
+    .id      = <uint:32> 100126;
     .name    = "atmosphere_technical";
     .symbol  = "at";
     .factor  = 98066.5;
@@ -1524,7 +1531,7 @@
     .aliases = ["atmosphere_technical", "at"];
   },
   {
-    .id      = <uint:16> 128;
+    .id      = <uint:32> 100127;
     .name    = "tex";
     .symbol  = "tex";
     .factor  = 1e-06;
@@ -1535,7 +1542,7 @@
     .aliases = ["tex"];
   },
   {
-    .id      = <uint:16> 129;
+    .id      = <uint:32> 100128;
     .name    = "denier";
     .symbol  = "den";
     .factor  = 1.1111111111111111e-07;
@@ -1549,7 +1556,7 @@
     .aliases = ["deniers", "denier", "den"];
   },
   {
-    .id      = <uint:16> 130;
+    .id      = <uint:32> 100129;
     .name    = "fluid_dram";
     .symbol  = "fl_dr";
     .factor  = 3.6966911953125e-06;
@@ -1560,7 +1567,7 @@
     .aliases = ["fluid_drams", "fluid_dram", "fl_drams", "fl_dr"];
   },
   {
-    .id      = <uint:16> 131;
+    .id      = <uint:32> 100130;
     .name    = "minim";
     .symbol  = "minim";
     .factor  = 6.1611519921875e-08;
@@ -1571,7 +1578,7 @@
     .aliases = ["minims", "minim"];
   },
   {
-    .id      = <uint:16> 132;
+    .id      = <uint:32> 100131;
     .name    = "peck";
     .symbol  = "pk";
     .factor  = 0.00880976754172;
@@ -1582,7 +1589,7 @@
     .aliases = ["pecks", "peck", "pk"];
   },
   {
-    .id      = <uint:16> 133;
+    .id      = <uint:32> 100132;
     .name    = "bushel";
     .symbol  = "bsh";
     .factor  = 0.03523907016688;
@@ -1593,7 +1600,7 @@
     .aliases = ["bushels", "bushel", "bsh"];
   },
   {
-    .id      = <uint:16> 348;
+    .id      = <uint:32> 100133;
     .name    = "pfund";
     .symbol  = "Pfd";
     .factor  = 0.5;
@@ -1604,7 +1611,7 @@
     .aliases = ["pfunds", "pfund", "Pfd"];
   },
   {
-    .id      = <uint:16> 349;
+    .id      = <uint:32> 100134;
     .name    = "zentner";
     .symbol  = "Ztr";
     .factor  = 50.0;
@@ -1615,7 +1622,7 @@
     .aliases = ["zentner", "Ztr"];
   },
   {
-    .id      = <uint:16> 350;
+    .id      = <uint:32> 100135;
     .name    = "doppelzentner";
     .symbol  = "dz";
     .factor  = 100.0;
@@ -1626,7 +1633,7 @@
     .aliases = ["doppelzentner", "dz"];
   },
   {
-    .id      = <uint:16> 351;
+    .id      = <uint:32> 100136;
     .name    = "lot";
     .symbol  = "lot";
     .factor  = 0.015625;
@@ -1637,7 +1644,7 @@
     .aliases = ["lots", "lot"];
   },
   {
-    .id      = <uint:16> 352;
+    .id      = <uint:32> 100137;
     .name    = "prussian_line";
     .symbol  = "prln";
     .factor  = 0.002179534722222222;
@@ -1651,7 +1658,7 @@
     .aliases = ["prussian_line", "linie", "prln"];
   },
   {
-    .id      = <uint:16> 353;
+    .id      = <uint:32> 100138;
     .name    = "prussian_zoll";
     .symbol  = "prz";
     .factor  = 0.026154416666666666;
@@ -1665,7 +1672,7 @@
     .aliases = ["prussian_zoll", "zoll", "prz"];
   },
   {
-    .id      = <uint:16> 354;
+    .id      = <uint:32> 100139;
     .name    = "prussian_fuss";
     .symbol  = "prf";
     .factor  = 0.313853;
@@ -1676,7 +1683,7 @@
     .aliases = ["preussischer_fuss", "prussian_fuss", "prf"];
   },
   {
-    .id      = <uint:16> 355;
+    .id      = <uint:32> 100140;
     .name    = "prussian_elle";
     .symbol  = "elle";
     # 25½ Zoll = 25.5 × 0.313853/12 m. Was 0.66716, which is 25.5085 Zoll — a
@@ -1691,7 +1698,7 @@
     .aliases = ["preussische_elle", "prussian_elle", "elle"];
   },
   {
-    .id      = <uint:16> 356;
+    .id      = <uint:32> 100141;
     .name    = "prussian_rute";
     .symbol  = "rute";
     # Exactly 12 Prussian Fuß. Written in full: rounding it to 3.76624 made
@@ -1705,7 +1712,7 @@
     .aliases = ["preussische_rute", "prussian_rute", "rute"];
   },
   {
-    .id      = <uint:16> 357;
+    .id      = <uint:32> 100142;
     .name    = "klafter";
     .symbol  = "klafter";
     # Exactly 6 Prussian Fuß — half a Rute. See the Rute above for why the last
@@ -1718,7 +1725,7 @@
     .aliases = ["prussian_klafter", "klafter"];
   },
   {
-    .id      = <uint:16> 358;
+    .id      = <uint:32> 100143;
     .name    = "german_mile";
     .symbol  = "dt_mi";
     .factor  = 7420.44;
@@ -1729,7 +1736,7 @@
     .aliases = ["german_mile", "deutsche_meile", "dt_mi"];
   },
   {
-    .id      = <uint:16> 359;
+    .id      = <uint:32> 100144;
     .name    = "morgen";
     .symbol  = "morgen";
     # Exactly 180 square Ruten = 180·(12·0.313853)² m². Terminates at 15
@@ -1742,7 +1749,7 @@
     .aliases = ["prussian_morgen", "morgen"];
   },
   {
-    .id      = <uint:16> 360;
+    .id      = <uint:32> 100145;
     .name    = "scheffel";
     .symbol  = "schffl";
     .factor  = 0.054961;
@@ -1753,7 +1760,7 @@
     .aliases = ["prussian_scheffel", "scheffel", "schffl"];
   },
   {
-    .id      = <uint:16> 361;
+    .id      = <uint:32> 100146;
     .name    = "survey_foot";
     .symbol  = "ftUS";
     .factor  = 0.3048006096012192;
@@ -1767,7 +1774,7 @@
     .aliases = ["survey_foot", "ftUS"];
   },
   {
-    .id      = <uint:16> 362;
+    .id      = <uint:32> 100147;
     .name    = "league";
     .symbol  = "lea";
     .factor  = 4828.032;
@@ -1778,7 +1785,7 @@
     .aliases = ["leagues", "league", "lea"];
   },
   {
-    .id      = <uint:16> 363;
+    .id      = <uint:32> 100148;
     .name    = "cable";
     .symbol  = "cbl";
     .factor  = 185.2;
@@ -1789,7 +1796,7 @@
     .aliases = ["cables", "cable", "cbl"];
   },
   {
-    .id      = <uint:16> 364;
+    .id      = <uint:32> 100149;
     .name    = "hand";
     .symbol  = "hand";
     .factor  = 0.1016;
@@ -1800,7 +1807,7 @@
     .aliases = ["hands", "hand"];
   },
   {
-    .id      = <uint:16> 365;
+    .id      = <uint:32> 100150;
     .name    = "quintal";
     .symbol  = "qntl";
     .factor  = 100.0;
@@ -1811,7 +1818,7 @@
     .aliases = ["quintals", "quintal", "qntl"];
   },
   {
-    .id      = <uint:16> 366;
+    .id      = <uint:32> 100151;
     .name    = "scruple";
     .symbol  = "sc";
     .factor  = 0.0012959782;
@@ -1822,7 +1829,7 @@
     .aliases = ["scruples", "scruple", "sc"];
   },
   {
-    .id      = <uint:16> 367;
+    .id      = <uint:32> 100152;
     .name    = "baud";
     .symbol  = "Bd";
     .factor  = 1.0;
@@ -1833,7 +1840,7 @@
     .aliases = ["bauds", "baud", "Bd"];
   },
   {
-    .id      = <uint:16> 368;
+    .id      = <uint:32> 100153;
     .name    = "delisle";
     .symbol  = "°De";
     .factor  = -0.6666666666666666;
@@ -1848,7 +1855,7 @@
     .aliases = ["degreesDe", "degreeDe", "delisle", "degrDe", "degDe", "°De"];
   },
   {
-    .id      = <uint:16> 369;
+    .id      = <uint:32> 100154;
     .name    = "newton_temp";
     .symbol  = "°N";
     .factor  = 3.0303030303030303;
@@ -1863,7 +1870,7 @@
     .aliases = ["newton_temperature", "degreesN", "degreeN", "degrN", "degN", "°N"];
   },
   {
-    .id      = <uint:16> 370;
+    .id      = <uint:32> 100155;
     .name    = "reaumur";
     .symbol  = "°Re";
     .factor  = 1.25;
@@ -1874,7 +1881,7 @@
     .aliases = ["degreesRe", "degreeRe", "reaumur", "degrRe", "degRe", "°Re"];
   },
   {
-    .id      = <uint:16> 371;
+    .id      = <uint:32> 100156;
     .name    = "romer";
     .symbol  = "°Ro";
     .factor  = 1.9047619047619047;
@@ -1891,7 +1898,7 @@
     .aliases = ["degreesRo", "degreeRo", "degrRo", "degRo", "romer", "°Ro"];
   },
   {
-    .id      = <uint:16> 372;
+    .id      = <uint:32> 100157;
     .name    = "percent";
     .symbol  = "%";
     .factor  = 0.01;
@@ -1902,7 +1909,7 @@
     .aliases = ["percent", "%"];
   },
   {
-    .id      = <uint:16> 373;
+    .id      = <uint:32> 100158;
     .name    = "per_mille";
     .symbol  = "‰";
     .factor  = 0.001;
@@ -1913,7 +1920,7 @@
     .aliases = ["per_mille", "‰"];
   },
   {
-    .id      = <uint:16> 374;
+    .id      = <uint:32> 100159;
     .name    = "per_myriad";
     .symbol  = "‱";
     .factor  = 0.0001;
@@ -1924,7 +1931,7 @@
     .aliases = ["per_myriad", "‱"];
   },
   {
-    .id      = <uint:16> 375;
+    .id      = <uint:32> 100160;
     .name    = "per_cent_mille";
     .symbol  = "pcm";
     .factor  = 1e-05;
@@ -1935,7 +1942,7 @@
     .aliases = ["per_cent_mille", "pcm"];
   },
   {
-    .id      = <uint:16> 376;
+    .id      = <uint:32> 100161;
     .name    = "ppm";
     .symbol  = "ppm";
     .factor  = 1e-06;
@@ -1946,7 +1953,7 @@
     .aliases = ["ppm"];
   },
   {
-    .id      = <uint:16> 377;
+    .id      = <uint:32> 100162;
     .name    = "ppb";
     .symbol  = "ppb";
     .factor  = 1e-09;
@@ -1964,7 +1971,7 @@
     # what the number means, and "7.2" alone is not. Without it "pH" parses as
     # p~H, the picohenry, which is why it also has to be a UNIT rather than
     # merely a refused spelling.
-    .id      = <uint:16> 380;
+    .id      = <uint:32> 100163;
     .name    = "ph_scale";
     .symbol  = "pH";
     .factor  = 1.0;
@@ -1978,7 +1985,7 @@
     # 1 mph = 1609.344 m / 3600 s = 0.44704 m/s exactly. Like the knot, this is
     # a customary speed unit people write as one token; unlike a compound it
     # cannot be prefixed (a kilo-mph is not a thing), hence .prefix = none.
-    .id      = <uint:16> 381;
+    .id      = <uint:32> 100164;
     .name    = "mile_per_hour";
     .symbol  = "mph";
     .factor  = 0.44704;
@@ -1993,7 +2000,7 @@
     # the stored decimal is only the rounded double, so the exact rational is
     # stated. "kmh" is the other spelling in the wild; "km/h" is the compound
     # and needs nothing here.
-    .id      = <uint:16> 382;
+    .id      = <uint:32> 100165;
     .name    = "kilometer_per_hour";
     .symbol  = "kph";
     .factor  = 0.2777777777777778;
@@ -2029,7 +2036,7 @@
   #
   # mmol/L needs no unit of its own: it is the compound m~mol/L.
   {
-    .id      = <uint:16> 383;
+    .id      = <uint:32> 100166;
     .name    = "german_hardness";
     .symbol  = "°dH";
     .factor  = 0.17832623000517145;
@@ -2042,7 +2049,7 @@
     .aliases = ["german_hardness", "°dH"];
   },
   {
-    .id      = <uint:16> 384;
+    .id      = <uint:32> 100167;
     .name    = "english_hardness";
     .symbol  = "°e";
     .factor  = 0.1424151981625826;
@@ -2055,7 +2062,7 @@
     .aliases = ["english_hardness", "clark_degree", "°Clark", "°e"];
   },
   {
-    .id      = <uint:16> 385;
+    .id      = <uint:32> 100168;
     .name    = "french_hardness";
     .symbol  = "°fH";
     .factor  = 0.09991407389644906;
@@ -2067,7 +2074,7 @@
     .aliases = ["french_hardness", "°fH"];
   },
   {
-    .id      = <uint:16> 386;
+    .id      = <uint:32> 100169;
     .name    = "russian_hardness";
     .symbol  = "°rH";
     .factor  = 0.024951344877488894;
@@ -2079,7 +2086,7 @@
     .aliases = ["russian_hardness", "°rH"];
   },
   {
-    .id      = <uint:16> 387;
+    .id      = <uint:32> 100170;
     .name    = "american_hardness";
     .symbol  = "°aH";
     .factor  = 0.009991407389644906;
@@ -2093,7 +2100,7 @@
     .aliases = ["american_hardness", "°aH"];
   },
   {
-    .id      = <uint:16> 388;
+    .id      = <uint:32> 100171;
     .name    = "val";
     .symbol  = "val";
     # The equivalent AS USED IN WATER ANALYSIS: the ions counted are divalent, so
@@ -2115,7 +2122,7 @@
     # scale, and the reason it is a unit rather than the compound gr/gal: as a
     # compound that is a MASS concentration, which does not convert to the other
     # hardness scales. Both spellings stay valid and mean different things.
-    .id      = <uint:16> 389;
+    .id      = <uint:32> 100172;
     .name    = "grains_per_gallon";
     .symbol  = "gpg";
     .factor  = 0.17103352162411276;
@@ -2139,7 +2146,7 @@
     # colour, which is exactly why every standard demands the method be
     # reported. Prefixes are allowed — ultrapure-water work really does write
     # m~NTU.
-    .id      = <uint:16> 390;
+    .id      = <uint:32> 100173;
     .name    = "turbidity_ntu";
     .symbol  = "NTU";
     .factor  = 1.0;
@@ -2153,7 +2160,7 @@
     # ISO 7027 nephelometric turbidity, near-infrared LED at 860 nm, 90°
     # detector. See NTU above for why these are separate kinds rather than
     # aliases of one another.
-    .id      = <uint:16> 391;
+    .id      = <uint:32> 100174;
     .name    = "turbidity_fnu";
     .symbol  = "FNU";
     .factor  = 1.0;
@@ -2172,7 +2179,7 @@
     # about half a percent. Its own kind keeps that conversion out of reach; for
     # absolute salinity write the mass fraction directly (g/k~g).
     # The scale is bounded (0…42 by construction), so no prefixes.
-    .id      = <uint:16> 392;
+    .id      = <uint:32> 100175;
     .name    = "practical_salinity";
     .symbol  = "PSU";
     .factor  = 1.0;
@@ -2188,7 +2195,7 @@
     # conductivity — a rescaled one — so it carries siemens-per-metre dimensions
     # and converts to µS/cm and mS/cm, which is the whole point of having it.
     # Only the uppercase spelling: "cF" is the centifarad.
-    .id      = <uint:16> 393;
+    .id      = <uint:32> 100176;
     .name    = "conductivity_factor";
     .symbol  = "CF";
     .factor  = 0.01;
@@ -2204,7 +2211,7 @@
     # it tells a reader — the sample was compared against formazin, by an
     # unspecified method — so it cannot be an alias of NTU or FNU without
     # inventing the geometry. Its own kind, like the rest of them.
-    .id      = <uint:16> 394;
+    .id      = <uint:32> 100177;
     .name    = "turbidity_ftu";
     .symbol  = "FTU";
     .factor  = 1.0;
@@ -2220,7 +2227,7 @@
     # sideways. A different optical quantity from FNU, not the same one measured
     # differently, and the instrument of choice above ~40 FNU where nephelometry
     # saturates.
-    .id      = <uint:16> 395;
+    .id      = <uint:32> 100178;
     .name    = "turbidity_fau";
     .symbol  = "FAU";
     .factor  = 1.0;
@@ -2237,7 +2244,7 @@
     # nowhere else, being nonlinear and sample-dependent. The method cannot
     # resolve below roughly 25 JTU either, so a milli-JTU is not a measurement:
     # no prefixes.
-    .id      = <uint:16> 396;
+    .id      = <uint:32> 100179;
     .name    = "turbidity_jtu";
     .symbol  = "JTU";
     .factor  = 1.0;

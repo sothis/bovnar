@@ -281,12 +281,17 @@ static void test_opaque_block(void)
 	             "an international unit is not a box");
 	ASSERT_FALSE(bvn_unit_equal(iu, box), "[IU] is not XBX");
 
-	/* The ranges do not overlap, which is what makes the ownership test a
-	 * comparison rather than a search. */
+	/* The two profiles own separate blocks of the id space, which is what makes
+	 * the ownership test a comparison rather than a search — and what lets
+	 * either profile grow without renumbering the other. */
 	ASSERT_TRUE(BVN_PROFILE_UCUM_OPAQUE_LAST < BVN_PROFILE_UNECE_OPAQUE_FIRST,
 	            "the ucum and unece opaque ranges must not overlap");
-	ASSERT_TRUE(BVN_PROFILE_UNECE_OPAQUE_LAST + 1 == BVN_VALUE_BASE_UNIT_COUNT,
-	            "the opaque block must end at the last enumerator");
+	ASSERT_TRUE(BVN_PROFILE_UNECE_OPAQUE_FIRST - BVN_PROFILE_UCUM_OPAQUE_FIRST
+	            == 10 * BVN_UNIT_BLOCK_SIZE,
+	            "ucum and unece are one block tag apart");
+	ASSERT_TRUE(BVN_PROFILE_UNECE_OPAQUE_LAST
+	            < BVN_PROFILE_UNECE_OPAQUE_FIRST + BVN_UNIT_BLOCK_SIZE,
+	            "unece's opaque units fit inside its own block");
 }
 
 /* ── round trip ─────────────────────────────────────────────────────────── */

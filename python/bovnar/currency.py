@@ -56,9 +56,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterator
 
-from .enums import BaseUnit, CURRENCY_FIAT_FIRST, CURRENCY_FIAT_LAST, \
-                   CURRENCY_CRYPTO_FIRST, CURRENCY_CRYPTO_LAST, \
-                   CURRENCY_EXT_FIRST, CURRENCY_EXT_LAST
+from .enums import BaseUnit, CURRENCY_FIRST, CURRENCY_LAST
 
 
 # ── Metadata record ────────────────────────────────────────────────────────
@@ -84,10 +82,16 @@ class CurrencyInfo:
 # ── Static metadata table (mirrors bovnar_currency.c) ─────────────────────
 
 _TABLE: dict[BaseUnit, CurrencyInfo] = {}
+# The same rows keyed by the plain int, for the predicates. They take "any base
+# unit" -- including ids this build does not define -- and BaseUnit(n) raises on
+# those, so they must not go through the enum to reach a row.
+_BY_ID: dict[int, CurrencyInfo] = {}
 
 def _row(base: BaseUnit, code: str, num: int, mu: int,
          crypto: bool, name: str) -> None:
-    _TABLE[base] = CurrencyInfo(base, code, num, mu, crypto, name)
+    info = CurrencyInfo(base, code, num, mu, crypto, name)
+    _TABLE[base] = info
+    _BY_ID[int(base)] = info
 
 # ISO 4217 fiat + precious metals
 _row(BaseUnit.AED, "AED", 784, 2, False, "UAE Dirham")
@@ -244,6 +248,8 @@ _row(BaseUnit.XAF, "XAF", 950, 0, False, "CFA Franc BEAC")
 _row(BaseUnit.XAG, "XAG", 961, 0, False, "Silver")
 _row(BaseUnit.XAU, "XAU", 959, 0, False, "Gold")
 _row(BaseUnit.XCD, "XCD", 951, 2, False, "East Caribbean Dollar")
+# XCG inherits ANG's numeric code 532; ANG is retained for compatibility.
+_row(BaseUnit.XCG, "XCG", 532, 2, False, "Caribbean Guilder")
 _row(BaseUnit.XDR, "XDR", 960, 0, False, "Special Drawing Rights")
 _row(BaseUnit.XOF, "XOF", 952, 0, False, "CFA Franc BCEAO")
 _row(BaseUnit.XPD, "XPD", 964, 0, False, "Palladium")
@@ -253,13 +259,8 @@ _row(BaseUnit.XTS, "XTS", 963, 0, False, "Test")
 _row(BaseUnit.YER, "YER", 886, 2, False, "Yemeni Rial")
 _row(BaseUnit.ZAR, "ZAR", 710, 2, False, "South African Rand")
 _row(BaseUnit.ZMW, "ZMW", 967, 2, False, "Zambian Kwacha")
-_row(BaseUnit.ZWL, "ZWL", 932, 2, False, "Zimbabwean Dollar")
-
-# Appended fiat currencies (enum 378-379, see CURRENCY_EXT_* in enums.py).
-# Added after the 134-347 block was frozen, so they live past the unit block to
-# keep existing enum values stable.  XCG inherits ANG's numeric code 532.
 _row(BaseUnit.ZWG, "ZWG", 924, 2, False, "Zimbabwe Gold")
-_row(BaseUnit.XCG, "XCG", 532, 2, False, "Caribbean Guilder")
+_row(BaseUnit.ZWL, "ZWL", 932, 2, False, "Zimbabwean Dollar")
 
 # Cryptocurrencies
 _row(BaseUnit.BTC,  "BTC",  0,  8, True, "Bitcoin")
@@ -317,20 +318,29 @@ _row(BaseUnit.RUNE, "RUNE", 0,  8, True, "THORChain")
 # ── Public predicates ──────────────────────────────────────────────────────
 
 def is_currency(base: BaseUnit) -> bool:
-    """True if base is any fiat, precious metal, or crypto currency."""
-    return (int(CURRENCY_FIAT_FIRST) <= int(base) <= int(CURRENCY_CRYPTO_LAST)
-            or int(CURRENCY_EXT_FIRST) <= int(base) <= int(CURRENCY_EXT_LAST))
+    """True if base is any fiat, precious metal, or crypto currency.
+
+    A bounds check over block 90 of the id space, matching the C
+    bvn_unit_is_currency.
+    """
+    return int(CURRENCY_FIRST) <= int(base) <= int(CURRENCY_LAST)
 
 
 def is_fiat(base: BaseUnit) -> bool:
-    """True if base is an ISO 4217 fiat currency or precious metal."""
-    return (int(CURRENCY_FIAT_FIRST) <= int(base) <= int(CURRENCY_FIAT_LAST)
-            or int(CURRENCY_EXT_FIRST) <= int(base) <= int(CURRENCY_EXT_LAST))
+    """True if base is an ISO 4217 fiat currency or precious metal.
+
+    Read from the catalogue row, not from a sub-range of the ids: fiat and
+    crypto are interleavable, so where a currency's id falls says nothing about
+    which kind it is. Matches the C bvn_unit_is_fiat.
+    """
+    info = _BY_ID.get(int(base))
+    return info is not None and not info.is_crypto
 
 
 def is_crypto(base: BaseUnit) -> bool:
-    """True if base is a cryptocurrency."""
-    return int(CURRENCY_CRYPTO_FIRST) <= int(base) <= int(CURRENCY_CRYPTO_LAST)
+    """True if base is a cryptocurrency. See is_fiat on why this reads the row."""
+    info = _BY_ID.get(int(base))
+    return info is not None and info.is_crypto
 
 
 def currency_info(base: BaseUnit) -> CurrencyInfo:

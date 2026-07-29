@@ -388,10 +388,18 @@ static const bvn_profile_t* profile_of_opaque(value_base_unit_t base)
 
 /* ── the arbitrary block ────────────────────────────────────────────────── */
 
+/*
+ * The opaque units no longer form one range — each profile has its own block —
+ * so this walks the per-profile runs. bu_none and every native unit are below
+ * the lowest profile block, which is the common case and the one comparison
+ * BVN_PROFILE_OPAQUE_SLOT's chain would otherwise pay for five times over.
+ */
 bool bvni_is_opaque(value_base_unit_t base)
 {
-	return (int)base >= BVN_PROFILE_OPAQUE_FIRST &&
-	       (int)base <= BVN_PROFILE_OPAQUE_LAST;
+	int32_t v = (int32_t)base;
+	if (v <= BVN_UNIT_NATIVE_LAST)
+		return false;
+	return BVN_PROFILE_OPAQUE_SLOT(v) >= 0;
 }
 
 bool bvni_unit_has_opaque(value_unit_t u)
@@ -1264,6 +1272,17 @@ static int32_t unit_to_profile_code(const bvn_profile_t* p, value_unit_t u,
 			return -1;
 		if (p->grammar == bvn_prof_grammar_flat && e != 1)
 			return -1;
+		/* "-100" is the widest exponent unit_exponent_t can carry, and
+		 * check_profile_string_bound in gen_profiles.py sizes the whole
+		 * BVNR_UNIT_STRING_MAX budget from that same 4.
+		 *
+		 * This used to emit ONE character, `(char)('0' + v)`, which was correct
+		 * only while exponents stopped at 9. Past that it wrote whatever byte
+		 * the arithmetic landed on: m^10 came out as "m:" — a colon, the
+		 * profile namespace separator — and m^100 as "m" plus a raw 0x94. The
+		 * profile PARSER has accepted two-digit exponents all along (see
+		 * scan_exponent), so this was a one-way hole: a unit the library could
+		 * read it could not write back. */
 		char expbuf[4];
 		int  explen = 0;
 		if (e != 1) {
@@ -1272,7 +1291,11 @@ static int32_t unit_to_profile_code(const bvn_profile_t* p, value_unit_t u,
 				expbuf[explen++] = '-';
 				v = -v;
 			}
-			expbuf[explen++] = (char)('0' + v);
+			if (v >= 100)
+				expbuf[explen++] = (char)('0' + v / 100);
+			if (v >= 10)
+				expbuf[explen++] = (char)('0' + (v / 10) % 10);
+			expbuf[explen++] = (char)('0' + v % 10);
 		}
 		size_t need = (i ? 1u : 0u) + plen + clen + (size_t)explen;
 		if (pos + need + 1 > bufsize)

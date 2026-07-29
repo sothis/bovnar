@@ -176,7 +176,11 @@ DERIVED = {
     'ppm':     (1e-6,               "10⁻⁶"),
     'ppb':     (1e-9,               "10⁻⁹"),
     'L':       (1e-3,               "10⁻³ m³"),
-    'Da':      (1.66053906660e-27,  "unified atomic mass unit (CODATA 2018)"),
+    # The one MEASURED constant in the registry, so the only entry in this table
+    # whose expected value carries an edition rather than a derivation. Stated at
+    # CODATA 2022: m_u = 1.66053906892(52)e-27 kg. src/gendata/units.bvnr says the
+    # same in its header; if the two ever disagree, this test is what says so.
+    'Da':      (1.66053906892e-27,  "unified atomic mass unit (CODATA 2022)"),
     # German historical: everything derives from the 1816 Prussian foot
     'Pfd':     (0.5,                "Zollverein Pfund = 500 g"),
     'Ztr':     (50.0,               "100 Pfund"),

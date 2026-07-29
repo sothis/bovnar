@@ -6,6 +6,25 @@
 #   from this file on every build; never edit the generated *.gen.{h,inc}. To
 #   add, remove, or change a unit, edit a record below and rebuild.
 #
+# WHICH CODATA EDITION — CODATA 2022 (published 2024)
+#   Almost every .factor here is EXACT: either a definition (the 2019 SI fixes
+#   c, h, e, k, N_A and K_cd, so the electronvolt and everything built on those
+#   constants is exact), or a convention nobody adjusts (gn = 9.80665 exactly,
+#   atm = 101325 Pa exactly, the international foot = 0.3048 m exactly, the
+#   thermochemical calorie = 4.184 J exactly). Those need no edition attached
+#   and none is implied for them.
+#
+#   ONE value in this file is a measured quantity with an uncertainty, and it is
+#   the atomic mass constant behind Da / u / amu (id 40). It is stated at CODATA
+#   2022: 1.66053906892(52)e-27 kg. An edition that is not written down is an
+#   edition nobody can check, which is why this paragraph exists rather than a
+#   bare number -- and it is what a reader comparing bovnar against UCUM's or
+#   UDUNITS' own tables needs, since those state the same unit at OLDER
+#   adjustments (UDUNITS still ships the 1986 value) and the difference is real
+#   rather than a bug in either.
+#
+#   Adding another measured constant means naming its edition beside it here.
+#
 # STABLE IDS (ABI)
 #   .id is the value_base_unit_t enum value. Append-only: NEVER renumber or
 #   reuse an id — downstream C and the Python bindings are pinned to these
@@ -462,6 +481,10 @@
     .prefix  = default;
     .aliases = ["bars", "bar"];
   },
+  # EXACT, not measured. The elementary charge is one of the seven defining
+  # constants of the 2019 SI, so e = 1.602176634e-19 C is a definition and the
+  # electronvolt inherits it. No CODATA adjustment moves this value, and none
+  # ever will -- it is fixed the way the metre is fixed by the speed of light.
   {
     .id      = <uint:16>  39;
     .name    = "electronvolt";
@@ -473,11 +496,17 @@
     .prefix  = default;
     .aliases = ["electronvolts", "electronvolt", "eV"];
   },
+  # MEASURED, and the only such value in this file -- see the CODATA note in the
+  # header. m_u = 1.66053906892(52)e-27 kg, CODATA 2022. The 2018 adjustment gave
+  # 1.66053906660e-27, which this file carried until the edition was pinned; the
+  # two differ by 1.4e-10 relative, four orders of magnitude below the tolerance
+  # check_profile_factors.py compares publishers at (doc/11 section 9.5), so the
+  # change is about being able to NAME the edition rather than about the number.
   {
     .id      = <uint:16>  40;
     .name    = "dalton";
     .symbol  = "Da";
-    .factor  = 1.6605390666e-27;
+    .factor  = 1.66053906892e-27;
     .dims    = { .mass = 1; };
     .affine  = false;
     .offset  = 0.0;

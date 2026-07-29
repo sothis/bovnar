@@ -67,7 +67,7 @@
  *   agree with their publishers: nothing in this repository checks that "KGM" is
  *   UNECE's kilogram rather than something the table asserts. Five tables that
  *   are wrong in the same way agree perfectly. See the provenance notes at the
- *   top of each src/gendata/*.bvnr.
+ *   top of each .bvnr data file under src/gendata.
  */
 
 #include <math.h>

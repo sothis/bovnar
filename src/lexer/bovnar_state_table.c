@@ -167,6 +167,34 @@
 	[0x15]=ACT_NONE,[0x16]=ACT_NONE,[0x17]=ACT_NONE,[0x18]=ACT_NONE, \
 	[0x19]=ACT_NONE,[0x1a]=ACT_NONE,[0x1b]=ACT_NONE,[0x1c]=ACT_NONE, \
 	[0x1d]=ACT_NONE,[0x1e]=ACT_NONE,[0x1f]=ACT_NONE,[0x7f]=ACT_NONE
+/*
+ * THE ROWS BELOW OVERRIDE INITIALISERS ON PURPOSE, and that is what the macros
+ * above are for: one of them supplies the uniform default for all 256 columns,
+ * and the explicit [byte] entries that follow replace it. Listing the bytes that
+ * matter and letting a macro fill the rest is what guarantees every column is
+ * defined -- an undefined column would be a silent zero, i.e. ACT_NONE, i.e. a
+ * byte rejected by accident rather than by decision. So -Woverride-init (GCC) /
+ * -Winitializer-overrides (clang) fires 546 times here, on correct code, and on
+ * nothing else in the library.
+ *
+ * SUPPRESSED HERE RATHER THAN WITH A -Wno- FLAG IN THE BUILD, because a flag
+ * only protects THIS build. dist/bovnar.c carries this file verbatim, and an
+ * integrator who compiles the amalgamation under their own -Wall -Wextra
+ * -Werror -- which is the first thing anyone does with a single-file library --
+ * met 546 warnings on their first build with no way to tell deliberate from
+ * accidental. A pragma travels with the code it is about; a build flag does not.
+ * cmake/amalgam_smoke.cmake compiles the amalgamation with no -Wno- of its own,
+ * so that first build is now what the smoke test already proved.
+ *
+ * MSVC has no equivalent warning and needs no arm here.
+ */
+#if defined(__clang__)
+#	pragma clang diagnostic push
+#	pragma clang diagnostic ignored "-Winitializer-overrides"
+#elif defined(__GNUC__)
+#	pragma GCC diagnostic push
+#	pragma GCC diagnostic ignored "-Woverride-init"
+#endif
 const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 	[undefined] = {
 		BVN_WHITESPACE(ACT_ignore_whitespace),
@@ -888,6 +916,11 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 		[0x0d] = ACT_resync_comment_outro,
 	},
 };
+#if defined(__clang__)
+#	pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#	pragma GCC diagnostic pop
+#endif
 #undef BVN_EACH_256
 #undef BVN_WHITESPACE
 #undef BVN_DIGITS

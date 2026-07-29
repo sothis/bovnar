@@ -55,6 +55,25 @@ extern "C" {
 					 (BVNR_VERSION_PATCH))
 #define BVNR_VERSION_STRING		"1.1.0"
 /*
+ * Pre-release marker for a build made from a tree that is AHEAD of the released
+ * version above. "-dev" while CHANGELOG.md still has an [Unreleased] section;
+ * "" as part of cutting a release, in the same commit that closes that section.
+ *
+ * It exists because "1.1.0" alone is a claim a build from this tree cannot
+ * honestly make: the tree carries an ABI break, new error codes and a unit
+ * notation that 1.1.0 does not have, so a `bovnar version` reading "1.1.0" sends
+ * a bug report against a release whose behaviour is not what the reporter ran.
+ *
+ * DELIBERATELY NOT PART OF BVNR_VERSION_STRING, and not a new API symbol. Those
+ * feed places that must stay a bare numeric triple -- the CMake project version
+ * (the release workflow greps it with a [0-9]+\.[0-9]+\.[0-9]+ regex), the
+ * SOVERSION derived from it, pyproject.toml's PEP 440 version, and the wheel
+ * smoke test that asserts bovnar.version() == '1.1.0'. The suffix is applied
+ * where the mistake actually happens: the `bovnar version` banner a human reads.
+ */
+#define BVNR_VERSION_SUFFIX		"-dev"
+#define BVNR_VERSION_STRING_FULL	BVNR_VERSION_STRING BVNR_VERSION_SUFFIX
+/*
  * Highest bovnar *spec* version this build understands. A document may declare
  * the spec version it targets with a leading "#!bovnar <major>.<minor>"
  * directive (see the spec, §"Version directive"); the reader parses it, exposes

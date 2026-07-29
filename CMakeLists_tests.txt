@@ -335,7 +335,7 @@ if (BVNR_FUZZ_TEST)
     target_link_libraries(bvnr_fuzz_test PRIVATE bvnr_static)
 
     target_compile_options(bvnr_fuzz_test PRIVATE
-        -Wall -Wextra -Wno-override-init -g
+        -Wall -Wextra -g
         $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>>:
             -fsanitize=address,undefined
             -fno-omit-frame-pointer>)
@@ -380,7 +380,7 @@ if (BVNR_FUZZ_TEST)
     target_link_libraries(bvnr_fuzz_writer_test PRIVATE bvnr_static)
 
     target_compile_options(bvnr_fuzz_writer_test PRIVATE
-        -Wall -Wextra -Wno-override-init -g
+        -Wall -Wextra -g
         $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>>:
             -fsanitize=address,undefined
             -fno-omit-frame-pointer>)
@@ -510,7 +510,7 @@ if (BVNR_FUZZ_EXTERNAL)
     # so the fuzzers get coverage feedback through the parser internals.
     add_library(bvnr_fuzz_objects OBJECT ${BVNR_SOURCES})
     target_compile_options(bvnr_fuzz_objects PRIVATE
-        -Wall -Wextra -Wno-override-init ${_ext_lib_cf})
+        -Wall -Wextra ${_ext_lib_cf})
     target_include_directories(bvnr_fuzz_objects
         PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include
         PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/io
@@ -525,7 +525,7 @@ if (BVNR_FUZZ_EXTERNAL)
         add_executable(bvnr_fuzz_ext_${name} ${source}
             $<TARGET_OBJECTS:bvnr_fuzz_objects>)
         target_compile_options(bvnr_fuzz_ext_${name} PRIVATE
-            -Wall -Wextra -Wno-override-init ${_ext_cf})
+            -Wall -Wextra ${_ext_cf})
         target_include_directories(bvnr_fuzz_ext_${name} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/include
             ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
@@ -541,7 +541,7 @@ if (BVNR_FUZZ_EXTERNAL)
     # instrumentation.  Run before the fuzzers to seed their corpora.
     add_executable(bvnr_fuzz_seed_gen tests/bovnar_fuzz_seed_gen.c)
     target_compile_options(bvnr_fuzz_seed_gen PRIVATE
-        -Wall -Wextra -Wno-override-init)
+        -Wall -Wextra)
 
 endif()
 
@@ -1118,6 +1118,24 @@ add_test(
 set_tests_properties(bvnr_cli_convert_fail_datetime_fraction PROPERTIES
     LABELS "cli;convert" TIMEOUT 30)
 
+# bvnr -> json must REPORT that a "/"-separated multi-dimensional array became a
+# nested JSON array, because the two render identically and only the nested one
+# survives the trip back. Every other loss the converter can inflict was already
+# reported; this one exited 0 in silence, which is the single outcome the report
+# exists to prevent. The fixture also carries a genuinely nested array, so a
+# false positive on THAT fails the round-trip test above rather than passing here
+# unnoticed.
+add_test(
+    NAME    bvnr_cli_convert_fail_dim_array
+    COMMAND "${CMAKE_COMMAND}"
+            -DBOVNAR=$<TARGET_FILE:bovnar> -DEMULATOR=${CMAKE_CROSSCOMPILING_EMULATOR}
+            -DINPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/tests/dim_array.bvnr
+            -DFROM=bvnr -DTO=json
+            "-DNEEDLE=multi-dimensional"
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/convert_expect_fail.cmake)
+set_tests_properties(bvnr_cli_convert_fail_dim_array PROPERTIES
+    LABELS "cli;convert" TIMEOUT 30)
+
 # query must print a sub-second datetime as the faithful ISO literal, not the
 # fraction-dropping integer carrier.
 add_test(
@@ -1207,9 +1225,10 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 149)   # 129 base + i18n_de + wrapper_sync
+set(BVNR_EXPECTED_TEST_COUNT 151)   # 129 base + i18n_de + wrapper_sync
                                     # + cache_stamps + profile_factors
                                     #         + playground_shim + wasm_cli_diff
+                                    #         + amalgam_smoke + convert_fail_dim_array
                                     #         (both DISABLED without node)
                                     #           + csp + font_stamps + html_docs
                                     #           + web_links + release_links
@@ -1581,10 +1600,37 @@ if(Python3_Interpreter_FOUND AND NOT WIN32)
 endif()
 
 # ── Single-file amalgamation ────────────────────────────────────────────────
-# The amalgamation is currently not shipped in dist/ (dist/bovnar.{c,h} are
-# git-ignored), so its regenerate-and-smoke-test (bvnr_amalgam) is disabled.
-# The tooling stays in the tree (amalgamate.py, cmake/amalgam_smoke.cmake) for
-# when it is reinstated.
+# dist/bovnar.{c,h} are git-ignored, so the FRESHNESS half of this test (does the
+# committed amalgamation match the sources?) has nothing to compare against and
+# the driver skips it. The other half is not conditional on shipping anything and
+# was disabled along with it, which left the amalgamation with no compile
+# coverage at all: bvnr_amalgam_reproducible above proves only that two
+# generations are byte-identical, which a file that does not compile satisfies
+# perfectly.
+#
+# That gap has a cost the rest of the suite cannot see. An integrator's first act
+# with a single-file library is to drop bovnar.c into their build, under their
+# own warning flags. Ours were hiding a real one: -Wno-override-init in
+# BVNR_C_FLAGS silenced 546 deliberate designated-initialiser overrides in the
+# lexer state table for THIS build only, and the amalgamation carries that table
+# verbatim -- so their first build produced 546 warnings ours never showed. The
+# suppression now lives in a pragma in src/lexer/bovnar_state_table.c, where it
+# travels with the code, and this test is what keeps it true: strict flags,
+# -Werror, and NO -Wno- of any kind, which is the integrator's build and not
+# ours.
+if(Python3_Interpreter_FOUND AND NOT WIN32 AND NOT BVNR_SANITIZE
+   AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/amalgam_smoke.c)
+    add_test(
+        NAME    bvnr_amalgam_smoke
+        COMMAND "${CMAKE_COMMAND}"
+                -DSRC_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                -DPYTHON=${Python3_EXECUTABLE}
+                -DCC=${CMAKE_C_COMPILER}
+                -DBIN_DIR=${CMAKE_CURRENT_BINARY_DIR}/amalgam_smoke
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/amalgam_smoke.cmake)
+    set_tests_properties(bvnr_amalgam_smoke PROPERTIES
+        LABELS "packaging;codegen;amalgam" TIMEOUT 300)
+endif()
 
 # ── Registration self-check ─────────────────────────────────────────────────
 # Only meaningful for a default configure; any option that adds or removes tests

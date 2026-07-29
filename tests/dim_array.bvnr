@@ -1,0 +1,12 @@
+# Fixture for bvnr_cli_convert_fail_dim_array.
+#
+# .rows and .nested render to BYTE-IDENTICAL JSON -- [[1,2,3],[4,5,6]] -- and
+# only .nested is what reading that JSON back produces. The "/" dimension
+# structure is therefore lost by `convert --to json`, exactly as a unit is, and
+# it used to be lost SILENTLY: the converter exited 0 and said nothing.
+#
+# .nested is here so the test also proves the opposite direction: a genuinely
+# nested array must NOT be reported, or the loss report becomes noise that
+# producers learn to ignore.
+.rows   = [1,2,3]/[4,5,6];
+.nested = [[1,2,3],[4,5,6]];

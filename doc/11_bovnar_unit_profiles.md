@@ -923,7 +923,7 @@ reading back `bvn_unit_to_string` and the coherent-SI factor. The UCUM column is
 | `L` | `L` | `0.001` |
 | `l` | `L` | `0.001` |
 | `t` | `t` | `1000.0` |
-| `u` | `Da` | `1.6605390666e-27` |
+| `u` | `Da` | `1.66053906892e-27` |
 | `eV` | `eV` | `1.602176634e-19` |
 | `ar` | `c~ha` | `100.0` |
 | `st` | `m³` | `1.0` |
@@ -1596,16 +1596,19 @@ exactly. UCUM's electrical base is charge, which maps to current **and** time, a
 `A` = `C/s` come out as a bare current. UCUM's plane angle is a base and bovnar's radian is
 dimensionless, so that component is dropped.
 
-**The tolerance is measured, and the margin is thin.** A publisher states decimals — UDUNITS writes
-the horsepower as `7.456999e2 W` and the atomic mass unit with the 1986 CODATA value — so a correct
-row still disagrees in the seventh digit. The genuine errors are far above that: the US survey foot
+**The tolerance is measured, and the margin is thin.** A publisher states decimals, and a publisher
+states them at whichever CODATA edition it was last revised against — UDUNITS writes the horsepower
+as `7.456999e2 W` and the atomic mass unit at the 1986 adjustment, UCUM states the same unit at 2018,
+and `units.bvnr` states it at 2022 (the one measured constant in the native registry; its header
+names the edition, since an edition nobody wrote down is one nobody can check). So a correct row
+still disagrees in the seventh digit. The genuine errors are far above that: the US survey foot
 at `2e-6`, the survey acre at `4e-6`, the tropical year at `2.1e-5`, the IT calorie at `6.7e-4`.
 
 What sets the bound is neither of those, but the closest real pair in any of the five vocabularies:
 
 | | |
 |---|---|
-| largest publisher rounding observed | `6.83e-7` — UDUNITS' 1986 CODATA atomic mass unit |
+| largest publisher rounding observed | `6.81e-7` — UDUNITS' 1986 CODATA atomic mass unit against bovnar's 2022 one |
 | smallest genuine difference observed | `7.87e-7` — UCUM's **British** chain against the international one |
 
 `TOL = 7.5e-7` is the only value that separates them, and it separates them by 10 %. This was found

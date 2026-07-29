@@ -2174,9 +2174,9 @@ static const bvn_dom_node_t *find_fractional_datetime(const bvn_dom_node_t *node
  * exits non-zero, so a script cannot mistake the output for a round-trip.
  */
 typedef struct {
-	uint32_t n_unit, n_symbol, n_reference, n_octet, n_wide, n_typed;
+	uint32_t n_unit, n_symbol, n_reference, n_octet, n_wide, n_typed, n_dims;
 	char     ex_unit[160], ex_symbol[128], ex_reference[128];
-	char     ex_octet[128], ex_wide[128], ex_typed[160];
+	char     ex_octet[128], ex_wide[128], ex_typed[160], ex_dims[160];
 } json_loss_t;
 
 static void json_loss_note(char *dst, size_t cap, const char *path,
@@ -2243,7 +2243,26 @@ static void json_loss_scan(const bvn_dom_node_t *node, const char *path,
 		break;
 	}
 	case BVN_DOM_ARRAY: {
-		uint32_t cnt = bvn_dom_array_count(node);
+		uint32_t cnt  = bvn_dom_array_count(node);
+		/*
+		 * A "/"-separated multi-dimensional array and a nested array of the same
+		 * shape produce BYTE-IDENTICAL JSON: [1,2,3]/[4,5,6] and
+		 * [[1,2,3],[4,5,6]] both emit [[1,2,3],[4,5,6]]. In the DOM they are not
+		 * the same thing at all -- the first is one array of 6 elements with
+		 * num_dims 2, the second is an array of 2 arrays of 3 -- and only the
+		 * second is what reading that JSON back gives you. So the dimension
+		 * structure is lost, exactly like a unit is, and it used to be lost
+		 * SILENTLY: convert exited 0 and said nothing, which is the one outcome
+		 * this report exists to prevent. Rows of length 1 are not a special case
+		 * worth excluding; if the document wrote "/", it meant a dimension.
+		 */
+		if (bvn_dom_array_dims(node) > 1u) {
+			char d[64];
+			snprintf(d, sizeof d, "%u-dimensional, %u element(s)",
+				 bvn_dom_array_dims(node), cnt);
+			L->n_dims++;
+			json_loss_note(L->ex_dims, sizeof L->ex_dims, path, d);
+		}
 		for (uint32_t i = 0; i < cnt; i++) {
 			char sub[256];
 			snprintf(sub, sizeof sub, "%s[%u]", path, i);
@@ -2260,7 +2279,7 @@ static void json_loss_scan(const bvn_dom_node_t *node, const char *path,
 static bool json_loss_report(const json_loss_t *L, const char *file)
 {
 	uint32_t total = L->n_unit + L->n_symbol + L->n_reference +
-			 L->n_octet + L->n_wide + L->n_typed;
+			 L->n_octet + L->n_wide + L->n_typed + L->n_dims;
 	if (!total) return false;
 	fprintf(stderr, "convert: %s: JSON cannot carry everything in this "
 			"document; the output above is LOSSY:\n", file);
@@ -2282,6 +2301,10 @@ static bool json_loss_report(const json_loss_t *L, const char *file)
 	if (L->n_octet)
 		fprintf(stderr, "  %u octet stream(s) become hex strings, e.g. %s\n",
 			L->n_octet, L->ex_octet);
+	if (L->n_dims)
+		fprintf(stderr, "  %u \"/\"-separated multi-dimensional array(s) become "
+				"nested JSON arrays and read back as nested arrays, "
+				"e.g. %s\n", L->n_dims, L->ex_dims);
 	fprintf(stderr, "convert: exiting 1: this JSON does not convert back to "
 			"the document it came from.\n");
 	return true;
@@ -3476,8 +3499,12 @@ int main(int argc, char **argv)
 	           strcmp(cmd, "--version") == 0) {
 		uint16_t smaj = 0, smin = 0;
 		bvnr_spec_version(&smaj, &smin);
+		/* BVNR_VERSION_STRING_FULL, not bvnr_version_string(): the CLI is
+		 * compiled against this header, so it can say "-dev" for a build made
+		 * ahead of the release without adding a library symbol or moving the
+		 * string every packaging surface compares against. See bovnar.h. */
 		printf("bovnar %s (spec %u.%u)\n",
-			bvnr_version_string(), smaj, smin);
+			BVNR_VERSION_STRING_FULL, smaj, smin);
 		return 0;
 	} else if (strcmp(cmd, "-h") == 0 || strcmp(cmd, "--help") == 0) {
 		usage(argv[0]);

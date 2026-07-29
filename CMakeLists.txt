@@ -75,7 +75,12 @@ else()
         -Wshadow
         -Wcast-qual
         -Wconversion
-        -Wno-override-init
+        # -Wno-override-init is deliberately NOT here. The lexer state table is
+        # the only place in the library that overrides a designated initialiser,
+        # it does so on purpose, and it suppresses the warning with a pragma of
+        # its own (src/lexer/bovnar_state_table.c) so the suppression survives
+        # into dist/bovnar.c -- where a build flag of ours cannot reach. Any
+        # NEW override-init in this library is therefore a real finding.
         -Wno-missing-field-initializers
         -pedantic
         $<$<AND:$<BOOL:${BVNR_ANALYZER}>,$<C_COMPILER_ID:GNU>>:-fanalyzer>

@@ -142,10 +142,12 @@ LENGTH, MASS, TIME, CURRENT, TEMP, AMOUNT, LUM = range(NDIM)
 # Relative tolerance for a factor comparison, CALIBRATED against the two
 # publishers rather than picked round.
 #
-# A publisher states decimals: UDUNITS writes the horsepower as 7.456999e2 W and
-# the atomic mass unit with the 1986 CODATA value, so a correct row still
-# disagrees in the seventh digit or so. Across all five tables every such
-# disagreement lands at or below 6.83e-7. The genuine errors this tool was
+# A publisher states decimals, and states them at whichever CODATA edition it was
+# last revised against: UDUNITS writes the horsepower as 7.456999e2 W and the
+# atomic mass unit at the 1986 adjustment, UCUM states that unit at 2018, and
+# units.bvnr states it at 2022 (its header names the edition). So a correct row
+# still disagrees in the seventh digit or so. Across all five tables every such
+# disagreement lands at or below 6.81e-7. The genuine errors this tool was
 # written to catch are above it: the US survey foot at 2e-6, the survey acre at
 # 4e-6, the tropical year at 2.1e-5, the IT calorie at 6.7e-4.
 #
@@ -156,7 +158,8 @@ LENGTH, MASS, TIME, CURRENT, TEMP, AMOUNT, LUM = range(NDIM)
 # different unit, and at a tolerance of 1e-6 it passed as a match. The real
 # boundary is therefore:
 #
-#     largest publisher rounding seen     6.83e-7   (UDUNITS' 1986 CODATA amu)
+#     largest publisher rounding seen     6.81e-7   (UDUNITS' 1986 CODATA amu
+#                                                    against bovnar's 2022 one)
 #     smallest genuine difference seen    7.87e-7   (British vs international)
 #
 # 7.5e-7 is the only value that separates them, and it separates them by 10 %.

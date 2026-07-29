@@ -26,9 +26,17 @@ if(NOT rc EQUAL 0)
 endif()
 
 # 2. Compile the freshly-generated amalgamation + smoke test (strict flags).
+#
+# NO -Wno- OF ANY KIND HERE, and that is the point of the step. This is meant to
+# be an integrator's first build of dist/bovnar.c, so every flag it needs that
+# the integrator would not think to pass is a warning they meet and we do not.
+# The one warning this ever produced -- 546 x -Woverride-init from the lexer's
+# deliberate designated-initialiser defaults -- is suppressed by a pragma in
+# src/lexer/bovnar_state_table.c, which travels into the amalgamation with the
+# code it is about. Adding a flag back here would hide the next such case.
 set(exe "${BIN_DIR}/amalgam_smoke")
 execute_process(
-    COMMAND "${CC}" -std=c99 -pedantic -O2 -Wall -Wextra -Wconversion -Wno-override-init -Werror
+    COMMAND "${CC}" -std=c99 -pedantic -O2 -Wall -Wextra -Wconversion -Werror
             "-I${gen}"
             "${SRC_DIR}/tests/amalgam_smoke.c"
             "${gen}/bovnar.c"
@@ -46,13 +54,22 @@ if(NOT rc EQUAL 0)
     message(FATAL_ERROR "amalgam smoke test failed (${rc})")
 endif()
 
-# 4. The committed dist/ must match the fresh generation (no stale checkout).
-foreach(f bovnar.h bovnar.c)
-    execute_process(
-        COMMAND "${CMAKE_COMMAND}" -E compare_files "${gen}/${f}" "${SRC_DIR}/dist/${f}"
-        RESULT_VARIABLE diff)
-    if(NOT diff EQUAL 0)
-        message(FATAL_ERROR
-            "dist/${f} is stale: re-run `python3 amalgamate.py` and commit dist/.")
-    endif()
-endforeach()
+# 4. If dist/ ships a committed amalgamation, it must match the fresh one (no
+#    stale checkout). dist/bovnar.{c,h} are git-ignored today, so this step is
+#    skipped rather than failing every run -- but it must not be DELETED: the
+#    day the amalgamation is shipped again, a stale committed copy is exactly
+#    the failure nobody notices. Skipping is reported, so "step 4 did nothing"
+#    can never be mistaken for "step 4 passed".
+if(EXISTS "${SRC_DIR}/dist/bovnar.h" AND EXISTS "${SRC_DIR}/dist/bovnar.c")
+    foreach(f bovnar.h bovnar.c)
+        execute_process(
+            COMMAND "${CMAKE_COMMAND}" -E compare_files "${gen}/${f}" "${SRC_DIR}/dist/${f}"
+            RESULT_VARIABLE diff)
+        if(NOT diff EQUAL 0)
+            message(FATAL_ERROR
+                "dist/${f} is stale: re-run `python3 amalgamate.py` and commit dist/.")
+        endif()
+    endforeach()
+else()
+    message(STATUS "amalgam smoke: dist/ ships no amalgamation, freshness step skipped")
+endif()

@@ -172,13 +172,33 @@ class _Parser:
         lst = []
         while True:
             self._ws()
-            if self._peek() == "]":
+            c = self._peek()
+            if c == "]":
                 self.i += 1
                 return lst
+            # An UNMATCHED '}' inside an array used to spin here forever. A
+            # closing delimiter is one of the characters _value() reports as the
+            # empty slot `[1, , 3]` is made of, so it returned None WITHOUT
+            # consuming anything, and the loop asked again, and again. A stray
+            # brace -- one duplicated line in units.bvnr -- turned every
+            # generator into a hang: no message, no exit, and in CI a timeout
+            # rather than a diagnosis.
+            #
+            # An array is closed by ']' and by nothing else, so say so.
+            if c in "}" or c == "":
+                self._err("unterminated array: expected `]`, got %r"
+                          % (c or "end of input"))
             lst.append(self._value())
             self._ws()
-            if self._peek() == ",":
+            c = self._peek()
+            if c == ",":
                 self.i += 1
+            elif c != "]":
+                # Same reasoning one step along: after an element the only legal
+                # continuations are ',' and ']'. Anything else would either spin
+                # or be silently swallowed by the next _value().
+                self._err("expected `,` or `]` after an array element, got %r"
+                          % (c or "end of input"))
 
     def _scalar(self):
         start = self.i

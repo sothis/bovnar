@@ -1246,36 +1246,114 @@ value_unit_t bvni_parse_profile_unit(const char* s, uint32_t len,
 
 /* ── writing a profile code back out ────────────────────────────────────── */
 
-/* This profile's spelling of a decimal decade, or NULL if it has none (every
- * decade the SI prefixes skip, and every non-zero decade in a flat profile,
- * which has no prefix mechanism at all). */
-static const char* prefix_for_decade(const bvn_profile_t* p, int32_t d,
-                                     uint32_t* len)
+/*
+ * Longest "<prefix><code>" this profile can assemble, for the read-back check
+ * below. The longest code in src/gendata is 166 bytes (a CF standard name) and
+ * the longest profile prefix 5; a concatenation that does not fit is treated as
+ * unverifiable and therefore unwritable, which is the safe direction.
+ */
+#define BVN_PROF_WRITE_MAX 256u
+
+/*
+ * Does "<pfx><code>" read back as the atom it was assembled from?
+ *
+ * IT DID NOT, AND THAT WAS THE WORST KIND OF BUG THIS FORMAT CAN HAVE. An
+ * expression profile joins a prefix to an atom with NOTHING between them --
+ * there is no '~' in UCUM or UDUNITS -- so the writer emits one token and the
+ * reader resolves it by its own rules: whole atom first, then prefix+atom. When
+ * the concatenation happens to BE an atom, the reader takes that atom, and the
+ * unit that comes back is not the unit that went in:
+ *
+ *     k~t  (kilotonne)   -> udunits "kt"  -> the KNOT, a speed
+ *     p~H  (picohenry)   -> udunits "pH"  -> the ACIDITY scale
+ *     f~t  (femtotonne)  -> udunits "ft"  -> the FOOT
+ *     p~t  (picotonne)   -> udunits "pt"  -> the PINT
+ *     n~t  (nanotonne)   -> udunits "nt"  -> the NIT, cd/m^2
+ *     a~t  (attotonne)   -> udunits "at"  -> the TECHNICAL ATMOSPHERE
+ *
+ * bvn_unit_to_profile reported success for every one. "kt" is the sharpest:
+ * units.bvnr refuses that exact token on INPUT, in compact_exceptions, because
+ * "reading a speed as a mass is exactly the failure this format exists to
+ * prevent" -- and the writer was emitting it.
+ *
+ * So a code is now assembled only if it reads back. The check mirrors the
+ * parser's own order (find_atom, then resolve_prefixed) rather than restating
+ * the rule, because a second description of that order is a second thing to
+ * keep in step. When the shortest prefix spelling fails, write_atom tries the
+ * next -- UDUNITS spells kilo both "k" and "kilo", and "kilot" is unambiguous
+ * -- and refuses only when no spelling survives.
+ */
+static bool code_reads_back(const bvn_profile_t* p,
+                            const char* pfx, uint32_t plen,
+                            const char* code, uint32_t clen,
+                            const bvn_prof_atom_t* want, int32_t want_decade)
+{
+	if (!want)
+		return false;
+	if ((size_t)plen + clen > BVN_PROF_WRITE_MAX)
+		return false;
+	char joined[BVN_PROF_WRITE_MAX];
+	memcpy(joined, pfx, plen);
+	memcpy(joined + plen, code, clen);
+	uint32_t jlen = plen + clen;
+
+	int32_t                got_decade = 0;
+	const bvn_prof_atom_t* got        = find_atom(p, joined, jlen);
+	if (!got)
+		got = resolve_prefixed(p, joined, jlen, &got_decade);
+	return got == want && got_decade == want_decade;
+}
+
+/*
+ * The prefix for decade `d` whose concatenation with `code` reads back as
+ * `want`, shortest spelling first.
+ *
+ * Same ordering as prefix_for_decade -- producers write "km", not "kilometer" --
+ * but a spelling that would resolve to a DIFFERENT atom is skipped rather than
+ * emitted. See code_reads_back for what that prevents. Returns NULL when no
+ * spelling of this decade survives, which makes the unit unwritable in this
+ * profile rather than writable as something else.
+ */
+static const char* prefix_that_reads_back(const bvn_profile_t* p, int32_t d,
+                                          const char* code, uint32_t clen,
+                                          const bvn_prof_atom_t* want,
+                                          uint32_t* len)
 {
 	if (d == 0) {
 		*len = 0;
-		return "";
+		return code_reads_back(p, "", 0u, code, clen, want, 0) ? "" : NULL;
 	}
 	if (!p->pfx)
 		return NULL;
-	/*
-	 * SHORTEST spelling wins, so the whole table is scanned rather than stopping
-	 * at the first hit. The prefix table is sorted longest-first, because that is
-	 * what the MATCHER needs; emitting wants the opposite, and taking the first
-	 * row gave "kilometer" where every producer writes "km".
-	 */
-	const bvn_prof_pfx_t* best = NULL;
-	for (const bvn_prof_pfx_t* e = p->pfx; e->code; e++) {
-		if (e->decade != d)
-			continue;
-		if (!best || e->len < best->len ||
-		    (e->len == best->len && memcmp(e->code, best->code, e->len) < 0))
-			best = e;
+	/* Selection sort over the decade's spellings: take the shortest not yet
+	 * tried, test it, and move on. The tables have at most a couple of
+	 * spellings per decade, so this stays a scan rather than needing an order. */
+	uint32_t tried_len = 0u;
+	const char* tried_code = NULL;
+	for (;;) {
+		const bvn_prof_pfx_t* best = NULL;
+		for (const bvn_prof_pfx_t* e = p->pfx; e->code; e++) {
+			if (e->decade != d)
+				continue;
+			/* strictly after the one already tried, in (len, bytes) order */
+			if (tried_code &&
+			    (e->len < tried_len ||
+			     (e->len == tried_len &&
+			      memcmp(e->code, tried_code, e->len) <= 0)))
+				continue;
+			if (!best || e->len < best->len ||
+			    (e->len == best->len && memcmp(e->code, best->code, e->len) < 0))
+				best = e;
+		}
+		if (!best)
+			return NULL;
+		if (code_reads_back(p, best->code, best->len, code, clen, want, d)) {
+			*len = best->len;
+			return best->code;
+		}
+		tried_len  = best->len;
+		tried_code = best->code;
 	}
-	if (!best)
-		return NULL;
-	*len = best->len;
-	return best->code;
 }
 
 /*
@@ -1325,7 +1403,7 @@ static bool write_atom(const bvn_profile_t* p, value_base_unit_t b,
 			int32_t want = si_decade_of(sp);
 			if (want != 0 && !e->metric)
 				return false;
-			*pfx = prefix_for_decade(p, want, plen);
+			*pfx = prefix_that_reads_back(p, want, e->code, e->len, e, plen);
 			if (!*pfx)
 				return false;
 			*code = e->code;
@@ -1354,9 +1432,14 @@ static bool write_atom(const bvn_profile_t* p, value_base_unit_t b,
 		 * exactly what this test says once every row is non-metric. */
 		if (want != 0 && !e->metric)
 			continue;
-		const char* got = prefix_for_decade(p, want, plen);
+		/* The atom this row names, so the assembled token can be checked
+		 * against it. A reverse row always carries an atom's own code, so a
+		 * miss here means the two generated tables have diverged. */
+		const bvn_prof_atom_t* at = find_atom(p, e->code, e->len);
+		const char* got = prefix_that_reads_back(p, want, e->code, e->len,
+		                                         at, plen);
 		if (!got)
-			continue;
+			continue;      /* this spelling would read back as another unit */
 		*pfx  = got;
 		*code = e->code;
 		*clen = e->len;

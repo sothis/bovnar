@@ -250,6 +250,31 @@
   # hecto prefix carries it. The LONG one is 112 pounds and is refused below:
   # 112 is not a decade and there is no native hundredweight to land on.
   { .code = "[scwt_av]";  .bovnar = "h~lb";  .metric = false; },
+
+  # ── The units bu_survey_* and friends unblocked ──────────────────────
+  #
+  # Every one of these was refused for want of a native unit, never because
+  # UCUM's definition was unclear. The survey lengths are exact rationals on
+  # the survey foot; [gal_wi], the historical Winchester gallon, IS the US
+  # dry gallon; [cr_i] and [crd_us] are one cord under two spellings.
+  { .code = "[in_us]";  .bovnar = "inUS";    .metric = false; },
+  { .code = "[yd_us]";  .bovnar = "ydUS";    .metric = false; },
+  { .code = "[mi_us]";  .bovnar = "miUS";    .metric = false; },
+  { .code = "[fth_us]"; .bovnar = "fathUS";  .metric = false; },
+  { .code = "[rd_us]";  .bovnar = "rdUS";    .metric = false; },
+  { .code = "[ch_us]";  .bovnar = "chUS";    .metric = false; },
+  { .code = "[lk_us]";  .bovnar = "lkUS";    .metric = false; },
+  { .code = "[fur_us]"; .bovnar = "furUS";   .metric = false; },
+  { .code = "[acr_us]"; .bovnar = "acUS";    .metric = false; },
+  { .code = "[pnt]";    .bovnar = "pnt";     .metric = false; },
+  { .code = "[pca]";    .bovnar = "pca";     .metric = false; },
+  { .code = "[lne]";    .bovnar = "lne";     .metric = false; },
+  { .code = "[dqt_us]"; .bovnar = "qt_dry";  .metric = false; },
+  { .code = "[dpt_us]"; .bovnar = "pt_dry";  .metric = false; },
+  { .code = "[gal_wi]"; .bovnar = "gal_dry"; .metric = false; },
+  { .code = "[bf_i]";   .bovnar = "fbm";     .metric = false; },
+  { .code = "[cr_i]";   .bovnar = "cord";    .metric = false; },
+  { .code = "[crd_us]"; .bovnar = "cord";    .metric = false;  .reverse = false; },
   # The long hundredweight is 112 lb, which no prefix reaches -- unlike the
   # short one above, which is exactly a hecto-pound.
   { .code = "[lcwt_av]";  .bovnar = "cwt_l"; .metric = false; },
@@ -521,21 +546,13 @@
   # Photometric and geometric atoms with no native form.
   { .code = "Lmb";   .why = "lambert — 1e4/pi cd/m^2, irrational against the native units"; },
   { .code = "sph";   .why = "spere — 4*pi steradian, not a decade"; },
-  { .code = "[lne]"; .why = "line (1/12 inch) — not a decade off any native length"; },
 
   # US survey lengths other than the foot.
-  { .code = "[in_us]"; .why = "US survey inch — bovnar carries only the survey foot"; },
-  { .code = "[mi_us]"; .why = "US survey mile — bovnar carries only the survey foot"; },
-  { .code = "[yd_us]"; .why = "US survey yard — bovnar carries only the survey foot"; },
   # These four used to map onto the INTERNATIONAL fur, ch, rd and ac, which are
   # 2 ppm (4 ppm for the acre) away from the survey units these codes name.
   # UCUM defines no international chain, rod or furlong, so there is nothing to
   # map them to; refusing is the only honest answer until the native registry
   # grows the survey series.
-  { .code = "[fur_us]"; .why = "US survey furlong — bovnar carries only the survey foot; native fur is the international furlong"; },
-  { .code = "[ch_us]";  .why = "US survey chain — bovnar carries only the survey foot; native ch is the international chain"; },
-  { .code = "[rd_us]";  .why = "US survey rod — bovnar carries only the survey foot; native rd is the international rod"; },
-  { .code = "[acr_us]"; .why = "US survey acre — bovnar carries only the survey foot; native ac is the international acre"; },
 
   # Chemical and clinical atoms with no native form.
   { .code = "[S]";      .why = "Svedberg unit — no native form"; },
@@ -605,8 +622,6 @@
 
   # US SURVEY units beyond the foot and Ramden's pair, for the reason the block
   # above gives: bovnar carries the survey foot and nothing else built on it.
-  { .code = "[lk_us]";   .why = "link for Gunter's chain — 66/100 survey feet, no native form"; },
-  { .code = "[fth_us]";  .why = "US survey fathom — bovnar carries only the survey foot"; },
   { .code = "[srd_us]";  .why = "US survey square rod — bovnar carries only the survey foot"; },
   { .code = "[smi_us]";  .why = "US survey square mile — bovnar carries only the survey foot"; },
   { .code = "[sct]";     .why = "section — a survey square mile, no native form"; },
@@ -614,9 +629,6 @@
   { .code = "[mil_us]";  .why = "US survey mil — native thou is the international mil"; },
 
   # US dry measure below the peck, and the historical gallon it came from.
-  { .code = "[gal_wi]";  .why = "historical winchester gallon — an eighth of a dry bushel, no native form"; },
-  { .code = "[dqt_us]";  .why = "US dry quart — native qt is the liquid quart"; },
-  { .code = "[dpt_us]";  .why = "US dry pint — native pt is the liquid pint"; },
 
   # The METRIC kitchen and jewellers' measures. Each is a round number of
   # millilitres or grams rather than a decade off one, so the unit slot -- which
@@ -631,9 +643,6 @@
 
   # Volumes defined as a whole-number multiple of a native unit. Same reason as
   # the metric kitchen: 144 and 128 are not powers of ten.
-  { .code = "[bf_i]";    .why = "board foot (144 cubic inches) — 144 is not a decade"; },
-  { .code = "[cr_i]";    .why = "cord (128 cubic feet) — 128 is not a decade"; },
-  { .code = "[crd_us]";  .why = "cord (128 cubic feet) — 128 is not a decade"; },
   { .code = "[cml_i]";   .why = "circular mil — pi/4 of a square mil, irrational against the native units"; },
   { .code = "[smoot]";   .why = "Smoot (67 inches) — 67 is not a decade"; },
   { .code = "[Ch]";      .why = "Charriere (a third of a millimetre) — thirds are not decades"; },
@@ -641,8 +650,6 @@
   # Typographic and pre-metric French lengths. Both families are built on
   # twelfths and sixths of each other, so none of them is a decade off a native
   # length, and bovnar has no point, pica, ligne or pouce to land on.
-  { .code = "[pnt]";     .why = "point (1/6 line) — no native typographic length"; },
-  { .code = "[pca]";     .why = "pica (12 points) — no native typographic length"; },
   { .code = "[pnt_pr]";  .why = "printer's point (0.013837 in) — no native typographic length"; },
   { .code = "[pca_pr]";  .why = "printer's pica — no native typographic length"; },
   { .code = "[pied]";    .why = "pied (32.48 cm) — no native form"; },

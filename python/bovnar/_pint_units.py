@@ -106,6 +106,33 @@ BOVNAR_PINT_DEFINITIONS: list[str] = [
     'bvnr_troy_pound = 0.3732417216 * kilogram',
     'bvnr_apothecary_dram = 0.0038879346 * kilogram',
     'bvnr_long_hundredweight = 50.80234544 * kilogram',
+    # The survey, typographic, dry-volume and forestry units. Each states
+    # bovnar's own exact factor: pint's survey lengths come from its SURVEY
+    # foot too, but its dry volumes and typographic units either differ or
+    # are absent, so all of them are defined here rather than half aliased.
+    'bvnr_survey_inch = 0.0254000508001016 * meter**1',
+    'bvnr_survey_yard = 0.91440182880365761 * meter**1',
+    'bvnr_survey_fathom = 1.8288036576073152 * meter**1',
+    'bvnr_survey_rod = 5.0292100584201167 * meter**1',
+    'bvnr_survey_chain = 20.116840233680467 * meter**1',
+    'bvnr_survey_link = 0.20116840233680466 * meter**1',
+    'bvnr_survey_furlong = 201.16840233680466 * meter**1',
+    'bvnr_survey_mile = 1609.3472186944373 * meter**1',
+    'bvnr_survey_acre = 4046.8726098742518 * meter**2',
+    'bvnr_point = 0.00035277777777777776 * meter**1',
+    'bvnr_pica = 0.0042333333333333337 * meter**1',
+    'bvnr_line = 0.0021166666666666669 * meter**1',
+    'bvnr_dry_gallon = 0.00440488377086 * meter**3',
+    'bvnr_dry_quart = 0.001101220942715 * meter**3',
+    'bvnr_dry_pint = 0.0005506104713575 * meter**3',
+    'bvnr_board_foot = 0.0023597372160000002 * meter**3',
+    'bvnr_cord = 3.6245563637760001 * meter**3',
+    'bvnr_survey_acre_foot = 1233.4892384681489 * meter**3',
+    'bvnr_darcy = 9.8692326671601282e-13 * meter**2',
+    'bvnr_therm_ec = 105505585.26199999 * meter**2 * kilogram * second**-2',
+    'bvnr_refrigeration_ton = 3516.8528420666667 * meter**2 * kilogram * second**-3',
+    'bvnr_dobson = 0.0004462 * mole * meter**-2',
+    'bvnr_shake = 1e-08 * second**1',
 ]
 
 
@@ -323,6 +350,31 @@ BASE_UNIT_TO_PINT: dict[int, str] = {
     100189: 'bvnr_troy_pound',              # TROY_POUND
     100190: 'bvnr_apothecary_dram',         # APOTHECARY_DRAM
     100191: 'bvnr_long_hundredweight',      # LONG_HUNDREDWEIGHT
+
+    # The survey, typographic, dry-volume and forestry units.
+    100192: 'bvnr_survey_inch',              # SURVEY_INCH
+    100193: 'bvnr_survey_yard',              # SURVEY_YARD
+    100194: 'bvnr_survey_fathom',            # SURVEY_FATHOM
+    100195: 'bvnr_survey_rod',               # SURVEY_ROD
+    100196: 'bvnr_survey_chain',             # SURVEY_CHAIN
+    100197: 'bvnr_survey_link',              # SURVEY_LINK
+    100198: 'bvnr_survey_furlong',           # SURVEY_FURLONG
+    100199: 'bvnr_survey_mile',              # SURVEY_MILE
+    100200: 'bvnr_survey_acre',              # SURVEY_ACRE
+    100201: 'bvnr_point',                    # POINT
+    100202: 'bvnr_pica',                     # PICA
+    100203: 'bvnr_line',                     # LINE
+    100204: 'bvnr_dry_gallon',               # DRY_GALLON
+    100205: 'bvnr_dry_quart',                # DRY_QUART
+    100206: 'bvnr_dry_pint',                 # DRY_PINT
+    100207: 'bvnr_board_foot',               # BOARD_FOOT
+    100208: 'bvnr_cord',                     # CORD
+    100209: 'bvnr_survey_acre_foot',         # SURVEY_ACRE_FOOT
+    100210: 'bvnr_darcy',                    # DARCY
+    100211: 'bvnr_therm_ec',                 # THERM_EC
+    100212: 'bvnr_refrigeration_ton',        # REFRIGERATION_TON
+    100213: 'bvnr_dobson',                   # DOBSON
+    100214: 'bvnr_shake',                    # SHAKE
 
 }
 

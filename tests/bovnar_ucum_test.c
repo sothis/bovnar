@@ -456,7 +456,7 @@ static void test_sweep_round_trip(void)
 	}
 	/* The figures doc/11 §5.3 quotes. Kept as named constants so the failure
 	 * message cannot disagree with what is actually compared. */
-	enum { DOC_SAME = 655, DOC_NO_CODE = 1294, DOC_REJECTED = 355 };
+	enum { DOC_SAME = 672, DOC_NO_CODE = 1553, DOC_REJECTED = 355 };
 	tests++;
 	if (same != DOC_SAME || no_code != DOC_NO_CODE || rejected != DOC_REJECTED) {
 		fprintf(stderr,

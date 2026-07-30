@@ -374,6 +374,37 @@ class BaseUnit(IntEnum):
     APOTHECARY_DRAM    = 100190   # 3 scruples, not the avoirdupois DRAM
     LONG_HUNDREDWEIGHT = 100191   # 112 lb; the short one is exactly h~lb
 
+    # The survey lengths, the typographic lengths, the US dry volumes and the
+    # singles that blocked whole families of publisher codes. See the notes
+    # beside them in src/gendata/units.bvnr.
+    # ---- US survey: exact rationals on the 1200/3937 m survey foot
+    SURVEY_INCH        = 100192   # inUS
+    SURVEY_YARD        = 100193   # ydUS
+    SURVEY_FATHOM      = 100194   # fathUS
+    SURVEY_ROD         = 100195   # rdUS
+    SURVEY_CHAIN       = 100196   # chUS
+    SURVEY_LINK        = 100197   # lkUS
+    SURVEY_FURLONG     = 100198   # furUS
+    SURVEY_MILE        = 100199   # miUS
+    SURVEY_ACRE        = 100200   # acUS
+    # ---- typographic: the DTP point and what is built on it
+    POINT              = 100201   # pnt
+    PICA               = 100202   # pca
+    LINE               = 100203   # lne
+    # ---- the US DRY volumes, 16 % larger than the liquid ones
+    DRY_GALLON         = 100204   # gal_dry
+    DRY_QUART          = 100205   # qt_dry
+    DRY_PINT           = 100206   # pt_dry
+    # ---- and the singles
+    BOARD_FOOT         = 100207   # fbm
+    CORD               = 100208   # cord
+    SURVEY_ACRE_FOOT   = 100209   # ac_ft
+    DARCY              = 100210   # darcy
+    THERM_EC           = 100211   # thm_ec
+    REFRIGERATION_TON  = 100212   # ton_ref
+    DOBSON             = 100213   # DU
+    SHAKE              = 100214   # shake
+
     # ---- Currencies: block 90 -------------------------------------------
     #
     # One contiguous run, fiat then crypto, mirroring src/gendata/
@@ -614,7 +645,7 @@ class BaseUnit(IntEnum):
 UNIT_BLOCK_SIZE     = 10000
 
 UNIT_NATIVE_FIRST   = BaseUnit.BIT
-UNIT_NATIVE_LAST    = BaseUnit.LONG_HUNDREDWEIGHT
+UNIT_NATIVE_LAST    = BaseUnit.SHAKE
 
 CURRENCY_FIRST      = BaseUnit.AED
 CURRENCY_LAST       = BaseUnit.RUNE

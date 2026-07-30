@@ -46,6 +46,7 @@
     - 3.29 [Conductivity and Dissolved Solids](#329-conductivity-and-dissolved-solids)
     - 3.30 [Turbidity and Salinity](#330-turbidity-and-salinity)
     - 3.31 [Sentinel Value](#331-sentinel-value)
+    - 3.32 [Units the Unit Profiles Needed](#332-units-the-unit-profiles-needed)
 4. [Prefixes](#4-prefixes)
     - 4.1 [SI Prefixes](#41-si-prefixes)
     - 4.2 [IEC Binary Prefixes](#42-iec-binary-prefixes)
@@ -108,7 +109,7 @@ The Bovnar quantity annotation system is an **optional, per-value annotation** t
 
 Two distinct namespaces share the annotation slot:
 
-- **Physical units** — 192 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
+- **Physical units** — 215 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
 - **Currency codes** — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical — HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01 — and `ANG` coexists with its successor `XCG`, which inherited its numeric code 532; see §9.2) and 50 cryptocurrency tickers.
 
 Both namespaces are syntactically unified: the same grammar, the same `~` prefix separator, the same compound-unit operators (`·`, `*`, `/`), and the same `value_unit_t` data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.
@@ -864,6 +865,90 @@ None of the five turbidity scales converts to any other:
 ### 3.31 Sentinel Value
 
 `bu_none` (value `0`) is the internal representation of "no base unit", used for the `no_unit` keyword and as the default when no unit annotation is present.
+
+---
+
+### 3.32 Units the Unit Profiles Needed
+
+Every unit in this section was, until it was added, the **sole** reason a run of UCUM, UDUNITS-2,
+QUDT, OM or UN/ECE codes had to be refused as `error_unit_profile_unsupported`: the publisher
+defines the unit, the value is exactly stateable, and there was no native unit to translate onto.
+None of them is new physics. All are exact — the ones whose value is not a terminating decimal in
+SI state a rational in `units.bvnr` rather than the repr of a double.
+
+#### US survey lengths
+
+`bu_survey_foot` (§3.21) has been in the registry all along and nothing was built on it, so every
+survey length above the foot had to be refused. Each below is an exact rational multiple of the
+survey foot's 1200/3937 m.
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `inUS` | `survey_inch` | US survey inch | `bu_survey_inch` | 100/3937 m |
+| `ydUS` | `survey_yard` | US survey yard | `bu_survey_yard` | 3600/3937 m |
+| `fathUS` | `survey_fathom` | US survey fathom | `bu_survey_fathom` | 7200/3937 m |
+| `rdUS` | `survey_rod` | US survey rod (pole, perch) | `bu_survey_rod` | 19800/3937 m |
+| `chUS` | `survey_chain` | US survey chain (Gunter's) | `bu_survey_chain` | 79200/3937 m |
+| `lkUS` | `survey_link` | US survey link | `bu_survey_link` | 792/3937 m |
+| `furUS` | `survey_furlong` | US survey furlong | `bu_survey_furlong` | 792000/3937 m |
+| `miUS` | `survey_mile`, `survey_miles` | US survey (statute) mile | `bu_survey_mile` | 6336000/3937 m |
+| `acUS` | `survey_acre`, `survey_acres` | US survey acre | `bu_survey_acre` | 43 560 `ftUS`squared = 62726400000/15499969 m2 |
+
+> **The survey foot is 2 ppm longer than the international foot**, and the survey acre 4 ppm larger
+> than the international acre — an area being a length squared. Small enough to ignore and never
+> small enough to be right: on a section of land the acre difference is about ten square metres.
+> The survey foot was withdrawn for new work at the end of 2022, which is a reason to read it
+> carefully rather than to refuse it, since US land records, state-plane coordinates and a century
+> of engineering drawings are written in it.
+
+#### Typographic lengths
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `pnt` | `point`, `points` | DTP point (1/72 in) | `bu_point` | 127/360000 m |
+| `pca` | `pica`, `picas` | pica (12 points) | `bu_pica` | 127/30000 m |
+| `lne` | `line`, `lines` | line (1/12 in) | `bu_line` | 127/60000 m |
+
+> The symbols are deliberately **not** `pt` and `ln`. `pt` is the pint and has been since before
+> these existed; a length answering to it would change what an existing spelling means, which
+> §10 forbids and which `gen_units.py` now refuses at build time. UCUM's own bracketed spellings
+> `[pnt]`, `[pca]` and `[lne]` name them unambiguously, so the symbols follow those. The
+> **printer's** point (0.013837 in) is a different unit and is still refused.
+
+#### US dry volumes, and the trade measures built on feet
+
+A dry quart is **16 per cent larger** than the liquid quart `qt`. The peck (`pk`) and bushel (`bsh`)
+in §3.19 have always been the dry ones; the gallon, quart and pint were only the liquid ones, so a
+document that meant dry had no way to say so.
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `gal_dry` | `dry_gallon`, `dry_gallons` | US dry gallon | `bu_dry_gallon` | 268.8025 in3 = 4.40488377086e-3 m3 |
+| `qt_dry` | `dry_quart`, `dry_quarts` | US dry quart | `bu_dry_quart` | 1.101220942715e-3 m3 |
+| `pt_dry` | `dry_pint`, `dry_pints` | US dry pint | `bu_dry_pint` | 5.506104713575e-4 m3 |
+| `fbm` | `board_foot`, `board_feet` | board foot (144 in3) | `bu_board_foot` | 2.359737216e-3 m3 |
+| `cord` | `cord`, `cords` | cord (128 ft3) | `bu_cord` | 3.624556363776 m3 |
+| `ac_ft` | `acre_foot`, `acre_feet` | acre-foot (survey) | `bu_survey_acre_foot` | `acUS`.`ftUS` = 1233.4892384681489 m3 |
+
+> `ac_ft` is the acre-foot on the **survey** acre and foot, which is what UDUNITS, OM and every US
+> water agency mean by it. The international acre-foot is `ac·ft` = 1233.48183754752 m³ — 5.8 ppm
+> away, and a different unit rather than a rounding.
+
+#### Permeability, energy, power, ozone and one very short time
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `darcy` | `darcy`, `darcys`, `darcies` | darcy (permeability) | `bu_darcy` | 1/1013250000000 m2 |
+| `thm_ec` | `therm_EC` | EC therm (1e5 `Btu`) | `bu_therm_ec` | 1.05505585262e8 J (exact) |
+| `ton_ref` | `refrigeration_ton`, `ton_of_refrigeration` | ton of refrigeration | `bu_refrigeration_ton` | 12 000 `Btu`/h = 52752792631/15000000 W |
+| `DU` | `dobson`, `dobson_unit`, `dobson_units` | Dobson unit (ozone column) | `bu_dobson` | 4.462e-4 mol.m-2 (exact) |
+| `shake` | `shake`, `shakes` | shake | `bu_shake` | 1e-8 s (exact) |
+
+> `darcy` takes prefixes, so the millidarcy every reservoir report is written in is `m~darcy` (or
+> compactly `mdarcy`). `thm_ec` is the therm European gas billing uses; native `thm` is the US
+> therm, 0.24 per cent away, and no SI prefix reaches 10⁵ — which is why it needed a unit of its
+> own rather than a prefixed `Btu`. `shake` exists for the same reason at the other end: there is
+> no SI prefix at 10⁻⁸.
 
 ---
 

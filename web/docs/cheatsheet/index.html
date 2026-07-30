@@ -42,7 +42,7 @@
 <blockquote>
 <p><strong>Spec version:</strong> 1.1
 <strong>Status:</strong> Reference — the symbol tables of the unit and currency registry
-<strong>Scope:</strong> 192 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.</p>
+<strong>Scope:</strong> 215 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.</p>
 </blockquote>
 <hr />
 <h2 id="table-of-contents">Table of Contents</h2>
@@ -80,6 +80,7 @@
 <li>4.27 <a href="#427-named-speeds--acidity">Named Speeds &amp; Acidity</a></li>
 <li>4.28 <a href="#428-water-hardness">Water Hardness</a></li>
 <li>4.29 <a href="#429-water-quality-instrument-scales">Water-Quality Instrument Scales</a></li>
+<li>4.30 <a href="#430-survey-typographic-dry-volume-and-trade-units">Survey, Typographic, Dry-Volume and Trade Units</a></li>
 </ul>
 </li>
 <li><a href="#5-currencies">Currencies</a><ul>
@@ -2345,6 +2346,252 @@ formazin only near 40 units. Bovnar refuses every conversion between them; repor
 <code>JTU</code> and <code>PSU</code> take no prefix. PSU is a conductivity ratio, <strong>not</strong> a mass fraction — for
 absolute salinity write <code>g/k~g</code>. Case matters: <code>cF</code> is the centifarad and <code>fau</code> the
 femto-astronomical-unit.</p>
+</blockquote>
+<hr />
+<h3 id="430-survey-typographic-dry-volume-and-trade-units">4.30 Survey, Typographic, Dry-Volume and Trade Units</h3>
+<p>Every unit here was, until it was added, the sole reason a run of UCUM, UDUNITS-2, QUDT, OM or
+UN/ECE codes had to be refused. All are exact; the ones whose value is not a terminating decimal in
+SI state a rational rather than a rounded double.</p>
+<h4 id="us-survey-lengths">US survey lengths</h4>
+<p><code>ftUS</code> (§4.4) has always been here and nothing was built on it. These are exact rational multiples
+of it, and the survey foot is 2 ppm longer than the international one — which is small enough to
+ignore and never small enough to be right.</p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>inUS</code></td>
+<td><code>survey_inch</code></td>
+<td>US survey inch</td>
+<td><code>bu_survey_inch</code></td>
+<td>100/3937 m ≈ 0.02540005 m</td>
+</tr>
+<tr>
+<td><code>ydUS</code></td>
+<td><code>survey_yard</code></td>
+<td>US survey yard</td>
+<td><code>bu_survey_yard</code></td>
+<td>3600/3937 m ≈ 0.91440183 m</td>
+</tr>
+<tr>
+<td><code>fathUS</code></td>
+<td><code>survey_fathom</code></td>
+<td>US survey fathom</td>
+<td><code>bu_survey_fathom</code></td>
+<td>7200/3937 m ≈ 1.82880366 m</td>
+</tr>
+<tr>
+<td><code>rdUS</code></td>
+<td><code>survey_rod</code></td>
+<td>US survey rod (pole, perch)</td>
+<td><code>bu_survey_rod</code></td>
+<td>19800/3937 m ≈ 5.02921006 m</td>
+</tr>
+<tr>
+<td><code>chUS</code></td>
+<td><code>survey_chain</code></td>
+<td>US survey chain (Gunter's)</td>
+<td><code>bu_survey_chain</code></td>
+<td>79200/3937 m ≈ 20.11684023 m</td>
+</tr>
+<tr>
+<td><code>lkUS</code></td>
+<td><code>survey_link</code></td>
+<td>US survey link</td>
+<td><code>bu_survey_link</code></td>
+<td>792/3937 m ≈ 0.20116840 m</td>
+</tr>
+<tr>
+<td><code>furUS</code></td>
+<td><code>survey_furlong</code></td>
+<td>US survey furlong</td>
+<td><code>bu_survey_furlong</code></td>
+<td>792000/3937 m ≈ 201.16840234 m</td>
+</tr>
+<tr>
+<td><code>miUS</code></td>
+<td><code>survey_mile</code>, <code>survey_miles</code></td>
+<td>US survey (statute) mile</td>
+<td><code>bu_survey_mile</code></td>
+<td>6336000/3937 m ≈ 1609.34721869 m</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>The survey foot was withdrawn for new work at the end of 2022. That is a reason to <strong>read</strong> it
+carefully, not to refuse it: US land records, state-plane coordinates and a century of drawings
+are written in these. <code>ac</code> vs <code>acUS</code> differ by 4 ppm — twice the foot's 2 ppm, an area being a
+length squared — which is about ten square metres on a section of land.</p>
+</blockquote>
+<h4 id="typographic-lengths">Typographic lengths</h4>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pnt</code></td>
+<td><code>point</code>, <code>points</code></td>
+<td>DTP point (¹⁄₇₂ in)</td>
+<td><code>bu_point</code></td>
+<td>127/360000 m ≈ 0.35277778 mm</td>
+</tr>
+<tr>
+<td><code>pca</code></td>
+<td><code>pica</code>, <code>picas</code></td>
+<td>pica (12 points, ⅙ in)</td>
+<td><code>bu_pica</code></td>
+<td>127/30000 m ≈ 4.23333333 mm</td>
+</tr>
+<tr>
+<td><code>lne</code></td>
+<td><code>line</code>, <code>lines</code></td>
+<td>line (¹⁄₁₂ in)</td>
+<td><code>bu_line</code></td>
+<td>127/60000 m ≈ 2.11666667 mm</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>The symbols are not <code>pt</code> and <code>ln</code>: <code>pt</code> is the <strong>pint</strong>. A length answering to <code>pt</code> would be the
+same collision as <code>kt</code> for the knot, which §6 refuses outright. The <strong>printer's</strong> point
+(0.013837 in) is a different unit and is not carried.</p>
+</blockquote>
+<h4 id="us-dry-volumes-and-the-trade-measures">US dry volumes and the trade measures</h4>
+<p>A dry quart is 16 % larger than the liquid <code>qt</code>. The peck and bushel here have always been the dry
+ones; the gallon, quart and pint were only the liquid ones.</p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gal_dry</code></td>
+<td><code>dry_gallon</code>, <code>dry_gallons</code></td>
+<td>US dry gallon</td>
+<td><code>bu_dry_gallon</code></td>
+<td>268.8025 in³ = 4.40488377086×10⁻³ m³</td>
+</tr>
+<tr>
+<td><code>qt_dry</code></td>
+<td><code>dry_quart</code>, <code>dry_quarts</code></td>
+<td>US dry quart</td>
+<td><code>bu_dry_quart</code></td>
+<td>1.101220942715×10⁻³ m³</td>
+</tr>
+<tr>
+<td><code>pt_dry</code></td>
+<td><code>dry_pint</code>, <code>dry_pints</code></td>
+<td>US dry pint</td>
+<td><code>bu_dry_pint</code></td>
+<td>5.506104713575×10⁻⁴ m³</td>
+</tr>
+<tr>
+<td><code>fbm</code></td>
+<td><code>board_foot</code>, <code>board_feet</code></td>
+<td>board foot (144 in³)</td>
+<td><code>bu_board_foot</code></td>
+<td>2.359737216×10⁻³ m³</td>
+</tr>
+<tr>
+<td><code>cord</code></td>
+<td><code>cord</code>, <code>cords</code></td>
+<td>cord (128 ft³)</td>
+<td><code>bu_cord</code></td>
+<td>3.624556363776 m³</td>
+</tr>
+<tr>
+<td><code>ac_ft</code></td>
+<td><code>acre_foot</code>, <code>acre_feet</code></td>
+<td>acre-foot (survey)</td>
+<td><code>bu_survey_acre_foot</code></td>
+<td>1233.4892384681489 m³</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>ac_ft</code> is built on the <strong>survey</strong> acre and foot, which is what UDUNITS, OM and every US water
+agency mean by an acre-foot. The international one is <code>ac·ft</code> = 1233.48183754752 m³.</p>
+</blockquote>
+<h4 id="and-the-singles">And the singles</h4>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>acUS</code></td>
+<td><code>survey_acre</code>, <code>survey_acres</code></td>
+<td>US survey acre</td>
+<td><code>bu_survey_acre</code></td>
+<td>62726400000/15499969 m² ≈ 4046.87261 m²</td>
+</tr>
+<tr>
+<td><code>darcy</code></td>
+<td><code>darcy</code>, <code>darcys</code>, <code>darcies</code></td>
+<td>darcy (permeability)</td>
+<td><code>bu_darcy</code></td>
+<td>1/1013250000000 m² ≈ 9.86923267×10⁻¹³ m²</td>
+</tr>
+<tr>
+<td><code>thm_ec</code></td>
+<td><code>therm_EC</code></td>
+<td>EC therm (10⁵ <code>Btu</code>)</td>
+<td><code>bu_therm_ec</code></td>
+<td>1.05505585262×10⁸ J (exact)</td>
+</tr>
+<tr>
+<td><code>ton_ref</code></td>
+<td><code>refrigeration_ton</code>, <code>ton_of_refrigeration</code></td>
+<td>ton of refrigeration (12 000 <code>Btu</code>/h)</td>
+<td><code>bu_refrigeration_ton</code></td>
+<td>52752792631/15000000 W ≈ 3516.85284 W</td>
+</tr>
+<tr>
+<td><code>DU</code></td>
+<td><code>dobson</code>, <code>dobson_unit</code>, <code>dobson_units</code></td>
+<td>Dobson unit (ozone column)</td>
+<td><code>bu_dobson</code></td>
+<td>4.462×10⁻⁴ mol·m⁻² (exact)</td>
+</tr>
+<tr>
+<td><code>shake</code></td>
+<td><code>shake</code>, <code>shakes</code></td>
+<td>shake</td>
+<td><code>bu_shake</code></td>
+<td>10⁻⁸ s (exact)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>darcy</code> takes prefixes, so the millidarcy every reservoir report is written in is <code>m~darcy</code>.
+<code>thm_ec</code> is the European gas-billing therm; native <code>thm</code> is the US therm, 0.24 % away.</p>
 </blockquote>
 <hr />
 <h2 id="5-currencies">5. Currencies</h2>

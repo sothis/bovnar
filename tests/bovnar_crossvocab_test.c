@@ -512,6 +512,104 @@ static void test_opaque_isolation(void)
 	}
 }
 
+/* ── every code this library WRITES must read back as what it wrote ─────── */
+
+/*
+ * The other direction, swept rather than tabulated.
+ *
+ * bvn_unit_to_profile joins a prefix to an atom with NOTHING between them --
+ * there is no '~' in UCUM or UDUNITS -- and the reader then resolves that one
+ * token by its own rules, whole atom before prefix+atom. Where the
+ * concatenation happens to BE an atom, the code means something else, and the
+ * writer used to report success anyway:
+ *
+ *     k~t (kilotonne)  -> udunits "kt"  -> the KNOT
+ *     p~H (picohenry)  -> udunits "pH"  -> the ACIDITY scale
+ *     f~t, p~t, n~t, a~t -> the FOOT, the PINT, the NIT, the TECHNICAL ATMOSPHERE
+ *
+ * Twenty-four of the nine thousand codes this sweep writes. "kt" is the sharp
+ * one: units.bvnr refuses that exact token on INPUT, in compact_exceptions,
+ * because reading a speed as a mass is the failure the format exists to
+ * prevent -- and the writer was emitting it.
+ *
+ * A table of cases would not have found it, because the collisions are an
+ * accident of two vocabularies' spellings meeting, not something anyone would
+ * think to write down. So this sweeps the whole native registry at every SI
+ * prefix and four exponents, through every namespace, and asserts the one
+ * property that matters: a code this library produces re-parses to the unit it
+ * was produced from. Nothing about WHICH code is asserted -- the writer is free
+ * to prefer "km" over "kilometer" -- only that it means the same thing.
+ */
+static void test_written_codes_read_back(void)
+{
+	static const char* NS[] = {
+		"ucum", "unece", "qudt", "qudt-qk", "udunits", "om", "cf",
+	};
+	static const si_prefix_id_t PFX[] = {
+		si_none,  si_atto, si_femto, si_pico, si_nano, si_micro,
+		si_milli, si_centi, si_deci, si_deca, si_hecto, si_kilo,
+		si_mega,  si_giga, si_tera, si_peta, si_exa,
+	};
+	static const unit_exponent_t EXP[] = {
+		exp_linear, exp_square, exp_cubic, exp_neg_linear,
+	};
+	long written = 0, differ = 0;
+
+	printf("  every code the writer produces reads back as itself...\n");
+
+	for (int b = BVN_UNIT_NATIVE_FIRST; b <= BVN_UNIT_NATIVE_LAST; b++) {
+		for (size_t pi = 0; pi < sizeof(PFX) / sizeof(PFX[0]); pi++) {
+			for (size_t ei = 0; ei < sizeof(EXP) / sizeof(EXP[0]); ei++) {
+				value_unit_t u;
+				memset(&u, 0, sizeof(u));
+				u.num_components         = 1;
+				u.components[0].base     = (value_base_unit_t)b;
+				u.components[0].exponent = EXP[ei];
+				u.components[0].prefix.system = prefix_si;
+				u.components[0].prefix.id.si  = PFX[pi];
+				if (!bvn_unit_valid(u))
+					continue;
+				for (size_t ni = 0; ni < sizeof(NS) / sizeof(NS[0]); ni++) {
+					char code[BVNR_UNIT_STRING_MAX];
+					if (bvn_unit_to_profile(NS[ni], u, code, sizeof code) < 0)
+						continue;   /* no spelling there; not a claim */
+					written++;
+					char qualified[BVNR_UNIT_STRING_MAX + 16];
+					snprintf(qualified, sizeof qualified, "%s:%s",
+					         NS[ni], code);
+					bool ok = true;
+					value_unit_t back =
+						bvn_parse_unit((const uint8_t*)qualified, &ok);
+					if (!ok || !bvn_unit_equal(u, back)) {
+						char want[BVNR_UNIT_STRING_MAX];
+						if (bvn_unit_to_string(u, want, sizeof want) < 0)
+							want[0] = '\0';
+						fprintf(stderr,
+						        "FAIL: %s -> %s, which reads back as %s\n",
+						        want, qualified,
+						        ok ? "a different unit" : "nothing at all");
+						differ++;
+					}
+				}
+			}
+		}
+	}
+	tests++;
+	if (differ != 0) {
+		fprintf(stderr, "FAIL: %ld of %ld written codes do not read back\n",
+		        differ, written);
+		failures++;
+	}
+	/* A floor on the sweep itself: a refactor that made the writer refuse
+	 * everything would otherwise pass this silently. */
+	tests++;
+	if (written < 7500) {
+		fprintf(stderr, "FAIL: only %ld codes written; the sweep has shrunk\n",
+		        written);
+		failures++;
+	}
+}
+
 /* ── the enforcement point, end to end ──────────────────────────────────── */
 
 static void test_enforcement(void)
@@ -544,6 +642,7 @@ int main(void)
 	test_agreement();
 	test_must_differ();
 	test_opaque_isolation();
+	test_written_codes_read_back();
 	test_enforcement();
 
 	printf("\n%d tests, %d failures\n", tests, failures);

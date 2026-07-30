@@ -191,6 +191,29 @@
 	bu_troy_pound   = 100189,
 	bu_apothecary_dram = 100190,
 	bu_long_hundredweight = 100191,
+	bu_survey_inch  = 100192,
+	bu_survey_yard  = 100193,
+	bu_survey_fathom = 100194,
+	bu_survey_rod   = 100195,
+	bu_survey_chain = 100196,
+	bu_survey_link  = 100197,
+	bu_survey_furlong = 100198,
+	bu_survey_mile  = 100199,
+	bu_survey_acre  = 100200,
+	bu_point        = 100201,
+	bu_pica         = 100202,
+	bu_line         = 100203,
+	bu_dry_gallon   = 100204,
+	bu_dry_quart    = 100205,
+	bu_dry_pint     = 100206,
+	bu_board_foot   = 100207,
+	bu_cord         = 100208,
+	bu_survey_acre_foot = 100209,
+	bu_darcy        = 100210,
+	bu_therm_ec     = 100211,
+	bu_refrigeration_ton = 100212,
+	bu_dobson       = 100213,
+	bu_shake        = 100214,
 
 /* The native block's bounds, and the dense table slot of a unit in it.
  *
@@ -201,8 +224,8 @@
  * arithmetic on the enumerator so it can be a designated-initialiser index in
  * the generated table rows: the row and the enum cannot drift apart. */
 #define BVN_UNIT_NATIVE_FIRST     100000
-#define BVN_UNIT_NATIVE_LAST      100191
-#define BVN_UNIT_NATIVE_COUNT     192
+#define BVN_UNIT_NATIVE_LAST      100214
+#define BVN_UNIT_NATIVE_COUNT     215
 #define BVN_UNIT_SLOT_NATIVE_BASE 1
 #define BVN_SLOT_NATIVE(b) \
 	(BVN_UNIT_SLOT_NATIVE_BASE + ((int)(b) - BVN_UNIT_NATIVE_FIRST))

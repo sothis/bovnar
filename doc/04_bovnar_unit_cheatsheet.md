@@ -2,7 +2,7 @@
 
 > **Spec version:** 1.1
 > **Status:** Reference — the symbol tables of the unit and currency registry
-> **Scope:** 192 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.
+> **Scope:** 215 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.
 
 ---
 
@@ -41,6 +41,7 @@
     - 4.27 [Named Speeds & Acidity](#427-named-speeds--acidity)
     - 4.28 [Water Hardness](#428-water-hardness)
     - 4.29 [Water-Quality Instrument Scales](#429-water-quality-instrument-scales)
+    - 4.30 [Survey, Typographic, Dry-Volume and Trade Units](#430-survey-typographic-dry-volume-and-trade-units)
 5. [Currencies](#5-currencies)
     - 5.1 [The Mandatory Currency Sigil](#51-the-mandatory-currency-sigil)
     - 5.2 [ISO 4217 Fiat Currencies](#52-iso-4217-fiat-currencies)
@@ -581,6 +582,79 @@ or `S/m` (`µmho/cm` too — `mho`/`℧` are the siemens); TDS is `mg/L`; resist
 > `JTU` and `PSU` take no prefix. PSU is a conductivity ratio, **not** a mass fraction — for
 > absolute salinity write `g/k~g`. Case matters: `cF` is the centifarad and `fau` the
 > femto-astronomical-unit.
+
+---
+
+### 4.30 Survey, Typographic, Dry-Volume and Trade Units
+
+Every unit here was, until it was added, the sole reason a run of UCUM, UDUNITS-2, QUDT, OM or
+UN/ECE codes had to be refused. All are exact; the ones whose value is not a terminating decimal in
+SI state a rational rather than a rounded double.
+
+#### US survey lengths
+
+`ftUS` (§4.4) has always been here and nothing was built on it. These are exact rational multiples
+of it, and the survey foot is 2 ppm longer than the international one — which is small enough to
+ignore and never small enough to be right.
+
+| Symbol | Long forms | Name | Enum | Factor |
+|--------|-----------|------|------|--------|
+| `inUS` | `survey_inch` | US survey inch | `bu_survey_inch` | 100/3937 m ≈ 0.02540005 m |
+| `ydUS` | `survey_yard` | US survey yard | `bu_survey_yard` | 3600/3937 m ≈ 0.91440183 m |
+| `fathUS` | `survey_fathom` | US survey fathom | `bu_survey_fathom` | 7200/3937 m ≈ 1.82880366 m |
+| `rdUS` | `survey_rod` | US survey rod (pole, perch) | `bu_survey_rod` | 19800/3937 m ≈ 5.02921006 m |
+| `chUS` | `survey_chain` | US survey chain (Gunter's) | `bu_survey_chain` | 79200/3937 m ≈ 20.11684023 m |
+| `lkUS` | `survey_link` | US survey link | `bu_survey_link` | 792/3937 m ≈ 0.20116840 m |
+| `furUS` | `survey_furlong` | US survey furlong | `bu_survey_furlong` | 792000/3937 m ≈ 201.16840234 m |
+| `miUS` | `survey_mile`, `survey_miles` | US survey (statute) mile | `bu_survey_mile` | 6336000/3937 m ≈ 1609.34721869 m |
+
+> The survey foot was withdrawn for new work at the end of 2022. That is a reason to **read** it
+> carefully, not to refuse it: US land records, state-plane coordinates and a century of drawings
+> are written in these. `ac` vs `acUS` differ by 4 ppm — twice the foot's 2 ppm, an area being a
+> length squared — which is about ten square metres on a section of land.
+
+#### Typographic lengths
+
+| Symbol | Long forms | Name | Enum | Factor |
+|--------|-----------|------|------|--------|
+| `pnt` | `point`, `points` | DTP point (¹⁄₇₂ in) | `bu_point` | 127/360000 m ≈ 0.35277778 mm |
+| `pca` | `pica`, `picas` | pica (12 points, ⅙ in) | `bu_pica` | 127/30000 m ≈ 4.23333333 mm |
+| `lne` | `line`, `lines` | line (¹⁄₁₂ in) | `bu_line` | 127/60000 m ≈ 2.11666667 mm |
+
+> The symbols are not `pt` and `ln`: `pt` is the **pint**. A length answering to `pt` would be the
+> same collision as `kt` for the knot, which §6 refuses outright. The **printer's** point
+> (0.013837 in) is a different unit and is not carried.
+
+#### US dry volumes and the trade measures
+
+A dry quart is 16 % larger than the liquid `qt`. The peck and bushel here have always been the dry
+ones; the gallon, quart and pint were only the liquid ones.
+
+| Symbol | Long forms | Name | Enum | Factor |
+|--------|-----------|------|------|--------|
+| `gal_dry` | `dry_gallon`, `dry_gallons` | US dry gallon | `bu_dry_gallon` | 268.8025 in³ = 4.40488377086×10⁻³ m³ |
+| `qt_dry` | `dry_quart`, `dry_quarts` | US dry quart | `bu_dry_quart` | 1.101220942715×10⁻³ m³ |
+| `pt_dry` | `dry_pint`, `dry_pints` | US dry pint | `bu_dry_pint` | 5.506104713575×10⁻⁴ m³ |
+| `fbm` | `board_foot`, `board_feet` | board foot (144 in³) | `bu_board_foot` | 2.359737216×10⁻³ m³ |
+| `cord` | `cord`, `cords` | cord (128 ft³) | `bu_cord` | 3.624556363776 m³ |
+| `ac_ft` | `acre_foot`, `acre_feet` | acre-foot (survey) | `bu_survey_acre_foot` | 1233.4892384681489 m³ |
+
+> `ac_ft` is built on the **survey** acre and foot, which is what UDUNITS, OM and every US water
+> agency mean by an acre-foot. The international one is `ac·ft` = 1233.48183754752 m³.
+
+#### And the singles
+
+| Symbol | Long forms | Name | Enum | Factor |
+|--------|-----------|------|------|--------|
+| `acUS` | `survey_acre`, `survey_acres` | US survey acre | `bu_survey_acre` | 62726400000/15499969 m² ≈ 4046.87261 m² |
+| `darcy` | `darcy`, `darcys`, `darcies` | darcy (permeability) | `bu_darcy` | 1/1013250000000 m² ≈ 9.86923267×10⁻¹³ m² |
+| `thm_ec` | `therm_EC` | EC therm (10⁵ `Btu`) | `bu_therm_ec` | 1.05505585262×10⁸ J (exact) |
+| `ton_ref` | `refrigeration_ton`, `ton_of_refrigeration` | ton of refrigeration (12 000 `Btu`/h) | `bu_refrigeration_ton` | 52752792631/15000000 W ≈ 3516.85284 W |
+| `DU` | `dobson`, `dobson_unit`, `dobson_units` | Dobson unit (ozone column) | `bu_dobson` | 4.462×10⁻⁴ mol·m⁻² (exact) |
+| `shake` | `shake`, `shakes` | shake | `bu_shake` | 10⁻⁸ s (exact) |
+
+> `darcy` takes prefixes, so the millidarcy every reservoir report is written in is `m~darcy`.
+> `thm_ec` is the European gas-billing therm; native `thm` is the US therm, 0.24 % away.
 
 ---
 

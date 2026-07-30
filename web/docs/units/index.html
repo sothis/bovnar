@@ -89,6 +89,7 @@
 <li>3.29 <a href="#329-conductivity-and-dissolved-solids">Conductivity and Dissolved Solids</a></li>
 <li>3.30 <a href="#330-turbidity-and-salinity">Turbidity and Salinity</a></li>
 <li>3.31 <a href="#331-sentinel-value">Sentinel Value</a></li>
+<li>3.32 <a href="#332-units-the-unit-profiles-needed">Units the Unit Profiles Needed</a></li>
 </ul>
 </li>
 <li><a href="#4-prefixes">Prefixes</a><ul>
@@ -168,7 +169,7 @@
 <p>The Bovnar quantity annotation system is an <strong>optional, per-value annotation</strong> that attaches a physical unit or currency denomination to any numeric field. It is part of the type annotation (<code>&lt;family:width,_base,unit&gt;</code>) and applies to the <code>uint</code>, <code>sint</code>, <code>float</code>, <code>float_fix</code>, and <code>float_dec</code> type families.</p>
 <p>Two distinct namespaces share the annotation slot:</p>
 <ul>
-<li><strong>Physical units</strong> — 192 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.</li>
+<li><strong>Physical units</strong> — 215 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.</li>
 <li><strong>Currency codes</strong> — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical — HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01 — and <code>ANG</code> coexists with its successor <code>XCG</code>, which inherited its numeric code 532; see §9.2) and 50 cryptocurrency tickers.</li>
 </ul>
 <p>Both namespaces are syntactically unified: the same grammar, the same <code>~</code> prefix separator, the same compound-unit operators (<code>·</code>, <code>*</code>, <code>/</code>), and the same <code>value_unit_t</code> data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.</p>
@@ -2540,6 +2541,263 @@ takes no prefix.</p>
 </blockquote>
 <h3 id="331-sentinel-value">3.31 Sentinel Value</h3>
 <p><code>bu_none</code> (value <code>0</code>) is the internal representation of "no base unit", used for the <code>no_unit</code> keyword and as the default when no unit annotation is present.</p>
+<hr />
+<h3 id="332-units-the-unit-profiles-needed">3.32 Units the Unit Profiles Needed</h3>
+<p>Every unit in this section was, until it was added, the <strong>sole</strong> reason a run of UCUM, UDUNITS-2,
+QUDT, OM or UN/ECE codes had to be refused as <code>error_unit_profile_unsupported</code>: the publisher
+defines the unit, the value is exactly stateable, and there was no native unit to translate onto.
+None of them is new physics. All are exact — the ones whose value is not a terminating decimal in
+SI state a rational in <code>units.bvnr</code> rather than the repr of a double.</p>
+<h4 id="us-survey-lengths">US survey lengths</h4>
+<p><code>bu_survey_foot</code> (§3.21) has been in the registry all along and nothing was built on it, so every
+survey length above the foot had to be refused. Each below is an exact rational multiple of the
+survey foot's 1200/3937 m.</p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum value</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>inUS</code></td>
+<td><code>survey_inch</code></td>
+<td>US survey inch</td>
+<td><code>bu_survey_inch</code></td>
+<td>100/3937 m</td>
+</tr>
+<tr>
+<td><code>ydUS</code></td>
+<td><code>survey_yard</code></td>
+<td>US survey yard</td>
+<td><code>bu_survey_yard</code></td>
+<td>3600/3937 m</td>
+</tr>
+<tr>
+<td><code>fathUS</code></td>
+<td><code>survey_fathom</code></td>
+<td>US survey fathom</td>
+<td><code>bu_survey_fathom</code></td>
+<td>7200/3937 m</td>
+</tr>
+<tr>
+<td><code>rdUS</code></td>
+<td><code>survey_rod</code></td>
+<td>US survey rod (pole, perch)</td>
+<td><code>bu_survey_rod</code></td>
+<td>19800/3937 m</td>
+</tr>
+<tr>
+<td><code>chUS</code></td>
+<td><code>survey_chain</code></td>
+<td>US survey chain (Gunter's)</td>
+<td><code>bu_survey_chain</code></td>
+<td>79200/3937 m</td>
+</tr>
+<tr>
+<td><code>lkUS</code></td>
+<td><code>survey_link</code></td>
+<td>US survey link</td>
+<td><code>bu_survey_link</code></td>
+<td>792/3937 m</td>
+</tr>
+<tr>
+<td><code>furUS</code></td>
+<td><code>survey_furlong</code></td>
+<td>US survey furlong</td>
+<td><code>bu_survey_furlong</code></td>
+<td>792000/3937 m</td>
+</tr>
+<tr>
+<td><code>miUS</code></td>
+<td><code>survey_mile</code>, <code>survey_miles</code></td>
+<td>US survey (statute) mile</td>
+<td><code>bu_survey_mile</code></td>
+<td>6336000/3937 m</td>
+</tr>
+<tr>
+<td><code>acUS</code></td>
+<td><code>survey_acre</code>, <code>survey_acres</code></td>
+<td>US survey acre</td>
+<td><code>bu_survey_acre</code></td>
+<td>43 560 <code>ftUS</code>squared = 62726400000/15499969 m2</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>The survey foot is 2 ppm longer than the international foot</strong>, and the survey acre 4 ppm larger
+than the international acre — an area being a length squared. Small enough to ignore and never
+small enough to be right: on a section of land the acre difference is about ten square metres.
+The survey foot was withdrawn for new work at the end of 2022, which is a reason to read it
+carefully rather than to refuse it, since US land records, state-plane coordinates and a century
+of engineering drawings are written in it.</p>
+</blockquote>
+<h4 id="typographic-lengths">Typographic lengths</h4>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum value</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pnt</code></td>
+<td><code>point</code>, <code>points</code></td>
+<td>DTP point (1/72 in)</td>
+<td><code>bu_point</code></td>
+<td>127/360000 m</td>
+</tr>
+<tr>
+<td><code>pca</code></td>
+<td><code>pica</code>, <code>picas</code></td>
+<td>pica (12 points)</td>
+<td><code>bu_pica</code></td>
+<td>127/30000 m</td>
+</tr>
+<tr>
+<td><code>lne</code></td>
+<td><code>line</code>, <code>lines</code></td>
+<td>line (1/12 in)</td>
+<td><code>bu_line</code></td>
+<td>127/60000 m</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>The symbols are deliberately <strong>not</strong> <code>pt</code> and <code>ln</code>. <code>pt</code> is the pint and has been since before
+these existed; a length answering to it would change what an existing spelling means, which
+§10 forbids and which <code>gen_units.py</code> now refuses at build time. UCUM's own bracketed spellings
+<code>[pnt]</code>, <code>[pca]</code> and <code>[lne]</code> name them unambiguously, so the symbols follow those. The
+<strong>printer's</strong> point (0.013837 in) is a different unit and is still refused.</p>
+</blockquote>
+<h4 id="us-dry-volumes-and-the-trade-measures-built-on-feet">US dry volumes, and the trade measures built on feet</h4>
+<p>A dry quart is <strong>16 per cent larger</strong> than the liquid quart <code>qt</code>. The peck (<code>pk</code>) and bushel (<code>bsh</code>)
+in §3.19 have always been the dry ones; the gallon, quart and pint were only the liquid ones, so a
+document that meant dry had no way to say so.</p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum value</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gal_dry</code></td>
+<td><code>dry_gallon</code>, <code>dry_gallons</code></td>
+<td>US dry gallon</td>
+<td><code>bu_dry_gallon</code></td>
+<td>268.8025 in3 = 4.40488377086e-3 m3</td>
+</tr>
+<tr>
+<td><code>qt_dry</code></td>
+<td><code>dry_quart</code>, <code>dry_quarts</code></td>
+<td>US dry quart</td>
+<td><code>bu_dry_quart</code></td>
+<td>1.101220942715e-3 m3</td>
+</tr>
+<tr>
+<td><code>pt_dry</code></td>
+<td><code>dry_pint</code>, <code>dry_pints</code></td>
+<td>US dry pint</td>
+<td><code>bu_dry_pint</code></td>
+<td>5.506104713575e-4 m3</td>
+</tr>
+<tr>
+<td><code>fbm</code></td>
+<td><code>board_foot</code>, <code>board_feet</code></td>
+<td>board foot (144 in3)</td>
+<td><code>bu_board_foot</code></td>
+<td>2.359737216e-3 m3</td>
+</tr>
+<tr>
+<td><code>cord</code></td>
+<td><code>cord</code>, <code>cords</code></td>
+<td>cord (128 ft3)</td>
+<td><code>bu_cord</code></td>
+<td>3.624556363776 m3</td>
+</tr>
+<tr>
+<td><code>ac_ft</code></td>
+<td><code>acre_foot</code>, <code>acre_feet</code></td>
+<td>acre-foot (survey)</td>
+<td><code>bu_survey_acre_foot</code></td>
+<td><code>acUS</code>.<code>ftUS</code> = 1233.4892384681489 m3</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>ac_ft</code> is the acre-foot on the <strong>survey</strong> acre and foot, which is what UDUNITS, OM and every US
+water agency mean by it. The international acre-foot is <code>ac·ft</code> = 1233.48183754752 m³ — 5.8 ppm
+away, and a different unit rather than a rounding.</p>
+</blockquote>
+<h4 id="permeability-energy-power-ozone-and-one-very-short-time">Permeability, energy, power, ozone and one very short time</h4>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum value</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>darcy</code></td>
+<td><code>darcy</code>, <code>darcys</code>, <code>darcies</code></td>
+<td>darcy (permeability)</td>
+<td><code>bu_darcy</code></td>
+<td>1/1013250000000 m2</td>
+</tr>
+<tr>
+<td><code>thm_ec</code></td>
+<td><code>therm_EC</code></td>
+<td>EC therm (1e5 <code>Btu</code>)</td>
+<td><code>bu_therm_ec</code></td>
+<td>1.05505585262e8 J (exact)</td>
+</tr>
+<tr>
+<td><code>ton_ref</code></td>
+<td><code>refrigeration_ton</code>, <code>ton_of_refrigeration</code></td>
+<td>ton of refrigeration</td>
+<td><code>bu_refrigeration_ton</code></td>
+<td>12 000 <code>Btu</code>/h = 52752792631/15000000 W</td>
+</tr>
+<tr>
+<td><code>DU</code></td>
+<td><code>dobson</code>, <code>dobson_unit</code>, <code>dobson_units</code></td>
+<td>Dobson unit (ozone column)</td>
+<td><code>bu_dobson</code></td>
+<td>4.462e-4 mol.m-2 (exact)</td>
+</tr>
+<tr>
+<td><code>shake</code></td>
+<td><code>shake</code>, <code>shakes</code></td>
+<td>shake</td>
+<td><code>bu_shake</code></td>
+<td>1e-8 s (exact)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>darcy</code> takes prefixes, so the millidarcy every reservoir report is written in is <code>m~darcy</code> (or
+compactly <code>mdarcy</code>). <code>thm_ec</code> is the therm European gas billing uses; native <code>thm</code> is the US
+therm, 0.24 per cent away, and no SI prefix reaches 10⁵ — which is why it needed a unit of its
+own rather than a prefixed <code>Btu</code>. <code>shake</code> exists for the same reason at the other end: there is
+no SI prefix at 10⁻⁸.</p>
+</blockquote>
 <hr />
 <h2 id="4-prefixes">4. Prefixes</h2>
 <p>A prefix is attached to a base unit symbol either with the <code>~</code> separator — <code>prefix~baseunit</code>, the canonical form — or <strong>compactly</strong>, without it: <code>kg</code> is <code>k~g</code>, <code>MiB</code> is <code>Mi~B</code>. Both spellings parse to the same <code>value_unit_t</code>; the writer always emits the separated form, so a document that round-trips through the library comes back canonical. See §4.3 for what the compact form does and does not accept.</p>

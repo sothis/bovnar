@@ -385,6 +385,102 @@ def check_unit_string_bound(units, prefixes):
 
 
 
+# Spellings that are BOTH a whole alias and a prefix + another alias, and were
+# so before this check existed. Every one is settled by the longest-alias rule
+# and settled the way units.bvnr's header says: "a bare alias always wins over a
+# prefixed reading ("min" is the minute, never milli-inch) and no existing
+# document can change meaning".
+#
+# They are listed rather than derived because the rule that matters is
+# HISTORICAL: an old collision is a decision already taken and already shipped,
+# a new one is a spelling somebody is about to redefine. The list is what tells
+# those apart, and it is short and closed — adding a unit does not add to it.
+KNOWN_ALIAS_SHADOWS = {
+    # symbol      the prefixed reading it also has
+    "PS":   "P + S     (petasiemens)",
+    "at":   "a + t     (attotonne)",
+    "au":   "a + u     (attodalton)",
+    "cd":   "c + d     (centiday)",
+    "ch":   "c + h     (centihour)",
+    "ct":   "c + t     (centitonne)",
+    "dB":   "d + B     (decibyte)",
+    "ft":   "f + t     (femtotonne)",
+    "kat":  "k + at    (kilo technical atmosphere)",
+    "kph":  "k + ph    (kilophot)",
+    "min":  "m + in    (milli-inch)",
+    "mph":  "m + ph    (milliphot)",
+    "nmi":  "n + mi    (nanomile)",
+    "pH":   "p + H     (picohenry)",
+    "ph":   "p + h     (picohour)",
+    "pt":   "p + t     (picotonne)",
+    "qt":   "q + t     (quectotonne)",
+    "rd":   "r + d     (ronnaday)",
+    "yd":   "y + d     (yoctoday)",
+}
+
+
+def check_alias_prefix_collisions(units, prefixes):
+    """Refuse an alias that changes what an EXISTING spelling means.
+
+    A prefix and an alias are written with nothing between them in the compact
+    form, so `<prefix><alias>` is a spelling the parser already resolves. Adding
+    a new alias that IS such a concatenation silently re-points it: the longest
+    matching alias wins, so the new whole-token alias beats the prefixed
+    reading, and a document that meant one unit now means another.
+
+    This is not hypothetical. `RT` was proposed as the symbol for the ton of
+    refrigeration; `R` is the ronna prefix and `T` the tesla, so `RT` had been
+    the ronnatesla since prefixes and units first met. `TR` is no better — `T`
+    is tera and `R` the roentgen. Both would have changed an existing spelling,
+    which the header of units.bvnr forbids in as many words: "no existing
+    document can change meaning".
+
+    A collision is a build failure at the file that owns it, with both readings
+    named, rather than a difference somebody notices in a diff of parse results
+    — which is how this one was noticed.
+
+    KNOWN_ALIAS_SHADOWS above is the set that predates the check. Those are not
+    exceptions to the rule; they are the rule's other half. The longest-alias
+    match resolves each of them to the whole token deliberately and always has,
+    which is why `min` is the minute and `cd` the candela. What must not happen
+    is a NEW alias joining that set, because then a spelling changes hands.
+
+    The compact-form exceptions are NOT an escape hatch: they make a spelling an
+    ERROR, which is the right answer for a token only the author can resolve,
+    and no answer at all for one this table has quietly redefined.
+    """
+    pfx = []
+    for system in ("si_prefixes", "iec_prefixes"):
+        for p in prefixes[system]:
+            for a in p["aliases"]:
+                pfx.append(a)
+    alias_of = {}
+    for u in units:
+        for a in u["aliases"]:
+            alias_of.setdefault(a, u["name"])
+    bad = []
+    for a, owner in sorted(alias_of.items()):
+        for p in pfx:
+            if not a.startswith(p) or len(a) == len(p):
+                continue
+            tail = a[len(p):]
+            other = alias_of.get(tail)
+            if other is not None and other != owner:
+                if a in KNOWN_ALIAS_SHADOWS:
+                    continue          # settled long ago; see the note above
+                bad.append("  %-14s is bu_%s, and also reads as %s + %s = bu_%s"
+                           % (a, owner, p, tail, other))
+    if bad:
+        raise SystemExit(
+            "gen_units: these spellings mean two different units — the whole "
+            "token names one and the compact prefix form names another, and the "
+            "longest-alias rule silently picks the first:\n%s\n\n"
+            "Choose a symbol that is not a prefix followed by another unit's "
+            "spelling. See check_alias_prefix_collisions in gen_units.py."
+            % "\n".join(bad))
+    return len(alias_of)
+
+
 def gen_prefix_policy(units):
     out = [BANNER]
     for u in units:
@@ -463,6 +559,7 @@ def main():
     prefixes = bvnr_data.load(
         open(os.path.join(GENDATA, "prefixes.bvnr"), "rb").read())
     worst_unit_str, unit_str_cap = check_unit_string_bound(units, prefixes)
+    check_alias_prefix_collisions(units, prefixes)
 
     rows = parse_rows(units)
     # WIRED fragments are written into the source tree where they are #include'd

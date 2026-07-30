@@ -20,6 +20,89 @@ rebuild consumers against the new headers. **SOVERSION is bumped 1 → 2**
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
 
+### Fixed — the writer emitted a code that read back as a different unit
+
+`bvn_unit_to_profile` joins a prefix to an atom with **nothing between them** —
+there is no `~` in UCUM or UDUNITS — and the reader then resolves that one token
+by its own rules, whole atom before prefix+atom. Where the concatenation happens
+to *be* an atom, the code means something else, and the writer reported success:
+
+```
+k~t (kilotonne)  -> udunits:kt   -> the KNOT, a speed
+p~H (picohenry)  -> udunits:pH   -> the ACIDITY scale
+f~t (femtotonne) -> udunits:ft   -> the FOOT
+p~t (picotonne)  -> udunits:pt   -> the PINT
+n~t (nanotonne)  -> udunits:nt   -> the NIT, cd/m²
+a~t (attotonne)  -> udunits:at   -> the TECHNICAL ATMOSPHERE
+```
+
+Twenty-four of the nine thousand codes the writer can produce. `kt` is the sharp
+one: `units.bvnr` refuses that exact token on **input**, in `compact_exceptions`,
+because "reading a speed as a mass is exactly the failure this format exists to
+prevent" — and the writer was emitting it.
+
+A code is now assembled only if it reads back, checked against the parser's own
+resolution order rather than against a restatement of it. When the shortest
+prefix spelling collides the next is tried — UDUNITS spells kilo both `k` and
+`kilo`, and `kilot` is unambiguous — so nothing that had a spelling lost one:
+`k~t` writes as `kilot`, `p~H` as `picoH`, while `km`, `mg` and `mt` keep their
+short forms. `test_written_codes_read_back` sweeps the whole registry at every
+SI prefix and four exponents through all seven namespaces and asserts the
+property directly; a table of cases would not have found this, because the
+collisions are an accident of two vocabularies' spellings meeting.
+
+### Added — 23 units, and the ~90 publisher codes they unblock
+
+Each was the **sole** reason a run of UCUM, UDUNITS-2, QUDT, OM or UN/ECE codes
+had to be refused. All are exact; the ones whose value is not a terminating
+decimal in SI state a rational rather than the repr of a double.
+
+* **The US survey lengths** — `inUS`, `ydUS`, `fathUS`, `rdUS`, `chUS`, `lkUS`,
+  `furUS`, `miUS`, `acUS`. `ftUS` had been in the registry all along and nothing
+  was built on it, so UDUNITS' `chain`, `rod`, `pole`, `perch`, `furlong`,
+  `fathom` and `acre` — which that vocabulary builds on the survey foot — had to
+  be refused rather than mapped onto the international lengths of the same name.
+  The survey foot is 2 ppm longer and the survey acre 4 ppm larger: small enough
+  to ignore and never small enough to be right.
+* **The typographic point, pica and line** — and *not* under the symbols `pt`
+  and `ln`, because `pt` is the pint. A length answering to `pt` would have been
+  the same collision as `kt` for the knot.
+* **The US dry gallon, quart and pint**, 16 % larger than the liquid ones the
+  registry already had; the peck and bushel here were always the dry ones.
+* **Board foot, cord and the survey acre-foot**, the trade measures whose
+  factors (144 in³, 128 ft³) are not a decade off anything.
+* **darcy, EC therm, ton of refrigeration, Dobson unit and shake** — the last
+  because there is no SI prefix at 10⁻⁸, and the darcy because it is exact:
+  every unit in its definition is.
+
+Every one of the 90 new profile mappings was checked against its publisher's own
+file; the run reports zero mismatches, zero quantity-kind disagreements and zero
+cross-reference disagreements.
+
+### Added — a symbol may not redefine a spelling that already exists
+
+`RT` was proposed for the ton of refrigeration. `R` is the ronna prefix and `T`
+the tesla, so `RT` had been the ronnatesla since prefixes and units first met,
+and the longest-alias rule would have handed the token silently to the new unit.
+`TR` is no better: `T` is tera and `R` the roentgen.
+
+`gen_units.py` now refuses any alias that is a prefix followed by another unit's
+spelling. The nineteen that predate the check are listed as what they are — the
+rule's other half, where the whole token wins deliberately and always has, which
+is why `min` is the minute and `cd` the candela. What must not happen is a *new*
+alias joining that set, because then a spelling changes hands. The proposal was
+caught by diffing 40 000 spellings before and after; the gate makes that a build
+failure with both readings named.
+
+### Fixed — a stray brace in a data file hung every generator
+
+An unmatched `}` inside an array made `bvnr_data.py` spin forever: a closing
+delimiter is one of the characters `_value()` reports as the empty slot in
+`[1, , 3]`, so it returned None without consuming anything and the loop asked
+again. One duplicated line in `units.bvnr` turned every generator into a hang —
+no message, no exit, and in CI a timeout rather than a diagnosis. An array is
+closed by `]` and by nothing else, and it says so now.
+
 ### Fixed — three more profile mappings, found by comparing two of our own tables
 
 The quantity-kind gate added last pass compares a QUDT unit against the QUDT

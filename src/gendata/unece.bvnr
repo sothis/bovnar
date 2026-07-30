@@ -852,6 +852,17 @@
   # bu_troy_pound unblocked. DRI above is the AVOIRDUPOIS dram, 2.2x smaller.
   { .code = "DRA";   .bovnar = "dr_ap";               },  # via qudt:DRAM_US
   { .code = "LBT";   .bovnar = "lb_t";                },  # via qudt:LB_T
+
+  # ── The units bu_survey_*, the dry volumes and the point unblocked ───
+  # L61/PTD and L62/QTD are each two Rec 20 codes for one dry measure.
+  { .code = "F49";.bovnar = "rdUS";       },
+  { .code = "GLD";.bovnar = "gal_dry";    },
+  { .code = "H82";.bovnar = "pnt";        },
+  { .code = "L61";.bovnar = "pt_dry";     },
+  { .code = "L62";.bovnar = "qt_dry";     },
+  { .code = "M52";.bovnar = "miUS";       },
+  { .code = "PTD";.bovnar = "pt_dry";    .reverse = false; },
+  { .code = "QTD";.bovnar = "qt_dry";    .reverse = false; },
   { .code = "DX";    .bovnar = "dyn/c~m";             .reverse = false; },  # via qudt:DYN-PER-CentiM
   { .code = "E01";   .bovnar = "N/c~m^2";             .reverse = false; },  # via qudt:N-PER-CentiM2
   { .code = "E09";   .bovnar = "m~A·h";               .reverse = false; },  # via qudt:MilliA-HR
@@ -1607,20 +1618,17 @@
   { .code = "E97";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.001)"; },
   { .code = "E98";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
   { .code = "F22";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1355.818009)"; },
-  { .code = "F49";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (5.02921)"; },
   { .code = "F78";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (249.080024)"; },
   { .code = "F80";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (746.043)"; },
   { .code = "FC";    .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (28.31684659)"; },
   { .code = "FIT";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0)"; },
   { .code = "G20";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (2989.067)"; },
   { .code = "G3";    .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (7.576817e-05)"; },
-  { .code = "GLD";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.00440488377)"; },
   { .code = "GT";    .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0)"; },
   { .code = "H11";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (3.91935077e-07)"; },
   { .code = "H71";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (3.919350773e-09)"; },
   { .code = "H73";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.001)"; },
   { .code = "H79";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0003333333)"; },
-  { .code = "H82";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0003527778)"; },
   { .code = "H91";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
   { .code = "H92";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
   { .code = "H93";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
@@ -1689,8 +1697,6 @@
   { .code = "L46";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.00015153635)"; },
   { .code = "L47";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.009092181)"; },
   { .code = "L53";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (6.577098e-09)"; },
-  { .code = "L61";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.000550610471)"; },
-  { .code = "L62";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.001101220943)"; },
   { .code = "L63";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0001689108796)"; },
   { .code = "L65";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (515.3788206)"; },
   { .code = "L66";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.004053861111)"; },
@@ -1713,7 +1719,6 @@
   { .code = "M42";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1609.347)"; },
   { .code = "M47";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (5.067075e-10)"; },
   { .code = "M48";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (2589997.766)"; },
-  { .code = "M52";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1609.347)"; },
   { .code = "M58";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1609.344)"; },
   { .code = "M68";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (3.62)"; },
   { .code = "M85";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.02916667)"; },
@@ -1734,14 +1739,12 @@
   { .code = "P72";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (2.77778e-10)"; },
   { .code = "P85";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (133.322)"; },
   { .code = "PLA";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0)"; },
-  { .code = "PTD";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.000550610471)"; },
   { .code = "Q19";   .why = "a nat per second — an information rate in the base-e logarithm, which has no native unit; it used to map to s^-1, i.e. to a frequency"; },
   { .code = "Q11";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
   { .code = "Q15";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
   { .code = "Q16";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
   { .code = "Q18";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (2.302585093)"; },
   { .code = "Q26";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
-  { .code = "QTD";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.001101220943)"; },
   { .code = "QTR";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (12.70058636)"; },
   { .code = "R1";    .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0042333)"; },
   { .code = "RPS";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (6.28318531)"; },

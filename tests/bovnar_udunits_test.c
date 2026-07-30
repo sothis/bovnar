@@ -191,12 +191,35 @@ static void test_near_miss_refusals(void)
 	chk_factor("udunits:long_hundredweight", 50.80234544);
 
 	/* UDUNITS builds these on the US SURVEY foot, 2 ppm longer than the
-	 * international foot the native atoms of the same name use. */
-	chk_error("udunits:chain", error_unit_profile_unsupported);
-	chk_error("udunits:rod", error_unit_profile_unsupported);
-	chk_error("udunits:furlong", error_unit_profile_unsupported);
-	chk_error("udunits:fathom", error_unit_profile_unsupported);
-	chk_error("udunits:acre", error_unit_profile_unsupported);
+	 * international foot the native atoms of the same name use -- which is why
+	 * they were refused until the registry had the survey lengths themselves.
+	 * They land on those now, and what is pinned is that they stay OFF the
+	 * international ones: a 2 ppm error in a boundary survey is a metre a mile
+	 * out over a township. */
+	chk_str("udunits:chain",   "chUS");
+	chk_str("udunits:rod",     "rdUS");
+	chk_str("udunits:pole",    "rdUS");
+	chk_str("udunits:perch",   "rdUS");
+	chk_str("udunits:furlong", "furUS");
+	chk_str("udunits:fathom",  "fathUS");
+	chk_str("udunits:acre",    "acUS");
+	chk_factor("udunits:chain", 20.116840233680467);
+	chk_factor("udunits:acre",  4046.8726098742518);
+	ASSERT_TRUE(!bvn_unit_equal(U("udunits:chain"), U("ch")),
+	            "the UDUNITS chain is NOT the international chain");
+	ASSERT_TRUE(!bvn_unit_equal(U("udunits:acre"), U("ac")),
+	            "the UDUNITS acre is NOT the international acre");
+
+	/* And the rest of what the same batch unblocked. */
+	chk_str("udunits:big_point",         "pnt");
+	chk_str("udunits:US_dry_quart",      "qt_dry");
+	chk_str("udunits:board_foot",        "fbm");
+	chk_str("udunits:acre_foot",         "ac_ft");
+	chk_str("udunits:refrigeration_ton", "ton_ref");
+	chk_factor("udunits:shake", 1e-8);
+	chk_factor("udunits:darcy", 9.8692326671601282e-13);
+	ASSERT_TRUE(!bvn_unit_equal(U("udunits:US_dry_quart"), U("qt")),
+	            "the dry quart is NOT the liquid quart");
 
 	/* The BTU goes the other way: UDUNITS' is the IT BTU, which is exactly
 	 * what native Btu is, so it maps where UCUM's unqualified one cannot. */

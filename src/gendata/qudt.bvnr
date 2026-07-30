@@ -239,6 +239,19 @@
   { .code = "GibiBYTE";   .bovnar = "Gi~B";   },
   { .code = "TebiBYTE";   .bovnar = "Ti~B";   },
 
+  # ── The units bu_survey_*, bu_darcy and friends unblocked ────────────
+  # QUDT's ROD is the SURVEY rod (16.5 survey feet), which is why it could
+  # not map onto the international rd.
+  { .code = "DARCY";                           .bovnar = "darcy";               },
+  { .code = "GAL_US_DRY";                      .bovnar = "gal_dry";             },
+  { .code = "MI_US";                           .bovnar = "miUS";                },
+  { .code = "PINT_US_DRY";                     .bovnar = "pt_dry";              },
+  { .code = "PT_BIG";                          .bovnar = "pnt";                 },
+  { .code = "QT_US_DRY";                       .bovnar = "qt_dry";              },
+  { .code = "ROD";                             .bovnar = "rdUS";                },
+  { .code = "SH";                              .bovnar = "shake";               },
+  { .code = "TON_FG";                          .bovnar = "ton_ref";             },
+
   # ── More refusals an existing native expression already covered ───────
   #
   # A degree Celsius or Fahrenheit INSIDE a compound is the interval, and the
@@ -2694,7 +2707,6 @@
   { .code = "CentiM_H2O_4DEG_C";           .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "CentiM_HG_0DEG_C";            .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "Ci";                          .why = "QUDT states no conversionMultiplier for this unit"; },
-  { .code = "DARCY";                       .why = "no native unit of this dimension is a decade away from QUDT's multiplier (9.869233e-13)"; },
   { .code = "DAY_Sidereal";                .why = "no native unit of this dimension is a decade away from QUDT's multiplier (86164.099)"; },
   { .code = "DEATHS-PER-KiloINDIV-YR";     .why = "no native unit of this dimension is a decade away from QUDT's multiplier (3.1688e-11)"; },
   { .code = "DEATHS-PER-MegaINDIV-YR";     .why = "no native unit of this dimension is a decade away from QUDT's multiplier (3.1688e-14)"; },
@@ -2763,7 +2775,6 @@
   { .code = "FT_HG";                       .why = "no native unit of this dimension is a decade away from QUDT's multiplier (40636.66)"; },
   { .code = "FUR_Long";                    .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "GAL_UK-PER-MIN";              .why = "no native unit of this dimension is a decade away from QUDT's multiplier (7.576817e-05)"; },
-  { .code = "GAL_US_DRY";                  .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.00440488377)"; },
   { .code = "GAUGE_FR";                    .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.0003333333)"; },
   { .code = "GA_Charriere";                .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "GM-PER-M2-HR";                .why = "no native unit of this dimension is a decade away from QUDT's multiplier (2.777777778e-07)"; },
@@ -2835,7 +2846,6 @@
   { .code = "MIL_Circ";                    .why = "no native unit of this dimension is a decade away from QUDT's multiplier (5.067075e-10)"; },
   { .code = "MIN_Sidereal";                .why = "no native unit of this dimension is a decade away from QUDT's multiplier (59.83617)"; },
   { .code = "MI_UK3";                      .why = "QUDT states no conversionMultiplier for this unit"; },
-  { .code = "MI_US";                       .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1609.347)"; },
   { .code = "MI_US-PER-SEC2";              .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1609.347)"; },
   { .code = "MI_US2";                      .why = "no native unit of this dimension is a decade away from QUDT's multiplier (2589997.766)"; },
   { .code = "MOL-PER-HR";                  .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.000277778)"; },
@@ -2955,7 +2965,6 @@
   { .code = "PFUND";                       .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "PHON";                        .why = "a dimensionless QUDT unit — every native ratio has the same dimension vector, so nothing here can tell which one it is; QUDT states no ucumCode or udunitsCode to settle it"; },
   { .code = "PINT_UK-PER-DAY";             .why = "no native unit of this dimension is a decade away from QUDT's multiplier (6.577098e-09)"; },
-  { .code = "PINT_US_DRY";                 .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.000550610471)"; },
   { .code = "PIXEL";                       .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "PK_UK";                       .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.009092181)"; },
   { .code = "PK_UK-PER-DAY";               .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1.05233576e-07)"; },
@@ -2970,7 +2979,6 @@
   { .code = "PPTR_VOL";                    .why = "a dimensionless QUDT unit — every native ratio has the same dimension vector, so nothing here can tell which one it is; QUDT states no ucumCode or udunitsCode to settle it"; },
   { .code = "PPT_VOL";                     .why = "a dimensionless QUDT unit — every native ratio has the same dimension vector, so nothing here can tell which one it is; QUDT states no ucumCode or udunitsCode to settle it"; },
   { .code = "PSU";                         .why = "QUDT states no conversionMultiplier for this unit"; },
-  { .code = "PT_BIG";                      .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.0003527778)"; },
   { .code = "PetaFLOPS";                   .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "PetaV-A";                     .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "PicoV-A_Reactive";            .why = "QUDT states no conversionMultiplier for this unit"; },
@@ -2994,7 +3002,6 @@
   { .code = "PlanckVolt";                  .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1.04295e+27)"; },
   { .code = "PlanckVolume";                .why = "no native unit of this dimension is a decade away from QUDT's multiplier (4.22419e-105)"; },
   { .code = "QT_UK-PER-SEC";               .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.0011365225)"; },
-  { .code = "QT_US_DRY";                   .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.001101220943)"; },
   { .code = "QUAD";                        .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1.055e+18)"; },
   { .code = "Quarter_UK";                  .why = "no native unit of this dimension is a decade away from QUDT's multiplier (12.70058636)"; },
   { .code = "REV-PER-HR";                  .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.00174532925)"; },
@@ -3002,7 +3009,6 @@
   { .code = "REV-PER-SEC";                 .why = "no native unit of this dimension is a decade away from QUDT's multiplier (6.28318531)"; },
   { .code = "REV-PER-SEC2";                .why = "no native unit of this dimension is a decade away from QUDT's multiplier (6.28318531)"; },
   { .code = "RHE";                         .why = "QUDT states no conversionMultiplier for this unit"; },
-  { .code = "ROD";                         .why = "no native unit of this dimension is a decade away from QUDT's multiplier (5.02921)"; },
   { .code = "RPK";                         .why = "a dimensionless QUDT unit — every native ratio has the same dimension vector, so nothing here can tell which one it is; QUDT states no ucumCode or udunitsCode to settle it"; },
   { .code = "RT";                          .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "RichterMagnitude";            .why = "QUDT states no conversionMultiplier for this unit"; },
@@ -3012,7 +3018,6 @@
   { .code = "SCM";                         .why = "no native unit of this dimension is a decade away from QUDT's multiplier (42.3105)"; },
   { .code = "SCM-PER-HR";                  .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.01175)"; },
   { .code = "SCM-PER-MIN";                 .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.7051738)"; },
-  { .code = "SH";                          .why = "no native unit of this dimension, and the coherent SI product cannot carry the decade (1e-08)"; },
   { .code = "SLUG-PER-DAY";                .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.0001689108796)"; },
   { .code = "SLUG-PER-FT";                 .why = "no native unit of this dimension is a decade away from QUDT's multiplier (47.88025919)"; },
   { .code = "SLUG-PER-FT2";                .why = "no native unit of this dimension is a decade away from QUDT's multiplier (157.0874645)"; },
@@ -3037,7 +3042,6 @@
   { .code = "TONNE-PER-HA-YR";             .why = "no native unit of this dimension is a decade away from QUDT's multiplier (3.17e-09)"; },
   { .code = "TONNE-PER-MO";                .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.0003919350773)"; },
   { .code = "TON_Assay";                   .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.02916667)"; },
-  { .code = "TON_FG";                      .why = "no native unit of this dimension is a decade away from QUDT's multiplier (3516.853)"; },
   { .code = "TON_FG-HR";                   .why = "no native unit of this dimension is a decade away from QUDT's multiplier (12660670.2)"; },
   { .code = "TON_LONG-PER-YD3";            .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1328.877829)"; },
   { .code = "TON_Register";                .why = "QUDT states no conversionMultiplier for this unit"; },

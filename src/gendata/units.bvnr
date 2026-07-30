@@ -1,5 +1,5 @@
 #!bovnar 1.1
-# units.bvnr — single source of truth for all 192 physical base units.
+# units.bvnr — single source of truth for all 215 physical base units.
 #
 # HOW THIS WORKS
 #   Hand-edited. gen_units.py (at the repo root) regenerates the C unit tables
@@ -2487,6 +2487,367 @@
     .offset  = 0.0;
     .prefix  = default;
     .aliases = ["long_hundredweights", "long_hundredweight", "cwt_l"];
+  },
+
+    # ── The US survey lengths ────────────────────────────────────────────
+    #
+    # bu_survey_foot has been here all along and nothing was built on it, so
+    # every survey length above the foot -- the mile, chain, rod, furlong,
+    # fathom, link, acre -- had to be refused, and UCUM, UDUNITS, OM and QUDT
+    # all define the whole family. Each is an exact rational multiple of
+    # 1200/3937 m, so each states .factor_num/.factor_den rather than a repr.
+    #
+    # The survey foot was withdrawn for new work at the end of 2022, which is a
+    # reason to READ it carefully and not a reason to refuse it: US land records,
+    # state plane coordinates and a century of engineering drawings are written
+    # in these, and the 2 ppm against the international foot is exactly what
+    # makes silently accepting the wrong one a defect.
+  {
+    .id      = <uint:32> 100192;
+    .name    = "survey_inch";
+    .symbol  = "inUS";
+    .factor  = 0.0254000508001016;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 100;
+    .factor_den = <sint:64> 3937;
+    .prefix  = default;
+    .aliases = ["survey_inch", "inUS"];
+  },
+  {
+    .id      = <uint:32> 100193;
+    .name    = "survey_yard";
+    .symbol  = "ydUS";
+    .factor  = 0.9144018288036576;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 3600;
+    .factor_den = <sint:64> 3937;
+    .prefix  = default;
+    .aliases = ["survey_yard", "ydUS"];
+  },
+  {
+    .id      = <uint:32> 100194;
+    .name    = "survey_fathom";
+    .symbol  = "fathUS";
+    .factor  = 1.8288036576073152;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 7200;
+    .factor_den = <sint:64> 3937;
+    .prefix  = default;
+    .aliases = ["survey_fathom", "fathUS"];
+  },
+  {
+    .id      = <uint:32> 100195;
+    .name    = "survey_rod";
+    .symbol  = "rdUS";
+    .factor  = 5.029210058420117;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 19800;
+    .factor_den = <sint:64> 3937;
+    .prefix  = default;
+    .aliases = ["survey_rod", "rdUS"];
+  },
+  {
+    .id      = <uint:32> 100196;
+    .name    = "survey_chain";
+    .symbol  = "chUS";
+    .factor  = 20.116840233680467;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 79200;
+    .factor_den = <sint:64> 3937;
+    .prefix  = default;
+    .aliases = ["survey_chain", "chUS"];
+  },
+  {
+    .id      = <uint:32> 100197;
+    .name    = "survey_link";
+    .symbol  = "lkUS";
+    .factor  = 0.20116840233680466;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 792;
+    .factor_den = <sint:64> 3937;
+    .prefix  = default;
+    .aliases = ["survey_link", "lkUS"];
+  },
+  {
+    .id      = <uint:32> 100198;
+    .name    = "survey_furlong";
+    .symbol  = "furUS";
+    .factor  = 201.16840233680466;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 792000;
+    .factor_den = <sint:64> 3937;
+    .prefix  = default;
+    .aliases = ["survey_furlong", "furUS"];
+  },
+  {
+    .id      = <uint:32> 100199;
+    .name    = "survey_mile";
+    .symbol  = "miUS";
+    .factor  = 1609.3472186944373;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 6336000;
+    .factor_den = <sint:64> 3937;
+    .prefix  = default;
+    .aliases = ["survey_miles", "survey_mile", "miUS"];
+  },
+    # 10 square chains, i.e. 43 560 survey feet squared. 4 ppm from the
+    # international acre -- twice the foot's 2 ppm, an area being a length
+    # squared -- which on a section of land is about ten square metres.
+  {
+    .id      = <uint:32> 100200;
+    .name    = "survey_acre";
+    .symbol  = "acUS";
+    .factor  = 4046.872609874252;
+    .dims    = { .length = 2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 62726400000;
+    .factor_den = <sint:64> 15499969;
+    .prefix  = default;
+    .aliases = ["survey_acres", "survey_acre", "acUS"];
+  },
+    # ── Typographic lengths ──────────────────────────────────────────────
+    #
+    # The DTP point is 1/72 inch exactly and the pica twelve of them; the line
+    # is the twelfth of an inch UCUM builds both on. None of the three is a
+    # terminating decimal in metres, so each states its rational.
+    #
+    # The symbols are not `pt` and `ln`: `pt` is the pint and has been since
+    # before this file, and a length that answered to it would be the same
+    # class of collision as `kt` for the knot. UCUM's own bracketed spellings
+    # -- [pnt], [pca], [lne] -- name them unambiguously, so the symbols follow
+    # those. The PRINTER'S point (0.013837 in) is a different unit and is still
+    # refused.
+  {
+    .id      = <uint:32> 100201;
+    .name    = "point";
+    .symbol  = "pnt";
+    .factor  = 0.00035277777777777776;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 127;
+    .factor_den = <sint:64> 360000;
+    .prefix  = default;
+    .aliases = ["points", "point", "pnt"];
+  },
+  {
+    .id      = <uint:32> 100202;
+    .name    = "pica";
+    .symbol  = "pca";
+    .factor  = 0.004233333333333334;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 127;
+    .factor_den = <sint:64> 30000;
+    .prefix  = default;
+    .aliases = ["picas", "pica", "pca"];
+  },
+  {
+    .id      = <uint:32> 100203;
+    .name    = "line";
+    .symbol  = "lne";
+    .factor  = 0.002116666666666667;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 127;
+    .factor_den = <sint:64> 60000;
+    .prefix  = default;
+    .aliases = ["lines", "line", "lne"];
+  },
+    # ── The US DRY volumes ───────────────────────────────────────────────
+    #
+    # A dry quart is 16 % larger than the liquid quart bu_quart already carries,
+    # and produce is sold in both. The peck and the bushel here have always been
+    # the dry ones; the gallon, quart and pint were only the liquid ones, so a
+    # document that meant dry had no way to say so.
+  {
+    .id      = <uint:32> 100204;
+    .name    = "dry_gallon";
+    .symbol  = "gal_dry";
+    .factor  = 0.00440488377086;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 220244188543;
+    .factor_den = <sint:64> 50000000000000;
+    .prefix  = default;
+    .aliases = ["dry_gallons", "dry_gallon", "gal_dry"];
+  },
+  {
+    .id      = <uint:32> 100205;
+    .name    = "dry_quart";
+    .symbol  = "qt_dry";
+    .factor  = 0.001101220942715;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 220244188543;
+    .factor_den = <sint:64> 200000000000000;
+    .prefix  = default;
+    .aliases = ["dry_quarts", "dry_quart", "qt_dry"];
+  },
+  {
+    .id      = <uint:32> 100206;
+    .name    = "dry_pint";
+    .symbol  = "pt_dry";
+    .factor  = 0.0005506104713575;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 220244188543;
+    .factor_den = <sint:64> 400000000000000;
+    .prefix  = default;
+    .aliases = ["dry_pints", "dry_pint", "pt_dry"];
+  },
+    # 144 cubic inches -- a foot by a foot by an inch. The timber trade's unit,
+    # and the reason 144 is not a decade off anything.
+  {
+    .id      = <uint:32> 100207;
+    .name    = "board_foot";
+    .symbol  = "fbm";
+    .factor  = 0.002359737216;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 18435447;
+    .factor_den = <sint:64> 7812500000;
+    .prefix  = default;
+    .aliases = ["board_feet", "board_foot", "fbm"];
+  },
+    # 128 cubic feet of stacked firewood: 4 ft by 4 ft by 8 ft.
+  {
+    .id      = <uint:32> 100208;
+    .name    = "cord";
+    .symbol  = "cord";
+    .factor  = 3.624556363776;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 884901456;
+    .factor_den = <sint:64> 244140625;
+    .prefix  = default;
+    .aliases = ["cords", "cord"];
+  },
+    # An acre of water a foot deep, on the SURVEY acre and foot -- which is
+    # what UDUNITS, OM and every US water agency mean by it. The international
+    # acre-foot is 1233.48183754752 m^3 and is spelled ac·ft.
+  {
+    .id      = <uint:32> 100209;
+    .name    = "survey_acre_foot";
+    .symbol  = "ac_ft";
+    .factor  = 1233.4892384681489;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 75271680000000;
+    .factor_den = <sint:64> 61023377953;
+    .prefix  = default;
+    .aliases = ["acre_feet", "acre_foot", "ac_ft"];
+  },
+    # One centipoise-centimetre-squared per second-atmosphere: the permeability
+    # unit of petroleum engineering. Exact, because every unit in that
+    # definition is: 1e-3 Pa*s * 1e-4 m^2 / (s * 101325 Pa) = 1e-7/101325 m^2.
+    # It takes prefixes, so the millidarcy every reservoir report is written in
+    # is m~darcy.
+  {
+    .id      = <uint:32> 100210;
+    .name    = "darcy";
+    .symbol  = "darcy";
+    .factor  = 9.869232667160128e-13;
+    .dims    = { .length = 2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 1;
+    .factor_den = <sint:64> 1013250000000;
+    .prefix  = default;
+    .aliases = ["darcies", "darcys", "darcy"];
+  },
+    # 100 000 international-table BTU exactly, the therm European gas billing
+    # uses. Native thm is the US therm (1.054804e8 J), 0.24 % away, and no
+    # prefix reaches 1e5 -- so this needed a unit of its own.
+  {
+    .id      = <uint:32> 100211;
+    .name    = "therm_ec";
+    .symbol  = "thm_ec";
+    .factor  = 105505585.262;
+    .dims    = { .length = 2; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 52752792631;
+    .factor_den = <sint:64> 500;
+    .prefix  = default;
+    .aliases = ["therm_EC", "thm_ec"];
+  },
+    # 12 000 international-table BTU per hour: the rate at which a short ton of
+    # ice melts in a day, and the unit every chiller is still rated in.
+    #
+    # The symbol is NOT the usual "RT", and not "TR" either: R is the ronna
+    # prefix and T the tesla, so "RT" already spells the ronnatesla, and T is
+    # tera and R the roentgen, so "TR" already spells the teraroentgen. Either
+    # would have changed what an existing spelling means, which this file's
+    # header forbids and which gen_units.py now refuses outright.
+  {
+    .id      = <uint:32> 100212;
+    .name    = "refrigeration_ton";
+    .symbol  = "ton_ref";
+    .factor  = 3516.8528420666667;
+    .dims    = { .length = 2; .mass = 1; .time = -3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 52752792631;
+    .factor_den = <sint:64> 15000000;
+    .prefix  = default;
+    .aliases = ["refrigeration_ton", "ton_of_refrigeration", "ton_ref"];
+  },
+    # 0.4462 mmol/m^2, the conventional column density total ozone is reported
+    # in. A 300 DU column is 3 mm of pure ozone at STP, which is where the name
+    # comes from.
+  {
+    .id      = <uint:32> 100213;
+    .name    = "dobson";
+    .symbol  = "DU";
+    .factor  = 0.0004462;
+    .dims    = { .length = -2; .amount = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 2231;
+    .factor_den = <sint:64> 5000000;
+    .prefix  = default;
+    .aliases = ["dobson_units", "dobson_unit", "dobson", "DU"];
+  },
+    # 10 ns, the neutron-generation time of a fission chain. There is no SI
+    # prefix at 1e-8, which is the only reason it needed a row.
+  {
+    .id      = <uint:32> 100214;
+    .name    = "shake";
+    .symbol  = "shake";
+    .factor  = 1e-08;
+    .dims    = { .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 1;
+    .factor_den = <sint:64> 100000000;
+    .prefix  = default;
+    .aliases = ["shakes", "shake"];
   }
 ];
 

@@ -82,18 +82,21 @@
 #
 # SOURCE, VERSION AND LICENSING
 #   Vocabulary  CF standard name table v94, last modified 2026-06-09
-#   Retrieved   2026-07-30 from https://cfconventions.org/Data/
-#               cf-standard-names/94/src/cf-standard-name-table.xml -- the
-#               VERSIONED path, not `current/`, so this row set stays
-#               reproducible after the table moves on
+#   Verified    against that table, retrieved 2026-07-30 from
+#               https://cfconventions.org/Data/cf-standard-names/94/src/
+#               cf-standard-name-table.xml -- the VERSIONED path, not
+#               `current/`, so this row set stays reproducible after the
+#               table moves on
 #   Publisher   maintained on behalf of the CF community by the Centre for
 #               Environmental Data Analysis (CEDA)
 #   Licence     NONE STATED BY THE PUBLISHER. The CF conventions DOCUMENT is
 #               CC0 1.0, but this table is maintained separately, in
 #               cf-convention/vocabularies, which carries no licence file and
 #               no in-band rights statement
-#   Taken       standard names, and the canonical_units each name states. No CF
-#               description text is reproduced anywhere in this repository
+#   Taken       standard names, and the canonical_units each name states --
+#               that field is carried in a trailing comment on every row and IS
+#               the row's target, so it cannot be paraphrased away. No CF
+#               <description> text
 #   Modified    yes -- a subset, each name translated to the unit its own
 #               canonical_units field states
 #

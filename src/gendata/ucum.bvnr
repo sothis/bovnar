@@ -49,14 +49,19 @@
 #
 # SOURCE, VERSION AND LICENSING
 #   Vocabulary  UCUM 2.2, revision date 2024-06-17 (ucum-essence.xml)
-#   Retrieved   2026-07-30 from https://github.com/ucum-org/ucum
+#   Verified    against that publication, retrieved 2026-07-30 from
+#               https://github.com/ucum-org/ucum
 #   Publisher   Regenstrief Institute, Inc. -- Copyright (c) 1999-2024, all
-#               rights reserved. UCUM is a registered trademark of Regenstrief
+#               rights reserved. Section 6 of the licence grants no trademark
+#               permission beyond describing the origin of the Work, and no
+#               endorsement by Regenstrief is claimed or implied
 #   Licence     UCUM Copyright Notice and License v1.1 (June 2024),
 #               https://ucum.org/license
-#   Taken       atom codes, prefix spellings, and the codes named in
-#               .unsupported. No UCUM description, definition or comment is
-#               reproduced anywhere in this repository
+#   Taken       atom codes, prefix spellings, the codes named in .unsupported,
+#               and the conventional NAME of a unit inside a refusal string --
+#               a few of which match UCUM's own <name> field word for word
+#               ("percent of slope"), because that is what the unit is called.
+#               No UCUM definition, value, property or printSymbol text
 #   Modified    yes -- a subset, mapped onto bovnar's native unit registry
 #
 #   READ THIRD_PARTY_NOTICES.md BEFORE REDISTRIBUTING. This is the one

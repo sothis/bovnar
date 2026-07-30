@@ -1,29 +1,54 @@
 # Third-party notices
 
-The unit-profile tables in `src/gendata/` — and the C tables generated from them
-into the library, the amalgamation, the WebAssembly build and the Python wheel —
-carry **identifier strings from six external vocabularies**. Those strings belong
-to their publishers. This file records, for each of them, what was taken, from
-which published version, under which licence, and what remains open.
+This file has two parts. **Part 1** covers the six external unit vocabularies
+whose identifiers are compiled into the library itself. **Part 2** covers the
+third-party components of the website and the build — webfonts, JavaScript
+libraries, imagery, and the toolchain whose output is committed.
 
 The MIT grant in [`LICENSE`](LICENSE) clause 1 covers **this project's own
 contribution**: the native unit registry, the `.bovnar` translation targets, the
 refusal rationales, the generators, and every line of C, Python and CMake around
-them. It does not, and cannot, grant rights in the third-party identifiers. See
-`LICENSE` clause 4.
+them. It does not, and cannot, grant rights in third-party material. See
+`LICENSE` clause 4 for the vocabularies and clause 5 for everything else.
+
+---
+
+# Part 1 — Unit vocabularies
+
+The unit-profile tables in `src/gendata/` — and the C tables generated from them
+into the library, the amalgamation, the WebAssembly build and the Python wheel —
+carry identifier strings from **six external vocabularies**. This part records,
+for each, what was taken, which published version the table is verified against,
+under which licence, and what remains open.
 
 ## What is taken, and what is not
 
-**Taken:** identifier strings only — a UCUM atom code, a QUDT local name, an OM
-local name, a UN/ECE common code, a UDUNITS spelling, a CF standard name — and,
-for CF alone, the `canonical_units` field each name states.
+**Taken:** identifier strings — a UCUM atom code, a QUDT or OM local name, a
+UN/ECE common code, a UDUNITS spelling, a CF standard name. Alongside them, two
+kinds of short upstream-derived text, both stated here rather than glossed over:
 
-**Not taken:** no upstream description, definition, label, comment or annotation
-appears anywhere in this repository. Where a `.bvnr` row carries prose, that
-prose was written here.
+* **The conventional NAME of a unit**, where a row would otherwise be
+  unreadable. A three-letter Rec 20 code is unintelligible without one, so most
+  rows of `unece.bvnr` carry a trailing comment such as `# statute mile` or
+  `# barrel, US petroleum`; the refusal strings in `ucum.bvnr` do the same, and a
+  few of those match UCUM's own `<name>` field word for word (`%[slope]` is
+  "percent of slope" in both). These are short factual designations of physical
+  units, not the expressive content of any publication, and no mapping table can
+  be written or reviewed without them.
+* **CF's `canonical_units` field**, which `cf.bvnr` carries in a trailing comment
+  on every row and translates into that row's target. §17.2 of
+  `doc/11_bovnar_unit_profiles.md` is built on it: it is *what* a `cf:` name
+  translates to, so it cannot be paraphrased away.
 
-**Not redistributed:** no upstream artefact ships with this project. The
-publishers' machine-readable definitions are fetched by
+**Not taken:** no upstream definition, description, annotation, property,
+`printSymbol` or explanatory prose. Where a `.bvnr` row carries reasoning — why a
+code is refused, why a target is the one it is — that reasoning was written here.
+No upstream conversion factor is copied either: every target resolves through
+Bovnar's own registry, which `check_profile_factors.py` then compares against the
+publisher's value rather than importing it.
+
+**Not redistributed:** no upstream artefact ships with this project, and none is
+tracked by git. The publishers' machine-readable definitions are fetched by
 `check_profile_factors.py --fetch` into `build/vocab/`, which is git-ignored,
 used to verify the tables against their sources, and never packaged. A release
 tarball, a wheel, a `.wasm` and the amalgamation contain none of them.
@@ -34,6 +59,12 @@ registry, and omits every code whose value this project cannot state exactly —
 `doc/11_bovnar_unit_profiles.md` §6.4 and §18 record which, and why. Where the
 licence below requires a modification notice, this paragraph is it.
 
+**On "verified against".** Each entry below names the published version the table
+is currently proved against by `check_profile_factors.py`, and the date that
+version was retrieved into the verification cache. It is a statement about what
+the rows demonstrably agree with today — which is the checkable claim, and the
+one that matters for attribution.
+
 ---
 
 ## UCUM — Unified Code for Units of Measure
@@ -41,10 +72,10 @@ licence below requires a modification notice, this paragraph is it.
 | | |
 |---|---|
 | **Used in** | `src/gendata/ucum.bvnr`, the `ucum:` profile |
-| **Version** | UCUM 2.2, revision date 2024-06-17 (`ucum-essence.xml`) |
-| **Retrieved** | 2026-07-30, from <https://github.com/ucum-org/ucum> |
+| **Verified against** | UCUM 2.2, revision date 2024-06-17 (`ucum-essence.xml`), retrieved 2026-07-30 |
+| **Source** | <https://github.com/ucum-org/ucum> |
 | **Home** | <https://ucum.org/> |
-| **Extracted** | atom codes, prefix spellings, and the codes named in the refusal list |
+| **Extracted** | atom codes, prefix spellings, the codes named in the refusal list, and the conventional name of a unit in a refusal string |
 
 > Copyright ©1999-2024, Regenstrief Institute, Inc. All rights reserved.
 >
@@ -55,7 +86,11 @@ licence below requires a modification notice, this paragraph is it.
 > THE WORK IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
 > ANY KIND, either express or implied.
 >
-> UCUM is a registered trademark of the Regenstrief Institute, Inc.
+> Section 6 of that licence grants no permission to use the Licensor's trade
+> names, trademarks, service marks or product names, beyond reasonable and
+> customary use in describing the origin of the Work. Nothing here is such a
+> use, and no affiliation with or endorsement by Regenstrief Institute is
+> claimed or implied.
 
 **Status: permission has not yet been obtained, and this is the one entry here
 that needs it.** The UCUM licence is revocable, and its §3(a) conditions the
@@ -93,8 +128,8 @@ profile can be excluded from any build with `-DBVNR_WITH_UCUM_PROFILE=OFF`
 | | |
 |---|---|
 | **Used in** | `src/gendata/qudt.bvnr`, `src/gendata/qudt-qk.bvnr`, `src/gendata/unece.bvnr` |
-| **Version** | QUDT 3.1.0 (`owl:versionIRI <http://qudt.org/3.1.0/vocab/unit>`) |
-| **Retrieved** | 2026-07-30, from <https://qudt.org/3.1.0/vocab/unit> and <https://qudt.org/3.1.0/vocab/quantitykind> |
+| **Verified against** | QUDT 3.1.0 (`owl:versionIRI <http://qudt.org/3.1.0/vocab/unit>`), retrieved 2026-07-30 |
+| **Source** | <https://qudt.org/3.1.0/vocab/unit> and <https://qudt.org/3.1.0/vocab/quantitykind> |
 | **Home** | <https://qudt.org/> |
 | **Extracted** | unit local names, quantity-kind local names, and the `qudt:uneceCommonCode` cross-reference |
 
@@ -120,8 +155,8 @@ imposes nothing on this project's own MIT-licensed code.
 | | |
 |---|---|
 | **Used in** | `src/gendata/om.bvnr`, the `om:` profile |
-| **Version** | OM 2.0 (`om-2.0.rdf`) |
-| **Retrieved** | 2026-07-30, from <https://github.com/HajoRijgersberg/OM> |
+| **Verified against** | OM 2.0 (`om-2.0.rdf`), retrieved 2026-07-30 |
+| **Source** | <https://github.com/HajoRijgersberg/OM> |
 | **Home** | <http://www.ontology-of-units-of-measure.org/> |
 | **Extracted** | unit local names, and the unit compositions (prefix/base, numerator/denominator, term/term, base/exponent) from which each translation target was derived |
 
@@ -146,8 +181,8 @@ licenses it expressly, so the extraction is covered.
 | | |
 |---|---|
 | **Used in** | `src/gendata/udunits.bvnr` (the `udunits:` profile), and `src/gendata/cf.bvnr` indirectly — CF states its `canonical_units` in UDUNITS syntax |
-| **Version** | `master` branch (`udunits2-base.xml`, `-derived.xml`, `-accepted.xml`, `-common.xml`) |
-| **Retrieved** | 2026-07-30, from <https://github.com/Unidata/UDUNITS-2> |
+| **Verified against** | `master` branch (`udunits2-base.xml`, `-derived.xml`, `-accepted.xml`, `-common.xml`), retrieved 2026-07-30 |
+| **Source** | <https://github.com/Unidata/UDUNITS-2> |
 | **Home** | <https://www.unidata.ucar.edu/software/udunits/> |
 | **Extracted** | unit symbols, singular and plural spellings, and prefix spellings |
 
@@ -197,8 +232,8 @@ Clause 3 is why nothing in this project claims Unidata's or UCAR's endorsement.
 | | |
 |---|---|
 | **Used in** | `src/gendata/cf.bvnr`, the `cf:` profile |
-| **Version** | CF standard name table v94, last modified 2026-06-09 |
-| **Retrieved** | 2026-07-30, from <https://cfconventions.org/Data/cf-standard-names/94/src/cf-standard-name-table.xml> |
+| **Verified against** | CF standard name table v94, last modified 2026-06-09, retrieved 2026-07-30 |
+| **Source** | <https://cfconventions.org/Data/cf-standard-names/94/src/cf-standard-name-table.xml> |
 | **Home** | <https://cfconventions.org/> |
 | **Extracted** | standard names, and the `canonical_units` each name states |
 
@@ -231,21 +266,29 @@ from any build with `-DBVNR_WITH_CF_PROFILE=OFF`.
 | | |
 |---|---|
 | **Used in** | `src/gendata/unece.bvnr`, the `unece:` profile |
-| **Version** | Recommendation No. 20, *Codes for Units of Measure Used in International Trade*, and Recommendation No. 21, *Codes for Passengers, Types of Cargo, Packages and Packaging Materials* |
-| **Reached via** | QUDT 3.1.0's `qudt:uneceCommonCode` cross-reference — see below |
+| **Vocabulary** | Recommendation No. 20, *Codes for Units of Measure Used in International Trade*, and Recommendation No. 21, *Codes for Passengers, Types of Cargo, Packages and Packaging Materials* |
+| **Verified against** | QUDT 3.1.0's `qudt:uneceCommonCode` cross-reference — see below |
 | **Home** | <https://unece.org/trade/uncefact/cl-recommendations> |
-| **Extracted** | UN/ECE common codes |
+| **Extracted** | UN/ECE common codes, and the conventional name of a unit in a trailing comment on most rows |
 
 > Contains UN/ECE common codes from UN/CEFACT Recommendations 20 and 21,
 > published by the United Nations Economic Commission for Europe. Neither UNECE
 > nor UN/CEFACT endorses this project or its use of the codes.
 
-**No UNECE artefact was read.** Recommendation 20 states its conversion factors
-in prose, so there is no machine-readable publication to resolve against; every
-code in `unece.bvnr` was reached through QUDT's published `uneceCommonCode`
-cross-reference, and is verified against it (`check_profile_factors.py`, class
-`Unece`). The extraction is therefore from QUDT, under CC BY 4.0 as recorded
-above; what is UNECE's here is the codes themselves.
+**Verified at one remove, through QUDT.** Recommendation 20 states its conversion
+factors in prose, so there is no machine-readable publication to resolve against.
+Every row of `unece.bvnr` is therefore proved against QUDT's published
+`uneceCommonCode` cross-reference rather than against a UNECE artefact
+(`check_profile_factors.py`, class `Unece`), and that cross-reference — not this
+project's reading of a code list — is what decided the table's contents when it
+was closed: `git log src/gendata/unece.bvnr` records rows being retargeted, and
+others left out, on the strength of QUDT's label for the unit carrying the code.
+
+Nothing in this repository reads or ships a UNECE publication; `check_profile_factors.py`
+lists no UNECE source, and no UNECE file is tracked by git. What this project
+cannot state is where each code was *first* encountered by its author over the
+months the table was written by hand, which is why nothing here claims a UNECE
+document was never consulted. What is UNECE's in the result is the codes.
 
 **Status: formally unresolved, practically low risk.** The generic United
 Nations website terms permit only personal, non-commercial download, without a
@@ -279,6 +322,119 @@ neither raising the questions above:
 
 ---
 
+# Part 2 — Website and build components
+
+The vocabularies above are the material this project *reasoned* about. They are
+not the only third-party material it ships. The repository also tracks, and
+<https://www.bovnar.io> also serves, several components that came from other
+people — two webfonts, two JavaScript libraries, two NASA images — and the
+committed WebAssembly artifact is the output of a third-party toolchain.
+
+None of these raises a question of the kind Part 1 does: every licence here is a
+plain permissive one. Each does carry a notice obligation, and this part is that
+notice.
+
+## Webfonts — IBM Plex Sans, JetBrains Mono
+
+| | |
+|---|---|
+| **Files** | `web/fonts/ibm-plex-sans-*.woff2`, `web/fonts/jetbrains-mono-*.woff2` |
+| **Licence** | SIL Open Font License, Version 1.1 (both) |
+
+> Copyright © 2017 IBM Corp. with Reserved Font Name "Plex" —
+> <https://github.com/IBM/plex>
+>
+> Copyright 2020 The JetBrains Mono Project Authors —
+> <https://github.com/JetBrains/JetBrainsMono>
+
+The OFL requires that **every copy of the Font Software carry the copyright
+notice and the licence**, and a browser downloading a `.woff2` from the site is
+receiving a copy. That is why [`web/fonts/OFL.txt`](web/fonts/OFL.txt) exists
+and is uploaded with the rest of `web/`: a link from a CSS comment would not
+have satisfied it.
+
+Both files are **subsets** (latin, greek) of the upstream variable fonts,
+generated from the Google Fonts css2 API and rehosted so the site has no
+`fonts.googleapis`/`gstatic` dependency. Subsetting makes them Modified Versions
+under OFL §2; neither Reserved Font Name is changed, and neither font is sold on
+its own.
+
+## highlight.js 11.9.0
+
+| | |
+|---|---|
+| **File** | `web/highlight-11.9.0.min.js` |
+| **Licence** | BSD 3-Clause — <https://github.com/highlightjs/highlight.js/blob/main/LICENSE> |
+
+> Copyright (c) 2006, Ivan Sagalaev. Highlight.js v11.9.0 (git: f47103d4f1),
+> licensed under BSD-3-Clause.
+
+The minified file retains its own `/*! … */` banner, which is what carries the
+notice to anyone who fetches it — but that banner reads "(c) 2006-2023 undefined
+and other contributors", an upstream build slip that names no copyright holder
+at all. The line quoted above is the one from the project's own `LICENSE`, which
+is why this entry states it rather than repeating the banner. Neither the
+copyright holder's nor the contributors' names are used to endorse this project.
+
+## marked 9.1.6
+
+| | |
+|---|---|
+| **File** | `web/marked-9.1.6.min.js` |
+| **Licence** | MIT — <https://github.com/markedjs/marked/blob/master/LICENSE.md> |
+
+> marked v9.1.6 — a markdown parser. Copyright (c) 2011-2023, Christopher
+> Jeffrey. (MIT Licensed) — <https://github.com/markedjs/marked>
+
+The minified file retains the copyright line but not the full MIT permission
+text, which the licence asks to accompany substantial portions. The upstream
+`LICENSE.md` linked above is that text, and this entry is the pointer to it.
+
+## Earth imagery — NASA
+
+| | |
+|---|---|
+| **Files** | `web/earth.jpg` (Blue Marble, cloud-free, equirectangular), `web/earth_night.jpg` (Black Marble night lights) |
+| **Status** | Not subject to copyright in the United States |
+
+> Images courtesy of NASA. NASA does not endorse this project.
+
+NASA media are generally not copyrighted and may be reused, including
+commercially, with NASA credited as the source. Credit is the whole of the
+obligation, and it is given here and — because a comment in a source file is not
+a credit anyone reading the site can see — publicly, in the *Bildnachweis*
+section of <https://www.bovnar.io/impressum.html>.
+
+## Emscripten
+
+| | |
+|---|---|
+| **Affects** | `web/bovnar_wasm_core.js`, `dist/wasm/bovnar*.mjs` and the committed `.wasm` — all `emcc` output (`wasm/build_wasm.sh`) |
+| **Licence** | dual MIT / University of Illinois NCSA — <https://github.com/emscripten-core/emscripten/blob/main/LICENSE> |
+
+> Portions of the generated JavaScript glue are Emscripten runtime code,
+> copyright the Emscripten authors. Emscripten is dual-licensed under the MIT
+> licence and the University of Illinois/NCSA Open Source License; it is used
+> here under the MIT option.
+
+The C that Emscripten compiles is this project's own; what is Emscripten's is
+the loader and runtime shims it emits around it. Its licence expressly permits
+distributing that output, and asks for the notice this entry gives.
+
+## Not third-party, despite appearances
+
+* `web/bovnar_highlight.js`, `web/bovnar_wasm.js`, `web/bovnar_parser_wasm.js`
+  and the editor definitions under `highlighter/` carry no third-party notice
+  and are, on everything the repository records, original work here.
+* `dist/linguist/languages.yml.fragment` and `dist/mime/*` are written *for*
+  those projects rather than extracted from them: a fragment to be contributed
+  upstream, not a copy of anything upstream holds.
+* Development-time dependencies that are never redistributed — `pint`, `numpy`,
+  `markdown`, `emsdk`, CMake, the compilers — are outside the scope of this
+  file, which covers only what this project actually ships.
+
+---
+
 ## Keeping this file true
 
 * Each `src/gendata/*.bvnr` profile file repeats its own provenance block in its
@@ -289,3 +445,10 @@ neither raising the questions above:
   the provenance recorded here unreproducible.
 * Bumping a vocabulary to a new upstream version means updating the version and
   retrieval date here and in the `.bvnr` header in the same commit.
+* Adding a third-party file to `web/` — a font, a library, an image — means an
+  entry in Part 2 in the same commit, and, where the licence requires the text
+  itself to travel with the file, a licence file served beside it.
+* Every claim in this file is meant to be checkable from the repository. Where
+  something is not — where it would depend on how the author worked rather than
+  on what the tree contains — this file says so instead of asserting it. The
+  UN/ECE entry is the worked example.

@@ -4504,13 +4504,21 @@ at all is the integrator's, which is the right place for it.</p>
 <p>Seven profiles carry identifier strings from <strong>six external vocabularies</strong>, and those strings are
 not this project's to license. The tables map them onto Bovnar's own registry; the mapping, the
 targets and the refusal rationales are original work here, and the identifiers are not.</p>
-<p>What is taken is identifiers <em>only</em> — a UCUM atom code, a QUDT or OM local name, a UN/ECE common
-code, a UDUNITS spelling, a CF standard name — plus, for <code>cf:</code> alone, the <code>canonical_units</code> field
-each name states, because §17.2 is built on it. No upstream description, definition, label or
-comment appears anywhere in the repository: where a row carries prose, that prose was written here.
-And no upstream artefact is redistributed at all. §9.5's factor proof fetches the publishers' own
-machine-readable definitions into a git-ignored build directory, verifies the tables against them,
-and packages none of them.</p>
+<p>What is taken is <strong>identifiers</strong> — a UCUM atom code, a QUDT or OM local name, a UN/ECE common code,
+a UDUNITS spelling, a CF standard name — and two kinds of short text beside them, both worth naming
+rather than glossing over. The first is the <strong>conventional name of a unit</strong>, where a row would
+otherwise be unreadable: a three-letter Rec 20 code is unintelligible without one, so most rows of
+<code>unece.bvnr</code> carry <code># statute mile</code> or <code># US petroleum barrel</code>, the refusal strings in <code>ucum.bvnr</code>
+do the same, and a few of those match UCUM's own <code>&lt;name&gt;</code> field word for word — <code>%[slope]</code> is
+"percent of slope" in both, because that is what the unit is called. The second is CF's
+<code>canonical_units</code>, which <code>cf.bvnr</code> carries on every row and translates into that row's target,
+because §17.2 is built on it and it cannot be paraphrased away.</p>
+<p>What is <em>not</em> taken is any upstream definition, description, annotation, property or explanatory
+prose — nor any upstream conversion factor, since every target resolves through the native registry
+and §9.5 then compares that against the publisher's value rather than importing it. Where a row
+carries reasoning, that reasoning was written here. And no upstream artefact is redistributed at
+all: §9.5's factor proof fetches the publishers' own machine-readable definitions into a git-ignored
+build directory, verifies the tables against them, and packages none of them.</p>
 <table>
 <thead>
 <tr>
@@ -4554,15 +4562,18 @@ and packages none of them.</p>
 <tr>
 <td><code>unece:</code></td>
 <td>UN/CEFACT Rec 20 and 21</td>
-<td>reached via QUDT's <code>uneceCommonCode</code></td>
-<td>UN/CEFACT IPR Policy; the extraction itself is CC BY 4.0 from QUDT</td>
+<td>verified via QUDT's <code>uneceCommonCode</code></td>
+<td>UN/CEFACT IPR Policy; what is verified against QUDT is CC BY 4.0</td>
 </tr>
 </tbody>
 </table>
 <p>The full notices — copyright lines, licence URIs, the BSD text verbatim, and the modification
 statement CC BY 4.0 requires — live in <code>THIRD_PARTY_NOTICES.md</code> at the root of the distribution,
 and each <code>src/gendata/*.bvnr</code> file repeats its own block in its header so that the version and the
-licence travel with the data rather than only with the notices file.</p>
+licence travel with the data rather than only with the notices file. That file has a second part,
+outside the scope of this document, covering the third-party components of the website and the
+build — the webfonts, the two JavaScript libraries, the NASA earth textures, and the toolchain whose
+output is committed.</p>
 <h3 id="182-every-table-is-an-adaptation-and-says-so">18.2 Every table is an adaptation, and says so</h3>
 <p>No table here reproduces a vocabulary, and none could: §3.1's three outcomes mean a code whose value
 Bovnar cannot state exactly is refused rather than approximated, so every table is a subset by

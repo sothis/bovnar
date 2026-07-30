@@ -43,13 +43,15 @@
 #
 # SOURCE, VERSION AND LICENSING
 #   Vocabulary  QUDT 3.1.0 (owl:versionIRI http://qudt.org/3.1.0/vocab/unit)
-#   Retrieved   2026-07-30 from https://qudt.org/3.1.0/vocab/unit
+#   Verified    against that publication, retrieved 2026-07-30 from
+#               https://qudt.org/3.1.0/vocab/unit
 #   Publisher   QUDT.org
 #   Licence     Creative Commons Attribution 4.0 International (CC BY 4.0),
 #               https://creativecommons.org/licenses/by/4.0/ -- attribution is
 #               made to QUDT.org, which does not endorse this project
-#   Taken       unit local names. No QUDT label, description or annotation is
-#               reproduced anywhere in this repository
+#   Taken       unit local names, and on a handful of rows a one-line note
+#               written HERE. No QUDT label, description, annotation or
+#               multiplier text
 #   Modified    yes -- a subset, mapped onto bovnar's native unit registry
 #
 #   The attribution CC BY 4.0 requires lives in THIRD_PARTY_NOTICES.md, in full.

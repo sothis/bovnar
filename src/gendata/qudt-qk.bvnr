@@ -52,15 +52,16 @@
 # SOURCE, VERSION AND LICENSING
 #   Vocabulary  QUDT 3.1.0 quantity kinds
 #               (owl:versionIRI http://qudt.org/3.1.0/vocab/quantitykind)
-#   Retrieved   2026-07-30 from https://qudt.org/3.1.0/vocab/quantitykind, with
-#               the coherent unit of each kind taken from QUDT's own
-#               applicableUnit list in https://qudt.org/3.1.0/vocab/unit
+#   Verified    against that publication, retrieved 2026-07-30 from
+#               https://qudt.org/3.1.0/vocab/quantitykind, with the coherent
+#               unit of each kind taken from QUDT's own applicableUnit list in
+#               https://qudt.org/3.1.0/vocab/unit
 #   Publisher   QUDT.org
 #   Licence     Creative Commons Attribution 4.0 International (CC BY 4.0),
 #               https://creativecommons.org/licenses/by/4.0/ -- attribution is
 #               made to QUDT.org, which does not endorse this project
 #   Taken       quantity-kind local names. No QUDT label, description or
-#               annotation is reproduced anywhere in this repository
+#               annotation text
 #   Modified    yes -- a subset, each kind mapped to its coherent SI unit in
 #               bovnar's native registry
 #

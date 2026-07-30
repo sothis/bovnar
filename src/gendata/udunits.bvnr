@@ -54,15 +54,15 @@
 # SOURCE, VERSION AND LICENSING
 #   Vocabulary  UDUNITS-2, master branch: udunits2-base.xml, -derived.xml,
 #               -accepted.xml, -common.xml
-#   Retrieved   2026-07-30 from https://github.com/Unidata/UDUNITS-2
+#   Verified    against those files, retrieved 2026-07-30 from
+#               https://github.com/Unidata/UDUNITS-2
 #   Publisher   Copyright 2025 University Corporation for Atmospheric Research
 #               and contributors, developed by the Unidata Program Center
 #   Licence     BSD 3-clause with a patent-termination clause; reproduced in
 #               full in THIRD_PARTY_NOTICES.md, which its clauses 1 and 2
 #               REQUIRE to accompany every source and binary redistribution
 #   Taken       unit symbols, singular and plural spellings, prefix spellings.
-#               No UDUNITS definition text is reproduced anywhere in this
-#               repository
+#               No UDUNITS definition or <definition> text
 #   Modified    yes -- a subset, mapped onto bovnar's native unit registry
 #
 #   Clause 3 is why nothing here claims Unidata's or UCAR's endorsement.

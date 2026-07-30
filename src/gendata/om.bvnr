@@ -72,7 +72,8 @@
 #
 # SOURCE, VERSION AND LICENSING
 #   Vocabulary  OM 2.0 (om-2.0.rdf)
-#   Retrieved   2026-07-30 from https://github.com/HajoRijgersberg/OM
+#   Verified    against that publication, retrieved 2026-07-30 from
+#               https://github.com/HajoRijgersberg/OM
 #   Publisher   (c) 2005-2025 Hajo Rijgersberg, Don Willems, Jan Top,
 #               Wageningen University and Research Centre, The Netherlands
 #   Licence     Creative Commons Attribution 4.0 International (CC BY 4.0),
@@ -80,8 +81,8 @@
 #               not endorse this project
 #   Taken       unit local names, and the compositions (prefix/base,
 #               numerator/denominator, term/term, base/exponent) each target
-#               above was derived from. No OM label, description or annotation
-#               is reproduced anywhere in this repository
+#               above was derived from. No OM label, description, annotation or
+#               factor text
 #   Modified    yes -- a subset, mapped onto bovnar's native unit registry
 #
 #   OM is published by an EEA maker, so the EU database right applies alongside

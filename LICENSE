@@ -24,8 +24,8 @@ SOFTWARE.
 
 This project contains multiple components that are distributed under separate
 licenses.  Unless otherwise specified in a file’s header, the following rules
-apply.  Clauses 1 to 3 are subject to clause 4, which governs material this
-project did not author and cannot license.
+apply.  Clauses 1 to 3 are subject to clauses 4 and 5, which govern material
+this project did not author and cannot license.
 
 1. Source Code
    All source code files (including but not limited to C, Python, CMake, and
@@ -69,3 +69,13 @@ project did not author and cannot license.
    No upstream artefact is redistributed by this project.  The publishers' own
    machine‑readable definitions are fetched only into a git‑ignored build
    directory, where they serve to verify the tables, and are never packaged.
+
+5. Other Third‑Party Components
+   The website and the build ship further material this project did not author:
+   the webfonts under web/fonts/ (SIL Open Font License 1.1 — the licence text
+   is served beside them, in web/fonts/OFL.txt, because that licence requires it
+   to accompany every copy), the two vendored JavaScript libraries under web/
+   (highlight.js, BSD‑3‑Clause; marked, MIT), the NASA earth imagery, and the
+   Emscripten runtime code inside the committed WebAssembly artifacts.  Each is
+   permissively licensed and each is recorded, with its notice, in Part 2 of
+   THIRD_PARTY_NOTICES.md.  Clauses 1 to 3 do not extend to any of it.

@@ -52,8 +52,10 @@
 #               permit only personal, non-commercial use, which is plainly not
 #               aimed at a code list published to be implemented -- the
 #               operative instrument is the UN/CEFACT IPR Policy
-#   Taken       UN/ECE common codes. No Rec 20 name or description text is
-#               reproduced anywhere in this repository
+#   Taken       UN/ECE common codes, and the conventional NAME of the unit in
+#               a trailing comment on most rows -- a three-letter code is
+#               unreadable without one, and unreviewable too. No Rec 20
+#               definition, conversion or explanatory text
 #   Modified    yes -- a subset, mapped onto bovnar's native unit registry
 #
 #   THIRD_PARTY_NOTICES.md carries the attribution and records the request for

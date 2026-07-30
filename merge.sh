@@ -4,7 +4,8 @@
 #
 #   bovnar.zip                  the tree as it is, comments intact
 #   bovnar-nocomments.zip       the same tree with the comments stripped out of
-#                               its C, Python, CMake and HTML sources
+#                               every language in it: C, Bovnar, Python, CMake,
+#                               HTML, XML, JavaScript, CSS and Markdown
 #   bvnr_src.txt … bvnr_py_src_exmpl_doc_web.txt
 #                               cumulative concatenated text dumps
 #                               (C → +python → +examples → +doc → +web)
@@ -18,14 +19,18 @@
 #
 # Comment stripping
 # -----------------
-# Two tools, because no one scanner knows all four languages:
+# Two tools, because no one scanner knows nine languages:
 #
 #   strip_comments.sh       C sources and headers (ISO C99 translation phase 3,
 #                           so a /* inside a string literal is left alone)
-#   strip_lang_comments.py  Python, CMake and HTML, each scanned with something
-#                           that knows its literals -- `#` occurs inside CMake
-#                           quoted arguments in this repository's own CTest
-#                           registry, and `<!--` occurs inside <script>.
+#   strip_lang_comments.py  everything else, each language scanned with
+#                           something that knows its literals. That is not
+#                           pedantry: `#` appears inside CMake quoted arguments
+#                           in this repository's own CTest registry, `<!--`
+#                           inside a <script> on the landing page, `//` inside
+#                           strings and regexes in the vendored highlighter, and
+#                           a Bovnar octet stream carries arbitrary bytes --
+#                           `#`, LF, NUL -- in length-prefixed chunks.
 #
 # Everything happens in a throwaway staging copy, so the tree is never modified
 # and the clean-tree guard strip.sh needs does not apply here.
@@ -34,18 +39,20 @@
 # a stripper removes it, and the MIT licence requires the notice to be retained.
 # strip.sh applies that rule to C by capturing the block and putting it back;
 # the same dance is done below for C, while strip_lang_comments.py does it
-# internally for the other three (along with keeping a `#!` shebang, a PEP 263
-# coding cookie and IE conditional comments, which are interface rather than
-# documentation).
+# internally for the rest -- along with a vendored /*! @license */ banner, a
+# `#!` shebang, a PEP 263 coding cookie, IE conditional comments, the
+# `<!-- bovnar:retired-path -->` markers three doc checkers read, and the first
+# comment of a Bovnar document, which is the only place `#!bovnar 1.1` can be.
 #
 # Nothing here is taken on trust. strip_lang_comments.py refuses to write a file
-# whose Python syntax tree, CMake token stream or HTML parse events changed, and
-# a build of the stripped tree is the check for C -- see the "Verifying" section
-# at the bottom of this file.
+# whose syntax tree, token stream, canonical XML or parse events changed, and a
+# build of the stripped tree is the check for C -- see the "Verifying" section at
+# the bottom of this file.
 #
-# Markdown, TOML, JSON, XML and .bvnr comments are NOT stripped, and neither are
-# JavaScript or CSS comments inside an HTML <script>/<style>: each would need
-# its own scanner, and the four that are handled are where the bulk sits.
+# NOT stripped: JSON and TOML (pyproject.toml keeps its comments), plain text,
+# *.min.js (no comments beyond the licence banner, and minified regex-versus-
+# division is a real risk for no gain), and JavaScript or CSS comments that sit
+# inside an HTML <script>/<style> element rather than in a .js/.css file.
 #
 # Hardening:
 #   set -e          abort on the first failing command (e.g. an unreadable file)
@@ -94,8 +101,7 @@ while (($#)); do
         -h|--help)
             sed -n '/^# usage:/{s/^# //;p;q}' "$0"
             printf '  -s, --strip   build the text dumps from the comment-free\n'
-            printf '                C, Python, CMake and HTML sources\n'
-            printf '                (both zips are written either way)\n'
+            printf '                sources (both zips are written either way)\n'
             exit 0 ;;
         *)
             printf 'merge.sh: unknown option: %s (try --help)\n' "$1" >&2
@@ -211,15 +217,20 @@ for i in "${!CFILES[@]}"; do
     mv -- "${CFILES[$i]}.hdr$$" "${CFILES[$i]}"
 done
 
-# Python, CMake and HTML.  strip_lang_comments.py keeps the SPDX block itself
-# and verifies each file against its own parser before writing it, so a file it
-# cannot prove unchanged fails the run rather than shipping mangled.
+# Everything else.  strip_lang_comments.py keeps the SPDX block itself and
+# verifies each file against its own parser before writing it, so a file it
+# cannot prove unchanged fails the run rather than shipping mangled.  It decides
+# per file what it can handle, so passing it a *.min.js (which it declines) or a
+# .cmake.in costs nothing.
 mapfile -d '' -t LFILES < <(
     find "$STAGE" -type f \( -iname '*.py' -o -iname '*.cmake' \
         -o -iname '*.cmake.in' -o -iname 'CMakeLists*.txt' \
-        -o -iname '*.html' -o -iname '*.htm' \) -print0)
+        -o -iname '*.html' -o -iname '*.htm' -o -iname '*.bvnr' \
+        -o -iname '*.xml' -o -iname '*.js' -o -iname '*.mjs' \
+        -o -iname '*.cjs' -o -iname '*.css' \
+        -o -iname '*.md' \) -print0)
 ((${#LFILES[@]})) || {
-    printf 'merge.sh: no Python/CMake/HTML sources staged\n' >&2
+    printf 'merge.sh: no non-C sources staged\n' >&2
     exit 1
 }
 python3 ./strip_lang_comments.py -i "${LFILES[@]}"
@@ -260,6 +271,7 @@ dump_files() {
             # in a dump that claims to have none, so it stops the run instead.
             case "$f" in
                 *.c|*.h|*.C|*.H|*.py|*.cmake|*.cmake.in|*.html|*.htm \
+                |*.bvnr|*.xml|*.js|*.mjs|*.cjs|*.css|*.md \
                 |CMakeLists*.txt|*/CMakeLists*.txt)
                     printf 'merge.sh: %s is not in the staging copy\n' "$f" >&2
                     exit 1 ;;
@@ -295,18 +307,18 @@ expand_files CMakeLists.txt CMakeLists_tests.txt cmake \
 
 printf 'merged -> %s\n' "$OUT"
 printf '  zips  : bovnar.zip (comments intact)\n'
-printf '          bovnar-nocomments.zip (%d C, %d Python/CMake/HTML file(s) stripped)\n' \
+printf '          bovnar-nocomments.zip (%d C, %d other file(s) through the strippers)\n' \
        "${#CFILES[@]}" "${#LFILES[@]}"
 printf '  dumps : bvnr_*%s.txt (%s)\n' "$SUF" \
        "$( ((STRIP)) && echo 'comments stripped' || echo 'comments intact')"
 printf '  git-ignored paths left out of the zips: %s\n' "$IGNORED_COUNT"
 
 # ---------------------------------------------------------------- verifying --
-# strip_lang_comments.py proves its own three languages -- a file whose Python
-# syntax tree, CMake token stream or HTML parse events changed is refused rather
-# than written -- but nothing above proves the C strip, and nothing proves the
-# result still builds. The check for that is to build both zips and compare, and
-# it is worth redoing after any change to the stripping step:
+# strip_lang_comments.py proves each of its own eight languages -- a file whose
+# syntax tree, token stream, canonical XML or parse events changed is refused
+# rather than written -- but nothing above proves the C strip, and nothing proves
+# the result still builds. The check for that is to build both zips and compare,
+# and it is worth redoing after any change to the stripping step:
 #
 #   out=$PWD/build/merged
 #   for z in bovnar bovnar-nocomments; do
@@ -316,17 +328,48 @@ printf '  git-ignored paths left out of the zips: %s\n' "$IGNORED_COUNT"
 #           && ctest --test-dir build -j4 )
 #   done
 #
-# Both trees must register the same number of tests and reach the same verdict on
-# every one of them, with two known differences:
+# Both trees must register the same number of tests (159 + 15 example documents
+# at the time of writing) and build clean, and every test must reach the same
+# verdict in both -- except for the five below, which are the complete expected
+# difference. Each one asserts something ABOUT comments or about a hash of a file
+# whose comments were removed; none of them means the code stopped working, and
+# the whole point of running both trees is that a SIXTH difference would.
 #
-#   bvnr_wasm_freshness  fails in the stripped tree, and has to. It hashes the
-#       library sources and compares against the stamp wasm/build_wasm.sh
-#       recorded, so a tree whose sources differ by as little as a comment is
-#       correctly reported as not the one the committed module was built from.
-#       Rewriting the stamp to match would be a lie about provenance; the
-#       stripped zip is a copy to read, not one to ship a playground from.
-#   bvnr_html_docs  fails in BOTH trees, for a reason that has nothing to do
-#       with stripping: gen_html_docs.py stamps each page with its git commit
-#       date and falls back to file mtimes when there is no history (see
-#       shallow_clone() there), and an unzipped tree has no .git. It passes in
-#       the repository itself.
+#   bvnr_py_all, bvnr_py_pure_all  fail on one case of 2533:
+#       test_units_example_derived_count_matches_its_own_header reads the comment
+#       "(N named SI-derived units)" out of examples/units.bvnr and counts the
+#       keys beneath it. Its subject is a comment, so a comment-free tree cannot
+#       satisfy it by construction.
+#   bvnr_wasm_freshness  hashes the library sources and compares against the
+#       stamp wasm/build_wasm.sh recorded, so a tree whose sources differ by as
+#       little as a comment is correctly reported as not the one the committed
+#       module was built from. Rewriting the stamp to match would be a lie about
+#       provenance; this zip is a copy to read, not one to ship a playground from.
+#   bvnr_cache_stamps, bvnr_font_stamps  the ?v= cache-busting stamps in
+#       web/index.html ARE content hashes of the .js and .css they label, so
+#       stripping those files necessarily moves them. The page still loads -- a
+#       stamp is a cache-busting hint, not a load requirement -- and re-deriving
+#       the stamps here would mean reimplementing three generators
+#       (build_wasm.sh, gen_font_stamps.py, gen_html_docs.py) inside a bundling
+#       script. If a green run matters more than comment-free web assets, drop
+#       -iname '*.js'/'*.mjs'/'*.css' from the staging find above.
+#   bvnr_html_docs  fails in BOTH trees for a reason unrelated to stripping:
+#       gen_html_docs.py stamps each page with its git commit date and falls back
+#       to file mtimes when there is no history (see shallow_clone() there), and
+#       an unzipped tree has no .git. It passes in the repository itself. In the
+#       stripped tree it also lists web/docs/index.html, which carries the
+#       ?v= stamp of docs.css -- the same cause as bvnr_cache_stamps.
+#
+# Two checks worth running when the Bovnar or Markdown scanners change, because
+# no ctest gate covers exactly what they do:
+#
+#   * every .bvnr file through the CLI, before and after. Copy the two files to
+#     paths of EQUAL length first: `bovnar events` derives its column width from
+#     the path, so a longer name alone changes where the output wraps.
+#         for c in events validate pretty-print "pretty-print --canonical"; do
+#             build/bovnar $c a.bvnr; build/bovnar $c b.bvnr; done
+#     All 32 documents in the tree, the 226 KB octet-stream example included,
+#     produce byte-identical output for all four.
+#   * `python3 gen_html_docs.py` in both trees, then diff web/docs/ with the
+#     dates and ?v= stamps normalised. All 14 pages must come out identical,
+#     which is what proves the Markdown strip changed nothing the generator sees.

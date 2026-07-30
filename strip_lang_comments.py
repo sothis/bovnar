@@ -1,61 +1,89 @@
 #!/usr/bin/env python3
-"""strip_lang_comments.py -- strip comments from Python, CMake and HTML files.
+"""strip_lang_comments.py -- strip comments from everything but C.
 
-The companion to strip_comments.sh, which does the same for C99. merge.sh runs
-both over a throwaway staging copy of the tree to build the comment-free half of
-the bundle; neither tool is meant to be pointed at the working tree.
+C is strip_comments.sh's job. This handles the other eight languages in the
+tree: Bovnar, Python, CMake, HTML, XML, JavaScript, CSS and Markdown. merge.sh
+runs both tools over a throwaway staging copy to build the comment-free half of
+the bundle; neither is meant to be pointed at the working tree.
 
 Why not a regex per language
 ----------------------------
-Every one of these three formats has a way to write the comment marker without
-starting a comment, and this repository uses all three:
+Every one of these formats has a way to write the comment marker without
+starting a comment, and this repository uses most of them:
 
     CMake   string(REGEX MATCHALL "# Subtest: [a-z_]+" _groups "${_tap}")
-            "#!bovnar 1.1\\n"                     -- a hash inside a quoted
-            [[literal #hash]]                        argument or a bracket
-                                                     argument is data
-    Python  sep = "#"                             -- and a hash inside any
-                                                     string literal
-    HTML    <script>if (a<!--b) ...</script>      -- script and style content is
+            "#!bovnar 1.1\\n"                     -- a hash inside a quoted or a
+            [[literal #hash]]                        bracket argument is data
+    Python  sep = "#"                             -- and inside any string
+    Bovnar  .k = "a#b";  and an octet stream, whose length-prefixed chunks
+            carry arbitrary bytes: '#', LF, NUL, anything
+    HTML    <script>if (a<!--b) ...</script>      -- script/style content is
                                                      raw text, not markup
+    XML     <a b="<!--">, <![CDATA[ <!-- ]]>
+    JS      url = "http://x"; re = /[/*]/;        -- 19 of the '//' in the
+                                                     vendored highlighter are
+                                                     of this kind
+    CSS     content: "/*";
+    MD      a fenced block containing <!-- -->    -- literal example text
 
-A line-oriented `s/#.*//` corrupts the CTest registry in exactly that first way,
-so each language is scanned with something that knows its literals: Python's own
-`tokenize`, `html.parser` (which implements the HTML5 raw-text rules), and for
-CMake a scanner for the four argument forms in cmake-language(7).
+So each language is scanned with something that knows its literals: Python's
+own `tokenize`, `html.parser` (which implements the HTML5 raw-text rules), and
+hand-written scanners for the rest, each following that language's spec --
+cmake-language(7), doc/12_bovnar.ebnf, CommonMark's fence rules.
 
 Verification
 ------------
-Stripping is only allowed to remove comments, so every file is checked before it
-is written, and a file that fails its check is left alone and reported:
+Stripping may only remove comments, so every file is checked before it is
+written, and one that fails is left alone and reported rather than shipped:
 
-    Python  ast.dump(ast.parse(...)) must be identical before and after, which
-            makes the two files the same program by construction
-    CMake   the token stream (arguments, parens, nesting) minus comments must be
-            identical
-    HTML    the parse event stream -- tags, attributes, text with insignificant
-            whitespace collapsed, exact text inside <pre>/<textarea> -- must be
-            identical
+    Python  ast.dump(ast.parse(...)) identical before and after, which makes
+            the two files the same program by construction
+    XML     ElementTree canonicalisation identical (comments are not part of
+            it, so equality proves nothing else moved)
+    Bovnar  identical token stream, identical line count, and every octet
+            stream byte-identical
+    CMake   identical token stream (arguments, parens, nesting)
+    JS      identical token stream, plus `node --check` in the same dialect
+            (script or module) the original passed in, where node exists
+    CSS     identical token stream
+    HTML    identical parse events -- tags, attributes, text with
+            insignificant whitespace collapsed, exact text inside <pre>
+    MD      identical block structure: fences, headings and the code inside
+            fenced/indented blocks byte-for-byte
+
+A file whose ORIGINAL cannot be verified (XML that does not parse, JS that node
+rejects) is skipped with a warning and counted, not stripped: unverifiable is a
+reason to leave a file alone, never a reason to fail the bundle. A file whose
+STRIPPED form fails verification is a hard error.
 
 What is kept
 ------------
 Comments that are not documentation but interface:
 
-    * an SPDX/copyright header block, in any of the three languages -- the MIT
-      licence requires the notice to be retained (same rule strip.sh applies to
-      C)
-    * a `#!` shebang on line 1, and a PEP 263 `# -*- coding: ... -*-` cookie on
-      line 1 or 2: Python reads both
-    * IE conditional comments (`<!--[if ...]> ... <![endif]-->`), which are
-      markup wearing a comment's clothes
+    * an SPDX/copyright header block, in every language that has one -- the MIT
+      licence requires the notice to be retained (the rule strip.sh applies to
+      C), and a vendored /*! ... @license ... */ banner is the same obligation
+      wearing a minifier's convention
+    * the FIRST comment of a Bovnar document, always. `#!bovnar 1.1` is a
+      version directive only as the very first comment (doc/12_bovnar.ebnf), so
+      dropping an ordinary comment ahead of one would PROMOTE it and change the
+      spec version the document targets -- and the leading comment is also where
+      the BOM rules apply
+    * `<!-- bovnar:... -->` markers in Markdown and HTML: check_doc_layout.py,
+      check_doc_refs.py and gen_html_docs.py read bovnar:retired-path out of
+      them, so they are configuration that happens to look like a comment
+    * a `#!` shebang on line 1 and a PEP 263 coding cookie on line 1 or 2:
+      Python reads both
+    * IE conditional comments, which are markup in a comment's clothing
 
 Lint, typing and coverage pragmas (`# noqa`, `# type:`, `# pragma: no cover`)
 are NOT kept. They address tools that never run against this bundle, and the
 verification above proves they do not change the program.
 
-Formats outside the three named are left untouched, deliberately: TOML, JSON,
-Markdown, XML and .bvnr comments are not stripped, and neither are JavaScript or
-CSS comments inside an HTML <script>/<style> element.
+Left alone deliberately: `*.min.js`, which has no comments beyond the licence
+banner that must be retained anyway, and where a tokenizer would be taking a
+real risk with regex-versus-division in minified code for no gain. JSON has no
+comments to strip.
 
 Usage
 -----
@@ -65,7 +93,7 @@ Usage
     strip_lang_comments.py -v ...               name each file on stderr
 
 Exit status
-    0   every file handled (a file of an unknown type is a no-op)
+    0   every file handled (an unknown or skipped type is a no-op)
     1   usage error
     3   one or more files failed; the rest were still processed
 """
@@ -74,8 +102,12 @@ import ast
 import io
 import os
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 import tokenize
+import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
 
 PROG = os.path.basename(sys.argv[0])
@@ -83,12 +115,29 @@ PROG = os.path.basename(sys.argv[0])
 # How much of the line a cut may take with it.
 DROP = "drop"     # the comment, the whitespace it leaves at end of line, and
                   # the whole line if the comment was all that was on it
-EXACT = "exact"   # the comment span and not one byte more -- for a comment
-                  # inside <pre>, where the surrounding whitespace is content
+KEEP = "keep"     # trim what the comment leaves behind but never delete the
+                  # line -- for Bovnar, where a deleted line moves every
+                  # diagnostic after it, and Markdown, where a blank line is
+                  # a block separator and trailing spaces are a <br>
+EXACT = "exact"   # the comment span and not one byte more -- inside <pre>, and
+                  # in XML, where the whitespace around it is text
+NL = "nl"         # replace the span with one newline: a multi-line comment is
+                  # a line terminator for JavaScript's semicolon insertion, so
+                  # closing it up could change what the program means
+
+# Comments that carry a licence are kept whatever else goes.
+LICENCE = re.compile(r"SPDX-License-Identifier|Copyright|\(c\)\s*\d{4}"
+                     r"|@license|@preserve|\bLicen[cs]e:", re.I)
+# Comments that are configuration read by the doc tooling.
+DIRECTIVE = re.compile(r"bovnar:[a-z-]+", re.I)
 
 
 class StripError(Exception):
     """A file could not be stripped, or could not be proven unchanged."""
+
+
+class Unverifiable(Exception):
+    """The original could not be checked, so it is left untouched."""
 
 
 # --------------------------------------------------------------------------
@@ -97,13 +146,21 @@ class StripError(Exception):
 
 def apply_cuts(src, cuts):
     """Remove (start, end, mode) spans from src, working backwards."""
+    nl = b"\n" if isinstance(src, bytes) else "\n"
     text = src
     for start, end, mode in sorted(cuts, key=lambda c: c[0], reverse=True):
-        line_start = text.rfind("\n", 0, start) + 1
-        line_end = text.find("\n", end)
+        line_start = text.rfind(nl, 0, start) + 1
+        line_end = text.find(nl, end)
         if line_end == -1:
             line_end = len(text)
         before, after = text[line_start:start], text[end:line_end]
+        if mode == EXACT:
+            text = text[:start] + text[end:]
+            continue
+        if mode == NL:
+            text = text[:line_start] + before.rstrip() + nl + after \
+                + text[line_end:]
+            continue
         if mode == DROP and not before.strip() and not after.strip():
             # The comment was the whole line: take the newline with it, rather
             # than leaving a blank line behind for every comment removed.
@@ -111,7 +168,7 @@ def apply_cuts(src, cuts):
             text = text[:line_start] + text[tail:]
             continue
         line = before + after
-        if mode != EXACT and not after.strip():
+        if not after.strip():
             line = line.rstrip()
         text = text[:line_start] + line + text[line_end:]
     return text
@@ -178,7 +235,7 @@ def verify_python(old, new):
     try:
         before = ast.dump(ast.parse(old))
     except SyntaxError as exc:
-        raise StripError("does not parse as Python before stripping: %s" % exc)
+        raise Unverifiable("does not parse as Python: %s" % exc)
     try:
         after = ast.dump(ast.parse(new))
     except SyntaxError as exc:
@@ -197,9 +254,10 @@ def scan_cmake(src):
     """Split CMake source into (kind, start, end) spans.
 
     kind is 'comment', 'arg' (a quoted or bracket argument, or a run of
-    unquoted argument text), 'punct' for ( and ), or 'space'.  cmake-language(7):
-    a # begins a comment unless it is escaped, inside a quoted argument or
-    inside a bracket argument, and #[[ ]] is a bracket comment.
+    unquoted argument text), 'punct' for ( and ), or 'space'.  Per
+    cmake-language(7) a # begins a comment unless it is escaped, inside a
+    quoted argument or inside a bracket argument, and #[[ ]] is a bracket
+    comment.
     """
     spans = []
     i, n = 0, len(src)
@@ -282,7 +340,10 @@ def cmake_tokens(src):
 
 
 def strip_cmake(src):
-    spans = scan_cmake(src)
+    try:
+        spans = scan_cmake(src)
+    except StripError as exc:
+        raise Unverifiable("cannot scan as CMake: %s" % exc)
     lines = src.splitlines(keepends=True)
     keep_rows = spdx_header_rows(lines, lambda l: l.lstrip().startswith("#"))
 
@@ -291,7 +352,7 @@ def strip_cmake(src):
         if kind != "comment":
             continue
         row = src.count("\n", 0, start) + 1
-        if row in keep_rows:
+        if row in keep_rows or LICENCE.search(src[start:end]):
             continue
         cuts.append((start, end, DROP))
     out = apply_cuts(src, cuts)
@@ -302,6 +363,560 @@ def strip_cmake(src):
 def verify_cmake(old, new):
     if cmake_tokens(old) != cmake_tokens(new):
         raise StripError("stripping changed the CMake token stream")
+
+
+# --------------------------------------------------------------------------
+# Bovnar
+#
+# doc/12_bovnar.ebnf:
+#   comment      = "#" , {comment-char} , ("\x0D" | "\x0A" | eof)
+#   string-literal = '"' , {string-char} , '"'   (backslash escapes)
+#   octet-stream = 0x00 { 0x01 uint16le data } 0x00   (0x0000 = 65536 bytes)
+# A NUL where a value is expected switches to binary chunk mode, and those
+# chunks carry arbitrary bytes -- so the scanner has to follow the framing
+# rather than look for a delimiter. Everything here is bytes, not str: a
+# document with an octet stream is not text and need not be valid UTF-8.
+
+
+def scan_bvnr(src):
+    """Split a Bovnar document into (kind, start, end) spans.
+
+    kind is 'comment', 'string', 'binary' (a whole octet stream) or 'data'.
+    """
+    spans = []
+    i, n = 0, len(src)
+    while i < n:
+        c = src[i]
+        if c == 0x23:                                   # '#'
+            j = i
+            while j < n and src[j] not in (0x0A, 0x0D):
+                j += 1
+            spans.append(("comment", i, j))
+            i = j
+        elif c == 0x22:                                 # '"'
+            j = i + 1
+            while j < n:
+                if src[j] == 0x5C:                      # backslash
+                    j += 2
+                    continue
+                if src[j] == 0x22:
+                    j += 1
+                    break
+                j += 1
+            else:
+                raise StripError("unterminated string at offset %d" % i)
+            spans.append(("string", i, j))
+            i = j
+        elif c == 0x00:                                 # octet stream
+            j = i + 1
+            while True:
+                if j >= n:
+                    raise StripError("EOF inside an octet stream at offset %d"
+                                     % i)
+                tag = src[j]
+                if tag == 0x00:                         # end-of-stream marker
+                    j += 1
+                    break
+                if tag != 0x01:
+                    raise StripError(
+                        "octet stream out of sync at offset %d (tag 0x%02x)"
+                        % (j, tag))
+                if j + 3 > n:
+                    raise StripError("truncated chunk length at offset %d" % j)
+                length = src[j + 1] | (src[j + 2] << 8)
+                if length == 0:
+                    length = 65536                      # 0x0000 encodes 65536
+                j += 3 + length
+                if j > n:
+                    raise StripError("chunk runs past EOF at offset %d" % i)
+            spans.append(("binary", i, j))
+            i = j
+        else:
+            j = i
+            while j < n and src[j] not in (0x23, 0x22, 0x00):
+                j += 1
+            spans.append(("data", i, j))
+            i = j
+    return spans
+
+
+def bvnr_tokens(src):
+    """Everything the parser looks at, and the octet streams on their own.
+
+    Data runs are split on whitespace so that two runs left adjacent by a
+    removed comment still compare equal token for token -- while a comment
+    removal that ran two tokens together would not.
+    """
+    toks, binaries = [], []
+    for kind, start, end in scan_bvnr(src):
+        chunk = src[start:end]
+        if kind == "comment":
+            continue
+        if kind == "data":
+            toks.extend(chunk.split())
+        else:
+            toks.append(chunk)
+            if kind == "binary":
+                binaries.append(chunk)
+    return toks, binaries
+
+
+def strip_bvnr(src):
+    try:
+        spans = scan_bvnr(src)
+    except StripError as exc:
+        raise Unverifiable("cannot scan as Bovnar: %s" % exc)
+    cuts, first = [], True
+    for kind, start, end in spans:
+        if kind != "comment":
+            continue
+        if first:
+            # The version directive is the very first comment or nothing, and
+            # removing an ordinary comment ahead of one would promote it.
+            first = False
+            continue
+        if LICENCE.search(src[start:end].decode("utf-8", "replace")):
+            continue
+        # KEEP, not DROP: a deleted line renumbers every diagnostic below it,
+        # and this tree's conformance corpus is the thing those diagnostics are
+        # measured against.
+        cuts.append((start, end, KEEP))
+    out = apply_cuts(src, cuts)
+    verify_bvnr(src, out)
+    return out
+
+
+def verify_bvnr(old, new):
+    old_toks, old_bin = bvnr_tokens(old)
+    try:
+        new_toks, new_bin = bvnr_tokens(new)
+    except StripError as exc:
+        raise StripError("stripping produced an unscannable document: %s" % exc)
+    if old_toks != new_toks:
+        raise StripError("stripping changed the Bovnar token stream")
+    if old_bin != new_bin:
+        raise StripError("stripping changed an octet stream")
+    if old.count(b"\n") != new.count(b"\n"):
+        raise StripError("stripping changed the line count")
+
+
+# --------------------------------------------------------------------------
+# XML
+
+
+def scan_xml_comments(src):
+    """Comment spans in an XML document, skipping CDATA, PIs and tag text."""
+    spans = []
+    i, n = 0, len(src)
+    while i < n:
+        c = src[i]
+        if c == "<":
+            if src.startswith("<!--", i):
+                end = src.find("-->", i)
+                if end == -1:
+                    raise StripError("unterminated comment at offset %d" % i)
+                spans.append((i, end + 3))
+                i = end + 3
+                continue
+            if src.startswith("<![CDATA[", i):
+                end = src.find("]]>", i)
+                if end == -1:
+                    raise StripError("unterminated CDATA at offset %d" % i)
+                i = end + 3
+                continue
+            if src.startswith("<?", i):
+                end = src.find("?>", i)
+                i = n if end == -1 else end + 2
+                continue
+            # A tag or a declaration: skip it, honouring quoted attribute
+            # values, so a "<!--" inside one is not mistaken for a comment.
+            j, quote = i + 1, None
+            while j < n:
+                if quote:
+                    if src[j] == quote:
+                        quote = None
+                elif src[j] in "\"'":
+                    quote = src[j]
+                elif src[j] == ">":
+                    j += 1
+                    break
+                j += 1
+            i = j
+        else:
+            i += 1
+    return spans
+
+
+def strip_xml(src):
+    try:
+        before = ET.canonicalize(src)
+    except (ET.ParseError, ValueError) as exc:
+        raise Unverifiable("does not parse as XML: %s" % exc)
+    try:
+        comments = scan_xml_comments(src)
+    except StripError as exc:
+        raise Unverifiable("cannot scan as XML: %s" % exc)
+
+    cuts = []
+    for start, end in comments:
+        body = src[start + 4:end - 3]
+        if LICENCE.search(body) or DIRECTIVE.search(body):
+            continue
+        # EXACT: the whitespace around an XML comment is text, and xml2rfc
+        # renders <artwork> verbatim.
+        cuts.append((start, end, EXACT))
+    out = apply_cuts(src, cuts)
+    try:
+        after = ET.canonicalize(out)
+    except ET.ParseError as exc:
+        raise StripError("stripping produced invalid XML: %s" % exc)
+    if before != after:
+        raise StripError("stripping changed the XML canonical form")
+    return out
+
+
+# --------------------------------------------------------------------------
+# JavaScript
+#
+# The hard part is that '/' is division or the start of a regular expression
+# depending on what came before it, and a regex body can contain '//' or '/*'.
+# The rule below is the usual one: a regex may start only where an expression
+# may start.
+
+JS_REGEX_OK_AFTER = {
+    "return", "typeof", "instanceof", "in", "of", "new", "delete", "void",
+    "throw", "case", "do", "else", "yield", "await",
+}
+JS_ID = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*")
+JS_NUM = re.compile(r"(?:0[xXbBoO])?[0-9][0-9a-fA-F_.eExXpP+-]*n?")
+JS_WS = "\t\n\v\f\r \u00a0\u2028\u2029\ufeff"   # ECMA-262 white space
+                                              # and line terminators
+
+
+def scan_js(src):
+    """Split JavaScript into (kind, start, end) spans.
+
+    kind is 'comment', 'space' or 'tok' (anything the parser looks at:
+    identifiers, numbers, strings, template literals, regexes, punctuation).
+    """
+    spans = []
+    i, n = 0, len(src)
+    prev = None            # the last 'tok' text, for the regex/division call
+    while i < n:
+        c = src[i]
+        if c in JS_WS:
+            j = i
+            while j < n and src[j] in JS_WS:
+                j += 1
+            spans.append(("space", i, j))
+            i = j
+        elif src.startswith("//", i):
+            j = src.find("\n", i)
+            j = n if j == -1 else j
+            spans.append(("comment", i, j))
+            i = j
+        elif src.startswith("/*", i):
+            j = src.find("*/", i + 2)
+            if j == -1:
+                raise StripError("unterminated block comment at offset %d" % i)
+            spans.append(("comment", i, j + 2))
+            i = j + 2
+        elif c in "'\"":
+            j = i + 1
+            while j < n:
+                if src[j] == "\\":
+                    j += 2
+                    continue
+                if src[j] == c:
+                    j += 1
+                    break
+                if src[j] == "\n":
+                    raise StripError("unterminated string at offset %d" % i)
+                j += 1
+            else:
+                raise StripError("unterminated string at offset %d" % i)
+            spans.append(("tok", i, j))
+            prev = src[i:j]
+            i = j
+        elif c == "`":
+            j, depth = i + 1, 0
+            while j < n:
+                if src[j] == "\\":
+                    j += 2
+                    continue
+                if depth == 0 and src.startswith("${", j):
+                    depth = 1
+                    j += 2
+                    continue
+                if depth and src[j] == "}":
+                    depth = 0
+                    j += 1
+                    continue
+                if depth == 0 and src[j] == "`":
+                    j += 1
+                    break
+                j += 1
+            else:
+                raise StripError("unterminated template at offset %d" % i)
+            spans.append(("tok", i, j))
+            prev = "`"
+            i = j
+        elif c == "/" and js_regex_allowed(prev):
+            j, in_class = i + 1, False
+            while j < n:
+                if src[j] == "\\":
+                    j += 2
+                    continue
+                if src[j] == "[":
+                    in_class = True
+                elif src[j] == "]":
+                    in_class = False
+                elif src[j] == "/" and not in_class:
+                    j += 1
+                    while j < n and src[j].isalpha():   # flags
+                        j += 1
+                    break
+                elif src[j] == "\n":
+                    raise StripError("unterminated regex at offset %d" % i)
+                j += 1
+            else:
+                raise StripError("unterminated regex at offset %d" % i)
+            spans.append(("tok", i, j))
+            prev = "/re/"
+            i = j
+        else:
+            m = JS_ID.match(src, i) or JS_NUM.match(src, i)
+            j = m.end() if m else i + 1
+            spans.append(("tok", i, j))
+            prev = src[i:j]
+            i = j
+    return spans
+
+
+def js_regex_allowed(prev):
+    """Could a '/' here start a regex rather than be a division sign?"""
+    if prev is None:
+        return True
+    if prev in JS_REGEX_OK_AFTER:
+        return True
+    if JS_ID.fullmatch(prev) or JS_NUM.fullmatch(prev):
+        return False                        # an identifier or number: division
+    if prev in (")", "]", "}", "`", "/re/") or prev[:1] in "'\"":
+        return False                        # end of an expression: division
+    return True                             # an operator or punctuation
+
+
+def js_tokens(src):
+    return [src[s:e] for kind, s, e in scan_js(src) if kind == "tok"]
+
+
+def strip_js(src):
+    try:
+        spans = scan_js(src)
+    except StripError as exc:
+        raise Unverifiable("cannot scan as JavaScript: %s" % exc)
+    dialect = js_dialect(src)               # raises Unverifiable if node says
+                                            # the original is already broken
+    cuts = []
+    for kind, start, end in spans:
+        if kind != "comment":
+            continue
+        body = src[start:end]
+        if body.startswith("/*!") or LICENCE.search(body):
+            continue
+        # A multi-line comment is a line terminator for automatic semicolon
+        # insertion, so it collapses to a newline rather than to nothing.
+        cuts.append((start, end, NL if "\n" in body else DROP))
+    out = apply_cuts(src, cuts)
+    if js_tokens(src) != js_tokens(out):
+        raise StripError("stripping changed the JavaScript token stream")
+    if dialect and not node_check(out, dialect):
+        raise StripError("stripping produced JavaScript node rejects")
+    return out
+
+
+def js_dialect(src):
+    """'js', 'mjs' or None: how node parses this file, if node is here."""
+    if not shutil.which("node"):
+        return None
+    for suffix in ("js", "mjs"):
+        if node_check(src, suffix):
+            return suffix
+    raise Unverifiable("node rejects the file as both script and module")
+
+
+def node_check(src, suffix):
+    with tempfile.NamedTemporaryFile("w", suffix="." + suffix,
+                                     encoding="utf-8", delete=False) as fh:
+        fh.write(src)
+        tmp = fh.name
+    try:
+        return subprocess.run(["node", "--check", tmp],
+                              stdout=subprocess.DEVNULL,
+                              stderr=subprocess.DEVNULL).returncode == 0
+    finally:
+        os.unlink(tmp)
+
+
+# --------------------------------------------------------------------------
+# CSS
+
+
+def scan_css(src):
+    """Split CSS into (kind, start, end) spans: 'comment', 'space' or 'tok'."""
+    spans = []
+    i, n = 0, len(src)
+    while i < n:
+        c = src[i]
+        if c in " \t\r\n\f":
+            j = i
+            while j < n and src[j] in " \t\r\n\f":
+                j += 1
+            spans.append(("space", i, j))
+            i = j
+        elif src.startswith("/*", i):
+            j = src.find("*/", i + 2)
+            if j == -1:
+                raise StripError("unterminated comment at offset %d" % i)
+            spans.append(("comment", i, j + 2))
+            i = j + 2
+        elif c in "'\"":
+            j = i + 1
+            while j < n:
+                if src[j] == "\\":
+                    j += 2
+                    continue
+                if src[j] == c:
+                    j += 1
+                    break
+                j += 1
+            else:
+                raise StripError("unterminated string at offset %d" % i)
+            spans.append(("tok", i, j))
+            i = j
+        else:
+            j = i
+            while j < n and src[j] not in " \t\r\n\f'\"" \
+                    and not src.startswith("/*", j):
+                j += 1
+            spans.append(("tok", i, max(j, i + 1)))
+            i = max(j, i + 1)
+    return spans
+
+
+def css_tokens(src):
+    return [src[s:e] for kind, s, e in scan_css(src) if kind == "tok"]
+
+
+def strip_css(src):
+    try:
+        spans = scan_css(src)
+    except StripError as exc:
+        raise Unverifiable("cannot scan as CSS: %s" % exc)
+    cuts = []
+    for kind, start, end in spans:
+        if kind != "comment":
+            continue
+        body = src[start:end]
+        if body.startswith("/*!") or LICENCE.search(body):
+            continue
+        cuts.append((start, end, NL if "\n" in body else DROP))
+    out = apply_cuts(src, cuts)
+    if css_tokens(src) != css_tokens(out):
+        raise StripError("stripping changed the CSS token stream")
+    return out
+
+
+# --------------------------------------------------------------------------
+# Markdown
+
+FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+
+
+def md_code_lines(src):
+    """The 1-based rows of every fenced or indented code line.
+
+    A <!-- --> inside a fence is example text, not a comment; doc/ shows HTML
+    and Bovnar in fences throughout.  A fence closes only on the same character
+    repeated at least as many times as it was opened (CommonMark), so a ``` line
+    inside a ~~~~ block does not end it.
+    """
+    rows, fence, prev_blank, indented = set(), None, True, False
+    for n, line in enumerate(src.splitlines(), 1):
+        stripped = line.strip()
+        if fence:
+            rows.add(n)
+            if stripped and set(stripped) == {fence[0]} \
+                    and len(stripped) >= len(fence):
+                fence = None
+            continue
+        m = FENCE.match(line)
+        if m:
+            fence = m.group(1)
+            rows.add(n)
+            prev_blank = False
+            continue
+        is_indented = line.startswith("    ") or line.startswith("\t")
+        if indented:
+            # An indented block runs on through every indented line and any
+            # blank line between them, not just the first line -- marking only
+            # the first left a <!-- --> two lines into a block strippable.
+            if is_indented and stripped:
+                rows.add(n)
+                continue
+            if not stripped:
+                continue
+            indented = False
+        elif prev_blank and is_indented and stripped:
+            indented = True
+            rows.add(n)
+            continue
+        prev_blank = not stripped
+    return rows
+
+
+def md_structure(src):
+    """Fences, headings and the exact text of every code line."""
+    code = md_code_lines(src)
+    lines = src.splitlines()
+    return (
+        [l for n, l in enumerate(lines, 1) if n in code],
+        [l for n, l in enumerate(lines, 1)
+         if n not in code and re.match(r"^ {0,3}#{1,6} ", l)],
+        len(lines),
+    )
+
+
+def strip_markdown(src):
+    code = md_code_lines(src)
+    cuts = []
+    i = 0
+    while True:
+        start = src.find("<!--", i)
+        if start == -1:
+            break
+        end = src.find("-->", start)
+        if end == -1:
+            break
+        end += 3
+        i = end
+        row = src.count("\n", 0, start) + 1
+        if row in code:
+            continue                        # inside a code block: example text
+        body = src[start + 4:end - 3]
+        if LICENCE.search(body) or DIRECTIVE.search(body):
+            continue
+        line_start = src.rfind("\n", 0, start) + 1
+        line_end = src.find("\n", start)
+        if "`" in src[line_start:line_end if line_end != -1 else len(src)]:
+            continue                        # possibly an inline code span
+        # KEEP: an HTML block is a block separator, so the line stays (blank);
+        # and trailing whitespace has to go, because two spaces are a <br>.
+        cuts.append((start, end, KEEP))
+    out = apply_cuts(src, cuts)
+    if md_structure(src) != md_structure(out):
+        raise StripError("stripping changed the Markdown block structure")
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -358,13 +973,13 @@ def strip_html(src):
         loc.feed(src)
         loc.close()
     except Exception as exc:                  # html.parser is tolerant, but
-        raise StripError("not parsable as HTML: %s" % exc)
+        raise Unverifiable("does not parse as HTML: %s" % exc)
 
     cuts = []
     for start, end, in_raw, data in loc.comments:
         if CONDITIONAL.match(data):
             continue                          # downlevel-revealed markup
-        if "SPDX-License-Identifier" in data or "Copyright" in data:
+        if LICENCE.search(data) or DIRECTIVE.search(data):
             continue
         cuts.append((start, end, EXACT if in_raw else DROP))
     out = apply_cuts(src, cuts)
@@ -457,18 +1072,34 @@ def verify_html(old, new):
 # --------------------------------------------------------------------------
 # dispatch
 
+# suffix (or exact name) -> (stripper, binary?)
+BY_SUFFIX = [
+    (".py", strip_python, False),
+    (".cmake", strip_cmake, False),
+    (".cmake.in", strip_cmake, False),
+    (".bvnr", strip_bvnr, True),
+    (".xml", strip_xml, False),
+    (".min.js", None, False),           # skipped: see the module docstring
+    (".js", strip_js, False),
+    (".mjs", strip_js, False),           # .mjs matters: wasm/index.mjs is the
+    (".cjs", strip_js, False),           # source web/bovnar_wasm.js must match,
+                                         # and a ctest gate compares the two
+    (".css", strip_css, False),
+    (".md", strip_markdown, False),
+    (".html", strip_html, False),
+    (".htm", strip_html, False),
+]
+
+
 def stripper_for(path):
-    name = os.path.basename(path)
-    lower = name.lower()
-    if lower.endswith(".py"):
-        return strip_python
-    # CMakeLists.txt, and this repo's second registry CMakeLists_tests.txt.
-    if lower.endswith((".cmake", ".cmake.in")) \
-            or re.match(r"^cmakelists.*\.txt$", lower):
-        return strip_cmake
-    if lower.endswith((".html", ".htm")):
-        return strip_html
-    return None
+    """(function, binary) for a path, (None, False) if nothing handles it."""
+    lower = os.path.basename(path).lower()
+    if re.match(r"^cmakelists.*\.txt$", lower):
+        return strip_cmake, False
+    for suffix, func, binary in BY_SUFFIX:
+        if lower.endswith(suffix):
+            return func, binary
+    return None, False
 
 
 def main(argv):
@@ -498,24 +1129,33 @@ def main(argv):
                          "use -i or -c\n" % (PROG, len(files)))
         return 1
 
-    failed = 0
+    failed = skipped = 0
     for path in files:
-        strip = stripper_for(path)
+        strip, binary = stripper_for(path)
         if strip is None:
             if verbose:
-                sys.stderr.write("%s: skipped (unknown type)\n" % path)
+                sys.stderr.write("%s: not handled\n" % path)
             continue
         if verbose:
             sys.stderr.write("%s\n" % path)
         try:
-            with open(path, "r", encoding="utf-8") as fh:
-                src = fh.read()
+            if binary:
+                with open(path, "rb") as fh:
+                    src = fh.read()
+            else:
+                with open(path, "r", encoding="utf-8") as fh:
+                    src = fh.read()
         except (OSError, UnicodeDecodeError) as exc:
             sys.stderr.write("%s: error: %s: %s\n" % (PROG, path, exc))
             failed += 1
             continue
         try:
             out = strip(src)
+        except Unverifiable as exc:
+            sys.stderr.write("%s: left alone, cannot verify: %s: %s\n"
+                             % (PROG, path, exc))
+            skipped += 1
+            continue
         except StripError as exc:
             sys.stderr.write("%s: error: %s: %s\n" % (PROG, path, exc))
             failed += 1
@@ -525,11 +1165,21 @@ def main(argv):
         if in_place:
             if out != src:
                 tmp = path + ".strip.tmp"
-                with open(tmp, "w", encoding="utf-8") as fh:
-                    fh.write(out)
+                if binary:
+                    with open(tmp, "wb") as fh:
+                        fh.write(out)
+                else:
+                    with open(tmp, "w", encoding="utf-8") as fh:
+                        fh.write(out)
                 os.replace(tmp, path)
         else:
-            sys.stdout.write(out)
+            if binary:
+                sys.stdout.buffer.write(out)
+            else:
+                sys.stdout.write(out)
+    if skipped:
+        sys.stderr.write("%s: %d file(s) left alone as unverifiable\n"
+                         % (PROG, skipped))
     return 3 if failed else 0
 
 

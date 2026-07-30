@@ -881,7 +881,7 @@ reaches every decade: `g` alone spells the microgram `ug`. A flat profile has no
 *(base, decade)* and a base contributes as many rows as it has codes. Keying a flat profile by base
 alone would leave whichever code happened to be shortest and make every other decade unwritable.
 
-It remains **partial by construction**, and in two different ways:
+It remains **partial by construction**, and in three different ways:
 
 - *No table is complete.* A native unit outside a transliteration table has nowhere to go — the Old
   German units, the water-hardness degrees, the turbidity kinds, `PSU`, `CF`, `mph`, `kph`, `rpm`,
@@ -889,6 +889,12 @@ It remains **partial by construction**, and in two different ways:
 - *A flat profile can only write a single component.* A flat code names a whole unit, so there is no
   way to compose one out of parts: `unece:MSK` reads back as `m/s²`, but a native `m/s²` has no
   UNECE spelling this function can construct. The expression profiles have no such limit.
+- *The dimensionless unit is spellable only in an expression profile.* `1` is a bare integer factor
+  of 10⁰ in that grammar, so `ucum:1` and `udunits:1` read back as the dimensionless unit. A flat
+  vocabulary has no integer-factor production, and the two that do own a unity code refuse it on
+  purpose — QUDT's `UNITLESS` and `NUM` and OM's `one` are all `.unsupported`, reading *"the absence
+  of a unit — write no unit at all"*. So the five flat namespaces refuse it, `cf` included, which is
+  read-only anyway (§17.3).
 
 | Native | `ucum` | `unece` | `qudt` | `udunits` |
 |---|---|---|---|---|
@@ -897,6 +903,7 @@ It remains **partial by construction**, and in two different ways:
 | `m/s` | `m.s-1` | — | — | `m.s-1` |
 | `Mi~B` | — | — | `MebiBYTE` | — |
 | `mph` | — | — | — | — |
+| *(dimensionless)* | `1` | — | — | `1` |
 
 The asymmetry is worth stating plainly: these profiles are good *readers* and partial *writers*. A
 round trip that starts in a vocabulary returns to it; one that starts in Bovnar's native registry

@@ -613,6 +613,83 @@ static void test_written_codes_read_back(void)
 	}
 }
 
+/*
+ * The DIMENSIONLESS unit, which the sweep above cannot reach.
+ *
+ * That sweep walks the native registry, so every unit it builds has exactly one
+ * component and the empty unit is never constructed -- which is how the writer
+ * came to answer "1" for all seven namespaces when only two can read it back.
+ *
+ * The contract is per-vocabulary and is asserted as such rather than as "if it
+ * writes, it reads back", because the interesting half is the REFUSAL. "1" is a
+ * production of the expression grammar (a bare integer factor of 10^0), so ucum
+ * and udunits round-trip it. The five flat vocabularies have no integer-factor
+ * production and no "1" code; two of them go further and refuse their own unity
+ * code on purpose -- QUDT's UNITLESS and NUM and OM's "one" are all in
+ * .unsupported reading "the absence of a unit -- write no unit at all". CF is
+ * unwritable outright and generates no reverse table. Writing "1" into any of
+ * the five contradicted all of that and produced error_unit_illegal on the way
+ * back in.
+ */
+static void test_the_dimensionless_unit_writes_only_where_it_reads(void)
+{
+	static const struct { const char* ns; bool writable; } NS[] = {
+		{ "ucum",    true  },   /* expression grammar: "1" is an integer factor */
+		{ "udunits", true  },
+		{ "unece",   false },   /* flat: no integer factor, and no "1" code */
+		{ "qudt",    false },   /* refuses UNITLESS and NUM on purpose */
+		{ "qudt-qk", false },
+		{ "om",      false },   /* refuses "one" on purpose */
+		{ "cf",      false },   /* read-only: no reverse table at all */
+	};
+	value_unit_t none = BVN_UNIT_NONE;
+	char code[BVNR_UNIT_STRING_MAX];
+
+	printf("  the dimensionless unit is written only where it parses...\n");
+
+	ASSERT_TRUE(none.num_components == 0, "BVN_UNIT_NONE has no components");
+
+	for (size_t i = 0; i < sizeof(NS) / sizeof(NS[0]); i++) {
+		int32_t n = bvn_unit_to_profile(NS[i].ns, none, code, sizeof code);
+		if (!NS[i].writable) {
+			tests++;
+			if (n >= 0) {
+				fprintf(stderr,
+				        "FAIL: %s cannot read \"%s\" back, so it must not be "
+				        "written there\n", NS[i].ns, code);
+				failures++;
+			}
+			continue;
+		}
+		tests++;
+		if (n < 0) {
+			fprintf(stderr, "FAIL: %s can spell the dimensionless unit\n",
+			        NS[i].ns);
+			failures++;
+			continue;
+		}
+		/* ...and where it IS written, it comes back as the same unit rather
+		 * than as some other dimensionless thing. */
+		char qualified[BVNR_UNIT_STRING_MAX + 16];
+		snprintf(qualified, sizeof qualified, "%s:%s", NS[i].ns, code);
+		bool ok = true;
+		value_unit_t back = bvn_parse_unit((const uint8_t*)qualified, &ok);
+		tests++;
+		if (!ok || !bvn_unit_equal(none, back)) {
+			fprintf(stderr, "FAIL: %s does not read back as the "
+			        "dimensionless unit\n", qualified);
+			failures++;
+		}
+	}
+
+	/* The refusals above must be about the unit and not about the build: a
+	 * namespace that cannot write "1" still writes an ordinary unit. */
+	bool ok = true;
+	value_unit_t kg = bvn_parse_unit((const uint8_t*)"k~g", &ok);
+	ASSERT_TRUE(ok && bvn_unit_to_profile("unece", kg, code, sizeof code) > 0,
+	            "unece still writes a unit it does have a code for");
+}
+
 /* ── the enforcement point, end to end ──────────────────────────────────── */
 
 static void test_enforcement(void)
@@ -646,6 +723,7 @@ int main(void)
 	test_must_differ();
 	test_opaque_isolation();
 	test_written_codes_read_back();
+	test_the_dimensionless_unit_writes_only_where_it_reads();
 	test_enforcement();
 
 	printf("\n%d tests, %d failures\n", tests, failures);

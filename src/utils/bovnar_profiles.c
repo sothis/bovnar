@@ -1449,17 +1449,44 @@ static bool write_atom(const bvn_profile_t* p, value_base_unit_t b,
 }
 
 /*
+ * Can this profile spell the DIMENSIONLESS unit, and may it be written to?
+ *
+ * Two conditions, and both are load-bearing.
+ *
+ * "1" is a production of the EXPRESSION grammar -- decade_of_integer reads it
+ * as a bare integer factor of 10^0 -- so ucum:1 and udunits:1 come back as the
+ * dimensionless unit. A flat vocabulary has no integer-factor production at
+ * all, and none of the five flat profiles defines "1" as a code either, so
+ * unece:1 and its siblings are error_unit_illegal. Emitting "1" there produced
+ * a code this library's own reader rejects. Worse, the flat profiles that DO
+ * have a unity code refuse it on purpose: QUDT's UNITLESS and NUM and OM's
+ * "one" all sit in .unsupported reading "the absence of a unit -- write no unit
+ * at all", so writing "1" contradicted the policy those tables state.
+ *
+ * The reverse table decides writability, the same way write_atom does. CF is
+ * marked unwritable and generates no reverse rows (src/gendata/cf.bvnr says so
+ * of itself: "returns -1 for every unit"), so the sentinel is the whole table
+ * and a read-only profile must not answer for the one unit that never reaches
+ * write_atom.
+ */
+static bool profile_can_write_unity(const bvn_profile_t* p)
+{
+	return p->grammar == bvn_prof_grammar_expr && p->rev && p->rev[0].code;
+}
+
+/*
  * Write `u` as a code in profile `p` (no "<ns>:" prefix).
  *
- * Partial by construction, and in two ways. A native unit outside the
+ * Partial by construction, and in three ways. A native unit outside the
  * transliteration table -- the Old German units, water hardness, turbidity,
- * every currency -- has nowhere to go. And a FLAT profile can only ever write a
+ * every currency -- has nowhere to go. A FLAT profile can only ever write a
  * single unprefixed component, because a flat code is one whole token: there is
  * no operator to join two of them with and no exponent to raise one by. A
  * compound like k~m/h therefore has no flat spelling even though "KMH" parses
  * to exactly it -- which is not a round-trip hole, because that unit has a
  * perfectly good native spelling and only an OPAQUE unit is obliged to come
- * back out in profile notation.
+ * back out in profile notation. And the DIMENSIONLESS unit is writable only
+ * where profile_can_write_unity says so.
  */
 static int32_t unit_to_profile_code(const bvn_profile_t* p, value_unit_t u,
                                     char* buf, size_t bufsize)
@@ -1471,7 +1498,7 @@ static int32_t unit_to_profile_code(const bvn_profile_t* p, value_unit_t u,
 	uint32_t nc = u.num_components < BVNR_MAX_UNIT_COMPONENTS
 	            ? u.num_components : BVNR_MAX_UNIT_COMPONENTS;
 	if (nc == 0) {
-		if (bufsize < 2)
+		if (!profile_can_write_unity(p))
 			return -1;
 		buf[0] = '1';
 		buf[1] = '\0';

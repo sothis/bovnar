@@ -57,6 +57,37 @@ to accompany every copy (`web/fonts/OFL.txt`), the Impressum gains a
 *Bildnachweis*, `doc/11` gains §18, and `CITATION.cff` gains a `references:`
 block naming all six vocabularies with their licences.
 
+### Fixed — the writer spelled the dimensionless unit in five namespaces that cannot read it
+
+`bvn_unit_to_profile(ns, u, …)` with a **dimensionless** `u` returned success and
+wrote `"1"` for all seven namespaces. Only two can read that back:
+
+```
+ucum:1  udunits:1   -> the dimensionless unit
+unece:1  qudt:1  qudt-qk:1  om:1  cf:1   -> error_unit_illegal
+```
+
+`1` is a production of the **expression** grammar — a bare integer factor of 10⁰,
+which is why UCUM and UDUNITS round-trip it. A flat vocabulary has no
+integer-factor production and none of the five defines `1` as a code. Two of them
+go further and refuse their own unity code *on purpose*: QUDT's `UNITLESS` and
+`NUM` and OM's `one` all sit in `.unsupported` reading "the absence of a unit —
+write no unit at all". The writer contradicted the policy those tables state.
+
+The sharpest case is `cf`, which is **read-only** and generates no reverse table
+at all — `src/gendata/cf.bvnr` says of itself that `bvn_unit_to_profile("cf", u)`
+"returns -1 for every unit", and it did, for every unit except this one: the
+`num_components == 0` branch returned above the writability check rather than
+below it, so exactly one unit escaped the guarantee.
+
+The branch now asks whether the profile can spell unity at all — expression
+grammar, and a reverse table that is not just its sentinel. Nothing that had a
+spelling lost one. `test_the_dimensionless_unit_writes_only_where_it_reads`
+asserts the contract per namespace rather than as "if it writes, it reads back",
+because here the interesting half is the refusal. The existing sweep could not
+have caught it: it walks the native registry, so every unit it builds has exactly
+one component and the empty one is never constructed.
+
 ### Fixed — `CITATION.cff` failed schema validation, silently
 
 One line — `abbreviation: BVNR` — sat at the **top level**, where CFF 1.2 sets

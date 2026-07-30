@@ -443,7 +443,7 @@ resolving, but the registry entry still depends on this repository preserving
 five filenames indefinitely. The `Published specification` field in the
 registration template in `doc/ietf/draft-sonntag-bovnar-00.md` uses
 `www.bovnar.io` paths instead — redirected across renames rather than
-invalidated by them — and §"Corrections to the Existing Registration" there
+invalidated by them — and §"Corrections to the Existing Registration" there <!-- bovnar:no-section-check: the target is doc/ietf/draft-sonntag-bovnar-00.md, which this checker does not index -->
 lists the replacement as one of the changes requested. The pointer files stay
 until that update is accepted.
 

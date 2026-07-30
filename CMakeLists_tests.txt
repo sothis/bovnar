@@ -1661,8 +1661,10 @@ endif()
 # subtle test back to the sentence that made it a requirement. Renumbering
 # doc/08's function sections cut every one of them at once, and the whole suite
 # stayed green: bvnr_web_links checks the documents' links, not what the C says
-# about them. Two more had been wrong for longer -- "spec §501", never a section
-# number, and a quoted doc/05 heading the document does not contain.
+# about them. Two more had been wrong for longer -- "spec §501" (bovnar:no-section-check;
+# this comment NARRATES a dead citation, and the checker now reads the root),
+# never a section number, and a quoted doc/05 heading the document does not
+# contain.
 if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_refs.py)
     add_test(NAME bvnr_doc_refs
              COMMAND ${Python3_EXECUTABLE}

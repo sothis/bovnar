@@ -28,8 +28,32 @@ What a citation may look like, and how the target document is resolved:
     §"Version directive"      -> a quoted name, matched case-insensitively
                                  against the document's text
 
-A citation to an external standard (IEEE 754 §3.5.2, ISO 8601 §4.2) is left
-alone: the skip list is what tells those apart from a citation into doc/.
+A citation to an external standard (IEEE 754 §3.5.2, ISO 8601 §4.2) or to
+somebody's licence (UCUM §3(a), CC BY 4.0 §2(a)(1)) is left alone: the skip list
+is what tells those apart from a citation into doc/.
+
+THE REPOSITORY ROOT WAS NOT SCANNED, and for a long time nobody noticed, because
+the root held little that cited a section. It does now -- README, CONTRIBUTING,
+THIRD_PARTY_NOTICES and the two CMakeLists between them carry citations into
+doc/, and a deliberately broken §99.4 in any of them passed this gate. The root
+is scanned now, non-recursively (its subdirectories are already covered by
+SEARCH_DIRS or are build output), with two files skipped whole and a marker for
+the individual lines that must not be resolved:
+
+  * CHANGELOG.md cites section numbers AS THEY WERE WHEN THE ENTRY WAS WRITTEN.
+    doc/08's renumbering is itself a changelog entry, and "carrying the citations
+    over" there would mean rewriting history to match today's numbering --
+    check_doc_counts.py skips it for exactly this reason and says so.
+  * This file documents bad citations as examples -- §7c and §501 above are the
+    two real ones it was built to catch -- so scanning itself reports its own
+    documentation as defects.
+  * `bovnar:no-section-check` on a line exempts the citations on that line, for
+    the two cases a file-level skip is too blunt for: a comment that NARRATES a
+    dead citation ("spec §501", never a section number), and a citation into a
+    document this checker does not index, such as the IETF draft under doc/ietf.
+    It is the same "a marker that looks like a comment is really configuration"
+    convention as `bovnar:retired-path`, and it is deliberately per-line: a whole
+    file waived is a file that stops being checked.
 
 The same rot reaches a table that quotes source. The spec's §16.10 reprints the
 error_code_t enum, and nothing compared it to include/bovnar.h — so it stopped
@@ -54,6 +78,18 @@ DOC_DIR = os.path.join(ROOT, "doc")
 
 SEARCH_DIRS = ["include", "src", "python", "tests", "wasm", "examples",
                "highlighter", "cmake", "doc"]
+
+# Files in the repository ROOT that are scanned in addition to the directories
+# above -- everything at the top level with a checked suffix, minus these two.
+# See the header for why each is whole-file rather than marker-exempt.
+ROOT_SKIP_FILES = {
+    "CHANGELOG.md",         # cites section numbers as they were, by design
+    "check_doc_refs.py",    # documents bad citations as its own examples
+}
+
+# A line carrying this marker has its citations left alone. Per line, never per
+# file; the header says what the two legitimate uses are.
+NO_CHECK = "bovnar:no-section-check"
 SUFFIXES = (".c", ".h", ".py", ".sh", ".cmake", ".mjs", ".js", ".md", ".txt")
 SKIP_DIRS = {"build", "__pycache__", ".git", ".pytest_cache", "node_modules"}
 
@@ -85,7 +121,14 @@ LINK = re.compile(r"\]\((?:doc/)?((?:\d+_[\w]+|datetime_[\w]+)\.md)")
 # these, so without the skip they would all read as dead citations into the spec.
 EXTERNAL = re.compile(
     r"\b(IEEE|ISO|IEC|RFC|BIPM|SI Brochure|Unicode|POSIX|CommonMark|W3C|ECMA|"
-    r"UTS|UAX|ITU|ANSI)\b", re.I)
+    r"UTS|UAX|ITU|ANSI|IANA|"
+    # Licences cite their own sections, and THIRD_PARTY_NOTICES.md quotes them
+    # constantly. Without these, "UCUM §3" resolves against the specification --
+    # which HAS a §3, so it would not even fail; it would agree, silently, about
+    # the wrong document. That file writes external sections out as "section N"
+    # for the same reason, but a reader who uses § should not be punished for it.
+    r"UCUM|CC BY|Creative Commons|OFL|SIL Open Font|UrhG|UDUNITS|QUDT"
+    r")\b", re.I)
 
 DOCN = re.compile(r"doc/(\d+)(?:_[\w.]+)?")
 # "§5.3", "§7c", "§A.1", or §"a quoted section name"
@@ -198,6 +241,13 @@ def check_file(path, rel, verbose):
     for m in REF.finditer(text):
         before = text[max(0, m.start() - 34):m.start()]
         if EXTERNAL.search(before):
+            continue
+        # The line's own opt-out. Read from the whole line rather than the
+        # 34-character window the cues use, so the marker can sit at the end of
+        # the sentence it exempts instead of having to crowd the citation.
+        ls = text.rfind("\n", 0, m.start()) + 1
+        le = text.find("\n", m.end())
+        if NO_CHECK in text[ls:le if le != -1 else len(text)]:
             continue
         doc = resolve_doc(text, m.start(), m.end(), default)
         line = text.count("\n", 0, m.start()) + 1
@@ -351,6 +401,14 @@ def main(argv):
     verbose = "--verbose" in argv
     load_docs()
     failed = total = 0
+    # The repository root, non-recursively: os.walk would descend into build/
+    # and into the directories SEARCH_DIRS already covers, and would scan each of
+    # those twice.
+    scan = [(os.path.join(ROOT, fn), fn)
+            for fn in sorted(os.listdir(ROOT))
+            if fn.endswith(SUFFIXES)
+            and fn not in ROOT_SKIP_FILES
+            and os.path.isfile(os.path.join(ROOT, fn))]
     for d in SEARCH_DIRS:
         base = os.path.join(ROOT, d)
         if not os.path.isdir(base):
@@ -362,11 +420,13 @@ def main(argv):
                     continue
                 path = os.path.join(dirpath, fn)
                 rel = os.path.relpath(path, ROOT).replace(os.sep, "/")
-                problems = check_file(path, rel, verbose)
-                total += 1
-                for line, msg in problems:
-                    failed += 1
-                    print(f"{rel}:{line}: {msg}")
+                scan.append((path, rel))
+    for path, rel in scan:
+        problems = check_file(path, rel, verbose)
+        total += 1
+        for line, msg in problems:
+            failed += 1
+            print(f"{rel}:{line}: {msg}")
     if failed:
         print(f"\n{failed} citation(s) point at a section that does not exist.")
         print("Renumbering a document means carrying its citations over with "

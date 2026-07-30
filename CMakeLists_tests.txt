@@ -9,7 +9,7 @@ include(CTest)
 # Python suites -- only when all seven are, because their totals are stated as
 # single numbers and a partial build would make those numbers wrong rather than
 # smaller. What keeps the reduced configurations honest instead is
-# bvnr_profiles_off_build at the end of this file, which compiles and runs the
+# bvnr_profile_configs at the end of this file, which compiles and runs the
 # extreme case.
 #
 # A suite's guard names every vocabulary it TOUCHES, not just its own: each of
@@ -1839,26 +1839,32 @@ endif()
 # ── A build with every unit profile switched off ─────────────────────────────
 # The per-vocabulary switches are compile-time, so nothing in this build can
 # reach the off state, and a build configuration nothing reaches is one that
-# quietly stops compiling. This compiles the amalgamation with all seven at 0,
-# under the integrator's strict flags, and runs a smoke test that pins the
-# contract of an absent profile (error_unit_profile_unknown, unwritable as well
-# as unreadable, native units untouched). It also reports what the seven cost in
-# binary size, which is the reason the switches exist.
+# quietly stops compiling. This compiles the amalgamation TWICE under the
+# integrator's strict flags -- once with all seven at 0, once with a PARTIAL set
+# -- and runs a smoke test against each. The all-off build pins the contract of
+# an absent profile (error_unit_profile_unknown, unwritable as well as
+# unreadable, native units untouched); the partial build pins what only a mixed
+# configuration can show: that the profile index skips absent entries rather
+# than walking them, that the blocked id space does not compact when a block is
+# unused, and that an opaque unit whose profile is absent stays incommensurable
+# and has no spelling. It also reports what the seven cost in binary size, which
+# is the reason the switches exist.
 #
 # Registered UNCONDITIONALLY of the switches, unlike the suites above: this is
 # the test that keeps the reduced configurations working, so a reduced build is
 # the last place it should be skipped.
 if(Python3_Interpreter_FOUND AND NOT WIN32 AND NOT BVNR_SANITIZE
-   AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/profiles_off_smoke.c)
+   AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/profiles_off_smoke.c
+   AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/profiles_partial_smoke.c)
     add_test(
-        NAME    bvnr_profiles_off_build
+        NAME    bvnr_profile_configs
         COMMAND "${CMAKE_COMMAND}"
                 -DSRC_DIR=${CMAKE_CURRENT_SOURCE_DIR}
                 -DPYTHON=${Python3_EXECUTABLE}
                 -DCC=${CMAKE_C_COMPILER}
                 -DBIN_DIR=${CMAKE_CURRENT_BINARY_DIR}/profiles_off
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/profiles_off_build.cmake)
-    set_tests_properties(bvnr_profiles_off_build PROPERTIES
+    set_tests_properties(bvnr_profile_configs PROPERTIES
         LABELS "packaging;codegen;amalgam;profile" TIMEOUT 300)
 endif()
 

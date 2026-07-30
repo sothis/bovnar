@@ -16276,15 +16276,28 @@ vocabulary's opaque units (§7.1) has no spelling at all, so `bvn_unit_to_string
 inventing one. There is no half-way state in which a build carries the ids but not the words. A build
 that must read `ucum:[IU]` needs `ucum` compiled in.
 
-**How the reduced configurations are kept working.** The switches are compile-time, so nothing in an
-ordinary build can reach the off state, and a build configuration nothing reaches is one that stops
-compiling without anyone noticing. `bvnr_profiles_off_build` compiles the *amalgamation* with all
-seven at `0`, under the strict `-Werror` flags an integrator uses, and runs
-`tests/profiles_off_smoke.c` — which pins the contract above and would fail on the two things that
-actually break here: a registry array left empty (C99 has no empty initialiser, which is why the
-table carries a sentinel row) and a table that loses its last reference and trips
-`-Wunused-const-variable`. It is registered unconditionally of the switches, since a reduced build is
-the last place it should be skipped. The per-vocabulary test suites are the other side of the same
+**How the reduced configurations are kept working.** The switches are compile-time, so an ordinary
+build reaches exactly one of the 128 configurations they describe, and a configuration nothing
+reaches is one that stops compiling without anyone noticing. `bvnr_profile_configs` compiles the
+*amalgamation* twice under the strict `-Werror` flags an integrator uses, and runs a smoke test
+against each.
+
+*All seven at `0`* (`tests/profiles_off_smoke.c`) is where the compile itself is at risk: it pins the
+contract above and would fail on the two things that actually break there — a registry array left
+empty (C99 has no empty initialiser, which is why the table carries a sentinel row) and a table that
+loses its last reference and trips `-Wunused-const-variable`.
+
+*A partial set* (`tests/profiles_partial_smoke.c`, `ucum` and `qudt-qk` on) is where the interesting
+mistakes live instead, and none of them is reachable when the answer is uniformly "none": an index
+that walks absent profiles rather than skipping them, an id space that compacts when a block is
+unused — `bu_unece_one` must stay `300000` with `unece` absent, or two builds would disagree about
+what an id means — and an opaque unit whose profile is not compiled in, which stays incommensurable
+and has no spelling. It also pins the distinction a mixed build is the only place to observe at
+once: an absent namespace is `error_unit_profile_unknown` while a bad code in a *present* one is
+`error_unit_illegal`.
+
+Both are registered unconditionally of the switches, since a reduced build is the last place they
+should be skipped. The per-vocabulary test suites are the other side of the same
 arrangement: each is registered only when its own profile is on, and the whole-corpus gates — the
 cross-vocabulary suite, the conformance runs, the Python suites — only when all seven are, because
 their totals are single numbers that a partial build would make wrong rather than smaller.

@@ -70,6 +70,34 @@ repository can see. BVNR is named in the abstract instead.
 here may need pip or the network, and explicit about being a spelling check
 rather than a schema validator (`cffconvert --validate` stays the full one).
 
+### Added — a PARTIAL profile build is tested, not only all-off
+
+`bvnr_profiles_off_build` drove one of the 128 configurations the seven
+compile-time switches describe: all of them at `0`. That is the configuration
+where the *compile* is at risk — an empty registry array, a table that loses its
+last reference under `-Werror` — and it was well covered.
+
+The mistakes that need a **mixed** build were not reachable there, because none
+of them can happen when the answer is uniformly "none":
+
+* `bvn_unit_profile_name(i)` must skip absent profiles rather than walk them.
+  With every profile off the count is 0 and the walk is vacuous.
+* The blocked id space must not **compact** when a block is unused:
+  `bu_unece_one` stays `300000` with `unece` absent, or two builds disagree
+  about what an id means — the one thing the block layout exists to prevent.
+* An opaque unit whose profile is absent is still in the opaque range, so still
+  incommensurable, and has no spelling — the writer must refuse it rather than
+  reach for another namespace.
+* An absent namespace is `error_unit_profile_unknown` while a bad code in a
+  *present* one is `error_unit_illegal`. A mixed build is the only place both
+  are observable at once.
+
+`tests/profiles_partial_smoke.c` pins all four, compiled against the
+amalgamation under the same strict flags, with `ucum` (an expression profile
+that owns opaque units) and `qudt-qk` (a flat one that owns none) on. The test
+driving both configurations is renamed `bvnr_profile_configs`, since it no
+longer drives only the off one. Each new assertion was mutation-tested.
+
 ### Fixed — the pint bridge refused units the library it bridges represents
 
 `from_pint` carried the literals **8** and **9** — `value_unit_t`'s component

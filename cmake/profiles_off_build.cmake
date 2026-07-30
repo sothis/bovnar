@@ -1,12 +1,20 @@
-# CTest driver for a build with every unit profile switched off.
+# CTest driver for the unit-profile build configurations the ordinary build
+# cannot reach.
 #
 # The per-vocabulary switches (BVNR_WITH_UCUM_PROFILE and its six siblings) are
-# compile-time, so the ordinary build can only ever exercise one of the 128
-# configurations they describe. This drives the other extreme -- all seven at 0 --
-# and it is the configuration where everything that can go wrong does: the
+# compile-time, so the ordinary build only ever exercises one of the 128
+# configurations they describe. This drives two more.
+#
+# ALL SEVEN OFF is the configuration where everything that can go wrong does: the
 # registry array loses every row, seven groups of tables lose their last
 # reference, and the strict flags an integrator uses turn either of those into an
 # error rather than a warning.
+#
+# A PARTIAL SET is where the interesting mistakes live instead -- an index that
+# walks absent profiles, an id space that compacts when a block is unused, an
+# opaque unit of a profile that is not there. None of those is reachable when the
+# answer is uniformly "none", which is why the two extremes were not enough on
+# their own. See tests/profiles_partial_smoke.c.
 #
 # The amalgamation is the vehicle because it is one translation unit and one
 # compiler call, and because it is also the artifact an integrator most often
@@ -63,6 +71,39 @@ execute_process(COMMAND "${exe}" RESULT_VARIABLE rc OUTPUT_VARIABLE out)
 message(STATUS "${out}")
 if(NOT rc EQUAL 0)
     message(FATAL_ERROR "profiles-off smoke test failed (${rc})")
+endif()
+
+# ── A PARTIAL SET ───────────────────────────────────────────────────────────
+#
+# ucum (an expression profile that owns opaque units) and qudt-qk (a flat one
+# that owns none) on; the other five off, one of which -- unece -- owns opaque
+# units, so a build without it still has to answer for ids in block 30.
+set(_partial
+    -DBVNR_WITH_UCUM_PROFILE=1
+    -DBVNR_WITH_UNECE_PROFILE=0
+    -DBVNR_WITH_QUDT_PROFILE=0
+    -DBVNR_WITH_QUDT_QK_PROFILE=1
+    -DBVNR_WITH_UDUNITS_PROFILE=0
+    -DBVNR_WITH_OM_PROFILE=0
+    -DBVNR_WITH_CF_PROFILE=0)
+
+set(exe_partial "${BIN_DIR}/profiles_partial_smoke")
+execute_process(
+    COMMAND "${CC}" -std=c99 -pedantic -O2 -Wall -Wextra -Wconversion -Werror
+            ${_partial} "-I${gen}"
+            "${SRC_DIR}/tests/profiles_partial_smoke.c"
+            "${gen}/bovnar.c"
+            -o "${exe_partial}"
+    RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
+if(NOT rc EQUAL 0)
+    message(FATAL_ERROR
+        "the amalgamation does not compile with a PARTIAL profile set:\n${out}\n${err}")
+endif()
+
+execute_process(COMMAND "${exe_partial}" RESULT_VARIABLE rc OUTPUT_VARIABLE out)
+message(STATUS "${out}")
+if(NOT rc EQUAL 0)
+    message(FATAL_ERROR "profiles-partial smoke test failed (${rc})")
 endif()
 
 # The same source compiled with the profiles ON, so the size difference is

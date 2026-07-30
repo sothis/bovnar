@@ -70,6 +70,56 @@ repository can see. BVNR is named in the abstract instead.
 here may need pip or the network, and explicit about being a spelling check
 rather than a schema validator (`cffconvert --validate` stays the full one).
 
+### Fixed — the pint bridge refused units the library it bridges represents
+
+`from_pint` carried the literals **8** and **9** — `value_unit_t`'s component
+count and `unit_exponent_t`'s range as they were when it was written. Both grew,
+to **32** and **±100**, and the literals did not. `python/bovnar/structs.py` had
+the right count the whole time; the two Python files simply disagreed, and
+nothing compared them.
+
+The consequence was an **asymmetry**: `to_pint` exported `m¹⁰⁰` and
+nine-component units happily, and `from_pint` then refused them, so
+`bovnar → pint → bovnar` failed for anything past the old limits — with a
+message that stated the old numbers as "bovnar's range". A test even pinned
+`meter**12` as unrepresentable, which was the bug rather than the rule.
+
+Both bounds are now imported from `bovnar.enums` and `bovnar.structs` rather
+than restated. The test pins the **round trip** instead of either number, so a
+future widening cannot break it and a future narrowing of the bridge alone
+cannot pass it.
+
+### Fixed — two normative documents described an exponent form the library does not use
+
+doc/03 §11.5 stated the ASCII caret form as `^[+-]?[1-9]`, "single digit", and
+omitted `⁰` (U+2070) from the superscript table; the IETF draft said "One digit
+1-9 only" in all three renderings. The range has been `[-100, 100]` for some
+time, and the library does not merely accept `m^100` — it **emits `m¹⁰⁰`** as
+the canonical spelling of exponent 100. So a conforming parser built from either
+document rejects documents this implementation writes, which is the sharpest
+form this kind of drift takes. doc/12's EBNF and doc/05 §6 had it right
+throughout.
+
+Three worked examples were wrong the same way: doc/01, doc/03 and doc/05 each
+showed a **nine-component** unit annotated `error_unit_illegal (9 > 8)`. All
+three parse — the limit is 32, which doc/03 itself states correctly three
+sections later. A reader copying any of them got a valid document the comment
+called invalid.
+
+### Added — the exponent range is gated, and the gate covers six documents
+
+`check_ietf_draft.py` already compared the error-code enum and the component
+limit against `include/bovnar.h`. It did not compare the **exponent range**,
+which is exactly why `[1-9]` outlived the widening, and its component matcher
+only recognised the limit stated as a sentence — never as the right-hand side of
+`9 > 8`, which is how all three stale examples wrote it.
+
+Both are fixed, and the document set grew from four files to nine: the tutorial
+and the bindings reference restate these constants too and were both wrong. The
+presence requirement stays on only for the normative documents — a tutorial need
+not state a limit — while any figure a document does state is checked. Each of
+the six original mistakes was mutation-tested against the new gate.
+
 ### Added — coverage for seven unit-carrying entry points that had none
 
 `bvnr_write_uint_unit` and `bvnr_write_float_unit` were exercised in four files.

@@ -820,9 +820,11 @@ Understanding the error codes is essential for debugging. The parser reports lin
 .x = <float:64,m//s> 1.0;    # error_unit_illegal (empty component between //)
 ```
 
-**Too many unit components:**
+**Too many unit components:** a compound unit may carry at most
+`BVNR_MAX_UNIT_COMPONENTS` = **32**; a thirty-third is `error_unit_illegal`. Nine is fine:
+
 ```bovnar
-.x = <float:64,m*s*k~g*A*K*mol*cd*b*V> 1.0;  # error_unit_illegal (9 > 8 max)
+.ok = <float:64,m*s*k~g*A*K*mol*cd*b*V> 1.0;  # nine components — valid
 ```
 
 **Inline unit suffix inside array:**

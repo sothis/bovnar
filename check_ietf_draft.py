@@ -42,6 +42,21 @@ places that only the header can settle:
     every fact checked above is re-checked in each rendering. This is the check
     that makes "fix the draft" mean all four files.
 
+WHAT IT COMPARES, AND WHY THE SET GREW. It began with the error-code enum and
+the component limit -- the two things that had drifted. The EXPONENT RANGE was
+added after doc/03 and all three renderings of the draft were found describing
+the caret form as "one digit 1-9", the range unit_exponent_t had before it grew
+to [-100, 100]: a parser built from either document rejects `m^100`, which this
+library emits as the canonical spelling of exponent 100. A specification that
+cannot describe its own reference implementation's output is the sharpest form
+this failure takes.
+
+The document set grew for the same reason. The tutorial's worked "too many
+components" example and the bindings reference's account of the pint bridge were
+both stating the old numbers, so the non-normative documents are checked too --
+without the requirement to STATE a limit, since only the normative ones have
+that duty, but with every figure they do state compared.
+
 Usage:
     python3 check_ietf_draft.py            # report and exit 1 on any drift
     python3 check_ietf_draft.py --verbose  # also list what was checked
@@ -84,6 +99,13 @@ def header_facts():
         if not m:
             raise SystemExit("check_ietf_draft: %s not in include/bovnar.h" % name)
         f[name] = int(m.group(1))
+    # The exponent bounds are SIGNED and parenthesised -- "(-100)" / "( 100)" --
+    # so they need their own pattern rather than the unsigned one above.
+    for name in ("BVN_EXPONENT_MIN", "BVN_EXPONENT_MAX"):
+        m = re.search(r"#\s*define\s+%s\s+\(\s*(-?\d+)\s*\)" % name, h)
+        if not m:
+            raise SystemExit("check_ietf_draft: %s not in include/bovnar.h" % name)
+        f[name] = int(m.group(1))
     # Type families: the vt_* enumerators, minus the two that are not families a
     # document can write (vt_plain is "no annotation", vt_illegal is the error).
     f["families"] = set(re.findall(r"\bvt_(\w+)", h)) - {"plain", "illegal"}
@@ -116,16 +138,29 @@ def check_errors(text, where, facts, problems, verbose):
         print("  ok  %s: all %d error codes agree" % (where, len(cited)))
 
 
-def check_component_limit(text, where, facts, problems, verbose):
+def check_component_limit(text, where, facts, problems, verbose,
+                          required=True):
     """The claim that drifted. Matched on the sentence, not on a bare number, so
-    an unrelated 8 elsewhere in the document cannot satisfy or break it."""
+    an unrelated 8 elsewhere in the document cannot satisfy or break it.
+
+    `required` is False for a document that has no duty to STATE the limit — a
+    tutorial or a bindings reference may mention it or not — while any figure it
+    does state is still checked. Only the normative documents must say it."""
     want = facts["BVNR_MAX_UNIT_COMPONENTS"]
     hits = re.findall(r"exceed[^.\n]*?(\d+)[^.\n]*?components?", text)
     hits += re.findall(r"components? per compound unit\D*?(\d+)", text)
+    # "Too many components (9 > 8)" and "(9 > 8 max)" -- the worked EXAMPLES,
+    # which the two patterns above never saw because they state the limit as
+    # the right-hand side of a comparison rather than as a sentence. Three
+    # documents carried a nine-component unit annotated as an error while the
+    # limit had been 32 for some time, so a reader copying the example got a
+    # valid document the comment called invalid.
+    hits += re.findall(r"components?[^.\n]*?\d+\s*>\s*(\d+)", text)
     if not hits:
-        problems.append("%s states no compound-unit component limit; the header "
-                        "says %d and a consumer implementing from this document "
-                        "cannot know it" % (where, want))
+        if required:
+            problems.append("%s states no compound-unit component limit; the "
+                            "header says %d and a consumer implementing from "
+                            "this document cannot know it" % (where, want))
         return
     bad = [h for h in hits if int(h) != want]
     if bad:
@@ -134,6 +169,49 @@ def check_component_limit(text, where, facts, problems, verbose):
                         % (where, "/".join(sorted(set(bad))), want))
     elif verbose:
         print("  ok  %s: component limit %d" % (where, want))
+
+
+def check_exponent_range(text, where, facts, problems, verbose):
+    """The other claim that drifted, and drifted further than the first.
+
+    doc/03 and all three renderings of the draft stated the caret exponent form
+    as "^[+-]?[1-9]", one digit, and omitted U+2070 from the superscript table
+    -- the range unit_exponent_t had before it grew to [-100, 100]. So an
+    implementer building a conforming parser from either document rejected
+    `m^100` and `m¹⁰⁰`, which this library not only accepts but EMITS: exponent
+    100 is written back as `m¹⁰⁰`. A specification that cannot describe its own
+    reference implementation's output is the sharpest form this failure takes,
+    and nothing compared the two, which is how it survived the widening.
+
+    Matched on the range as a PAIR, so a document that states one bound and not
+    the other is caught too, and on the "one digit"/"[1-9]" phrasings that were
+    the actual wording of the mistake."""
+    lo = facts["BVN_EXPONENT_MIN"]
+    hi = facts["BVN_EXPONENT_MAX"]
+
+    # The old wording, in every spelling it appeared in.
+    for pat, what in ((r"[Oo]ne digit 1-9", "\"one digit 1-9\""),
+                      (r"\^\[\+-\]\?\[1-9\]", "`^[+-]?[1-9]`"),
+                      (r"single digit", "\"single digit\"")):
+        if re.search(pat, text):
+            problems.append(
+                "%s describes the exponent form as %s; the range is [%d, %d] "
+                "and up to three digits are scanned, so a parser built from "
+                "this document rejects `m^100` -- which the library writes"
+                % (where, what, lo, hi))
+
+    # And the range itself, wherever it is stated as a pair.
+    hits = re.findall(r"\[\s*(-?\d+)\s*,\s*(-?\d+)\s*\]", text)
+    ranges = [(int(a), int(b)) for a, b in hits
+              if abs(int(a)) in (9, 100) and abs(int(b)) in (9, 100)]
+    bad = [r for r in ranges if r != (lo, hi)]
+    if bad:
+        problems.append(
+            "%s states an exponent range of %s; BVN_EXPONENT_MIN/MAX are "
+            "[%d, %d]" % (where, "/".join("[%d, %d]" % r for r in sorted(set(bad))),
+                          lo, hi))
+    elif verbose and ranges:
+        print("  ok  %s: exponent range [%d, %d]" % (where, lo, hi))
 
 
 def check_macro_values(text, where, facts, problems, verbose):
@@ -215,6 +293,7 @@ def main(argv):
     where = "doc/ietf/%s.md" % DRAFT_STEM
     check_errors(text, where, facts, problems, verbose)
     check_component_limit(text, where, facts, problems, verbose)
+    check_exponent_range(text, where, facts, problems, verbose)
     check_macro_values(text, where, facts, problems, verbose)
     check_spec_version(text, where, facts, problems, verbose)
     check_epochs(text, where, problems, verbose)
@@ -228,6 +307,7 @@ def main(argv):
         t = open(p, encoding="utf-8", errors="replace").read()
         w = "doc/ietf/%s.%s" % (DRAFT_STEM, ext)
         check_component_limit(t, w, facts, problems, verbose)
+        check_exponent_range(t, w, facts, problems, verbose)
         # The .xml/.html wrap identifiers in markup, so only the component
         # claim and the macro restatements survive a plain-text comparison
         # reliably. That is the claim that drifted; the rest is covered by
@@ -239,14 +319,37 @@ def main(argv):
                  (SPEC_DOC, "doc/03_bovnar_spec.md")):
         t = open(p, encoding="utf-8").read()
         check_component_limit(t, w, facts, problems, verbose)
+        check_exponent_range(t, w, facts, problems, verbose)
+        check_macro_values(t, w, facts, problems, verbose)
+
+    # And the documents that are not normative but restate the limits anyway.
+    # The tutorial's worked "too many components" example and the bindings
+    # reference's account of what from_pint refuses were both wrong for as long
+    # as the constants had been growing -- the tutorial showed a nine-component
+    # unit annotated as an error, and the bindings doc described the pint
+    # bridge's own stale bounds as bovnar's. Neither has to STATE a limit, so
+    # the presence requirement is off; what they do state is checked.
+    for name in ("01_bovnar_tutorial.md", "09_bovnar_python_bindings.md",
+                 "04_bovnar_unit_cheatsheet.md", "06_bovnar_unit_policy.md",
+                 "11_bovnar_unit_profiles.md"):
+        p = os.path.join(ROOT, "doc", name)
+        if not os.path.exists(p):
+            continue
+        t = open(p, encoding="utf-8").read()
+        w = "doc/" + name
+        check_component_limit(t, w, facts, problems, verbose, required=False)
+        check_exponent_range(t, w, facts, problems, verbose)
         check_macro_values(t, w, facts, problems, verbose)
 
     if problems:
         return die(problems)
-    print("check_ietf_draft: the IETF draft, its three renderings, doc/03 and "
-          "doc/05 agree with include/bovnar.h on %d error codes, the numeric "
-          "limits, %d type families and the spec version."
-          % (len(facts["errors"]), len(facts["families"])))
+    print("check_ietf_draft: the IETF draft, its three renderings and six "
+          "documents agree with include/bovnar.h on %d error codes, the "
+          "component limit (%d), the exponent range ([%d, %d]), %d type "
+          "families and the spec version."
+          % (len(facts["errors"]), facts["BVNR_MAX_UNIT_COMPONENTS"],
+             facts["BVN_EXPONENT_MIN"], facts["BVN_EXPONENT_MAX"],
+             len(facts["families"])))
     return 0
 
 

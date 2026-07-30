@@ -1490,14 +1490,21 @@ Internet-Draft              The Bovnar Format                  July 2026
     +=============+==========+========================================+
     | Form        | Example  | Notes                                  |
     +=============+==========+========================================+
-    | Superscript | m², m⁻³  | U+00B9, U+00B2, U+00B3, U+2074-U+2079; |
-    |             |          | sign U+207A (no-op) or U+207B (negate) |
+    | Superscript | m², m⁻³, | U+2070, U+00B9, U+00B2, U+00B3,        |
+    |             | m¹⁰⁰     | U+2074-U+2079; sign U+207A (no-op) or  |
+    |             |          | U+207B (negate); one to three digits   |
     +-------------+----------+----------------------------------------+
-    | Caret       | m^2, m^- | One digit 1-9 only; ^0 is not an       |
-    |             | 3, m^+2  | exponent                               |
+    | Caret       | m^2, m^- | ^[+-]?[0-9]{1,3}                       |
+    |             | 3, m^100 |                                        |
     +-------------+----------+----------------------------------------+
 
                         Table 8: Unit exponent forms
+
+   An exponent is an integer in [-100, 100] (BVN_EXPONENT_MIN,
+   BVN_EXPONENT_MAX), with zero reserved: m^0 and m⁰ are not units.  At
+   most three digits are scanned, so m^1000 is an unrecognised token
+   rather than an over-large exponent, while m^200 scans and is refused
+   on the range check.  Both are error_unit_illegal.
 
    A compound unit MUST NOT exceed *32 components*; more is
    error_unit_illegal.  An empty component between separators (m//s,

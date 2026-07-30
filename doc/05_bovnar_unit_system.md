@@ -2535,8 +2535,8 @@ All four errors are raised during the `on_unverified` → validator phase. In `c
 # Empty component → error_unit_illegal
 .bad1 = <float:64,m//s>      1.0;
 
-# Too many components (9 > 8) → error_unit_illegal
-.bad2 = <float:64,m*s*k~g*A*K*mol*cd*b*B> 1.0;
+# Too many components (33 > 32) → error_unit_illegal
+.bad2 = <float:64,m*s*g*A*K*mol*cd*b*V*Hz*N*Pa*J*W*Ω*F*C*S*Wb*T*H*lm*lx*Bq*Gy*kat*L*min*h*d*bar*eV*Da> 1.0;
 
 # Unknown base unit → error_unit_illegal
 .bad3 = <float:64,foobar>    1.0;

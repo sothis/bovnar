@@ -28,6 +28,7 @@ silent drift when pint's own definitions change between versions — the failure
 mode the table exists to prevent (bovnar "b"=bit vs pint barn, "R"=roentgen vs
 pint gas constant, byte=1 vs 8*bit, ...).
 """
+import inspect
 import math
 
 import pytest
@@ -312,10 +313,19 @@ class TestPintRoundTrip:
         assert unit_to_str(from_pint_unit('newton*meter', ureg=reg)) == 'N·m'
         assert unit_to_str(from_pint_unit('micropascal', ureg=reg)) == 'µ~Pa'
 
-    @pytest.mark.parametrize("expr", ['meter**0.5', 'meter**12'])
+    # 'meter**12' used to be in this list, and it was the bug rather than the
+    # rule: the bridge carried unit_exponent_t's OLD ±9 range as a literal, so
+    # an exponent bovnar represents perfectly well was refused and this test
+    # pinned the refusal. What is genuinely unrepresentable is a non-integer
+    # exponent and one past the real range.
+    @pytest.mark.parametrize("expr", ['meter**0.5', 'meter**101', 'meter**-101'])
     def test_unrepresentable_rejected(self, expr, reg):
         with pytest.raises(BovnarArgumentError):
             from_pint_unit(expr, ureg=reg)
+
+    @pytest.mark.parametrize("expr", ['meter**10', 'meter**12', 'meter**100'])
+    def test_within_the_range_is_accepted(self, expr, reg):
+        assert from_pint_unit(expr, ureg=reg) is not None
 
     @pytest.mark.parametrize("bad", [__import__('numpy').array([1.0, 2.0]),
                                      ['m'], 5, 3.5])
@@ -370,3 +380,48 @@ class TestReverseCacheLifetime:
         gc.collect()
         # the dropped registry's entry is gone; nothing else removed.
         assert len(pb._reverse_cache) == before - 1
+
+
+@needs_lib
+class TestBridgeBoundsFollowTheLibrary:
+    """from_pint must accept everything to_pint can produce.
+
+    The bridge carried the literals 8 and 9 — value_unit_t's component count and
+    unit_exponent_t's range as they were when it was written. Both grew, to 32
+    and ±100, and the literals did not, so `bovnar -> pint -> bovnar` failed for
+    any unit past the old limits while `bovnar -> pint` succeeded. The refusal
+    even said the old numbers were "bovnar's range", which they had stopped
+    being. structs.py had the right count the whole time; the two files simply
+    disagreed, and nothing compared them.
+
+    So the property pinned here is the round trip itself rather than either
+    number: whatever the C library accepts and to_pint exports, from_pint takes
+    back. A future widening of either bound cannot break it, and a future
+    narrowing of the bridge alone cannot pass it.
+    """
+
+    @pytest.mark.parametrize("text", [
+        "m^3", "m^9", "m^10", "m^100", "m^-100", "m^-10",
+        "m·s·g·A·K·mol·cd·b",                    # 8 components, the old ceiling
+        "m·s·g·A·K·mol·cd·Hz·N",                 # 9, one past it
+    ])
+    def test_round_trip_survives_the_current_limits(self, text, reg):
+        u = bovnar.parse_unit(text)
+        back = from_pint_unit(to_pint_unit(u, ureg=reg), ureg=reg)
+        assert units_compatible(u, back), (
+            f"{text} did not survive bovnar -> pint -> bovnar")
+
+    def test_the_bounds_are_the_librarys_own(self):
+        """Not a restatement of the numbers — a check that the bridge reads
+        them from where they are defined rather than keeping a copy."""
+        from bovnar import _pint_bridge as pb
+        from bovnar.enums import EXPONENT_MIN, EXPONENT_MAX
+        from bovnar.structs import MAX_UNIT_COMPONENTS
+        src = inspect.getsource(pb.from_pint_unit)
+        assert "MAX_UNIT_COMPONENTS" in src, "the component bound must be imported"
+        assert "EXPONENT_MIN" in src and "EXPONENT_MAX" in src, \
+            "the exponent bounds must be imported"
+        # and the imported values are the C library's, which test_enums.py and
+        # test_abi.py already close against include/bovnar.h.
+        assert (EXPONENT_MIN, EXPONENT_MAX) == (-100, 100)
+        assert MAX_UNIT_COMPONENTS == 32

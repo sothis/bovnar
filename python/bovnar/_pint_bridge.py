@@ -40,8 +40,10 @@ from __future__ import annotations
 
 import weakref
 
-from .enums import BaseUnit, SIPrefix, IECPrefix, Exponent, PrefixSystem
-from .structs import ValueUnit, make_unit_dimensionless, make_unit_compound
+from .enums import (BaseUnit, SIPrefix, IECPrefix, Exponent, PrefixSystem,
+                    EXPONENT_MIN, EXPONENT_MAX)
+from .structs import (ValueUnit, MAX_UNIT_COMPONENTS,
+                      make_unit_dimensionless, make_unit_compound)
 from .exceptions import BovnarArgumentError
 from ._pint_units import BASE_UNIT_TO_PINT, CURRENCY_TOKENS, build_registry
 
@@ -204,9 +206,21 @@ def from_pint_unit(unit, *, ureg=None, validate: bool = True) -> ValueUnit:
     items = list(unit._units.items())       # {canonical_name: exponent}
     if not items:
         return make_unit_dimensionless()
-    if len(items) > 8:
+    # THE BOUNDS ARE IMPORTED, NOT RESTATED. These were the literals 8 and 9,
+    # written when value_unit_t held eight components and unit_exponent_t
+    # stopped at ±9. Both grew -- to 32 and ±100 -- and these did not, so the
+    # bridge refused units the library it bridges represents perfectly well,
+    # and said so in a message that asserted something false about bovnar.
+    #
+    # It was ASYMMETRIC too, which is what made it bite: to_pint_unit exported
+    # m¹⁰⁰ and nine-component units happily, and from_pint_unit then refused
+    # them, so bovnar -> pint -> bovnar failed on anything past the old limits.
+    # structs.py had the right number the whole time; the two files simply
+    # disagreed.
+    if len(items) > MAX_UNIT_COMPONENTS:
         raise BovnarArgumentError(
-            f"pint unit has {len(items)} components; bovnar allows at most 8")
+            f"pint unit has {len(items)} components; bovnar allows at most "
+            f"{MAX_UNIT_COMPONENTS}")
     revmap = _reverse_map(reg)
     comps = []
     for name, exp in items:
@@ -214,9 +228,11 @@ def from_pint_unit(unit, *, ureg=None, validate: bool = True) -> ValueUnit:
             raise BovnarArgumentError(
                 f"non-integer exponent {exp} on {name!r} is not representable in bovnar")
         exp = int(exp)
-        if exp == 0 or abs(exp) > 9:
+        if exp == 0 or not (EXPONENT_MIN <= exp <= EXPONENT_MAX):
             raise BovnarArgumentError(
-                f"exponent {exp} on {name!r} is outside bovnar's range [-9, 9]")
+                f"exponent {exp} on {name!r} is outside bovnar's range "
+                f"[{EXPONENT_MIN}, {EXPONENT_MAX}]"
+                + (" (zero is reserved)" if exp == 0 else ""))
         code, sysid, pfxint = _resolve_name(name, revmap)
         d = {'base': BaseUnit(code), 'exp': Exponent(exp)}
         if sysid == PrefixSystem.IEC:

@@ -858,8 +858,13 @@ pint error.
 `from_pint` / `from_pint_unit` validate the resulting `ValueUnit` by default
 (`validate=True`); a pint unit that maps to a structurally invalid bovnar unit
 (e.g. a prefix not permitted on that base) raises `BovnarArgumentError`. pint
-units with more than 8 components, non-integer exponents, or exponents outside
-`[-9, 9]` also raise.
+units with more than `MAX_UNIT_COMPONENTS` (32) components, non-integer
+exponents, or exponents outside `[EXPONENT_MIN, EXPONENT_MAX]` = `[-100, 100]`
+also raise. Those two bounds are imported from `bovnar.structs` and
+`bovnar.enums` rather than restated in the bridge: they were once written out as
+8 and ±9, the values the C library had when the bridge was first written, and
+stayed behind when it grew — so `from_pint` refused units `to_pint` had just
+produced, and said the old numbers were bovnar's range.
 
 ### 8.4 Registry control: `build_registry`
 

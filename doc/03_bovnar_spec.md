@@ -1620,8 +1620,22 @@ Exponents can be written in two forms:
 
 | Form | Example | Meaning |
 |------|---------|---------|
-| Unicode superscript | `m²`, `m⁻³` | Using U+00B2/00B3 etc. |
-| ASCII caret | `m^2`, `m^-3`, `m^+2` | Using `^[+-]?[1-9]` (single digit; `^0` is not a valid exponent) |
+| Unicode superscript | `m²`, `m⁻³`, `m¹⁰⁰` | `[⁺⁻]? ⁰-⁹ {⁰-⁹}` — one to three superscript digits |
+| ASCII caret | `m^2`, `m^-3`, `m^+2`, `m^100` | `^[+-]?[0-9]{1,3}` |
+
+An exponent is an **integer in `[BVN_EXPONENT_MIN, BVN_EXPONENT_MAX]` = `[-100, 100]`**, with **zero
+reserved**: `m^0` and `m⁰` are not units. The two forms carry the same values; `⁺` and `+` are
+accepted and have no effect.
+
+At most **three digits** are scanned, which is exactly what 100 needs. A longer run is therefore not
+an over-large exponent but an unrecognised token: `m^1000` finds no `^` where the scan expects one
+and fails to resolve as a base symbol. A value that scans cleanly and lands outside the range —
+`m^200` — is refused on the range check. Both are `error_unit_illegal`.
+
+> The named enumerators of `unit_exponent_t` cover only ±1…±9 and are kept for callers that use
+> them; they are **not** the range. Do not switch exhaustively over that enum, and do not treat a
+> value outside the named nine as invalid — ask `bvn_int_to_exponent`, which returns `exp_invalid`
+> for anything genuinely out of range.
 
 **Superscript mapping:**
 
@@ -1636,6 +1650,7 @@ Exponents can be written in two forms:
 | `⁷` | U+2077 | 7 |
 | `⁸` | U+2078 | 8 |
 | `⁹` | U+2079 | 9 |
+| `⁰` | U+2070 | 0 — only as a **non-leading** digit, e.g. `m¹⁰⁰`; a lone `m⁰` is not a unit |
 | `⁺` | U+207A | positive sign (no-op) |
 | `⁻` | U+207B | negate exponent |
 
@@ -2197,8 +2212,9 @@ The unit may be written directly after the value literal instead of — or redun
 # Empty component in compound unit
 .x = <float:64,m//s> 1.0;       # error_unit_illegal
 
-# Too many components (> 8)
-.y = <float:64,m*s*g*A*K*mol*cd*b*V> 1.0;  # error_unit_illegal (9 components)
+# Too many components (> 32 — see §11.7)
+.y = <float:64,m*s*g*A*K*mol*cd*b*V*Hz*N*Pa*J*W*Ω*F*C*S*Wb*T*H*lm*lx*Bq*Gy*kat*L*min*h*d*bar*eV*Da> 1.0;
+                                            # error_unit_illegal (33 components)
 
 # float_fix: Q >= effective width
 .bad_q = <float_fix:16,q16> 1.0;            # Q=16 >= width=16 → error_illegal_value_type

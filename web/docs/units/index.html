@@ -5909,8 +5909,8 @@ ev_data   data=&quot;1500&quot;
 <div class="codehilite"><pre><code class="language-bovnar"># Empty component → error_unit_illegal
 .bad1 = &lt;float:64,m//s&gt;      1.0;
 
-# Too many components (9 &gt; 8) → error_unit_illegal
-.bad2 = &lt;float:64,m*s*k~g*A*K*mol*cd*b*B&gt; 1.0;
+# Too many components (33 &gt; 32) → error_unit_illegal
+.bad2 = &lt;float:64,m*s*g*A*K*mol*cd*b*V*Hz*N*Pa*J*W*Ω*F*C*S*Wb*T*H*lm*lx*Bq*Gy*kat*L*min*h*d*bar*eV*Da&gt; 1.0;
 
 # Unknown base unit → error_unit_illegal
 .bad3 = &lt;float:64,foobar&gt;    1.0;

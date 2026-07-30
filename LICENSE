@@ -20,6 +20,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+NOTE: the grant above is not the whole of this file, and this distribution is
+not MIT-only.  It contains third-party material that is licensed to you by its
+own publishers and not by the copyright holder named above — see clauses 4 and
+5 below, and THIRD_PARTY_NOTICES.md, which must accompany any redistribution.
+
 ==============================================================================
 
 This project contains multiple components that are distributed under separate

@@ -381,14 +381,14 @@ copyright holder's nor the contributors' names are used to endorse this project.
 | | |
 |---|---|
 | **File** | `web/marked-9.1.6.min.js` |
-| **Licence** | MIT — <https://github.com/markedjs/marked/blob/master/LICENSE.md> |
+| **Licence** | MIT — <https://github.com/markedjs/marked/blob/master/LICENSE> |
 
 > marked v9.1.6 — a markdown parser. Copyright (c) 2011-2023, Christopher
 > Jeffrey. (MIT Licensed) — <https://github.com/markedjs/marked>
 
 The minified file retains the copyright line but not the full MIT permission
 text, which the licence asks to accompany substantial portions. The upstream
-`LICENSE.md` linked above is that text, and this entry is the pointer to it.
+`LICENSE` linked above is that text, and this entry is the pointer to it.
 
 ## Earth imagery — NASA
 
@@ -420,6 +420,29 @@ section of <https://www.bovnar.io/impressum.html>.
 The C that Emscripten compiles is this project's own; what is Emscripten's is
 the loader and runtime shims it emits around it. Its licence expressly permits
 distributing that output, and asks for the notice this entry gives.
+
+## Date algorithms — Howard Hinnant
+
+| | |
+|---|---|
+| **Affects** | `include/bvn_gregorian_date.h`, `src/utils/bvn_gregorian_date.c` |
+| **Status** | Donated to the public domain by the author |
+
+> The civil-date ↔ day-number conversions are derived from Howard Hinnant's
+> *chrono-Compatible Low-Level Date Algorithms*,
+> <https://howardhinnant.github.io/date_algorithms.html>, of which the author
+> writes: "Consider these donated to the public domain."
+
+This is the only algorithm in the C sources derived from a published
+implementation rather than from a specification or from first principles, and
+`bvn_gregorian_date.h` has credited it in its header since it was written.
+There is no obligation attached; it is recorded here because a notices file that
+lists a webfont and omits an algorithm is not telling the whole story.
+
+The claim that it is the *only* one is bounded, not absolute: it rests on a
+sweep of every source comment in `src/`, `include/` and `python/bovnar/` for
+external URLs and for the phrases a derivation is normally marked with, which
+found this and nothing else.
 
 ## Not third-party, despite appearances
 
@@ -455,3 +478,15 @@ distributing that output, and asks for the notice this entry gives.
   something is not — where it would depend on how the author worked rather than
   on what the tree contains — this file says so instead of asserting it. The
   UN/ECE entry is the worked example.
+* **The links in this file are not gated.** `check_web_links.py` resolves
+  internal links only, by design: no test here may need the network. So an
+  upstream project that renames its licence file leaves a dead link in a notices
+  document, which is the one kind of rot this file cannot detect about itself —
+  two of them were already introduced and caught by hand. Spot-check the URLs
+  when touching an entry.
+* Where the notices must reach a consumer who never sees this repository, that
+  path is verified rather than assumed: the Python wheel carries `LICENSE` and
+  this file under `dist-info/licenses/` with both declared as `License-File` in
+  its metadata, `pack_artifacts.cmake` copies it into every binary archive and
+  the amalgamation drop, and `dist/wasm/README.md` — the README npm publishes —
+  points at it.

@@ -2,9 +2,14 @@ cff-version: 1.2.0
 message: "If you use this software, please cite it using the metadata below."
 type: software
 title: Bovnar
-abbreviation: BVNR
+# NO `abbreviation:` KEY. It is valid inside a `references:` entry and NOT at the
+# top level, where CFF 1.2 sets additionalProperties: false -- so the one line
+# "abbreviation: BVNR" made this whole file fail schema validation, silently, for
+# as long as it was here. Nothing in the repository checked it. BVNR is named in
+# the abstract instead, which renders everywhere the abbreviation did not.
 abstract: >-
-  A text-based serialization format in which every value carries its own type
+  A text-based serialization format, abbreviated BVNR, in which every value
+  carries its own type
   family, bit width, numeric base and physical unit inline, with no external
   schema, so that dimensional mismatches are rejected by the parser rather than
   by a separate validation pass. Ships a dependency-free C99 reference
@@ -65,3 +70,78 @@ keywords:
 #   issue: 0
 #   start: 0
 #   doi: 10.21105/joss.00000
+
+# The unit-profile tables carry identifier strings from six external
+# vocabularies. Listing them here puts that attribution into the machine-readable
+# metadata that Zenodo, GitHub and cffconvert read, rather than leaving it only
+# in prose. `license:` is given where an SPDX identifier exists; UCUM's licence
+# has none, so it is named in `notes`. THIRD_PARTY_NOTICES.md is authoritative
+# for all of it, including the two questions that are still open.
+references:
+  - type: standard
+    title: "The Unified Code for Units of Measure (UCUM)"
+    abbreviation: UCUM
+    version: "2.2"
+    authors:
+      - name: "Regenstrief Institute, Inc."
+    url: "https://ucum.org/"
+    notes: >-
+      Atom codes and prefix spellings, used under the UCUM Copyright Notice and
+      License v1.1 (no SPDX identifier). Permission for the derived mapping table
+      is outstanding; see THIRD_PARTY_NOTICES.md.
+  - type: database
+    title: "QUDT - Quantities, Units, Dimensions and Data Types Ontologies"
+    abbreviation: QUDT
+    version: "3.1.0"
+    license: CC-BY-4.0
+    authors:
+      - name: QUDT.org
+    url: "https://qudt.org/"
+    notes: >-
+      Unit and quantity-kind local names, and the uneceCommonCode
+      cross-reference. Modified: extracted and mapped onto Bovnar's unit
+      registry. QUDT.org does not endorse this project.
+  - type: database
+    title: "OM 2 - Ontology of units of Measure"
+    abbreviation: OM
+    version: "2.0"
+    license: CC-BY-4.0
+    authors:
+      - family-names: Rijgersberg
+        given-names: Hajo
+      - family-names: Willems
+        given-names: Don
+      - family-names: Top
+        given-names: Jan
+    url: "http://www.ontology-of-units-of-measure.org/"
+    notes: >-
+      Unit local names and the compositions each translation target was derived
+      from. Modified: extracted and mapped onto Bovnar's unit registry. The
+      authors do not endorse this project.
+  - type: software
+    title: "UDUNITS-2"
+    license: BSD-3-Clause
+    authors:
+      - name: "University Corporation for Atmospheric Research"
+    url: "https://www.unidata.ucar.edu/software/udunits/"
+    notes: >-
+      Unit symbols, spellings and prefix spellings from the UDUNITS-2 unit
+      database. Neither UCAR nor Unidata endorses this project.
+  - type: data
+    title: "CF standard name table"
+    version: "94"
+    authors:
+      - name: "CF community"
+      - name: "Centre for Environmental Data Analysis"
+    url: "https://cfconventions.org/Data/cf-standard-names/94/build/cf-standard-name-table.html"
+    notes: >-
+      Standard names and the canonical_units each states. No licence is stated
+      by the publisher for the table itself; a declaration has been requested.
+  - type: standard
+    title: "UN/CEFACT Recommendations 20 and 21 - Codes for Units of Measure"
+    authors:
+      - name: "United Nations Economic Commission for Europe"
+    url: "https://unece.org/trade/uncefact/cl-recommendations"
+    notes: >-
+      UN/ECE common codes, verified through QUDT's uneceCommonCode
+      cross-reference. Neither UNECE nor UN/CEFACT endorses this project.

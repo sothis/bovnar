@@ -90,3 +90,5 @@ strings from UCUM, QUDT, OM 2, UDUNITS-2, the CF standard name table and UN/ECE
 Recommendations 20 and 21. Those identifiers belong to their publishers and the
 MIT grant does not extend to them; the notices, per vocabulary, are in
 [`THIRD_PARTY_NOTICES.md`](https://github.com/sothis/bovnar/blob/main/THIRD_PARTY_NOTICES.md).
+Part 2 of the same file covers the Emscripten runtime code inside the generated
+glue.

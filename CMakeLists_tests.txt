@@ -1309,7 +1309,8 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 159)   # 129 base + i18n_de + wrapper_sync + doc_counts
+set(BVNR_EXPECTED_TEST_COUNT 160)   # 129 base + i18n_de + wrapper_sync + doc_counts
+                                    #             + citation
                                     #         + profiles_off_build
                                     # + om_test + cf_test
                                     # + cache_stamps + profile_factors
@@ -1616,6 +1617,24 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_releas
                      ${CMAKE_CURRENT_SOURCE_DIR}/check_release_links.py)
     set_tests_properties(bvnr_release_links PROPERTIES
         LABELS "web;packaging" TIMEOUT 60)
+endif()
+
+# ── CITATION.cff is a schema-valid CFF 1.2 file ─────────────────────────────
+# Nothing read this file but machines, and machines do not complain: GitHub's
+# citation widget, Zenodo and cffconvert degrade quietly on a document that fails
+# validation. One line -- `abbreviation: BVNR`, a real CFF key that is legal only
+# inside a `references:` entry -- sat at the top level, where the schema sets
+# additionalProperties: false, and invalidated the whole file for as long as it
+# was there. It also matters more than it did: the file's `references:` block now
+# carries the machine-readable attribution for the six unit vocabularies whose
+# identifiers ship in the library (THIRD_PARTY_NOTICES.md), and attribution that
+# fails to parse is attribution nobody receives.
+if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_citation.py)
+    add_test(NAME bvnr_citation
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/check_citation.py)
+    set_tests_properties(bvnr_citation PROPERTIES
+        LABELS "packaging" TIMEOUT 60)
 endif()
 
 # ── Every document in doc/ has the same shape ───────────────────────────────

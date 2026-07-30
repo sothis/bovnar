@@ -188,7 +188,7 @@ Adding a vocabulary is therefore a data file and a registry row, not a second pa
 
 ### 1.2 Why a notation rather than more native units
 
-Bovnar's native registry is 180 physical units and 216 currencies, hand-maintained in
+Bovnar's native registry is 192 physical units and 216 currencies, hand-maintained in
 `src/gendata/`. UCUM's atom table is larger — a complete clinical, apothecary, troy, avoirdupois
 and CGS inventory — and its expression language is unbounded, so the set of valid UCUM codes cannot
 be enumerated as a table of units at all.
@@ -898,9 +898,9 @@ The asymmetry is worth stating plainly: these profiles are good *readers* and pa
 round trip that starts in a vocabulary returns to it; one that starts in Bovnar's native registry
 may have nowhere to go.
 
-Sweeping the whole native registry — all 186 physical units, each at the twelve prefixes
-`si_none da h k M G T d c m µ n` — **627** combinations survive a native → UCUM → native round trip
-unchanged, **1250** have no UCUM code, 355 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
+Sweeping the whole native registry — all 192 physical units, each at the twelve prefixes
+`si_none da h k M G T d c m µ n` — **655** combinations survive a native → UCUM → native round trip
+unchanged, **1294** have no UCUM code, 355 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
 before the question arises, and **none round-trips to a different unit**. The last of those is the
 invariant; the two counts move whenever the registry gains a unit, so `test_sweep_round_trip` in
 `tests/bovnar_ucum_test.c` pins all three rather than leaving them as prose.
@@ -1566,7 +1566,7 @@ native target is worth, and compares. `unece` is reached at one remove; see §9.
 The generator also emits the **reverse** tables §5.3 uses, choosing the canonical code for each slot
 by the grammar's rule (shortest for an expression profile, first-declared for a flat one), honouring
 `.reverse = false`, and recording that code's own decade. Deriving them rather than searching the
-forward tables at run time is what makes `bvn_unit_to_profile` deterministic; the 627 round trips
+forward tables at run time is what makes `bvn_unit_to_profile` deterministic; the 655 round trips
 quoted in §5.3 are the check that forward and reverse agree.
 
 ### 9.3 Tests

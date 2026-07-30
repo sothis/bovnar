@@ -28,9 +28,22 @@ import re
 from bovnar.enums import (
     Event, TokenType, ValueTypeFamily, PrefixSystem,
     SIPrefix, IECPrefix, BaseUnit, Exponent, ErrorCode,
+    UNIT_NATIVE_FIRST, UNIT_NATIVE_LAST,
+    CURRENCY_FIRST, CURRENCY_LAST, CURRENCY_COUNT,
 )
 
-_HEADER = pathlib.Path(__file__).resolve().parents[2] / "include" / "bovnar.h"
+_REPO = pathlib.Path(__file__).resolve().parents[2]
+_HEADER = _REPO / "include" / "bovnar.h"
+
+
+def _gendata(name: str):
+    """Read a src/gendata catalogue with the dependency-free reader the code
+    generators use. Same source the C enum is generated from, so a test built on
+    it compares the two halves rather than one half against a memory of it."""
+    import sys
+    sys.path.insert(0, str(_REPO))
+    import bvnr_data
+    return bvnr_data.load((_REPO / "src" / "gendata" / name).read_bytes())
 
 
 def _c_enum(name: str) -> dict:
@@ -225,13 +238,61 @@ class TestBaseUnit:
         values = [int(u) for u in BaseUnit]
         assert len(values) == len(set(values))
 
-    def test_count(self):
+    def test_native_block_closed_against_gendata(self):
+        """BaseUnit's native block IS units.bvnr — every row, and no other.
 
-        # NONE, plus every native unit, plus every currency. There is no
-        # sentinel: the id space is blocked and sparse, so nothing can be
-        # bounded by "one past the last member". Adding a unit or a currency
-        # moves this by exactly one per addition.
-        assert len(BaseUnit) == 1 + 180 + 216
+        This replaced `len(BaseUnit) == 1 + 180 + 216`, and the reason is the
+        one this file already states beside the error codes: a hardcoded count
+        cannot catch something added on the C side, because the number and the
+        enum go stale together and agree with each other. They did. The six
+        temperature-interval units (100180..100185) were added to units.bvnr,
+        the C enum is generated from that file and had them, and the Python
+        BaseUnit did not -- so `bovnar.BaseUnit.DELTA_KELVIN` did not exist,
+        UNIT_NATIVE_LAST named the wrong unit, and the count assertion passed
+        the whole time because 180 was stale in exactly the same direction.
+
+        The names are checked too, not only the ids: the convention is the
+        gendata `.name` upper-cased, and a member spelled differently is a
+        member callers cannot find.
+        """
+        units = _gendata("units.bvnr")["units"]
+        want = {u["id"]: u["name"].upper() for u in units}
+        got = {int(b): b.name for b in BaseUnit
+               if UNIT_NATIVE_FIRST <= int(b) <= UNIT_NATIVE_FIRST + 9999}
+        assert got == want
+
+    def test_native_bounds_match_gendata(self):
+        units = _gendata("units.bvnr")["units"]
+        assert int(UNIT_NATIVE_FIRST) == units[0]["id"]
+        assert int(UNIT_NATIVE_LAST) == units[-1]["id"]
+
+    def test_currency_block_closed_against_gendata(self):
+        """The currency block IS currencies.bvnr, in order.
+
+        A currency's member name is its ISO code, with one rule for the one
+        collision the two catalogues have: a code that is already a native
+        unit's name takes a trailing underscore, because a Python enum cannot
+        hold the name twice. CUP is the Cuban Peso and the US cup, so the
+        currency is CUP_ — the wire token is still the bare uppercase code, and
+        doc/05 §10.3 is about this exact pair. The rule is applied here rather
+        than the exception being listed, so a second collision is handled
+        rather than reported."""
+        units = {u["name"].upper() for u in _gendata("units.bvnr")["units"]}
+        codes = [c["code"] for c in _gendata("currencies.bvnr")["currencies"]]
+        want = [c + "_" if c in units else c for c in codes]
+        got = [b.name for b in BaseUnit
+               if CURRENCY_FIRST <= int(b) <= CURRENCY_LAST]
+        assert got == want
+        assert CURRENCY_COUNT == len(codes)
+
+    def test_no_members_outside_the_two_blocks(self):
+        """Nothing but NONE lives between or beyond them."""
+        stray = [b.name for b in BaseUnit
+                 if int(b) != 0
+                 and not (UNIT_NATIVE_FIRST <= int(b) <= UNIT_NATIVE_LAST)
+                 and not (CURRENCY_FIRST <= int(b) <= CURRENCY_LAST)]
+        assert stray == []
+
 
 class TestExponent:
     def test_positive_exponents(self):

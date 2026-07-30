@@ -1407,7 +1407,27 @@ usually where the money is.</p>
 </tr>
 <tr>
 <td>Calorie</td>
-<td><code>cal</code> = 4.184 J (thermochemical); the food "Calorie" is <code>kcal</code></td>
+<td><code>cal</code> = 4.184 J (thermochemical) · <code>cal_IT</code> = 4.1868 J (international table) — 0.067 % apart; the food "Calorie" is <code>k~cal</code></td>
+</tr>
+<tr>
+<td>BTU</td>
+<td><code>Btu</code> = 1055.05585262 J (international table) · <code>Btu_th</code> = 1054.35026449 J (thermochemical) — the same 0.067 %, and note the pairing crosses over: bovnar's unqualified calorie is the thermochemical one and its unqualified BTU the IT one, because that is what UCUM and UDUNITS respectively mean by theirs</td>
+</tr>
+<tr>
+<td>Dram</td>
+<td><code>dr</code> (avoirdupois) = 1.7718451953125 g · <code>dr_ap</code> (apothecary) = 3.8879346 g — <strong>2.2× apart</strong>, which is the widest near miss in the registry</td>
+</tr>
+<tr>
+<td>Pound</td>
+<td><code>lb</code> (avoirdupois) = 0.45359237 kg · <code>lb_t</code> (troy, = the apothecary pound) = 0.3732417216 kg</td>
+</tr>
+<tr>
+<td>Hundredweight</td>
+<td><code>cwt_l</code> (long/imperial) = 112 lb = 50.80234544 kg · the short one is exactly 100 lb, so write <code>h~lb</code></td>
+</tr>
+<tr>
+<td>Water column</td>
+<td><code>mH2O</code> = 9806.65 Pa is the <strong>conventional</strong> column (water at 1000 kg/m³). A column stated at a temperature — UDUNITS' <code>water_4C</code>, QUDT's <code>IN_H2O</code> — is a different unit and is refused rather than rounded onto this one</td>
 </tr>
 <tr>
 <td>Thou</td>
@@ -1615,6 +1635,46 @@ usually where the money is.</p>
 <td>hydroponic EC scale</td>
 <td><code>CF</code></td>
 <td><code>cF</code> (centifarad)</td>
+</tr>
+<tr>
+<td>thermochemical calorie</td>
+<td><code>cal</code></td>
+<td><code>cal_IT</code> (0.067 % larger)</td>
+</tr>
+<tr>
+<td>international-table calorie</td>
+<td><code>cal_IT</code></td>
+<td><code>cal</code></td>
+</tr>
+<tr>
+<td>international-table BTU</td>
+<td><code>Btu</code></td>
+<td><code>Btu_th</code></td>
+</tr>
+<tr>
+<td>thermochemical BTU</td>
+<td><code>Btu_th</code></td>
+<td><code>Btu</code></td>
+</tr>
+<tr>
+<td>apothecary dram</td>
+<td><code>dr_ap</code></td>
+<td><code>dr</code> (avoirdupois, 2.2× smaller)</td>
+</tr>
+<tr>
+<td>troy or apothecary pound</td>
+<td><code>lb_t</code></td>
+<td><code>lb</code> (avoirdupois)</td>
+</tr>
+<tr>
+<td>long hundredweight</td>
+<td><code>cwt_l</code></td>
+<td><code>h~lb</code> (that is the SHORT one, 100 lb)</td>
+</tr>
+<tr>
+<td>centimetre of water</td>
+<td><code>cmH2O</code>, <code>c~mH2O</code></td>
+<td><code>c~m~H2O</code> — the prefix goes on <code>mH2O</code>, which is the metre of water</td>
 </tr>
 </tbody>
 </table>

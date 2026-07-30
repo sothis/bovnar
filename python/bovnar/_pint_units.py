@@ -98,6 +98,14 @@ BOVNAR_PINT_DEFINITIONS: list[str] = [
     'bvnr_scheffel = 0.054961 * meter**3',
     'bvnr_var = 1.0 * meter**2 * kilogram * second**-3',
     'bvnr_zentner = 50.0 * kilogram',
+    # Units the profiles needed; each states bovnar's own exact factor rather
+    # than borrowing a pint definition that may follow another convention.
+    'bvnr_meter_water = 9806.65 * pascal',
+    'bvnr_calorie_it = 4.1868 * joule',
+    'bvnr_btu_th = 1054.3502644888889 * joule',
+    'bvnr_troy_pound = 0.3732417216 * kilogram',
+    'bvnr_apothecary_dram = 0.0038879346 * kilogram',
+    'bvnr_long_hundredweight = 50.80234544 * kilogram',
 ]
 
 
@@ -297,6 +305,25 @@ BASE_UNIT_TO_PINT: dict[int, str] = {
     100101: 'bvnr_neper',                   # NEPER
     100102: 'bvnr_decibel',                 # DECIBEL
 
+    # The six temperature INTERVALS. They carry bovnar's temperature-interval
+    # kind, so they get a dimension of their own here for the same reason the
+    # turbidity scales do: pint's kelvin would convert ΔK straight into K, and
+    # a rise of 25 degrees is 25 K while 25 °C is 298.15 K.
+    100180: 'bvnr_delta_kelvin',            # DELTA_KELVIN (also Δ°C)
+    100181: 'bvnr_delta_fahrenheit',        # DELTA_FAHRENHEIT (also Δ°Ra)
+    100182: 'bvnr_delta_delisle',           # DELTA_DELISLE
+    100183: 'bvnr_delta_newton_temp',       # DELTA_NEWTON_TEMP
+    100184: 'bvnr_delta_reaumur',           # DELTA_REAUMUR
+    100185: 'bvnr_delta_romer',             # DELTA_ROMER
+
+    # The units the unit profiles needed.
+    100186: 'bvnr_meter_water',             # METER_WATER
+    100187: 'bvnr_calorie_it',              # CALORIE_IT
+    100188: 'bvnr_btu_th',                  # BTU_TH
+    100189: 'bvnr_troy_pound',              # TROY_POUND
+    100190: 'bvnr_apothecary_dram',         # APOTHECARY_DRAM
+    100191: 'bvnr_long_hundredweight',      # LONG_HUNDREDWEIGHT
+
 }
 
 
@@ -335,11 +362,26 @@ KIND_DIMENSIONS: dict[str, str] = {
     'bvnr_jtu':         'turbidity_jtu',
     'bvnr_psu':         'practical_salinity',
     'bvnr_radian':      'angle',
+    'bvnr_delta_kelvin': 'temperature_interval',
 }
 
 # The angle kind is SHARED: degree -> radian is a conversion people legitimately
 # want, and steradian really is radian², so these are defined from the reference
 # rather than as dimensions of their own.
+# The temperature-interval kind is SHARED across the six scales, exactly as the
+# angle kind is: Δ°F -> ΔK is a conversion people legitimately want (a 9-degree
+# Fahrenheit rise IS a 5-kelvin rise), and only the offset is missing, because
+# an interval has none. Δ°C shares bvnr_delta_kelvin and Δ°Ra shares
+# bvnr_delta_fahrenheit; the Celsius degree IS the kelvin and the Rankine degree
+# IS the Fahrenheit degree, so those are aliases and not units.
+_INTERVAL_DERIVED: list[str] = [
+    'bvnr_delta_fahrenheit = %.17g * bvnr_delta_kelvin' % (5.0 / 9.0),
+    'bvnr_delta_delisle = %.17g * bvnr_delta_kelvin' % (-2.0 / 3.0),
+    'bvnr_delta_newton_temp = %.17g * bvnr_delta_kelvin' % (100.0 / 33.0),
+    'bvnr_delta_reaumur = 1.25 * bvnr_delta_kelvin',
+    'bvnr_delta_romer = %.17g * bvnr_delta_kelvin' % (40.0 / 21.0),
+]
+
 _ANGLE_DERIVED: list[str] = [
     'bvnr_degree = %.17g * bvnr_radian' % (math.pi / 180.0),
     'bvnr_gradian = %.17g * bvnr_radian' % (math.pi / 200.0),
@@ -386,6 +428,12 @@ _KIND_NATIVE_FALLBACK: list[str] = [
     'bvnr_fau = 1.0',
     'bvnr_jtu = 1.0',
     'bvnr_psu = 1.0',
+    'bvnr_delta_kelvin = kelvin',
+    'bvnr_delta_fahrenheit = %.17g * kelvin' % (5.0 / 9.0),
+    'bvnr_delta_delisle = %.17g * kelvin' % (-2.0 / 3.0),
+    'bvnr_delta_newton_temp = %.17g * kelvin' % (100.0 / 33.0),
+    'bvnr_delta_reaumur = 1.25 * kelvin',
+    'bvnr_delta_romer = %.17g * kelvin' % (40.0 / 21.0),
 ]
 
 # --- semantic caveats: parse/label OK, but value semantics differ ------------
@@ -875,6 +923,8 @@ def build_registry(reg=None, *, with_currencies: bool = True,
         for name, dim in KIND_DIMENSIONS.items():
             reg.define('%s = [%s]' % (name, dim))
         for d in _ANGLE_DERIVED:
+            reg.define(d)
+        for d in _INTERVAL_DERIVED:
             reg.define(d)
     else:
         for d in _KIND_NATIVE_FALLBACK:

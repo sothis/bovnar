@@ -1,5 +1,5 @@
 #!bovnar 1.1
-# units.bvnr — single source of truth for all 180 physical base units.
+# units.bvnr — single source of truth for all 192 physical base units.
 #
 # HOW THIS WORKS
 #   Hand-edited. gen_units.py (at the repo root) regenerates the C unit tables
@@ -2374,6 +2374,119 @@
     .prefix  = default;
     .aliases = ["delta_romer", "deltaromer", "delta_degRo", "deltadegRo",
                 "Δ°Ro"];
+  },
+
+  # ── Units the profiles needed and this registry did not have ─────────────
+  #
+  # Each of the six below was, until it was added, the sole reason a run of
+  # codes in UCUM, UDUNITS-2, QUDT and UN/ECE had to be refused as
+  # error_unit_profile_unsupported: the publisher defines the unit, the value is
+  # exactly stateable, and there was simply no native unit to translate it onto.
+  # They are not new physics — they are the ones a cross-vocabulary reader hits.
+  {
+    # The conventional water column, exactly 9806.65 Pa per metre (the density
+    # of water taken as 1000 kg/m³ and g as gn), the same convention that makes
+    # the millimetre of mercury exactly 133.322387415 Pa. It takes prefixes, so
+    # the two spellings anyone actually writes fall out of it: c~mH2O is the
+    # centimetre of water ventilators are set in, and the compact "cmH2O"
+    # resolves to the same component.
+    #
+    # This one unit is what lets the whole UDUNITS water-column family and
+    # UCUM's m[H2O] and [in_i'H2O] translate; twenty-six codes across the two
+    # were refused for want of it.
+    .id      = <uint:32> 100186;
+    .name    = "meter_water";
+    .symbol  = "mH2O";
+    .factor  = 9806.65;
+    .dims    = { .length = -1; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["metre_water", "meter_water", "mH2O"];
+  },
+  {
+    # The INTERNATIONAL TABLE calorie, 4.1868 J exactly. Native `cal` is the
+    # THERMOCHEMICAL one (4.184 J), and the two are not interchangeable: the
+    # unqualified calorie is thermochemical in UCUM and IT in UDUNITS, which is
+    # precisely why both vocabularies had to refuse the other's spelling rather
+    # than guess. With both units present each maps to the one it means.
+    .id      = <uint:32> 100187;
+    .name    = "calorie_it";
+    .symbol  = "cal_IT";
+    .factor  = 4.1868;
+    .dims    = { .length = 2; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["calorie_IT", "cal_IT"];
+  },
+  {
+    # The THERMOCHEMICAL BTU, the other half of the same split: native `Btu` is
+    # the international-table one (1055.05585262 J), and UCUM's unqualified
+    # [Btu] is thermochemical.
+    #
+    # Both are one pound of water raised one degree Fahrenheit, so both are the
+    # corresponding calorie times 453.59237 g/lb times 5/9 °C/°F. For the IT
+    # calorie that terminates at 1055.05585262 exactly; for the thermochemical
+    # one it does not, so the exact rational is stated rather than a repr of the
+    # double. 4.184 × 453.59237 × 5/9 = 23722880951/22500000.
+    .id      = <uint:32> 100188;
+    .name    = "btu_th";
+    .symbol  = "Btu_th";
+    .factor  = 1054.3502644888889;
+    .dims    = { .length = 2; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 23722880951;
+    .factor_den = <sint:64>    22500000;
+    .prefix  = default;
+    .aliases = ["Btu_th", "BTU_th", "btu_th"];
+  },
+  {
+    # Twelve troy ounces, 0.3732417216 kg exactly. The APOTHECARY pound is the
+    # same mass -- the apothecary ounce IS the troy ounce -- so both spellings
+    # land here, which is what UCUM's [lb_tr] and [lb_ap] and UDUNITS'
+    # troy_pound and apothecary_pound all needed. The symbol follows the troy
+    # ounce's own `oz_t`.
+    .id      = <uint:32> 100189;
+    .name    = "troy_pound";
+    .symbol  = "lb_t";
+    .factor  = 0.3732417216;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["apothecary_pound", "troy_pounds", "troy_pound", "lb_t"];
+  },
+  {
+    # Three apothecary scruples, 3.8879346 g exactly. Native `dr` is the
+    # AVOIRDUPOIS dram (1.7718451953125 g), a different mass entirely, and a
+    # prescription written in one and read as the other is out by 2.2.
+    .id      = <uint:32> 100190;
+    .name    = "apothecary_dram";
+    .symbol  = "dr_ap";
+    .factor  = 0.0038879346;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["apothecary_drams", "apothecary_dram", "dr_ap"];
+  },
+  {
+    # 112 avoirdupois pounds, 50.80234544 kg exactly -- the imperial
+    # hundredweight, which is a twentieth of the long ton and not a hundred of
+    # anything. The SHORT hundredweight has no row: it is exactly 100 lb, which
+    # the prefix mechanism already spells as h~lb, and ucum.bvnr has mapped
+    # [scwt_av] onto that for as long as it has had the atom.
+    .id      = <uint:32> 100191;
+    .name    = "long_hundredweight";
+    .symbol  = "cwt_l";
+    .factor  = 50.80234544;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["long_hundredweights", "long_hundredweight", "cwt_l"];
   }
 ];
 

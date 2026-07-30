@@ -351,6 +351,29 @@ class BaseUnit(IntEnum):
     TURBIDITY_FAU      = 100178   # attenuation at 0°, not scatter
     TURBIDITY_JTU      = 100179   # Jackson candle method; no formazin relation
 
+    # Temperature INTERVALS. A rise of 25 degrees is 25 K; 25 °C is 298.15 K.
+    # These carry the same dimension as the scales and a quantity kind of their
+    # own, so ΔK does not convert into K (see units.bvnr). Δ°C shares
+    # DELTA_KELVIN and Δ°Ra shares DELTA_FAHRENHEIT: the Celsius degree IS the
+    # kelvin and the Rankine degree IS the Fahrenheit degree, so those are
+    # aliases rather than rows.
+    DELTA_KELVIN       = 100180   # ΔK, Δ°C
+    DELTA_FAHRENHEIT   = 100181   # Δ°F, Δ°Ra
+    DELTA_DELISLE      = 100182
+    DELTA_NEWTON_TEMP  = 100183
+    DELTA_REAUMUR      = 100184
+    DELTA_ROMER        = 100185
+
+    # Units the unit profiles needed and this registry did not have; each was
+    # the sole reason a run of UCUM, UDUNITS, QUDT and UN/ECE codes had to be
+    # refused. See the note beside them in src/gendata/units.bvnr.
+    METER_WATER        = 100186   # mH2O, the conventional 9806.65 Pa column
+    CALORIE_IT         = 100187   # 4.1868 J; native CALORIE is thermochemical
+    BTU_TH             = 100188   # thermochemical BTU; native BTU is the IT one
+    TROY_POUND         = 100189   # 12 troy ounces; also the apothecary pound
+    APOTHECARY_DRAM    = 100190   # 3 scruples, not the avoirdupois DRAM
+    LONG_HUNDREDWEIGHT = 100191   # 112 lb; the short one is exactly h~lb
+
     # ---- Currencies: block 90 -------------------------------------------
     #
     # One contiguous run, fiat then crypto, mirroring src/gendata/
@@ -591,7 +614,7 @@ class BaseUnit(IntEnum):
 UNIT_BLOCK_SIZE     = 10000
 
 UNIT_NATIVE_FIRST   = BaseUnit.BIT
-UNIT_NATIVE_LAST    = BaseUnit.TURBIDITY_JTU
+UNIT_NATIVE_LAST    = BaseUnit.LONG_HUNDREDWEIGHT
 
 CURRENCY_FIRST      = BaseUnit.AED
 CURRENCY_LAST       = BaseUnit.RUNE

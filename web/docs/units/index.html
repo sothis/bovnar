@@ -168,7 +168,7 @@
 <p>The Bovnar quantity annotation system is an <strong>optional, per-value annotation</strong> that attaches a physical unit or currency denomination to any numeric field. It is part of the type annotation (<code>&lt;family:width,_base,unit&gt;</code>) and applies to the <code>uint</code>, <code>sint</code>, <code>float</code>, <code>float_fix</code>, and <code>float_dec</code> type families.</p>
 <p>Two distinct namespaces share the annotation slot:</p>
 <ul>
-<li><strong>Physical units</strong> — 180 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.</li>
+<li><strong>Physical units</strong> — 192 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.</li>
 <li><strong>Currency codes</strong> — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical — HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01 — and <code>ANG</code> coexists with its successor <code>XCG</code>, which inherited its numeric code 532; see §9.2) and 50 cryptocurrency tickers.</li>
 </ul>
 <p>Both namespaces are syntactically unified: the same grammar, the same <code>~</code> prefix separator, the same compound-unit operators (<code>·</code>, <code>*</code>, <code>/</code>), and the same <code>value_unit_t</code> data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.</p>
@@ -871,8 +871,35 @@ the <code>sr</code> silently dropped. What holds now:</p>
 <td><code>bu_pennyweight</code></td>
 <td>1.55517384×10⁻³ kg (exact)</td>
 </tr>
+<tr>
+<td><code>lb_t</code></td>
+<td><code>troy_pound</code>, <code>troy_pounds</code>, <code>apothecary_pound</code></td>
+<td>troy pound (= apothecary pound)</td>
+<td><code>bu_troy_pound</code></td>
+<td>0.3732417216 kg (exact, = 12 <code>oz_t</code>)</td>
+</tr>
+<tr>
+<td><code>dr_ap</code></td>
+<td><code>apothecary_dram</code>, <code>apothecary_drams</code></td>
+<td>dram (apothecary)</td>
+<td><code>bu_apothecary_dram</code></td>
+<td>3.8879346×10⁻³ kg (exact, = 3 <code>sc</code>)</td>
+</tr>
+<tr>
+<td><code>cwt_l</code></td>
+<td><code>long_hundredweight</code>, <code>long_hundredweights</code></td>
+<td>hundredweight (long/imperial)</td>
+<td><code>bu_long_hundredweight</code></td>
+<td>50.80234544 kg (exact, = 112 <code>lb</code>)</td>
+</tr>
 </tbody>
 </table>
+<blockquote>
+<p>The apothecary dram is <strong>2.2×</strong> the avoirdupois <code>dr</code> and the two are a classic near miss; the
+apothecary POUND, by contrast, <em>is</em> the troy pound (twelve apothecary ounces, and an apothecary
+ounce is a troy ounce), so both spellings are one unit. The SHORT hundredweight is exactly 100 lb,
+which the prefix mechanism already spells <code>h~lb</code>, so it has no unit of its own.</p>
+</blockquote>
 <h4 id="temperature">Temperature</h4>
 <table>
 <thead>
@@ -1068,8 +1095,23 @@ the <code>sr</code> silently dropped. What holds now:</p>
 <td><code>bu_inch_hg</code></td>
 <td>3386.388640341 Pa (= 25.4 mmHg exactly)</td>
 </tr>
+<tr>
+<td><code>mH2O</code></td>
+<td><code>metre_water</code>, <code>meter_water</code></td>
+<td>metre of water column</td>
+<td><code>bu_meter_water</code></td>
+<td>9806.65 Pa (exact, conventional)</td>
+</tr>
 </tbody>
 </table>
+<blockquote>
+<p><code>mH2O</code> takes prefixes, so the spellings people actually write fall out of it: <code>c~mH2O</code> (or the
+compact <code>cmH2O</code>) is the centimetre of water a ventilator is set in, and <code>m~mH2O</code> the millimetre.
+The value is the conventional column — water at 1000 kg/m³ under standard gravity — the same kind
+of convention that fixes <code>mmHg</code> at exactly 133.322387415 Pa. A column measured at a stated
+temperature (UDUNITS' <code>water_4C</code>, QUDT's <code>IN_H2O</code>) is a <em>different</em> unit and is refused, not
+rounded onto this one.</p>
+</blockquote>
 <h3 id="36-energy-units">3.6 Energy Units</h3>
 <table>
 <thead>
@@ -1117,9 +1159,32 @@ the <code>sr</code> silently dropped. What holds now:</p>
 <td><code>bu_foot_pound</code></td>
 <td>1.3558179483 J</td>
 </tr>
+<tr>
+<td><code>cal_IT</code></td>
+<td><code>calorie_IT</code></td>
+<td>International Table calorie</td>
+<td><code>bu_calorie_it</code></td>
+<td>4.1868 J (exact)</td>
+</tr>
+<tr>
+<td><code>Btu_th</code></td>
+<td><code>BTU_th</code>, <code>btu_th</code></td>
+<td>thermochemical BTU</td>
+<td><code>bu_btu_th</code></td>
+<td>23722880951/22500000 J ≈ 1054.35026449 J</td>
+</tr>
 </tbody>
 </table>
 <blockquote>
+<p><strong>Two calories and two BTUs, and the pairs cross over.</strong> <code>cal</code> is the THERMOCHEMICAL calorie and
+<code>Btu</code> the INTERNATIONAL TABLE BTU, which is not an inconsistency but the two vocabularies' own
+defaults: UCUM's unqualified <code>cal</code> is thermochemical and its unqualified <code>[Btu]</code> is too, while
+UDUNITS' unqualified <code>calorie</code> is the IT one. Each pair is 0.067 % apart — dimensionally identical
+and numerically wrong if confused — so both members of both pairs are carried and every profile
+code lands on the one its own vocabulary says it means. Both BTUs are one pound of water raised
+one degree Fahrenheit, i.e. the corresponding calorie × 453.59237 g/lb × 5/9; that terminates for
+the IT calorie and does not for the thermochemical one, which is why <code>Btu_th</code> states an exact
+rational rather than a decimal.</p>
 <p><strong><code>BTU</code> alias note:</strong> <code>BTU</code> (all uppercase, three characters) is a valid alias for <code>bu_btu</code>. Because currencies require the <code>$</code> sigil, the bare token <code>BTU</code> is a physical-unit lookup and resolves to <code>bu_btu</code>; <code>Btu</code> and <code>btu</code> are also accepted. See §10.2 for the complete look-alike table.</p>
 </blockquote>
 <h3 id="37-power-units">3.7 Power Units</h3>
@@ -4846,7 +4911,7 @@ whole string fails to resolve.</p>
 </tr>
 </tbody>
 </table>
-<p><code>bu_none</code> is 0 and belongs to no block; every tag between the native units and the currencies is now taken, so a further vocabulary needs one outside 10–90. Blocks 40–80 currently contribute no ids at all: those vocabularies map every code onto a native unit, and the block tag reserves their room rather than filling it. Within block 10 the 180 native units run contiguously from <code>bu_bit</code> = 100000 to <code>bu_turbidity_jtu</code> = 100179, in the order of <code>units.bvnr</code>. Currencies run contiguously from 900000 and — unlike every other block — have <strong>no named <code>bu_*</code> enumerators</strong> (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a <code>$</code> sigil, resolved by <code>bvn_parse_currency_str</code> and carried as the numeric <code>base</code> value. <code>bvn_unit_is_currency(base)</code> is a bounds check over block 90.</p>
+<p><code>bu_none</code> is 0 and belongs to no block; every tag between the native units and the currencies is now taken, so a further vocabulary needs one outside 10–90. Blocks 40–80 currently contribute no ids at all: those vocabularies map every code onto a native unit, and the block tag reserves their room rather than filling it. Within block 10 the native units run contiguously from <code>bu_bit</code> = 100000 to <code>bu_long_hundredweight</code> = 100191, in the order of <code>units.bvnr</code>; <code>BVN_UNIT_NATIVE_FIRST</code>, <code>BVN_UNIT_NATIVE_LAST</code> and <code>BVN_UNIT_NATIVE_COUNT</code> are generated beside the enum, so read the bounds from those rather than from this sentence. Currencies run contiguously from 900000 and — unlike every other block — have <strong>no named <code>bu_*</code> enumerators</strong> (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a <code>$</code> sigil, resolved by <code>bvn_parse_currency_str</code> and carried as the numeric <code>base</code> value. <code>bvn_unit_is_currency(base)</code> is a bounds check over block 90.</p>
 <p>Only a vocabulary that contributes units of its <em>own</em> takes a block. A unit profile is a spelling for the unit slot, so most of its codes translate to native units and carry native ids; the ones that get a block id of their own are the <strong>opaque</strong> units — codes with no native equivalent and no dimension, such as UCUM's assay-defined <code>[IU]</code> or UN/ECE's package types — which need an identity precisely because nothing else can stand in for them.</p>
 <blockquote>
 <p><strong>Why blocks.</strong> One flat counter makes every vocabulary's ids a function of every other vocabulary's size, and that was not hypothetical. This space previously had physical units at 1–133 <em>and again</em> at 348–396 because the currencies had been dropped in between; two currencies stranded at 378–379, outside their own range, because that range had been frozen; and the profiles' units pinned above all of it. Adding a currency shifted units. The 2.0 renumbering ended that, and made an id self-describing: 200017 is UCUM's, whatever else the build contains.</p>
@@ -5010,11 +5075,16 @@ whole string fails to resolve.</p>
 <span class="cm">/* Not a member of the enum, and NOT a bound on it: the number of rows in the</span>
 <span class="cm"> * dense tables the library indexes by bvni_unit_slot(). The id space is</span>
 <span class="cm"> * sparse, so it has no &quot;one past the end&quot;. */</span>
-<span class="cm">/* #define BVN_UNIT_SLOT_COUNT 247 */</span>
+<span class="cm">/* #define BVN_UNIT_SLOT_COUNT 259 */</span>
 </code></pre></div>
 
 <h4 id="unit_exponent_t"><code>unit_exponent_t</code></h4>
-<div class="codehilite"><pre><span></span><code><span class="k">typedef</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="n">unit_exponent_e</span><span class="w"> </span><span class="p">{</span>
+<div class="codehilite"><pre><span></span><code><span class="cp">#define BVN_EXPONENT_MIN    (-100)</span>
+<span class="cp">#define BVN_EXPONENT_MAX    ( 100)</span>
+
+<span class="k">typedef</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="n">unit_exponent_e</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">exp_range_min</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="n">BVN_EXPONENT_MIN</span><span class="p">,</span>
+<span class="w">    </span><span class="n">exp_range_max</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="n">BVN_EXPONENT_MAX</span><span class="p">,</span>
 <span class="w">    </span><span class="n">exp_invalid</span><span class="w">    </span><span class="o">=</span><span class="w">   </span><span class="mi">0</span><span class="p">,</span>
 <span class="w">    </span><span class="n">exp_linear</span><span class="w">     </span><span class="o">=</span><span class="w">   </span><span class="mi">1</span><span class="p">,</span><span class="w">  </span><span class="n">exp_square</span><span class="w">    </span><span class="o">=</span><span class="w">  </span><span class="mi">2</span><span class="p">,</span><span class="w">  </span><span class="n">exp_cubic</span><span class="w">     </span><span class="o">=</span><span class="w">  </span><span class="mi">3</span><span class="p">,</span>
 <span class="w">    </span><span class="n">exp_quartic</span><span class="w">    </span><span class="o">=</span><span class="w">   </span><span class="mi">4</span><span class="p">,</span><span class="w">  </span><span class="n">exp_quintic</span><span class="w">   </span><span class="o">=</span><span class="w">  </span><span class="mi">5</span><span class="p">,</span><span class="w">  </span><span class="n">exp_sextic</span><span class="w">    </span><span class="o">=</span><span class="w">  </span><span class="mi">6</span><span class="p">,</span>
@@ -5025,6 +5095,12 @@ whole string fails to resolve.</p>
 <span class="p">}</span><span class="w"> </span><span class="n">unit_exponent_t</span><span class="p">;</span>
 </code></pre></div>
 
+<p><strong>The named enumerators are not the range.</strong> They cover ±1…±9 and are kept because callers use them;
+the type carries any integer in <code>[BVN_EXPONENT_MIN, BVN_EXPONENT_MAX]</code> = ±100, which is what §6 and
+the grammar describe. <code>exp_range_min</code>/<code>exp_range_max</code> are enumerators so that the underlying type is
+wide enough for them on every conforming compiler; neither is a valid exponent to <em>use</em>. Do not
+switch exhaustively over this enum, and do not assume a value outside the named nine is invalid —
+ask <code>bvn_int_to_exponent</code>, which returns <code>exp_invalid</code> for anything out of range.</p>
 <p><code>exp_invalid</code> (value <code>0</code>) is the zero-initialization sentinel. Always initialize components before use.</p>
 <h3 id="112-structures">11.2 Structures</h3>
 <h4 id="value_unit_component_t"><code>value_unit_component_t</code></h4>

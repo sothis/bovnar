@@ -65,13 +65,23 @@ _KIND_UNITS = {bu.name for bu in BaseUnit
                if not bu.name.startswith('_')
                and BASE_UNIT_TO_PINT.get(int(bu)) in KIND_DIMENSIONS}
 
-def _shares_the_angle_dimension():
-    """Units carrying [angle] in pint, because bovnar puts them in the angle
-    kind: the angle family itself, and the photometric units built on the
-    steradian (lm = cd·sr, lx = lm/m², ph = lm/cm²). Asked of the registry
-    rather than listed by hand — the hand-written list did not grow when the
-    photometric units joined the kind, and the SI-dimension check below then
-    failed for a unit that was behaving correctly."""
+def _carries_a_synthetic_dimension():
+    """Units whose pint dimensionality is NOT expressible in the seven SI
+    dimensions, because bovnar puts them in a quantity kind and the bridge gives
+    that kind a dimension of its own.
+
+    _KIND_UNITS above finds the kinds' REFERENCE units, the ones KIND_DIMENSIONS
+    names. It cannot find the units DERIVED from one — the angle family and the
+    photometric units built on the steradian, and now the five temperature
+    intervals defined from ΔK — because those carry the synthetic dimension
+    without appearing in that table.
+
+    So the question is asked of the registry, and asked in the general form: any
+    dimension the SI seven do not cover. This started as a hand-written list of
+    angle units, which did not grow when the photometric units joined the kind
+    and then failed the SI-dimension check below for units that were behaving
+    correctly; narrowing it to '[angle]' had the same failure waiting for the
+    next kind, which the temperature intervals duly were."""
     reg = build_registry()
     out = set()
     for bu in BaseUnit:
@@ -82,13 +92,13 @@ def _shares_the_angle_dimension():
         token = BASE_UNIT_TO_PINT.get(int(bu))
         if token is None:
             continue
-        if any(str(d) == '[angle]' for d in reg.Unit(token).dimensionality):
+        if any(str(d) not in _PINT_DIM for d in reg.Unit(token).dimensionality):
             out.add(bu.name)
     return out
 
 
-_ANGLE_UNITS = _shares_the_angle_dimension()
-_ISOLATED = _KIND_UNITS | _ANGLE_UNITS
+_SYNTHETIC_DIM_UNITS = _carries_a_synthetic_dimension()
+_ISOLATED = _KIND_UNITS | _SYNTHETIC_DIM_UNITS
 
 
 def _pint_dimvec(unit):

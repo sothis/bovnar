@@ -185,6 +185,12 @@
 	bu_delta_newton_temp = 100183,
 	bu_delta_reaumur = 100184,
 	bu_delta_romer  = 100185,
+	bu_meter_water  = 100186,
+	bu_calorie_it   = 100187,
+	bu_btu_th       = 100188,
+	bu_troy_pound   = 100189,
+	bu_apothecary_dram = 100190,
+	bu_long_hundredweight = 100191,
 
 /* The native block's bounds, and the dense table slot of a unit in it.
  *
@@ -195,8 +201,8 @@
  * arithmetic on the enumerator so it can be a designated-initialiser index in
  * the generated table rows: the row and the enum cannot drift apart. */
 #define BVN_UNIT_NATIVE_FIRST     100000
-#define BVN_UNIT_NATIVE_LAST      100185
-#define BVN_UNIT_NATIVE_COUNT     186
+#define BVN_UNIT_NATIVE_LAST      100191
+#define BVN_UNIT_NATIVE_COUNT     192
 #define BVN_UNIT_SLOT_NATIVE_BASE 1
 #define BVN_SLOT_NATIVE(b) \
 	(BVN_UNIT_SLOT_NATIVE_BASE + ((int)(b) - BVN_UNIT_NATIVE_FIRST))

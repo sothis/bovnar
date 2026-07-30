@@ -40,6 +40,16 @@ THREE OUTCOMES, AND ONLY TWO ARE ERRORS.
              table does not map it. Advisory: it is a coverage suggestion, not a
              defect, and the decision to carry a unit is editorial.
 
+AND ONE COMPARISON THAT IS NOT A NUMBER AT ALL. Everything above compares a
+factor and a dimension vector, and a dimension vector has no room for a QUANTITY
+KIND: a bit, a radian, a steradian, a decibel and a pure ratio are all
+[0,0,0,0,0,0,0], and a bit per second and a hertz are both T⁻¹ at factor 1. So a
+mapping could turn a data rate into a frequency and score perfectly here. It
+did, seven times over, until `check_quantity_kinds` was added — see the note on
+that function. It uses QUDT's own unit-to-quantity-kind links to check the two
+QUDT tables against each other, on the one axis the factor comparison is blind
+to, and a disagreement there fails the run like a MISMATCH.
+
 ALL SEVEN PROFILES ARE COVERED, BUT NOT ALL EQUALLY. `ucum`, `udunits`, `qudt`,
 `qudt-qk`, `om` and `cf` are checked against their publishers' own definitions.
 `unece` is checked at ONE REMOVE, through QUDT's `qudt:uneceCommonCode`
@@ -220,6 +230,52 @@ TOL = 7.5e-7
 # bit is ln(2) = 0.693 and its byte 8·ln(2) = 5.545, the SI-coherent unit of
 # entropy being the nat. bovnar's bit is 1. qudt-qk.bvnr already refuses
 # `InformationEntropy` for exactly this reason.
+#
+# THE WHOLE QUDT INFORMATION FAMILY IS THAT ONE DIFFERENCE, REPEATED. Every row
+# below is a prefixed bit or byte, a rate of one, or a linear density of one,
+# and each is off the native target by exactly ln 2 or 8·ln 2 — never by
+# anything else. Listing them by name rather than widening the tolerance is
+# deliberate: the ratio is 0.693, so a tolerance that admitted it would admit
+# every real disagreement in the file. A row that stops being off by exactly the
+# model factor stops being waived and fails, which is the property that matters.
+_QUDT_INFO_MODEL = [
+    "BIT", "BYTE",
+    # decimal bit and byte
+    "KiloBIT", "MegaBIT", "GigaBIT", "TeraBIT", "PetaBIT", "ExaBIT",
+    "KiloBYTE", "MegaBYTE", "GigaBYTE", "TeraBYTE", "PetaBYTE", "ExaBYTE",
+    # binary bit and byte
+    "KibiBIT", "MebiBIT", "GibiBIT", "TebiBIT",
+    "KibiBYTE", "MebiBYTE", "GibiBYTE", "TebiBYTE",
+    # the shannon, which is the bit under its information-theory name
+    "SHANNON", "SHANNON-PER-SEC",
+    # rates
+    "BIT-PER-SEC", "BYTE-PER-SEC",
+    "KiloBIT-PER-SEC", "MegaBIT-PER-SEC", "GigaBIT-PER-SEC",
+    "TeraBIT-PER-SEC", "PetaBIT-PER-SEC",
+    "KiloBYTE-PER-SEC", "MegaBYTE-PER-SEC", "GigaBYTE-PER-SEC",
+    # linear, areal and volumetric bit densities
+    "BIT-PER-M", "BIT-PER-M2", "BIT-PER-M3", "GigaBIT-PER-M",
+    "KibiBIT-PER-M", "KibiBIT-PER-M2", "KibiBIT-PER-M3",
+    "MebiBIT-PER-M", "MebiBIT-PER-M2", "MebiBIT-PER-M3",
+    "GibiBIT-PER-M", "GibiBIT-PER-M2", "GibiBIT-PER-M3",
+]
+# The same family again in Rec 20's numbering, reached through the same QUDT
+# units and therefore carrying the same ln 2. These are UNECE codes, but the
+# difference being waived is QUDT's model and not a claim about Rec 20 — which
+# is the whole reason this vocabulary's results are labelled secondary.
+_UNECE_INFO_MODEL = [
+    "J63", "AD", "Q14", "Q12",                     # bit, byte, shannon, octet
+    "C37", "D36", "B68", "E83", "E78",             # decimal bit
+    "2P", "4L", "E34", "E35", "E36",               # decimal byte
+    "C21", "D11", "B30",                           # binary bit
+    "E64", "E63", "E62", "E61",                    # binary byte
+    "B10", "P93", "Q13", "Q17",                    # rates
+    "C74", "E20", "B80", "E84", "E79",
+    "P94", "P95", "E68",
+    "E88", "E89",                                  # densities
+    "E72", "E73", "E74", "E75", "E76", "E77",
+    "E69", "E70", "E71",
+]
 WAIVED_MODEL = {
     ("ucum", "bit"), ("ucum", "By"), ("ucum", "Bd"),
     ("udunits", "bit"), ("udunits", "byte"), ("udunits", "baud"),
@@ -228,11 +284,8 @@ WAIVED_MODEL = {
     # defines the octet as the number 8 where bovnar's B is a base unit of
     # information with no factor to the bit.
     ("udunits", "octet"),
-    ("qudt", "BIT"), ("qudt", "BYTE"),
-    ("qudt", "KiloBYTE"), ("qudt", "MegaBYTE"), ("qudt", "GigaBYTE"),
-    ("qudt", "TeraBYTE"), ("qudt", "KibiBYTE"), ("qudt", "MebiBYTE"),
-    ("qudt", "GibiBYTE"), ("qudt", "TebiBYTE"),
-}
+} | {("qudt", code) for code in _QUDT_INFO_MODEL} \
+  | {("unece", code) for code in _UNECE_INFO_MODEL}
 
 # Places where the PUBLISHER is wrong, or states a value rounded past the
 # tolerance above, and bovnar is deliberately not following it. Each is reported
@@ -274,10 +327,102 @@ WAIVED_UPSTREAM = {
         "QUDT rounds the torr to 133.322 Pa (6 digits); native Torr is the "
         "exact 101325/760. 2.8 ppm, the same publisher rounding as UCUM's "
         "mercury column.",
+    # The four information units QUDT states at a value that is not its OWN
+    # model. Every other member of the family is exactly ln 2 (or 8·ln 2) times
+    # the corresponding power of two — see _QUDT_INFO_MODEL — and these four are
+    # out by a further 8.9 and 7.5 with no pattern between them. Pebi- and Exbi-
+    # name 2^50 and 2^60 and nothing else can, so the rows map and the
+    # disagreement is recorded here, exactly as UCUM's inverted phot is.
+    ("qudt", "PebiBIT"):
+        "QUDT states the pebibit at 8.727e13 where its own bit (ln 2) times "
+        "2^50 is 7.804e14 — a factor of 8.9 with no stated basis. PebiBYTE "
+        "carries the same error and PebiBIT is exactly an eighth of it, so the "
+        "two are one mistake. Native Pi~b is 2^50 bits.",
+    ("qudt", "ExbiBIT"):
+        "QUDT states the exbibit at 1.060e17 where its own bit times 2^60 is "
+        "7.992e17 — a factor of 7.5, inherited from ExbiBYTE in the same way "
+        "PebiBIT inherits PebiBYTE's. Native Ei~b is 2^60 bits.",
+    ("qudt", "PebiBYTE"):
+        "QUDT states the pebibyte at 6.981e14 where its own byte (8·ln 2) "
+        "times 2^50 is 6.243e15 — a factor of 8.9. Native Pi~B is 2^50 bytes, "
+        "which is what the name means in every standard that defines it.",
+    ("qudt", "ExbiBYTE"):
+        "QUDT states the exbibyte at 8.480e17 where its own byte times 2^60 is "
+        "6.393e18 — a factor of 7.5. Native Ei~B is 2^60 bytes.",
+    # Four thermochemical-BTU rates QUDT publishes at three or four significant
+    # digits while publishing the same unit exactly elsewhere. The clearest is
+    # BTU_TH-FT-PER-HR-FT2-DEG_F at 1.73 beside its own
+    # BTU_TH-FT-PER-FT2-HR-DEG_F -- the identical unit with the operands in a
+    # different order -- at 1.729577206. bovnar's Btu_th is exact
+    # (23722880951/22500000 J), so the native side is the more precise of the
+    # two and the rows map.
+    ("qudt", "BTU_TH-PER-HR"):
+        "QUDT rounds to 0.2929 (4 digits); the exact thermochemical BTU per "
+        "hour is 0.29287507. 85 ppm, publisher rounding.",
+    ("qudt", "KiloBTU_TH-PER-HR"):
+        "The same 4-digit rounding as BTU_TH-PER-HR, a thousand times over: "
+        "292.9 against the exact 292.87507. 85 ppm.",
+    ("qudt", "BTU_TH-PER-MIN"):
+        "QUDT rounds to 17.573 (5 digits); the exact value is 17.5725044. "
+        "28 ppm, publisher rounding.",
+    ("qudt", "BTU_TH-FT-PER-HR-FT2-DEG_F"):
+        "QUDT rounds to 1.73 (3 digits) while stating the SAME unit under "
+        "BTU_TH-FT-PER-FT2-HR-DEG_F as 1.729577206 — the operands reordered and "
+        "the value not rounded. 244 ppm, and QUDT's own table is the evidence.",
+    # Rec 20's own codes for the two units above, reached through the same QUDT
+    # rows and so carrying the same error.
+    ("unece", "E60"):
+        "Rec 20's pebibyte, reached through qudt:PebiBYTE — which QUDT states "
+        "at 6.981e14 rather than 2^50 of its own byte. The cross-reference "
+        "carries QUDT's error, not a statement about Rec 20; native Pi~B is "
+        "2^50 bytes.",
+    ("unece", "E59"):
+        "Rec 20's exbibyte, reached through qudt:ExbiBYTE and carrying the same "
+        "error as E60. Native Ei~B is 2^60 bytes.",
+    # Rec 20's codes for the rounded QUDT rows above, inheriting the rounding
+    # through the cross-reference rather than stating one of their own.
+    ("unece", "J47"):
+        "Rec 20's BTU (th) per hour, reached through qudt:BTU_TH-PER-HR and "
+        "carrying its 4-digit rounding (0.2929 against the exact 0.29287507). "
+        "85 ppm.",
+    ("unece", "J51"):
+        "Rec 20's BTU (th) per minute, carrying qudt:BTU_TH-PER-MIN's 5-digit "
+        "rounding. 28 ppm.",
+    ("unece", "J46"):
+        "Rec 20's BTU (th) foot per hour square foot degree Fahrenheit, "
+        "carrying qudt:BTU_TH-FT-PER-HR-FT2-DEG_F's 3-digit rounding — which "
+        "QUDT contradicts in its own table. 244 ppm.",
+    ("unece", "UA"):
+        "Rec 20's torr, reached through qudt:TORR and carrying the same 6-digit "
+        "rounding already waived there. 2.8 ppm; native Torr is the exact "
+        "101325/760.",
     ("om", "millimetreOfMercury"):
         "OM rounds the mercury column to 133.322 Pa (6 digits); native mmHg is "
         "the exact conventional 133.322387415 Pa. 2.9 ppm, the same publisher "
         "rounding UCUM's m[Hg] and QUDT's TORR already carry.",
+}
+
+
+# QUDT unit -> quantity kind links that QUDT itself has filed under the wrong
+# kind, checked by check_quantity_kinds below. Same standing as WAIVED_UPSTREAM
+# and reported the same way: a note on every run, never a silent skip.
+WAIVED_KIND = {
+    ("LM-PER-M2", "Luminance"):
+        "A lumen per square metre is a LUX — illuminance, the luminous flux "
+        "arriving on a surface. QUDT files it under Luminance (cd/m², the flux "
+        "leaving one) while filing its own LUX under LuminousFluxPerArea, so "
+        "the two spellings of one unit sit under two different kinds. Native "
+        "lx is correct.",
+    ("LM-PER-FT2", "Luminance"):
+        "The same misfiling as LM-PER-M2, in square feet: lumens per unit area "
+        "is illuminance, not luminance.",
+    ("KiloBYTE-PER-SEC", "DataRate"):
+        "QUDT gives DataRate eight applicable units: seven bit rates and this "
+        "one byte rate. bovnar carries bit and byte as separate kinds with no "
+        "factor between them, so a kind cannot be both. The name and the "
+        "seven-to-one majority settle it on the bit per second, and this one "
+        "link is QUDT pooling what bovnar keeps apart — the same pooling that "
+        "makes BitRate and RotationalFrequency unmappable.",
 }
 
 
@@ -1203,6 +1348,103 @@ class NativeIndex:
         return None
 
 
+def load_native_convertible():
+    """A bound `bvn_units_convertible`, or None.
+
+    Separate from load_native() because it asks a different question. That one
+    reports a factor and a dimension vector, which is everything a value
+    comparison needs and NOT everything a unit is: the dimension vector is
+    [0,…,0] for the bit, the radian, the steradian, the decibel and every ratio
+    alike, so two units can agree on both and still be different quantities.
+    bvn_units_convertible is the predicate that also compares the QUANTITY KINDS
+    the library tracks beside the dimensions (bvni_kind_table in
+    bovnar_si_units.c), and it is the only thing here that can see the
+    difference between a bit per second and a hertz."""
+    sys.path.insert(0, os.path.join(REPO, "python"))
+    try:
+        import bovnar
+        bovnar._ffi.load_library()
+    except Exception:
+        return None
+
+    cache = {}
+
+    def convertible(a, b):
+        key = (a, b)
+        if key in cache:
+            return cache[key]
+        try:
+            ua, ub = bovnar.parse_unit(a), bovnar.parse_unit(b)
+            r = bool(bovnar.units_convertible(ua, ub))
+        except Exception:
+            r = None                      # the library refuses one of them
+        cache[key] = r
+        return r
+
+    return convertible
+
+
+def check_quantity_kinds(cache, convertible, verbose):
+    """QUDT's own unit -> quantity-kind links, as a check on both tables.
+
+    THE HOLE THIS CLOSES. Every other comparison in this file is a NUMBER
+    against a NUMBER: the publisher's factor and dimension vector against the
+    native target's. That cannot see a quantity kind, because a kind is exactly
+    what a dimension vector has no room for — a bit, a radian, a steradian, a
+    decibel and a pure ratio are all [0,0,0,0,0,0,0], and a bit per second and a
+    hertz are both T⁻¹ at factor 1. So a mapping could turn a data rate into a
+    frequency, a bit density into a reciprocal length, or a radiance into an
+    irradiance, and pass every check here with a perfect score.
+
+    That is not hypothetical. It is what the tables did: qudt:ExaBIT-PER-SEC was
+    E~Hz, qudt-qk:BitRate and ByteRate were Hz, BitTransmissionRate and
+    ByteTransmissionRate were s⁻¹, LinearBitDensity was m⁻¹, DataRate was Hz,
+    and PowerPerAreaAngle and TotalRadiance were W/m² beside a `Radiance` that
+    correctly carried the steradian. Seven of them, each a unit the library's own
+    bvn_units_convertible calls incompatible with the one it was standing in for.
+
+    The check needs no new source. QUDT already states, for nearly every unit it
+    defines, the quantity kind that unit measures (`qudt:hasQuantityKind`) — and
+    bovnar maps both vocabularies. A kind translates to the COHERENT unit of the
+    kind (see qudt-qk.bvnr), so a unit OF that kind must be convertible with it.
+    Two tables, one publisher's cross-reference between them, and an assertion
+    neither table can satisfy on its own.
+
+    Reported per unit/kind pair. A pair where either side is unmapped, or where
+    the library refuses one of the two expressions, is skipped rather than
+    guessed at; WAIVED_KIND holds the links QUDT itself has filed wrongly."""
+    units = parse_ttl(os.path.join(cache, "qudt-units.ttl"), "unit")
+    tgt = {}
+    for ns in ("qudt", "qudt-qk"):
+        doc = bvnr_data.load(
+            open(os.path.join(GENDATA, ns + ".bvnr"), "rb").read())
+        tgt[ns] = {m["code"]: m["bovnar"] for m in doc.get("mapped", [])}
+    bad, notes, checked = [], [], 0
+    for local in sorted(units):
+        utarget = tgt["qudt"].get(local)
+        if utarget is None:
+            continue
+        for ref in units[local].get("hasQuantityKind", []):
+            kind = ref.split(":")[-1].strip()
+            ktarget = tgt["qudt-qk"].get(kind)
+            if ktarget is None:
+                continue
+            if (local, kind) in WAIVED_KIND:
+                notes.append("  %-16s ~ %-22s %s"
+                             % (local, kind, WAIVED_KIND[(local, kind)]))
+                continue
+            ok = convertible(utarget, ktarget)
+            if ok is None:
+                continue
+            checked += 1
+            if not ok:
+                bad.append("  %-26s -> %-16s is not convertible with "
+                           "%s -> %s" % (local, utarget, kind, ktarget))
+            elif verbose:
+                print("    kind ok %-24s -> %-14s ~ %s" % (local, utarget, kind))
+    return bad, notes, checked
+
+
 def check_profile(ns, vocab, native, native_index, verbose):
     """-> (mismatches, dead, missing) as lists of printable lines."""
     doc = bvnr_data.load(open(os.path.join(GENDATA, ns + ".bvnr"), "rb").read())
@@ -1396,12 +1638,35 @@ def main(argv):
         total_dead += len(dead)
         total_missing += len(missing)
 
+    # The one comparison that is not a number against a number. It needs both
+    # QUDT vocabularies cached, since it is QUDT's own link between them.
+    kind_bad, kind_checked = [], 0
+    if "qudt" in available and "qudt-qk" in available:
+        convertible = load_native_convertible()
+        if convertible is not None:
+            kind_bad, kind_notes, kind_checked = check_quantity_kinds(
+                args.cache, convertible, args.verbose)
+            if kind_notes:
+                print("\nQUANTITY KIND — waived, QUDT files the unit under the "
+                      "wrong kind (%d):" % len(kind_notes))
+                for line in kind_notes:
+                    print(line)
+            if kind_bad:
+                print("\nQUANTITY KIND — a unit is not convertible with the "
+                      "coherent unit of the kind QUDT says it measures (%d):"
+                      % len(kind_bad))
+                for line in kind_bad:
+                    print(line)
+
     print("\ncheck_profile_factors: %d row(s) compared across %s; "
           "%d mismatch, %d dead, %d unmapped-but-exact%s"
           % (total_checked, ", ".join(available), total_mismatch, total_dead,
              total_missing, "" if args.verbose else
              " (--verbose to list the last two)"))
-    if total_mismatch:
+    if kind_checked:
+        print("check_profile_factors: %d unit/quantity-kind pair(s) checked "
+              "for quantity kind; %d disagree" % (kind_checked, len(kind_bad)))
+    if total_mismatch or kind_bad:
         return 1
     if total_dead and args.strict_dead:
         return 1

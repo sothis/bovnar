@@ -164,11 +164,31 @@ static void test_near_miss_refusals(void)
 	chk_error("udunits:month", error_unit_profile_unsupported);
 	chk_str("udunits:Julian_year", "yr");
 
-	/* UDUNITS' unqualified calorie is the IT calorie (4.1868 J); native cal
-	 * is the thermochemical 4.184 J. 0.067 % apart. */
-	chk_error("udunits:calorie", error_unit_profile_unsupported);
-	chk_error("udunits:cal", error_unit_profile_unsupported);
-	chk_error("udunits:IT_calorie", error_unit_profile_unsupported);
+	/* UDUNITS' unqualified calorie is the IT calorie (4.1868 J); native cal is
+	 * the thermochemical 4.184 J. 0.067 % apart, and both are now units, so
+	 * what is pinned is that the two spellings stay on the two bases rather
+	 * than one of them being refused to keep the other honest. */
+	chk_str("udunits:calorie",                "cal_IT");
+	chk_str("udunits:cal",                    "cal_IT");
+	chk_str("udunits:IT_calorie",             "cal_IT");
+	chk_str("udunits:thermochemical_calorie", "cal");
+	chk_factor("udunits:cal",                    4.1868);
+	chk_factor("udunits:thermochemical_calorie", 4.184);
+
+	/* UDUNITS states both columns as pressure GRADIENTS and builds its
+	 * pressures as a length times one, so the gradients themselves have to
+	 * translate for the expressions on them to work. */
+	chk_factor("udunits:H2O",    9806.65);
+	chk_factor("udunits:cmH2O",    98.0665);
+	chk_factor("udunits:Hg",   133322.387415);
+	chk_factor("udunits:mmHg",    133.322387415);
+
+	/* Apothecary and troy masses against the avoirdupois ones they are a
+	 * near miss for. */
+	chk_str("udunits:troy_pound",       "lb_t");
+	chk_str("udunits:apothecary_pound", "lb_t");
+	chk_factor("udunits:apdram", 0.0038879346);
+	chk_factor("udunits:long_hundredweight", 50.80234544);
 
 	/* UDUNITS builds these on the US SURVEY foot, 2 ppm longer than the
 	 * international foot the native atoms of the same name use. */

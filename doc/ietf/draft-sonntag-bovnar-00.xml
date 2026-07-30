@@ -1160,9 +1160,9 @@ grows in minor revisions (<xref target="version-stability"/>). An implementer ne
 <xref target="BOVNAR-UNITS"/> to build a conforming parser; everything else required
 is in this document.</t>
 
-<t>The registry covers 180 named units across SI <xref target="SI"/>, IEC binary
+<t>The registry covers 192 named units across SI <xref target="SI"/>, IEC binary
 <xref target="IEC80000-13"/>, imperial and US customary, CGS, radiation, electrical
-power, rotational, surveying, textile, and other families, accepting 529
+power, rotational, surveying, textile, and other families, accepting 586
 spellings in total once long-form and plural aliases are counted; plus
 216 currency codes (<xref target="currency"/>).</t>
 

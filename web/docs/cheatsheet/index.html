@@ -42,7 +42,7 @@
 <blockquote>
 <p><strong>Spec version:</strong> 1.1
 <strong>Status:</strong> Reference — the symbol tables of the unit and currency registry
-<strong>Scope:</strong> 180 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.</p>
+<strong>Scope:</strong> 192 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.</p>
 </blockquote>
 <hr />
 <h2 id="table-of-contents">Table of Contents</h2>
@@ -75,8 +75,8 @@
 <li>4.22 <a href="#422-electrical-power">Electrical Power</a></li>
 <li>4.23 <a href="#423-textile-linear-density">Textile Linear Density</a></li>
 <li>4.24 <a href="#424-old-german-units">Old German Units</a></li>
-<li>4.25 <a href="#425-additional-physical-units-361367">Additional Physical Units (361–367)</a></li>
-<li>4.26 <a href="#426-ratio-and-proportion-372377">Ratio and Proportion (372–377)</a></li>
+<li>4.25 <a href="#425-additional-physical-units">Additional Physical Units</a></li>
+<li>4.26 <a href="#426-ratio-and-proportion">Ratio and Proportion</a></li>
 <li>4.27 <a href="#427-named-speeds--acidity">Named Speeds &amp; Acidity</a></li>
 <li>4.28 <a href="#428-water-hardness">Water Hardness</a></li>
 <li>4.29 <a href="#429-water-quality-instrument-scales">Water-Quality Instrument Scales</a></li>
@@ -984,8 +984,32 @@
 <td><code>bu_pennyweight</code></td>
 <td>1.55517384×10⁻³ kg (exact)</td>
 </tr>
+<tr>
+<td><code>lb_t</code></td>
+<td><code>troy_pound</code>, <code>troy_pounds</code>, <code>apothecary_pound</code></td>
+<td>troy pound (= apothecary pound)</td>
+<td><code>bu_troy_pound</code></td>
+<td>0.3732417216 kg (exact, = 12 <code>oz_t</code>)</td>
+</tr>
+<tr>
+<td><code>dr_ap</code></td>
+<td><code>apothecary_dram</code>, <code>apothecary_drams</code></td>
+<td>dram (apothecary)</td>
+<td><code>bu_apothecary_dram</code></td>
+<td>3.8879346×10⁻³ kg (exact, = 3 <code>sc</code>)</td>
+</tr>
+<tr>
+<td><code>cwt_l</code></td>
+<td><code>long_hundredweight</code>, <code>long_hundredweights</code></td>
+<td>hundredweight (long/imperial)</td>
+<td><code>bu_long_hundredweight</code></td>
+<td>50.80234544 kg (exact, = 112 <code>lb</code>)</td>
+</tr>
 </tbody>
 </table>
+<blockquote>
+<p><code>dr_ap</code> is <strong>2.2× the avoirdupois <code>dr</code></strong>, and the short hundredweight is exactly <code>h~lb</code>, so it has no unit of its own.</p>
+</blockquote>
 <h3 id="46-temperature">4.6 Temperature</h3>
 <table>
 <thead>
@@ -1165,6 +1189,13 @@
 <td><code>bu_inch_hg</code></td>
 <td>3386.388640341 Pa (= 25.4 mmHg exactly)</td>
 </tr>
+<tr>
+<td><code>mH2O</code></td>
+<td><code>metre_water</code>, <code>meter_water</code></td>
+<td>metre of water column</td>
+<td><code>bu_meter_water</code></td>
+<td>9806.65 Pa (exact, conventional)</td>
+</tr>
 </tbody>
 </table>
 <blockquote>
@@ -1216,6 +1247,20 @@
 <td>foot-pound</td>
 <td><code>bu_foot_pound</code></td>
 <td>1.3558179483 J</td>
+</tr>
+<tr>
+<td><code>cal_IT</code></td>
+<td><code>calorie_IT</code></td>
+<td>International Table calorie</td>
+<td><code>bu_calorie_it</code></td>
+<td>4.1868 J (exact)</td>
+</tr>
+<tr>
+<td><code>Btu_th</code></td>
+<td><code>BTU_th</code>, <code>btu_th</code></td>
+<td>thermochemical BTU</td>
+<td><code>bu_btu_th</code></td>
+<td>23 722 880 951/22 500 000 J ≈ 1054.35026449 J</td>
 </tr>
 </tbody>
 </table>
@@ -1965,7 +2010,7 @@ which. The library refuses the pair. See doc/05 §3.15.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="425-additional-physical-units-361367">4.25 Additional Physical Units (361–367)</h3>
+<h3 id="425-additional-physical-units">4.25 Additional Physical Units</h3>
 <h4 id="length">Length</h4>
 <table>
 <thead>
@@ -2058,7 +2103,7 @@ which. The library refuses the pair. See doc/05 §3.15.</p>
 </tbody>
 </table>
 <p>SI prefixes are accepted on all units in this section. IEC prefixes are rejected for all non-digital units.</p>
-<h3 id="426-ratio-and-proportion-372377">4.26 Ratio and Proportion (372–377)</h3>
+<h3 id="426-ratio-and-proportion">4.26 Ratio and Proportion</h3>
 <p>Dimensionless scaling factors: <code>5 %</code> ≡ <code>0.05</code>, <code>250 ppm</code> ≡ <code>0.00025</code>. These do <strong>not</strong> accept SI or IEC prefixes.</p>
 <table>
 <thead>

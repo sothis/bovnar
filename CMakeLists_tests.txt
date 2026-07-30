@@ -1309,7 +1309,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 158)   # 129 base + i18n_de + wrapper_sync
+set(BVNR_EXPECTED_TEST_COUNT 159)   # 129 base + i18n_de + wrapper_sync + doc_counts
                                     #         + profiles_off_build
                                     # + om_test + cf_test
                                     # + cache_stamps + profile_factors
@@ -1573,6 +1573,23 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_un
                      ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_unit_tables.py
                      ${CMAKE_CURRENT_SOURCE_DIR})
     set_tests_properties(bvnr_doc_unit_tables PROPERTIES
+        LABELS "docs;units;gendata" TIMEOUT 60)
+endif()
+
+# ── The catalogue counts stated in prose match src/gendata ─────────────────
+# The tables are gated above; the SENTENCES were not. A stale unit count sat in
+# the README, the cheatsheet's scope line, the EBNF commentary, the IETF draft
+# and the JOSS paper for as long as the registry had been growing, because a
+# count in prose is invisible to a table check. This reads the headline numbers
+# back out of the documents and compares them to what src/gendata actually
+# holds. (Stating the old figure here would be a claim like any other, and this
+# gate would rightly fail on it -- hence the wording.)
+if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_counts.py)
+    add_test(NAME bvnr_doc_counts
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_counts.py
+                     ${CMAKE_CURRENT_SOURCE_DIR})
+    set_tests_properties(bvnr_doc_counts PROPERTIES
         LABELS "docs;units;gendata" TIMEOUT 60)
 endif()
 

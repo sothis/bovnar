@@ -214,8 +214,15 @@
   { .code = "BevelGearPitchAngle";           .bovnar = "rad";                 .reverse = false; },
   { .code = "BiodegredationHalfLife";        .bovnar = "s";                   .reverse = false; },
   { .code = "BiogeochemicalRate";            .bovnar = "mol/k~g·s";           .reverse = false; },
-  { .code = "BitRate";                       .bovnar = "Hz";                  .reverse = false; },
-  { .code = "BitTransmissionRate";           .bovnar = "s^-1";                .reverse = false; },
+  # AN INFORMATION RATE IS NOT A FREQUENCY, and six rows in this file used to
+  # say it was. The dimension vector cannot tell them apart -- both are T⁻¹ --
+  # so the derivation that filled this table took the coherent unit of that
+  # dimension, which is the hertz, and a QUDT `BitRate` came out of the parser
+  # as a frequency. The library's own kind table (bvni_kind_table in
+  # bovnar_si_units.c) calls b/s and Hz incompatible for exactly this reason, so
+  # the translated unit was one bovnar itself would refuse to convert into the
+  # thing it meant. ByteRate and ByteTransmissionRate below carry the fix;
+  # BitRate, BitTransmissionRate and DataRate are dealt with where they appear.
   { .code = "BloodGlucoseLevel";             .bovnar = "m~mol/L";             .reverse = false; },
   { .code = "BloodGlucoseLevel_Mass";        .bovnar = "m~g/c~m^3";           .reverse = false; },
   { .code = "BodyMassIndex";                 .bovnar = "k~g/m^2";             .reverse = false; },
@@ -227,8 +234,8 @@
   { .code = "BurnRate";                      .bovnar = "m/s";                 .reverse = false; },
   { .code = "BurnTime";                      .bovnar = "H/Ω";                 .reverse = false; },
   { .code = "BurstFactor";                   .bovnar = "Pa·m^2/k~g";          .reverse = false; },
-  { .code = "ByteRate";                      .bovnar = "Hz";                  .reverse = false; },
-  { .code = "ByteTransmissionRate";          .bovnar = "s^-1";                .reverse = false; },
+  { .code = "ByteRate";                      .bovnar = "B/s";                 .reverse = false; },
+  { .code = "ByteTransmissionRate";          .bovnar = "B/s";                 .reverse = false; },
   { .code = "CENTER-OF-GRAVITY_X";           .bovnar = "m";                   .reverse = false; },
   { .code = "CENTER-OF-GRAVITY_Y";           .bovnar = "m";                   .reverse = false; },
   { .code = "CENTER-OF-GRAVITY_Z";           .bovnar = "m";                   .reverse = false; },
@@ -282,7 +289,9 @@
   { .code = "CyclotronAngularFrequency";     .bovnar = "rad/s";               .reverse = false; },
   { .code = "DELTA-V";                       .bovnar = "m/s";                 .reverse = false; },
   { .code = "DRY-MASS";                      .bovnar = "k~g";                 .reverse = false; },
-  { .code = "DataRate";                      .bovnar = "Hz";                  .reverse = false; },
+  # A data rate is a bit rate: every one of QUDT's eight applicable units
+  # here is a bit or byte per second. It was Hz — see the note beside BitRate.
+  { .code = "DataRate";                      .bovnar = "b/s";                 .reverse = false; },
   { .code = "DebyeAngularFrequency";         .bovnar = "rad/s";               .reverse = false; },
   { .code = "DebyeAngularWavenumber";        .bovnar = "rad/m";               .reverse = false; },
   { .code = "DebyeTemperature";              .bovnar = "K";                   .reverse = false; },
@@ -465,7 +474,11 @@
   { .code = "Incidence";                     .bovnar = "Hz";                  .reverse = false; },
   { .code = "IncidenceProportion";           .bovnar = "Hz";                  .reverse = false; },
   { .code = "IncidenceRate";                 .bovnar = "Hz";                  .reverse = false; },
-  { .code = "InformationFlowRate";           .bovnar = "Hz";                  .reverse = false; },
+  # InformationFlowRate is REFUSED below rather than mapped: QUDT gives it three
+  # applicable units in three logarithmic bases (hartley, nat and shannon per
+  # second) and only the shannon is bovnar's bit, so the kind does not name one
+  # coherent unit. It used to map to Hz, which named a coherent unit of the
+  # wrong quantity.
   { .code = "InitialExpansionRatio";         .bovnar = "K^-1";                .reverse = false; },
   { .code = "InitialNozzleThroatDiameter";   .bovnar = "m";                   .reverse = false; },
   { .code = "InitialVehicleMass";            .bovnar = "k~g";                 .reverse = false; },
@@ -519,7 +532,10 @@
   { .code = "LinearAbsorptionCoefficient";   .bovnar = "m^-1";                .reverse = false; },
   { .code = "LinearAcceleration";            .bovnar = "m/s^2";               .reverse = false; },
   { .code = "LinearAttenuationCoefficient";  .bovnar = "m^-1";                .reverse = false; },
-  { .code = "LinearBitDensity";              .bovnar = "m^-1";                .reverse = false; },
+  # Bits per metre, not a reciprocal length: same substitution as BitRate above,
+  # and QUDT's own applicableUnit list here is unambiguous (BIT-PER-M and its
+  # binary-prefixed siblings).
+  { .code = "LinearBitDensity";              .bovnar = "b/m";                 .reverse = false; },
   { .code = "LinearCompressibility";         .bovnar = "s^2/k~g";             .reverse = false; },
   { .code = "LinearDensity";                 .bovnar = "k~g/m";               .reverse = false; },
   { .code = "LinearElectricCharge";          .bovnar = "s·A/m";               .reverse = false; },
@@ -548,9 +564,10 @@
   { .code = "LineicTorque";                  .bovnar = "N";                   .reverse = false; },
   { .code = "LinkedFlux";                    .bovnar = "N·m/A";               .reverse = false; },
   { .code = "LiquidVolume";                  .bovnar = "m^3";                 .reverse = false; },
-  { .code = "LogarithmicMedianInformationFlow_SourceToBase10"; .bovnar = "s^-1";                .reverse = false; },
-  { .code = "LogarithmicMedianInformationFlow_SourceToBase2"; .bovnar = "s^-1";                .reverse = false; },
-  { .code = "LogarithmicMedianInformationFlow_SourceToBaseE"; .bovnar = "s^-1";                .reverse = false; },
+  # Base 2 is the shannon per second, which IS the bit per second. The base-10
+  # (hartley) and base-e (nat) siblings have no native unit and are refused
+  # below; all three used to be s⁻¹, i.e. a frequency.
+  { .code = "LogarithmicMedianInformationFlow_SourceToBase2"; .bovnar = "b/s";                 .reverse = false; },
   { .code = "LondonPenetrationDepth";        .bovnar = "m";                   .reverse = false; },
   { .code = "LorenzCoefficient";             .bovnar = "V^2/K^2";             .reverse = false; },
   { .code = "LossAngle";                     .bovnar = "rad";                 .reverse = false; },
@@ -736,7 +753,13 @@
   { .code = "PowerAreaPerSolidAngle";        .bovnar = "W·m^2/sr";            .reverse = false; },
   { .code = "PowerConstant";                 .bovnar = "m·k~g/s^2·A";         .reverse = false; },
   { .code = "PowerPerArea";                  .bovnar = "m·Pa/s";              .reverse = false; },
-  { .code = "PowerPerAreaAngle";             .bovnar = "k~g/s^3";             .reverse = false; },
+  # Radiance under another name: power per area per solid angle. QUDT states no
+  # applicableUnit for it, and the dimension vector (M·T⁻³) is the same one
+  # `Radiance` carries, so the derivation dropped the steradian and produced
+  # W/m² -- IRRADIANCE, a different quantity, and one the library's kind table
+  # keeps separate for the same reason it keeps lm from cd. `Radiance` a few
+  # lines below already spells it correctly; these two now agree with it.
+  { .code = "PowerPerAreaAngle";             .bovnar = "W/m^2·sr";            .reverse = false; },
   { .code = "PowerPerAreaQuarticTemperature"; .bovnar = "W/m^2·K^4";           .reverse = false; },
   { .code = "PowerPerElectricCharge";        .bovnar = "V/s";                 .reverse = false; },
   { .code = "PoyntingVector";                .bovnar = "W/m^2";               .reverse = false; },
@@ -801,10 +824,8 @@
   { .code = "RocketAtmosphericTransverseForce"; .bovnar = "k~g·m/s^2";           .reverse = false; },
   { .code = "Rotary-TranslatoryMotionConversion"; .bovnar = "m/rad";               .reverse = false; },
   { .code = "RotaryShock";                   .bovnar = "m^2·k~g/s";           .reverse = false; },
-  { .code = "RotationalFrequency";           .bovnar = "Hz";                  .reverse = false; },
   { .code = "RotationalMass";                .bovnar = "k~g·m^2";             .reverse = false; },
   { .code = "RotationalStiffness";           .bovnar = "N·m/rad";             .reverse = false; },
-  { .code = "RotationalVelocity";            .bovnar = "Hz";                  .reverse = false; },
   { .code = "ScalarMagneticPotential";       .bovnar = "V·s/m";               .reverse = false; },
   { .code = "SecondAxialMomentOfArea";       .bovnar = "m^4";                 .reverse = false; },
   { .code = "SecondMomentOfArea";            .bovnar = "m^4";                 .reverse = false; },
@@ -967,7 +988,7 @@
   { .code = "TotalLinearStoppingPower";      .bovnar = "J/m";                 .reverse = false; },
   { .code = "TotalMassStoppingPower";        .bovnar = "J·m^2/k~g";           .reverse = false; },
   { .code = "TotalPressure";                 .bovnar = "k~g/m·s^2";           .reverse = false; },
-  { .code = "TotalRadiance";                 .bovnar = "k~g/s^3";             .reverse = false; },
+  { .code = "TotalRadiance";                 .bovnar = "W/m^2·sr";            .reverse = false; },
   { .code = "TouchThresholds";               .bovnar = "m";                   .reverse = false; },
   { .code = "TransmissionRatioBetweenRotationAndTranslation"; .bovnar = "m";                   .reverse = false; },
   { .code = "TrueExhaustVelocity";           .bovnar = "m/s";                 .reverse = false; },
@@ -1029,6 +1050,28 @@
   { .code = "LogarithmicRatio";   .why = "no coherent unit — dB and Np carry no reference level"; },
   { .code = "Currency";           .why = "not a physical kind — write an ISO 4217 unit with the $ sigil"; },
   { .code = "InformationEntropy"; .why = "QUDT's coherent unit here is the bit, which bovnar treats as a unit of information rather than of entropy"; },
+  # The three below are the same refusal one step along: an information RATE
+  # whose logarithmic base is not settled, or is settled on a base bovnar has no
+  # unit for. Each was mapped to Hz or s⁻¹ before, which is a coherent unit of
+  # the right dimension and the wrong quantity — see the note beside BitRate.
+  # QUDT names the BIT and then gives the kind one applicable unit, the OCTET
+  # per second — a BYTE rate. bovnar carries bit and byte as separate kinds
+  # with no factor between them, so the vocabulary itself does not say which of
+  # two incommensurable units this kind means. It used to say Hz, which is
+  # neither. Write qudt:BIT-PER-SEC or qudt:BYTE-PER-SEC and there is no doubt.
+  { .code = "BitRate"; .why = "QUDT names the bit and lists only the octet per second as the applicable unit, so the kind does not settle whether it is b/s or B/s — two units bovnar holds incommensurable"; },
+  { .code = "BitTransmissionRate"; .why = "the same ambiguity as BitRate: QUDT names the bit and states the octet per second"; },
+  # QUDT pools the hertz and the revolution per second into one kind. bovnar
+  # does not: a revolution is an ANGLE of 2π radians and a hertz is a count per
+  # second, and the two differ by exactly that 2π (see the note on C94/M46 in
+  # unece.bvnr). So these two kinds name a frequency and an angular rate at
+  # once, and no single coherent unit answers for both. Write qudt-qk:Frequency
+  # for the count and qudt-qk:AngularVelocity for the angle.
+  { .code = "RotationalFrequency"; .why = "QUDT's applicable units mix the hertz with the revolution per second, which bovnar holds to be a frequency and an angular rate — different quantities, 2π apart"; },
+  { .code = "RotationalVelocity"; .why = "the same pooling as RotationalFrequency: a hertz and a revolution per second are not one quantity here"; },
+  { .code = "InformationFlowRate"; .why = "QUDT gives this kind three applicable units in three logarithmic bases — hartley, nat and shannon per second — and only the shannon is bovnar's bit, so the kind names no single coherent unit"; },
+  { .code = "LogarithmicMedianInformationFlow_SourceToBase10"; .why = "a hartley per second; bovnar has no unit for the base-10 information content"; },
+  { .code = "LogarithmicMedianInformationFlow_SourceToBaseE"; .why = "a nat per second; bovnar has no unit for the base-e information content"; },
 
   # ── Closing the table against QUDT quantity kinds ─────────────────────
   #

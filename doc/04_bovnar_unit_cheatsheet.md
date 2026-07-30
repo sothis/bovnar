@@ -2,7 +2,7 @@
 
 > **Spec version:** 1.1
 > **Status:** Reference — the symbol tables of the unit and currency registry
-> **Scope:** 180 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.
+> **Scope:** 192 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.
 
 ---
 
@@ -36,8 +36,8 @@
     - 4.22 [Electrical Power](#422-electrical-power)
     - 4.23 [Textile Linear Density](#423-textile-linear-density)
     - 4.24 [Old German Units](#424-old-german-units)
-    - 4.25 [Additional Physical Units (361–367)](#425-additional-physical-units-361367)
-    - 4.26 [Ratio and Proportion (372–377)](#426-ratio-and-proportion-372377)
+    - 4.25 [Additional Physical Units](#425-additional-physical-units)
+    - 4.26 [Ratio and Proportion](#426-ratio-and-proportion)
     - 4.27 [Named Speeds & Acidity](#427-named-speeds--acidity)
     - 4.28 [Water Hardness](#428-water-hardness)
     - 4.29 [Water-Quality Instrument Scales](#429-water-quality-instrument-scales)
@@ -244,6 +244,11 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly
 | `slug`  | `slugs` | slug | `bu_slug` | 14.593902937 kg |
 | `dr`    | `dram`, `drams` | dram (avoirdupois) | `bu_dram` | 1.7718451953125×10⁻³ kg (exact) |
 | `dwt`   | `pennyweight`, `pennyweights` | pennyweight (troy) | `bu_pennyweight` | 1.55517384×10⁻³ kg (exact) |
+| `lb_t`  | `troy_pound`, `troy_pounds`, `apothecary_pound` | troy pound (= apothecary pound) | `bu_troy_pound` | 0.3732417216 kg (exact, = 12 `oz_t`) |
+| `dr_ap` | `apothecary_dram`, `apothecary_drams` | dram (apothecary) | `bu_apothecary_dram` | 3.8879346×10⁻³ kg (exact, = 3 `sc`) |
+| `cwt_l` | `long_hundredweight`, `long_hundredweights` | hundredweight (long/imperial) | `bu_long_hundredweight` | 50.80234544 kg (exact, = 112 `lb`) |
+
+> `dr_ap` is **2.2× the avoirdupois `dr`**, and the short hundredweight is exactly `h~lb`, so it has no unit of its own.
 
 ### 4.6 Temperature
 
@@ -282,6 +287,7 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly
 | `Torr` | `torr` | torr | `bu_torr` | 101 325/760 Pa |
 | `psi`  | — | pound-force per square inch | `bu_psi` | 6894.757293168362 Pa |
 | `inHg` | `inch_hg`, `inch_mercury` | inch of mercury | `bu_inch_hg` | 3386.388640341 Pa (= 25.4 mmHg exactly) |
+| `mH2O` | `metre_water`, `meter_water` | metre of water column | `bu_meter_water` | 9806.65 Pa (exact, conventional) |
 
 > `at ≠ atm`: 1 at = 98 066.5 Pa; 1 atm = 101 325 Pa.
 
@@ -294,6 +300,8 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly
 | `erg`   | `ergs` | erg | `bu_erg` | 10⁻⁷ J (exact) |
 | `thm`   | `therm`, `therms` | US therm | `bu_therm` | 1.05480400×10⁸ J (exact) |
 | `ft_lb` | `foot_pound`, `foot_pounds` | foot-pound | `bu_foot_pound` | 1.3558179483 J |
+| `cal_IT` | `calorie_IT` | International Table calorie | `bu_calorie_it` | 4.1868 J (exact) |
+| `Btu_th` | `BTU_th`, `btu_th` | thermochemical BTU | `bu_btu_th` | 23 722 880 951/22 500 000 J ≈ 1054.35026449 J |
 
 > `BTU` (all-caps) is a valid alias: with no `$` sigil the token is a physical-unit lookup (the currency table is only consulted for `$`-prefixed tokens), and it matches `bu_btu`. `Btu` and `btu` are also accepted.
 
@@ -478,7 +486,7 @@ No Old German unit accepts any SI or IEC prefix (`bvn_prefix_unit_valid` rejects
 |----------|-----------|------|------|--------|
 | `schffl` | `scheffel`, `prussian_scheffel` | Scheffel (Prussian) | `bu_scheffel` | 54.961×10⁻³ m³ |
 
-### 4.25 Additional Physical Units (361–367)
+### 4.25 Additional Physical Units
 
 #### Length
 
@@ -504,7 +512,7 @@ No Old German unit accepts any SI or IEC prefix (`bvn_prefix_unit_valid` rejects
 
 SI prefixes are accepted on all units in this section. IEC prefixes are rejected for all non-digital units.
 
-### 4.26 Ratio and Proportion (372–377)
+### 4.26 Ratio and Proportion
 
 Dimensionless scaling factors: `5 %` ≡ `0.05`, `250 ppm` ≡ `0.00025`. These do **not** accept SI or IEC prefixes.
 

@@ -1273,6 +1273,14 @@ static void test_nonsi_enum_order(void)
 	ASSERT_TRUE((int)bu_delta_newton_temp   == 100183, "bu_delta_newton_temp == 100183");
 	ASSERT_TRUE((int)bu_delta_reaumur       == 100184, "bu_delta_reaumur == 100184");
 	ASSERT_TRUE((int)bu_delta_romer         == 100185, "bu_delta_romer == 100185");
+	/* The units the profiles needed: each unblocked a run of publisher codes
+	 * that had no native unit to land on. */
+	ASSERT_TRUE((int)bu_meter_water         == 100186, "bu_meter_water == 100186");
+	ASSERT_TRUE((int)bu_calorie_it          == 100187, "bu_calorie_it == 100187");
+	ASSERT_TRUE((int)bu_btu_th              == 100188, "bu_btu_th == 100188");
+	ASSERT_TRUE((int)bu_troy_pound          == 100189, "bu_troy_pound == 100189");
+	ASSERT_TRUE((int)bu_apothecary_dram     == 100190, "bu_apothecary_dram == 100190");
+	ASSERT_TRUE((int)bu_long_hundredweight  == 100191, "bu_long_hundredweight == 100191");
 	/* The native units are block 10 of a blocked id space: one contiguous run
 	 * from BVN_UNIT_NATIVE_FIRST, and the whole of it below every profile's
 	 * block. Both matter. The run is what makes the dense table slot plain
@@ -1282,11 +1290,11 @@ static void test_nonsi_enum_order(void)
 	 * silently stop converting. */
 	ASSERT_EQ_INT((int)bu_bit, BVN_UNIT_NATIVE_FIRST,
 	              "the first native unit opens block 10");
-	ASSERT_EQ_INT((int)bu_delta_romer, BVN_UNIT_NATIVE_LAST,
+	ASSERT_EQ_INT((int)bu_long_hundredweight, BVN_UNIT_NATIVE_LAST,
 	              "the last native unit closes the run");
 	ASSERT_EQ_INT(BVN_UNIT_NATIVE_LAST - BVN_UNIT_NATIVE_FIRST + 1,
 	              BVN_UNIT_NATIVE_COUNT, "the native run has no holes");
-	ASSERT_TRUE((int)bu_delta_romer < BVN_PROFILE_UCUM_OPAQUE_FIRST,
+	ASSERT_TRUE((int)bu_long_hundredweight < BVN_PROFILE_UCUM_OPAQUE_FIRST,
 	            "native units sit below every profile block");
 	ASSERT_EQ_INT(BVN_UNIT_NATIVE_FIRST, 100000, "block 10 starts at 100000");
 	ASSERT_EQ_INT(BVN_PROFILE_UCUM_OPAQUE_FIRST, 200000,

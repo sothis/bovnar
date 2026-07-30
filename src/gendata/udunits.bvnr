@@ -329,6 +329,57 @@
   { .code = "mm_Hg";                  .bovnar = "mmHg"; .metric = false; },
   { .code = "inHg";                   .bovnar = "inHg"; .metric = false; },
   { .code = "in_Hg";                  .bovnar = "inHg"; .metric = false; },
+
+  # ── Water and mercury columns ─────────────────────────────────────────
+  #
+  # UDUNITS states both columns as pressure GRADIENTS -- `H2O` is
+  # `gravity 1000 kg/m^3`, i.e. 9806.65 Pa per metre -- and then builds every
+  # pressure as a LENGTH times one of them: cmH2O is `cm H2O`, inHg is
+  # `inch Hg`. bovnar can say that exactly: mH2O/m and mmHg/m~m are the two
+  # gradients, so the atoms map and the expressions built on them fall out of
+  # the profile's own grammar rather than needing a row each.
+  #
+  # The water column needed bu_meter_water, which is why these were refused
+  # until it existed; the mercury one did not, and was refused only because a
+  # gradient was read as 'not a native unit'.
+  { .code = "H2O";                     .bovnar = "mH2O/m";      .metric = false; .reverse = false; },
+  { .code = "h2o";                     .bovnar = "mH2O/m";      .metric = false; .reverse = false; },
+  { .code = "conventional_water";      .bovnar = "mH2O/m";      .metric = false; .reverse = false; },
+  { .code = "water";                   .bovnar = "mH2O/m";      .metric = false; .reverse = false; },
+  { .code = "cm_H2O";                  .bovnar = "c~mH2O";      .metric = false; .reverse = false; },
+  { .code = "cmH2O";                   .bovnar = "c~mH2O";      .metric = false; },
+  { .code = "ftH2O";                   .bovnar = "ft·mH2O/m";   .metric = false; .reverse = false; },
+  { .code = "fth2o";                   .bovnar = "ft·mH2O/m";   .metric = false; .reverse = false; },
+  { .code = "foot_water";              .bovnar = "ft·mH2O/m";   .metric = false; .reverse = false; },
+  { .code = "feet_water";              .bovnar = "ft·mH2O/m";   .metric = false; .reverse = false; },
+  { .code = "foot_H2O";                .bovnar = "ft·mH2O/m";   .metric = false; .reverse = false; },
+  { .code = "feet_H2O";                .bovnar = "ft·mH2O/m";   .metric = false; .reverse = false; },
+  { .code = "footH2O";                 .bovnar = "ft·mH2O/m";   .metric = false; .reverse = false; },
+  { .code = "feetH2O";                 .bovnar = "ft·mH2O/m";   .metric = false; .reverse = false; },
+  { .code = "Hg";                      .bovnar = "mmHg/m~m";    .metric = false; .reverse = false; },
+  { .code = "mercury_0C";              .bovnar = "mmHg/m~m";    .metric = false; .reverse = false; },
+  { .code = "mercuries_0C";            .bovnar = "mmHg/m~m";    .metric = false; .reverse = false; },
+  { .code = "mercury_32F";             .bovnar = "mmHg/m~m";    .metric = false; .reverse = false; },
+  { .code = "mercuries_32F";           .bovnar = "mmHg/m~m";    .metric = false; .reverse = false; },
+  { .code = "conventional_mercury";    .bovnar = "mmHg/m~m";    .metric = false; .reverse = false; },
+  { .code = "conventional_mercuries";  .bovnar = "mmHg/m~m";    .metric = false; .reverse = false; },
+
+  # UDUNITS' unqualified calorie is the INTERNATIONAL TABLE one (4.1868 J);
+  # its thermochemical_calorie is what bovnar spells `cal`. Both now have a
+  # unit of their own to land on, so neither has to be refused to keep the
+  # other honest.
+  { .code = "calorie";                 .bovnar = "cal_IT";      .metric = false; .reverse = false; },
+  { .code = "cal";                     .bovnar = "cal_IT";      .metric = false; },
+  { .code = "IT_calorie";              .bovnar = "cal_IT";      .metric = false; .reverse = false; },
+
+  # Apothecary and troy masses. The apothecary pound is twelve apothecary
+  # ounces and an apothecary ounce IS a troy ounce, so all three spellings
+  # are one unit; `troy_pound` is the one it is written back as.
+  { .code = "troy_pound";              .bovnar = "lb_t";        .metric = false; },
+  { .code = "apothecary_pound";        .bovnar = "lb_t";        .metric = false; .reverse = false; },
+  { .code = "appound";                 .bovnar = "lb_t";        .metric = false; .reverse = false; },
+  { .code = "apdram";                  .bovnar = "dr_ap";       .metric = false; },
+  { .code = "long_hundredweight";      .bovnar = "cwt_l";       .metric = false; },
   { .code = "inch_Hg";                .bovnar = "inHg"; .metric = false; },
   { .code = "lbf";                    .bovnar = "lbf";  .metric = false; },
   { .code = "pound_force";            .bovnar = "lbf";  .metric = false; },
@@ -685,9 +736,6 @@
   # It could not when this block was written: at 22 bytes it put the profile's
   # worst case over BVNR_UNIT_STRING_MAX, which was 192. That constant is 1024
   # now, so the spelling fits and the unqualified forms below stay refused.
-  { .code = "calorie";                .why = "the unqualified UDUNITS calorie is the IT calorie (4.1868 J); native cal is thermochemical — write the native cal"; },
-  { .code = "cal";                    .why = "the unqualified UDUNITS cal is the IT calorie; native cal is thermochemical — write the native cal"; },
-  { .code = "IT_calorie";             .why = "IT calorie (4.1868 J); native cal is thermochemical"; },
 
   # ── Scales with no decade to fold into ───────────────────────────────────
   { .code = "shake"; .why = "1e-8 s — there is no SI prefix for 10⁻⁸"; },
@@ -732,11 +780,6 @@
   { .code = "degreeW";                 .why = "a coordinate direction, not a unit"; },
   { .code = "degreesW";                .why = "a coordinate direction, not a unit"; },
   { .code = "assay_ton";               .why = "assay ton (29.16667 g) — not a decade off any native mass"; },
-  { .code = "long_hundredweight";      .why = "long hundredweight (112 lb) — 112 is not a decade"; },
-  { .code = "troy_pound";              .why = "troy pound (12 troy ounces) — no native form"; },
-  { .code = "apothecary_pound";        .why = "troy pound (12 troy ounces) — no native form"; },
-  { .code = "apdram";                  .why = "apothecary dram; native dr is the avoirdupois dram"; },
-  { .code = "appound";                 .why = "apothecary pound (12 troy ounces) — no native form"; },
   { .code = "bag";                     .why = "bag (94 lb) — 94 is not a decade"; },
   { .code = "printers_point";          .why = "printer's point — no native typographic length"; },
   { .code = "printers_pica";           .why = "printer's pica — no native typographic length"; },
@@ -776,39 +819,18 @@
   { .code = "sidereal_minute";         .why = "sidereal minute — native min is the ordinary one"; },
   { .code = "sidereal_second";         .why = "sidereal second — native s is the ordinary one"; },
   { .code = "eon";                     .why = "eon (1e9 UDUNITS years) — UDUNITS' year is the tropical year and native yr is the Julian one, the same disagreement that keeps the bare year itself out of the mapped list"; },
-  { .code = "H2O";                     .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "h2o";                     .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "conventional_water";      .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "water";                   .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "water_4C";                .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "waters_4C";               .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "water_39F";               .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "waters_39F";              .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "water_60F";               .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "waters_60F";              .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "Hg";                      .why = "the mercury column as a pressure GRADIENT (133322 Pa/m), which is how UDUNITS builds its mercury pressures — not a pressure itself and not a native unit. The pressures built on it, mmHg cmHg inHg, do map"; },
-  { .code = "mercury_0C";              .why = "the mercury column as a pressure GRADIENT (133322 Pa/m), which is how UDUNITS builds its mercury pressures — not a pressure itself and not a native unit. The pressures built on it, mmHg cmHg inHg, do map"; },
-  { .code = "mercuries_0C";            .why = "the mercury column as a pressure GRADIENT (133322 Pa/m), which is how UDUNITS builds its mercury pressures — not a pressure itself and not a native unit. The pressures built on it, mmHg cmHg inHg, do map"; },
-  { .code = "mercury_32F";             .why = "the mercury column as a pressure GRADIENT (133322 Pa/m), which is how UDUNITS builds its mercury pressures — not a pressure itself and not a native unit. The pressures built on it, mmHg cmHg inHg, do map"; },
-  { .code = "mercuries_32F";           .why = "the mercury column as a pressure GRADIENT (133322 Pa/m), which is how UDUNITS builds its mercury pressures — not a pressure itself and not a native unit. The pressures built on it, mmHg cmHg inHg, do map"; },
-  { .code = "conventional_mercury";    .why = "the mercury column as a pressure GRADIENT (133322 Pa/m), which is how UDUNITS builds its mercury pressures — not a pressure itself and not a native unit. The pressures built on it, mmHg cmHg inHg, do map"; },
-  { .code = "conventional_mercuries";  .why = "the mercury column as a pressure GRADIENT (133322 Pa/m), which is how UDUNITS builds its mercury pressures — not a pressure itself and not a native unit. The pressures built on it, mmHg cmHg inHg, do map"; },
+  { .code = "water_4C"; .why = "UDUNITS builds this on water at 999.972 kg/m³; native mH2O is the CONVENTIONAL column, 1000 kg/m³ exactly. 28 ppm apart — a different water, not a different spelling"; },
+  { .code = "waters_4C"; .why = "see water_4C: a 999.972 kg/m³ column, not the conventional one"; },
+  { .code = "water_39F"; .why = "see water_4C: a 999.972 kg/m³ column, not the conventional one"; },
+  { .code = "waters_39F"; .why = "see water_4C: a 999.972 kg/m³ column, not the conventional one"; },
+  { .code = "water_60F"; .why = "UDUNITS builds this on water at 999.001 kg/m³; native mH2O is the conventional 1000 kg/m³ column, 999 ppm away"; },
+  { .code = "waters_60F"; .why = "see water_60F: a 999.001 kg/m³ column, not the conventional one"; },
   { .code = "mercury_60F";             .why = "60 degF mercury column — native mmHg is the conventional 0 degC one"; },
   { .code = "mercuries_60F";           .why = "60 degF mercury column — native mmHg is the conventional 0 degC one"; },
-  { .code = "cm_H2O";                  .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "cmH2O";                   .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "inch_H2O_39F";            .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "inches_H2O_39F";          .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "inch_H2O_60F";            .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "inches_H2O_60F";          .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "ftH2O";                   .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "fth2o";                   .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "foot_water";              .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "feet_water";              .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "foot_H2O";                .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "feet_H2O";                .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "footH2O";                 .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
-  { .code = "feetH2O";                 .why = "water column — bovnar has no water-column unit; the technical atmosphere is exactly ten metres of water, so a mapping onto it would be numerically perfect and would hand a centimetre of water back as a millitechnical atmosphere. Same refusal as ucum m[H2O]"; },
+  { .code = "inch_H2O_39F"; .why = "an inch of the 999.972 kg/m³ column — see water_4C; the conventional inch of water is in·mH2O/m"; },
+  { .code = "inches_H2O_39F"; .why = "an inch of the 999.972 kg/m³ column — see water_4C"; },
+  { .code = "inch_H2O_60F"; .why = "an inch of the 999.001 kg/m³ column — see water_60F"; },
+  { .code = "inches_H2O_60F"; .why = "an inch of the 999.001 kg/m³ column — see water_60F"; },
   { .code = "inch_Hg_60F";             .why = "60 degF inch of mercury — native inHg is the conventional 0 degC one"; },
   { .code = "inches_Hg_60F";           .why = "60 degF inch of mercury — native inHg is the conventional 0 degC one"; },
   { .code = "B_SPL";                   .why = "bel SPL — dB carries no reference level"; },

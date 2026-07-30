@@ -108,7 +108,7 @@ The Bovnar quantity annotation system is an **optional, per-value annotation** t
 
 Two distinct namespaces share the annotation slot:
 
-- **Physical units** — 180 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
+- **Physical units** — 192 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
 - **Currency codes** — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical — HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01 — and `ANG` coexists with its successor `XCG`, which inherited its numeric code 532; see §9.2) and 50 cryptocurrency tickers.
 
 Both namespaces are syntactically unified: the same grammar, the same `~` prefix separator, the same compound-unit operators (`·`, `*`, `/`), and the same `value_unit_t` data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.
@@ -322,6 +322,14 @@ Bovnar supports 180 named physical base units. Currency codes are a separate nam
 | `slug` | `slugs` | slug | `bu_slug` | 14.593902937 kg |
 | `dr`   | `dram`, `drams` | dram (avoirdupois) | `bu_dram` | 1.7718451953125×10⁻³ kg (exact) |
 | `dwt`  | `pennyweight`, `pennyweights` | pennyweight (troy) | `bu_pennyweight` | 1.55517384×10⁻³ kg (exact) |
+| `lb_t` | `troy_pound`, `troy_pounds`, `apothecary_pound` | troy pound (= apothecary pound) | `bu_troy_pound` | 0.3732417216 kg (exact, = 12 `oz_t`) |
+| `dr_ap`| `apothecary_dram`, `apothecary_drams` | dram (apothecary) | `bu_apothecary_dram` | 3.8879346×10⁻³ kg (exact, = 3 `sc`) |
+| `cwt_l`| `long_hundredweight`, `long_hundredweights` | hundredweight (long/imperial) | `bu_long_hundredweight` | 50.80234544 kg (exact, = 112 `lb`) |
+
+> The apothecary dram is **2.2×** the avoirdupois `dr` and the two are a classic near miss; the
+> apothecary POUND, by contrast, *is* the troy pound (twelve apothecary ounces, and an apothecary
+> ounce is a troy ounce), so both spellings are one unit. The SHORT hundredweight is exactly 100 lb,
+> which the prefix mechanism already spells `h~lb`, so it has no unit of its own.
 
 #### Temperature
 
@@ -383,6 +391,14 @@ A bare array is homogeneous in its unit (spec [§7.4](03_bovnar_spec.md#74-eleme
 | `Torr` | `torr` | torr | `bu_torr` | 101325/760 Pa |
 | `psi`  | — | pound-force per square inch | `bu_psi` | 6894.757293168362 Pa |
 | `inHg` | `inch_hg`, `inch_mercury` | inch of mercury | `bu_inch_hg` | 3386.388640341 Pa (= 25.4 mmHg exactly) |
+| `mH2O` | `metre_water`, `meter_water` | metre of water column | `bu_meter_water` | 9806.65 Pa (exact, conventional) |
+
+> `mH2O` takes prefixes, so the spellings people actually write fall out of it: `c~mH2O` (or the
+> compact `cmH2O`) is the centimetre of water a ventilator is set in, and `m~mH2O` the millimetre.
+> The value is the conventional column — water at 1000 kg/m³ under standard gravity — the same kind
+> of convention that fixes `mmHg` at exactly 133.322387415 Pa. A column measured at a stated
+> temperature (UDUNITS' `water_4C`, QUDT's `IN_H2O`) is a *different* unit and is refused, not
+> rounded onto this one.
 
 ### 3.6 Energy Units
 
@@ -393,6 +409,18 @@ A bare array is homogeneous in its unit (spec [§7.4](03_bovnar_spec.md#74-eleme
 | `erg`  | `ergs` | erg | `bu_erg` | 10⁻⁷ J (exact) |
 | `thm`  | `therm`, `therms` | US therm | `bu_therm` | 1.05480400×10⁸ J (exact) |
 | `ft_lb` | `foot_pound`, `foot_pounds` | foot-pound | `bu_foot_pound` | 1.3558179483 J |
+| `cal_IT` | `calorie_IT` | International Table calorie | `bu_calorie_it` | 4.1868 J (exact) |
+| `Btu_th` | `BTU_th`, `btu_th` | thermochemical BTU | `bu_btu_th` | 23722880951/22500000 J ≈ 1054.35026449 J |
+
+> **Two calories and two BTUs, and the pairs cross over.** `cal` is the THERMOCHEMICAL calorie and
+> `Btu` the INTERNATIONAL TABLE BTU, which is not an inconsistency but the two vocabularies' own
+> defaults: UCUM's unqualified `cal` is thermochemical and its unqualified `[Btu]` is too, while
+> UDUNITS' unqualified `calorie` is the IT one. Each pair is 0.067 % apart — dimensionally identical
+> and numerically wrong if confused — so both members of both pairs are carried and every profile
+> code lands on the one its own vocabulary says it means. Both BTUs are one pound of water raised
+> one degree Fahrenheit, i.e. the corresponding calorie × 453.59237 g/lb × 5/9; that terminates for
+> the IT calorie and does not for the thermochemical one, which is why `Btu_th` states an exact
+> rational rather than a decimal.
 
 > **`BTU` alias note:** `BTU` (all uppercase, three characters) is a valid alias for `bu_btu`. Because currencies require the `$` sigil, the bare token `BTU` is a physical-unit lookup and resolves to `bu_btu`; `Btu` and `btu` are also accepted. See §10.2 for the complete look-alike table.
 
@@ -1624,7 +1652,7 @@ A base unit's id is **blocked**, not a running counter: the leading two decimal 
 | 80 | 800000–809999 | CF standard names | `src/gendata/cf.bvnr` |
 | 90 | 900000–909999 | currencies | `src/gendata/currencies.bvnr` |
 
-`bu_none` is 0 and belongs to no block; every tag between the native units and the currencies is now taken, so a further vocabulary needs one outside 10–90. Blocks 40–80 currently contribute no ids at all: those vocabularies map every code onto a native unit, and the block tag reserves their room rather than filling it. Within block 10 the 180 native units run contiguously from `bu_bit` = 100000 to `bu_turbidity_jtu` = 100179, in the order of `units.bvnr`. Currencies run contiguously from 900000 and — unlike every other block — have **no named `bu_*` enumerators** (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a `$` sigil, resolved by `bvn_parse_currency_str` and carried as the numeric `base` value. `bvn_unit_is_currency(base)` is a bounds check over block 90.
+`bu_none` is 0 and belongs to no block; every tag between the native units and the currencies is now taken, so a further vocabulary needs one outside 10–90. Blocks 40–80 currently contribute no ids at all: those vocabularies map every code onto a native unit, and the block tag reserves their room rather than filling it. Within block 10 the native units run contiguously from `bu_bit` = 100000 to `bu_long_hundredweight` = 100191, in the order of `units.bvnr`; `BVN_UNIT_NATIVE_FIRST`, `BVN_UNIT_NATIVE_LAST` and `BVN_UNIT_NATIVE_COUNT` are generated beside the enum, so read the bounds from those rather than from this sentence. Currencies run contiguously from 900000 and — unlike every other block — have **no named `bu_*` enumerators** (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a `$` sigil, resolved by `bvn_parse_currency_str` and carried as the numeric `base` value. `bvn_unit_is_currency(base)` is a bounds check over block 90.
 
 Only a vocabulary that contributes units of its *own* takes a block. A unit profile is a spelling for the unit slot, so most of its codes translate to native units and carry native ids; the ones that get a block id of their own are the **opaque** units — codes with no native equivalent and no dimension, such as UCUM's assay-defined `[IU]` or UN/ECE's package types — which need an identity precisely because nothing else can stand in for them.
 
@@ -1791,13 +1819,18 @@ typedef enum value_base_unit_e {
 /* Not a member of the enum, and NOT a bound on it: the number of rows in the
  * dense tables the library indexes by bvni_unit_slot(). The id space is
  * sparse, so it has no "one past the end". */
-/* #define BVN_UNIT_SLOT_COUNT 247 */
+/* #define BVN_UNIT_SLOT_COUNT 259 */
 ```
 
 #### `unit_exponent_t`
 
 ```c
+#define BVN_EXPONENT_MIN	(-100)
+#define BVN_EXPONENT_MAX	( 100)
+
 typedef enum unit_exponent_e {
+    exp_range_min  = BVN_EXPONENT_MIN,
+    exp_range_max  = BVN_EXPONENT_MAX,
     exp_invalid    =   0,
     exp_linear     =   1,  exp_square    =  2,  exp_cubic     =  3,
     exp_quartic    =   4,  exp_quintic   =  5,  exp_sextic    =  6,
@@ -1807,6 +1840,13 @@ typedef enum unit_exponent_e {
     exp_neg_septic =  -7,  exp_neg_octic = -8,  exp_neg_nonic = -9,
 } unit_exponent_t;
 ```
+
+**The named enumerators are not the range.** They cover ±1…±9 and are kept because callers use them;
+the type carries any integer in `[BVN_EXPONENT_MIN, BVN_EXPONENT_MAX]` = ±100, which is what §6 and
+the grammar describe. `exp_range_min`/`exp_range_max` are enumerators so that the underlying type is
+wide enough for them on every conforming compiler; neither is a valid exponent to *use*. Do not
+switch exhaustively over this enum, and do not assume a value outside the named nine is invalid —
+ask `bvn_int_to_exponent`, which returns `exp_invalid` for anything out of range.
 
 `exp_invalid` (value `0`) is the zero-initialization sentinel. Always initialize components before use.
 

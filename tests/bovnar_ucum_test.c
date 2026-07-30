@@ -405,7 +405,7 @@ static void test_sweep_round_trip(void)
 	long same = 0, no_code = 0, differ = 0, rejected = 0;
 
 	printf("  sweeping the registry for native -> UCUM -> native...\n");
-	/* Block 10 only: the 180 native units, one contiguous run. Currencies
+	/* Block 10 only: the native units, one contiguous run. Currencies
 	 * (block 90) and the profiles' opaque units (blocks 20+) have no native
 	 * spelling to sweep and are covered by their own tests. */
 	for (int b = BVN_UNIT_NATIVE_FIRST; b <= BVN_UNIT_NATIVE_LAST; b++) {
@@ -456,7 +456,7 @@ static void test_sweep_round_trip(void)
 	}
 	/* The figures doc/11 §5.3 quotes. Kept as named constants so the failure
 	 * message cannot disagree with what is actually compared. */
-	enum { DOC_SAME = 627, DOC_NO_CODE = 1250, DOC_REJECTED = 355 };
+	enum { DOC_SAME = 655, DOC_NO_CODE = 1294, DOC_REJECTED = 355 };
 	tests++;
 	if (same != DOC_SAME || no_code != DOC_NO_CODE || rejected != DOC_REJECTED) {
 		fprintf(stderr,
@@ -629,17 +629,46 @@ static void test_regressions(void)
 #undef CHK_UCUM
 
 	/*
-	 * Near-miss mappings the table refuses on purpose, because each is
-	 * dimensionally correct and numerically wrong — the failure no later check
-	 * would catch. UCUM's unqualified BTU is thermochemical and bovnar's Btu is
-	 * the IT one; the apothecary dram is 2.2x the avoirdupois dram bovnar has.
+	 * The near misses. Each of these pairs is dimensionally identical and
+	 * numerically different, which is the failure no later check would catch,
+	 * and each used to be half refused: bovnar had the IT BTU and not the
+	 * thermochemical one, the thermochemical calorie and not the IT one, the
+	 * avoirdupois dram and not the apothecary one, so [Btu], cal_IT and [dr_ap]
+	 * could only be turned away.
+	 *
+	 * Both halves of each pair are now units, so what is pinned here is that
+	 * they stay APART: the two spellings land on two different bases, at the
+	 * two different values, and the unqualified UCUM code lands on the one UCUM
+	 * says it means. A regression that collapsed a pair would be exactly the
+	 * silent 0.07 % (or 2.2x) error the refusals were protecting against.
 	 */
-	chk_error("ucum:[Btu]",   error_unit_profile_unsupported);
-	chk_error("ucum:cal_IT",  error_unit_profile_unsupported);
-	chk_error("ucum:[dr_ap]", error_unit_profile_unsupported);
 	chk_str("ucum:[Btu_IT]", "Btu");
+	chk_str("ucum:[Btu_th]", "Btu_th");
+	chk_str("ucum:[Btu]",    "Btu_th");   /* UCUM defines [Btu] AS [Btu_th] */
+	chk_factor("ucum:[Btu_IT]", 1055.05585262);
+	chk_factor("ucum:[Btu_th]", 1054.3502644888889);
+	chk_str("ucum:cal_th",  "cal");
+	chk_str("ucum:cal",     "cal");       /* UCUM's bare cal is thermochemical */
+	chk_str("ucum:cal_IT",  "cal_IT");
+	chk_factor("ucum:cal",    4.184);
+	chk_factor("ucum:cal_IT", 4.1868);
 	chk_str("ucum:[dr_av]",  "dr");
+	chk_str("ucum:[dr_ap]",  "dr_ap");
+	chk_factor("ucum:[dr_av]", 0.0017718451953125);
+	chk_factor("ucum:[dr_ap]", 0.0038879346);
 	chk_factor("ucum:[Cal]", 4184.0);
+	/* The apothecary pound IS the troy pound — twelve apothecary ounces, and an
+	 * apothecary ounce is a troy ounce — so these two DO land together. */
+	chk_str("ucum:[lb_tr]", "lb_t");
+	chk_str("ucum:[lb_ap]", "lb_t");
+	/* The water column, and the inch built on it the way UCUM builds it. */
+	chk_factor("ucum:m[H2O]",  9806.65);
+	chk_factor("ucum:cm[H2O]",   98.0665);
+	chk_str("ucum:m[H2O]", "mH2O");
+	/* The short hundredweight is exactly a hecto-pound and needs no unit of its
+	 * own; the long one is 112 lb and does. */
+	chk_str("ucum:[scwt_av]", "h~lb");
+	chk_str("ucum:[lcwt_av]", "cwt_l");
 
 	/* An unknown lowercase namespace reports the profile error, not a generic
 	 * one — a consumer needs to tell "no such profile" from "not a unit". */

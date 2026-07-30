@@ -20,6 +20,135 @@ rebuild consumers against the new headers. **SOVERSION is bumped 1 → 2**
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
 
+### Fixed — seven profile mappings turned an information quantity into a frequency
+
+`qudt-qk:BitRate` translated to **`Hz`**. `ByteRate` to `Hz`. `BitTransmissionRate` and
+`ByteTransmissionRate` to `s⁻¹`. `LinearBitDensity` to `m⁻¹`. `DataRate` to `Hz`. And
+`qudt:ExaBIT-PER-SEC` — reached from `unece:E58` as well — to `E~Hz`, with `qudt:NAT-PER-SEC`
+(`unece:Q19`) to `s⁻¹` beside it. A document annotated `qudt-qk:BitRate` came out of the parser
+carrying a unit the library itself calls **incompatible** with the `b/s` it meant.
+
+The cause is one blind spot, and it is the same one `bvni_kind_table` exists to cover: a bit per
+second and a hertz have the same dimension vector (T⁻¹) and the same factor (1). The derivation
+that filled these tables compared exactly those two things, found the coherent unit of that
+dimension, and wrote down the hertz. Two more of the same shape sat in the photometric rows —
+`PowerPerAreaAngle` and `TotalRadiance` came out as **W/m²**, irradiance, beside a `Radiance` that
+correctly carried the steradian.
+
+Every one is now the unit its code names, or refused:
+
+```
+qudt-qk:BitRate                  b/s ... refused: QUDT names the bit and lists only OCTET-PER-SEC
+qudt-qk:ByteRate                 B/s
+qudt-qk:LinearBitDensity         b/m
+qudt-qk:DataRate                 b/s
+qudt-qk:PowerPerAreaAngle        W/m²·sr        (agreeing with Radiance)
+qudt:ExaBIT-PER-SEC              E~b/s
+qudt:NAT-PER-SEC                 refused — a nat has no native unit
+```
+
+`BitRate`, `BitTransmissionRate`, `InformationFlowRate`, `RotationalFrequency` and
+`RotationalVelocity` are **refused** rather than mapped, because QUDT pools quantities bovnar keeps
+apart: it gives `BitRate` one applicable unit and that unit is the octet per second, and it lists
+the hertz and the revolution per second under one rotational kind although they differ by exactly
+2π. Where a vocabulary does not say which of two incommensurable units it means, an error message
+is the honest answer.
+
+### Added — a gate on the one axis the factor comparison cannot see
+
+`check_profile_factors.py` compares a publisher's factor and dimension vector against the native
+target's, ten thousand rows of it. A dimension vector has **no room for a quantity kind** — a bit, a
+radian, a steradian, a decibel and a pure ratio are all `[0,0,0,0,0,0,0]` — so every one of the
+seven mappings above scored perfectly for as long as it existed.
+
+`check_quantity_kinds` closes it, and needs no new source: QUDT already states, for 2798 of the
+units it defines, the quantity kind that unit measures, and bovnar maps both vocabularies. A kind
+translates to the coherent unit of the kind, so a unit **of** that kind must be convertible with it
+— and `bvn_units_convertible` is the predicate that compares kinds as well as dimensions. 2567
+unit/quantity-kind pairs are checked on every run; a disagreement fails the run like a factor
+mismatch. Three links are waived by name, each because QUDT files a unit under the wrong kind (a
+lumen per square metre is a lux, not a luminance), and each is printed rather than skipped.
+
+### Added — the information families the profiles refused, and 26 UN/ECE codes with them
+
+`unece:AD` is the byte. `unece:J63` is the bit. Both are among the most-used codes in Rec 20, and
+both were refused — along with fifty-five siblings covering every decimal and binary prefix, every
+rate and every linear density. QUDT was refused the same way: `BIT-PER-SEC`, `KiloBIT`, `MebiBIT`,
+`SHANNON`, `OCTET`, `PetaBYTE` and forty-six more.
+
+One number caused all of it. QUDT models information as **entropy**, so its bit is ln 2 = 0.693 and
+its byte 8·ln 2, the coherent unit of entropy being the nat; bovnar's bit is 1. That is a modelling
+difference and not a wrong conversion, and it had already been accepted for `BIT`, `BYTE` and eight
+prefixed bytes — the rest of the family is the same difference at another decade or binary power.
+Ratios were taken against QUDT's own `BIT` and `BYTE` rather than against 1, so every row is an
+exact power of ten or of two off the atom it names and the ln 2 cancels.
+
+Four rows are waived because QUDT does not follow its own model there: it states the pebibit,
+exbibit, pebibyte and exbibyte at values 8.9 and 7.5 out from 2⁵⁰ and 2⁶⁰ of its own bit. The names
+are unambiguous, so those map and the disagreement is recorded, exactly as UCUM's inverted phot is.
+
+`unece:E86` and `E87` stay refused: the cross-reference attaches the tebibit per square and per
+cubic metre the other way round from the way every other family in the block runs, and a secondary
+source contradicting its own pattern is evidence rather than proof.
+
+### Added — six native units the profiles needed, and the 100+ codes they unblock
+
+Each of these was the **sole** reason a run of publisher codes had to be refused. The publisher
+defines the unit, the value is exactly stateable, and there was simply no native unit to translate
+onto.
+
+| Unit | Exactly | Unblocks |
+|---|---|---|
+| `mH2O` | 9806.65 Pa (conventional column) | UCUM `m[H2O]`, `[in_i'H2O]`; the whole UDUNITS water-column family; `qudt:FT_H2O`, `MilliM_H2O`; `unece:K24` |
+| `cal_IT` | 4.1868 J | UCUM `cal_IT`; UDUNITS `calorie`/`cal`/`IT_calorie`; nine QUDT rows; `unece:D70`, `D71`, `D72`, `D75`, `E14`, `K52`, `L14` |
+| `Btu_th` | 23722880951/22500000 J | UCUM `[Btu]`, `[Btu_th]`; twenty QUDT rows; eleven UN/ECE codes |
+| `lb_t` | 0.3732417216 kg | UCUM `[lb_tr]`, `[lb_ap]`; UDUNITS `troy_pound`, `apothecary_pound`, `appound` |
+| `dr_ap` | 0.0038879346 kg | UCUM `[dr_ap]`; UDUNITS `apdram` |
+| `cwt_l` | 50.80234544 kg | UCUM `[lcwt_av]`; UDUNITS `long_hundredweight`; `qudt:CWT_LONG`; `unece:CWI`; `om:hundredweight-British` |
+
+**Two calories and two BTUs, and the pairs cross over.** `cal` is the thermochemical calorie and
+`Btu` the international-table BTU — not an inconsistency but the vocabularies' own defaults, since
+UCUM's unqualified `cal` is thermochemical while UDUNITS' unqualified `calorie` is the IT one. Each
+pair is 0.067 % apart, dimensionally identical and numerically wrong if confused, which is why the
+missing halves used to be refused rather than rounded onto the halves that existed. Both members of
+both pairs are carried now and every code lands on the one its own vocabulary says it means.
+
+`mH2O` takes prefixes, so `c~mH2O` (compactly `cmH2O`) is the centimetre of water a ventilator is
+set in. UDUNITS states both its water and its mercury column as pressure **gradients** and builds
+every pressure as a length times one, which bovnar can now say exactly — `mH2O/m` and `mmHg/m~m` —
+so the expressions built on them fall out of the profile's own grammar. A column measured at a
+stated temperature (`water_4C`, `qudt:IN_H2O`) is a *different* unit and stays refused.
+
+The short hundredweight has no unit: it is exactly 100 lb, which the prefix mechanism already
+spells `h~lb`.
+
+### Fixed — the Python `BaseUnit` enum was six units short of the C one
+
+`BaseUnit.DELTA_KELVIN` did not exist. Nor did the other five temperature intervals, so a Python
+caller could not name a unit the C enum, the parser and the writer had all carried since they were
+added — and `UNIT_NATIVE_LAST` reported the wrong end of the block. Nothing noticed, because the
+only check was `len(BaseUnit) == 1 + 180 + 216` and the count had gone stale in exactly the same
+direction as the enum. That is the failure this file already documents for the error codes: a
+hardcoded number and the thing it counts go stale together and agree with each other.
+
+The count assertion is replaced by four that close both blocks against `src/gendata` — every id,
+every member name, the bounds, and nothing outside them. The pint bridge was missing the same six
+units and gained a `[temperature_interval]` dimension for them, so pint now refuses `ΔK → K` as
+bovnar does; its test's list of kind-carrying units, which had already been widened once when the
+photometric units joined the angle kind, now asks the registry for *any* non-SI dimension rather
+than for `[angle]` by name.
+
+### Added — the catalogue counts stated in prose are gated against `src/gendata`
+
+The tables were checked thoroughly — roughly 1150 documented rows, the generated C factors, the
+profiles against their publishers. The **sentences** were not, so a stale unit count sat in the
+README, the cheatsheet's scope line, the EBNF commentary, the IETF draft and the JOSS paper, and
+the spelling total was out by more than fifty. A count in prose is invisible to a table check.
+
+`check_doc_counts.py` reads the headline numbers back out of every document, comment header and
+generator and compares them to what the data files hold — 46 stated counts across fifteen files.
+`CHANGELOG.md` and the release notes are exempt: they record what was true at a version.
+
 ### Added — a temperature difference is a unit now: `ΔK` and five siblings
 
 `25 °C` is 298.15 K. A *rise* of 25 degrees is 25 K — and there was no way to write that, so a

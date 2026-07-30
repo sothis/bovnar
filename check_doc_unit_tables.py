@@ -3,7 +3,7 @@
 check_doc_unit_tables.py — the unit and currency tables in doc/ against gendata.
 
 doc/04 (the cheatsheet) and doc/05 (the unit system) between them carry every one
-of the 180 physical units and all 216 currencies, twice over, as hand-written
+of the 192 physical units and all 216 currencies, twice over, as hand-written
 markdown: a canonical symbol, the accepted long forms, the bu_* enumerator, and
 for money the ISO numeric code and minor-unit count. Roughly 1150 rows.
 

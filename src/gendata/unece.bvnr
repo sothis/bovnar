@@ -146,6 +146,43 @@
   { .code = "MWH"; .bovnar = "M~W·h";  },
   { .code = "BTU"; .bovnar = "Btu";    },
 
+  # ── Thermochemical BTU, IT calorie, water column, long hundredweight ──
+  #
+  # Twenty-six codes that were refused only because the native registry had no
+  # unit to land them on. Reached, like everything else in this file, through
+  # QUDT's uneceCommonCode cross-reference, and each one checked against the
+  # value that cross-reference gives.
+  #
+  # DEG_F here is a temperature INTERVAL -- a thermal resistance is per degree
+  # of rise -- so it is Δ°F, which is linear and may stand inside a product.
+  { .code = "CWI";.bovnar = "cwt_l"; },   # long hundredweight (112 lb)
+  { .code = "D70";.bovnar = "cal_IT"; },   # calorie (international table)
+  { .code = "E14";.bovnar = "k~cal_IT"; },   # kilocalorie (international table)
+  { .code = "UA";.bovnar = "Torr"; },   # torr
+
+  { .code = "D71";.bovnar = "cal_IT/(s·c~m·K)";  .reverse = false; },   # cal_IT per second centimetre kelvin
+  { .code = "D72";.bovnar = "cal_IT/(s·c~m^2·K)";.reverse = false; },   # cal_IT per second square centimetre kelvin
+  { .code = "D75";.bovnar = "cal_IT/g";          .reverse = false; },   # calorie (international table) per gram
+  { .code = "J19";.bovnar = "Δ°F·h·ft^2/Btu_th"; .reverse = false; },   # degree Fahrenheit hour square foot per BTU (th)
+  { .code = "J46";.bovnar = "Btu_th·ft/(h·ft^2·Δ°F)";.reverse = false; },   # BTU (th) foot per hour square foot degree Fahrenheit
+  { .code = "J47";.bovnar = "Btu_th/h";          .reverse = false; },   # BTU (th) per hour
+  { .code = "J48";.bovnar = "Btu_th·in/(ft^2·h·Δ°F)";.reverse = false; },   # BTU (th) inch per square foot hour degree Fahrenheit
+  { .code = "J51";.bovnar = "Btu_th/min";        .reverse = false; },   # BTU (th) per minute
+  { .code = "J52";.bovnar = "Btu_th/s";          .reverse = false; },   # BTU (th) per second
+  { .code = "K24";.bovnar = "ft·mH2O/m";         .reverse = false; },   # foot of water column
+  { .code = "K52";.bovnar = "k~cal_IT/(h·m·K)";  .reverse = false; },   # kilocalorie (IT) per hour metre degree Celsius
+  { .code = "L14";.bovnar = "m^2·h·K/k~cal_IT";  .reverse = false; },   # square metre hour degree Celsius per kilocalorie (IT)
+  { .code = "N51";.bovnar = "Btu_th/(ft^2·h)";   .reverse = false; },   # BTU (th) per square foot hour
+  { .code = "N54";.bovnar = "Btu_th/(ft^2·s)";   .reverse = false; },   # BTU (th) per square foot second
+  { .code = "N59";.bovnar = "Btu_th/ft^3";       .reverse = false; },   # BTU (th) per cubic foot
+  { .code = "N61";.bovnar = "Btu_th/Δ°F";        .reverse = false; },   # BTU (th) per degree Fahrenheit
+  { .code = "N63";.bovnar = "Btu_th/Δ°Ra";       .reverse = false; },   # BTU (th) per degree Rankine
+  { .code = "N75";.bovnar = "Btu_th/(h·ft^2·Δ°F)";.reverse = false; },   # BTU (th) per hour square foot degree Fahrenheit
+  { .code = "N85";.bovnar = "Δ°F·h/Btu_th";      .reverse = false; },   # degree Fahrenheit hour per BTU (th)
+  { .code = "N87";.bovnar = "Δ°F·s/Btu_th";      .reverse = false; },   # degree Fahrenheit second per BTU (th)
+  { .code = "N89";.bovnar = "Δ°F·h·ft^2/(Btu_th·in)";.reverse = false; },   # degree Fahrenheit hour square foot per BTU (th) inch
+  { .code = "P38";.bovnar = "Btu_th/ft^2";       .reverse = false; },   # BTU (th) per square foot
+
   # Electricity and magnetism
   { .code = "AMP"; .bovnar = "A";      },
   { .code = "VLT"; .bovnar = "V";      },
@@ -332,6 +369,79 @@
   # same way doc/11 §6.3 records for a UCUM annotation.
   { .code = "59";  .bovnar = "ppm";    },   # parts per million
   { .code = "61";  .bovnar = "ppb";    },   # parts per billion
+
+  # ── Information: bits, bytes, their rates and their linear densities ──
+  #
+  # Fifty-seven of Rec 20's codes, and every one of them used to be refused. AD
+  # (byte) and J63 (bit) are among the most-used codes in the whole list, so
+  # this was not a gap at the margin. The cause was one number: QUDT, the
+  # cross-reference this vocabulary is checked through, models information as
+  # ENTROPY and states its bit as ln 2 rather than 1. Every code below is
+  # therefore off the native target by exactly ln 2 (or 8·ln 2 for a byte) --
+  # the same modelling difference the UCUM and UDUNITS profiles have always
+  # waived for their own bit and byte, and no evidence about Rec 20 at all.
+  #
+  # E86 and E87 (tebibit per square and per cubic metre) are NOT here. The
+  # cross-reference attaches them the other way round from the way every other
+  # family in this block runs -- Kibi, Mebi, Gibi, Pebi and Exbi all go m, m²,
+  # m³ in ascending code order, and Tebi comes out E85, E87, E86. A secondary
+  # source contradicting its own pattern is evidence and not proof, so those
+  # two stay refused rather than being mapped on a guess.
+  { .code = "J63";.bovnar = "b"; },   # bit
+  { .code = "AD";.bovnar = "B"; },   # byte
+  { .code = "C37";.bovnar = "k~b"; },   # kilobit
+  { .code = "D36";.bovnar = "M~b"; },   # megabit
+  { .code = "B68";.bovnar = "G~b"; },   # gigabit
+  { .code = "E83";.bovnar = "T~b"; },   # terabit
+  { .code = "E78";.bovnar = "P~b"; },   # petabit
+  { .code = "2P";.bovnar = "k~B"; },   # kilobyte
+  { .code = "4L";.bovnar = "M~B"; },   # megabyte
+  { .code = "E34";.bovnar = "G~B"; },   # gigabyte
+  { .code = "E35";.bovnar = "T~B"; },   # terabyte
+  { .code = "E36";.bovnar = "P~B"; },   # petabyte
+  { .code = "C21";.bovnar = "Ki~b"; },   # kibibit
+  { .code = "D11";.bovnar = "Mi~b"; },   # mebibit
+  { .code = "B30";.bovnar = "Gi~b"; },   # gibibit
+  { .code = "E64";.bovnar = "Ki~B"; },   # kibibyte
+  { .code = "E63";.bovnar = "Mi~B"; },   # mebibyte
+  { .code = "E62";.bovnar = "Gi~B"; },   # gibibyte
+  { .code = "E61";.bovnar = "Ti~B"; },   # tebibyte
+  { .code = "E60";.bovnar = "Pi~B"; },   # pebibyte
+  { .code = "E59";.bovnar = "Ei~B"; },   # exbibyte
+  { .code = "Q14";.bovnar = "b";         .reverse = false; },   # shannon — the bit under its information-theory name
+  { .code = "Q12";.bovnar = "B";         .reverse = false; },   # octet — the byte under its telecoms name
+
+  { .code = "B10";.bovnar = "b/s";       .reverse = false; },   # bit per second
+  { .code = "P93";.bovnar = "B/s";       .reverse = false; },   # byte per second
+  { .code = "Q13";.bovnar = "B/s";       .reverse = false; },   # octet per second
+  { .code = "Q17";.bovnar = "b/s";       .reverse = false; },   # shannon per second
+  { .code = "C74";.bovnar = "k~b/s";     .reverse = false; },   # kilobit per second
+  { .code = "E20";.bovnar = "M~b/s";     .reverse = false; },   # megabit per second
+  { .code = "B80";.bovnar = "G~b/s";     .reverse = false; },   # gigabit per second
+  { .code = "E84";.bovnar = "T~b/s";     .reverse = false; },   # terabit per second
+  { .code = "E79";.bovnar = "P~b/s";     .reverse = false; },   # petabit per second
+  { .code = "E58";.bovnar = "E~b/s";     .reverse = false; },   # exabit per second
+  { .code = "P94";.bovnar = "k~B/s";     .reverse = false; },   # kilobyte per second
+  { .code = "P95";.bovnar = "M~B/s";     .reverse = false; },   # megabyte per second
+  { .code = "E68";.bovnar = "G~B/s";     .reverse = false; },   # gigabyte per second
+  { .code = "E88";.bovnar = "b/m";       .reverse = false; },   # bit per metre
+  { .code = "E89";.bovnar = "b/m^2";     .reverse = false; },   # bit per square metre
+  { .code = "E72";.bovnar = "Ki~b/m";    .reverse = false; },   # kibibit per metre
+  { .code = "E73";.bovnar = "Ki~b/m^2";  .reverse = false; },   # kibibit per square metre
+  { .code = "E74";.bovnar = "Ki~b/m^3";  .reverse = false; },   # kibibit per cubic metre
+  { .code = "E75";.bovnar = "Mi~b/m";    .reverse = false; },   # mebibit per metre
+  { .code = "E76";.bovnar = "Mi~b/m^2";  .reverse = false; },   # mebibit per square metre
+  { .code = "E77";.bovnar = "Mi~b/m^3";  .reverse = false; },   # mebibit per cubic metre
+  { .code = "E69";.bovnar = "Gi~b/m";    .reverse = false; },   # gibibit per metre
+  { .code = "E70";.bovnar = "Gi~b/m^2";  .reverse = false; },   # gibibit per square metre
+  { .code = "E71";.bovnar = "Gi~b/m^3";  .reverse = false; },   # gibibit per cubic metre
+  { .code = "E85";.bovnar = "Ti~b/m";    .reverse = false; },   # tebibit per metre
+  { .code = "E80";.bovnar = "Pi~b/m";    .reverse = false; },   # pebibit per metre
+  { .code = "E81";.bovnar = "Pi~b/m^2";  .reverse = false; },   # pebibit per square metre
+  { .code = "E82";.bovnar = "Pi~b/m^3";  .reverse = false; },   # pebibit per cubic metre
+  { .code = "E65";.bovnar = "Ei~b/m";    .reverse = false; },   # exbibit per metre
+  { .code = "E66";.bovnar = "Ei~b/m^2";  .reverse = false; },   # exbibit per square metre
+  { .code = "E67";.bovnar = "Ei~b/m^3";  .reverse = false; },   # exbibit per cubic metre
 
   { .code = "C81"; .bovnar = "rad";    },   # radian
   { .code = "D27"; .bovnar = "sr";     },   # steradian
@@ -748,7 +858,6 @@
   { .code = "E43";   .bovnar = "J/c~m^2";             .reverse = false; },  # via qudt:J-PER-CentiM2
   { .code = "E44";   .bovnar = "g·gn·k~m/c~m^2";      .reverse = false; },  # via qudt:KiloGM_F-M-PER-CentiM2
   { .code = "E45";   .bovnar = "m~Ω";                 },  # via qudt:MilliOHM
-  { .code = "E58";   .bovnar = "E~Hz";                },  # via qudt:ExaBIT-PER-SEC
   { .code = "E91";   .bovnar = "d^-1";                .reverse = false; },  # via qudt:PER-DAY
   { .code = "E92";   .bovnar = "d~m^3/h";             .reverse = false; },  # via qudt:DeciM3-PER-HR
   { .code = "E93";   .bovnar = "k~g/h";               .reverse = false; },  # via qudt:KiloGM-PER-HR
@@ -1376,7 +1485,6 @@
   { .code = "P97";   .bovnar = "rad^-1";              .reverse = false; },  # via qudt:PER-RAD
   { .code = "PO";    .bovnar = "lb/in";               .reverse = false; },  # via qudt:LB-PER-IN
   { .code = "Q10";   .bovnar = "J/T";                 .reverse = false; },  # via qudt:J-PER-T
-  { .code = "Q19";   .bovnar = "s^-1";                .reverse = false; },  # via qudt:NAT-PER-SEC
   { .code = "Q20";   .bovnar = "s/k~g";               .reverse = false; },  # via qudt:SEC-PER-KiloGM
   { .code = "Q21";   .bovnar = "W·m^2";               .reverse = false; },  # via qudt:W-M2
   { .code = "Q22";   .bovnar = "s/rad·m^3";           .reverse = false; },  # via qudt:SEC-PER-RAD-M3
@@ -1474,8 +1582,6 @@
   # -- the cross-reference cannot say what the code means. Refusing those says
   # exactly that, which is better than picking a claimant.
   { .code = "208";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (2589997.766)"; },
-  { .code = "2P";    .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
-  { .code = "4L";    .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
   { .code = "4R";    .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0086409)"; },
   { .code = "4W";    .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.2519444444)"; },
   { .code = "57";    .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0)"; },
@@ -1484,66 +1590,17 @@
   { .code = "A21";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (426.9)"; },
   { .code = "A42";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (3.7e+10)"; },
   { .code = "A49";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.1e-07)"; },
-  { .code = "AD";    .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
   { .code = "B1";    .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.84e-06)"; },
-  { .code = "B10";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.6931471806)"; },
-  { .code = "B30";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
-  { .code = "B68";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
-  { .code = "B80";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (693147180.6)"; },
   { .code = "BFT";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.00236)"; },
   { .code = "BLD";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.115628199)"; },
   { .code = "BUI";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.03636872)"; },
-  { .code = "C21";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
-  { .code = "C37";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
   { .code = "C69";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
-  { .code = "C74";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (693.1471806)"; },
-  { .code = "CWI";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (50.80235)"; },
-  { .code = "D11";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
   { .code = "D15";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
-  { .code = "D36";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
   { .code = "D42";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (31556925.22)"; },
-  { .code = "D70";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (4.1868)"; },
-  { .code = "D71";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (418.68)"; },
-  { .code = "D72";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (41868)"; },
-  { .code = "D75";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (4186.8)"; },
   { .code = "DRA";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0038879346)"; },
-  { .code = "E14";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (4186.8)"; },
   { .code = "E15";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.162230556)"; },
-  { .code = "E20";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (693147.1806)"; },
-  { .code = "E34";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
-  { .code = "E35";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
-  { .code = "E36";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
-  { .code = "E59";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
-  { .code = "E60";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
-  { .code = "E61";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
-  { .code = "E62";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
-  { .code = "E63";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
-  { .code = "E64";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
-  { .code = "E65";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.152921505e+18)"; },
-  { .code = "E66";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.152921505e+18)"; },
-  { .code = "E67";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.152921505e+18)"; },
-  { .code = "E68";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (5545177444)"; },
-  { .code = "E69";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (744261118)"; },
-  { .code = "E70";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (744261118)"; },
-  { .code = "E71";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (744261118)"; },
-  { .code = "E72";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (709.7827129)"; },
-  { .code = "E73";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (709.7827129)"; },
-  { .code = "E74";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (709.7827129)"; },
-  { .code = "E75";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (726817.498)"; },
-  { .code = "E76";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (726817.498)"; },
-  { .code = "E77";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (726817.498)"; },
-  { .code = "E78";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
-  { .code = "E79";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (6.931471806e+14)"; },
-  { .code = "E80";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.125899907e+15)"; },
-  { .code = "E81";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.125899907e+15)"; },
-  { .code = "E82";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.125899907e+15)"; },
-  { .code = "E83";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
-  { .code = "E84";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (6.931471806e+11)"; },
-  { .code = "E85";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.099511628e+12)"; },
   { .code = "E86";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.099511628e+12)"; },
   { .code = "E87";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.099511628e+12)"; },
-  { .code = "E88";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.6931471806)"; },
-  { .code = "E89";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.6931471806)"; },
   { .code = "E97";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.001)"; },
   { .code = "E98";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
   { .code = "F22";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1355.818009)"; },
@@ -1572,7 +1629,6 @@
   { .code = "J16";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0)"; },
   { .code = "J17";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0)"; },
   { .code = "J18";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0)"; },
-  { .code = "J19";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.1762280394)"; },
   { .code = "J20";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
   { .code = "J21";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (5.555555556e-06)"; },
   { .code = "J22";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.1761101837)"; },
@@ -1585,18 +1641,12 @@
   { .code = "J42";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (519.2203999)"; },
   { .code = "J43";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (426.9347649)"; },
   { .code = "J44";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (17.58)"; },
-  { .code = "J46";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.73)"; },
-  { .code = "J47";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.2929)"; },
-  { .code = "J48";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.144131434)"; },
-  { .code = "J51";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (17.573)"; },
-  { .code = "J52";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1054.35)"; },
   { .code = "J54";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
   { .code = "J57";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.1591132)"; },
   { .code = "J58";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.002651886)"; },
   { .code = "J59";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.841587e-06)"; },
   { .code = "J60";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (4.41981e-05)"; },
   { .code = "J61";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.1591132)"; },
-  { .code = "J63";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
   { .code = "J64";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (4.209343e-07)"; },
   { .code = "J65";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.010242e-05)"; },
   { .code = "J66";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0006061453)"; },
@@ -1612,7 +1662,6 @@
   { .code = "K18";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.54864)"; },
   { .code = "K20";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (35.31466)"; },
   { .code = "K21";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.05097033)"; },
-  { .code = "K24";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (2989.067)"; },
   { .code = "K25";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (40636.66)"; },
   { .code = "K42";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (9809.5)"; },
   { .code = "K45";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.04572)"; },
@@ -1620,7 +1669,6 @@
   { .code = "K49";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (61023.76)"; },
   { .code = "K50";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
   { .code = "K51";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (4190)"; },
-  { .code = "K52";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.163)"; },
   { .code = "K64";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.8164663)"; },
   { .code = "K69";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (28.83323)"; },
   { .code = "K73";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.000226796185)"; },
@@ -1629,7 +1677,6 @@
   { .code = "K82";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.8164663)"; },
   { .code = "K86";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (12410.56)"; },
   { .code = "K97";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0011365225)"; },
-  { .code = "L14";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.859845)"; },
   { .code = "L23";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.000277778)"; },
   { .code = "L33";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (3.2812e-07)"; },
   { .code = "L41";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.007061552425)"; },
@@ -1671,46 +1718,31 @@
   { .code = "M88";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0003919350773)"; },
   { .code = "MIK";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (2589997.766)"; },
   { .code = "N27";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.008630974841)"; },
-  { .code = "N51";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (3.152481054)"; },
-  { .code = "N54";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (11348.93179)"; },
-  { .code = "N59";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (37234.03)"; },
-  { .code = "N61";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1897.830476)"; },
-  { .code = "N63";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1897.830476)"; },
   { .code = "N70";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.055e+18)"; },
-  { .code = "N75";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (5.674465897)"; },
   { .code = "N84";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.895634241)"; },
-  { .code = "N85";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.896902829)"; },
   { .code = "N86";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0005265650668)"; },
-  { .code = "N87";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0005269174526)"; },
   { .code = "N88";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (6.933471799)"; },
-  { .code = "N89";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (6.938111789)"; },
   { .code = "N94";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (3.335640952e-10)"; },
   { .code = "P27";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (10.764)"; },
   { .code = "P29";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (3.4262591)"; },
   { .code = "P30";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.3183098862)"; },
-  { .code = "P38";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (11348.93179)"; },
   { .code = "P45";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (453.59237)"; },
   { .code = "P46";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (7.559872833)"; },
   { .code = "P53";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (1.256637e-07)"; },
   { .code = "P72";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (2.77778e-10)"; },
   { .code = "P85";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (133.322)"; },
-  { .code = "P93";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (5.545177444)"; },
-  { .code = "P94";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (5545.177444)"; },
-  { .code = "P95";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (5545177.444)"; },
   { .code = "PLA";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0)"; },
   { .code = "PTD";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.000550610471)"; },
+  { .code = "Q19";   .why = "a nat per second — an information rate in the base-e logarithm, which has no native unit; it used to map to s^-1, i.e. to a frequency"; },
   { .code = "Q11";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
-  { .code = "Q14";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
   { .code = "Q15";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
   { .code = "Q16";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
-  { .code = "Q17";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.6931471806)"; },
   { .code = "Q18";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (2.302585093)"; },
   { .code = "Q26";   .why = "dimensionless through QUDT's cross-reference — every native ratio has the same dimension vector and nothing here can say which one Rec 20 means"; },
   { .code = "QTD";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.001101220943)"; },
   { .code = "QTR";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (12.70058636)"; },
   { .code = "R1";    .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (0.0042333)"; },
   { .code = "RPS";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (6.28318531)"; },
-  { .code = "UA";    .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (133.322)"; },
   { .code = "WCD";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (3.62)"; },
   { .code = "WSD";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (4.672)"; },
   { .code = "35";    .why = "QUDT's cross-reference disagrees with itself about this code (claimed by MilliL-PER-CentiM2-MIN, MilliL-PER-CentiM2-SEC), so this repository cannot say what Rec 20 means by it"; },

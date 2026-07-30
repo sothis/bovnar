@@ -96,7 +96,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - [FAQ](https://www.bovnar.io/doc/02_bovnar_faq.md) — Common questions on types, units, limits, encoding, and the API.
 - [Specification](https://www.bovnar.io/doc/03_bovnar_spec.md) — The complete format specification (spec 1.1): grammar, types, units, limits.
 - [Unit & currency cheatsheet](https://www.bovnar.io/doc/04_bovnar_unit_cheatsheet.md) — Every unit symbol, prefix, and currency code in one reference table.
-- [Unit system](https://www.bovnar.io/doc/05_bovnar_unit_system.md) — The 180 physical units, SI/IEC prefixes, and 216 currencies, with dimensions and factors.
+- [Unit system](https://www.bovnar.io/doc/05_bovnar_unit_system.md) — The 192 physical units, SI/IEC prefixes, and 216 currencies, with dimensions and factors.
 - [Unit policy](https://www.bovnar.io/doc/06_bovnar_unit_policy.md) — What a policy validates and converts, the order it resolves in, and the errors it raises.
 - [Unit ambiguities](https://www.bovnar.io/doc/07_bovnar_unit_ambiguities.md) — Which reading wins when a token could mean two things, and how to write the other.
 - [Read & Write C API](https://www.bovnar.io/doc/08_bovnar_readwrite_api.md) — The C reader/writer/DOM API reference (bovnar.h, bovnar_dom.h).
@@ -1766,7 +1766,7 @@ a mismatch is `error_unit_mismatch`.
 
 **How many base units does Bovnar support?**
 
-186 named base units across the following categories:
+192 named base units across the following categories:
 
 - **7 SI base units** — second, meter, gram, ampere, kelvin, mole, candela.
 - **21 named SI-derived units** — hertz through katal (Hz, N, Pa, J, W, V, Ω, F, C, S, Wb, T, H, lm, lx, Bq, Gy, Sv, kat, rad, sr).
@@ -1801,6 +1801,7 @@ a mismatch is `error_unit_mismatch`.
 - **5 turbidity scales** — **NTU**, **FNU**, **FTU**, **FAU**, **JTU**: one quantity kind each, because each names a *measurement method* and no factor relates any pair of them.
 - **1 salinity scale** — **PSU** (practical salinity, PSS-78): a conductivity ratio, so not a mass fraction and not convertible to `‰`.
 - **1 conductivity scale** — **CF** (hydroponic conductivity factor, 1 CF = 0.1 mS/cm exactly), which *does* convert, being a rescaled conductivity.
+- **6 units the unit profiles needed** — **metre of water column** (`mH2O`, the conventional 9 806.65 Pa; `c~mH2O` is the centimetre a ventilator is set in), **IT calorie** (`cal_IT`, 4.1868 J — native `cal` is the thermochemical 4.184 J), **thermochemical BTU** (`Btu_th` — native `Btu` is the international-table one), **troy pound** (`lb_t`, twelve troy ounces; also the apothecary pound), **apothecary dram** (`dr_ap`, three scruples — native `dr` is the avoirdupois dram, 2.2× smaller), and the **long hundredweight** (`cwt_l`, 112 lb; the short one is exactly `h~lb` and needs no unit of its own). Each was the sole reason a run of UCUM, UDUNITS-2, QUDT and UN/ECE codes had to be refused.
 
 The `bu_gram` base unit is used for mass so that the `k~` prefix can carry the kilo: `k~g` = kilogram. The Rankine symbol is `°Ra` (also accepted as `Ra`); note `R` alone is reserved for röntgen. Thou accepts `mil` as an alternative spelling. `var` and `VA` share the same SI dimensional signature as watt but are kept distinct for physical clarity. `rpm` has the same SI dimension as `Hz` (s⁻¹) but a distinct base unit for semantic clarity in rotational contexts. `at` (atmosphere technical) must not be confused with `atm` (standard atmosphere): 1 at = 98 066.5 Pa; 1 atm = 101 325 Pa.
 
@@ -4099,7 +4100,7 @@ ev_data
 
 ### 11.1 Base Units
 
-The unit system supports **180 named base units** across SI, IEC-binary, Imperial/US customary, CGS electromagnetic, radiation, electrical-power, and other categories. The table below covers the SI base units, all 22 named SI-derived units (degree Celsius among them — it is listed under *Non-SI units accepted for use with SI* below, where it is conventionally grouped), and the other non-SI units accepted for use with SI. For the complete reference — including Imperial/US customary, CGS, radiation, electrical-power, rotational, textile, surveying, volume, and other unit families — see **[`doc/05_bovnar_unit_system.md`](05_bovnar_unit_system.md)**.
+The unit system supports **192 named base units** across SI, IEC-binary, Imperial/US customary, CGS electromagnetic, radiation, electrical-power, and other categories. The table below covers the SI base units, all 22 named SI-derived units (degree Celsius among them — it is listed under *Non-SI units accepted for use with SI* below, where it is conventionally grouped), and the other non-SI units accepted for use with SI. For the complete reference — including Imperial/US customary, CGS, radiation, electrical-power, rotational, textile, surveying, volume, and other unit families — see **[`doc/05_bovnar_unit_system.md`](05_bovnar_unit_system.md)**.
 
 **SI base units and digital units**
 
@@ -5842,7 +5843,7 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
 
 > **Spec version:** 1.1
 > **Status:** Reference — the symbol tables of the unit and currency registry
-> **Scope:** 180 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.
+> **Scope:** 192 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.
 
 ---
 
@@ -5876,8 +5877,8 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
     - 4.22 [Electrical Power](#422-electrical-power)
     - 4.23 [Textile Linear Density](#423-textile-linear-density)
     - 4.24 [Old German Units](#424-old-german-units)
-    - 4.25 [Additional Physical Units (361–367)](#425-additional-physical-units-361367)
-    - 4.26 [Ratio and Proportion (372–377)](#426-ratio-and-proportion-372377)
+    - 4.25 [Additional Physical Units](#425-additional-physical-units)
+    - 4.26 [Ratio and Proportion](#426-ratio-and-proportion)
     - 4.27 [Named Speeds & Acidity](#427-named-speeds--acidity)
     - 4.28 [Water Hardness](#428-water-hardness)
     - 4.29 [Water-Quality Instrument Scales](#429-water-quality-instrument-scales)
@@ -6084,6 +6085,11 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly
 | `slug`  | `slugs` | slug | `bu_slug` | 14.593902937 kg |
 | `dr`    | `dram`, `drams` | dram (avoirdupois) | `bu_dram` | 1.7718451953125×10⁻³ kg (exact) |
 | `dwt`   | `pennyweight`, `pennyweights` | pennyweight (troy) | `bu_pennyweight` | 1.55517384×10⁻³ kg (exact) |
+| `lb_t`  | `troy_pound`, `troy_pounds`, `apothecary_pound` | troy pound (= apothecary pound) | `bu_troy_pound` | 0.3732417216 kg (exact, = 12 `oz_t`) |
+| `dr_ap` | `apothecary_dram`, `apothecary_drams` | dram (apothecary) | `bu_apothecary_dram` | 3.8879346×10⁻³ kg (exact, = 3 `sc`) |
+| `cwt_l` | `long_hundredweight`, `long_hundredweights` | hundredweight (long/imperial) | `bu_long_hundredweight` | 50.80234544 kg (exact, = 112 `lb`) |
+
+> `dr_ap` is **2.2× the avoirdupois `dr`**, and the short hundredweight is exactly `h~lb`, so it has no unit of its own.
 
 ### 4.6 Temperature
 
@@ -6122,6 +6128,7 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly
 | `Torr` | `torr` | torr | `bu_torr` | 101 325/760 Pa |
 | `psi`  | — | pound-force per square inch | `bu_psi` | 6894.757293168362 Pa |
 | `inHg` | `inch_hg`, `inch_mercury` | inch of mercury | `bu_inch_hg` | 3386.388640341 Pa (= 25.4 mmHg exactly) |
+| `mH2O` | `metre_water`, `meter_water` | metre of water column | `bu_meter_water` | 9806.65 Pa (exact, conventional) |
 
 > `at ≠ atm`: 1 at = 98 066.5 Pa; 1 atm = 101 325 Pa.
 
@@ -6134,6 +6141,8 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly
 | `erg`   | `ergs` | erg | `bu_erg` | 10⁻⁷ J (exact) |
 | `thm`   | `therm`, `therms` | US therm | `bu_therm` | 1.05480400×10⁸ J (exact) |
 | `ft_lb` | `foot_pound`, `foot_pounds` | foot-pound | `bu_foot_pound` | 1.3558179483 J |
+| `cal_IT` | `calorie_IT` | International Table calorie | `bu_calorie_it` | 4.1868 J (exact) |
+| `Btu_th` | `BTU_th`, `btu_th` | thermochemical BTU | `bu_btu_th` | 23 722 880 951/22 500 000 J ≈ 1054.35026449 J |
 
 > `BTU` (all-caps) is a valid alias: with no `$` sigil the token is a physical-unit lookup (the currency table is only consulted for `$`-prefixed tokens), and it matches `bu_btu`. `Btu` and `btu` are also accepted.
 
@@ -6318,7 +6327,7 @@ No Old German unit accepts any SI or IEC prefix (`bvn_prefix_unit_valid` rejects
 |----------|-----------|------|------|--------|
 | `schffl` | `scheffel`, `prussian_scheffel` | Scheffel (Prussian) | `bu_scheffel` | 54.961×10⁻³ m³ |
 
-### 4.25 Additional Physical Units (361–367)
+### 4.25 Additional Physical Units
 
 #### Length
 
@@ -6344,7 +6353,7 @@ No Old German unit accepts any SI or IEC prefix (`bvn_prefix_unit_valid` rejects
 
 SI prefixes are accepted on all units in this section. IEC prefixes are rejected for all non-digital units.
 
-### 4.26 Ratio and Proportion (372–377)
+### 4.26 Ratio and Proportion
 
 Dimensionless scaling factors: `5 %` ≡ `0.05`, `250 ppm` ≡ `0.00025`. These do **not** accept SI or IEC prefixes.
 
@@ -6827,7 +6836,7 @@ The Bovnar quantity annotation system is an **optional, per-value annotation** t
 
 Two distinct namespaces share the annotation slot:
 
-- **Physical units** — 180 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
+- **Physical units** — 192 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
 - **Currency codes** — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical — HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01 — and `ANG` coexists with its successor `XCG`, which inherited its numeric code 532; see §9.2) and 50 cryptocurrency tickers.
 
 Both namespaces are syntactically unified: the same grammar, the same `~` prefix separator, the same compound-unit operators (`·`, `*`, `/`), and the same `value_unit_t` data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.
@@ -7041,6 +7050,14 @@ Bovnar supports 180 named physical base units. Currency codes are a separate nam
 | `slug` | `slugs` | slug | `bu_slug` | 14.593902937 kg |
 | `dr`   | `dram`, `drams` | dram (avoirdupois) | `bu_dram` | 1.7718451953125×10⁻³ kg (exact) |
 | `dwt`  | `pennyweight`, `pennyweights` | pennyweight (troy) | `bu_pennyweight` | 1.55517384×10⁻³ kg (exact) |
+| `lb_t` | `troy_pound`, `troy_pounds`, `apothecary_pound` | troy pound (= apothecary pound) | `bu_troy_pound` | 0.3732417216 kg (exact, = 12 `oz_t`) |
+| `dr_ap`| `apothecary_dram`, `apothecary_drams` | dram (apothecary) | `bu_apothecary_dram` | 3.8879346×10⁻³ kg (exact, = 3 `sc`) |
+| `cwt_l`| `long_hundredweight`, `long_hundredweights` | hundredweight (long/imperial) | `bu_long_hundredweight` | 50.80234544 kg (exact, = 112 `lb`) |
+
+> The apothecary dram is **2.2×** the avoirdupois `dr` and the two are a classic near miss; the
+> apothecary POUND, by contrast, *is* the troy pound (twelve apothecary ounces, and an apothecary
+> ounce is a troy ounce), so both spellings are one unit. The SHORT hundredweight is exactly 100 lb,
+> which the prefix mechanism already spells `h~lb`, so it has no unit of its own.
 
 #### Temperature
 
@@ -7102,6 +7119,14 @@ A bare array is homogeneous in its unit (spec [§7.4](03_bovnar_spec.md#74-eleme
 | `Torr` | `torr` | torr | `bu_torr` | 101325/760 Pa |
 | `psi`  | — | pound-force per square inch | `bu_psi` | 6894.757293168362 Pa |
 | `inHg` | `inch_hg`, `inch_mercury` | inch of mercury | `bu_inch_hg` | 3386.388640341 Pa (= 25.4 mmHg exactly) |
+| `mH2O` | `metre_water`, `meter_water` | metre of water column | `bu_meter_water` | 9806.65 Pa (exact, conventional) |
+
+> `mH2O` takes prefixes, so the spellings people actually write fall out of it: `c~mH2O` (or the
+> compact `cmH2O`) is the centimetre of water a ventilator is set in, and `m~mH2O` the millimetre.
+> The value is the conventional column — water at 1000 kg/m³ under standard gravity — the same kind
+> of convention that fixes `mmHg` at exactly 133.322387415 Pa. A column measured at a stated
+> temperature (UDUNITS' `water_4C`, QUDT's `IN_H2O`) is a *different* unit and is refused, not
+> rounded onto this one.
 
 ### 3.6 Energy Units
 
@@ -7112,6 +7137,18 @@ A bare array is homogeneous in its unit (spec [§7.4](03_bovnar_spec.md#74-eleme
 | `erg`  | `ergs` | erg | `bu_erg` | 10⁻⁷ J (exact) |
 | `thm`  | `therm`, `therms` | US therm | `bu_therm` | 1.05480400×10⁸ J (exact) |
 | `ft_lb` | `foot_pound`, `foot_pounds` | foot-pound | `bu_foot_pound` | 1.3558179483 J |
+| `cal_IT` | `calorie_IT` | International Table calorie | `bu_calorie_it` | 4.1868 J (exact) |
+| `Btu_th` | `BTU_th`, `btu_th` | thermochemical BTU | `bu_btu_th` | 23722880951/22500000 J ≈ 1054.35026449 J |
+
+> **Two calories and two BTUs, and the pairs cross over.** `cal` is the THERMOCHEMICAL calorie and
+> `Btu` the INTERNATIONAL TABLE BTU, which is not an inconsistency but the two vocabularies' own
+> defaults: UCUM's unqualified `cal` is thermochemical and its unqualified `[Btu]` is too, while
+> UDUNITS' unqualified `calorie` is the IT one. Each pair is 0.067 % apart — dimensionally identical
+> and numerically wrong if confused — so both members of both pairs are carried and every profile
+> code lands on the one its own vocabulary says it means. Both BTUs are one pound of water raised
+> one degree Fahrenheit, i.e. the corresponding calorie × 453.59237 g/lb × 5/9; that terminates for
+> the IT calorie and does not for the thermochemical one, which is why `Btu_th` states an exact
+> rational rather than a decimal.
 
 > **`BTU` alias note:** `BTU` (all uppercase, three characters) is a valid alias for `bu_btu`. Because currencies require the `$` sigil, the bare token `BTU` is a physical-unit lookup and resolves to `bu_btu`; `Btu` and `btu` are also accepted. See §10.2 for the complete look-alike table.
 
@@ -8343,7 +8380,7 @@ A base unit's id is **blocked**, not a running counter: the leading two decimal 
 | 80 | 800000–809999 | CF standard names | `src/gendata/cf.bvnr` |
 | 90 | 900000–909999 | currencies | `src/gendata/currencies.bvnr` |
 
-`bu_none` is 0 and belongs to no block; every tag between the native units and the currencies is now taken, so a further vocabulary needs one outside 10–90. Blocks 40–80 currently contribute no ids at all: those vocabularies map every code onto a native unit, and the block tag reserves their room rather than filling it. Within block 10 the 180 native units run contiguously from `bu_bit` = 100000 to `bu_turbidity_jtu` = 100179, in the order of `units.bvnr`. Currencies run contiguously from 900000 and — unlike every other block — have **no named `bu_*` enumerators** (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a `$` sigil, resolved by `bvn_parse_currency_str` and carried as the numeric `base` value. `bvn_unit_is_currency(base)` is a bounds check over block 90.
+`bu_none` is 0 and belongs to no block; every tag between the native units and the currencies is now taken, so a further vocabulary needs one outside 10–90. Blocks 40–80 currently contribute no ids at all: those vocabularies map every code onto a native unit, and the block tag reserves their room rather than filling it. Within block 10 the native units run contiguously from `bu_bit` = 100000 to `bu_long_hundredweight` = 100191, in the order of `units.bvnr`; `BVN_UNIT_NATIVE_FIRST`, `BVN_UNIT_NATIVE_LAST` and `BVN_UNIT_NATIVE_COUNT` are generated beside the enum, so read the bounds from those rather than from this sentence. Currencies run contiguously from 900000 and — unlike every other block — have **no named `bu_*` enumerators** (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a `$` sigil, resolved by `bvn_parse_currency_str` and carried as the numeric `base` value. `bvn_unit_is_currency(base)` is a bounds check over block 90.
 
 Only a vocabulary that contributes units of its *own* takes a block. A unit profile is a spelling for the unit slot, so most of its codes translate to native units and carry native ids; the ones that get a block id of their own are the **opaque** units — codes with no native equivalent and no dimension, such as UCUM's assay-defined `[IU]` or UN/ECE's package types — which need an identity precisely because nothing else can stand in for them.
 
@@ -8510,13 +8547,18 @@ typedef enum value_base_unit_e {
 /* Not a member of the enum, and NOT a bound on it: the number of rows in the
  * dense tables the library indexes by bvni_unit_slot(). The id space is
  * sparse, so it has no "one past the end". */
-/* #define BVN_UNIT_SLOT_COUNT 247 */
+/* #define BVN_UNIT_SLOT_COUNT 259 */
 ```
 
 #### `unit_exponent_t`
 
 ```c
+#define BVN_EXPONENT_MIN	(-100)
+#define BVN_EXPONENT_MAX	( 100)
+
 typedef enum unit_exponent_e {
+    exp_range_min  = BVN_EXPONENT_MIN,
+    exp_range_max  = BVN_EXPONENT_MAX,
     exp_invalid    =   0,
     exp_linear     =   1,  exp_square    =  2,  exp_cubic     =  3,
     exp_quartic    =   4,  exp_quintic   =  5,  exp_sextic    =  6,
@@ -8526,6 +8568,13 @@ typedef enum unit_exponent_e {
     exp_neg_septic =  -7,  exp_neg_octic = -8,  exp_neg_nonic = -9,
 } unit_exponent_t;
 ```
+
+**The named enumerators are not the range.** They cover ±1…±9 and are kept because callers use them;
+the type carries any integer in `[BVN_EXPONENT_MIN, BVN_EXPONENT_MAX]` = ±100, which is what §6 and
+the grammar describe. `exp_range_min`/`exp_range_max` are enumerators so that the underlying type is
+wide enough for them on every conforming compiler; neither is a valid exponent to *use*. Do not
+switch exhaustively over this enum, and do not assume a value outside the named nine is invalid —
+ask `bvn_int_to_exponent`, which returns `exp_invalid` for anything out of range.
 
 `exp_invalid` (value `0`) is the zero-initialization sentinel. Always initialize components before use.
 
@@ -10125,7 +10174,12 @@ usually where the money is.
 | Pressure ≈ 1 atm | `atm` = 101325 Pa · `at` (technical) = 98066.5 Pa · `bar` = 100000 Pa |
 | Millimetre of mercury | `Torr` = 101325/760 Pa ≈ 133.322368 Pa · `mmHg` = 133.322387415 Pa — **not** the same unit (they differ by 1.4×10⁻⁷ relative) |
 | Horsepower | `hp` (mechanical) = 745.6998715822702 W · `PS` (metric) = 735.49875 W |
-| Calorie | `cal` = 4.184 J (thermochemical); the food "Calorie" is `kcal` |
+| Calorie | `cal` = 4.184 J (thermochemical) · `cal_IT` = 4.1868 J (international table) — 0.067 % apart; the food "Calorie" is `k~cal` |
+| BTU | `Btu` = 1055.05585262 J (international table) · `Btu_th` = 1054.35026449 J (thermochemical) — the same 0.067 %, and note the pairing crosses over: bovnar's unqualified calorie is the thermochemical one and its unqualified BTU the IT one, because that is what UCUM and UDUNITS respectively mean by theirs |
+| Dram | `dr` (avoirdupois) = 1.7718451953125 g · `dr_ap` (apothecary) = 3.8879346 g — **2.2× apart**, which is the widest near miss in the registry |
+| Pound | `lb` (avoirdupois) = 0.45359237 kg · `lb_t` (troy, = the apothecary pound) = 0.3732417216 kg |
+| Hundredweight | `cwt_l` (long/imperial) = 112 lb = 50.80234544 kg · the short one is exactly 100 lb, so write `h~lb` |
+| Water column | `mH2O` = 9806.65 Pa is the **conventional** column (water at 1000 kg/m³). A column stated at a temperature — UDUNITS' `water_4C`, QUDT's `IN_H2O` — is a different unit and is refused rather than rounded onto this one |
 | Thou | `thou` = `mil` = 25.4 µm — `mil` is **not** a milliradian, which is `mrad` / `m~rad` |
 
 ---
@@ -10172,6 +10226,14 @@ usually where the money is.
 | practical salinity | `PSU` | `‰` or `g/kg` |
 | absolute salinity | `g/k~g` | `PSU` |
 | hydroponic EC scale | `CF` | `cF` (centifarad) |
+| thermochemical calorie | `cal` | `cal_IT` (0.067 % larger) |
+| international-table calorie | `cal_IT` | `cal` |
+| international-table BTU | `Btu` | `Btu_th` |
+| thermochemical BTU | `Btu_th` | `Btu` |
+| apothecary dram | `dr_ap` | `dr` (avoirdupois, 2.2× smaller) |
+| troy or apothecary pound | `lb_t` | `lb` (avoirdupois) |
+| long hundredweight | `cwt_l` | `h~lb` (that is the SHORT one, 100 lb) |
+| centimetre of water | `cmH2O`, `c~mH2O` | `c~m~H2O` — the prefix goes on `mH2O`, which is the metre of water |
 
 ---
 
@@ -14560,7 +14622,7 @@ Adding a vocabulary is therefore a data file and a registry row, not a second pa
 
 ### 1.2 Why a notation rather than more native units
 
-Bovnar's native registry is 180 physical units and 216 currencies, hand-maintained in
+Bovnar's native registry is 192 physical units and 216 currencies, hand-maintained in
 `src/gendata/`. UCUM's atom table is larger — a complete clinical, apothecary, troy, avoirdupois
 and CGS inventory — and its expression language is unbounded, so the set of valid UCUM codes cannot
 be enumerated as a table of units at all.
@@ -15270,9 +15332,9 @@ The asymmetry is worth stating plainly: these profiles are good *readers* and pa
 round trip that starts in a vocabulary returns to it; one that starts in Bovnar's native registry
 may have nowhere to go.
 
-Sweeping the whole native registry — all 186 physical units, each at the twelve prefixes
-`si_none da h k M G T d c m µ n` — **627** combinations survive a native → UCUM → native round trip
-unchanged, **1250** have no UCUM code, 355 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
+Sweeping the whole native registry — all 192 physical units, each at the twelve prefixes
+`si_none da h k M G T d c m µ n` — **655** combinations survive a native → UCUM → native round trip
+unchanged, **1294** have no UCUM code, 355 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
 before the question arises, and **none round-trips to a different unit**. The last of those is the
 invariant; the two counts move whenever the registry gains a unit, so `test_sweep_round_trip` in
 `tests/bovnar_ucum_test.c` pins all three rather than leaving them as prose.
@@ -15938,7 +16000,7 @@ native target is worth, and compares. `unece` is reached at one remove; see §9.
 The generator also emits the **reverse** tables §5.3 uses, choosing the canonical code for each slot
 by the grammar's rule (shortest for an expression profile, first-declared for a flat one), honouring
 `.reverse = false`, and recording that code's own decade. Deriving them rather than searching the
-forward tables at run time is what makes `bvn_unit_to_profile` deterministic; the 627 round trips
+forward tables at run time is what makes `bvn_unit_to_profile` deterministic; the 655 round trips
 quoted in §5.3 are the check that forward and reverse agree.
 
 ### 9.3 Tests
@@ -17787,8 +17849,8 @@ profile-char = (* any unit-char, plus "," at brace depth >= 1 -- a    *)
 (*   part of IEC 80000-13, which stops at yobi (Yi, 2^80).             *)
 (*                                                                     *)
 (* base-unit  = a symbol looked up in the fixed unit table by              *)
-(*   bvn_parse_unit (src/utils/bovnar_utils.c): 180 named units with        *)
-(*   529 accepted spellings (canonical symbols plus long-form and plural    *)
+(*   bvn_parse_unit (src/utils/bovnar_utils.c): 192 named units with        *)
+(*   586 accepted spellings (canonical symbols plus long-form and plural    *)
 (*   aliases), spanning SI, imperial / US customary, CGS, radiation,        *)
 (*   surveying, culinary, Old German and digital-storage quantities.        *)
 (*   Doc 2 (the unit-system spec) is the authoritative registry; the SI     *)

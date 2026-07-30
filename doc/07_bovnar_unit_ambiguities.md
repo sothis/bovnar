@@ -497,7 +497,12 @@ usually where the money is.
 | Pressure ≈ 1 atm | `atm` = 101325 Pa · `at` (technical) = 98066.5 Pa · `bar` = 100000 Pa |
 | Millimetre of mercury | `Torr` = 101325/760 Pa ≈ 133.322368 Pa · `mmHg` = 133.322387415 Pa — **not** the same unit (they differ by 1.4×10⁻⁷ relative) |
 | Horsepower | `hp` (mechanical) = 745.6998715822702 W · `PS` (metric) = 735.49875 W |
-| Calorie | `cal` = 4.184 J (thermochemical); the food "Calorie" is `kcal` |
+| Calorie | `cal` = 4.184 J (thermochemical) · `cal_IT` = 4.1868 J (international table) — 0.067 % apart; the food "Calorie" is `k~cal` |
+| BTU | `Btu` = 1055.05585262 J (international table) · `Btu_th` = 1054.35026449 J (thermochemical) — the same 0.067 %, and note the pairing crosses over: bovnar's unqualified calorie is the thermochemical one and its unqualified BTU the IT one, because that is what UCUM and UDUNITS respectively mean by theirs |
+| Dram | `dr` (avoirdupois) = 1.7718451953125 g · `dr_ap` (apothecary) = 3.8879346 g — **2.2× apart**, which is the widest near miss in the registry |
+| Pound | `lb` (avoirdupois) = 0.45359237 kg · `lb_t` (troy, = the apothecary pound) = 0.3732417216 kg |
+| Hundredweight | `cwt_l` (long/imperial) = 112 lb = 50.80234544 kg · the short one is exactly 100 lb, so write `h~lb` |
+| Water column | `mH2O` = 9806.65 Pa is the **conventional** column (water at 1000 kg/m³). A column stated at a temperature — UDUNITS' `water_4C`, QUDT's `IN_H2O` — is a different unit and is refused rather than rounded onto this one |
 | Thou | `thou` = `mil` = 25.4 µm — `mil` is **not** a milliradian, which is `mrad` / `m~rad` |
 
 ---
@@ -544,6 +549,14 @@ usually where the money is.
 | practical salinity | `PSU` | `‰` or `g/kg` |
 | absolute salinity | `g/k~g` | `PSU` |
 | hydroponic EC scale | `CF` | `cF` (centifarad) |
+| thermochemical calorie | `cal` | `cal_IT` (0.067 % larger) |
+| international-table calorie | `cal_IT` | `cal` |
+| international-table BTU | `Btu` | `Btu_th` |
+| thermochemical BTU | `Btu_th` | `Btu` |
+| apothecary dram | `dr_ap` | `dr` (avoirdupois, 2.2× smaller) |
+| troy or apothecary pound | `lb_t` | `lb` (avoirdupois) |
+| long hundredweight | `cwt_l` | `h~lb` (that is the SHORT one, 100 lb) |
+| centimetre of water | `cmH2O`, `c~mH2O` | `c~m~H2O` — the prefix goes on `mH2O`, which is the metre of water |
 
 ---
 

@@ -225,6 +225,14 @@
   { .code = "[oz_tr]";    .bovnar = "oz_t";  .metric = false; },
   { .code = "[pwt_tr]";   .bovnar = "dwt";   .metric = false; },
   { .code = "[sc_ap]";    .bovnar = "sc";    .metric = false; },
+  # The apothecary dram is three scruples, and the avoirdupois dram bovnar
+  # spells "dr" is a different mass by a factor of 2.2. The apothecary POUND is
+  # twelve apothecary ounces, and an apothecary ounce IS a troy ounce, so
+  # [lb_ap] and [lb_tr] are one unit; [lb_ap] is not the spelling it is written
+  # back as.
+  { .code = "[dr_ap]";    .bovnar = "dr_ap"; .metric = false; },
+  { .code = "[lb_tr]";    .bovnar = "lb_t";  .metric = false; },
+  { .code = "[lb_ap]";    .bovnar = "lb_t";  .metric = false; .reverse = false; },
   { .code = "[car_m]";    .bovnar = "ct";    .metric = false; },
   # The apothecary ounce IS the troy ounce. The apothecary DRAM is not the
   # avoirdupois one, though -- 3.8879346 g against 1.7718 g -- so it is refused
@@ -242,6 +250,9 @@
   # hecto prefix carries it. The LONG one is 112 pounds and is refused below:
   # 112 is not a decade and there is no native hundredweight to land on.
   { .code = "[scwt_av]";  .bovnar = "h~lb";  .metric = false; },
+  # The long hundredweight is 112 lb, which no prefix reaches -- unlike the
+  # short one above, which is exactly a hecto-pound.
+  { .code = "[lcwt_av]";  .bovnar = "cwt_l"; .metric = false; },
 
   # Volume
   { .code = "[gal_us]"; .bovnar = "gal";      .metric = false; },
@@ -274,6 +285,15 @@
   # with the reason printed on every run; it is publisher rounding, not a
   # different unit. Native inHg is the exact one.
   { .code = "[in_i'Hg]"; .bovnar = "inHg";        .metric = false; },
+  # The WATER column, the same shape as the mercury one above: "m[H2O]" is a
+  # METRE of water and metric, so "cm[H2O]" falls out as the centimetre a
+  # ventilator is set in. It was refused while there was no native water-column
+  # unit to land on -- mapping it onto the technical atmosphere would have been
+  # numerically perfect and would have handed a centimetre of water back as a
+  # millitechnical atmosphere. bu_meter_water is that unit.
+  { .code = "m[H2O]";   .bovnar = "mH2O";   .metric = true;  },
+  # UCUM builds the inch of water as m[H2O].[in_i]/m, and so does this.
+  { .code = "[in_i'H2O]"; .bovnar = "in·mH2O/m";  .metric = false; .reverse = false; },
   { .code = "[PRU]";     .bovnar = "mmHg·s/m~L";  .metric = false; },
   { .code = "[wood'U]";  .bovnar = "mmHg·min/L";  .metric = false; },
   { .code = "[psi]";    .bovnar = "psi";    .metric = false; },
@@ -287,9 +307,15 @@
   # [Btu] -- is refused below rather than silently mapped 0.07 % wrong.
   { .code = "cal_th";   .bovnar = "cal";    .metric = true;  },
   { .code = "cal";      .bovnar = "cal";    .metric = true;  },
+  { .code = "cal_IT";   .bovnar = "cal_IT"; .metric = true;  },
   # The nutrition Calorie is 1000 thermochemical calories.
   { .code = "[Cal]";    .bovnar = "k~cal";  .metric = false; },
   { .code = "[Btu_IT]"; .bovnar = "Btu";    .metric = false; },
+  # bu_btu_th is the thermochemical BTU, so [Btu_th] and UCUM's unqualified
+  # [Btu] -- which UCUM defines AS [Btu_th] -- both land on it. [Btu] carries
+  # .reverse = false so the unit is written back under the qualified spelling.
+  { .code = "[Btu_th]"; .bovnar = "Btu_th"; .metric = false; },
+  { .code = "[Btu]";    .bovnar = "Btu_th"; .metric = false; .reverse = false; },
   { .code = "erg";      .bovnar = "erg";    .metric = false; },
   { .code = "[HP]";     .bovnar = "hp";     .metric = false; },
   { .code = "[kn_i]";   .bovnar = "kn";     .metric = false; },
@@ -473,20 +499,16 @@
 
   # Columns of liquid other than mercury, and other pressure references bovnar
   # does not carry.
-  { .code = "m[H2O]"; .why = "metre of water column — no native form"; },
 
   # Energy conventions bovnar does not carry. Its cal is thermochemical (which
   # is what UCUM's unqualified cal is, so that one maps) and its Btu is the IT
   # one -- so every other calorie and EVERY other BTU, the unqualified [Btu]
   # included, is refused. Mapping [Btu] onto Btu would be wrong by 0.07 %:
   # small, dimensionally correct, and invisible to every later check.
-  { .code = "[Btu]";    .why = "unqualified BTU is thermochemical; native Btu is the IT one"; },
-  { .code = "[Btu_th]"; .why = "thermochemical BTU; native Btu is the IT one"; },
   { .code = "[Btu_39]"; .why = "39 degF BTU — no native form"; },
   { .code = "[Btu_59]"; .why = "59 degF BTU — no native form"; },
   { .code = "[Btu_60]"; .why = "60 degF BTU — no native form"; },
   { .code = "[Btu_m]";  .why = "mean BTU — no native form"; },
-  { .code = "cal_IT";   .why = "IT calorie (4.1868 J); native cal is thermochemical"; },
   { .code = "cal_m";    .why = "mean calorie — no native form"; },
   { .code = "cal_[15]"; .why = "15 degC calorie — no native form"; },
   { .code = "cal_[20]"; .why = "20 degC calorie — no native form"; },
@@ -495,8 +517,6 @@
   # dram is 3.8879346 g and bovnar's dr is the AVOIRDUPOIS dram at 1.7718 g --
   # a factor of 2.2 apart, which is exactly the kind of near-miss that makes an
   # eager mapping worse than a refusal.
-  { .code = "[dr_ap]";  .why = "apothecary dram; native dr is the avoirdupois dram"; },
-  { .code = "[lb_ap]";  .why = "apothecary pound (12 troy ounces) — no native form"; },
 
   # Photometric and geometric atoms with no native form.
   { .code = "Lmb";   .why = "lambert — 1e4/pi cd/m^2, irrational against the native units"; },
@@ -608,8 +628,6 @@
   { .code = "[oz_m]";    .why = "metric ounce (28 g) — not a decade off any native mass"; },
 
   # Imperial and troy masses with no native counterpart.
-  { .code = "[lcwt_av]"; .why = "long hundredweight (112 lb) — 112 is not a decade"; },
-  { .code = "[lb_tr]";   .why = "troy pound (12 troy ounces) — no native form"; },
 
   # Volumes defined as a whole-number multiple of a native unit. Same reason as
   # the metric kitchen: 144 and 128 are not powers of ten.
@@ -637,5 +655,4 @@
   # this inherits it; the technical atmosphere is exactly ten metres of water,
   # so a mapping onto d~at would be numerically perfect and would hand a
   # clinician's centimetre of water back as a millitechnical atmosphere.
-  { .code = "[in_i'H2O]"; .why = "inch of water column — bovnar has no water-column unit; see m[H2O]"; },
 ];

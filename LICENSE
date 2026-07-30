@@ -24,7 +24,8 @@ SOFTWARE.
 
 This project contains multiple components that are distributed under separate
 licenses.  Unless otherwise specified in a file’s header, the following rules
-apply:
+apply.  Clauses 1 to 3 are subject to clause 4, which governs material this
+project did not author and cannot license.
 
 1. Source Code
    All source code files (including but not limited to C, Python, CMake, and
@@ -42,3 +43,29 @@ apply:
    via the Creative Commons CC0 1.0 Universal (CC0) license.
    To view a copy of this dedication, visit:
    https://creativecommons.org/publicdomain/zero/1.0/
+
+4. Third‑Party Vocabulary Data
+   The unit‑profile tables in src/gendata/ — and the C tables generated from
+   them, which are compiled into the library, the single‑file amalgamation, the
+   WebAssembly build and the Python wheel — incorporate identifier strings from
+   six external vocabularies: UCUM, QUDT, OM 2, UDUNITS‑2, the CF standard name
+   table, and UN/ECE Recommendations 20 and 21.  Documentation under doc/ that
+   tabulates those identifiers incorporates them likewise.
+
+   Those identifiers remain the property of their publishers and are used under
+   the licenses recorded, in full and per vocabulary, in THIRD_PARTY_NOTICES.md
+   in the root of this distribution.  Some of those licenses impose conditions —
+   attribution in particular — that the MIT License does not; one of them (UCUM)
+   is more restrictive than the MIT License and its position is stated openly in
+   that file.
+
+   The grants in clauses 1 and 2 extend to this project's own contribution: the
+   native unit registry, the translation targets, the refusal rationales, the
+   generators, and the surrounding code and prose.  They do not extend to the
+   third‑party identifiers, and nothing here grants a right in them that this
+   project does not hold.  Anyone redistributing this software, in source or
+   binary form, must carry THIRD_PARTY_NOTICES.md with it.
+
+   No upstream artefact is redistributed by this project.  The publishers' own
+   machine‑readable definitions are fetched only into a git‑ignored build
+   directory, where they serve to verify the tables, and are never packaged.

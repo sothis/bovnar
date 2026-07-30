@@ -69,6 +69,25 @@
 #   Composed names lose to atom-shaped ones outright -- OM's
 #   "cubicMetrePerSquareMetre" is worth a metre, and a metre must not be written
 #   back as one.
+#
+# SOURCE, VERSION AND LICENSING
+#   Vocabulary  OM 2.0 (om-2.0.rdf)
+#   Retrieved   2026-07-30 from https://github.com/HajoRijgersberg/OM
+#   Publisher   (c) 2005-2025 Hajo Rijgersberg, Don Willems, Jan Top,
+#               Wageningen University and Research Centre, The Netherlands
+#   Licence     Creative Commons Attribution 4.0 International (CC BY 4.0),
+#               https://creativecommons.org/licenses/by/4.0/ -- the authors do
+#               not endorse this project
+#   Taken       unit local names, and the compositions (prefix/base,
+#               numerator/denominator, term/term, base/exponent) each target
+#               above was derived from. No OM label, description or annotation
+#               is reproduced anywhere in this repository
+#   Modified    yes -- a subset, mapped onto bovnar's native unit registry
+#
+#   OM is published by an EEA maker, so the EU database right applies alongside
+#   copyright; CC BY 4.0 section 2(a)(1) licences it expressly, which is what
+#   makes this extraction covered rather than merely small. The attribution the
+#   licence requires lives in THIRD_PARTY_NOTICES.md, in full.
 
 .schema_version = <uint:16> 1;
 

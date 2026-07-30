@@ -40,6 +40,20 @@
 #   qudt-qk.bvnr, because a kind of quantity is not a unit. QUDT's currency
 #   units: bovnar has ISO 4217 natively, written with the $ sigil. Every unit
 #   whose QUDT value this file cannot state exactly.
+#
+# SOURCE, VERSION AND LICENSING
+#   Vocabulary  QUDT 3.1.0 (owl:versionIRI http://qudt.org/3.1.0/vocab/unit)
+#   Retrieved   2026-07-30 from https://qudt.org/3.1.0/vocab/unit
+#   Publisher   QUDT.org
+#   Licence     Creative Commons Attribution 4.0 International (CC BY 4.0),
+#               https://creativecommons.org/licenses/by/4.0/ -- attribution is
+#               made to QUDT.org, which does not endorse this project
+#   Taken       unit local names. No QUDT label, description or annotation is
+#               reproduced anywhere in this repository
+#   Modified    yes -- a subset, mapped onto bovnar's native unit registry
+#
+#   The attribution CC BY 4.0 requires lives in THIRD_PARTY_NOTICES.md, in full.
+#   There is no ShareAlike term, so nothing here reaches bovnar's own licence.
 
 .schema_version = <uint:16> 1;
 

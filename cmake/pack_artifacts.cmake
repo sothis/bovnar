@@ -59,13 +59,20 @@ function(_pack topdir outfile fmt)
     message(STATUS "pack_artifacts: wrote ${outfile}")
 endfunction()
 
-# Headers + LICENSE + README, plus the documentation, examples and editor
-# highlighters — common to every binary archive.
+# Headers + LICENSE + THIRD_PARTY_NOTICES + README, plus the documentation,
+# examples and editor highlighters — common to every binary archive.
+#
+# THIRD_PARTY_NOTICES.md is not optional packaging. The profile tables compiled
+# into these binaries carry identifiers from six external vocabularies, and two
+# of those licences (UDUNITS-2's BSD-3 clause 2, CC BY 4.0's attribution) require
+# the notice to travel with a BINARY distribution specifically. An archive
+# shipped without it is out of compliance the moment it is downloaded.
 function(_stage_common top)
     file(MAKE_DIRECTORY "${STAGE}/${top}/include")
     file(GLOB _hdrs "${SRC_DIR}/include/*.h")
     file(COPY ${_hdrs} DESTINATION "${STAGE}/${top}/include")
-    file(COPY "${SRC_DIR}/LICENSE" "${SRC_DIR}/README.md" DESTINATION "${STAGE}/${top}")
+    file(COPY "${SRC_DIR}/LICENSE" "${SRC_DIR}/THIRD_PARTY_NOTICES.md"
+              "${SRC_DIR}/README.md" DESTINATION "${STAGE}/${top}")
     # Ship the docs, runnable examples and syntax highlighters alongside the
     # binaries. Each is a committed source directory; guard with EXISTS so a
     # trimmed checkout still packs a valid (if leaner) archive.
@@ -127,7 +134,8 @@ if(PYTHON)
         # Repo-root README (not dist/README.md) so the amalgamation ships the
         # project's main readme, matching the platform archives.
         file(COPY "${BIN_DIR}/amalgamate/bovnar.h" "${BIN_DIR}/amalgamate/bovnar.c"
-             "${SRC_DIR}/LICENSE" "${SRC_DIR}/README.md" DESTINATION "${STAGE}/${_atop}")
+             "${SRC_DIR}/LICENSE" "${SRC_DIR}/THIRD_PARTY_NOTICES.md"
+             "${SRC_DIR}/README.md" DESTINATION "${STAGE}/${_atop}")
         # Bundle the docs and runnable examples with the single-file drop.
         foreach(_extra doc examples)
             if(EXISTS "${SRC_DIR}/${_extra}")

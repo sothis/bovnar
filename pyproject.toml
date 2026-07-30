@@ -8,7 +8,11 @@ version         = "1.2.0"
 description     = "Python bindings for the Bovnar (BVNR) typed, unit-aware serialisation format"
 readme          = "python/README.md"
 license         = "MIT"
-license-files   = ["LICENSE"]
+# THIRD_PARTY_NOTICES.md ships in the wheel beside the licence: the compiled
+# libbvnr inside it carries identifiers from six external vocabularies, and the
+# attribution two of those licences require has to reach whoever installs the
+# wheel, not only whoever clones the repository.
+license-files   = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
 requires-python = ">=3.10"
 authors         = [
     { name = "Janos Sonntag" },

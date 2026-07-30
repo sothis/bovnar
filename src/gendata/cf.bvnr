@@ -79,6 +79,29 @@
 # PROVENANCE
 #   CF standard name table version 94 (2026-06-09), the
 #   `current` table published at cfconventions.org.
+#
+# SOURCE, VERSION AND LICENSING
+#   Vocabulary  CF standard name table v94, last modified 2026-06-09
+#   Retrieved   2026-07-30 from https://cfconventions.org/Data/
+#               cf-standard-names/94/src/cf-standard-name-table.xml -- the
+#               VERSIONED path, not `current/`, so this row set stays
+#               reproducible after the table moves on
+#   Publisher   maintained on behalf of the CF community by the Centre for
+#               Environmental Data Analysis (CEDA)
+#   Licence     NONE STATED BY THE PUBLISHER. The CF conventions DOCUMENT is
+#               CC0 1.0, but this table is maintained separately, in
+#               cf-convention/vocabularies, which carries no licence file and
+#               no in-band rights statement
+#   Taken       standard names, and the canonical_units each name states. No CF
+#               description text is reproduced anywhere in this repository
+#   Modified    yes -- a subset, each name translated to the unit its own
+#               canonical_units field states
+#
+#   Nothing suggests the CF community means the table to be restricted -- it
+#   exists to be embedded in data files worldwide -- but there is no grant to
+#   point at, so THIRD_PARTY_NOTICES.md attributes it and records the request
+#   for an explicit licence. A build that must not carry the table at all takes
+#   -DBVNR_WITH_CF_PROFILE=OFF.
 
 .schema_version = <uint:16> 1;
 

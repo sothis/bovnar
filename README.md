@@ -823,5 +823,14 @@ Machine-readable metadata lives in [`CITATION.cff`](CITATION.cff): GitHub's *Cit
 | Source code (C, Python, CMake) | [MIT](LICENSE) |
 | Documentation (`doc/`) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
 | Examples (`examples/`) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| Third-party vocabulary identifiers in the unit profiles | their publishers' — see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) |
 
 Copyright © 2026 Janos Sonntag.
+
+The unit-profile tables carry identifier strings from UCUM, QUDT, OM 2,
+UDUNITS-2, the CF standard name table and UN/ECE Recommendations 20 and 21.
+Those identifiers belong to their publishers, and the MIT grant above does not
+extend to them; [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) records what
+was taken from each, from which published version, under which license, and
+which questions are still open. Redistributing Bovnar — in source or in binary
+form — means carrying that file along with it.

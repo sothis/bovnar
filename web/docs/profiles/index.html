@@ -254,6 +254,12 @@ tables wrong in the same way would agree with each other perfectly.</p>
 <li>17.2 <a href="#172-the-unit-is-cfs-own-canonical_units">The unit is CF's own <code>canonical_units</code></a></li>
 <li>17.3 <a href="#173-read-only-and-why-a-namespace-may-be">Read-only, and why a namespace may be</a></li>
 <li>17.4 <a href="#174-what-is-absent-and-what-it-costs">What is absent, and what it costs</a></li>
+</ul>
+</li>
+<li><a href="#18-provenance-licensing-and-attribution">Provenance, licensing and attribution</a><ul>
+<li>18.1 <a href="#181-what-is-taken-from-whom">What is taken from whom</a></li>
+<li>18.2 <a href="#182-every-table-is-an-adaptation-and-says-so">Every table is an adaptation, and says so</a></li>
+<li>18.3 <a href="#183-the-two-open-questions">The two open questions</a></li>
 <li><a href="#see-also">See also</a></li>
 </ul>
 </li>
@@ -4492,6 +4498,105 @@ recorded here is that completeness won <em>inside</em> the vocabulary: a standar
 is indistinguishable, to a producer, from one bovnar has never heard of, and a vocabulary carried in
 part is a vocabulary whose absences have to be documented one by one. Whether to carry the vocabulary
 at all is the integrator's, which is the right place for it.</p>
+<hr />
+<h2 id="18-provenance-licensing-and-attribution">18. Provenance, licensing and attribution</h2>
+<h3 id="181-what-is-taken-from-whom">18.1 What is taken from whom</h3>
+<p>Seven profiles carry identifier strings from <strong>six external vocabularies</strong>, and those strings are
+not this project's to license. The tables map them onto Bovnar's own registry; the mapping, the
+targets and the refusal rationales are original work here, and the identifiers are not.</p>
+<p>What is taken is identifiers <em>only</em> — a UCUM atom code, a QUDT or OM local name, a UN/ECE common
+code, a UDUNITS spelling, a CF standard name — plus, for <code>cf:</code> alone, the <code>canonical_units</code> field
+each name states, because §17.2 is built on it. No upstream description, definition, label or
+comment appears anywhere in the repository: where a row carries prose, that prose was written here.
+And no upstream artefact is redistributed at all. §9.5's factor proof fetches the publishers' own
+machine-readable definitions into a git-ignored build directory, verifies the tables against them,
+and packages none of them.</p>
+<table>
+<thead>
+<tr>
+<th>Namespace</th>
+<th>Vocabulary</th>
+<th>Version</th>
+<th>Licence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ucum:</code></td>
+<td>UCUM</td>
+<td>2.2 (rev. 2024-06-17)</td>
+<td>UCUM Copyright Notice and License v1.1 — <strong>restrictive; see §18.3</strong></td>
+</tr>
+<tr>
+<td><code>qudt:</code>, <code>qudt-qk:</code></td>
+<td>QUDT</td>
+<td>3.1.0</td>
+<td>CC BY 4.0, attribution to QUDT.org</td>
+</tr>
+<tr>
+<td><code>om:</code></td>
+<td>OM 2</td>
+<td>2.0</td>
+<td>CC BY 4.0, © Rijgersberg, Willems, Top / Wageningen UR</td>
+</tr>
+<tr>
+<td><code>udunits:</code></td>
+<td>UDUNITS-2</td>
+<td>master</td>
+<td>BSD 3-clause, © UCAR / Unidata</td>
+</tr>
+<tr>
+<td><code>cf:</code></td>
+<td>CF standard name table</td>
+<td>v94 (2026-06-09)</td>
+<td><strong>none stated by the publisher; see §18.3</strong></td>
+</tr>
+<tr>
+<td><code>unece:</code></td>
+<td>UN/CEFACT Rec 20 and 21</td>
+<td>reached via QUDT's <code>uneceCommonCode</code></td>
+<td>UN/CEFACT IPR Policy; the extraction itself is CC BY 4.0 from QUDT</td>
+</tr>
+</tbody>
+</table>
+<p>The full notices — copyright lines, licence URIs, the BSD text verbatim, and the modification
+statement CC BY 4.0 requires — live in <code>THIRD_PARTY_NOTICES.md</code> at the root of the distribution,
+and each <code>src/gendata/*.bvnr</code> file repeats its own block in its header so that the version and the
+licence travel with the data rather than only with the notices file.</p>
+<h3 id="182-every-table-is-an-adaptation-and-says-so">18.2 Every table is an adaptation, and says so</h3>
+<p>No table here reproduces a vocabulary, and none could: §3.1's three outcomes mean a code whose value
+Bovnar cannot state exactly is refused rather than approximated, so every table is a subset by
+construction, and §6.4 is the standing list of what each one leaves out. That is what makes these
+adaptations rather than copies, and CC BY 4.0 requires an adaptation to be marked as one — which is
+why the notices file states it for QUDT and OM in those words, and why the <code>.bvnr</code> headers do too.</p>
+<p>It also has a consequence worth stating outside the licence text: <strong>a publisher's endorsement is
+never implied.</strong> QUDT.org, the OM authors, UCAR/Unidata and the CF and UN/CEFACT communities have no
+involvement in this project. Where a translation is wrong, it is wrong here — which is exactly what
+§9.5 exists to catch, and §10.2 is the honest account of what it still cannot.</p>
+<h3 id="183-the-two-open-questions">18.3 The two open questions</h3>
+<p>Four of the six are settled: QUDT and OM are CC BY 4.0 and need attribution, which they now have;
+UDUNITS-2 is BSD 3-clause and needs its notice carried into binary distributions, which
+<code>pack_artifacts.cmake</code> now does; UN/ECE is formally unresolved on paper and universally implemented
+in practice, and written confirmation has been sought. Two are genuinely open.</p>
+<p><strong>UCUM.</strong> Its licence is revocable, and §3(a) conditions the grant on not creating derivative works
+of the UCUM table and not adding to, deleting from or modifying its content. <code>ucum.bvnr</code> is a subset
+mapped onto a different unit model, which is a derivative work on the licence's own definition
+whatever its purpose. Two things follow, and both matter. First: Bovnar's native notation was
+designed and specified independently of UCUM, is not offered as a replacement for it, and the
+<code>ucum:</code> namespace exists precisely so that a producer holding a UCUM code need not translate it by
+hand — §1.2 is the whole argument for a notation rather than more native units, and it is an
+interoperability argument. Second: a UCUM code is never silently reinterpreted, because §3.1 leaves
+nowhere for a guess to hide. Written permission for the derived mapping is being sought; until it is
+granted, <code>-DBVNR_WITH_UCUM_PROFILE=OFF</code> (§9.4) drops the table from the build entirely.</p>
+<p><strong>CF.</strong> The conventions <em>document</em> is CC0 1.0, but the standard name table is maintained separately
+and carries no licence file and no in-band rights statement. Nothing suggests the CF community means
+it to be restricted — a standard name exists to be written into data files worldwide — but there is
+no grant to point at, so the table is attributed to the CF community and CEDA and an explicit
+licence declaration has been requested. <code>-DBVNR_WITH_CF_PROFILE=OFF</code> is the same escape hatch.</p>
+<p>Neither question is one this document can close by reasoning about it, and neither is recorded here
+as settled. What is recorded is what was taken, from which published version, and under which terms
+— so that the answer, when it arrives, lands against a provenance record rather than against a
+table nobody can trace.</p>
 <hr />
 <h2 id="see-also">See also</h2>
 <ul>

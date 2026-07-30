@@ -46,6 +46,25 @@
 #   UCUM value this file cannot state exactly: when in doubt an atom goes in
 #   .unsupported, because refusing costs a producer an error message and guessing
 #   costs them a wrong number.
+#
+# SOURCE, VERSION AND LICENSING
+#   Vocabulary  UCUM 2.2, revision date 2024-06-17 (ucum-essence.xml)
+#   Retrieved   2026-07-30 from https://github.com/ucum-org/ucum
+#   Publisher   Regenstrief Institute, Inc. -- Copyright (c) 1999-2024, all
+#               rights reserved. UCUM is a registered trademark of Regenstrief
+#   Licence     UCUM Copyright Notice and License v1.1 (June 2024),
+#               https://ucum.org/license
+#   Taken       atom codes, prefix spellings, and the codes named in
+#               .unsupported. No UCUM description, definition or comment is
+#               reproduced anywhere in this repository
+#   Modified    yes -- a subset, mapped onto bovnar's native unit registry
+#
+#   READ THIRD_PARTY_NOTICES.md BEFORE REDISTRIBUTING. This is the one
+#   vocabulary here whose licence is more restrictive than bovnar's own: it is
+#   revocable, and its section 3(a) bars derivative works of the UCUM table.
+#   Permission for this derived mapping is still outstanding, and that file says
+#   so and says what is being done about it. A build that must not carry the
+#   table at all takes -DBVNR_WITH_UCUM_PROFILE=OFF.
 
 .schema_version = <uint:16> 1;
 

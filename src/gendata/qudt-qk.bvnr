@@ -48,6 +48,23 @@
 # PROVENANCE
 #   Same standing gap as every other profile here: nothing in this repository
 #   checks the QUDT side. See the note in qudt.bvnr.
+#
+# SOURCE, VERSION AND LICENSING
+#   Vocabulary  QUDT 3.1.0 quantity kinds
+#               (owl:versionIRI http://qudt.org/3.1.0/vocab/quantitykind)
+#   Retrieved   2026-07-30 from https://qudt.org/3.1.0/vocab/quantitykind, with
+#               the coherent unit of each kind taken from QUDT's own
+#               applicableUnit list in https://qudt.org/3.1.0/vocab/unit
+#   Publisher   QUDT.org
+#   Licence     Creative Commons Attribution 4.0 International (CC BY 4.0),
+#               https://creativecommons.org/licenses/by/4.0/ -- attribution is
+#               made to QUDT.org, which does not endorse this project
+#   Taken       quantity-kind local names. No QUDT label, description or
+#               annotation is reproduced anywhere in this repository
+#   Modified    yes -- a subset, each kind mapped to its coherent SI unit in
+#               bovnar's native registry
+#
+#   The attribution CC BY 4.0 requires lives in THIRD_PARTY_NOTICES.md, in full.
 
 .schema_version = <uint:16> 1;
 

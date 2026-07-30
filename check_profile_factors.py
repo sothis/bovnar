@@ -182,9 +182,16 @@ SOURCES = {
     # CF states each standard name's canonical_units as a UDUNITS expression, so
     # checking this vocabulary means reading TWO publishers: CF for the name's
     # units and Unidata for what those units are worth. Both are primary.
+    #
+    # PINNED TO THE VERSIONED PATH, not `current/`. cf.bvnr was built against
+    # table v94 and THIRD_PARTY_NOTICES.md attributes that version; fetching
+    # `current/` would silently move the thing this run compares against, so a
+    # table that stopped matching its own recorded provenance would look like a
+    # table that had gone wrong. Bumping the version is an edit here, in the
+    # .bvnr header and in the notices file, in one commit.
     "cf": [
         ("cf-standard-name-table.xml",
-         "https://cfconventions.org/Data/cf-standard-names/current/src/"
+         "https://cfconventions.org/Data/cf-standard-names/94/src/"
          "cf-standard-name-table.xml"),
         ("udunits2-base.xml",
          "https://raw.githubusercontent.com/Unidata/UDUNITS-2/master/lib/udunits2-base.xml"),

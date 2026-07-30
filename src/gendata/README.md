@@ -30,6 +30,28 @@ rebuild — never edit the generated `*.gen.{h,inc}`.**
 | `gen_units.py` / `gen_prefixes.py` / `gen_currencies.py` / `gen_profiles.py` | repo root | the generators |
 | `bvnr_data.py` | repo root | the small built-in `.bvnr` reader they use |
 
+## Provenance and licensing
+
+The seven profile files carry **identifier strings from six external
+vocabularies** — UCUM, QUDT, OM 2, UDUNITS-2, the CF standard name table, and
+UN/ECE Recommendations 20 and 21. Those strings belong to their publishers; the
+mappings, targets and refusal rationales beside them are this project's own, and
+`LICENSE` clause 4 draws that line.
+
+Each profile file carries a `SOURCE, VERSION AND LICENSING` block in its header
+naming the exact upstream version, the retrieval date, the licence and what was
+extracted, so the provenance travels with the data. The full notices — copyright
+lines, licence texts, and the modification statement CC BY 4.0 requires — are in
+[`THIRD_PARTY_NOTICES.md`](../../THIRD_PARTY_NOTICES.md) at the repo root, and
+`doc/11_bovnar_unit_profiles.md` §18 is the reader-facing account, including the
+two questions that are still open (UCUM's derivative-works bar, and the CF
+table's absent licence).
+
+**Bumping a vocabulary to a new upstream version is three edits in one commit:**
+the rows, the `.bvnr` header block, and the notices file — plus the pinned URI in
+`check_profile_factors.py`, which fetches an exact published version and never a
+`current/` alias, so that a table can always be traced to what it was built from.
+
 ## Building
 
 The generators parse the `.bvnr` files with `bvnr_data.py` (a small built-in

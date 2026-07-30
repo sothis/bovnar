@@ -424,11 +424,14 @@ distributing that output, and asks for the notice this entry gives.
 ## Not third-party, despite appearances
 
 * `web/bovnar_highlight.js`, `web/bovnar_wasm.js`, `web/bovnar_parser_wasm.js`
-  and the editor definitions under `highlighter/` carry no third-party notice
-  and are, on everything the repository records, original work here.
-* `dist/linguist/languages.yml.fragment` and `dist/mime/*` are written *for*
-  those projects rather than extracted from them: a fragment to be contributed
-  upstream, not a copy of anything upstream holds.
+  and the editor definitions under `highlighter/` — the Sublime syntax and
+  colour scheme, the VS Code grammar and theme, the Vim, Geany and CLion
+  definitions — are **clean-room original work**, written for this project
+  against the Bovnar grammar rather than adapted from any existing syntax
+  definition, theme or template.
+* `dist/linguist/languages.yml.fragment` and `dist/mime/*` are likewise original
+  and written *for* those projects rather than extracted from them: a fragment
+  to be contributed upstream, not a copy of anything upstream holds.
 * Development-time dependencies that are never redistributed — `pint`, `numpy`,
   `markdown`, `emsdk`, CMake, the compilers — are outside the scope of this
   file, which covers only what this project actually ships.

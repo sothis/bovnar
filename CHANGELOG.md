@@ -28,7 +28,9 @@ contribution — the native unit registry, the translation targets, the refusal
 rationales, the generators, the code and the prose. It does **not** cover the
 identifier strings the unit-profile tables carry from UCUM, QUDT, OM 2,
 UDUNITS-2, the CF standard name table and UN/ECE Recommendations 20 and 21, nor
-the webfonts, JavaScript libraries and imagery the website serves. It never did;
+the further material Part 2 of the notices inventories — the website's fonts and
+libraries, the imagery, the committed toolchain output, an algorithm the date
+routines derive from, the code of conduct's adapted text. It never did;
 the file said otherwise, which offered recipients a right to sublicense and sell
 material this project has never held a right in.
 

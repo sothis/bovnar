@@ -1,9 +1,17 @@
 # Third-party notices
 
 This file has two parts. **Part 1** covers the six external unit vocabularies
-whose identifiers are compiled into the library itself. **Part 2** covers the
-third-party components of the website and the build — webfonts, JavaScript
-libraries, imagery, and the toolchain whose output is committed.
+whose identifiers are compiled into the library itself. **Part 2** covers
+everything else this project did not author — the webfonts and libraries the
+website serves, the imagery, the toolchain whose output is committed, one
+algorithm the C sources derive from, and the code of conduct's adapted text.
+
+Part 2 is the part that grows. It began as the website's components and has
+twice been widened by a review that found a category nobody had thought of, so
+it is written as an inventory rather than a list to be recited elsewhere: **the
+sections of Part 2 are the authoritative enumeration**, and prose that summarises
+them, here or in `LICENSE`, says "and everything else in Part 2" rather than
+naming them, because a recited list is a list that goes stale.
 
 The MIT grant in [`LICENSE`](LICENSE) clause 1 covers **this project's own
 contribution**: the native unit registry, the `.bovnar` translation targets, the
@@ -322,17 +330,20 @@ neither raising the questions above:
 
 ---
 
-# Part 2 — Website and build components
+# Part 2 — Everything else
 
 The vocabularies above are the material this project *reasoned* about. They are
-not the only third-party material it ships. The repository also tracks, and
-<https://www.bovnar.io> also serves, several components that came from other
-people — two webfonts, two JavaScript libraries, two NASA images — and the
-committed WebAssembly artifact is the output of a third-party toolchain.
+not the only third-party material it ships, and the sections below are the
+inventory of the rest. It started as the website's components; a later review
+added an algorithm the C sources derive from, and a later one still the adapted
+text of the code of conduct. Each section is a notice, and where a licence asks
+for more than a notice, it says so.
 
-None of these raises a question of the kind Part 1 does: every licence here is a
-plain permissive one. Each does carry a notice obligation, and this part is that
-notice.
+Most of what follows is plainly permissively licensed and needs only attribution.
+**One entry is not:** the Contributor Covenant's text carries no licence
+statement this project could establish, which is the same shape of question the
+CF standard name table raises in Part 1, and it is recorded the same way — as
+open, not as settled.
 
 ## Webfonts — IBM Plex Sans, JetBrains Mono
 
@@ -497,9 +508,13 @@ adapted, and it is.
   the provenance recorded here unreproducible.
 * Bumping a vocabulary to a new upstream version means updating the version and
   retrieval date here and in the `.bvnr` header in the same commit.
-* Adding a third-party file to `web/` — a font, a library, an image — means an
-  entry in Part 2 in the same commit, and, where the licence requires the text
-  itself to travel with the file, a licence file served beside it.
+* Bringing in anything this project did not author — a font, a library, an
+  image, an algorithm adapted from a published implementation, a document
+  adapted from someone else's — means an entry in Part 2 in the same commit,
+  and, where the licence requires the text itself to travel with the file, a
+  licence file beside it. `CONTRIBUTING.md` asks this as a review question,
+  because no build gate can: a licence check would have to know where a string
+  came from.
 * Every claim in this file is meant to be checkable from the repository. Where
   something is not — where it would depend on how the author worked rather than
   on what the tree contains — this file says so instead of asserting it. The

@@ -75,12 +75,21 @@ this project did not author and cannot license.
    machine‑readable definitions are fetched only into a git‑ignored build
    directory, where they serve to verify the tables, and are never packaged.
 
-5. Other Third‑Party Components
-   The website and the build ship further material this project did not author:
-   the webfonts under web/fonts/ (SIL Open Font License 1.1 — the licence text
-   is served beside them, in web/fonts/OFL.txt, because that licence requires it
-   to accompany every copy), the two vendored JavaScript libraries under web/
-   (highlight.js, BSD‑3‑Clause; marked, MIT), the NASA earth imagery, and the
-   Emscripten runtime code inside the committed WebAssembly artifacts.  Each is
-   permissively licensed and each is recorded, with its notice, in Part 2 of
-   THIRD_PARTY_NOTICES.md.  Clauses 1 to 3 do not extend to any of it.
+5. Other Third‑Party Material
+   This project ships further material it did not author, of several kinds: the
+   webfonts under web/fonts/ (SIL Open Font License 1.1 — the licence text is
+   served beside them, in web/fonts/OFL.txt, because that licence requires it to
+   accompany every copy); the vendored JavaScript libraries under web/
+   (highlight.js, BSD‑3‑Clause; marked, MIT); the NASA earth imagery; the
+   Emscripten runtime code inside the committed WebAssembly artifacts; an
+   algorithm the date routines are derived from; and the adapted text of
+   CODE_OF_CONDUCT.md.
+
+   PART 2 OF THIRD_PARTY_NOTICES.md IS THE AUTHORITATIVE LIST, not the sentence
+   above, which is a summary and has twice been found out of date.  Clauses 1 to
+   3 do not extend to any material recorded there, whether or not this clause
+   names it.
+
+   Most of that material is permissively licensed and asks only to be
+   attributed.  Not all of it: THIRD_PARTY_NOTICES.md marks the exceptions, and
+   marks them as open questions rather than settled ones.

@@ -4571,9 +4571,9 @@ build directory, verifies the tables against them, and packages none of them.</p
 statement CC BY 4.0 requires — live in <code>THIRD_PARTY_NOTICES.md</code> at the root of the distribution,
 and each <code>src/gendata/*.bvnr</code> file repeats its own block in its header so that the version and the
 licence travel with the data rather than only with the notices file. That file has a second part,
-outside the scope of this document, covering the third-party components of the website and the
-build — the webfonts, the two JavaScript libraries, the NASA earth textures, and the toolchain whose
-output is committed.</p>
+outside the scope of this document, inventorying everything else this project ships that it did not
+author — the website's fonts and libraries, the imagery, the toolchain whose output is committed,
+and whatever later review adds to it.</p>
 <h3 id="182-every-table-is-an-adaptation-and-says-so">18.2 Every table is an adaptation, and says so</h3>
 <p>No table here reproduces a vocabulary, and none could: §3.1's three outcomes mean a code whose value
 Bovnar cannot state exactly is refused rather than approximated, so every table is a subset by
@@ -4585,10 +4585,12 @@ never implied.</strong> QUDT.org, the OM authors, UCAR/Unidata and the CF and UN
 involvement in this project. Where a translation is wrong, it is wrong here — which is exactly what
 §9.5 exists to catch, and §10.2 is the honest account of what it still cannot.</p>
 <h3 id="183-the-two-open-questions">18.3 The two open questions</h3>
-<p>Four of the six are settled: QUDT and OM are CC BY 4.0 and need attribution, which they now have;
-UDUNITS-2 is BSD 3-clause and needs its notice carried into binary distributions, which
-<code>pack_artifacts.cmake</code> now does; UN/ECE is formally unresolved on paper and universally implemented
-in practice, and written confirmation has been sought. Two are genuinely open.</p>
+<p><strong>Three of the six are settled.</strong> QUDT and OM are CC BY 4.0 and need attribution, which they now
+have; UDUNITS-2 is BSD 3-clause and needs its notice carried into binary distributions, which
+<code>pack_artifacts.cmake</code> now does. <strong>One is low-risk but unconfirmed:</strong> UN/ECE is unresolved on the
+face of the UN's own website terms and universally implemented in practice — Rec 20 exists to be
+implemented — and written confirmation has been sought rather than assumed. <strong>Two are genuinely
+open</strong>, and neither is open because nobody has got round to it.</p>
 <p><strong>UCUM.</strong> Its licence is revocable, and §3(a) conditions the grant on not creating derivative works
 of the UCUM table and not adding to, deleting from or modifying its content. <code>ucum.bvnr</code> is a subset
 mapped onto a different unit model, which is a derivative work on the licence's own definition

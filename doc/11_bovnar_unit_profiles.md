@@ -2910,9 +2910,9 @@ The full notices — copyright lines, licence URIs, the BSD text verbatim, and t
 statement CC BY 4.0 requires — live in `THIRD_PARTY_NOTICES.md` at the root of the distribution,
 and each `src/gendata/*.bvnr` file repeats its own block in its header so that the version and the
 licence travel with the data rather than only with the notices file. That file has a second part,
-outside the scope of this document, covering the third-party components of the website and the
-build — the webfonts, the two JavaScript libraries, the NASA earth textures, and the toolchain whose
-output is committed.
+outside the scope of this document, inventorying everything else this project ships that it did not
+author — the website's fonts and libraries, the imagery, the toolchain whose output is committed,
+and whatever later review adds to it.
 
 ### 18.2 Every table is an adaptation, and says so
 
@@ -2929,10 +2929,12 @@ involvement in this project. Where a translation is wrong, it is wrong here — 
 
 ### 18.3 The two open questions
 
-Four of the six are settled: QUDT and OM are CC BY 4.0 and need attribution, which they now have;
-UDUNITS-2 is BSD 3-clause and needs its notice carried into binary distributions, which
-`pack_artifacts.cmake` now does; UN/ECE is formally unresolved on paper and universally implemented
-in practice, and written confirmation has been sought. Two are genuinely open.
+**Three of the six are settled.** QUDT and OM are CC BY 4.0 and need attribution, which they now
+have; UDUNITS-2 is BSD 3-clause and needs its notice carried into binary distributions, which
+`pack_artifacts.cmake` now does. **One is low-risk but unconfirmed:** UN/ECE is unresolved on the
+face of the UN's own website terms and universally implemented in practice — Rec 20 exists to be
+implemented — and written confirmation has been sought rather than assumed. **Two are genuinely
+open**, and neither is open because nobody has got round to it.
 
 **UCUM.** Its licence is revocable, and §3(a) conditions the grant on not creating derivative works
 of the UCUM table and not adding to, deleting from or modifying its content. `ucum.bvnr` is a subset

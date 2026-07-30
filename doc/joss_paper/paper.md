@@ -124,7 +124,10 @@ benchmark mode for measuring parsing throughput across payload shapes.
 # Availability
 
 Bovnar is MIT licensed and developed at <https://github.com/sothis/bovnar>;
-this paper describes version 1.1.0. The format is defined by a versioned
+the unit-profile tables additionally carry identifier strings from the
+vocabularies they translate, which remain under their publishers' own licences
+and are recorded in the repository's third-party notices. This paper describes
+version 1.1.0. The format is defined by a versioned
 specification with a formal EBNF grammar, and has a registered IANA media type,
 `text/vnd.bovnar` [@iana_bovnar]; an Internet-Draft describing it has been
 prepared for the IETF independent submission stream and is included in the

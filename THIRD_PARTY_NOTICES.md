@@ -101,17 +101,17 @@ one that matters for attribution.
 > claimed or implied.
 
 **Status: permission has not yet been obtained, and this is the one entry here
-that needs it.** The UCUM licence is revocable, and its §3(a) conditions the
+that needs it.** The UCUM licence is revocable, and its section 3(a) conditions the
 grant on not creating derivative works of the Work and not adding to, deleting
 from or modifying its content. `ucum.bvnr` extracts a subset of the atom table
 and maps it onto a different unit model, which is a derivative work on the
-licence's own definition (§1.3), whatever its purpose. §2 permits developing
+licence's own definition (section 1.3), whatever its purpose. Section 2 permits developing
 "Software Applications that will communicate with and interoperate with the
 Work", which is exactly what the `ucum:` namespace is for — but that grant reads
 to a program that consumes UCUM, not obviously to a re-encoded table shipped
 alongside one.
 
-Two things are true and worth stating plainly, because §3(a) also bars using the
+Two things are true and worth stating plainly, because section 3(a) also bars using the
 Work to develop or promulgate a different standard for identifying units of
 measure, or to dilute UCUM's purpose:
 
@@ -151,7 +151,7 @@ profile can be excluded from any build with `-DBVNR_WITH_UCUM_PROFILE=OFF`
 > state exactly were omitted. QUDT.org does not endorse this project or its use
 > of the material.
 
-CC BY 4.0 §2(a)(1) licenses the sui generis database rights as well as the
+CC BY 4.0 section 2(a)(1) licenses the sui generis database rights as well as the
 copyright, so the extraction is covered whichever right applies. There is no
 ShareAlike term: the attribution above is the whole of the obligation, and it
 imposes nothing on this project's own MIT-licensed code.
@@ -179,7 +179,8 @@ imposes nothing on this project's own MIT-licensed code.
 > the material.
 
 OM is published by an EEA maker, so the EU sui generis database right
-(§§ 87a ff. UrhG) is the relevant right alongside copyright. CC BY 4.0 §2(a)(1)
+(sections 87a ff. UrhG) is the relevant right alongside copyright. CC BY 4.0
+section 2(a)(1)
 licenses it expressly, so the extraction is covered.
 
 ---
@@ -367,7 +368,7 @@ have satisfied it.
 Both files are **subsets** (latin, greek) of the upstream variable fonts,
 generated from the Google Fonts css2 API and rehosted so the site has no
 `fonts.googleapis`/`gstatic` dependency. Subsetting makes them Modified Versions
-under OFL §2; neither Reserved Font Name is changed, and neither font is sold on
+under OFL section 2; neither Reserved Font Name is changed, and neither font is sold on
 its own.
 
 ## highlight.js 11.9.0
@@ -519,6 +520,12 @@ adapted, and it is.
   something is not — where it would depend on how the author worked rather than
   on what the tree contains — this file says so instead of asserting it. The
   UN/ECE entry is the worked example.
+* **`§` here means a section of a Bovnar document; another document's section is
+  written out as "section N".** The distinction is not decoration. This file
+  cites six other people's licences far more often than it cites its own project,
+  and `check_doc_refs.py` — which resolves a bare `§N` against `doc/`, and would
+  read "UCUM section 3" as a citation into the Bovnar specification — does not
+  scan the repository root at all, so nothing here would catch the confusion.
 * **The links in this file are not gated.** `check_web_links.py` resolves
   internal links only, by design: no test here may need the network. So an
   upstream project that renames its licence file leaves a dead link in a notices

@@ -371,9 +371,9 @@ Every build also regenerates the single-file amalgamation into `build/amalgamate
 
 | Archive | Contents |
 |---|---|
-| `bovnar-<version>-<count>-amalgamate.tar.xz` | the amalgamation (`bovnar.h`, `bovnar.c`), plus `LICENSE`, `README.md`, `doc/` and `examples/` |
-| `bovnar-linux-<version>-<count>.tar.xz` | Linux libraries, CLI and headers, plus `doc/`, `examples/` and the editor `highlighter/` grammars |
-| `bovnar-windows-<version>-<count>.zip` | Windows libraries, CLI and headers (from the MSVC/MinGW build, or the `BVNR_CROSS_MINGW` cross-build on a Linux host), plus `doc/`, `examples/` and the editor `highlighter/` grammars |
+| `bovnar-<version>-<count>-amalgamate.tar.xz` | the amalgamation (`bovnar.h`, `bovnar.c`), plus `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`, `doc/` and `examples/` |
+| `bovnar-linux-<version>-<count>.tar.xz` | Linux libraries, CLI and headers, plus `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`, `doc/`, `examples/` and the editor `highlighter/` grammars |
+| `bovnar-windows-<version>-<count>.zip` | Windows libraries, CLI and headers (from the MSVC/MinGW build, or the `BVNR_CROSS_MINGW` cross-build on a Linux host), plus `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`, `doc/`, `examples/` and the editor `highlighter/` grammars |
 
 Disable with `-DBVNR_PACKAGE=OFF`.
 

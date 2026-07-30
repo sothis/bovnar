@@ -2253,6 +2253,127 @@
     .offset  = 0.0;
     .prefix  = none;
     .aliases = ["jackson_turbidity", "JTU"];
+  },
+  # ── TEMPERATURE DIFFERENCES ──────────────────────────────────────────────
+  #
+  # A temperature DIFFERENCE is not a temperature. 25 °C is 298.15 K; a rise of
+  # 25 degrees is 25 K. The scales above are affine, so the format converted the
+  # second as if it were the first, and there was no spelling that said
+  # otherwise -- the format's most concrete gap, recorded as such in doc/11
+  # §10.3 and now closed here rather than in a foreign notation, because a
+  # profile cannot add a unit no native document could reach.
+  #
+  # Each of these is the INTERVAL of the scale above it: .affine = false and
+  # .offset = 0.0, because a difference is a RATIO scale. That is what makes
+  # them compose -- ΔK/k~m is a lapse rate, 1/ΔK an expansion coefficient --
+  # where the affine scales cannot appear in a compound at all.
+  #
+  # They carry the temperature-interval QUANTITY KIND (bvni_kind_table), which
+  # is what refuses ΔK -> K: same dimension, different quantity, exactly as bit
+  # is to byte and lumen to candela. The kind counts only for a lone unit at
+  # exponent 1, because that is the only place the affine offset was ever
+  # applied -- the K in W/(m²·K) is already an interval, and making that a
+  # different unit would break every U-value written to date. See the note on
+  # bvni_kind_exponents.
+  #
+  # TWO ROWS, NOT FOUR, FOR THE FOUR MODERN SCALES. The degree Celsius interval
+  # IS the kelvin (SI Brochure 9th ed. §2.3.1) and the Rankine degree IS the
+  # Fahrenheit degree, so Δ°C and Δ°Ra are aliases here rather than rows of
+  # their own. Separate rows would be two units that must compare equal and
+  # convert by exactly 1 -- a distinction with no content, and one more pair for
+  # every cross-check in the tree to keep in step.
+  #
+  # The ASCII spellings are "delta_" + the scale's own short ASCII form, so
+  # Δ°C is delta_degC beside the scale's degC. No bare delta_C or delta_F: those
+  # read as a delta coulomb and a delta farad, and the scales themselves do not
+  # alias bare C or F either. delta_K is the exception and is not ambiguous --
+  # K is the kelvin and nothing else.
+  {
+    .id      = <uint:32> 100180;
+    .name    = "delta_kelvin";
+    .symbol  = "ΔK";
+    .factor  = 1.0;
+    .dims    = { .temperature = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["delta_kelvin", "deltakelvin", "delta_K", "deltaK", "ΔK",
+                "delta_celsius", "deltacelsius", "delta_degC", "deltadegC",
+                "Δ°C"];
+  },
+  {
+    .id      = <uint:32> 100181;
+    .name    = "delta_fahrenheit";
+    .symbol  = "Δ°F";
+    .factor  = 0.5555555555555556;
+    .dims    = { .temperature = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    # Exact rational: 1 Δ°F = 5/9 K, the same non-terminating slope as °F and
+    # °Ra. A value converts losslessly to ΔK only when it is a multiple of 9.
+    .factor_num = <sint:64> 5;
+    .factor_den = <sint:64> 9;
+    .prefix  = default;
+    .aliases = ["delta_fahrenheit", "deltafahrenheit", "delta_degF",
+                "deltadegF", "Δ°F",
+                "delta_rankine", "deltarankine", "delta_degRa", "deltadegRa",
+                "Δ°Ra"];
+  },
+  {
+    # Delisle runs BACKWARDS -- 0 °De is boiling and the numbers grow as the
+    # temperature falls -- so its interval is negative. That needs no new
+    # arithmetic: the °De scale row above already carries -2/3.
+    .id      = <uint:32> 100182;
+    .name    = "delta_delisle";
+    .symbol  = "Δ°De";
+    .factor  = -0.6666666666666666;
+    .dims    = { .temperature = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> -2;
+    .factor_den = <sint:64>  3;
+    .prefix  = default;
+    .aliases = ["delta_delisle", "deltadelisle", "delta_degDe", "deltadegDe",
+                "Δ°De"];
+  },
+  {
+    .id      = <uint:32> 100183;
+    .name    = "delta_newton_temp";
+    .symbol  = "Δ°N";
+    .factor  = 3.0303030303030303;
+    .dims    = { .temperature = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 100;
+    .factor_den = <sint:64>  33;
+    .prefix  = default;
+    .aliases = ["delta_newton_temperature", "delta_degN", "deltadegN", "Δ°N"];
+  },
+  {
+    .id      = <uint:32> 100184;
+    .name    = "delta_reaumur";
+    .symbol  = "Δ°Re";
+    .factor  = 1.25;
+    .dims    = { .temperature = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["delta_reaumur", "deltareaumur", "delta_degRe", "deltadegRe",
+                "Δ°Re"];
+  },
+  {
+    .id      = <uint:32> 100185;
+    .name    = "delta_romer";
+    .symbol  = "Δ°Ro";
+    .factor  = 1.9047619047619047;
+    .dims    = { .temperature = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 40;
+    .factor_den = <sint:64> 21;
+    .prefix  = default;
+    .aliases = ["delta_romer", "deltaromer", "delta_degRo", "deltadegRo",
+                "Δ°Ro"];
   }
 ];
 

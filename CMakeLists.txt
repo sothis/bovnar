@@ -51,6 +51,27 @@ The *.gen.inc snippets are build artifacts in <build>/generated (not committed):
 they are regenerated automatically when missing, and unconditionally when this is \
 ON. Generation uses a small built-in reader and needs only Python 3 (no bovnar)."
     OFF)
+# One switch per unit-profile vocabulary, all ON so the default build is the
+# build every consumer already has. Turning one off drops that vocabulary's
+# atom/unsupported/reverse tables and its registry row; the seven together are
+# roughly half of libbvnr's data (`cf` alone is ~150 KB), which is the whole
+# reason a library that names sensor networks as a target needs these.
+#
+# THEY DO NOT CHANGE THE ABI. The generators still run whole, so every base-unit
+# id, the dense unit tables and every struct layout are identical in all
+# configurations; a namespace that is off is error_unit_profile_unknown and
+# nothing else moves. bvn_unit_profile_count()/bvn_unit_profile_name() report
+# what a given build carries. See src/utils/bvn_profile_impl.h and doc/11 §9.4.
+#
+# The profile TEST suites are registered only for the profiles that are on (see
+# CMakeLists_tests.txt): a suite that asserts ucum:m parses cannot pass in a
+# build without ucum, and skipping it there is the honest reading rather than a
+# failure to explain.
+set(BVNR_PROFILE_NAMES UCUM UNECE QUDT QUDT_QK UDUNITS OM CF)
+foreach(_prof IN LISTS BVNR_PROFILE_NAMES)
+    option(BVNR_WITH_${_prof}_PROFILE
+        "Compile the ${_prof} unit-profile tables into the library" ON)
+endforeach()
 
 if(MSVC)
     # MSVC (x64). /utf-8 so the UTF-8 string literals in the sources (unit
@@ -311,6 +332,17 @@ set(BVNR_SOURCES
 
 add_library(bvnr_objects OBJECT ${BVNR_SOURCES})
 target_compile_options(bvnr_objects PRIVATE ${BVNR_C_FLAGS})
+# The per-profile switches. Passed as 0/1 rather than as define/undef, because
+# bvn_profile_impl.h defaults them to 1 with #ifndef and tests them with #if --
+# so a stale -U would silently turn a profile back ON, while a 0 cannot.
+foreach(_prof IN LISTS BVNR_PROFILE_NAMES)
+    if(BVNR_WITH_${_prof}_PROFILE)
+        target_compile_definitions(bvnr_objects PRIVATE BVNR_WITH_${_prof}_PROFILE=1)
+    else()
+        target_compile_definitions(bvnr_objects PRIVATE BVNR_WITH_${_prof}_PROFILE=0)
+        message(STATUS "unit profile ${_prof}: OFF (tables excluded)")
+    endif()
+endforeach()
 # The generated *.gen.inc snippets are build artifacts (not committed); they are
 # produced into BVNR_GENERATED_DIR by the generation step below and found via the
 # private include path here. The public *.gen.h enum headers stay in include/.

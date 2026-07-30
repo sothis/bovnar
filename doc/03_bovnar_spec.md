@@ -836,6 +836,80 @@ comma must introduce a real parameter, and a `:` must be followed by at least
 one parameter. Empty, trailing, or doubled components — `<uint:8,>`,
 `<uint:8,,>`, `<uint:,_16>`, and the bare `<uint:>` — are `error_illegal_value_type`.
 
+#### Whitespace inside an annotation
+
+Whitespace (and a comment, which is whitespace) is allowed **beside a
+separator** and nowhere else. The separators are the `:` that introduces the
+parameter list, the `,` between parameters, and the `<` / `>` that delimit the
+annotation:
+
+```bovnar
+.a = <float : 64> 1.0;          # valid — either side of the family colon
+.b = <uint:8 , _16> "ff";       # valid — either side of a parameter comma
+.c = <float:64,m/s > 1.0;       # valid — before the closing bracket
+.d = <float:64, # which unit
+      m/s> 1.0;                 # valid — a comment stands in for the space
+```
+
+**Inside a parameter it is `error_type_param_whitespace`**, reported at the
+first byte after the whitespace:
+
+```bovnar
+.e = <float:64,k g> 1.0;        # error_type_param_whitespace
+.f = <uint:6 4> 1;              # error_type_param_whitespace
+.g = <float:64,m / s> 1.0;      # error_type_param_whitespace
+```
+
+This is a rule about a *wrong value*, not about tidiness. Whitespace inside a
+parameter used to be deleted, so `<float:64,k g>` was accepted as `k~g` and
+`<uint:6 4>` as a 64-bit width — a wrong unit and a wrong type, each produced
+silently. The trap has a specific victim: UDUNITS and CF multiply with a space,
+so `<float:64,udunits:m s-1>` was accepted as `ms-1`, **reciprocal
+milliseconds**, for a value the author wrote as a speed. A producer writes
+`udunits:m*s-1` instead.
+
+A comma nested inside a UCUM annotation is part of the code rather than a
+separator, so it does not end the parameter: `ucum:mL{cells,tot}` is one
+parameter, not two.
+
+#### The one exception: a namespaced parameter
+
+Inside a parameter that carries a **profile namespace** (`udunits:`, `ucum:`, …),
+whitespace is neither deleted nor refused — it is **kept verbatim** and handed to
+the vocabulary, which decides what it means. This exists for one concrete reason:
+UDUNITS multiplies with a space, and `kg m-2 s-1` is the commonest spelling of a
+flux in netCDF and CF metadata.
+
+```bovnar
+.flux = <float:64,udunits:kg m-2 s-1> 0.5;   # valid — the same unit as udunits:kg*m-2*s-1
+.speed = <float:64,udunits:m s-1> 9.81;      # valid — m/s
+.t = <float:64,udunits:ms-1> 1.0;            # valid, and DIFFERENT: m~s⁻¹, a
+                                             # reciprocal millisecond. The space
+                                             # is what tells the two apart
+.count = <float:64,ucum:mL{cells, tot}> 1.0; # valid — an annotation is inert
+                                             # text and keeps its spacing
+.bad = <float:64,ucum:[in i]> 1.0;           # error_unit_illegal — from UCUM's
+                                             # grammar, not from the lexer
+.bad = <float:64,qudt:Kilo GM> 1.0;          # error_unit_illegal — a flat
+                                             # vocabulary has no operators
+```
+
+Three details of that exception:
+
+- **The family `:` is not a namespace.** Only a second `:` at bracket depth 0
+  makes a parameter namespaced, so `<uint:6 4>` is still
+  `error_type_param_whitespace`.
+- **Trailing whitespace is trimmed**, since it sits beside the separator that
+  ends the parameter: `<float:64,udunits:m >` is `udunits:m`.
+- **A line break is still an error**, even in a namespaced parameter. No
+  vocabulary spells a unit across a line, and admitting one would let a
+  malformed code consume a document's layout.
+
+An **inline** unit suffix cannot carry a space and never will — whitespace is
+what terminates that token, so `1.0 k g` has always been
+`error_unexpected_input_byte`, and the space-separated profile spelling is
+available in a type annotation only.
+
 ### 5.4 Examples
 
 ```bovnar
@@ -1136,7 +1210,9 @@ Comma-separated elements are distinct *values*, but since spec 1.0 they are no l
 Since spec 1.0 the elements of an array must be **homogeneous**. The rule is *"shape uniform, fields free"*, checked over the materialised value (above the lexer; it complements the streaming reader's per-value type and unit checks):
 
 - **Kind.** Every non-null element shares the same kind — number, string, symbol, bool, reference, octet stream, array, or struct. `[1, "two"]` and `[1, {.x=1;}]` are `error_array_element_type_mismatch`.
-- **Dimension** (bare scalar arrays and matrices). Numeric elements must share the same physical dimension; the numeric encodings (`uint`, `sint`, `float`, `float_fix`, `float_dec`) may mix. `[<float:64,m> 1.0, <float:64,k~g> 2.0]` (length vs mass) is rejected; `[1, 2.5, 3]` (all dimensionless) is fine. Each currency is its own dimension, so a bare array may not mix `$USD` and `$EUR` values.
+- **Unit** (bare scalar arrays and matrices). Numeric elements must carry the **same unit**, not merely the same dimension; the numeric encodings (`uint`, `sint`, `float`, `float_fix`, `float_dec`) may mix freely. `[<float:64,m> 1.0, <float:64,k~g> 2.0]` (length vs mass) is rejected, and so are `[<float:64,m> 1.0, <float:64,ft> 2.0]` (a scale apart), `[<float_dec:64,$USD> 1.0, <float_dec:64,k~$USD> 2.0]` (a prefix apart) and `[<float:64,°C> 1.0, <float:64,K> 2.0]` (an affine **offset** apart). `[1, 2.5, 3]` (all dimensionless) is fine, and so is `[<float:64,m*s> 1.0, <float:64,s*m> 2.0]` — the comparison is order-insensitive, because unit multiplication commutes — as is an explicit `no_unit` beside an omitted unit, which are two spellings of the same thing. Each currency is its own unit, so a bare array may not mix `$USD` and `$EUR` values.
+
+  The rule is the unit and not the dimension because of the sentence that closes this section: *a consumer may treat the elements identically*. Under dimensional homogeneity that sentence was false — a reader that took it at its word and applied one unit to `[1.0 m, 2.0 ft]` was wrong by 0.3048, and on `[1.0 °C, 2.0 K]` wrong by an added 273.15. An offset between two neighbouring cells is not a mistake anything downstream can notice, so it is refused at the parse, where every other wrong unit in this format is refused.
 - **`datetime` (spec 1.1).** A `datetime` is its own kind: it does **not** mix with the plain numeric encodings above (`[<datetime:64,unix> 1, <sint:64> 2]` is `error_array_element_type_mismatch`). And, exactly as for currencies, its **epoch is a dimension** — a bare array may not mix epochs (`[<datetime:64,unix> 1, <datetime:64,tai> 2]` is rejected); a homogeneous same-epoch datetime array is fine. (These are materialised-document/DOM-tier rules, like the rest of §7.4.)
 - **Rectangular** (nested arrays). Sibling sub-arrays must have the same length and recursively-matching element shape: `[[1,2],[3,4]]` is valid, `[[1,2],[3,4,5]]` is `error_array_row_size_mismatch`.
 - **Structs — same keys, fields free.** Sibling structs must share the same keys, in order, with the same per-field *kinds* and nesting. Differing keys are `error_struct_shape_mismatch`; a field that is a number in one record and a string in another is `error_array_element_type_mismatch`. But a scalar field may carry a **different unit** in each record, and a list field a **different length** — so a multi-currency ledger and per-record argument lists are valid.
@@ -1151,11 +1227,13 @@ Since spec 1.0 the elements of an array must be **homogeneous**. The rule is *"s
 
 .bad_kind   = [1, "two"];                  # error_array_element_type_mismatch
 .bad_dim    = [<float:64,m> 1.0, <float:64,k~g> 2.0];  # error_array_element_type_mismatch
+.bad_scale  = [<float:64,m> 1.0, <float:64,ft> 2.0];   # same dimension, different unit
+.bad_offset = [<float:64,°C> 1.0, <float:64,K> 2.0];   # 273.15 apart
 .bad_ragged = [[1, 2], [3, 4, 5]];         # error_array_row_size_mismatch
 .bad_keys   = [{.x = 1;}, {.y = 1;}];      # error_struct_shape_mismatch
 ```
 
-A bare array of measurements is therefore uniform — a consumer may treat its elements identically — while records (structs) describe genuinely different things. **Heterogeneous data is modelled with a struct, not an array.** (This is a deliberate tightening over pre-1.0 drafts, which allowed ragged and mixed-type arrays; it also means a ragged or mixed-type JSON array has no bovnar representation and the `json → bvnr` converter rejects it rather than losing structure.)
+A bare array of measurements is therefore uniform — a consumer may read the whole block under the unit of any one element — while records (structs) describe genuinely different things. **Heterogeneous data is modelled with a struct, not an array.** (This is a deliberate tightening over pre-1.0 drafts, which allowed ragged and mixed-type arrays; it also means a ragged or mixed-type JSON array has no bovnar representation and the `json → bvnr` converter rejects it rather than losing structure.)
 
 ### 7.5 Array Elements with Type Annotations
 
@@ -2566,9 +2644,11 @@ typedef enum error_code_e {
     error_recovered                     = 37,  /* reserved; never set by the library */
     error_unit_mismatch                 = 38,
     /* Array element homogeneity (spec 1.0): every non-null element of an array
-     * must share the same kind and physical dimension; sibling sub-arrays must
-     * match in length and element shape (recursively); sibling structs must
-     * share the same keys with recursively-matching fields. */
+     * must share the same kind, and every element of a BARE array the same UNIT
+     * (§7.4 -- not merely the same dimension, so m beside ft and °C beside K are
+     * both refused); sibling sub-arrays must match in length and element shape
+     * (recursively); sibling structs must share the same keys with
+     * recursively-matching fields, whose units stay free. */
     error_array_element_type_mismatch   = 39,
     error_struct_shape_mismatch         = 40,
     /* A struct (or the top-level document) repeats a key. Keys must be unique
@@ -2608,7 +2688,15 @@ typedef enum error_code_e {
      * first-class part of the format (§9) — but an assertion by the CONSUMER
      * that this particular channel carries text, made at the door rather than
      * discovered as corruption downstream. */
-    error_octet_stream_forbidden             = 51
+    error_octet_stream_forbidden             = 51,
+    /* whitespace split a type-annotation PARAMETER in two (§5.3). Every `ws` the
+     * grammar allows inside an annotation sits beside a separator; in the middle
+     * of a parameter there is no production for it, and the lexer used to drop it
+     * anyway -- so "<float:64,k g>" was accepted as the kilogram and "<uint:6 4>"
+     * as a 64-bit width. Reported at the first byte after the whitespace. A byte
+     * that is illegal anywhere in an annotation is still
+     * error_unexpected_input_byte. */
+    error_type_param_whitespace              = 52
 } error_code_t;
 ```
 

@@ -179,6 +179,12 @@
 	bu_turbidity_ftu = 100177,
 	bu_turbidity_fau = 100178,
 	bu_turbidity_jtu = 100179,
+	bu_delta_kelvin = 100180,
+	bu_delta_fahrenheit = 100181,
+	bu_delta_delisle = 100182,
+	bu_delta_newton_temp = 100183,
+	bu_delta_reaumur = 100184,
+	bu_delta_romer  = 100185,
 
 /* The native block's bounds, and the dense table slot of a unit in it.
  *
@@ -189,8 +195,8 @@
  * arithmetic on the enumerator so it can be a designated-initialiser index in
  * the generated table rows: the row and the enum cannot drift apart. */
 #define BVN_UNIT_NATIVE_FIRST     100000
-#define BVN_UNIT_NATIVE_LAST      100179
-#define BVN_UNIT_NATIVE_COUNT     180
+#define BVN_UNIT_NATIVE_LAST      100185
+#define BVN_UNIT_NATIVE_COUNT     186
 #define BVN_UNIT_SLOT_NATIVE_BASE 1
 #define BVN_SLOT_NATIVE(b) \
 	(BVN_UNIT_SLOT_NATIVE_BASE + ((int)(b) - BVN_UNIT_NATIVE_FIRST))

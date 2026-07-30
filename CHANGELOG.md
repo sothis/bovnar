@@ -9,13 +9,253 @@ it in lockstep. The highest spec a build understands is reported by
 
 ## [Unreleased]
 
-The on-the-wire format grows only additively: the unit parser accepts one new
-input spelling (the compact prefix form, below), every existing document parses
-to exactly the same values, and the canonical output form is unchanged. **The ABI
-breaks**: `bvnr_data_t` and `bvnr_read_flags_t.want_unit` changed shape (see
-below) — rebuild consumers against the new headers. **SOVERSION is bumped 1 → 2**
+The on-the-wire format grows only additively *except in one place*: the unit
+parser accepts one new input spelling (the compact prefix form, below), the
+canonical output form is unchanged, and every existing document parses to exactly
+the same values — **unless it has whitespace inside a type-annotation parameter**,
+which used to be deleted and is now an error. See the first entry below; those
+documents carried a unit their author did not write. **The ABI breaks**:
+`bvnr_data_t` and `bvnr_read_flags_t.want_unit` changed shape (see below) —
+rebuild consumers against the new headers. **SOVERSION is bumped 1 → 2**
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
+
+### Added — a temperature difference is a unit now: `ΔK` and five siblings
+
+`25 °C` is 298.15 K. A *rise* of 25 degrees is 25 K — and there was no way to write that, so a
+producer wrote `°C` and every consumer converted it as a scale reading. The two documents were
+byte-identical, nothing in the pipeline could tell them apart, and the number was wrong by 273.15.
+doc/11 §10.3 called it "the format's most concrete gap, worth more than this whole profile"; it also
+said the fix belonged in the **native registry**, because importing it through a foreign notation
+would put it somewhere no native document could reach. That is where it went.
+
+Six base units (ids 100180–100185), eight spellings, one new quantity kind:
+
+| Unit | Exactly | Also spelled |
+|---|---|---|
+| `ΔK` | 1 K | `delta_K`, `deltaK`, `delta_kelvin` — **and `Δ°C`**, `delta_degC`, `delta_celsius` |
+| `Δ°F` | 5/9 K | `delta_degF` — **and `Δ°Ra`**, `delta_degRa`, `delta_rankine` |
+| `Δ°De` | −2/3 K | `delta_degDe`, `delta_delisle` (Delisle runs backwards) |
+| `Δ°N` | 100/33 K | `delta_degN`, `delta_newton_temperature` |
+| `Δ°Re` | 5/4 K | `delta_degRe`, `delta_reaumur` |
+| `Δ°Ro` | 40/21 K | `delta_degRo`, `delta_romer` |
+
+`Δ°C` **is** `ΔK` and `Δ°Ra` **is** `Δ°F` — the Celsius interval is the kelvin (SI Brochure 9th ed.
+§2.3.1) and the Rankine degree is the Fahrenheit degree, so those are aliases rather than rows of
+their own: two units that must compare equal and convert by exactly 1 would be a distinction with no
+content. There is deliberately no bare `delta_C` or `delta_F`, which read as a delta coulomb and a
+delta farad.
+
+Each is a **ratio** scale — `.affine = false`, `.offset = 0.0` — carrying a new
+`BVNI_KIND_TEMP_INTERVAL` quantity kind, which is the mechanism that already keeps `M~b/s` out of
+`M~B/s` and `lm` out of `cd`:
+
+```
+ΔK   → K       error_unit_mismatch    the hazard, and the whole point
+°C   → Δ°C     error_unit_mismatch    only the author knows which was meant
+Δ°F  → ΔK      factor 5/9             exact; lossless for multiples of 9, else unit_inexact
+Δ°De → ΔK      factor −2/3            no new arithmetic: the registry already had negative factors
+--si on 25 Δ°C                        25 ΔK, not 298.15 K
+[<float:64,K> 1.0, <float:64,ΔK> 2.0] error_array_element_type_mismatch, from §7.4 alone
+```
+
+Being ratio scales is also what lets them into a compound at all: `Δ°F/mi` is a lapse rate, `Δ°Re^-1`
+an expansion coefficient, where `°F/mi` and `°Re^-1` have no SI meaning whatever.
+
+**The one judgement call, and it breaks nothing.** The interval kind counts only for a **lone unit at
+exponent 1**, so `W/(m²·ΔK)` and `W/(m²·K)` are the *same unit*, as are `ΔK/k~m` and `K/k~m`, and
+`ΔK^-1` and `K^-1`. The scope follows the hazard exactly: an affine offset is only ever applied to a
+lone component at exponent 1, so that is the only place a difference could have been read as a scale
+— a `K` inside a compound was already an interval. Counting the kind there would have separated two
+spellings of one quantity and broken every U-value and lapse rate written to date. This asymmetry is
+the only rule in the change that was not already somewhere in the tree, and `bvni_kind_exponents`
+carries the reasoning beside it.
+
+**No grammar change, no new error code, no ABI break** — the ids append inside the native block,
+which is what its spare space is for, and `error_unit_mismatch` already says what a delta-to-scale
+conversion is. `bvn_unit_si_normal_form` gained the one line it needed: an interval reduces to `ΔK`,
+never to `K`, or the form would be screened out as incompatible and a normalising pass would silently
+leave every temperature difference in a document alone.
+
+**One profile row was wrong and is corrected.** `qudt-qk:TemperatureDifference` mapped to `K`, making
+it the same unit as `qudt-qk:ThermodynamicTemperature` — the confusion the code's own name rules out,
+and one that converts to °F wrong by 255.37. It maps to `ΔK`, and since no other quantity kind claims
+`ΔK` it is the one row in that file's tail that reverses. A quantity kind states a quantity and no
+unit, so nothing published is being diverged from. **The four CF standard names that are differences
+by name** (`air_temperature_anomaly` and siblings) are deliberately left at `K`: CF *states*
+`canonical_units = "K"` for them, and overriding a publisher's stated unit from the sense of its name
+is a different decision — and one that would put `cf:air_temperature_anomaly` in disagreement with
+`udunits:K` for the same variable. CF 1.12's own answer, a `units_metadata` attribute, is not in the
+unit slot and still cannot be read by a profile; a converter is where that call belongs.
+
+Thirteen conformance cases (UNT-065…UNT-077) and
+`test_temperature_difference_is_its_own_quantity_kind`. The design record, including the two
+mechanisms that were rejected — a `delta` type-annotation parameter and a general `Δ(…)` unit
+operator — is [doc/temperature_difference.md](doc/temperature_difference.md).
+
+### Fixed — a space inside a type annotation produced a different unit, silently
+
+`<float:64,k g>` was accepted as `k~g`. `<uint:6 4>` was accepted as a 64-bit
+width. `<float:64,udunits:m s-1>` — the space-multiplied spelling UDUNITS and CF
+use, and the commonest one in netCDF metadata — was accepted as `udunits:ms-1`,
+**reciprocal milliseconds**, for a value its author wrote as a speed. This was
+the one place in the format where a wrong unit was produced silently rather than
+refused, and the format's entire argument is that a wrong unit stops the parse.
+
+The lexer skipped whitespace anywhere inside an annotation body, because
+whitespace between parameters (`<uint:8, _16>`) is legal and by the time a
+parameter was scanned the two positions were no longer distinguishable. They are
+distinguished now, by state rather than after the fact:
+
+* **legal, unchanged** — beside a separator: after the family keyword, either
+  side of the family `:` or of a `,` between parameters, and before the closing
+  `>`. A comment counts as whitespace, as it always did. `<float : 64>`,
+  `<uint:8 , _16>` and `<float:64,m/s >` all still parse;
+* **`error_type_param_whitespace` (52)**, new — inside a parameter, reported at
+  the first byte after the whitespace;
+* a `,` or `:` nested inside a UCUM annotation or bracketed atom is part of the
+  code and not a separator, so it licenses nothing: `ucum:mL{cells,tot}` parses
+  and `ucum:mL{cells, tot}` does not, which is what makes §3.4's promise to keep
+  annotation text verbatim true.
+
+**For a native parameter this is not a grammar change.** doc/12 has always placed
+every `ws` inside an annotation beside a separator and never derived one in the
+middle of a parameter; so does the IETF draft's ABNF. The implementation was
+leniently wrong and now agrees with its own normative grammar, which is why the
+fix is unconditional rather than gated on a spec version — gating it would leave
+the hole open for every document that exists. An **inline** unit suffix was never
+affected: whitespace ends that token, so `1.0 k g` has always been
+`error_unexpected_input_byte`.
+
+### Added — a space multiplies in `udunits:`, as UDUNITS and CF write it
+
+Once the lexer could tell whitespace *between* parameters from whitespace *inside*
+one, a third answer became available for the case that wanted it. Inside a
+parameter carrying a profile **namespace**, whitespace is neither deleted nor
+refused: it is kept **verbatim** and handed to the vocabulary.
+
+```
+udunits:kg m-2 s-1   →  k~g/m²·s   CF's commonest spelling of a flux, and the
+                                   same unit as udunits:kg*m-2*s-1
+udunits:m s-1        →  m/s        a speed
+udunits:ms-1         →  m~s⁻¹      a reciprocal MILLISECOND — also valid UDUNITS,
+                                   and a different unit. The space is the whole
+                                   difference, and it is the reading this used to
+                                   silently produce for the line above
+ucum:mL{cells, tot}  →  m~L        an annotation is inert text and keeps its
+                                   spacing, which makes doc/11 §3.4's promise
+                                   true for the first time
+ucum:[in i]          →  error_unit_illegal   from UCUM's grammar, not the lexer
+qudt:Kilo GM         →  error_unit_illegal   a flat vocabulary has no operators
+<float:64,k g>       →  error_type_param_whitespace   a NATIVE parameter, unchanged
+```
+
+`' '` joins `.` and `*` in the UDUNITS profile's multiplication set. It could not
+have before: while the space was being deleted, the parser never saw one — it saw
+`ms-1`, a perfectly good UDUNITS expression — so listing space as an operator
+would only have made the wrong reading look supported. doc/11 §13.2, which
+explained why the spelling could not be carried, now explains how it is.
+
+Three limits, each stated in §13.2:
+
+* **a run of spaces is not collapsed** — `kg  m-2` is two operators in a row and
+  fails as `error_unit_illegal`. Collapsing in the lexer would have cost a UCUM
+  annotation the spacing it now keeps;
+* **the inline unit form cannot carry a space and never will** — whitespace is
+  what terminates that token, so the space-separated spelling is available in a
+  type annotation only;
+* **a line break is still an error**, even in a namespaced parameter: no
+  vocabulary spells a unit across a line, and admitting one would let a malformed
+  code consume a document's layout.
+
+The family `:` deliberately does *not* open a namespace — only a later `:` at
+bracket depth 0 does — which is what keeps `<uint:6 4>` an error. Trailing
+whitespace inside a namespaced parameter is trimmed, since it sits beside the
+separator that ends the parameter.
+
+**It also restores a diagnostic.** `udunits:days since 1970-01-01` reaches the
+profile again and is refused as `error_unit_profile_unsupported` — "you wrote
+valid UDUNITS and bovnar cannot carry a reference time" — rather than as a
+whitespace error, which was the right refusal for the wrong reason.
+
+Twenty-three conformance cases pin the whole boundary (TYP-042…TYP-055 and
+UPR-043…UPR-043f), including the annotation/inline agreement between
+`udunits:kg m-2 s-1` and `udunits:kg*m-2*s-1`, which passes only if both spellings
+produce the same `value_unit_t`, and §14.2's pairing of `udunits:ms-1` against
+`udunits:m*s-1` as two units that must not compare equal — a check that matters
+more now, not less.
+
+### Changed — a bare array is homogeneous in its UNIT, not in its dimension
+
+§7.4 said numeric array elements must share the same physical dimension, and
+closed by telling consumers that "a bare array of measurements is therefore
+uniform — a consumer may treat its elements identically". Those two statements
+were not compatible. Dimensional homogeneity admitted
+
+```bovnar
+.a = [<float:64,m> 1.0, <float:64,ft> 2.0];              # 0.3048 apart
+.b = [<float_dec:64,$USD> 1.0, <float_dec:64,k~$USD> 2.0];   # 1000 apart
+.c = [<float:64,°C> 1.0, <float:64,K> 2.0];              # 273.15 apart — an OFFSET
+```
+
+and a consumer that did what §7.4 permitted — read the block under one unit —
+computed wrong numbers from all three. `.c` is what settles it: an affine offset
+between two neighbouring cells is not a scale error anything downstream can
+notice.
+
+The check is now `bvn_unit_equal`, so §7.4's promise is true as written rather
+than deleted. It is order-insensitive (`[m*s, s*m]` stays valid — unit
+multiplication commutes) and an explicit `no_unit` still matches an omitted unit,
+which the component count alone would have called different. **Struct fields are
+untouched**: "shape uniform, fields free" still lets a multi-currency ledger carry
+`$USD` in one record and `$EUR` in the next, because a record's fields are named
+and read one at a time. Seven conformance cases were added (HOM-017…HOM-023).
+
+Documents affected are documents where a consumer reading the array as a block was
+already getting wrong answers; there is no spelling that has to change, only an
+array that has to become a struct or gain a common unit.
+
+### Added — one build switch per unit-profile vocabulary
+
+`BVNR_WITH_UCUM_PROFILE`, `..._UNECE_...`, `..._QUDT_...`, `..._QUDT_QK_...`,
+`..._UDUNITS_...`, `..._OM_...`, `..._CF_...` — all `ON`, so the default build is
+the build every consumer already has. doc/11 §9.4 used to say the profiles were
+unconditional and the switch did not exist; §15.3 then measured the price (the
+binary grew 65 %, and the CF names added 780 KB more), and §10.4 carried the
+switch as specified-and-not-built. It is built.
+
+| all seven ON | all seven OFF |
+|---|---|
+| `libbvnr.so` 1.96 MB | **524 KB** |
+
+**Nothing about the ABI varies with them.** The generators still run whole: every
+`bu_*` id keeps its value, the dense unit tables and opaque blocks are unchanged,
+and no struct or signature moves — so two builds with different switches are
+ABI-compatible and differ only in which namespaces they translate. A namespace
+that is compiled out is `error_unit_profile_unknown`, which is the answer §9.4
+reserved that code for, and the same one an invented namespace gets: the document
+is not wrong for naming `ucum`, and a build without `ucum` cannot read it either
+way. The cost is symmetrical — an absent namespace is unwritable too, so
+`bvn_unit_to_profile` and `bvn_unit_to_ucum` return −1 and a unit carrying that
+vocabulary's opaque units has no spelling at all.
+
+Two new entry points report what a build carries, so a consumer can ask instead of
+inferring it from a failed parse:
+
+```c
+uint32_t     bvn_unit_profile_count(void);
+const char*  bvn_unit_profile_name(uint32_t index);   /* NULL past the end */
+```
+
+`bovnar version` prints the same list. Because the switches are compile-time,
+nothing in an ordinary build can reach the off state, so `bvnr_profiles_off_build`
+compiles the **amalgamation** with all seven at `0` under an integrator's strict
+`-Werror` flags and runs `tests/profiles_off_smoke.c` against it — which is what
+catches the two things that actually break there: a registry array left empty (C99
+has no empty initialiser; the table carries a sentinel row) and a table that loses
+its last reference and trips `-Wunused-const-variable`. Each per-vocabulary test
+suite is registered only when its own profile is on; the whole-corpus gates only
+when all seven are.
 
 ### Fixed — `run_tests.sh` ran 81 of the 157 registered tests
 

@@ -47,6 +47,16 @@ typedef enum state_e {
 	type_outro,
 	type_body_outro,
 	copy_type_byte,
+	/* Inside a type annotation, with whitespace (or a comment) consumed since
+	 * the last parameter byte. Split out from type_body_outro because those two
+	 * positions are NOT the same: after the family keyword, after a ',' and
+	 * after the family ':' the grammar of doc/12 has a `ws`, so whitespace there
+	 * is ignorable; in the middle of a parameter it has no production at all,
+	 * and swallowing it turned "<float:64,k g>" into k~g and the UDUNITS
+	 * "m s-1" into reciprocal milliseconds. The state exists so the byte AFTER
+	 * the whitespace can be judged: a separator resumes, a parameter byte is
+	 * error_type_param_whitespace. */
+	type_body_ws,
 	tf_u,
 	tf_ui, tf_uin,
 	tf_ut, tf_utf,
@@ -145,7 +155,16 @@ enum action_id {
 	ACT_type_intro,
 	ACT_type_outro,
 	ACT_copy_type_byte,
-	ACT_to_type_body_outro,
+	/* ',' and ':' — the only two bytes inside an annotation body that END a
+	 * parameter, and therefore the only two after which whitespace is legal.
+	 * Kept separate from ACT_copy_type_byte so that bvn_build_run_lut, which
+	 * derives the bulk-copy class from this table, excludes them: the fast path
+	 * must not copy a separator without letting the state advance. */
+	ACT_copy_type_sep_byte,
+	/* Whitespace mid-parameter. Not a plain state transition: whether it is an
+	 * error or a byte of a profile code depends on the parameter it lands in. */
+	ACT_type_ws_byte,
+	ACT_type_param_whitespace,
 	ACT_neg_number_intro,
 	ACT_copy_number_byte,
 	ACT_zero_intro,
@@ -296,6 +315,23 @@ typedef struct bvnr_lexer_s {
 	uint8_t			utf8_hi;
 	uint8_t			bom_len;
 	uint8_t			type_len;
+	/*
+	 * Where whitespace stands inside the annotation body currently being
+	 * accumulated. Two flags, because the two questions are different scopes:
+	 *
+	 *   type_family_colon  annotation-wide. The FIRST ':' in a body separates
+	 *                      the type family from its parameter list; every later
+	 *                      one at depth 0 opens a profile namespace. Without
+	 *                      this, "<uint:6 4>" would look namespaced and its
+	 *                      space would be copied instead of refused.
+	 *   type_param_ns      per parameter, reset by each depth-0 ','. True once
+	 *                      this parameter has a namespace, which is what lets
+	 *                      whitespace inside it be a code byte (UDUNITS
+	 *                      multiplies with a space; a UCUM annotation keeps its
+	 *                      spacing verbatim) rather than an error.
+	 */
+	bool			type_family_colon;
+	bool			type_param_ns;
 	uint16_t		str_len;
 	uint8_t			bom[2];
 	uint8_t			*type_data;
@@ -400,6 +436,9 @@ bool bvn_action_value_outro               (bvnr_reader_t* p);
 bool bvn_action_type_intro                (bvnr_reader_t* p);
 bool bvn_action_type_outro                (bvnr_reader_t* p);
 bool bvn_action_copy_type_byte            (bvnr_reader_t* p);
+bool bvn_action_copy_type_sep_byte        (bvnr_reader_t* p);
+bool bvn_action_type_ws_byte              (bvnr_reader_t* p);
+bool bvn_action_type_param_whitespace     (bvnr_reader_t* p);
 bool bvn_action_neg_number_intro          (bvnr_reader_t* p);
 bool bvn_action_copy_number_byte          (bvnr_reader_t* p);
 bool bvn_action_zero_intro                (bvnr_reader_t* p);

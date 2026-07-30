@@ -29,6 +29,56 @@
 #include "bovnar.h"
 
 /*
+ * WHICH PROFILES THIS BUILD CARRIES.
+ *
+ * One switch per vocabulary, all ON by default, so the default build is exactly
+ * what it was and no consumer has to opt in to keep working. Turning one off
+ * drops that vocabulary's atom, unsupported and reverse tables -- which is where
+ * the size is: the seven of them together are about half of libbvnr's data, and
+ * `cf` alone is 150 KB. A library that advertises no dependencies and names
+ * sensor networks as a target has to let that go.
+ *
+ * WHAT A SWITCH DOES NOT CHANGE. Not the base-unit id space, not the dense unit
+ * tables, not value_unit_t, not error_code_t, not any exported signature: the
+ * generators run whole regardless, every bu_* enumerator keeps the value it has,
+ * and the opaque blocks stay where they are. So a document written by a build
+ * with `ucum` on and read by a build with it off gets
+ * error_unit_profile_unknown -- the answer doc/11 section 9.4 reserved that code
+ * for -- rather than a different unit or a silently shifted id. Two builds with
+ * different switches are ABI-compatible; they differ only in which namespaces
+ * they can translate. bvn_unit_profile_count/bvn_unit_profile_name report which,
+ * so a consumer can ask instead of guessing.
+ *
+ * The cost of a namespace being off is symmetrical and total: it cannot be
+ * parsed (error_unit_profile_unknown), and it cannot be written --
+ * bvn_unit_to_profile and bvn_unit_to_ucum return -1, and a unit carrying that
+ * profile's opaque units has no spelling at all, so bvn_unit_to_string fails
+ * rather than inventing one. A build that has to READ ucum:[IU] needs the ucum
+ * profile compiled in; there is no half-way state.
+ */
+#ifndef BVNR_WITH_UCUM_PROFILE
+#define BVNR_WITH_UCUM_PROFILE     1
+#endif
+#ifndef BVNR_WITH_UNECE_PROFILE
+#define BVNR_WITH_UNECE_PROFILE    1
+#endif
+#ifndef BVNR_WITH_QUDT_PROFILE
+#define BVNR_WITH_QUDT_PROFILE     1
+#endif
+#ifndef BVNR_WITH_QUDT_QK_PROFILE
+#define BVNR_WITH_QUDT_QK_PROFILE  1
+#endif
+#ifndef BVNR_WITH_UDUNITS_PROFILE
+#define BVNR_WITH_UDUNITS_PROFILE  1
+#endif
+#ifndef BVNR_WITH_OM_PROFILE
+#define BVNR_WITH_OM_PROFILE       1
+#endif
+#ifndef BVNR_WITH_CF_PROFILE
+#define BVNR_WITH_CF_PROFILE       1
+#endif
+
+/*
  * The unit profiles (spec 1.2). See doc/11_bovnar_unit_profiles.md.
  *
  * A "<namespace>:<code>" expression in the unit slot is translated, at parse
@@ -91,7 +141,13 @@ int32_t bvni_unit_to_ucum(value_unit_t u, char* buf, size_t bufsize);
 /* Write the full "<ns>:<code>" canonical spelling of a unit that has no native
  * one, picking the namespace that owns its opaque units. Returns -1 when `u`
  * has no opaque component, when its opaque components come from two different
- * profiles (no single spelling exists), or when the buffer is too small. */
+ * profiles (no single spelling exists), when the profile that owns them is not
+ * compiled in, or when the buffer is too small. */
 int32_t bvni_unit_profile_spelling(value_unit_t u, char* buf, size_t bufsize);
+
+/* The namespaces compiled into this build, for the public
+ * bvn_unit_profile_count / bvn_unit_profile_name. */
+uint32_t    bvni_profile_count(void);
+const char* bvni_profile_name(uint32_t index);
 
 #endif /* BVN_PROFILE_IMPL_H_ */

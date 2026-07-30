@@ -3557,6 +3557,21 @@ int main(int argc, char **argv)
 		 * string every packaging surface compares against. See bovnar.h. */
 		printf("bovnar %s (spec %u.%u)\n",
 			BVNR_VERSION_STRING_FULL, smaj, smin);
+		/* Which unit profiles this build carries. The vocabularies are
+		 * compiled per-namespace (BVNR_WITH_*_PROFILE), so "ucum:m is not a
+		 * unit" and "this build has no ucum" are the same error code from the
+		 * outside; a human debugging that needs one place to look. Printed even
+		 * when the list is empty, because "none" is the answer that explains
+		 * the error, and a missing line explains nothing. */
+		uint32_t np = bvn_unit_profile_count();
+		printf("unit profiles: ");
+		if (!np) {
+			printf("none\n");
+		} else {
+			for (uint32_t i = 0; i < np; i++)
+				printf("%s%s", i ? " " : "", bvn_unit_profile_name(i));
+			printf("\n");
+		}
 		return 0;
 	} else if (strcmp(cmd, "-h") == 0 || strcmp(cmd, "--help") == 0) {
 		usage(argv[0]);

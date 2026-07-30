@@ -706,3 +706,9 @@ class ErrorCode(IntEnum):
     # opened with text_only. An assertion by the CONSUMER, not a defect in the
     # document.
     OCTET_STREAM_FORBIDDEN      = 51
+    # Whitespace split a type-annotation parameter in two. The grammar puts
+    # every `ws` inside an annotation beside a separator; in the middle of a
+    # parameter it has no production, and the lexer used to drop it anyway --
+    # which is how "<float:64,k g>" became a kilogram and the UDUNITS spelling
+    # "udunits:m s-1" became a reciprocal millisecond.
+    TYPE_PARAM_WHITESPACE       = 52

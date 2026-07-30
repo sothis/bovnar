@@ -747,44 +747,52 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
  *     breaks the shape (so sparse arrays like [1,,3] stay valid).
  */
 /*
- * "Same physical dimension" for homogeneity. bvn_units_compatible covers the SI
- * physical units, but it returns false for any unit containing a currency
- * (currencies deliberately have no SI dimension). For homogeneity each currency
- * is its own dimension, so when the SI check fails we fall back to comparing the
- * base components and exponents directly (ignoring prefix magnitude): "$USD" and
- * "$USD" match, "$USD" and "$EUR" do not, "k~$USD" and "$USD" match, and
- * "$USD/oz_t" matches another "$USD/oz_t". Pure-physical units never reach the
- * fallback because bvn_units_compatible already decided them.
+ * THE SAME UNIT, for the homogeneity of a bare array.
+ *
+ * This used to be "the same physical dimension" — bvn_units_compatible, with a
+ * currency fallback — and §7.4 said in the same breath that "a bare array of
+ * measurements is therefore uniform: a consumer may treat its elements
+ * identically". Those two statements were not compatible. Dimensional
+ * homogeneity admits
+ *
+ *      [<float:64,m> 1.0, <float:64,ft> 2.0]          scale differs by 0.3048
+ *      [<float_dec:64,$USD> 1, <float_dec:64,k~$USD> 2]   by 1000
+ *      [<float:64,°C> 1.0, <float:64,K> 2.0]          by an OFFSET of 273.15
+ *
+ * and in each of them a consumer that took §7.4 at its word and read the block
+ * with one unit computed a wrong number. The last is the one that settles it: an
+ * affine offset between two neighbouring cells is not a scale error a reader can
+ * notice downstream, and refusing a wrong unit at the parse is the whole claim
+ * the format makes.
+ *
+ * So a bare array is homogeneous in its UNIT, not merely in its dimension, and
+ * §7.4's promise is now true as written. Struct fields are untouched — "shape
+ * uniform, fields free" still lets a multi-currency ledger carry $USD in one
+ * record and $EUR in the next, because a record's fields are named and a
+ * consumer reads them one at a time.
+ *
+ * bvn_unit_equal is the library's own comparator, so this agrees with equality
+ * everywhere else, and it is order-insensitive: "$USD·$EUR" and "$EUR·$USD" are
+ * the same unit and stay in one array. What it cannot see is that an omitted
+ * unit and an explicit "no_unit" are two spellings of dimensionless with
+ * different component counts (0 against 1 × bu_none), which would have made
+ * "[<float:64,no_unit> 1.0, <float:64> 2.0]" heterogeneous; that is settled
+ * first, below, before the structural comparison is allowed to matter.
  */
-static bool bvn_dom_same_dimension(value_unit_t a, value_unit_t b)
+static bool bvn_dom_unit_dimensionless(value_unit_t u)
 {
-	if (bvn_units_compatible(a, b))
-		return true;
-	if (a.num_components != b.num_components)
-		return false;
-	uint32_t n = a.num_components < BVNR_MAX_UNIT_COMPONENTS
-	           ? a.num_components : BVNR_MAX_UNIT_COMPONENTS;
-	/* Order-insensitive, like bvn_unit_equal: unit multiplication commutes, so
-	 * "$USD·$EUR" and "$EUR·$USD" are the same unit. Comparing position by
-	 * position rejected an array whose elements spell the same unit in a
-	 * different order — a false rejection of a legitimate document, and a
-	 * disagreement with the comparator the rest of the library uses. Prefix
-	 * magnitude is still ignored here on purpose: k~$USD and $USD are the same
-	 * currency, which is what this fallback exists to say. */
-	bool used[BVNR_MAX_UNIT_COMPONENTS] = { false };
-	for (uint32_t i = 0; i < n; i++) {
-		bool found = false;
-		for (uint32_t j = 0; j < n; j++) {
-			if (used[j]) continue;
-			if (a.components[i].base     != b.components[j].base)     continue;
-			if (a.components[i].exponent != b.components[j].exponent) continue;
-			used[j] = true;
-			found   = true;
-			break;
-		}
-		if (!found) return false;
+	for (uint32_t i = 0; i < u.num_components
+	                  && i < BVNR_MAX_UNIT_COMPONENTS; i++) {
+		if (u.components[i].base != bu_none)
+			return false;
 	}
 	return true;
+}
+static bool bvn_dom_same_unit(value_unit_t a, value_unit_t b)
+{
+	if (bvn_dom_unit_dimensionless(a) && bvn_dom_unit_dimensionless(b))
+		return true;
+	return bvn_unit_equal(a, b);
 }
 static const bvn_dom_node_t *bvn_dom_first_nonnull_elem(
 	const bvn_dom_node_t *arr)
@@ -804,12 +812,13 @@ static const bvn_dom_node_t *bvn_dom_first_nonnull_elem(
  *
  * check_dim distinguishes the two scopes of the spec-1.0 rule ("shape uniform,
  * fields free"). In a bare array / matrix context (check_dim = true) elements
- * must share the same physical dimension AND sub-arrays must be rectangular
- * (equal length). Once the path descends into a struct, its fields need only
- * match in KIND and nesting: a scalar field may carry a different unit in each
- * record (e.g. a multi-currency ledger) and a list field may have a different
- * length in each record (e.g. per-record argument lists). So struct-field
- * recursion passes check_dim = false, freeing both dimension and array length.
+ * must share the same UNIT (bvn_dom_same_unit, above) AND sub-arrays must be
+ * rectangular (equal length). Once the path descends into a struct, its fields
+ * need only match in KIND and nesting: a scalar field may carry a different unit
+ * in each record (e.g. a multi-currency ledger) and a list field may have a
+ * different length in each record (e.g. per-record argument lists). So
+ * struct-field recursion passes check_dim = false, freeing both unit and array
+ * length.
  */
 /*
  * Hard recursion-depth guard for the post-parse structural validators below.
@@ -847,7 +856,7 @@ static error_code_t bvn_dom_shape_equal(
 			a->value_type.base != b->value_type.base)
 			return error_array_element_type_mismatch;
 		if (check_dim &&
-			!bvn_dom_same_dimension(bvn_dom_get_unit(a), bvn_dom_get_unit(b)))
+			!bvn_dom_same_unit(bvn_dom_get_unit(a), bvn_dom_get_unit(b)))
 			return error_array_element_type_mismatch;
 		return error_none;
 	}

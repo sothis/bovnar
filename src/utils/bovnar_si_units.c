@@ -406,6 +406,17 @@ typedef enum {
 	BVNI_KIND_TURBIDITY_FAU,
 	BVNI_KIND_TURBIDITY_JTU,
 	BVNI_KIND_SALINITY_PSU,
+	/*
+	 * A temperature DIFFERENCE, which is not a temperature. 25 °C is 298.15 K;
+	 * a rise of 25 degrees is 25 K, and before the Δ units existed there was no
+	 * spelling that said so, so the format converted the second as if it were
+	 * the first. This kind is what refuses ΔK -> K -- same dimension Θ,
+	 * different quantity, exactly as bit is to byte and lumen to candela.
+	 *
+	 * It is the ONE kind that is conditional on the shape of the unit rather
+	 * than on the component alone; bvni_kind_exponents says why.
+	 */
+	BVNI_KIND_TEMP_INTERVAL,
 	BVNI_KIND_COUNT
 } bvni_quantity_kind_t;
 typedef struct {
@@ -438,28 +449,73 @@ static const bvni_kind_entry_t bvni_kind_table[] = {
 	{ bu_turbidity_fau,      BVNI_KIND_TURBIDITY_FAU, 1 },
 	{ bu_turbidity_jtu,      BVNI_KIND_TURBIDITY_JTU, 1 },
 	{ bu_practical_salinity, BVNI_KIND_SALINITY_PSU,  1 },
+	/* The six temperature intervals. Δ°C shares bu_delta_kelvin and Δ°Ra shares
+	 * bu_delta_fahrenheit -- those pairs are the same interval, so they are
+	 * aliases in units.bvnr and there is nothing extra to list here. */
+	{ bu_delta_kelvin,      BVNI_KIND_TEMP_INTERVAL, 1 },
+	{ bu_delta_fahrenheit,  BVNI_KIND_TEMP_INTERVAL, 1 },
+	{ bu_delta_delisle,     BVNI_KIND_TEMP_INTERVAL, 1 },
+	{ bu_delta_newton_temp, BVNI_KIND_TEMP_INTERVAL, 1 },
+	{ bu_delta_reaumur,     BVNI_KIND_TEMP_INTERVAL, 1 },
+	{ bu_delta_romer,       BVNI_KIND_TEMP_INTERVAL, 1 },
 };
 #define BVNI_KIND_TABLE_COUNT \
 	((uint32_t)(sizeof(bvni_kind_table) / sizeof(bvni_kind_table[0])))
 /* Net exponent of every quantity kind in `u`. False if a component's exponent
- * is unusable, which makes the unit incomparable rather than equal-to-anything. */
+ * is unusable, which makes the unit incomparable rather than equal-to-anything.
+ *
+ * THE TEMPERATURE INTERVAL IS SCOPED TO A LONE UNIT AT EXPONENT 1, and every
+ * other kind is not. The asymmetry is deliberate and it is small: the interval
+ * kind exists to stop a temperature difference converting as a scale reading,
+ * and a scale reading is only ever possible where the affine offset is applied
+ * -- which bvn_unit_to_si_factor allows for a single component at exponent 1 and
+ * nowhere else. So:
+ *
+ *   ΔK        vs  K        incompatible   the hazard, and the whole point
+ *   Δ°F       vs  °F       incompatible   likewise
+ *   ΔK/k~m    vs  K/k~m    the same unit  a lapse rate; no offset was ever
+ *                                         applied here, so there is nothing to
+ *                                         separate
+ *   1/ΔK      vs  1/K      the same unit  an expansion coefficient
+ *   W/(m²·ΔK) vs  W/(m²·K) the same unit  a U-value
+ *
+ * The last three are why the scope is not "every component": K inside a compound
+ * is ALREADY an interval, because an affine scale cannot appear in a compound at
+ * all. Counting the kind there would make W/(m²·ΔK) a different unit from
+ * W/(m²·K) and break every U-value written to date, in exchange for separating
+ * two spellings of one quantity.
+ */
 static bool bvni_kind_exponents(value_unit_t u, int32_t out[BVNI_KIND_COUNT])
 {
 	for (uint32_t k = 0; k < BVNI_KIND_COUNT; k++)
 		out[k] = 0;
+	bool lone = (u.num_components == 1u);
 	for (uint32_t i = 0; i < u.num_components && i < BVNR_MAX_UNIT_COMPONENTS; i++) {
 		int32_t e = bvn_exponent_to_int(u.components[i].exponent);
 		if (e == 0)
 			return false;
 		for (uint32_t t = 0; t < BVNI_KIND_TABLE_COUNT; t++) {
-			if (bvni_kind_table[t].base == u.components[i].base) {
-				out[bvni_kind_table[t].kind] +=
-					bvni_kind_table[t].weight * e;
-				break;
-			}
+			if (bvni_kind_table[t].base != u.components[i].base)
+				continue;
+			if (bvni_kind_table[t].kind == BVNI_KIND_TEMP_INTERVAL
+			    && !(lone && e == 1))
+				break;   /* see the note above: here it is the same unit */
+			out[bvni_kind_table[t].kind] +=
+				bvni_kind_table[t].weight * e;
+			break;
 		}
 	}
 	return true;
+}
+/* Is `u` a temperature interval in the sense above -- a lone Δ unit at exponent
+ * 1, the one shape where the interval kind is significant? Used by the SI normal
+ * form, which must reduce Δ°F to ΔK and never to K. */
+static bool bvni_unit_is_temp_interval(value_unit_t u)
+{
+	int32_t k[BVNI_KIND_COUNT];
+	if (!bvni_kind_exponents(u, k))
+		return false;
+	return k[BVNI_KIND_TEMP_INTERVAL] != 0;
 }
 /* True when both units carry the same amount of every quantity kind. Exposed
  * within the library so the formatter's named-SI collapse can apply the same
@@ -632,6 +688,16 @@ bool bvn_unit_si_normal_form(value_unit_t u, value_unit_t *out)
 	int32_t dims[bvn_si_dim_count];
 	if (!bvn_unit_dimension_vector(u, dims))
 		return false;
+	/*
+	 * A temperature INTERVAL reduces to ΔK, never to K. The dimension vector
+	 * cannot say which -- both are Θ¹ -- so the kind has to be asked, exactly as
+	 * the photometric check below asks it after the fact. Getting this wrong is
+	 * not a cosmetic slip: the screen at the end of this function would find ΔK
+	 * and K incompatible and report "no SI form", so `--si` over a document of
+	 * temperature differences would silently leave every one of them alone.
+	 */
+	value_base_unit_t kelvin_base = bvni_unit_is_temp_interval(u)
+	                              ? bu_delta_kelvin : bu_kelvin;
 	value_unit_t r;
 	memset(&r, 0, sizeof(r));
 	for (uint32_t i = 0; i < sizeof(si_base) / sizeof(si_base[0]); i++) {
@@ -648,7 +714,8 @@ bool bvn_unit_si_normal_form(value_unit_t u, value_unit_t *out)
 		if (r.num_components >= BVNR_MAX_UNIT_COMPONENTS)
 			return false;
 		value_unit_component_t *c = &r.components[r.num_components++];
-		c->base            = si_base[i].base;
+		c->base            = (si_base[i].dim == bvn_si_dim_kelvin)
+		                   ? kelvin_base : si_base[i].base;
 		c->exponent        = bvn_int_to_exponent(e);
 		c->prefix.system   = prefix_si;
 		c->prefix.id.si    = si_base[i].prefix;

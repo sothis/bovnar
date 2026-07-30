@@ -22,7 +22,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <meta property="article:published_time" content="2026-07-25">
-<meta property="article:modified_time" content="2026-07-29">
+<meta property="article:modified_time" content="2026-07-30">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar Unit Ambiguities">
@@ -32,7 +32,7 @@
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
 <link rel="alternate" type="text/markdown" href="/doc/07_bovnar_unit_ambiguities.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Unit Ambiguities", "description": "Every Bovnar token that could plausibly mean two things — what the parser reads it as, and how to write the other meaning.", "url": "https://www.bovnar.io/docs/ambiguities/", "mainEntityOfPage": "https://www.bovnar.io/docs/ambiguities/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-07-25", "dateModified": "2026-07-29", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Unit Ambiguities", "item": "https://www.bovnar.io/docs/ambiguities/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Unit Ambiguities", "description": "Every Bovnar token that could plausibly mean two things — what the parser reads it as, and how to write the other meaning.", "url": "https://www.bovnar.io/docs/ambiguities/", "mainEntityOfPage": "https://www.bovnar.io/docs/ambiguities/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-07-25", "dateModified": "2026-07-30", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Unit Ambiguities", "item": "https://www.bovnar.io/docs/ambiguities/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
@@ -716,6 +716,12 @@ not assume the two are the same file.</p>
 </table>
 <p>ASCII aliases avoid the question: <code>degC</code>, <code>degF</code>, <code>degRa</code>, <code>degN</code>, <code>degDe</code>, <code>degRe</code>, <code>degRo</code>.
 <code>K</code> (kelvin) is absolute and needs no degree sign.</p>
+<p>The temperature <em>intervals</em> (§9) prefix the same tokens with <code>Δ</code> (U+0394) and carry the same
+warning, resolved the same way — <code>delta_degC</code>, <code>delta_degF</code>, <code>delta_degRa</code>, <code>delta_degN</code>,
+<code>delta_degDe</code>, <code>delta_degRe</code>, <code>delta_degRo</code>, and <code>delta_K</code> for <code>ΔK</code>. There is deliberately <strong>no</strong>
+<code>delta_C</code> or <code>delta_F</code>: those read as a delta coulomb and a delta farad, exactly as the table above
+warns for <code>C</code> and <code>F</code>, so they are <code>error_unit_illegal</code> rather than aliases. <code>delta_K</code> is the one
+bare-letter form, and it is unambiguous because <code>K</code> is the kelvin and nothing else.</p>
 <p>The water-hardness degrees carry the same warning, and one of them is genuinely dangerous:</p>
 <table>
 <thead>
@@ -890,6 +896,11 @@ spells out (<code>A·s</code> → <code>C</code>); it never substitutes one name
 <td><code>‰</code>, <code>g/kg</code>, plain numbers</td>
 </tr>
 <tr>
+<td><code>ΔK</code>, <code>Δ°C</code>, <code>Δ°F</code>, <code>Δ°Ra</code>, <code>Δ°De</code>, <code>Δ°N</code>, <code>Δ°Re</code>, <code>Δ°Ro</code></td>
+<td>temperature <strong>interval</strong> (one shared kind, so <code>Δ°F</code> → <code>ΔK</code> works at 5/9)</td>
+<td><code>K</code>, <code>°C</code>, <code>°F</code> and every other temperature <em>scale</em>: 25 °C is 298.15 K, a <em>rise</em> of 25 degrees is 25 K</td>
+</tr>
+<tr>
 <td><code>%</code>, <code>‰</code>, <code>‱</code>, <code>pcm</code>, <code>ppm</code>, <code>ppb</code></td>
 <td>pure ratios</td>
 <td><em>(freely interconvertible, and with a plain number: 1 % → 0.01)</em></td>
@@ -900,6 +911,11 @@ spells out (<code>A·s</code> → <code>C</code>); it never substitutes one name
 <code>ppm</code> is the <strong>dimensionless</strong> 10⁻⁶ and the hardness scale is <code>°aH</code>, an amount concentration — the
 two carry different dimensions and do not convert into one another. If your source says "ppm
 hardness", write <code>°aH</code>.</p>
+<p>The temperature-interval kind is the one that is scoped to a <strong>lone unit at exponent 1</strong>, and every
+other kind in the table is not. The reason is §10: an offset can only ever be applied to a lone bare
+temperature, so that is the only place a difference could have been misread as a reading. Inside a
+compound <code>ΔK</code> and <code>K</code> are the <em>same unit</em> — <code>W/(m²·ΔK)</code> is <code>W/(m²·K)</code>, <code>ΔK/k~m</code> is <code>K/k~m</code> — because
+the <code>K</code> there was already an interval.</p>
 <p>The logarithmic kinds are separate because no factor can relate them: 20 dB is a ratio of 100, not
 twice 10 dB, and a pH one unit lower is a tenfold concentration. <code>rpm</code> is a <em>cycle</em> rate and
 <code>rev/min</code> an <em>angular</em> rate — they differ by 2π and do not convert into one another either.</p>
@@ -948,8 +964,14 @@ do record a rate of change in °C/h. What it means is a temperature <strong>diff
 per hour, and the difference is what Bovnar cannot infer from the unit: <code>20 °C/h</code>
 as a rate is <code>20 K/h</code>, while <code>20 °C</code> as a reading is <code>293.15 K</code>. Rather than pick
 one, the library refuses to produce a number and leaves the components for a
-consumer that knows which was meant. Write <code>K/h</code> when you mean the rate — the
-kelvin has no offset and the ambiguity disappears.</p>
+consumer that knows which was meant. Write <code>ΔK/h</code> when you mean the rate — or
+<code>K/h</code>, which is the same unit (§9) — and the ambiguity disappears.</p>
+<p><strong>The lone case now has a spelling too, and it did not before.</strong> <code>&lt;float:64,°C&gt; 25.0</code>
+is a reading of 25 °C and converts to 298.15 K; if you meant a <em>rise</em> of 25 degrees,
+write <code>&lt;float:64,Δ°C&gt; 25.0</code>, which converts to 25 ΔK. This was the one place in the
+format where a wrong unit produced a wrong number silently — the two documents were
+byte-identical and there was no third spelling to disambiguate them. See doc/05 §3.4
+and doc/temperature_difference.md.</p>
 <hr />
 <h2 id="11-a-named-unit-is-not-its-compound">11. A named unit is not its compound</h2>
 <p>A named unit is a single component; the compound that means the same thing is several. Both are

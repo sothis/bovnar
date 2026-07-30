@@ -197,7 +197,7 @@ Bovnar's ground is where CF does not reach: heterogeneous documents rather than 
 
 ### Carrying other vocabularies: unit profiles (under implementation)
 
-Because these code systems sit at a different layer, they can be **components rather than alternatives**. Five foreign notations are accepted in the unit slot, alongside the native one:
+Because these code systems sit at a different layer, they can be **components rather than alternatives**. Seven foreign notations are accepted in the unit slot, alongside the native one:
 
 ```bovnar
 #!bovnar 1.2
@@ -237,8 +237,28 @@ ucum:B[SPL]   →  error_unit_profile_unsupported valid UCUM, no representation 
 udunits:days since 1970-01-01
               →  error_unit_profile_unsupported valid UDUNITS; an epoch is a type
                                                 parameter here, not a unit
-cf:m          →  error_unit_profile_unknown    no such profile
+udunits:kg m-2 s-1
+              →  k~g/m²·s                      UDUNITS multiplies with a SPACE,
+                                                and this is CF's commonest
+                                                spelling. Same unit as
+                                                udunits:kg*m-2*s-1
+udunits:ms-1  →  m~s⁻¹                         a reciprocal millisecond — also
+                                                valid UDUNITS, and a different
+                                                unit. The space is the difference
+<float:64,k g>
+              →  error_type_param_whitespace   a NATIVE unit has no space in it
+nosuch:m      →  error_unit_profile_unknown    no such profile — and the same
+                                                answer for a namespace this
+                                                build was compiled without
 ```
+
+**Each vocabulary is a build option.** `BVNR_WITH_UCUM_PROFILE` and its six siblings are `ON` by
+default; turning them off drops that vocabulary's tables and nothing else — the base-unit ids, every
+struct layout and every signature are identical in all configurations, so builds with different
+switches stay ABI-compatible. The tables are the bulk of the library: with all seven off
+`libbvnr.so` goes from 1.96 MB to **524 KB**, which is what makes the unit system usable on a sensor
+node that reads no ontology. `bovnar version` prints what a build carries, and
+`bvn_unit_profile_count()` / `bvn_unit_profile_name(i)` report it to a program.
 
 Full specification, the transliteration tables, the collisions between namespaces (`st` is the stone natively and the *stere* in UCUM; UCUM's `B` is the bel where QUDT's `BYTE` is the byte), an explicit list of what does *not* map, and the cross-vocabulary suite: [doc/11_bovnar_unit_profiles.md](doc/11_bovnar_unit_profiles.md).
 

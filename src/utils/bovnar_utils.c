@@ -537,6 +537,7 @@ const char* bvn_error_to_string(error_code_t code)
 	case error_unit_profile_unknown:      return "unit_profile_unknown";
 	case error_unit_profile_unsupported:  return "unit_profile_unsupported";
 	case error_octet_stream_forbidden:    return "octet_stream_forbidden";
+	case error_type_param_whitespace:     return "type_param_whitespace";
 	case error_base_requires_string_literal: return "base_requires_string_literal";
 	case error_type_value_mismatch:       return "type_value_mismatch";
 	case error_value_out_of_range:        return "value_out_of_range";
@@ -1098,6 +1099,14 @@ int32_t bvn_unit_to_profile(const char* ns, value_unit_t u, char* buf,
 int32_t bvn_unit_to_ucum(value_unit_t u, char* buf, size_t bufsize)
 {
 	return bvni_unit_to_ucum(u, buf, bufsize);
+}
+uint32_t bvn_unit_profile_count(void)
+{
+	return bvni_profile_count();
+}
+const char* bvn_unit_profile_name(uint32_t index)
+{
+	return bvni_profile_name(index);
 }
 value_unit_t bvn_parse_unit(const uint8_t* unit, bool* ok)
 {

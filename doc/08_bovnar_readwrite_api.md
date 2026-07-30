@@ -1562,6 +1562,7 @@ fprintf(stderr, "error: %s\n", bvn_error_to_string(bvnr_reader_get_error(r)));
 | `error_unit_profile_unknown` | 49 | `"unit_profile_unknown"` | A unit written in the `name:` profile notation names a profile this build does not have (profile under implementation) |
 | `error_unit_profile_unsupported` | 50 | `"unit_profile_unsupported"` | A valid profile expression over known atoms with no representation in the unit model — a special unit carrying a reference level, a scale factor outside the SI prefix decades, or more components than a unit may hold (profile under implementation) |
 | `error_octet_stream_forbidden` | 51 | `"octet_stream_forbidden"` | Under implementation — not in a released version. The document contains an octet stream and the reader was opened with `text_only`. Reported at the stream's opening `0x00`, before its payload is read |
+| `error_type_param_whitespace` | 52 | `"type_param_whitespace"` | Whitespace split a type-annotation parameter in two (spec §5.3). Legal beside a separator — the family `:`, a `,` between parameters, before the closing `>` — and an error inside a parameter, reported at the first byte after it. `<float:64,k g>` used to be accepted as `k~g` and `<uint:6 4>` as a 64-bit width |
 
 ### 3.6 Canonicalising observer (`bvnr_canon_observer_*`)
 

@@ -900,7 +900,22 @@
   { .code = "Temperature";                   .bovnar = "K";                   .reverse = false; },
   { .code = "TemperatureAmountOfSubstance";  .bovnar = "mol·K";               .reverse = false; },
   { .code = "TemperatureBasedLength";        .bovnar = "m/K";                 .reverse = false; },
-  { .code = "TemperatureDifference";         .bovnar = "K";                   .reverse = false; },
+  # A DIFFERENCE, and now there is a unit that says so. This row read "K" until
+  # the Δ units existed, which made qudt-qk:TemperatureDifference and
+  # qudt-qk:ThermodynamicTemperature the same unit -- the exact confusion the
+  # code's own name rules out, and one that converts to °F wrong by 255.37.
+  # A quantity KIND states a quantity and no unit, so there is no published unit
+  # string to diverge from here: ΔK is the faithful reading of the name.
+  #
+  # The CF standard names that are also differences (air_temperature_anomaly and
+  # its three siblings) are deliberately NOT changed the same way: CF states
+  # canonical_units = "K" for them, and overriding a publisher's stated unit from
+  # its name is a different decision -- see doc/temperature_difference.md §7.
+  # It reverses, unlike the rest of this tail: ΔK is claimed by no other quantity
+  # kind, so there is exactly one code to write it back as, and gen_profiles.py's
+  # coverage check is right to insist the question be answered rather than left
+  # to the block's default.
+  { .code = "TemperatureDifference";         .bovnar = "ΔK";                  .reverse = true;  },
   { .code = "TemperatureGradient";           .bovnar = "K/m";                 .reverse = false; },
   { .code = "TemperaturePerMagneticFluxDensity"; .bovnar = "K/T";                 .reverse = false; },
   { .code = "TemperaturePerTime";            .bovnar = "K/s";                 .reverse = false; },

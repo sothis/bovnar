@@ -632,7 +632,7 @@ a mismatch is `error_unit_mismatch`.
 
 **How many base units does Bovnar support?**
 
-180 named base units across the following categories:
+186 named base units across the following categories:
 
 - **7 SI base units** — second, meter, gram, ampere, kelvin, mole, candela.
 - **21 named SI-derived units** — hertz through katal (Hz, N, Pa, J, W, V, Ω, F, C, S, Wb, T, H, lm, lx, Bq, Gy, Sv, kat, rad, sr).
@@ -641,6 +641,7 @@ a mismatch is `error_unit_mismatch`.
 - **13 Imperial/US customary length units** — inch, foot, yard, mile, nautical mile, ångström, light-year, parsec, furlong, fathom, **chain** (`ch`), **rod** (`rd`), and **thou** (thousandth of an inch, alias `mil`).
 - **11 Imperial/US customary mass units** — pound, ounce, grain, stone, short ton, long ton, troy ounce, carat, **slug**, **dram** (`dr`), **pennyweight** (`dwt`).
 - **6 temperature scales** — degree Fahrenheit (affine), **degree Rankine** (linear, absolute), and the historical **Delisle** (`°De`), **Newton** (`°N`), **Réaumur** (`°Re`), and **Rømer** (`°Ro`) scales (all affine). Degree Celsius is counted among the non-SI accepted units above.
+- **6 temperature *differences*** — **ΔK** (`delta_K`; `Δ°C` is the same unit, since the Celsius interval *is* the kelvin), **Δ°F** (`Δ°Ra` likewise), and the intervals of the four historical scales: **Δ°De**, **Δ°N**, **Δ°Re**, **Δ°Ro**. Each is a ratio scale — no offset — with its own quantity kind, so `ΔK` never converts to `K`: 25 °C is 298.15 K but a *rise* of 25 degrees is 25 K.
 - **6 pressure units** — atmosphere, mmHg, Torr, psi, **inch of mercury** (`inHg`), and **atmosphere technical** (`at`, = 1 kgf/cm² = 98 066.5 Pa).
 - **5 energy units** — calorie, BTU, erg, therm, **foot-pound** (`ft_lb`).
 - **2 power units** — horsepower (`hp`), **metric horsepower** (`PS`, also `CV`; = 735.49875 W).
@@ -846,16 +847,22 @@ separator.
 **Can array elements have different types?**
 
 Array elements must be **homogeneous** (spec 1.0): every non-null element shares
-the same kind, and a bare array of numbers shares the same physical dimension.
-The numeric *encodings* may still mix, since they all denote the same dimension:
+the same kind, and every element of a bare array carries the same **unit**. The
+numeric *encodings* may still mix, since the encoding is not part of the unit:
 
 ```bovnar
 .mixed = [<uint:8> 1, <sint:8> -1, <float:32> 3.14];   # valid: all dimensionless
+.same  = [<uint:32,m> 1, <float:64,m> 2.0];            # valid: one unit, two encodings
 ```
 
-But genuinely different kinds (`[1, "two"]`) or dimensions (`[<float:64,m> 1.0,
-<float:64,k~g> 2.0]`) are rejected with `error_array_element_type_mismatch`.
-Heterogeneous data goes in a **struct**, not an array.
+Different kinds (`[1, "two"]`) are rejected with
+`error_array_element_type_mismatch`, and so is anything that is not the same
+unit — a different dimension (`[<float:64,m> 1.0, <float:64,k~g> 2.0]`), a
+different scale (`m` beside `ft`), a different prefix (`$USD` beside `k~$USD`),
+or a different zero (`°C` beside `K`, which are 273.15 apart). The rule is the
+unit rather than the dimension so that reading a bare array as one block is
+actually safe; a **struct** is where genuinely different things go, and a
+struct's fields keep their own units.
 
 Homogeneity is a **materialised-document** rule: it is checked over the whole
 value once it is assembled, so it is enforced by the DOM parser

@@ -719,11 +719,35 @@ bool bvn_action_value_outro(bvnr_reader_t* p)
 bool bvn_action_type_intro(bvnr_reader_t* p)
 {
 	p->lex.token_type = token_is_type;
+	/* A fresh body: no family ':' yet, and the parameter that has not started
+	 * yet has no namespace. Both are per-annotation state. */
+	p->lex.type_family_colon = false;
+	p->lex.type_param_ns     = false;
 	p->lex.next_state = type_intro;
 	return true;
 }
+/*
+ * Drop whitespace that ended up at the end of a parameter.
+ *
+ * Only a NAMESPACED parameter can accumulate whitespace at all (see
+ * bvn_action_type_ws_byte), and there the space is a code byte -- so
+ * "<float:64,udunits:m >" would otherwise reach the profile as "m " and fail on a
+ * dangling multiplication, while "<float:64,m/s >" has always been legal. The
+ * trailing run is whitespace beside the separator that closes the parameter,
+ * which is exactly where the grammar allows it; the interior run is the part that
+ * means something and is left alone. Called at the two bytes that end a
+ * parameter: a depth-0 ',' and the '>'.
+ */
+static void bvn_type_trim_trailing_ws(bvnr_lexer_t* l)
+{
+	while (l->type_len > 0u
+	       && (l->type_data[l->type_len - 1u] == 0x20u
+	           || l->type_data[l->type_len - 1u] == 0x09u))
+		--l->type_len;
+}
 bool bvn_action_type_outro(bvnr_reader_t* p)
 {
+	bvn_type_trim_trailing_ws(&p->lex);
 	if (!bvn_lex_finalize(p, bvn_val_receive))
 		return false;
 	p->lex.next_state = type_outro;
@@ -739,6 +763,129 @@ bool bvn_action_copy_type_byte(bvnr_reader_t* p)
 	l->type_data[l->type_len++] = (uint8_t)l->byte;
 	l->next_state = copy_type_byte;
 	return true;
+}
+/*
+ * Brace/bracket depth of the parameter bytes accumulated so far.
+ *
+ * A ',' inside a UCUM annotation or a bracketed atom is part of the code, not a
+ * parameter separator (doc/11 §2.4) — "ucum:mL{cells,tot}" is ONE parameter —
+ * and the same goes for a ':' appearing in annotation text. Only a separator at
+ * depth zero may open the whitespace window below, or "{cells, tot}" would have
+ * its space deleted and §3.4's promise to preserve annotation text verbatim
+ * would stop being true.
+ *
+ * The depth is recomputed from type_data rather than counted as the bytes go by.
+ * That is deliberate: the bulk-copy fast path memcpy's a run of parameter bytes
+ * without ever entering an action, so a running counter would miss every brace
+ * it copied, and taking '{' and '}' out of the run class to fix that would slow
+ * the hot path to serve a byte that arrives at most a few times per annotation.
+ * A separator is rare; a re-scan of at most 255 bytes when one arrives is not
+ * worth avoiding, and it cannot fall out of step with the buffer it reads.
+ */
+static uint32_t bvn_type_param_depth(const uint8_t* d, uint32_t len)
+{
+	uint32_t depth = 0;
+	for (uint32_t i = 0; i < len; i++) {
+		if (d[i] == '{' || d[i] == '[')
+			++depth;
+		else if ((d[i] == '}' || d[i] == ']') && depth)
+			--depth;
+	}
+	return depth;
+}
+/*
+ * A ',' or ':' at depth zero: copied like any other parameter byte, but it
+ * leaves the machine at type_body_outro, where whitespace is ignorable, instead
+ * of copy_type_byte, where it is not. Nested, it is an ordinary code byte and
+ * behaves exactly like bvn_action_copy_type_byte.
+ */
+bool bvn_action_copy_type_sep_byte(bvnr_reader_t* p)
+{
+	bvnr_lexer_t* l = &p->lex;
+	bool nested = bvn_type_param_depth(l->type_data, l->type_len) != 0u;
+	if (!nested) {
+		/* This byte ends the parameter, so whitespace that ran up to it was
+		 * beside a separator after all. */
+		if (l->byte == ',')
+			bvn_type_trim_trailing_ws(l);
+		/* Which colon is this? The first at depth 0 separates the type family
+		 * from its parameter list; a later one opens a profile namespace, and
+		 * that is what decides whether whitespace inside THIS parameter is a
+		 * code byte or an error. A ',' starts a fresh parameter, which has no
+		 * namespace until a ':' gives it one. */
+		if (l->byte == ':') {
+			if (l->type_family_colon)
+				l->type_param_ns = true;
+			else
+				l->type_family_colon = true;
+		} else {
+			l->type_param_ns = false;
+		}
+	}
+	if (l->type_len == BVN_TYPE_BUF_CAP - 1u) {
+		bvn_lexer_set_error(p, error_type_too_long);
+		return false;
+	}
+	l->type_data[l->type_len++] = (uint8_t)l->byte;
+	l->next_state = nested ? copy_type_byte : type_body_outro;
+	return true;
+}
+/*
+ * Whitespace arriving in the MIDDLE of a parameter. Two outcomes, and which one
+ * depends on whether the parameter is namespaced.
+ *
+ * NATIVE PARAMETER -> error_type_param_whitespace, via type_body_ws. A space
+ * cannot be part of a native unit or a width: "<float:64,k g>" was accepted as
+ * k~g and "<uint:6 4>" as a 64-bit width, which is a wrong unit and a wrong type
+ * produced silently, and doc/12 never derived either of them.
+ *
+ * PROFILE PARAMETER -> the byte is COPIED, and the vocabulary decides. This is
+ * the case that was previously indistinguishable from the one above and is the
+ * reason the whole space was deleted for so long. UDUNITS multiplies with a
+ * space, and CF's commonest spelling of a flux is "kg m-2 s-1"; that expression
+ * now reaches the UDUNITS parser as itself instead of as the "kg m-2 s-1" with
+ * the spaces deleted -- which was "kgm-2s-1", a different unit, or in the
+ * two-token case "ms-1", a reciprocal millisecond where a speed was meant. A
+ * UCUM annotation keeps its spacing, which is what doc/11 §3.4 has always
+ * promised. Every other vocabulary refuses the space through its own grammar as
+ * error_unit_illegal, which is the right layer for it: "no such code" rather
+ * than "no whitespace here".
+ *
+ * ONLY SPACE AND TAB. LF/CR/VT/FF keep going to type_body_ws even in a profile
+ * parameter: no vocabulary spells a unit across a line, so admitting one would
+ * buy nothing and would let a malformed code swallow a document's layout the way
+ * an unterminated bracket would.
+ */
+bool bvn_action_type_ws_byte(bvnr_reader_t* p)
+{
+	bvnr_lexer_t* l = &p->lex;
+	if (!l->type_param_ns || (l->byte != 0x20 && l->byte != 0x09)) {
+		l->next_state = type_body_ws;
+		return true;
+	}
+	if (l->type_len == BVN_TYPE_BUF_CAP - 1u) {
+		bvn_lexer_set_error(p, error_type_too_long);
+		return false;
+	}
+	l->type_data[l->type_len++] = (uint8_t)l->byte;
+	l->next_state = copy_type_byte;
+	return true;
+}
+/*
+ * A byte that would have been a legal parameter byte, arriving after whitespace
+ * that split a parameter in two. Reported as its own code rather than as
+ * error_unexpected_input_byte because the byte itself is not the problem and the
+ * fix is specific: delete the space. "<float:64,k g>" and "<uint:6 4>" both land
+ * here, and so does the space-multiplied UDUNITS spelling "udunits:m s-1" that
+ * doc/11 §13.2 warns about — for which the answer is "m*s-1", not a narrower
+ * unit table. A byte that is illegal anywhere in an annotation still fails as
+ * error_unexpected_input_byte; only bytes that WERE accepted here before reach
+ * this action.
+ */
+bool bvn_action_type_param_whitespace(bvnr_reader_t* p)
+{
+	bvn_lexer_set_error(p, error_type_param_whitespace);
+	return false;
 }
 bool bvn_action_neg_number_intro(bvnr_reader_t* p)
 {

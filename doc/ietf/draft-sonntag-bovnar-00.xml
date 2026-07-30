@@ -3271,9 +3271,12 @@ code is not assigned on top of them.</t>
       <c>51</c>
       <c><spanx style="verb">error_octet_stream_forbidden</spanx></c>
       <c>C</c>
+      <c>52</c>
+      <c><spanx style="verb">error_type_param_whitespace</spanx></c>
+      <c>D</c>
 </texttable>
 
-<t>Two entries warrant a note.</t>
+<t>Four entries warrant a note.</t>
 
 <t><spanx style="verb">error_base_requires_string_literal</spanx> (33) is defined for a non-decimal
 base given a bare, unquoted numeric literal. In practice such a token
@@ -3293,6 +3296,26 @@ is well-formed and the octet stream is a first-class part of the format,
 but this consumer has asserted that its channel carries text. Reporting
 it is how a consumer whose pipeline normalizes line endings declines the
 document at the door instead of discovering the damage downstream.</t>
+
+<t><spanx style="verb">error_type_param_whitespace</spanx> (52) is raised for whitespace inside a
+type-annotation parameter. The grammar of <xref target="collected-abnf"/> places every
+<spanx style="verb">ws</spanx> in <spanx style="verb">type-ann</spanx> beside a separator - after <spanx style="verb">family</spanx>, either side of the
+":" that introduces <spanx style="verb">param-list</spanx> or of a "," between parameters, and
+before the closing "&gt;" - and derives none inside a <spanx style="verb">param</spanx>. A consumer
+that skips whitespace uniformly within an annotation instead of at those
+positions silently concatenates a split parameter, which yields a
+different type or a different unit rather than an error: <spanx style="verb">&lt;uint:6 4&gt;</spanx>
+becomes a 64-bit width, <spanx style="verb">&lt;float:64,k g&gt;</spanx> becomes the kilogram, and the
+space-multiplied UDUNITS spelling <spanx style="verb">m s-1</spanx> becomes <spanx style="verb">ms-1</spanx>, a reciprocal
+millisecond. Reporting code 52 at the first octet after the whitespace is
+therefore a requirement of this document and not a lexical nicety.</t>
+
+<t>The unit-profile facility of <xref target="error-codes"/>, which this document
+does not specify, admits whitespace inside a parameter that carries a profile
+namespace, where it is part of the foreign code rather than a separator. A
+consumer that implements no profile never reaches that case: with no namespace
+to recognise, every parameter is a native one and code 52 applies
+throughout.</t>
 
 </section>
 <section anchor="examples"><name>Examples</name>

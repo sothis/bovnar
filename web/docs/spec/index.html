@@ -22,7 +22,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <meta property="article:published_time" content="2026-05-14">
-<meta property="article:modified_time" content="2026-07-29">
+<meta property="article:modified_time" content="2026-07-30">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar Specification (v1.1)">
@@ -32,7 +32,7 @@
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
 <link rel="alternate" type="text/markdown" href="/doc/03_bovnar_spec.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Specification (v1.1)", "description": "The complete Bovnar (BVNR) format specification, version 1.1: grammar, type system, physical units, numeric bases, limits, and error semantics.", "url": "https://www.bovnar.io/docs/spec/", "mainEntityOfPage": "https://www.bovnar.io/docs/spec/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-07-29", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Specification (v1.1)", "item": "https://www.bovnar.io/docs/spec/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Specification (v1.1)", "description": "The complete Bovnar (BVNR) format specification, version 1.1: grammar, type system, physical units, numeric bases, limits, and error semantics.", "url": "https://www.bovnar.io/docs/spec/", "mainEntityOfPage": "https://www.bovnar.io/docs/spec/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-07-30", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Specification (v1.1)", "item": "https://www.bovnar.io/docs/spec/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
@@ -1058,6 +1058,63 @@ positional slot is never needed, so the parameter list is parsed strictly: a
 comma must introduce a real parameter, and a <code>:</code> must be followed by at least
 one parameter. Empty, trailing, or doubled components — <code>&lt;uint:8,&gt;</code>,
 <code>&lt;uint:8,,&gt;</code>, <code>&lt;uint:,_16&gt;</code>, and the bare <code>&lt;uint:&gt;</code> — are <code>error_illegal_value_type</code>.</p>
+<h4 id="whitespace-inside-an-annotation">Whitespace inside an annotation</h4>
+<p>Whitespace (and a comment, which is whitespace) is allowed <strong>beside a
+separator</strong> and nowhere else. The separators are the <code>:</code> that introduces the
+parameter list, the <code>,</code> between parameters, and the <code>&lt;</code> / <code>&gt;</code> that delimit the
+annotation:</p>
+<div class="codehilite"><pre><code class="language-bovnar">.a = &lt;float : 64&gt; 1.0;          # valid — either side of the family colon
+.b = &lt;uint:8 , _16&gt; &quot;ff&quot;;       # valid — either side of a parameter comma
+.c = &lt;float:64,m/s &gt; 1.0;       # valid — before the closing bracket
+.d = &lt;float:64, # which unit
+      m/s&gt; 1.0;                 # valid — a comment stands in for the space</code></pre></div>
+<p><strong>Inside a parameter it is <code>error_type_param_whitespace</code></strong>, reported at the
+first byte after the whitespace:</p>
+<div class="codehilite"><pre><code class="language-bovnar">.e = &lt;float:64,k g&gt; 1.0;        # error_type_param_whitespace
+.f = &lt;uint:6 4&gt; 1;              # error_type_param_whitespace
+.g = &lt;float:64,m / s&gt; 1.0;      # error_type_param_whitespace</code></pre></div>
+<p>This is a rule about a <em>wrong value</em>, not about tidiness. Whitespace inside a
+parameter used to be deleted, so <code>&lt;float:64,k g&gt;</code> was accepted as <code>k~g</code> and
+<code>&lt;uint:6 4&gt;</code> as a 64-bit width — a wrong unit and a wrong type, each produced
+silently. The trap has a specific victim: UDUNITS and CF multiply with a space,
+so <code>&lt;float:64,udunits:m s-1&gt;</code> was accepted as <code>ms-1</code>, <strong>reciprocal
+milliseconds</strong>, for a value the author wrote as a speed. A producer writes
+<code>udunits:m*s-1</code> instead.</p>
+<p>A comma nested inside a UCUM annotation is part of the code rather than a
+separator, so it does not end the parameter: <code>ucum:mL{cells,tot}</code> is one
+parameter, not two.</p>
+<h4 id="the-one-exception-a-namespaced-parameter">The one exception: a namespaced parameter</h4>
+<p>Inside a parameter that carries a <strong>profile namespace</strong> (<code>udunits:</code>, <code>ucum:</code>, …),
+whitespace is neither deleted nor refused — it is <strong>kept verbatim</strong> and handed to
+the vocabulary, which decides what it means. This exists for one concrete reason:
+UDUNITS multiplies with a space, and <code>kg m-2 s-1</code> is the commonest spelling of a
+flux in netCDF and CF metadata.</p>
+<div class="codehilite"><pre><code class="language-bovnar">.flux = &lt;float:64,udunits:kg m-2 s-1&gt; 0.5;   # valid — the same unit as udunits:kg*m-2*s-1
+.speed = &lt;float:64,udunits:m s-1&gt; 9.81;      # valid — m/s
+.t = &lt;float:64,udunits:ms-1&gt; 1.0;            # valid, and DIFFERENT: m~s⁻¹, a
+                                             # reciprocal millisecond. The space
+                                             # is what tells the two apart
+.count = &lt;float:64,ucum:mL{cells, tot}&gt; 1.0; # valid — an annotation is inert
+                                             # text and keeps its spacing
+.bad = &lt;float:64,ucum:[in i]&gt; 1.0;           # error_unit_illegal — from UCUM&#x27;s
+                                             # grammar, not from the lexer
+.bad = &lt;float:64,qudt:Kilo GM&gt; 1.0;          # error_unit_illegal — a flat
+                                             # vocabulary has no operators</code></pre></div>
+<p>Three details of that exception:</p>
+<ul>
+<li><strong>The family <code>:</code> is not a namespace.</strong> Only a second <code>:</code> at bracket depth 0
+  makes a parameter namespaced, so <code>&lt;uint:6 4&gt;</code> is still
+  <code>error_type_param_whitespace</code>.</li>
+<li><strong>Trailing whitespace is trimmed</strong>, since it sits beside the separator that
+  ends the parameter: <code>&lt;float:64,udunits:m &gt;</code> is <code>udunits:m</code>.</li>
+<li><strong>A line break is still an error</strong>, even in a namespaced parameter. No
+  vocabulary spells a unit across a line, and admitting one would let a
+  malformed code consume a document's layout.</li>
+</ul>
+<p>An <strong>inline</strong> unit suffix cannot carry a space and never will — whitespace is
+what terminates that token, so <code>1.0 k g</code> has always been
+<code>error_unexpected_input_byte</code>, and the space-separated profile spelling is
+available in a type annotation only.</p>
 <h3 id="54-examples">5.4 Examples</h3>
 <div class="codehilite"><pre><code class="language-bovnar"># Simple types
 .a = &lt;uint:32&gt; 1000;
@@ -1340,12 +1397,13 @@ rows, but <code>[]/[1]</code> is <code>error_array_row_size_mismatch</code>.</p>
 <p>Since spec 1.0 the elements of an array must be <strong>homogeneous</strong>. The rule is <em>"shape uniform, fields free"</em>, checked over the materialised value (above the lexer; it complements the streaming reader's per-value type and unit checks):</p>
 <ul>
 <li><strong>Kind.</strong> Every non-null element shares the same kind — number, string, symbol, bool, reference, octet stream, array, or struct. <code>[1, "two"]</code> and <code>[1, {.x=1;}]</code> are <code>error_array_element_type_mismatch</code>.</li>
-<li><strong>Dimension</strong> (bare scalar arrays and matrices). Numeric elements must share the same physical dimension; the numeric encodings (<code>uint</code>, <code>sint</code>, <code>float</code>, <code>float_fix</code>, <code>float_dec</code>) may mix. <code>[&lt;float:64,m&gt; 1.0, &lt;float:64,k~g&gt; 2.0]</code> (length vs mass) is rejected; <code>[1, 2.5, 3]</code> (all dimensionless) is fine. Each currency is its own dimension, so a bare array may not mix <code>$USD</code> and <code>$EUR</code> values.</li>
-<li><strong><code>datetime</code> (spec 1.1).</strong> A <code>datetime</code> is its own kind: it does <strong>not</strong> mix with the plain numeric encodings above (<code>[&lt;datetime:64,unix&gt; 1, &lt;sint:64&gt; 2]</code> is <code>error_array_element_type_mismatch</code>). And, exactly as for currencies, its <strong>epoch is a dimension</strong> — a bare array may not mix epochs (<code>[&lt;datetime:64,unix&gt; 1, &lt;datetime:64,tai&gt; 2]</code> is rejected); a homogeneous same-epoch datetime array is fine. (These are materialised-document/DOM-tier rules, like the rest of §7.4.)</li>
-<li><strong>Rectangular</strong> (nested arrays). Sibling sub-arrays must have the same length and recursively-matching element shape: <code>[[1,2],[3,4]]</code> is valid, <code>[[1,2],[3,4,5]]</code> is <code>error_array_row_size_mismatch</code>.</li>
-<li><strong>Structs — same keys, fields free.</strong> Sibling structs must share the same keys, in order, with the same per-field <em>kinds</em> and nesting. Differing keys are <code>error_struct_shape_mismatch</code>; a field that is a number in one record and a string in another is <code>error_array_element_type_mismatch</code>. But a scalar field may carry a <strong>different unit</strong> in each record, and a list field a <strong>different length</strong> — so a multi-currency ledger and per-record argument lists are valid.</li>
-<li><strong>Null is a hole.</strong> <code>null</code> / empty array elements match any shape and never establish or break homogeneity, so sparse arrays like <code>[1, , 3]</code> remain valid.</li>
+<li><strong>Unit</strong> (bare scalar arrays and matrices). Numeric elements must carry the <strong>same unit</strong>, not merely the same dimension; the numeric encodings (<code>uint</code>, <code>sint</code>, <code>float</code>, <code>float_fix</code>, <code>float_dec</code>) may mix freely. <code>[&lt;float:64,m&gt; 1.0, &lt;float:64,k~g&gt; 2.0]</code> (length vs mass) is rejected, and so are <code>[&lt;float:64,m&gt; 1.0, &lt;float:64,ft&gt; 2.0]</code> (a scale apart), <code>[&lt;float_dec:64,$USD&gt; 1.0, &lt;float_dec:64,k~$USD&gt; 2.0]</code> (a prefix apart) and <code>[&lt;float:64,°C&gt; 1.0, &lt;float:64,K&gt; 2.0]</code> (an affine <strong>offset</strong> apart). <code>[1, 2.5, 3]</code> (all dimensionless) is fine, and so is <code>[&lt;float:64,m*s&gt; 1.0, &lt;float:64,s*m&gt; 2.0]</code> — the comparison is order-insensitive, because unit multiplication commutes — as is an explicit <code>no_unit</code> beside an omitted unit, which are two spellings of the same thing. Each currency is its own unit, so a bare array may not mix <code>$USD</code> and <code>$EUR</code> values.</li>
 </ul>
+<p>The rule is the unit and not the dimension because of the sentence that closes this section: <em>a consumer may treat the elements identically</em>. Under dimensional homogeneity that sentence was false — a reader that took it at its word and applied one unit to <code>[1.0 m, 2.0 ft]</code> was wrong by 0.3048, and on <code>[1.0 °C, 2.0 K]</code> wrong by an added 273.15. An offset between two neighbouring cells is not a mistake anything downstream can notice, so it is refused at the parse, where every other wrong unit in this format is refused.
+- <strong><code>datetime</code> (spec 1.1).</strong> A <code>datetime</code> is its own kind: it does <strong>not</strong> mix with the plain numeric encodings above (<code>[&lt;datetime:64,unix&gt; 1, &lt;sint:64&gt; 2]</code> is <code>error_array_element_type_mismatch</code>). And, exactly as for currencies, its <strong>epoch is a dimension</strong> — a bare array may not mix epochs (<code>[&lt;datetime:64,unix&gt; 1, &lt;datetime:64,tai&gt; 2]</code> is rejected); a homogeneous same-epoch datetime array is fine. (These are materialised-document/DOM-tier rules, like the rest of §7.4.)
+- <strong>Rectangular</strong> (nested arrays). Sibling sub-arrays must have the same length and recursively-matching element shape: <code>[[1,2],[3,4]]</code> is valid, <code>[[1,2],[3,4,5]]</code> is <code>error_array_row_size_mismatch</code>.
+- <strong>Structs — same keys, fields free.</strong> Sibling structs must share the same keys, in order, with the same per-field <em>kinds</em> and nesting. Differing keys are <code>error_struct_shape_mismatch</code>; a field that is a number in one record and a string in another is <code>error_array_element_type_mismatch</code>. But a scalar field may carry a <strong>different unit</strong> in each record, and a list field a <strong>different length</strong> — so a multi-currency ledger and per-record argument lists are valid.
+- <strong>Null is a hole.</strong> <code>null</code> / empty array elements match any shape and never establish or break homogeneity, so sparse arrays like <code>[1, , 3]</code> remain valid.</p>
 <div class="codehilite"><pre><code class="language-bovnar">.ok_scalars = [1, 2.5, 3];                 # valid: same (no) dimension, encodings may mix
 .ok_matrix  = [[1, 2], [3, 4]];            # valid: rectangular
 .ok_records = [{.cur = USD; .bal = &lt;float_dec:64,$USD&gt; 1.0;},
@@ -1354,9 +1412,11 @@ rows, but <code>[]/[1]</code> is <code>error_array_row_size_mismatch</code>.</p>
 
 .bad_kind   = [1, &quot;two&quot;];                  # error_array_element_type_mismatch
 .bad_dim    = [&lt;float:64,m&gt; 1.0, &lt;float:64,k~g&gt; 2.0];  # error_array_element_type_mismatch
+.bad_scale  = [&lt;float:64,m&gt; 1.0, &lt;float:64,ft&gt; 2.0];   # same dimension, different unit
+.bad_offset = [&lt;float:64,°C&gt; 1.0, &lt;float:64,K&gt; 2.0];   # 273.15 apart
 .bad_ragged = [[1, 2], [3, 4, 5]];         # error_array_row_size_mismatch
 .bad_keys   = [{.x = 1;}, {.y = 1;}];      # error_struct_shape_mismatch</code></pre></div>
-<p>A bare array of measurements is therefore uniform — a consumer may treat its elements identically — while records (structs) describe genuinely different things. <strong>Heterogeneous data is modelled with a struct, not an array.</strong> (This is a deliberate tightening over pre-1.0 drafts, which allowed ragged and mixed-type arrays; it also means a ragged or mixed-type JSON array has no bovnar representation and the <code>json → bvnr</code> converter rejects it rather than losing structure.)</p>
+<p>A bare array of measurements is therefore uniform — a consumer may read the whole block under the unit of any one element — while records (structs) describe genuinely different things. <strong>Heterogeneous data is modelled with a struct, not an array.</strong> (This is a deliberate tightening over pre-1.0 drafts, which allowed ragged and mixed-type arrays; it also means a ragged or mixed-type JSON array has no bovnar representation and the <code>json → bvnr</code> converter rejects it rather than losing structure.)</p>
 <h3 id="75-array-elements-with-type-annotations">7.5 Array Elements with Type Annotations</h3>
 <p>Individual elements may carry type annotations. The annotation appears <strong>before</strong> each element value, <strong>after</strong> the comma or opening bracket:</p>
 <div class="codehilite"><pre><code class="language-bovnar">.mixed = [&lt;uint:8&gt; 1, &lt;sint:8&gt; -1, &lt;float:64&gt; 3.14];
@@ -3473,9 +3533,11 @@ All functions return <code>false</code> on serialisation error.</p>
 <span class="w">    </span><span class="n">error_recovered</span><span class="w">                     </span><span class="o">=</span><span class="w"> </span><span class="mi">37</span><span class="p">,</span><span class="w">  </span><span class="cm">/* reserved; never set by the library */</span>
 <span class="w">    </span><span class="n">error_unit_mismatch</span><span class="w">                 </span><span class="o">=</span><span class="w"> </span><span class="mi">38</span><span class="p">,</span>
 <span class="w">    </span><span class="cm">/* Array element homogeneity (spec 1.0): every non-null element of an array</span>
-<span class="cm">     * must share the same kind and physical dimension; sibling sub-arrays must</span>
-<span class="cm">     * match in length and element shape (recursively); sibling structs must</span>
-<span class="cm">     * share the same keys with recursively-matching fields. */</span>
+<span class="cm">     * must share the same kind, and every element of a BARE array the same UNIT</span>
+<span class="cm">     * (§7.4 -- not merely the same dimension, so m beside ft and °C beside K are</span>
+<span class="cm">     * both refused); sibling sub-arrays must match in length and element shape</span>
+<span class="cm">     * (recursively); sibling structs must share the same keys with</span>
+<span class="cm">     * recursively-matching fields, whose units stay free. */</span>
 <span class="w">    </span><span class="n">error_array_element_type_mismatch</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="mi">39</span><span class="p">,</span>
 <span class="w">    </span><span class="n">error_struct_shape_mismatch</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="mi">40</span><span class="p">,</span>
 <span class="w">    </span><span class="cm">/* A struct (or the top-level document) repeats a key. Keys must be unique</span>
@@ -3515,7 +3577,15 @@ All functions return <code>false</code> on serialisation error.</p>
 <span class="cm">     * first-class part of the format (§9) — but an assertion by the CONSUMER</span>
 <span class="cm">     * that this particular channel carries text, made at the door rather than</span>
 <span class="cm">     * discovered as corruption downstream. */</span>
-<span class="w">    </span><span class="n">error_octet_stream_forbidden</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="mi">51</span>
+<span class="w">    </span><span class="n">error_octet_stream_forbidden</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="mi">51</span><span class="p">,</span>
+<span class="w">    </span><span class="cm">/* whitespace split a type-annotation PARAMETER in two (§5.3). Every `ws` the</span>
+<span class="cm">     * grammar allows inside an annotation sits beside a separator; in the middle</span>
+<span class="cm">     * of a parameter there is no production for it, and the lexer used to drop it</span>
+<span class="cm">     * anyway -- so &quot;&lt;float:64,k g&gt;&quot; was accepted as the kilogram and &quot;&lt;uint:6 4&gt;&quot;</span>
+<span class="cm">     * as a 64-bit width. Reported at the first byte after the whitespace. A byte</span>
+<span class="cm">     * that is illegal anywhere in an annotation is still</span>
+<span class="cm">     * error_unexpected_input_byte. */</span>
+<span class="w">    </span><span class="n">error_type_param_whitespace</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="mi">52</span>
 <span class="p">}</span><span class="w"> </span><span class="n">error_code_t</span><span class="p">;</span>
 </code></pre></div>
 

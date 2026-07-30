@@ -168,6 +168,31 @@
 	[0x19]=ACT_NONE,[0x1a]=ACT_NONE,[0x1b]=ACT_NONE,[0x1c]=ACT_NONE, \
 	[0x1d]=ACT_NONE,[0x1e]=ACT_NONE,[0x1f]=ACT_NONE,[0x7f]=ACT_NONE
 /*
+ * Every byte a type-annotation PARAMETER may contain, except the two that end
+ * one (',' and ':'), the '>' that ends the annotation, the '#' that opens a
+ * comment, and whitespace. The three body states below differ only in what they
+ * do with this class — copy it, or refuse it because whitespace split the
+ * parameter — so it is one macro rather than three hand-kept copies that were
+ * already drifting apart in comment text.
+ *
+ * '$' starts a currency, '%' is percent, '(' and ')' group a unit expression,
+ * '~' joins a prefix to its unit, '^' introduces an exponent. spec 1.2 added
+ * '[', ']', '{', '}' and '\'' for UCUM (bracketed atoms, annotations, codes like
+ * [arb'U]); that widens the class for EVERY unit string, so "<float:64,m[s]>"
+ * reaches bvn_parse_unit and fails there as error_unit_illegal instead of
+ * failing here as error_unexpected_input_byte -- one error code moves for a
+ * family of inputs that were errors before and are errors after. ';', '#', '<',
+ * '>' and '"' stay OUT, so an unterminated bracket or annotation cannot consume
+ * the rest of the document.
+ */
+#define BVN_TYPE_PARAM_CLASS(a) \
+	[0x24]=(a),[0x25]=(a),[0x27]=(a),[0x28]=(a),[0x29]=(a), \
+	[0x2a]=(a),[0x2b]=(a),[0x2d]=(a),[0x2e]=(a),[0x2f]=(a), \
+	[0x5b]=(a),[0x5d]=(a),[0x5e]=(a),[0x5f]=(a), \
+	[0x7b]=(a),[0x7d]=(a),[0x7e]=(a), \
+	BVN_DIGITS(a), BVN_ALPHA_UPPER(a), BVN_ALPHA_LOWER(a), \
+	BVN_UTF8_CONTINUATION(a), BVN_UTF8_LEADER(a)
+/*
  * THE ROWS BELOW OVERRIDE INITIALISERS ON PURPOSE, and that is what the macros
  * above are for: one of them supplies the uniform default for all 256 columns,
  * and the explicit [byte] entries that follow replace it. Listing the bytes that
@@ -314,78 +339,53 @@ const uint8_t bvn_after_state_idx_table[dimension_state][256] = {
 	[tf_datet]   = { ['i'] = ACT_kw_advance },
 	[tf_dateti]  = { ['m'] = ACT_kw_advance },
 	[tf_datetim] = { ['e'] = ACT_tf_datetime_done },
+	/*
+	 * The three annotation-body states. They accept the same bytes and differ
+	 * only in where whitespace may fall:
+	 *
+	 *   copy_type_byte   mid-parameter. Whitespace here has no production in
+	 *                    doc/12 (`type-param-list = type-param , {ws , "," ,
+	 *                    ws , type-param}` puts every `ws` beside a separator),
+	 *                    so it does not resume the parameter -- it goes to
+	 *                    type_body_ws for judgement.
+	 *   type_body_outro  at a separator boundary: after the family keyword,
+	 *                    after a ',' or after the family ':'. Whitespace and
+	 *                    comments are ignorable here, which is what keeps
+	 *                    "<uint:8, 16>" and "<float : 64>" legal.
+	 *   type_body_ws     mid-parameter, whitespace already consumed. Only a
+	 *                    separator, a '>' or a comment may follow; a parameter
+	 *                    byte is error_type_param_whitespace.
+	 *
+	 * Before this split the whole body was two states and whitespace was simply
+	 * dropped, which made "<float:64,k g>" a kilogram and the UDUNITS spelling
+	 * "udunits:m s-1" a reciprocal millisecond -- the one place in the format
+	 * where a wrong unit was produced silently instead of refused.
+	 */
 	[copy_type_byte] = {
-		BVN_WHITESPACE(ACT_to_type_body_outro),
-		[0x24] = ACT_copy_type_byte,
-		[0x25] = ACT_copy_type_byte,
-		[0x28] = ACT_copy_type_byte,
-		[0x29] = ACT_copy_type_byte,
-		[0x2a] = ACT_copy_type_byte,
-		[0x2b] = ACT_copy_type_byte,
-		[0x2c] = ACT_copy_type_byte,
-		[0x2d] = ACT_copy_type_byte,
-		[0x2e] = ACT_copy_type_byte,
-		[0x2f] = ACT_copy_type_byte,
-		BVN_DIGITS(ACT_copy_type_byte),
-		[0x3a] = ACT_copy_type_byte,
+		BVN_WHITESPACE(ACT_type_ws_byte),
+		BVN_TYPE_PARAM_CLASS(ACT_copy_type_byte),
+		[0x2c] = ACT_copy_type_sep_byte,
+		[0x3a] = ACT_copy_type_sep_byte,
 		[0x3e] = ACT_type_outro,
-		BVN_ALPHA_UPPER(ACT_copy_type_byte),
-		[0x5e] = ACT_copy_type_byte,
-		[0x5f] = ACT_copy_type_byte,
-		[0x7e] = ACT_copy_type_byte,
-		/* spec 1.2 — the UCUM unit profile needs '[', ']', '{', '}' and '\''
-		 * (bracketed atoms, annotations, codes like [arb'U]). This widens the
-		 * class for EVERY unit string, so "<float:64,m[s]>" now reaches
-		 * bvn_parse_unit and fails there as error_unit_illegal instead of
-		 * failing here as error_unexpected_input_byte: one error code moves for
-		 * a family of inputs that were errors before and are errors after.
-		 * ';', '#', '<', '>' and '"' stay OUT, so an unterminated bracket or
-		 * annotation cannot consume the rest of the document. */
-		[0x27] = ACT_copy_type_byte,
-		[0x5b] = ACT_copy_type_byte,
-		[0x5d] = ACT_copy_type_byte,
-		[0x7b] = ACT_copy_type_byte,
-		[0x7d] = ACT_copy_type_byte,
-		BVN_ALPHA_LOWER(ACT_copy_type_byte),
-		BVN_UTF8_CONTINUATION(ACT_copy_type_byte),
-		BVN_UTF8_LEADER(ACT_copy_type_byte),
 	},
 	[type_body_outro] = {
 		BVN_WHITESPACE(ACT_ignore_whitespace),
 		[0x23] = ACT_comment_intro,
-		[0x24] = ACT_copy_type_byte,
-		[0x25] = ACT_copy_type_byte,
-		[0x28] = ACT_copy_type_byte,
-		[0x29] = ACT_copy_type_byte,
-		[0x2a] = ACT_copy_type_byte,
-		[0x2b] = ACT_copy_type_byte,
-		[0x2c] = ACT_copy_type_byte,
-		[0x2d] = ACT_copy_type_byte,
-		[0x2e] = ACT_copy_type_byte,
-		[0x2f] = ACT_copy_type_byte,
-		BVN_DIGITS(ACT_copy_type_byte),
-		[0x3a] = ACT_copy_type_byte,
+		BVN_TYPE_PARAM_CLASS(ACT_copy_type_byte),
+		[0x2c] = ACT_copy_type_sep_byte,
+		[0x3a] = ACT_copy_type_sep_byte,
 		[0x3e] = ACT_type_outro,
-		BVN_ALPHA_UPPER(ACT_copy_type_byte),
-		[0x5e] = ACT_copy_type_byte,
-		[0x5f] = ACT_copy_type_byte,
-		[0x7e] = ACT_copy_type_byte,
-		/* spec 1.2 — the UCUM unit profile needs '[', ']', '{', '}' and '\''
-		 * (bracketed atoms, annotations, codes like [arb'U]). This widens the
-		 * class for EVERY unit string, so "<float:64,m[s]>" now reaches
-		 * bvn_parse_unit and fails there as error_unit_illegal instead of
-		 * failing here as error_unexpected_input_byte: one error code moves for
-		 * a family of inputs that were errors before and are errors after.
-		 * ';', '#', '<', '>' and '"' stay OUT, so an unterminated bracket or
-		 * annotation cannot consume the rest of the document. */
-		[0x27] = ACT_copy_type_byte,
-		[0x5b] = ACT_copy_type_byte,
-		[0x5d] = ACT_copy_type_byte,
-		[0x7b] = ACT_copy_type_byte,
-		[0x7d] = ACT_copy_type_byte,
-		BVN_ALPHA_LOWER(ACT_copy_type_byte),
-		BVN_UTF8_CONTINUATION(ACT_copy_type_byte),
-		BVN_UTF8_LEADER(ACT_copy_type_byte),
+	},
+	[type_body_ws] = {
+		BVN_WHITESPACE(ACT_ignore_whitespace),
+		[0x23] = ACT_comment_intro,
+		BVN_TYPE_PARAM_CLASS(ACT_type_param_whitespace),
+		[0x2c] = ACT_copy_type_sep_byte,
+		[0x3a] = ACT_copy_type_sep_byte,
+		/* Whitespace before the closing '>' is the outermost `ws` of
+		 * `type-annotation = "<" , ws , param-type , ws , ">"`, and deleting it
+		 * cannot change which unit was written. */
+		[0x3e] = ACT_type_outro,
 	},
 	[type_outro] = {
 		BVN_WHITESPACE(ACT_ignore_whitespace),
@@ -944,7 +944,9 @@ const action_t bvn_action_table[ACT__count] = {
 	[ACT_type_intro]                 = bvn_action_type_intro,
 	[ACT_type_outro]                 = bvn_action_type_outro,
 	[ACT_copy_type_byte]             = bvn_action_copy_type_byte,
-	[ACT_to_type_body_outro]         = bvn_action_set_state,
+	[ACT_copy_type_sep_byte]         = bvn_action_copy_type_sep_byte,
+	[ACT_type_param_whitespace]      = bvn_action_type_param_whitespace,
+	[ACT_type_ws_byte]               = bvn_action_type_ws_byte,
 	[ACT_neg_number_intro]           = bvn_action_neg_number_intro,
 	[ACT_copy_number_byte]           = bvn_action_copy_number_byte,
 	[ACT_zero_intro]                 = bvn_action_zero_intro,
@@ -1045,7 +1047,6 @@ const action_t bvn_action_table[ACT__count] = {
 const state_t bvn_action_target_state[ACT__count] = {
 	[ACT_ignore_comment_byte]       = ignore_comment_byte,
 	[ACT_to_identifier_outro]       = identifier_outro,
-	[ACT_to_type_body_outro]        = type_body_outro,
 	[ACT_to_number_outro]           = number_outro,
 	[ACT_string_outro]              = string_outro_nosp,
 	[ACT_to_string_outro]           = string_outro,

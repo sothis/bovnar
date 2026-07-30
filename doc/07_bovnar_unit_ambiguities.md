@@ -242,6 +242,13 @@ The degree sign is not decoration: without it the token is a different quantity 
 ASCII aliases avoid the question: `degC`, `degF`, `degRa`, `degN`, `degDe`, `degRe`, `degRo`.
 `K` (kelvin) is absolute and needs no degree sign.
 
+The temperature *intervals* (§9) prefix the same tokens with `Δ` (U+0394) and carry the same
+warning, resolved the same way — `delta_degC`, `delta_degF`, `delta_degRa`, `delta_degN`,
+`delta_degDe`, `delta_degRe`, `delta_degRo`, and `delta_K` for `ΔK`. There is deliberately **no**
+`delta_C` or `delta_F`: those read as a delta coulomb and a delta farad, exactly as the table above
+warns for `C` and `F`, so they are `error_unit_illegal` rather than aliases. `delta_K` is the one
+bare-letter form, and it is unambiguous because `K` is the kelvin and nothing else.
+
 The water-hardness degrees carry the same warning, and one of them is genuinely dangerous:
 
 | With `°` | Means | Without `°` | Means |
@@ -296,12 +303,19 @@ conversions in the first group; the second group is protected by an explicit qua
 | `FAU` | turbidity, attenuation 0° | ditto |
 | `JTU` | turbidity, visual candle | ditto |
 | `PSU` | practical salinity | `‰`, `g/kg`, plain numbers |
+| `ΔK`, `Δ°C`, `Δ°F`, `Δ°Ra`, `Δ°De`, `Δ°N`, `Δ°Re`, `Δ°Ro` | temperature **interval** (one shared kind, so `Δ°F` → `ΔK` works at 5/9) | `K`, `°C`, `°F` and every other temperature *scale*: 25 °C is 298.15 K, a *rise* of 25 degrees is 25 K |
 | `%`, `‰`, `‱`, `pcm`, `ppm`, `ppb` | pure ratios | *(freely interconvertible, and with a plain number: 1 % → 0.01)* |
 
 Water chemistry calls the American hardness scale "ppm" (milligrams of CaCO₃ per litre). Bovnar's
 `ppm` is the **dimensionless** 10⁻⁶ and the hardness scale is `°aH`, an amount concentration — the
 two carry different dimensions and do not convert into one another. If your source says "ppm
 hardness", write `°aH`.
+
+The temperature-interval kind is the one that is scoped to a **lone unit at exponent 1**, and every
+other kind in the table is not. The reason is §10: an offset can only ever be applied to a lone bare
+temperature, so that is the only place a difference could have been misread as a reading. Inside a
+compound `ΔK` and `K` are the *same unit* — `W/(m²·ΔK)` is `W/(m²·K)`, `ΔK/k~m` is `K/k~m` — because
+the `K` there was already an interval.
 
 The logarithmic kinds are separate because no factor can relate them: 20 dB is a ratio of 100, not
 twice 10 dB, and a pH one unit lower is a tenfold concentration. `rpm` is a *cycle* rate and
@@ -326,8 +340,15 @@ do record a rate of change in °C/h. What it means is a temperature **difference
 per hour, and the difference is what Bovnar cannot infer from the unit: `20 °C/h`
 as a rate is `20 K/h`, while `20 °C` as a reading is `293.15 K`. Rather than pick
 one, the library refuses to produce a number and leaves the components for a
-consumer that knows which was meant. Write `K/h` when you mean the rate — the
-kelvin has no offset and the ambiguity disappears.
+consumer that knows which was meant. Write `ΔK/h` when you mean the rate — or
+`K/h`, which is the same unit (§9) — and the ambiguity disappears.
+
+**The lone case now has a spelling too, and it did not before.** `<float:64,°C> 25.0`
+is a reading of 25 °C and converts to 298.15 K; if you meant a *rise* of 25 degrees,
+write `<float:64,Δ°C> 25.0`, which converts to 25 ΔK. This was the one place in the
+format where a wrong unit produced a wrong number silently — the two documents were
+byte-identical and there was no third spelling to disambiguate them. See doc/05 §3.4
+and doc/temperature_difference.md.
 
 ---
 

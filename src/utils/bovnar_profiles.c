@@ -176,13 +176,20 @@ typedef struct {
 	 * "known and not carryable" rather than "not a code", or NULL.
 	 *
 	 * This exists for UDUNITS' reference-time construct, "<unit> since
-	 * <timestamp>", and a substring test is the right shape for two reasons.
-	 * The construct cannot be caught as an ATOM, because the lexer deletes the
-	 * whitespace inside a type annotation and "days since 1970-01-01" arrives
-	 * as one unsplittable token; and the outcome must be
-	 * error_unit_profile_unsupported rather than error_unit_illegal, because a
-	 * producer who writes it has written valid UDUNITS and deserves to be told
-	 * bovnar cannot carry it -- not that they made a typo.
+	 * <timestamp>". The construct cannot be caught as an ATOM: it is three
+	 * tokens in UDUNITS and one string here, so there is nothing to look up.
+	 * The outcome must be error_unit_profile_unsupported rather than
+	 * error_unit_illegal, because a producer who writes it has written valid
+	 * UDUNITS and deserves to be told bovnar cannot carry it -- not that they
+	 * made a typo.
+	 *
+	 * Note what it can and cannot reach since the lexer stopped deleting
+	 * whitespace inside a type annotation. The spelling UDUNITS actually uses,
+	 * "days since 1970-01-01", now fails one layer earlier as
+	 * error_type_param_whitespace and never arrives here; what this test still
+	 * catches is the concatenated "dayssince1970-01-01", which is the form a
+	 * producer reaches for after being told the spaces are illegal, and the form
+	 * that must not come back as "not a code".
 	 */
 	const char*             refuse_substr;
 	/* Does this vocabulary have UCUM's "{...}" annotations? They carry no
@@ -218,6 +225,7 @@ static bool is_mul(const bvn_profile_t* p, char c)
 	return false;
 }
 
+#if BVNR_WITH_UCUM_PROFILE
 static const bvn_prof_pfx_t ucum_pfx_table[] = {
 #include "bovnar_profile_ucum_prefix.gen.inc"
 	{ NULL, 0, 0 }
@@ -237,10 +245,12 @@ static const bvn_prof_rev_t ucum_rev_table[] = {
 #include "bovnar_profile_ucum_reverse.gen.inc"
 	{ bu_none, NULL, 0, 0, false, iec_none }
 };
+#endif /* BVNR_WITH_UCUM_PROFILE */
 
 /* UNECE Recommendation 20/21. Flat, so there is no prefix table at all: a Rec 20
  * code is one whole token and "KGM" is the kilogram rather than a kilo applied
  * to something. */
+#if BVNR_WITH_UNECE_PROFILE
 static const bvn_prof_atom_t unece_atom_table[] = {
 #include "bovnar_profile_unece_atom.gen.inc"
 	{ NULL, 0, NULL, bu_none, false }
@@ -255,8 +265,10 @@ static const bvn_prof_rev_t unece_rev_table[] = {
 #include "bovnar_profile_unece_reverse.gen.inc"
 	{ bu_none, NULL, 0, 0, false, iec_none }
 };
+#endif /* BVNR_WITH_UNECE_PROFILE */
 
 /* QUDT unit local names. Flat: "KiloGM" is one symbol, not a prefix on "GM". */
+#if BVNR_WITH_QUDT_PROFILE
 static const bvn_prof_atom_t qudt_atom_table[] = {
 #include "bovnar_profile_qudt_atom.gen.inc"
 	{ NULL, 0, NULL, bu_none, false }
@@ -271,6 +283,7 @@ static const bvn_prof_rev_t qudt_rev_table[] = {
 #include "bovnar_profile_qudt_reverse.gen.inc"
 	{ bu_none, NULL, 0, 0, false, iec_none }
 };
+#endif /* BVNR_WITH_QUDT_PROFILE */
 
 /*
  * QUDT QUANTITY KINDS, which are not units: a kind says what is measured and
@@ -280,6 +293,7 @@ static const bvn_prof_rev_t qudt_rev_table[] = {
  * error) while still admitting the namespace at all. The reasoning, and the
  * failure mode it leaves open, are set out at the top of qudt-qk.bvnr.
  */
+#if BVNR_WITH_QUDT_QK_PROFILE
 static const bvn_prof_atom_t qudt_qk_atom_table[] = {
 #include "bovnar_profile_qudt_qk_atom.gen.inc"
 	{ NULL, 0, NULL, bu_none, false }
@@ -294,9 +308,11 @@ static const bvn_prof_rev_t qudt_qk_rev_table[] = {
 #include "bovnar_profile_qudt_qk_reverse.gen.inc"
 	{ bu_none, NULL, 0, 0, false, iec_none }
 };
+#endif /* BVNR_WITH_QUDT_QK_PROFILE */
 
 /* UDUNITS-2, the units syntax of netCDF and the CF conventions. An expr profile
  * like UCUM, differing only in which bytes spell an operator. */
+#if BVNR_WITH_UDUNITS_PROFILE
 static const bvn_prof_pfx_t udunits_pfx_table[] = {
 #include "bovnar_profile_udunits_prefix.gen.inc"
 	{ NULL, 0, 0 }
@@ -316,6 +332,7 @@ static const bvn_prof_rev_t udunits_rev_table[] = {
 #include "bovnar_profile_udunits_reverse.gen.inc"
 	{ bu_none, NULL, 0, 0, false, iec_none }
 };
+#endif /* BVNR_WITH_UDUNITS_PROFILE */
 
 /*
  * OM 2, the Ontology of units of Measure. A flat profile like QUDT, and for the
@@ -324,6 +341,7 @@ static const bvn_prof_rev_t udunits_rev_table[] = {
  * om.bvnr was BUILT from that structure, but the structure is read at generate
  * time and not at parse time, so a name is matched whole here.
  */
+#if BVNR_WITH_OM_PROFILE
 static const bvn_prof_atom_t om_atom_table[] = {
 #include "bovnar_profile_om_atom.gen.inc"
 	{ NULL, 0, NULL, bu_none, false }
@@ -338,6 +356,7 @@ static const bvn_prof_rev_t om_rev_table[] = {
 #include "bovnar_profile_om_reverse.gen.inc"
 	{ bu_none, NULL, 0, 0, false, iec_none }
 };
+#endif /* BVNR_WITH_OM_PROFILE */
 
 /*
  * CF standard names, which are not units: a standard name says what quantity a
@@ -352,6 +371,7 @@ static const bvn_prof_rev_t om_rev_table[] = {
  * no rows, which makes bvn_unit_to_profile("cf", u) return -1 for every unit
  * through the ordinary "no row names this base" path.
  */
+#if BVNR_WITH_CF_PROFILE
 static const bvn_prof_atom_t cf_atom_table[] = {
 #include "bovnar_profile_cf_atom.gen.inc"
 	{ NULL, 0, NULL, bu_none, false }
@@ -366,65 +386,129 @@ static const bvn_prof_rev_t cf_rev_table[] = {
 #include "bovnar_profile_cf_reverse.gen.inc"
 	{ bu_none, NULL, 0, 0, false, iec_none }
 };
+#endif /* BVNR_WITH_CF_PROFILE */
 
 /*
  * Every namespace this build defines. Anything else before a ':' is
  * error_unit_profile_unknown, which is how a consumer tells "this build has no
- * such profile" from "that is not a unit".
+ * such profile" from "that is not a unit" -- and, since the per-vocabulary build
+ * switches of bvn_profile_impl.h, how it tells a namespace that was compiled out
+ * from one that never existed. The two are the same answer on purpose: a
+ * document is not wrong for naming ucum, and a build without ucum cannot read it
+ * either way.
+ *
+ * A SENTINEL CLOSES THE TABLE, and it is not decoration. Every row here is
+ * conditional, so a build with all seven switches off would otherwise leave an
+ * empty array initialiser -- which C99 does not have -- and the loops below
+ * would index a zero-length object. ns_len 0 can match no namespace (the
+ * grammar's name-head is one lower-alpha or digit) and the impossible opaque
+ * range (0, -1) can contain no base unit, so the row is unreachable by
+ * construction rather than by a skip test each loop has to remember.
  */
 static const bvn_profile_t bvn_profiles[] = {
+#if BVNR_WITH_UCUM_PROFILE
 	{ "ucum", 4, bvn_prof_grammar_expr,
 	  ucum_pfx_table, ucum_atom_table, ucum_unsup_table, ucum_rev_table,
 	  BVN_PROFILE_UCUM_OPAQUE_FIRST, BVN_PROFILE_UCUM_OPAQUE_LAST,
 	  "", false, NULL, true },
+#endif
+#if BVNR_WITH_UNECE_PROFILE
 	{ "unece", 5, bvn_prof_grammar_flat,
 	  NULL, unece_atom_table, unece_unsup_table, unece_rev_table,
 	  BVN_PROFILE_UNECE_OPAQUE_FIRST, BVN_PROFILE_UNECE_OPAQUE_LAST,
 	  NULL, false, NULL, false },
+#endif
+#if BVNR_WITH_QUDT_PROFILE
 	{ "qudt", 4, bvn_prof_grammar_flat,
 	  NULL, qudt_atom_table, qudt_unsup_table, qudt_rev_table,
 	  BVN_PROFILE_QUDT_OPAQUE_FIRST, BVN_PROFILE_QUDT_OPAQUE_LAST,
 	  NULL, false, NULL, false },
+#endif
+#if BVNR_WITH_QUDT_QK_PROFILE
 	{ "qudt-qk", 7, bvn_prof_grammar_flat,
 	  NULL, qudt_qk_atom_table, qudt_qk_unsup_table, qudt_qk_rev_table,
 	  BVN_PROFILE_QUDT_QK_OPAQUE_FIRST, BVN_PROFILE_QUDT_QK_OPAQUE_LAST,
 	  NULL, false, NULL, false },
+#endif
 	/*
 	 * '*' multiplies beside '.', and '^' introduces an exponent, so "kg*m-2"
 	 * and "m^2" parse.
 	 *
 	 * SPACE IS NOT IN THIS SET, although UDUNITS itself multiplies with it and
-	 * CF's commonest spelling is "kg m-2 s-1". A space cannot reach this parser:
-	 * the lexer deletes whitespace inside a type annotation, so by the time a
-	 * unit slot is scanned "m s-1" has already become "ms-1" -- which is a
-	 * perfectly good UDUNITS expression meaning RECIPROCAL MILLISECONDS. Listing
-	 * space here would not have made the space-separated form work; it would
-	 * have made the wrong reading of it look supported. A producer writes
-	 * "kg*m-2*s-1" or "kg.m-2.s-1" instead, and section 10.2 of
-	 * doc/11_bovnar_unit_profiles.md records why.
+	 * CF's commonest spelling is "kg m-2 s-1". A space cannot reach this parser
+	 * at all: the lexer now refuses whitespace inside a type parameter
+	 * (error_type_param_whitespace), so "m s-1" is a parse error rather than the
+	 * "ms-1" -- reciprocal milliseconds -- it used to silently become. Adding
+	 * ' ' here would mean admitting the space-separated form into the type
+	 * grammar, which is a different and much larger decision than a
+	 * multiplication character; until it is made, a producer writes
+	 * "kg*m-2*s-1" or "kg.m-2.s-1", both of which UDUNITS also accepts. Section
+	 * 13.2 of doc/11_bovnar_unit_profiles.md records why.
 	 */
+#if BVNR_WITH_UDUNITS_PROFILE
 	{ "udunits", 7, bvn_prof_grammar_expr,
 	  udunits_pfx_table, udunits_atom_table, udunits_unsup_table,
 	  udunits_rev_table,
 	  BVN_PROFILE_UDUNITS_OPAQUE_FIRST, BVN_PROFILE_UDUNITS_OPAQUE_LAST,
-	  "*", true, "since", false },
+	  "* ", true, "since", false },
+#endif
+#if BVNR_WITH_OM_PROFILE
 	{ "om", 2, bvn_prof_grammar_flat,
 	  NULL, om_atom_table, om_unsup_table, om_rev_table,
 	  BVN_PROFILE_OM_OPAQUE_FIRST, BVN_PROFILE_OM_OPAQUE_LAST,
 	  NULL, false, NULL, false },
+#endif
+#if BVNR_WITH_CF_PROFILE
 	{ "cf", 2, bvn_prof_grammar_flat,
 	  NULL, cf_atom_table, cf_unsup_table, cf_rev_table,
 	  BVN_PROFILE_CF_OPAQUE_FIRST, BVN_PROFILE_CF_OPAQUE_LAST,
+	  NULL, false, NULL, false },
+#endif
+	{ NULL, 0, bvn_prof_grammar_flat, NULL, NULL, NULL, NULL, 0, -1,
 	  NULL, false, NULL, false },
 };
 #define BVN_PROFILE_COUNT \
 	(sizeof(bvn_profiles) / sizeof(bvn_profiles[0]))
 
-/* The profile whose namespace is exactly s[0..len), or NULL. */
+/*
+ * The namespaces this build actually carries. The sentinel is excluded, which is
+ * the whole reason these two do not simply expose BVN_PROFILE_COUNT: that number
+ * counts rows in the array, and one of the rows is not a profile.
+ *
+ * A linear walk rather than a subtraction, so the pair keeps agreeing with
+ * profile_by_ns if the table ever grows a second unreachable row.
+ */
+uint32_t bvni_profile_count(void)
+{
+	uint32_t n = 0;
+	for (size_t i = 0; i < BVN_PROFILE_COUNT; i++) {
+		if (bvn_profiles[i].ns)
+			++n;
+	}
+	return n;
+}
+const char* bvni_profile_name(uint32_t index)
+{
+	uint32_t n = 0;
+	for (size_t i = 0; i < BVN_PROFILE_COUNT; i++) {
+		if (!bvn_profiles[i].ns)
+			continue;
+		if (n == index)
+			return bvn_profiles[i].ns;
+		++n;
+	}
+	return NULL;
+}
+
+/* The profile whose namespace is exactly s[0..len), or NULL. The !p->ns test is
+ * the sentinel row: its ns is NULL, and memcmp against a null pointer is
+ * undefined even for a length of zero. */
 static const bvn_profile_t* profile_by_ns(const char* s, uint32_t len)
 {
 	for (size_t i = 0; i < BVN_PROFILE_COUNT; i++) {
 		const bvn_profile_t* p = &bvn_profiles[i];
+		if (!p->ns)
+			continue;
 		if (p->ns_len == len && memcmp(s, p->ns, len) == 0)
 			return p;
 	}

@@ -1271,6 +1271,83 @@ static const cf_case_t g_cases[] = {
 	ERROR_CASE("TYP-041", "types", "sint illegal in base 85 (no sign char)",
 	           ".x = <sint:16,_85> \"AB\";",
 	           error_illegal_value_type),
+	/* Whitespace in a type annotation, and the exact line between the positions
+	 * the grammar of doc/12 gives a `ws` and the positions it does not. The
+	 * negative half is the reason this group exists: whitespace used to be
+	 * DELETED wherever it fell, so "<float:64,k g>" was a kilogram and
+	 * "<uint:6 4>" was a 64-bit width — a wrong type and a wrong unit, both
+	 * produced silently. Every case here parsed before and three of them parsed
+	 * to something the author did not write. */
+	VALID("TYP-042", "types", "whitespace after the family colon",
+	      ".x = <float: 64> 1.0;"),
+	VALID("TYP-043", "types", "whitespace before the family colon",
+	      ".x = <float :64> 1.0;"),
+	VALID("TYP-044", "types", "whitespace either side of a parameter comma",
+	      ".x = <uint:8 , _16> \"ff\";"),
+	VALID("TYP-045", "types", "whitespace before the closing angle bracket",
+	      ".x = <float:64,m/s > 1.0;"),
+	VALID("TYP-046", "types", "a newline and a comment stand in for the space",
+	      ".x = <float:64, # which unit\n      m/s> 1.0;"),
+	ERROR_CASE("TYP-047", "types", "a space inside a unit parameter",
+	           ".x = <float:64,k g> 1.0;",
+	           error_type_param_whitespace),
+	ERROR_CASE("TYP-048", "types", "a space inside a width parameter",
+	           ".x = <uint:6 4> 1;",
+	           error_type_param_whitespace),
+	ERROR_CASE("TYP-049", "types", "a space around a unit operator",
+	           ".x = <float:64,m / s> 1.0;",
+	           error_type_param_whitespace),
+	ERROR_CASE("TYP-050", "types", "a newline inside a unit parameter",
+	           ".x = <float:64,m\n/s> 1.0;",
+	           error_type_param_whitespace),
+	ERROR_CASE("TYP-051", "types", "a comment inside a unit parameter",
+	           ".x = <float:64,m # here\n/s> 1.0;",
+	           error_type_param_whitespace),
+	/* A ',' nested inside a UCUM annotation is part of the code, not a
+	 * parameter separator, so the scanner must not end the parameter there. */
+	VALID("TYP-052", "types", "a comma inside a UCUM annotation",
+	      "#!bovnar 1.2\n.x = <float:64,ucum:mL{cells,tot}> 1.0;"),
+	/* Whitespace inside a NAMESPACED parameter is a byte of the code, not an
+	 * error: it is carried in verbatim and the vocabulary decides. UCUM
+	 * annotations are inert text and keep their spacing, which is what doc/11
+	 * §3.4 promises; the unit is m~L either way. */
+	VALID("TYP-053", "types", "a space inside a UCUM annotation is kept",
+	      "#!bovnar 1.2\n.x = <float:64,ucum:mL{cells, tot}> 1.0;"),
+	/* Same route, opposite outcome, and the difference is the point: UCUM has no
+	 * atom spelled "in i", so this is error_unit_illegal from the vocabulary's
+	 * own grammar rather than error_type_param_whitespace from the lexer. */
+	ERROR_CASE("TYP-054", "types", "a space inside a UCUM bracketed atom",
+	           "#!bovnar 1.2\n.x = <float:64,ucum:[in i]> 1.0;",
+	           error_unit_illegal),
+	ERROR_CASE("TYP-054b", "types", "a space where UCUM has no operator for one",
+	           "#!bovnar 1.2\n.x = <float:64,ucum:mm[Hg] x> 1.0;",
+	           error_unit_illegal),
+	/* A flat vocabulary has no operators at all, so a space simply makes the
+	 * token something it does not define. */
+	ERROR_CASE("TYP-054c", "types", "a space in a flat profile code",
+	           "#!bovnar 1.2\n.x = <float:64,qudt:Kilo GM> 1.0;",
+	           error_unit_illegal),
+	/* The family ':' is not a namespace. Without that distinction the width
+	 * parameter of "<uint:6 4>" would look namespaced and its space would be
+	 * copied rather than refused. */
+	ERROR_CASE("TYP-054d", "types", "the family colon does not open a namespace",
+	           "#!bovnar 1.2\n.x = <uint:6 4,ucum:m> 1;",
+	           error_type_param_whitespace),
+	/* Trailing whitespace is beside the separator that ends the parameter, so it
+	 * is trimmed rather than handed to the vocabulary as a dangling operator. */
+	VALID("TYP-054e", "types", "trailing space in a profile parameter is trimmed",
+	      "#!bovnar 1.2\n.x = <float:64,udunits:m > 1.0;"),
+	/* No vocabulary spells a unit across a line, so a line break stays an error
+	 * even inside a namespaced parameter. */
+	ERROR_CASE("TYP-054f", "types", "a newline inside a profile parameter",
+	           "#!bovnar 1.2\n.x = <float:64,udunits:kg\nm-2> 1.0;",
+	           error_type_param_whitespace),
+	/* An inline unit suffix was never affected: whitespace ENDS the token there,
+	 * so the second word is a stray token rather than a silent concatenation.
+	 * Pinned here so the two spellings of one unit stay refused together. */
+	ERROR_CASE("TYP-055", "types", "a space in an inline unit suffix",
+	           ".x = 1.0 k g;",
+	           error_unexpected_input_byte),
 
 	/* ── DEFAULT TYPE SYNTHESIS ──────────────────────────────────── */
 	VALID("DTS-001", "default_synthesis", "plain integer → uint:64",
@@ -1638,6 +1715,53 @@ static const cf_case_t g_cases[] = {
 	           ".v = <float:64,m^1000> 1.0;",
 	           error_unit_illegal),
 
+	/* ── TEMPERATURE DIFFERENCES ─────────────────────────────────── */
+	/* A temperature difference is not a temperature: 25 °C is 298.15 K, a RISE
+	 * of 25 degrees is 25 K, and until the Δ units existed there was no spelling
+	 * that said so. These pin the notation; the semantics they exist for (ΔK is
+	 * incompatible with K, Δ°C IS ΔK, a compound is unaffected) are checked
+	 * where the comparators are, in tests/bovnar_si_units_test.c. */
+	VALID("UNT-065", "units", "a kelvin interval",
+	      ".dt = <float:64,ΔK> 25.0;"),
+	VALID("UNT-066", "units", "the Celsius interval, which is the kelvin",
+	      ".dt = <float:64,Δ°C> 25.0;"),
+	VALID("UNT-067", "units", "a Fahrenheit interval",
+	      ".dt = <float:64,Δ°F> 9.0;"),
+	VALID("UNT-068", "units", "ASCII spellings of an interval",
+	      ".a = <float:64,delta_K> 1.0;\n.b = <float:64,delta_degC> 1.0;\n"
+	      ".c = <float:64,delta_degF> 1.0;"),
+	VALID("UNT-069", "units", "an interval as an inline unit",
+	      ".dt = 25.0 ΔK;"),
+	VALID("UNT-070", "units", "a prefixed interval",
+	      ".dt = <float:64,m~ΔK> 5.0;"),
+	/* A difference is a RATIO scale, which is what lets it into a compound at
+	 * all — the affine scales cannot appear in one. */
+	VALID("UNT-071", "units", "a lapse rate: an interval per length",
+	      ".lapse = <float:64,ΔK/k~m> 6.5;"),
+	VALID("UNT-072", "units", "an expansion coefficient: a reciprocal interval",
+	      ".alpha = <float:64,ΔK^-1> 1.2e-5;"),
+	VALID("UNT-073", "units", "a Fahrenheit interval in a compound",
+	      ".lapse = <float:64,Δ°F/mi> 1.0;"),
+	/* The four historical intervals, Delisle included: its slope is negative
+	 * because the scale runs backwards, which needed no new arithmetic. */
+	VALID("UNT-074", "units", "the four historical intervals",
+	      ".a = <float:64,Δ°De> 1.0;\n.b = <float:64,Δ°N> 1.0;\n"
+	      ".c = <float:64,Δ°Re> 1.0;\n.d = <float:64,Δ°Ro> 1.0;"),
+	/* The interval and its scale may not share a bare array: same dimension,
+	 * different unit, and 273.15 apart. Falls out of §7.4 with no rule of its
+	 * own — which is the point of closing this in the registry. */
+	DOM_ERROR("UNT-075", "units", "an interval and a scale in one array",
+	          ".t = [<float:64,K> 1.0, <float:64,ΔK> 2.0];",
+	          error_array_element_type_mismatch),
+	/* Deliberately NOT aliases: they read as a delta coulomb and a delta farad,
+	 * and the scales do not alias bare C or F either. */
+	ERROR_CASE("UNT-076", "units", "no bare delta_C",
+	           ".dt = <float:64,delta_C> 1.0;",
+	           error_unit_illegal),
+	ERROR_CASE("UNT-077", "units", "no bare delta_F",
+	           ".dt = <float:64,delta_F> 1.0;",
+	           error_unit_illegal),
+
 	/* ── UNIT PROFILE (UCUM) ─────────────────────────────────────── */
 	/* A profile expression has exactly three outcomes: it becomes a real unit,
 	 * it becomes a profile-only unit, or it becomes an error -- and the errors
@@ -1785,9 +1909,40 @@ static const cf_case_t g_cases[] = {
 	/* Reference time is valid UDUNITS with nowhere to land: a bovnar timestamp
 	 * is <datetime:width,epoch>, whose epoch is a type parameter rather than a
 	 * unit and whose carrier is defined as a count of seconds. */
+	/* Spelled as UDUNITS spells it, spaces and all: a space inside a namespaced
+	 * parameter is a code byte, so this reaches the profile and is refused by the
+	 * "since" substring test — "you wrote valid UDUNITS and bovnar cannot carry
+	 * it", not "you made a typo". */
 	ERROR_CASE("UPR-043", "unit_profile", "UDUNITS reference time has no representation",
 	           "#!bovnar 1.2\n.t = <float:64,udunits:days since 1970-01-01> 1.0;",
 	           error_unit_profile_unsupported),
+	/* The concatenated spelling a producer reaches for after being told the
+	 * construct is unsupported must get the same answer, not "not a code". */
+	ERROR_CASE("UPR-043b", "unit_profile", "UDUNITS reference time, concatenated",
+	           "#!bovnar 1.2\n.t = <float:64,udunits:dayssince1970-01-01> 1.0;",
+	           error_unit_profile_unsupported),
+	/* SPACE MULTIPLIES IN UDUNITS, and this is CF's commonest spelling of a
+	 * flux. The pair is the whole point: the space-separated and the
+	 * star-separated forms are ONE unit, checked through the annotation/inline
+	 * agreement rule, which passes only if both spellings produced the same
+	 * value_unit_t. */
+	VALID("UPR-043c", "unit_profile", "UDUNITS multiplies with a space, as CF writes it",
+	      "#!bovnar 1.2\n.f = <float:64,udunits:kg m-2 s-1> 0.5 udunits:kg*m-2*s-1;"),
+	/* And the trap it does NOT reopen. "m s-1" is a speed; "ms-1" is a
+	 * reciprocal millisecond, which is also perfectly good UDUNITS. They are
+	 * different units and the space is what tells them apart — which is exactly
+	 * what was lost while whitespace was deleted, and why listing space as an
+	 * operator then would have made the wrong reading look supported. */
+	VALID("UPR-043d", "unit_profile", "a space-separated speed is a speed",
+	      "#!bovnar 1.2\n.v = <float:64,udunits:m s-1> 9.81 m/s;"),
+	VALID("UPR-043e", "unit_profile", "and the spaceless spelling is still a millisecond",
+	      "#!bovnar 1.2\n.t = <float:64,udunits:ms-1> 1.0 m~s^-1;"),
+	/* A run of spaces is two operators in a row: the vocabulary's own answer to
+	 * a malformed expression, and not something the lexer collapses — collapsing
+	 * would have cost a UCUM annotation the spacing §3.4 keeps verbatim. */
+	ERROR_CASE("UPR-043f", "unit_profile", "two spaces are two multiplications",
+	           "#!bovnar 1.2\n.f = <float:64,udunits:kg  m-2> 1.0;",
+	           error_unit_illegal),
 	ERROR_CASE("UPR-044", "unit_profile", "a CF coordinate direction is not a unit",
 	           "#!bovnar 1.2\n.lat = <float:64,udunits:degrees_north> 51.5;",
 	           error_unit_profile_unsupported),
@@ -1938,6 +2093,38 @@ static const cf_case_t g_cases[] = {
 	DOM_ERROR("HOM-016", "homogeneity", "sibling matrices, equal cell count, different shape",
 	          ".a = [[1,2,3]/[4,5,6], [7,8]/[9,10]/[11,12]];",
 	          error_array_row_size_mismatch),
+	/* A bare array is homogeneous in its UNIT, not merely in its dimension.
+	 * HOM-006/007 only ever needed the weaker rule; these three are the cases
+	 * the weaker rule ADMITTED, each of which made §7.4's "a consumer may treat
+	 * its elements identically" false. HOM-019 is the one that decides it: the
+	 * two cells differ by an affine offset of 273.15, so a consumer reading the
+	 * block under one unit is not merely rescaling, it is adding a constant to
+	 * half the data. */
+	DOM_ERROR("HOM-017", "homogeneity", "one dimension, different scale (m vs ft)",
+	          ".a = [<float:64,m> 1.0, <float:64,ft> 2.0];",
+	          error_array_element_type_mismatch),
+	DOM_ERROR("HOM-018", "homogeneity", "one currency, different prefix (USD vs kUSD)",
+	          ".a = [<float_dec:64,$USD> 1.0, <float_dec:64,k~$USD> 2.0];",
+	          error_array_element_type_mismatch),
+	DOM_ERROR("HOM-019", "homogeneity", "one dimension, an affine offset apart (°C vs K)",
+	          ".a = [<float:64,degC> 1.0, <float:64,K> 2.0];",
+	          error_array_element_type_mismatch),
+	/* What unit equality must NOT reject. Unit multiplication commutes, so the
+	 * comparison is a multiset and not positional; and "no_unit" and an omitted
+	 * unit are two spellings of dimensionless that the component count alone
+	 * would have called different. */
+	DOM_VALID("HOM-020", "homogeneity", "same unit spelled in a different order",
+	          ".a = [<float:64,m*s> 1.0, <float:64,s*m> 2.0];"),
+	DOM_VALID("HOM-021", "homogeneity", "explicit no_unit beside an omitted unit",
+	          ".a = [<float:64,no_unit> 1.0, <float:64> 2.0];"),
+	DOM_VALID("HOM-022", "homogeneity", "the same unit under mixed encodings",
+	          ".a = [<uint:32,m> 1, <float:64,m> 2.0];"),
+	/* The unit rule is the BARE-array rule only. A record's fields stay free —
+	 * HOM-004 pins that for two currencies; this pins it for the affine case
+	 * that HOM-019 refuses inside an array, because a named field is read one at
+	 * a time and carries its own unit to the reader. */
+	DOM_VALID("HOM-023", "homogeneity", "record fields may differ by an affine offset",
+	          ".a = [{.t = <float:64,degC> 1.0;}, {.t = <float:64,K> 2.0;}];"),
 };
 
 #define NUM_CASES ((int)(sizeof(g_cases) / sizeof(g_cases[0])))

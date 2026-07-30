@@ -301,7 +301,21 @@ typedef enum error_code_e {
 	 * (anything that normalises line endings, a log aggregator, a git checkout
 	 * without `-text`) can say so at the door rather than discover it as
 	 * corruption downstream. */
-	error_octet_stream_forbidden        = 51
+	error_octet_stream_forbidden        = 51,
+	/* Whitespace split a type-annotation parameter in two. The grammar puts
+	 * every `ws` inside an annotation beside a separator -- after the family
+	 * keyword, either side of the family ':' or of a ',' between parameters, and
+	 * before the closing '>' -- and has no production for whitespace in the
+	 * middle of a parameter. The lexer used to drop it anyway, which is how
+	 * `<float:64,k g>` became a kilogram, `<uint:6 4>` became a 64-bit width,
+	 * and the UDUNITS spelling `udunits:m s-1` became a reciprocal millisecond
+	 * instead of a speed: the one place in the format where a wrong unit was
+	 * produced silently rather than refused. Reported at the first byte after
+	 * the whitespace, with its own code because the fix is specific -- delete
+	 * the space, or write the multiplication the notation actually has
+	 * (`m*s-1`). A byte that is illegal anywhere in an annotation remains
+	 * error_unexpected_input_byte. */
+	error_type_param_whitespace         = 52
 } error_code_t;
 typedef enum prefix_system_e {
 	prefix_si,
@@ -1213,6 +1227,31 @@ BVN_API bool         bvn_unit_is_profile_only(value_unit_t u);
 BVN_API int32_t      bvn_unit_to_profile(const char* ns, value_unit_t u,
                                          char* buf, size_t bufsize);
 BVN_API int32_t      bvn_unit_to_ucum(value_unit_t u, char* buf, size_t bufsize);
+/*
+ * WHICH PROFILE NAMESPACES THIS BUILD CARRIES.
+ *
+ * The profiles are compiled per vocabulary (BVNR_WITH_UCUM_PROFILE and its six
+ * siblings, all on by default). Turning one off drops that vocabulary's tables
+ * -- the seven together are about half of the library's data -- and nothing
+ * else: the base-unit ids, the dense unit tables, every struct layout and every
+ * signature here are the same in all configurations, so builds with different
+ * switches stay ABI-compatible and differ only in which namespaces they
+ * translate.
+ *
+ * A namespace that is not compiled in is error_unit_profile_unknown, the same
+ * answer as a namespace that never existed, and it is unwritable as well as
+ * unreadable: bvn_unit_to_profile and bvn_unit_to_ucum return -1 for it.
+ *
+ * This pair is how a consumer finds out WITHOUT parsing a probe document.
+ * bvn_unit_profile_count returns how many namespaces are present;
+ * bvn_unit_profile_name returns the i-th name (lowercase, as it is spelled
+ * before the ':'), or NULL when i is out of range. The order is the library's
+ * and is not a contract; the set is. Both are always available -- a build with
+ * every profile off reports a count of zero rather than dropping the symbols,
+ * so a caller does not need a second way to ask.
+ */
+BVN_API uint32_t     bvn_unit_profile_count(void);
+BVN_API const char*  bvn_unit_profile_name(uint32_t index);
 BVN_API bool         bvn_unit_equal(value_unit_t a, value_unit_t b);
 BVN_API double       bvn_unit_prefix_factor(value_unit_t u);
 BVN_API int32_t      bvn_unit_prefix_exponent(value_unit_t u);

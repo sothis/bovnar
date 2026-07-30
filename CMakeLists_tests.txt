@@ -1,5 +1,31 @@
 include(CTest)
 
+# ── Which unit profiles this build carries ──────────────────────────────────
+# The per-vocabulary switches (BVNR_WITH_*_PROFILE, see CMakeLists.txt) are
+# compile-time, so a suite that asserts "ucum:m is the metre" cannot pass in a
+# build without ucum. Each profile suite is therefore registered only when its
+# own profile is on, and the gates that span the whole corpus -- the cross-
+# vocabulary suite, the conformance runs and their documented case count, and the
+# Python suites -- only when all seven are, because their totals are stated as
+# single numbers and a partial build would make those numbers wrong rather than
+# smaller. What keeps the reduced configurations honest instead is
+# bvnr_profiles_off_build at the end of this file, which compiles and runs the
+# extreme case.
+#
+# A suite's guard names every vocabulary it TOUCHES, not just its own: each of
+# these files ends with an "agrees with the vocabularies already here" block that
+# asserts one spelling against another's, so bvnr_om_test needs all six and
+# bvnr_ucum_test needs one. The lists come from `grep -c '"<ns>:' ` over each
+# suite; if one grows a cross-check against a new namespace, its guard has to grow
+# with it -- the symptom otherwise is a reduced build failing on an assertion
+# about a profile it was told not to carry.
+set(BVNR_ALL_PROFILES TRUE)
+foreach(_prof IN LISTS BVNR_PROFILE_NAMES)
+    if(NOT BVNR_WITH_${_prof}_PROFILE)
+        set(BVNR_ALL_PROFILES FALSE)
+    endif()
+endforeach()
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests")
 
 # ── C unit tests ────────────────────────────────────────────────────────────
@@ -189,41 +215,71 @@ set_tests_properties(bvnr_unit_ext_test PROPERTIES
     LABELS "unit;si;units_ext"
     FAIL_REGULAR_EXPRESSION "tests, [1-9][0-9]* failures")
 
+if(BVNR_WITH_UCUM_PROFILE)
 add_test(NAME bvnr_ucum_test COMMAND bvnr_ucum_test)
 set_tests_properties(bvnr_ucum_test PROPERTIES
     LABELS "unit;si;profile;ucum"
     FAIL_REGULAR_EXPRESSION "tests, [1-9][0-9]* failures")
+endif()
 
+# Ten of the unece assertions are agreements against a ucum spelling.
+if(BVNR_WITH_UNECE_PROFILE AND BVNR_WITH_UCUM_PROFILE)
 add_test(NAME bvnr_unece_test COMMAND bvnr_unece_test)
 set_tests_properties(bvnr_unece_test PROPERTIES
     LABELS "unit;si;profile;unece"
     FAIL_REGULAR_EXPRESSION "tests, [1-9][0-9]* failures")
+endif()
 
+# The qudt suite covers both QUDT namespaces (50 of its assertions are
+# qudt-qk) and cross-checks a few rows against ucum and unece.
+if(BVNR_WITH_QUDT_PROFILE AND BVNR_WITH_QUDT_QK_PROFILE
+   AND BVNR_WITH_UCUM_PROFILE AND BVNR_WITH_UNECE_PROFILE)
 add_test(NAME bvnr_qudt_test COMMAND bvnr_qudt_test)
 set_tests_properties(bvnr_qudt_test PROPERTIES
     LABELS "unit;si;profile;qudt"
     FAIL_REGULAR_EXPRESSION "tests, [1-9][0-9]* failures")
+endif()
 
+# The udunits suite cross-checks against ucum, unece and both QUDT
+# namespaces — thirteen of its assertions name another vocabulary.
+if(BVNR_WITH_UDUNITS_PROFILE AND BVNR_WITH_UCUM_PROFILE
+   AND BVNR_WITH_UNECE_PROFILE AND BVNR_WITH_QUDT_PROFILE
+   AND BVNR_WITH_QUDT_QK_PROFILE)
 add_test(NAME bvnr_udunits_test COMMAND bvnr_udunits_test)
 set_tests_properties(bvnr_udunits_test PROPERTIES
     LABELS "unit;si;profile;udunits"
     FAIL_REGULAR_EXPRESSION "tests, [1-9][0-9]* failures")
+endif()
 
+# "om: agrees with the vocabularies already here" names all five of them.
+if(BVNR_WITH_OM_PROFILE AND BVNR_WITH_UCUM_PROFILE
+   AND BVNR_WITH_UNECE_PROFILE AND BVNR_WITH_QUDT_PROFILE
+   AND BVNR_WITH_QUDT_QK_PROFILE AND BVNR_WITH_UDUNITS_PROFILE)
 add_test(NAME bvnr_om_test COMMAND bvnr_om_test)
 set_tests_properties(bvnr_om_test PROPERTIES
     LABELS "unit;si;profile;om"
     FAIL_REGULAR_EXPRESSION "tests, [1-9][0-9]* failures")
+endif()
 
+# The cf suite checks a few of its names against ucum, qudt-qk and udunits
+# spellings.
+if(BVNR_WITH_CF_PROFILE AND BVNR_WITH_UCUM_PROFILE
+   AND BVNR_WITH_QUDT_QK_PROFILE AND BVNR_WITH_UDUNITS_PROFILE)
 add_test(NAME bvnr_cf_test COMMAND bvnr_cf_test)
 set_tests_properties(bvnr_cf_test PROPERTIES
     LABELS "unit;si;profile;cf"
     FAIL_REGULAR_EXPRESSION "tests, [1-9][0-9]* failures")
+endif()
 
-# The cross-vocabulary suite: do the vocabularies agree with EACH OTHER?
+# The cross-vocabulary suite: do the vocabularies agree with EACH OTHER? Needs
+# every profile by definition -- an agreement between seven tables cannot be
+# checked with three of them compiled out.
+if(BVNR_ALL_PROFILES)
 add_test(NAME bvnr_crossvocab_test COMMAND bvnr_crossvocab_test)
 set_tests_properties(bvnr_crossvocab_test PROPERTIES
     LABELS "unit;si;profile;crossvocab;conformance"
     FAIL_REGULAR_EXPRESSION "tests, [1-9][0-9]* failures")
+endif()
 
 add_test(NAME bvnr_reader_test COMMAND bvnr_reader_test)
 set_tests_properties(bvnr_reader_test PROPERTIES
@@ -309,6 +365,9 @@ target_compile_options(bvnr_conformance_iut PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_conformance_iut PRIVATE bvnr_static)
 
 # Self-test: conformance suite exercised against the built-in reference impl.
+# 54 of its cases are the unit_profile group, so the corpus runs whole only in a
+# build that carries every profile (see BVNR_ALL_PROFILES at the top).
+if(BVNR_ALL_PROFILES)
 add_test(NAME bvnr_conformance_self
     COMMAND bvnr_conformance)
 set_tests_properties(bvnr_conformance_self PROPERTIES
@@ -331,6 +390,7 @@ set_tests_properties(bvnr_conformance_iut_self PROPERTIES
     PASS_REGULAR_EXPRESSION "# All [0-9]+ conformance tests passed"
     FAIL_REGULAR_EXPRESSION "not ok|conformance tests FAILED")
 endif()
+endif()   # BVNR_ALL_PROFILES
 
 # ── Fuzz tests ───────────────────────────────────────────────────────────────
 
@@ -612,7 +672,11 @@ if(Python3_FOUND)
     endif()
 endif()
 
-if(_bvnr_have_pytest)
+# BVNR_ALL_PROFILES as well: the Python suites assert profile behaviour (the Unit
+# object parses "ucum:mm[Hg]" and writes it back), and the bindings load whatever
+# libbvnr.so the build produced, so a partial build fails them for a reason that
+# is not a defect.
+if(_bvnr_have_pytest AND BVNR_ALL_PROFILES)
 
     set(_py_src   "${CMAKE_CURRENT_SOURCE_DIR}/python")
     set(_py_tests "${CMAKE_CURRENT_SOURCE_DIR}/python/tests")
@@ -1245,7 +1309,8 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 157)   # 129 base + i18n_de + wrapper_sync
+set(BVNR_EXPECTED_TEST_COUNT 158)   # 129 base + i18n_de + wrapper_sync
+                                    #         + profiles_off_build
                                     # + om_test + cf_test
                                     # + cache_stamps + profile_factors
                                     #         + playground_shim + wasm_cli_diff
@@ -1281,6 +1346,7 @@ endif()
 # The documented total said 306 in six places while the suite ran 319, and one
 # whole group was missing from the table. Check the numbers instead of copying
 # them again.
+if(BVNR_ALL_PROFILES)
 add_test(
     NAME    bvnr_conformance_doc_counts
     COMMAND "${CMAKE_COMMAND}"
@@ -1290,6 +1356,7 @@ add_test(
             -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/conformance_counts.cmake)
 set_tests_properties(bvnr_conformance_doc_counts PROPERTIES
     LABELS "conformance;docs" TIMEOUT 60)
+endif()   # BVNR_ALL_PROFILES
 
 # ── doc/13's worked examples are what the adapter actually emits ──────────────
 # doc/13 tells a third-party implementor that conformance means output
@@ -1731,6 +1798,32 @@ if(Python3_Interpreter_FOUND AND NOT WIN32 AND NOT BVNR_SANITIZE
         LABELS "packaging;codegen;amalgam" TIMEOUT 300)
 endif()
 
+# ── A build with every unit profile switched off ─────────────────────────────
+# The per-vocabulary switches are compile-time, so nothing in this build can
+# reach the off state, and a build configuration nothing reaches is one that
+# quietly stops compiling. This compiles the amalgamation with all seven at 0,
+# under the integrator's strict flags, and runs a smoke test that pins the
+# contract of an absent profile (error_unit_profile_unknown, unwritable as well
+# as unreadable, native units untouched). It also reports what the seven cost in
+# binary size, which is the reason the switches exist.
+#
+# Registered UNCONDITIONALLY of the switches, unlike the suites above: this is
+# the test that keeps the reduced configurations working, so a reduced build is
+# the last place it should be skipped.
+if(Python3_Interpreter_FOUND AND NOT WIN32 AND NOT BVNR_SANITIZE
+   AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/profiles_off_smoke.c)
+    add_test(
+        NAME    bvnr_profiles_off_build
+        COMMAND "${CMAKE_COMMAND}"
+                -DSRC_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                -DPYTHON=${Python3_EXECUTABLE}
+                -DCC=${CMAKE_C_COMPILER}
+                -DBIN_DIR=${CMAKE_CURRENT_BINARY_DIR}/profiles_off
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/profiles_off_build.cmake)
+    set_tests_properties(bvnr_profiles_off_build PROPERTIES
+        LABELS "packaging;codegen;amalgam;profile" TIMEOUT 300)
+endif()
+
 # ── Registration self-check ─────────────────────────────────────────────────
 # Only meaningful for a default configure; any option that adds or removes tests
 # makes the count legitimately differ, so this compares only when the relevant
@@ -1741,7 +1834,7 @@ endif()
 get_property(_bvnr_all_tests DIRECTORY PROPERTY TESTS)
 list(LENGTH _bvnr_all_tests _bvnr_ntests)
 if(BVNR_PACKAGE AND BVNR_FUZZ_TEST AND NOT BVNR_SANITIZE AND NOT WIN32
-   AND NOT CMAKE_CROSSCOMPILING AND _bvnr_have_pytest)
+   AND NOT CMAKE_CROSSCOMPILING AND _bvnr_have_pytest AND BVNR_ALL_PROFILES)
     if(NOT _bvnr_ntests EQUAL ${BVNR_EXPECTED_TEST_COUNT})
         message(FATAL_ERROR
             "registered ${_bvnr_ntests} tests, expected "

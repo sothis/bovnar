@@ -94,7 +94,7 @@ tables wrong in the same way would agree with each other perfectly.
     - 9.1 [Where the tables live](#91-where-the-tables-live)
     - 9.2 [What the generator checks, and what it does not](#92-what-the-generator-checks-and-what-it-does-not)
     - 9.3 [Tests](#93-tests)
-    - 9.4 [No build switch](#94-no-build-switch)
+    - 9.4 [One build switch per vocabulary](#94-one-build-switch-per-vocabulary)
     - 9.5 [The factor proof](#95-the-factor-proof)
     - 9.6 [Synchronisation between the five tables](#96-synchronisation-between-the-five-tables)
 10. [Cost, risk, and what is left out](#10-cost-risk-and-what-is-left-out)
@@ -114,7 +114,7 @@ tables wrong in the same way would agree with each other perfectly.
     - 12.4 [The quantity-kind table: the ISO 80000 core](#124-the-quantity-kind-table-the-iso-80000-core)
 13. [The UDUNITS profile](#13-the-udunits-profile)
     - 13.1 [An expression profile, sharing the UCUM parser](#131-an-expression-profile-sharing-the-ucum-parser)
-    - 13.2 [Space does not multiply, and cannot](#132-space-does-not-multiply-and-cannot)
+    - 13.2 [Space multiplies, and now it can](#132-space-multiplies-and-now-it-can)
     - 13.3 [The near misses: codes that name a native unit and are not it](#133-the-near-misses-codes-that-name-a-native-unit-and-are-not-it)
     - 13.4 [Reference time is refused, and why](#134-reference-time-is-refused-and-why)
 14. [The cross-vocabulary conformance suite](#14-the-cross-vocabulary-conformance-suite)
@@ -898,9 +898,9 @@ The asymmetry is worth stating plainly: these profiles are good *readers* and pa
 round trip that starts in a vocabulary returns to it; one that starts in Bovnar's native registry
 may have nowhere to go.
 
-Sweeping the whole native registry — all 180 physical units, each at the twelve prefixes
+Sweeping the whole native registry — all 186 physical units, each at the twelve prefixes
 `si_none da h k M G T d c m µ n` — **627** combinations survive a native → UCUM → native round trip
-unchanged, **1178** have no UCUM code, 355 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
+unchanged, **1250** have no UCUM code, 355 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
 before the question arises, and **none round-trips to a different unit**. The last of those is the
 invariant; the two counts move whenever the registry gains a unit, so `test_sweep_round_trip` in
 `tests/bovnar_ucum_test.c` pins all three rather than leaving them as prose.
@@ -1432,11 +1432,22 @@ int32_t bvn_unit_to_profile(const char* ns, value_unit_t u,
 /* New. bvn_unit_to_profile against "ucum", for callers that predate the other
  * vocabularies. */
 int32_t bvn_unit_to_ucum(value_unit_t u, char* buf, size_t bufsize);
+
+/* New. WHICH NAMESPACES THIS BUILD CARRIES (section 9.4). The vocabularies are
+ * compiled per-namespace, so "there is no such profile" and "this build has no
+ * such profile" are the same error code from the outside; this pair is how a
+ * consumer finds out up front rather than inferring it from a failed parse.
+ * bvn_unit_profile_name returns NULL past the end, and the ORDER is the
+ * library's and not a contract -- the set is. Both are present in every
+ * configuration; a build with all seven off answers 0 rather than dropping the
+ * symbols, so a caller needs no second way to ask. */
+uint32_t    bvn_unit_profile_count(void);
+const char* bvn_unit_profile_name(uint32_t index);
 ```
 
 `bvn_parse_unit` keeps its signature, which is why the policy strings of §4.3 work with no change
 at all: `bvnr_unit_policy_t` parses its targets with it, so the notation arrives for free. No struct
-changed, so the only ABI movement is the two error codes and the three new entry points.
+changed, so the only ABI movement is the two error codes and the five new entry points.
 
 ### 8.2 Python
 
@@ -1452,11 +1463,23 @@ bovnar.unit_is_profile_only(vu)  # -> bool
 bovnar.unit_error_code(s)        # -> int (error_code_t), 0 when s parses
 ```
 
+`bovnar.unit_to_profile`'s `ns` may also be `"om"` or `"cf"` — `cf` is read-only (§17.3), so it
+raises for every unit — and a namespace this build was not compiled with (§9.4) raises like one that
+does not exist.
+
 The existing `from_pint_unit` / `to_pint_unit` bridge is untouched.
 
 ### 8.3 CLI
 
-No new flags. `--unit`, `--field`, `--require-dimension` and `--require-field` take unit strings and
+`bovnar version` prints the compiled-in namespaces on a second line, which is where to look first
+when a code that should parse does not:
+
+```
+bovnar 1.2.0-dev (spec 1.1)
+unit profiles: ucum unece qudt qudt-qk udunits om cf
+```
+
+Otherwise, no new flags. `--unit`, `--field`, `--require-dimension` and `--require-field` take unit strings and
 therefore take profile strings:
 
 ```
@@ -1586,15 +1609,50 @@ only if both spellings produced the same `value_unit_t` — which lets the corpu
 equality without needing any comparison facility of its own, and without a conforming implementation
 having to expose one.
 
-### 9.4 No build switch
+### 9.4 One build switch per vocabulary
 
-The profiles are unconditional. There is no `BVNR_WITH_UCUM_PROFILE` option and no addition to a
-feature-report function: a build that has the profiles has all five of them.
-`error_unit_profile_unknown` therefore means only what it says — the namespace is not one this build
-defines — and today that is every namespace outside the five in the table at the head of this
-document. If the profiles ever become optional, or a sixth vocabulary lands, that error code is
-already the right answer for a build without it, which is why it exists as a separate code rather
-than as `error_unit_illegal`.
+**`BVNR_WITH_<NAME>_PROFILE`, seven of them, all `ON` by default.** This section used to say the
+profiles were unconditional and that the switch did not exist; §15.3 then measured what that cost —
+the binary grew 65 % — and §10.4 carried the switch as specified-and-not-built. It is built.
+
+| | |
+|---|---|
+| Options | `BVNR_WITH_UCUM_PROFILE`, `..._UNECE_...`, `..._QUDT_...`, `..._QUDT_QK_...`, `..._UDUNITS_...`, `..._OM_...`, `..._CF_...` |
+| Default | `ON`, every one. The default build is byte-for-byte the build every consumer already has |
+| What comes out | That vocabulary's atom, unsupported and reverse tables, its registry row, and the string literals they point into |
+| What it saves | All seven off: **1.96 MB → 524 KB** of `libbvnr.so` (a 73 % reduction), measured Release+LTO on x86-64. `cf` alone is about 150 KB |
+| Reported by | `bvn_unit_profile_count()` / `bvn_unit_profile_name(i)`, and `bovnar version` prints the list |
+
+**What a switch does not change, and this is the part that matters.** Not the base-unit id space, not
+the dense unit tables, not `value_unit_t`, not `error_code_t`, not one exported signature. The
+generators still run whole: every `bu_ucum_*` enumerator keeps the value it has and the opaque blocks
+stay where they are (§7.1), so two builds with different switches are ABI-compatible and differ only
+in which namespaces they translate. A caller compiled against one can link the other.
+
+**An absent namespace is `error_unit_profile_unknown`** — the same answer as a namespace no build
+ever defined. That is deliberate and it is what this section always predicted the code was for: the
+document is not wrong for naming `ucum`, and a build without `ucum` cannot read it either way. A
+consumer that needs to distinguish the two asks `bvn_unit_profile_count`/`bvn_unit_profile_name`
+before parsing rather than inferring it from an error afterwards.
+
+**The cost of an absent namespace is symmetrical and total.** It cannot be read, and it cannot be
+written: `bvn_unit_to_profile` and `bvn_unit_to_ucum` return −1 for it, and a unit carrying that
+vocabulary's opaque units (§7.1) has no spelling at all, so `bvn_unit_to_string` fails rather than
+inventing one. There is no half-way state in which a build carries the ids but not the words. A build
+that must read `ucum:[IU]` needs `ucum` compiled in.
+
+**How the reduced configurations are kept working.** The switches are compile-time, so nothing in an
+ordinary build can reach the off state, and a build configuration nothing reaches is one that stops
+compiling without anyone noticing. `bvnr_profiles_off_build` compiles the *amalgamation* with all
+seven at `0`, under the strict `-Werror` flags an integrator uses, and runs
+`tests/profiles_off_smoke.c` — which pins the contract above and would fail on the two things that
+actually break here: a registry array left empty (C99 has no empty initialiser, which is why the
+table carries a sentinel row) and a table that loses its last reference and trips
+`-Wunused-const-variable`. It is registered unconditionally of the switches, since a reduced build is
+the last place it should be skipped. The per-vocabulary test suites are the other side of the same
+arrangement: each is registered only when its own profile is on, and the whole-corpus gates — the
+cross-vocabulary suite, the conformance runs, the Python suites — only when all seven are, because
+their totals are single numbers that a partial build would make wrong rather than smaller.
 
 ### 9.5 The factor proof
 
@@ -1887,20 +1945,30 @@ it, since the factor proof is the only check in the tree that looks outside the 
 **The tables rot.** UCUM, Rec 20, QUDT and UDUNITS all revise; the data files do not, and nothing in
 the build notices. `--fetch` re-downloads, but nothing schedules it.
 
-**Whitespace inside a type annotation is accepted and not accumulated, and a unit parameter cannot
-opt out.** This is a deliberate rule rather than an oversight — the EBNF records it beside
-`type-param-list`, and it is what lets `<uint:8, 16>` be written with a space after the comma. Its
-consequence in a *unit* parameter is not deliberate: a space **between** parameters and a space
-**inside** a unit are indistinguishable by the time the parameter is scanned, so `<float:64,k g>`
-is accepted as `k~g`, and `<float:64,udunits:m s-1>` becomes `udunits:ms-1` — reciprocal
-milliseconds — rather than being refused.
+**~~Whitespace inside a type annotation is accepted and not accumulated~~ — closed.** This section
+used to record the one place in the format where a wrong unit was produced silently rather than
+refused: a space **between** parameters and a space **inside** a unit were indistinguishable by the
+time the parameter was scanned, so `<float:64,k g>` was accepted as `k~g` and
+`<float:64,udunits:m s-1>` became `udunits:ms-1` — reciprocal milliseconds — for a value written as
+a speed.
 
-It is why §13.2 cannot support CF's space-separated spelling and why it does not try. Closing it
-means separating the two cases: keep whitespace skippable around the `,` separators, and make it an
-error inside a unit parameter, so a space-separated unit fails loudly instead of joining into a
-different one. That is a change to the annotation grammar and belongs in its own revision, not in
-this one — but it is a change worth making, because this is the one place in the format where a
-wrong unit is produced silently rather than refused.
+The fix is the one this section called for. Whitespace stays ignorable beside a separator (the
+family `:`, a `,` between parameters, the closing `>`), and inside a *native* parameter it is
+`error_type_param_whitespace`. That half was not a change to the grammar: doc/12 always put every
+`ws` in an annotation beside a separator and never derived one in the middle of a parameter, so the
+implementation was leniently wrong and now agrees with the normative grammar. It *is* a change to
+what parses — a document relying on the old leniency now fails — and that is the point: those
+documents carried a unit their author did not write.
+
+**And once the two positions were distinguishable, a third answer became available for the one that
+wanted it.** Inside a parameter carrying a profile *namespace*, whitespace is neither deleted nor
+refused: it is kept verbatim and handed to the vocabulary. UDUNITS multiplies with a space, so
+`udunits:kg m-2 s-1` — CF's commonest spelling — is now the unit it says it is, and `udunits:ms-1` is
+still the reciprocal millisecond it has always been. A UCUM annotation keeps its spacing, which makes
+§3.4's promise true for the first time. Every other vocabulary refuses a space through its own
+grammar as `error_unit_illegal`, which is the right layer: "no such code", not "no whitespace here".
+§13.2, which used to explain why the space-separated form could not be supported, now explains how it
+is.
 
 **The refusal set is where adopters leave.** §6.4 refuses osmolality, the non-Julian years, the
 referenced bels and four decades of scale. A clinical corpus will meet several of those early, and
@@ -1920,21 +1988,34 @@ exact code sees a change.
 
 ### 10.3 Deliberately not attempted
 
-- **Temperature difference.** `Cel` is a scale, here as in UCUM, and a difference of 25 °C still
-  converts as 298.15 K. CF 1.12 closed this with a `units_metadata` attribute carrying
-  `temperature: difference`; Bovnar has no equivalent and this profile does not add one, because a
-  delta scale is a *native registry* change and importing it through a foreign notation would put
-  the fix somewhere no native document could reach it. It remains the format's most concrete gap,
-  and it is worth more than this whole profile.
+- **~~Temperature difference~~ — closed, natively.** `Cel` is still a scale here as in UCUM, and a
+  `ucum:Cel` value is still a scale reading. What changed is that Bovnar now has a unit for the
+  difference: `ΔK` and its five siblings, in their own quantity kind, so `ΔK → K` is
+  `error_unit_mismatch` and `--si` on 25 Δ°C gives 25 ΔK rather than 298.15 K. This entry called it
+  "the format's most concrete gap, worth more than this whole profile", and said the fix belonged in
+  the *native registry* because importing it through a foreign notation would put it somewhere no
+  native document could reach — which is where it went. See doc/temperature_difference.md.
+
+  Two consequences for this document. **One row here was wrong and is corrected**:
+  `qudt-qk:TemperatureDifference` mapped to `K`, which made it the same unit as
+  `qudt-qk:ThermodynamicTemperature` — the confusion the code's own name rules out. It maps to `ΔK`.
+  A quantity kind states a quantity and no unit, so there is no published unit string being diverged
+  from. **The CF standard names that are differences by name** (`air_temperature_anomaly` and three
+  siblings) are deliberately *not* changed the same way: CF states `canonical_units = "K"` for them,
+  and overriding a publisher's stated unit from the sense of its name is a different decision, and one
+  that would put `cf:air_temperature_anomaly` in disagreement with `udunits:K` for the same variable.
+  CF 1.12's own answer is the `units_metadata` attribute, which is not in the unit slot and so still
+  cannot be read by a profile — the converter §2 describes is where that call belongs.
 - **Case-insensitive UCUM.** UCUM defines a case-insensitive variant. `ucum:` is the case-sensitive
   one only, which is why `RAD` and `REM` are in the table and UCUM's bracketed `[RAD]`/`[REM]` are
   not (§6.1). `ucum_ci:` is unreserved and undefined; it would need its own atom table and would
   make §6.2's collisions materially worse.
-- **CF.** `cf:` is a name the grammar of §2.6 would admit and no build defines, so it is
-  `error_unit_profile_unknown`. CF's `units` strings are UDUNITS syntax — which `udunits:` does
-  carry (§13) — but with a separate standard-name table and a reference date embedded in the time
-  unit; neither of those fits a per-value unit slot, and the honest answer for the parts of CF that
-  `udunits:` cannot reach is a converter, not a profile.
+- **~~CF~~.** Superseded: `cf:` is a namespace now (§17), carrying the standard-name table this entry
+  said would not fit. What remains not attempted is the other half of what CF is — a reference date
+  embedded in the time unit, which still has nowhere to land in a per-value unit slot (§13.4), and
+  the `units` strings themselves, which are UDUNITS syntax and reached through `udunits:` (§13).
+  `cf:` is read-only for the reason §17 gives: dozens of standard names state the same unit, so
+  writing one back would assert a quantity the unit does not know.
 - **Exchange rates.** Unchanged and unchangeable: currencies carry no conversion table, and a
   cross-currency conversion is refused rather than guessed (doc/05 §9.6). No vocabulary here yields
   a currency, so the profiles never reach this.
@@ -1949,7 +2030,7 @@ cross-check.
 |---|---|---|
 | Verbatim source preservation (`bvnr_data_t.unit_source`, writer re-emission) | §5.2, §7.3 | An annotation is dropped by a document built through the writer API. A parse-and-re-serialise round trip keeps it |
 | ~~The generator's factor proof against the publishers' own values~~ | §9.2, §9.5 | **Built** as `check_profile_factors.py`, outside the generator. All seven profiles, six against their own publishers and `unece` at one remove through QUDT |
-| `BVNR_WITH_UCUM_PROFILE` and feature reporting | §9.4 | The profiles are unconditional, which is a simplification rather than a loss |
+| ~~`BVNR_WITH_UCUM_PROFILE` and feature reporting~~ | §9.4 | **Built** as seven per-vocabulary switches plus `bvn_unit_profile_count`/`bvn_unit_profile_name`. All seven off takes `libbvnr.so` from 1.96 MB to 524 KB |
 | A machine check of `unece` against Rec 20 **itself** | §9.2, §9.5, §10.2 | Rec 20's factors are prose; the table is checked through QUDT's cross-reference instead, which is another publisher's reading |
 
 The factor proof was the one worth building next and is now built (§9.5). It caught four wrong
@@ -2294,24 +2375,50 @@ udunits:hPa         →  h~Pa
 udunits:nit         →  cd/m²
 ```
 
-### 13.2 Space does not multiply, and cannot
+### 13.2 Space multiplies, and now it can
 
-UDUNITS multiplies with a space, and CF's commonest spelling is `kg m-2 s-1`. **Bovnar cannot accept
-it, and does not pretend to.**
+UDUNITS multiplies with a space, and CF's commonest spelling of a flux is `kg m-2 s-1`. **Bovnar
+accepts it in a type annotation**, and `' '` is in this profile's multiplication set beside `.` and
+`*`.
 
-The lexer deletes whitespace inside a type annotation, so the slot `udunits:m s-1` arrives at the
-profile parser as `udunits:ms-1` — which is itself a perfectly good UDUNITS expression meaning
-**reciprocal milliseconds**. Listing space as an operator would not have made the space-separated
-form work; it would have made the wrong reading of it look supported.
+```
+udunits:kg m-2 s-1   →  k~g/m²·s     the same unit as udunits:kg*m-2*s-1
+udunits:m s-1        →  m/s          a speed
+udunits:ms-1         →  m~s⁻¹        a reciprocal MILLISECOND — also valid UDUNITS,
+                                     and a different unit. The space is what
+                                     tells the two apart
+udunits:kg  m-2      →  error_unit_illegal   two operators in a row
+```
 
-A producer writes `kg*m-2*s-1` or `kg.m-2.s-1`, both of which UDUNITS also accepts. The test suite
-pins `udunits:ms-1` to `m~s⁻¹` explicitly, so that anyone tempted to add `' '` to the profile's
-multiplication set sees what it would actually mean, and §14.2 pins `udunits:ms-1` and
-`udunits:m*s-1` as a pair that must not compare equal.
+**This section used to say the opposite, and the reason it could is the reason it no longer has to.**
+While the lexer *deleted* whitespace inside a type annotation, the slot `udunits:m s-1` arrived here
+as `udunits:ms-1` — a perfectly good UDUNITS expression meaning reciprocal milliseconds — so listing
+space as an operator would not have made the space-separated form work. It would only have made the
+wrong reading of it look supported. §10.2 recorded that as the one place in the format where a wrong
+unit was produced silently rather than refused.
 
-This is a symptom of something larger, recorded in §10.2: **a space anywhere inside a type
-annotation is silently deleted**, so `<float:64,k g>` is accepted as `k~g`. That predates the
-profiles and affects native units too.
+Closing that hole is what made this possible. Whitespace beside a parameter separator is still
+ignorable, whitespace inside a *native* parameter is `error_type_param_whitespace`, and whitespace
+inside a **namespaced** parameter is carried in verbatim for the vocabulary to interpret (spec §5.3).
+So the space now reaches this parser as a space, and means here what it means in UDUNITS.
+
+Three limits worth stating plainly:
+
+- **A run of spaces is not collapsed.** `kg  m-2` is two multiplications in a row and fails as
+  `error_unit_illegal`. Collapsing runs in the lexer would have cost a UCUM annotation the spacing
+  §3.4 promises to keep verbatim, and a malformed expression getting the vocabulary's own error is
+  the right outcome anyway.
+- **The inline unit form cannot carry a space and never will.** Whitespace is what *terminates* that
+  token, so `1.0 udunits:kg m-2` is a value, a unit and a stray token. The space-separated spelling
+  is available in a type annotation only.
+- **A line break is still an error.** No vocabulary spells a unit across a line.
+
+`udunits:ms-1` is still pinned to `m~s⁻¹` explicitly, and §14.2 still pins `udunits:ms-1` against
+`udunits:m*s-1` as a pair that must not compare equal — that pair matters *more* now, not less,
+because the space is the only thing distinguishing the speed from the reciprocal millisecond.
+Conformance cases UPR-043c…UPR-043f pin the whole boundary, including the annotation/inline agreement
+between `udunits:kg m-2 s-1` and `udunits:kg*m-2*s-1`, which passes only if both spellings produce
+the same `value_unit_t`.
 
 ### 13.3 The near misses: codes that name a native unit and are not it
 
@@ -2535,10 +2642,15 @@ instead. `check_profile_factors.py` re-proves all of it from the publishers' fil
 | coverage suggestions outstanding | 1161 | 0 |
 | `bovnar` binary | 617 KB | 1015 KB |
 
-**The binary is 65 % larger**, and that is the real price. It is table data — codes, targets and
+**The binary is 65 % larger**, and that was the real price. It is table data — codes, targets and
 refusal strings — and the refusal reasons are written as shared literals per family so the compiler
-pools them, but a build that wants only one vocabulary still pays for five. A per-profile build
-switch is the obvious answer and does not exist yet.
+pools them, but a build that wanted only one vocabulary still paid for five.
+
+**The per-profile build switch called for here now exists** (§9.4): seven `BVNR_WITH_<NAME>_PROFILE`
+options, all on by default, and a build with every one off takes `libbvnr.so` from 1.96 MB to 524 KB.
+The paragraph above is what it answers, and the id-space blocking mentioned two paragraphs down is
+what made it cheap — because each vocabulary owns its own block, dropping one moves no other
+vocabulary's ids, so the switches change what a build can *translate* and nothing about its ABI.
 
 `BVNR_UNIT_STRING_MAX` went from 1024 to 1088 to admit `astronomical_unit_BIPM_2006` (§13.3), and
 the UCUM block from 32 to 41 arbitrary atoms — which, with a block per profile, moved no other vocabulary's ids.
@@ -2746,12 +2858,13 @@ have to move — the longest name is 166 bytes and the cap is 1088 — but the b
 | with `om:` and `cf:` | **1798 KB** |
 
 Three quarters of that is `cf`, and nearly all of `cf` is the names themselves: 502 KB of generated
-atom rows against OM's 89 KB. §15.3's warning about a per-profile build switch applies here with
-more force than it did to any earlier vocabulary — it is now the difference between a 1 MB binary
-and a 1.8 MB one for a consumer who reads no netCDF at all. The decision recorded
-here is that completeness won: a standard name that is absent from the table is indistinguishable,
-to a producer, from one bovnar has never heard of, and a vocabulary carried in part is a vocabulary
-whose absences have to be documented one by one.
+atom rows against OM's 89 KB. This is what finally forced the per-profile build switch §15.3 had been
+asking for — it is the difference between a 1 MB binary and a 1.8 MB one for a consumer who reads no
+netCDF at all, and `-DBVNR_WITH_CF_PROFILE=OFF` is now how they decline it (§9.4). The decision
+recorded here is that completeness won *inside* the vocabulary: a standard name absent from the table
+is indistinguishable, to a producer, from one bovnar has never heard of, and a vocabulary carried in
+part is a vocabulary whose absences have to be documented one by one. Whether to carry the vocabulary
+at all is the integrator's, which is the right place for it.
 
 ---
 

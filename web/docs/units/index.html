@@ -22,7 +22,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <meta property="article:published_time" content="2026-05-14">
-<meta property="article:modified_time" content="2026-07-29">
+<meta property="article:modified_time" content="2026-07-30">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar Unit &amp; Currency System">
@@ -32,7 +32,7 @@
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
 <link rel="alternate" type="text/markdown" href="/doc/05_bovnar_unit_system.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Unit & Currency System", "description": "Every Bovnar physical unit, SI and IEC prefix, and currency — 180 units and 216 currencies with dimensions and exact conversion factors.", "url": "https://www.bovnar.io/docs/units/", "mainEntityOfPage": "https://www.bovnar.io/docs/units/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-07-29", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Unit & Currency System", "item": "https://www.bovnar.io/docs/units/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Unit & Currency System", "description": "Every Bovnar physical unit, SI and IEC prefix, and currency — 180 units and 216 currencies with dimensions and exact conversion factors.", "url": "https://www.bovnar.io/docs/units/", "mainEntityOfPage": "https://www.bovnar.io/docs/units/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-07-30", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Unit & Currency System", "item": "https://www.bovnar.io/docs/units/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
@@ -216,6 +216,8 @@ unaffected in every version. See
 .gold_rate = 2351.40 $USD/oz_t; # inline compound currency/unit
 .ratio     = 3.14 no_unit;      # explicit dimensionless</code></pre></div>
 <p>The inline unit uses the <strong>same character set</strong> and <strong>same semantic parser</strong> (<code>bvn_parse_unit</code>) as the type-annotation unit parameter. It is terminated by ASCII whitespace, <code>#</code> (comment), or <code>;</code>.</p>
+<p><strong>A native unit contains no whitespace, in either position.</strong> Inline, whitespace ends the token, so <code>1.0 k g</code> is a value with a stray token after it (<code>error_unexpected_input_byte</code>). In a type annotation, whitespace is legal only beside a separator — the family <code>:</code>, a <code>,</code> between parameters, the closing <code>&gt;</code> — and inside a native unit parameter it is <code>error_type_param_whitespace</code> (spec <a href="https://www.bovnar.io/docs/spec/#53-parameter-order">§5.3</a>). <code>&lt;float:64,k g&gt;</code> used to be accepted as <code>k~g</code>, which made it the one place in the format where a wrong unit was produced silently instead of refused.</p>
+<p>A parameter carrying a <strong>profile namespace</strong> is the exception: there whitespace is kept verbatim and the vocabulary decides what it means, because UDUNITS multiplies with a space and <code>udunits:kg m-2 s-1</code> is the commonest spelling of a flux in CF metadata. That is a property of the foreign notation, not of the native one — see doc/11 §13.2.</p>
 <h4 id="constraints">Constraints</h4>
 <table>
 <thead>
@@ -936,6 +938,81 @@ the <code>sr</code> silently dropped. What holds now:</p>
 </table>
 <blockquote>
 <p>Kelvin (<code>K</code>) is the SI base unit (§3.1). <code>Ra</code> not <code>R</code> — <code>R</code> is reserved for the röntgen (<code>bu_roentgen</code>).</p>
+</blockquote>
+<h4 id="temperature-differences">Temperature Differences</h4>
+<p>Every unit above is a <strong>scale</strong>: <code>25 °C</code> is 298.15 K, and Bovnar converts it that way. A <strong>difference</strong> of 25 degrees is 25 K, and these are the units that say so.</p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum value</th>
+<th>Conversion</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ΔK</code>, <code>delta_K</code></td>
+<td><code>deltaK</code>, <code>delta_kelvin</code>, <code>deltakelvin</code>, <code>Δ°C</code>, <code>delta_degC</code>, <code>deltadegC</code>, <code>delta_celsius</code>, <code>deltacelsius</code></td>
+<td>kelvin interval</td>
+<td><code>bu_delta_kelvin</code></td>
+<td>1 K exactly (linear). <code>Δ°C</code> <strong>is</strong> this unit</td>
+</tr>
+<tr>
+<td><code>Δ°F</code>, <code>delta_degF</code></td>
+<td><code>deltadegF</code>, <code>delta_fahrenheit</code>, <code>deltafahrenheit</code>, <code>Δ°Ra</code>, <code>delta_degRa</code>, <code>deltadegRa</code>, <code>delta_rankine</code>, <code>deltarankine</code></td>
+<td>Fahrenheit interval</td>
+<td><code>bu_delta_fahrenheit</code></td>
+<td>5/9 K exactly (linear). <code>Δ°Ra</code> <strong>is</strong> this unit</td>
+</tr>
+<tr>
+<td><code>Δ°De</code>, <code>delta_degDe</code></td>
+<td><code>deltadegDe</code>, <code>delta_delisle</code>, <code>deltadelisle</code></td>
+<td>Delisle interval</td>
+<td><code>bu_delta_delisle</code></td>
+<td>−2/3 K exactly (linear)</td>
+</tr>
+<tr>
+<td><code>Δ°N</code>, <code>delta_degN</code></td>
+<td><code>deltadegN</code>, <code>delta_newton_temperature</code></td>
+<td>Newton interval</td>
+<td><code>bu_delta_newton_temp</code></td>
+<td>100/33 K exactly (linear)</td>
+</tr>
+<tr>
+<td><code>Δ°Re</code>, <code>delta_degRe</code></td>
+<td><code>deltadegRe</code>, <code>delta_reaumur</code>, <code>deltareaumur</code></td>
+<td>Réaumur interval</td>
+<td><code>bu_delta_reaumur</code></td>
+<td>5/4 K exactly (linear)</td>
+</tr>
+<tr>
+<td><code>Δ°Ro</code>, <code>delta_degRo</code></td>
+<td><code>deltadegRo</code>, <code>delta_romer</code>, <code>deltaromer</code></td>
+<td>Rømer interval</td>
+<td><code>bu_delta_romer</code></td>
+<td>40/21 K exactly (linear)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Six rows, eight spellings.</strong> The degree Celsius interval <em>is</em> the kelvin (SI Brochure 9th ed. §2.3.1) and the Rankine degree <em>is</em> the Fahrenheit degree, so <code>Δ°C</code> and <code>Δ°Ra</code> are aliases rather than units of their own — two units that had to compare equal and convert by exactly 1 would be a distinction with no content.</p>
+<p><strong>They are ratio scales.</strong> <code>.affine = false</code>, <code>.offset = 0.0</code>. That is what lets them compose where the scales cannot: <code>Δ°F/k~m</code> is a lapse rate and <code>Δ°Re^-1</code> an expansion coefficient, while <code>°F/k~m</code> and <code>°Re^-1</code> have no SI meaning at all (§9.4 — an affine scale is meaningful only alone at exponent 1).</p>
+<p><strong>They carry their own quantity kind</strong>, so:</p>
+<div class="codehilite"><pre><span></span><code>ΔK   → K       error_unit_mismatch      the whole point
+°C   → Δ°C     error_unit_mismatch      a reading is not an interval, and only
+                                        the author can decide which one it was
+Δ°C  → ΔK      factor 1                 the same unit
+Δ°F  → ΔK      factor 5/9               exact; lossless only for multiples of 9
+Δ°De → ΔK      factor −2/3              Delisle runs backwards
+--si on 25 Δ°C                          25 ΔK, not 298.15 K
+[&lt;float:64,K&gt; 1.0, &lt;float:64,ΔK&gt; 2.0]   error_array_element_type_mismatch
+</code></pre></div>
+
+<p>A bare array is homogeneous in its unit (spec <a href="https://www.bovnar.io/docs/spec/#74-element-homogeneity">§7.4</a>), so the last line needs no rule of its own.</p>
+<p><strong>Inside a compound the distinction does not arise, and is not made.</strong> <code>W/(m²·ΔK)</code> and <code>W/(m²·K)</code> are the <em>same unit</em>, as are <code>ΔK/k~m</code> and <code>K/k~m</code>, and <code>ΔK^-1</code> and <code>K^-1</code>. The reason is the one above: an affine scale cannot appear in a compound at all, so a <code>K</code> there was already an interval and there is nothing to separate. The quantity kind is therefore significant only for a lone unit at exponent 1 — precisely where the affine offset was the hazard. Every U-value written before these units existed keeps its meaning.</p>
+<blockquote>
+<p><code>Δ</code> is U+0394 (<code>0xCE 0x94</code>); every unit has ASCII spellings, formed as <code>delta_</code> plus the scale's own short form. There is deliberately no bare <code>delta_C</code> or <code>delta_F</code>: those read as a delta coulomb and a delta farad, and the scales themselves do not alias bare <code>C</code> or <code>F</code> either. <code>delta_K</code> is unambiguous because <code>K</code> is the kelvin and nothing else.</p>
 </blockquote>
 <h3 id="35-pressure-units">3.5 Pressure Units</h3>
 <table>
@@ -4907,12 +4984,17 @@ whole string fails to resolve.</p>
 <span class="w">    </span><span class="cm">/* Historical temperature scales */</span>
 <span class="w">    </span><span class="n">bu_delisle</span><span class="p">,</span><span class="w"> </span><span class="n">bu_newton_temp</span><span class="p">,</span><span class="w"> </span><span class="n">bu_reaumur</span><span class="p">,</span><span class="w"> </span><span class="n">bu_romer</span><span class="p">,</span>
 
+<span class="w">    </span><span class="cm">/* Temperature differences (Δ°C shares bu_delta_kelvin, Δ°Ra shares</span>
+<span class="cm">     * bu_delta_fahrenheit — the same interval, so an alias not an id) */</span>
+<span class="w">    </span><span class="n">bu_delta_kelvin</span><span class="p">,</span><span class="w"> </span><span class="n">bu_delta_fahrenheit</span><span class="p">,</span><span class="w"> </span><span class="n">bu_delta_delisle</span><span class="p">,</span>
+<span class="w">    </span><span class="n">bu_delta_newton_temp</span><span class="p">,</span><span class="w"> </span><span class="n">bu_delta_reaumur</span><span class="p">,</span><span class="w"> </span><span class="n">bu_delta_romer</span><span class="p">,</span>
+
 <span class="w">    </span><span class="cm">/* Dimensionless ratio units */</span>
 <span class="w">    </span><span class="n">bu_percent</span><span class="p">,</span><span class="w"> </span><span class="n">bu_per_mille</span><span class="p">,</span><span class="w"> </span><span class="n">bu_per_myriad</span><span class="p">,</span>
 <span class="w">    </span><span class="n">bu_per_cent_mille</span><span class="p">,</span><span class="w"> </span><span class="n">bu_ppm</span><span class="p">,</span><span class="w"> </span><span class="n">bu_ppb</span><span class="p">,</span>
 
 <span class="w">    </span><span class="cm">/* … water hardness, turbidity and the rest of block 10, up to</span>
-<span class="cm">     * bu_turbidity_jtu = 100179. The whole run is generated into</span>
+<span class="cm">     * bu_delta_romer = 100185. The whole run is generated into</span>
 <span class="cm">     * include/bovnar_units.gen.h from src/gendata/units.bvnr. */</span>
 
 <span class="w">    </span><span class="cm">/* Block 90 — the currencies — has NO named enumerators: a currency is</span>

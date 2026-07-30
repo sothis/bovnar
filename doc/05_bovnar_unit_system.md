@@ -171,6 +171,10 @@ A unit may be written directly after a scalar value literal, between the value a
 
 The inline unit uses the **same character set** and **same semantic parser** (`bvn_parse_unit`) as the type-annotation unit parameter. It is terminated by ASCII whitespace, `#` (comment), or `;`.
 
+**A native unit contains no whitespace, in either position.** Inline, whitespace ends the token, so `1.0 k g` is a value with a stray token after it (`error_unexpected_input_byte`). In a type annotation, whitespace is legal only beside a separator — the family `:`, a `,` between parameters, the closing `>` — and inside a native unit parameter it is `error_type_param_whitespace` (spec [§5.3](03_bovnar_spec.md#53-parameter-order)). `<float:64,k g>` used to be accepted as `k~g`, which made it the one place in the format where a wrong unit was produced silently instead of refused.
+
+A parameter carrying a **profile namespace** is the exception: there whitespace is kept verbatim and the vocabulary decides what it means, because UDUNITS multiplies with a space and `udunits:kg m-2 s-1` is the commonest spelling of a flux in CF metadata. That is a property of the foreign notation, not of the native one — see doc/11 §13.2.
+
 #### Constraints
 
 | Situation | Result |
@@ -332,6 +336,42 @@ Bovnar supports 180 named physical base units. Currency codes are a separate nam
 | `°Ro`, `degRo` | `degrRo`, `degreeRo`, `degreesRo`, `romer` | degree Rømer | `bu_romer` | K = (°Ro − 7.5) × 40/21 + 273.15 (affine) |
 
 > Kelvin (`K`) is the SI base unit (§3.1). `Ra` not `R` — `R` is reserved for the röntgen (`bu_roentgen`).
+
+#### Temperature Differences
+
+Every unit above is a **scale**: `25 °C` is 298.15 K, and Bovnar converts it that way. A **difference** of 25 degrees is 25 K, and these are the units that say so.
+
+| Symbol | Long forms | Name | Enum value | Conversion |
+|--------|-----------|------|------------|------------|
+| `ΔK`, `delta_K` | `deltaK`, `delta_kelvin`, `deltakelvin`, `Δ°C`, `delta_degC`, `deltadegC`, `delta_celsius`, `deltacelsius` | kelvin interval | `bu_delta_kelvin` | 1 K exactly (linear). `Δ°C` **is** this unit |
+| `Δ°F`, `delta_degF` | `deltadegF`, `delta_fahrenheit`, `deltafahrenheit`, `Δ°Ra`, `delta_degRa`, `deltadegRa`, `delta_rankine`, `deltarankine` | Fahrenheit interval | `bu_delta_fahrenheit` | 5/9 K exactly (linear). `Δ°Ra` **is** this unit |
+| `Δ°De`, `delta_degDe` | `deltadegDe`, `delta_delisle`, `deltadelisle` | Delisle interval | `bu_delta_delisle` | −2/3 K exactly (linear) |
+| `Δ°N`, `delta_degN` | `deltadegN`, `delta_newton_temperature` | Newton interval | `bu_delta_newton_temp` | 100/33 K exactly (linear) |
+| `Δ°Re`, `delta_degRe` | `deltadegRe`, `delta_reaumur`, `deltareaumur` | Réaumur interval | `bu_delta_reaumur` | 5/4 K exactly (linear) |
+| `Δ°Ro`, `delta_degRo` | `deltadegRo`, `delta_romer`, `deltaromer` | Rømer interval | `bu_delta_romer` | 40/21 K exactly (linear) |
+
+**Six rows, eight spellings.** The degree Celsius interval *is* the kelvin (SI Brochure 9th ed. §2.3.1) and the Rankine degree *is* the Fahrenheit degree, so `Δ°C` and `Δ°Ra` are aliases rather than units of their own — two units that had to compare equal and convert by exactly 1 would be a distinction with no content.
+
+**They are ratio scales.** `.affine = false`, `.offset = 0.0`. That is what lets them compose where the scales cannot: `Δ°F/k~m` is a lapse rate and `Δ°Re^-1` an expansion coefficient, while `°F/k~m` and `°Re^-1` have no SI meaning at all (§9.4 — an affine scale is meaningful only alone at exponent 1).
+
+**They carry their own quantity kind**, so:
+
+```
+ΔK   → K       error_unit_mismatch      the whole point
+°C   → Δ°C     error_unit_mismatch      a reading is not an interval, and only
+                                        the author can decide which one it was
+Δ°C  → ΔK      factor 1                 the same unit
+Δ°F  → ΔK      factor 5/9               exact; lossless only for multiples of 9
+Δ°De → ΔK      factor −2/3              Delisle runs backwards
+--si on 25 Δ°C                          25 ΔK, not 298.15 K
+[<float:64,K> 1.0, <float:64,ΔK> 2.0]   error_array_element_type_mismatch
+```
+
+A bare array is homogeneous in its unit (spec [§7.4](03_bovnar_spec.md#74-element-homogeneity)), so the last line needs no rule of its own.
+
+**Inside a compound the distinction does not arise, and is not made.** `W/(m²·ΔK)` and `W/(m²·K)` are the *same unit*, as are `ΔK/k~m` and `K/k~m`, and `ΔK^-1` and `K^-1`. The reason is the one above: an affine scale cannot appear in a compound at all, so a `K` there was already an interval and there is nothing to separate. The quantity kind is therefore significant only for a lone unit at exponent 1 — precisely where the affine offset was the hazard. Every U-value written before these units existed keeps its meaning.
+
+> `Δ` is U+0394 (`0xCE 0x94`); every unit has ASCII spellings, formed as `delta_` plus the scale's own short form. There is deliberately no bare `delta_C` or `delta_F`: those read as a delta coulomb and a delta farad, and the scales themselves do not alias bare `C` or `F` either. `delta_K` is unambiguous because `K` is the kelvin and nothing else.
 
 ### 3.5 Pressure Units
 
@@ -1725,12 +1765,17 @@ typedef enum value_base_unit_e {
     /* Historical temperature scales */
     bu_delisle, bu_newton_temp, bu_reaumur, bu_romer,
 
+    /* Temperature differences (Δ°C shares bu_delta_kelvin, Δ°Ra shares
+     * bu_delta_fahrenheit — the same interval, so an alias not an id) */
+    bu_delta_kelvin, bu_delta_fahrenheit, bu_delta_delisle,
+    bu_delta_newton_temp, bu_delta_reaumur, bu_delta_romer,
+
     /* Dimensionless ratio units */
     bu_percent, bu_per_mille, bu_per_myriad,
     bu_per_cent_mille, bu_ppm, bu_ppb,
 
     /* … water hardness, turbidity and the rest of block 10, up to
-     * bu_turbidity_jtu = 100179. The whole run is generated into
+     * bu_delta_romer = 100185. The whole run is generated into
      * include/bovnar_units.gen.h from src/gendata/units.bvnr. */
 
     /* Block 90 — the currencies — has NO named enumerators: a currency is

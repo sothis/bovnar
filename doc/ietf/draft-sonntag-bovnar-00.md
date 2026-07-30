@@ -2600,9 +2600,10 @@ U:
 | 49 | `error_unit_profile_unknown` | U |
 | 50 | `error_unit_profile_unsupported` | U |
 | 51 | `error_octet_stream_forbidden` | C |
+| 52 | `error_type_param_whitespace` | D |
 {: title="Error codes"}
 
-Two entries warrant a note.
+Four entries warrant a note.
 
 `error_base_requires_string_literal` (33) is defined for a non-decimal
 base given a bare, unquoted numeric literal. In practice such a token
@@ -2622,6 +2623,26 @@ is well-formed and the octet stream is a first-class part of the format,
 but this consumer has asserted that its channel carries text. Reporting
 it is how a consumer whose pipeline normalizes line endings declines the
 document at the door instead of discovering the damage downstream.
+
+`error_type_param_whitespace` (52) is raised for whitespace inside a
+type-annotation parameter. The grammar of {{collected-abnf}} places every
+`ws` in `type-ann` beside a separator - after `family`, either side of the
+`:` that introduces `param-list` or of a `,` between parameters, and
+before the closing `>` - and derives none inside a `param`. A consumer
+that skips whitespace uniformly within an annotation instead of at those
+positions silently concatenates a split parameter, which yields a
+different type or a different unit rather than an error: `<uint:6 4>`
+becomes a 64-bit width, `<float:64,k g>` becomes the kilogram, and the
+space-multiplied UDUNITS spelling `m s-1` becomes `ms-1`, a reciprocal
+millisecond. Reporting code 52 at the first octet after the whitespace is
+therefore a requirement of this document and not a lexical nicety.
+
+The unit-profile facility of {{error-codes}}, which this document does not
+specify, admits whitespace inside a parameter that carries a profile
+namespace, where it is part of the foreign code rather than a separator. A
+consumer that implements no profile never reaches that case: with no
+namespace to recognise, every parameter is a native one and code 52 applies
+throughout.
 
 
 # Examples {#examples}

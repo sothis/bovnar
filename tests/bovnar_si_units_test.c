@@ -2521,6 +2521,99 @@ static void test_affine_unit_in_a_product_has_no_si_value(void)
 	ASSERT_TRUE(fabs(out - 293.15) < 1e-9, "20 °C is 293.15 K");
 }
 
+static void test_temperature_difference_is_its_own_quantity_kind(void)
+{
+	printf("  a temperature difference is not a temperature...\n");
+	/* 25 °C is 298.15 K; a RISE of 25 degrees is 25 K. Before the Δ units there
+	 * was no spelling for the second, so the format converted it as the first —
+	 * wrong by 273.15, with the two documents byte-identical. The Δ units carry
+	 * their own quantity kind, which is what refuses the conversion that used to
+	 * be silently wrong. */
+	value_unit_t dK  = BVN_UNIT_NO_PREFIX(bu_delta_kelvin);
+	value_unit_t dF  = BVN_UNIT_NO_PREFIX(bu_delta_fahrenheit);
+	value_unit_t dDe = BVN_UNIT_NO_PREFIX(bu_delta_delisle);
+	value_unit_t K   = BVN_UNIT_NO_PREFIX(bu_kelvin);
+	value_unit_t C   = BVN_UNIT_NO_PREFIX(bu_celsius);
+	value_unit_t F   = BVN_UNIT_NO_PREFIX(bu_fahrenheit);
+
+	/* The refusals this exists for. Note it is not a dimension check: all six
+	 * units below are Θ¹. */
+	ASSERT_TRUE(!bvn_units_compatible(dK, K), "ΔK is not K");
+	ASSERT_TRUE(!bvn_units_compatible(C, dK), "°C is not ΔK");
+	ASSERT_TRUE(!bvn_units_compatible(F, dF), "°F is not Δ°F");
+	double out = 4242.0;
+	ASSERT_TRUE(!bvn_unit_convert_value(25.0, dK, K, &out),
+		    "ΔK -> K is refused rather than answered");
+	ASSERT_TRUE(out == 4242.0, "the output is left untouched");
+	ASSERT_TRUE(!bvn_unit_convert_value(25.0, C, dK, &out),
+		    "°C -> ΔK is refused: only the author knows which was meant");
+
+	/* Δ°C IS ΔK — the Celsius interval is the kelvin (SI Brochure 9th ed.
+	 * §2.3.1) — so units.bvnr aliases it rather than adding a row. Two units
+	 * that must compare equal and convert by exactly 1 would be a distinction
+	 * with no content; this is what pins that they are one unit. */
+	bool ok = false;
+	value_unit_t dC = bvn_parse_unit((const uint8_t *)"Δ°C", &ok);
+	ASSERT_TRUE(ok, "Δ°C parses");
+	ASSERT_TRUE(bvn_unit_equal(dC, dK), "Δ°C IS ΔK, not merely equal in value");
+	value_unit_t dRa = bvn_parse_unit((const uint8_t *)"Δ°Ra", &ok);
+	ASSERT_TRUE(ok, "Δ°Ra parses");
+	ASSERT_TRUE(bvn_unit_equal(dRa, dF), "Δ°Ra IS Δ°F");
+
+	/* The intervals convert among themselves, by their scales' own slopes, with
+	 * no offset anywhere. Δ°De is negative because Delisle runs backwards. */
+	ASSERT_TRUE(bvn_unit_convert_value(9.0, dF, dK, &out),
+		    "Δ°F -> ΔK converts");
+	ASSERT_TRUE(fabs(out - 5.0) < 1e-12, "9 Δ°F is 5 ΔK (5/9, no offset)");
+	ASSERT_TRUE(bvn_unit_convert_value(3.0, dDe, dK, &out),
+		    "Δ°De -> ΔK converts");
+	ASSERT_TRUE(fabs(out + 2.0) < 1e-12, "3 Δ°De is -2 ΔK (Delisle inverts)");
+
+	/* The SI normal form must reduce an interval to ΔK and never to K. Getting
+	 * this wrong is not cosmetic: the form is screened against the unit it came
+	 * from, so a K here would report "no SI form" and a normalising pass would
+	 * silently leave every temperature difference in a document alone. */
+	value_unit_t nf;
+	ASSERT_TRUE(bvn_unit_si_normal_form(dF, &nf), "Δ°F has an SI normal form");
+	ASSERT_TRUE(bvn_unit_equal(nf, dK), "Δ°F normalises to ΔK, not K");
+
+	/* INSIDE A COMPOUND THE DISTINCTION DOES NOT ARISE, AND IS NOT MADE. An
+	 * affine scale is meaningful only alone at exponent 1, so a K in a compound
+	 * was ALREADY an interval — W/(m²·K) has always been a U-value. Counting the
+	 * kind there would make W/(m²·ΔK) a different unit and break every U-value
+	 * written to date, in exchange for separating two spellings of one quantity.
+	 * So the kind is significant exactly where the offset was the hazard. */
+	static const struct { value_base_unit_t other; unit_exponent_t exp;
+			      const char *what; } compounds[] = {
+		{ bu_meter,  exp_neg_linear, "per metre (a lapse rate)" },
+		{ bu_second, exp_neg_linear, "per second (a heating rate)" },
+		{ bu_watt,   exp_linear,     "times a watt" },
+	};
+	for (size_t i = 0; i < sizeof compounds / sizeof compounds[0]; i++) {
+		value_unit_t with_delta = bvni_test_u2(bu_delta_kelvin, exp_linear,
+						       compounds[i].other,
+						       compounds[i].exp);
+		value_unit_t with_kelvin = bvni_test_u2(bu_kelvin, exp_linear,
+							compounds[i].other,
+							compounds[i].exp);
+		ASSERT_TRUE(bvn_units_compatible(with_delta, with_kelvin),
+			    "ΔK and K are the same unit inside a compound");
+		out = 0.0;
+		ASSERT_TRUE(bvn_unit_convert_value(6.5, with_delta, with_kelvin, &out),
+			    "and the conversion is the identity");
+		ASSERT_TRUE(fabs(out - 6.5) < 1e-12, "factor 1, no rescale");
+	}
+	/* Same at a negative exponent alone: an expansion coefficient. */
+	value_unit_t inv_delta  = { .num_components = 1, .components = {
+		{ .base = bu_delta_kelvin, .exponent = exp_neg_linear,
+		  .prefix = {prefix_si, .id.si = si_none} } } };
+	value_unit_t inv_kelvin = { .num_components = 1, .components = {
+		{ .base = bu_kelvin, .exponent = exp_neg_linear,
+		  .prefix = {prefix_si, .id.si = si_none} } } };
+	ASSERT_TRUE(bvn_units_compatible(inv_delta, inv_kelvin),
+		    "ΔK^-1 and K^-1 are the same unit");
+}
+
 static void test_photometric_units_carry_the_steradian(void)
 {
 	printf("  luminous flux is not luminous intensity...\n");
@@ -2887,6 +2980,7 @@ int main(void)
 	test_named_si_collapse_never_substitutes_a_named_unit();
 	test_affine_unit_in_a_product_has_no_si_value();
 	test_photometric_units_carry_the_steradian();
+	test_temperature_difference_is_its_own_quantity_kind();
 	test_info_prefix_rule_follows_magnitude_not_enum_order();
 	test_rational_to_str_reports_too_long();
 	test_wide_denominator_renders_in_every_base();

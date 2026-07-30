@@ -1265,6 +1265,14 @@ static void test_nonsi_enum_order(void)
 	ASSERT_TRUE((int)bu_turbidity_ftu       == 100177, "bu_turbidity_ftu == 100177");
 	ASSERT_TRUE((int)bu_turbidity_fau       == 100178, "bu_turbidity_fau == 100178");
 	ASSERT_TRUE((int)bu_turbidity_jtu       == 100179, "bu_turbidity_jtu == 100179");
+	/* The temperature intervals. Δ°C shares bu_delta_kelvin and Δ°Ra shares
+	 * bu_delta_fahrenheit — the same interval, so an alias rather than an id. */
+	ASSERT_TRUE((int)bu_delta_kelvin        == 100180, "bu_delta_kelvin == 100180");
+	ASSERT_TRUE((int)bu_delta_fahrenheit    == 100181, "bu_delta_fahrenheit == 100181");
+	ASSERT_TRUE((int)bu_delta_delisle       == 100182, "bu_delta_delisle == 100182");
+	ASSERT_TRUE((int)bu_delta_newton_temp   == 100183, "bu_delta_newton_temp == 100183");
+	ASSERT_TRUE((int)bu_delta_reaumur       == 100184, "bu_delta_reaumur == 100184");
+	ASSERT_TRUE((int)bu_delta_romer         == 100185, "bu_delta_romer == 100185");
 	/* The native units are block 10 of a blocked id space: one contiguous run
 	 * from BVN_UNIT_NATIVE_FIRST, and the whole of it below every profile's
 	 * block. Both matter. The run is what makes the dense table slot plain
@@ -1274,11 +1282,11 @@ static void test_nonsi_enum_order(void)
 	 * silently stop converting. */
 	ASSERT_EQ_INT((int)bu_bit, BVN_UNIT_NATIVE_FIRST,
 	              "the first native unit opens block 10");
-	ASSERT_EQ_INT((int)bu_turbidity_jtu, BVN_UNIT_NATIVE_LAST,
+	ASSERT_EQ_INT((int)bu_delta_romer, BVN_UNIT_NATIVE_LAST,
 	              "the last native unit closes the run");
 	ASSERT_EQ_INT(BVN_UNIT_NATIVE_LAST - BVN_UNIT_NATIVE_FIRST + 1,
 	              BVN_UNIT_NATIVE_COUNT, "the native run has no holes");
-	ASSERT_TRUE((int)bu_turbidity_jtu < BVN_PROFILE_UCUM_OPAQUE_FIRST,
+	ASSERT_TRUE((int)bu_delta_romer < BVN_PROFILE_UCUM_OPAQUE_FIRST,
 	            "native units sit below every profile block");
 	ASSERT_EQ_INT(BVN_UNIT_NATIVE_FIRST, 100000, "block 10 starts at 100000");
 	ASSERT_EQ_INT(BVN_PROFILE_UCUM_OPAQUE_FIRST, 200000,

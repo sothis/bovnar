@@ -259,6 +259,19 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly
 
 > Kelvin (`K`) is in §4.1. `R` is reserved for röntgen (§4.20). `N` alone is newton (§4.2); use `°N` or `degN` for Newton temperature.
 
+**Temperature differences.** Every scale above is a *scale*: `25 °C` is 298.15 K. A *difference* of 25 degrees is 25 K, and these are the units for it. Each is a ratio scale (no offset) carrying the temperature-interval quantity kind, so `ΔK` never converts to `K` and `°C` never converts to `Δ°C` — those are `error_unit_mismatch`.
+
+| Symbol | Long forms | Name | Enum | Conversion |
+|--------|-----------|------|------|------------|
+| `ΔK`, `delta_K` | `deltaK`, `delta_kelvin`, `deltakelvin`, `Δ°C`, `delta_degC`, `deltadegC`, `delta_celsius`, `deltacelsius` | kelvin interval | `bu_delta_kelvin` | 1 K exactly. `Δ°C` **is** this unit — the Celsius interval is the kelvin |
+| `Δ°F`, `delta_degF` | `deltadegF`, `delta_fahrenheit`, `deltafahrenheit`, `Δ°Ra`, `delta_degRa`, `deltadegRa`, `delta_rankine`, `deltarankine` | Fahrenheit interval | `bu_delta_fahrenheit` | 5/9 K exactly. `Δ°Ra` **is** this unit |
+| `Δ°De`, `delta_degDe` | `deltadegDe`, `delta_delisle`, `deltadelisle` | Delisle interval | `bu_delta_delisle` | −2/3 K exactly (Delisle runs backwards) |
+| `Δ°N`, `delta_degN` | `deltadegN`, `delta_newton_temperature` | Newton interval | `bu_delta_newton_temp` | 100/33 K exactly |
+| `Δ°Re`, `delta_degRe` | `deltadegRe`, `delta_reaumur`, `deltareaumur` | Réaumur interval | `bu_delta_reaumur` | 5/4 K exactly |
+| `Δ°Ro`, `delta_degRo` | `deltadegRo`, `delta_romer`, `deltaromer` | Rømer interval | `bu_delta_romer` | 40/21 K exactly |
+
+> `Δ` is U+0394; every unit here has ASCII spellings. There is deliberately no bare `delta_C` or `delta_F` — those read as a delta coulomb and a delta farad. Inside a **compound** the distinction does not arise and is not made: `W/(m²·ΔK)` and `W/(m²·K)` are the same unit, because an affine scale cannot appear in a compound at all, so the `K` there was already an interval.
+
 ### 4.7 Pressure
 
 | Symbol | Long forms | Name | Enum | Factor |

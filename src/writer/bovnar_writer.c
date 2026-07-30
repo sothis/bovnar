@@ -808,6 +808,14 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 			 * refused when the policy is set), so this is purely an
 			 * assertion — no value is ever rewritten here. */
 			int32_t ri = bvn_policy_match_rule(&w->val.policy, &w->val.path);
+			/* The producing side carries the promise (doc/06 §5.2), so it
+			 * refuses an undecidable rule for the same reason the reader does:
+			 * a document nested past BVN_PATH_MAX_DEPTH leaves the position
+			 * unknown, and an assertion that cannot be evaluated has not been
+			 * met. Writing the document anyway would put the silence into the
+			 * artefact rather than into one parse of it. */
+			if (ri == BVN_POLICY_PATH_UNKNOWN)
+				return bvn_writer_set_error(w, error_unit_mismatch);
 			if (ri >= 0 &&
 			    !bvn_policy_selects(u, w->val.policy.rule[ri].unit))
 				return bvn_writer_set_error(w, error_unit_mismatch);

@@ -482,6 +482,46 @@
   { .code = "gray";                                    .bovnar = "Gy";                  },
   { .code = "grayPerSecond-Time";                      .bovnar = "Gy/s";                },
   { .code = "hectare";                                 .bovnar = "ha";                  },
+
+  # ── Refusals that an existing native expression already covered ───────
+  #
+  # None of these needed a new unit; each was a stale refusal. Three groups:
+  # units the registry has under another spelling (are is a centihectare, the
+  # apothecary pound IS the troy pound, the Réaumur degree was there all
+  # along); compounds the registry can build (a poundal is lb·ft/s², a
+  # footcandle a lumen per square foot -- NOT cd/ft², which is a luminance and
+  # is what matching on dimension alone would have picked); and two shapes the
+  # other profiles already spell -- a degree Celsius inside a compound, which
+  # qudt.bvnr reads as K because K in a compound IS the interval, and a ratio
+  # of two of the same unit, which unece.bvnr spells 3H as k~g/k~g to keep
+  # 'a ratio OF WHAT'.
+  { .code = "are";                                     .bovnar = "c~ha"; },   # 100 m^2; the native unit is the hectare, so this is a centihectare
+  { .code = "centiare";                                .bovnar = "m^2"; },   # 1 m^2
+  { .code = "degreeReaumur";                           .bovnar = "°Re"; },   # the SCALE's unit; ReaumurScale below is the scale itself
+  { .code = "poundApothecaries";                       .bovnar = "lb_t"; },   # = the troy pound, twelve apothecary ounces
+  { .code = "poundal";                                 .bovnar = "lb·ft/s^2"; },   # one pound accelerated at one foot per second squared
+  { .code = "footPoundal";                             .bovnar = "lb·ft^2/s^2"; },   # a poundal through a foot
+  { .code = "footcandle";                              .bovnar = "lm/ft^2"; },   # a LUMEN per square foot: illuminance, not cd/ft^2
+  { .code = "kayser";                                  .bovnar = "c~m^-1"; },   # the reciprocal centimetre of spectroscopy
+  { .code = "gilbert";                                 .bovnar = "Oe·c~m"; },   # one oersted centimetre
+  { .code = "ton-Force-Short";                         .bovnar = "tn_sh·gn"; },   # a short ton under standard gravity
+  { .code = "rhe";                                     .bovnar = "P^-1"; },   # the reciprocal poise
+  { .code = "metreOfMercury";                          .bovnar = "k~mmHg"; },   # OM rounds the column; see the waiver
+  { .code = "centimetreOfMercury";                     .bovnar = "da~mmHg"; },   # OM rounds the column; see the waiver
+  { .code = "quart-Imperial";                          .bovnar = "qt_uk"; },   # OM states this one at five digits where its pint, gallon, gill and fluid ounce are exact; see the waiver
+  { .code = "degreeCelsiusDay";                        .bovnar = "K·d"; },
+  { .code = "degreeCelsiusPerHour";                    .bovnar = "K/h"; },
+  { .code = "degreeCelsiusPerMinute-Time";             .bovnar = "K/min"; },
+  { .code = "degreeCelsiusPerSecond-Time";             .bovnar = "K/s"; },
+  { .code = "reciprocalDegreeCelsius";                 .bovnar = "K^-1"; },
+  { .code = "metrePerMetre";                           .bovnar = "m/m"; },
+  { .code = "gramPerGram";                             .bovnar = "g/g"; },
+  { .code = "molePerMole";                             .bovnar = "mol/mol"; },
+  { .code = "kilogramPerKilogram";                     .bovnar = "k~g/k~g"; },
+  { .code = "squareMetrePerSquareMetre";               .bovnar = "m^2/m^2"; },
+  { .code = "cubicMetrePerCubicmetre";                 .bovnar = "m^3/m^3"; },
+  { .code = "cubicCentimetrePerCubicCentimetre";       .bovnar = "c~m^3/c~m^3"; },
+  { .code = "cubicMillimetrePerCubicMillimetre";       .bovnar = "m~m^3/m~m^3"; },
   { .code = "hectareDay";                              .bovnar = "d·ha";                },
   { .code = "hectoampere";                             .bovnar = "h~A";                 },
   { .code = "hectobecquerel";                          .bovnar = "h~Bq";                },
@@ -1376,9 +1416,8 @@
   { .code = "_25Millilitre";                           .why = "bovnar has no unit of this magnitude"; },
   { .code = "abvolt";                                  .why = "bovnar has no unit of this magnitude"; },
   { .code = "acre-USSurvey";                           .why = "bovnar has no unit of this magnitude"; },
-  { .code = "acreFoot";                                .why = "bovnar has no unit of this magnitude"; },
+  { .code = "acreFoot";                                              .why = "OM states 1233.489 m^3, which is the US SURVEY acre-foot; the international acre-foot ac·ft is 1233.48183754752. A different acre, not a rounding"; },
   { .code = "amylaseUnit";                             .why = "an arbitrary unit: its magnitude comes from an assay or a procedure, not from a scale"; },
-  { .code = "are";                                     .why = "bovnar has no unit of this magnitude"; },
   { .code = "bar-Food";                                .why = "a household portion whose magnitude OM does not state"; },
   { .code = "bel";                                     .why = "an arbitrary unit: its magnitude comes from an assay or a procedure, not from a scale"; },
   { .code = "bottle";                                  .why = "a household portion whose magnitude OM does not state"; },
@@ -1388,8 +1427,6 @@
   { .code = "calorie-InternationalTable";              .why = "OM states no factor for this unit, so its magnitude is unknown here"; },
   { .code = "calorie-Mean";                            .why = "bovnar has no unit of this magnitude"; },
   { .code = "calorie-Thermochemical";                  .why = "OM states no factor for this unit, so its magnitude is unknown here"; },
-  { .code = "centiare";                                .why = "bovnar has no unit of this magnitude"; },
-  { .code = "centimetreOfMercury";                     .why = "bovnar has no unit of this magnitude"; },
   { .code = "cicero";                                  .why = "bovnar has no unit of this magnitude"; },
   { .code = "circularMil";                             .why = "bovnar has no unit of this magnitude"; },
   { .code = "colonyFormingUnit";                       .why = "an arbitrary unit: its magnitude comes from an assay or a procedure, not from a scale"; },
@@ -1397,21 +1434,13 @@
   { .code = "colonyFormingUnitPerGram";                .why = "an arbitrary unit: its magnitude comes from an assay or a procedure, not from a scale"; },
   { .code = "colonyFormingUnitPerMillilitre";          .why = "an arbitrary unit: its magnitude comes from an assay or a procedure, not from a scale"; },
   { .code = "cord";                                    .why = "bovnar has no unit of this magnitude"; },
-  { .code = "cubicCentimetrePerCubicCentimetre";       .why = "dimension one — bovnar spells that by omitting the unit slot"; },
-  { .code = "cubicMetrePerCubicmetre";                 .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "cubicMetrePerYear";                       .why = "OM's year is the GREGORIAN 31556952 s; native yr is the Julian 31557600 s, and no native unit states OM's"; },
-  { .code = "cubicMillimetrePerCubicMillimetre";       .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "cup";                                     .why = "a household portion whose magnitude OM does not state"; },
   { .code = "darcy";                                   .why = "bovnar has no unit of this magnitude"; },
   { .code = "dash";                                    .why = "a household portion whose magnitude OM does not state"; },
   { .code = "day-Sidereal";                            .why = "no native sidereal time unit"; },
   { .code = "debye";                                   .why = "bovnar has no unit of this magnitude"; },
   { .code = "deepBowl";                                .why = "a household portion whose magnitude OM does not state"; },
-  { .code = "degreeCelsiusDay";                        .why = "an affine unit away from exponent 1 or beside another component (doc/11 section 3.8)"; },
-  { .code = "degreeCelsiusPerHour";                    .why = "an affine unit away from exponent 1 or beside another component (doc/11 section 3.8)"; },
-  { .code = "degreeCelsiusPerMinute-Time";             .why = "an affine unit away from exponent 1 or beside another component (doc/11 section 3.8)"; },
-  { .code = "degreeCelsiusPerSecond-Time";             .why = "an affine unit away from exponent 1 or beside another component (doc/11 section 3.8)"; },
-  { .code = "degreeReaumur";                           .why = "bovnar has no unit of this magnitude"; },
   { .code = "deltaA450";                               .why = "an arbitrary unit: its magnitude comes from an assay or a procedure, not from a scale"; },
   { .code = "deltaA450PerSecond-Time";                 .why = "an arbitrary unit: its magnitude comes from an assay or a procedure, not from a scale"; },
   { .code = "deltaA450PerSecond-TimePerMilligram";     .why = "an arbitrary unit: its magnitude comes from an assay or a procedure, not from a scale"; },
@@ -1426,18 +1455,14 @@
   { .code = "faraday";                                 .why = "OM states no factor for this unit, so its magnitude is unknown here"; },
   { .code = "fathom-USSurvey";                         .why = "bovnar has no unit of this magnitude"; },
   { .code = "fillet";                                  .why = "a household portion whose magnitude OM does not state"; },
-  { .code = "footPoundal";                             .why = "bovnar has no unit of this magnitude"; },
-  { .code = "footcandle";                              .why = "bovnar has no unit of this magnitude"; },
   { .code = "footlambert";                             .why = "bovnar has no unit of this magnitude"; },
   { .code = "franklin";                                .why = "bovnar has no unit of this magnitude"; },
   { .code = "gigayear";                                .why = "OM's year is the GREGORIAN 31556952 s; native yr is the Julian 31557600 s, and no native unit states OM's"; },
   { .code = "gigayearCubicKiloparsec";                 .why = "OM's year is the GREGORIAN 31556952 s; native yr is the Julian 31557600 s, and no native unit states OM's"; },
   { .code = "gigayearCubicParsec";                     .why = "OM's year is the GREGORIAN 31556952 s; native yr is the Julian 31557600 s, and no native unit states OM's"; },
-  { .code = "gilbert";                                 .why = "bovnar has no unit of this magnitude"; },
   { .code = "glass";                                   .why = "a household portion whose magnitude OM does not state"; },
   { .code = "gramOfCarbonDioxideEquivalent";           .why = "a CO2-equivalent, an accounting quantity that depends on a chosen warming horizon rather than a unit of mass"; },
   { .code = "gramOfCarbonDioxideEquivalentPerKilowattHour"; .why = "a CO2-equivalent, an accounting quantity that depends on a chosen warming horizon rather than a unit of mass"; },
-  { .code = "gramPerGram";                             .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "gross";                                   .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "halfDozen";                               .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "handful";                                 .why = "a household portion whose magnitude OM does not state"; },
@@ -1449,13 +1474,11 @@
   { .code = "hour-Sidereal";                           .why = "no native sidereal time unit"; },
   { .code = "hundredCount";                            .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "jansky";                                  .why = "OM states no factor for this unit, so its magnitude is unknown here"; },
-  { .code = "kayser";                                  .why = "bovnar has no unit of this magnitude"; },
   { .code = "kilocalorie-Mean";                        .why = "bovnar has no unit of this magnitude"; },
   { .code = "kilocalorie-MeanPerDay";                  .why = "bovnar has no unit of this magnitude"; },
   { .code = "kilocalorie-MeanPerHectogram";            .why = "bovnar has no unit of this magnitude"; },
   { .code = "kilogramOfCarbonDioxideEquivalent";       .why = "a CO2-equivalent, an accounting quantity that depends on a chosen warming horizon rather than a unit of mass"; },
   { .code = "kilogramOfCarbonDioxideEquivalentPerMegawattHour"; .why = "a CO2-equivalent, an accounting quantity that depends on a chosen warming horizon rather than a unit of mass"; },
-  { .code = "kilogramPerKilogram";                     .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "lambert";                                 .why = "bovnar has no unit of this magnitude"; },
   { .code = "litrePer100Kilometre";                    .why = "bovnar has no unit of this magnitude"; },
   { .code = "magnitude";                               .why = "an arbitrary unit: its magnitude comes from an assay or a procedure, not from a scale"; },
@@ -1464,8 +1487,6 @@
   { .code = "megaeuroPerMegatonne";                    .why = "a currency: OM models money as a unit, bovnar carries currencies in a system of their own (doc/11 section 7.2)"; },
   { .code = "megaeuroPerMegawatt";                     .why = "a currency: OM models money as a unit, bovnar carries currencies in a system of their own (doc/11 section 7.2)"; },
   { .code = "megaeuroPerPetajoule";                    .why = "a currency: OM models money as a unit, bovnar carries currencies in a system of their own (doc/11 section 7.2)"; },
-  { .code = "metreOfMercury";                          .why = "bovnar has no unit of this magnitude"; },
-  { .code = "metrePerMetre";                           .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "micromagnitude";                          .why = "an arbitrary unit: its magnitude comes from an assay or a procedure, not from a scale"; },
   { .code = "mil-Angle";                               .why = "bovnar has no unit of this magnitude"; },
   { .code = "mile-USSurvey";                           .why = "bovnar has no unit of this magnitude"; },
@@ -1474,7 +1495,6 @@
   { .code = "millisecond-AnglePerYear";                .why = "OM's year is the GREGORIAN 31556952 s; native yr is the Julian 31557600 s, and no native unit states OM's"; },
   { .code = "minute-HourAngle";                        .why = "an ANGLE spelled like a time; bovnar has no hour-angle unit"; },
   { .code = "minute-Sidereal";                         .why = "no native sidereal time unit"; },
-  { .code = "molePerMole";                             .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "month";                                   .why = "OM states no factor for this unit, so its magnitude is unknown here"; },
   { .code = "one";                                     .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "partsPerMillionPerYear";                  .why = "OM's year is the GREGORIAN 31556952 s; native yr is the Julian 31557600 s, and no native unit states OM's"; },
@@ -1491,15 +1511,10 @@
   { .code = "point-Postscript";                        .why = "bovnar has no unit of this magnitude"; },
   { .code = "point-TeX";                               .why = "bovnar has no unit of this magnitude"; },
   { .code = "portion";                                 .why = "a household portion whose magnitude OM does not state"; },
-  { .code = "poundApothecaries";                       .why = "bovnar has no unit of this magnitude"; },
   { .code = "poundSterling";                           .why = "a currency: OM models money as a unit, bovnar carries currencies in a system of their own (doc/11 section 7.2)"; },
-  { .code = "poundal";                                 .why = "bovnar has no unit of this magnitude"; },
   { .code = "quad";                                    .why = "OM states no factor for this unit, so its magnitude is unknown here"; },
-  { .code = "quart-Imperial";                          .why = "bovnar has no unit of this magnitude"; },
-  { .code = "reciprocalDegreeCelsius";                 .why = "an affine unit away from exponent 1 or beside another component (doc/11 section 3.8)"; },
   { .code = "reciprocalDegreeCelsiusDay";              .why = "an affine unit away from exponent 1 or beside another component (doc/11 section 3.8)"; },
   { .code = "reciprocalYear";                          .why = "OM's year is the GREGORIAN 31556952 s; native yr is the Julian 31557600 s, and no native unit states OM's"; },
-  { .code = "rhe";                                     .why = "bovnar has no unit of this magnitude"; },
   { .code = "rod-US";                                  .why = "bovnar has no unit of this magnitude"; },
   { .code = "scoop";                                   .why = "a household portion whose magnitude OM does not state"; },
   { .code = "second-HourAngle";                        .why = "an ANGLE spelled like a time; bovnar has no hour-angle unit"; },
@@ -1514,7 +1529,6 @@
   { .code = "solarMassPerGigayearCubicParsec";         .why = "OM's year is the GREGORIAN 31556952 s; native yr is the Julian 31557600 s, and no native unit states OM's"; },
   { .code = "solarRadius";                             .why = "bovnar has no unit of this magnitude"; },
   { .code = "spread";                                  .why = "a household portion whose magnitude OM does not state"; },
-  { .code = "squareMetrePerSquareMetre";               .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "squareMile-Statute";                      .why = "OM states no factor for this unit, so its magnitude is unknown here"; },
   { .code = "statampere";                              .why = "bovnar has no unit of this magnitude"; },
   { .code = "statcoulomb";                             .why = "bovnar has no unit of this magnitude"; },
@@ -1527,7 +1541,6 @@
   { .code = "statweber";                               .why = "bovnar has no unit of this magnitude"; },
   { .code = "therm-EC";                                .why = "bovnar has no unit of this magnitude"; },
   { .code = "thousandPiece";                           .why = "dimension one — bovnar spells that by omitting the unit slot"; },
-  { .code = "ton-Force-Short";                         .why = "bovnar has no unit of this magnitude"; },
   { .code = "ton-Register";                            .why = "OM states no factor for this unit, so its magnitude is unknown here"; },
   { .code = "ton-ShortAssay";                          .why = "bovnar has no unit of this magnitude"; },
   { .code = "tonOfRefrigeration";                      .why = "bovnar has no unit of this magnitude"; },

@@ -50,6 +50,17 @@ that function. It uses QUDT's own unit-to-quantity-kind links to check the two
 QUDT tables against each other, on the one axis the factor comparison is blind
 to, and a disagreement there fails the run like a MISMATCH.
 
+AND ONE THAT COMPARES TWO BOVNAR TABLES RATHER THAN A TABLE AND A PUBLISHER.
+Everything above asks whether one of these tables agrees with the vocabulary it
+came from. A defect can survive that by being consistent within its own
+vocabulary: QUDT models the international unit as an amount of substance
+throughout, so nothing internal to QUDT objects to `IU-PER-MilliGM` becoming
+µmol/kg — while UCUM, and bovnar's own ucum table, hold [IU] to be arbitrary and
+commensurable with nothing. `check_cross_reference` uses QUDT's published
+ucumCode/udunitsCode as a claim that two rows in two different bovnar tables
+describe one unit, and checks that they do. It found three defects the other two
+could not.
+
 ALL SEVEN PROFILES ARE COVERED, BUT NOT ALL EQUALLY. `ucum`, `udunits`, `qudt`,
 `qudt-qk`, `om` and `cf` are checked against their publishers' own definitions.
 `unece` is checked at ONE REMOVE, through QUDT's `qudt:uneceCommonCode`
@@ -365,6 +376,13 @@ WAIVED_UPSTREAM = {
     ("qudt", "BTU_TH-PER-MIN"):
         "QUDT rounds to 17.573 (5 digits); the exact value is 17.5725044. "
         "28 ppm, publisher rounding.",
+    ("qudt", "S_Ab"):
+        "QUDT gives the absiemens the dimension vector of the siemens per METRE "
+        "(A0E2L-3I0M-1H0T3D0) while giving its own S the correct L-2. Its "
+        "description says \"equal to 10^9 siemen\", its ucumCode says \"GS\", and "
+        "its abohm, abfarad and abhenry all carry the conductance-shaped vector "
+        "— four things against one. Native G~S is the conductance the name "
+        "means; following the vector produced a conductivity, out by a metre.",
     ("qudt", "BTU_TH-FT-PER-HR-FT2-DEG_F"):
         "QUDT rounds to 1.73 (3 digits) while stating the SAME unit under "
         "BTU_TH-FT-PER-FT2-HR-DEG_F as 1.729577206 — the operands reordered and "
@@ -396,6 +414,18 @@ WAIVED_UPSTREAM = {
         "Rec 20's torr, reached through qudt:TORR and carrying the same 6-digit "
         "rounding already waived there. 2.8 ppm; native Torr is the exact "
         "101325/760.",
+    ("om", "metreOfMercury"):
+        "The same 6-digit rounding of the mercury column OM applies to its "
+        "millimetreOfMercury below, a thousand times over: 133322 against the "
+        "exact conventional 133322.387415. 2.9 ppm.",
+    ("om", "centimetreOfMercury"):
+        "The same rounding again at the centimetre: 1333.22 against "
+        "1333.22387415. 2.9 ppm.",
+    ("om", "quart-Imperial"):
+        "OM states the imperial quart at five digits, 0.0011365 m³ against the "
+        "exact 0.0011365225 — 20 ppm. Its OWN imperial pint, gallon, gill and "
+        "fluid ounce are exact and all four are mapped, so this is one coarse "
+        "row rather than a different quart.",
     ("om", "millimetreOfMercury"):
         "OM rounds the mercury column to 133.322 Pa (6 digits); native mmHg is "
         "the exact conventional 133.322387415 Pa. 2.9 ppm, the same publisher "
@@ -406,6 +436,92 @@ WAIVED_UPSTREAM = {
 # QUDT unit -> quantity kind links that QUDT itself has filed under the wrong
 # kind, checked by check_quantity_kinds below. Same standing as WAIVED_UPSTREAM
 # and reported the same way: a note on every run, never a silent skip.
+# QUDT cross-references (its ucumCode / udunitsCode) that do not describe the
+# unit they are attached to, checked by check_cross_reference below. Same
+# standing as WAIVED_UPSTREAM and reported the same way. Keyed on
+# (QUDT local name, the cross-referenced code).
+WAIVED_XREF = {
+    ("BIT-PER-SEC", "Bd"):
+        "QUDT cross-references the bit per second to the BAUD. A baud is a "
+        "SYMBOL rate and a bit per second an information rate; one symbol "
+        "carries one bit only in a binary modulation. bovnar keeps Bd and b/s "
+        "apart for that reason, and both rows are right.",
+    ("BIT-PER-SEC", "bps"):
+        "UDUNITS' bps is its baud — the same conflation as the ucumCode above.",
+    ("MegaBIT-PER-SEC", "MBd"):
+        "The megabaud, for the megabit per second: see BIT-PER-SEC ~ Bd.",
+    ("TeraW-HR", "TW/h"):
+        "A terawatt-HOUR cross-referenced to a terawatt PER hour. QUDT's own "
+        "multiplier (3.6e15) is the energy, so the code is a typo for TW.h.",
+    ("GM-PER-DEG_C", "d/Cel"):
+        "'d' is the DAY. QUDT's multiplier (0.001) and its own label say gram "
+        "per degree Celsius, so the code is a typo for g/Cel.",
+    ("GM-PER-DEG_C", "d.Cel-1"):
+        "The other spelling of the d/Cel typo: 'd' is the day.",
+    ("DRAM_US", "fldr"):
+        "UDUNITS' fldr is the FLUID dram, a volume. QUDT's own multiplier and "
+        "dimension vector for DRAM_US are a mass (0.0038879346 kg, the "
+        "apothecary dram), so the cross-reference names a different quantity "
+        "entirely.",
+    ("DeciM3-PER-MIN", "dm3.min-3"):
+        "min-3 is the minute CUBED. QUDT's own multiplier (1.666667e-5) is a "
+        "cubic decimetre per minute, so the exponent is a typo for -1.",
+    ("DeciM3-PER-MIN", "dm3/min3"):
+        "The same cubed minute as the other spelling of this code.",
+    ("MilliL-PER-CentiM2-MIN", "mL.cm-2"):
+        "The code has lost the minute. QUDT's own multiplier (1.666667e-4) "
+        "carries it, so the row does too.",
+    ("OHM-M2-PER-M", "Ohm2.m.m-1"):
+        "Ω²·m/m is Ω². QUDT's dimension vector is the ohm-metre, so the code "
+        "is a typo for Ohm.m2.m-1.",
+    ("N-M-PER-KiloGM", "gp"):
+        "UDUNITS' gp is the geopotential, an acceleration; the newton-metre "
+        "per kilogram is a specific energy. The two differ by a length.",
+    ("OZ_VOL_US", "fl oz"):
+        "A SPACE MULTIPLIES in UDUNITS, and 'fl' is a femtolitre, so 'fl oz' "
+        "reads as 1e-15 L times a fluid ounce. bovnar reproduces UDUNITS' own "
+        "grammar; the code wanted UDUNITS' floz.",
+    ("S_Ab", "GS"):
+        "The gigasiemens is what the absiemens IS — this cross-reference is the "
+        "evidence the row now follows. It disagrees only because QUDT's "
+        "dimension vector for the unit does not; see the WAIVED_UPSTREAM entry.",
+    # The thermal-conductivity pair: QUDT's UCUM form has lost the foot that
+    # makes it a conductivity rather than a conductance per unit area. Both
+    # spellings of the code carry the same loss.
+    ("BTU_TH-FT-PER-FT2-HR-DEG_F", "[Btu_th].[ft_i]-2.h-1.[degF]-1"):
+        "The code is a thermal conductance per unit area; QUDT's own multiplier "
+        "(1.729577206) is the conductivity, i.e. that times a foot. The foot is "
+        "missing from the code, not from the unit.",
+    ("BTU_TH-FT-PER-FT2-HR-DEG_F", "[Btu_th]/([ft_i]2.h.[degF])"):
+        "The same missing foot as the other spelling of this code.",
+    # An affine scale inside a product. UCUM is an EXPRESSION profile, so `Cel`
+    # translates as the atom it is — bovnar's °C — and a compound holding it has
+    # no SI factor, exactly as the native °C/h has none (doc/11 §3.8). A flat
+    # profile states the whole code and can say what it means, which is why the
+    # QUDT rows read K. Neither is wrong; they are two grammars.
+    ("CentiM-SEC-DEG_C", "cm.s.Cel-1"):
+        "UCUM translates the atom Cel to the affine °C, and an affine scale in "
+        "a product has no value (doc/11 §3.8); the flat QUDT code names the "
+        "whole unit and so can read the interval, K. A grammar difference.",
+    ("CentiM-SEC-DEG_C", "cm.s/Cel"):
+        "The same grammar difference as the other spelling.",
+    ("DEG_F-HR-FT2-PER-BTU_TH", "[degF].h-1.[ft_i]-2.[Btu_th]-1"):
+        "As CentiM-SEC-DEG_C: UCUM's [degF] is the affine scale, the QUDT row "
+        "reads the interval Δ°F. The code also inverts the hour and the square "
+        "foot against QUDT's own multiplier.",
+    ("DEG_F-HR-FT2-PER-BTU_TH", "[degF]/(h.[ft_i]2.[Btu_th])"):
+        "The same as the other spelling of this code.",
+    ("IU-PER-MilliGM", "[IU].mg-1"):
+        "This is the cross-reference the row now follows: UCUM declares [IU] "
+        "ARBITRARY, so the code is not commensurable with a molar amount and "
+        "the QUDT row is refused. Kept here because the pair is still compared.",
+    ("NP-PER-SEC", "Np.s-1"):
+        "This cross-reference is the evidence the row now follows; it is "
+        "listed so the pair keeps being compared rather than falling silent.",
+    ("NP-PER-SEC", "Np/s"):
+        "As the other spelling: the evidence for the fix, kept under comparison.",
+}
+
 WAIVED_KIND = {
     ("LM-PER-M2", "Luminance"):
         "A lumen per square metre is a LUX — illuminance, the luminous flux "
@@ -416,6 +532,12 @@ WAIVED_KIND = {
     ("LM-PER-FT2", "Luminance"):
         "The same misfiling as LM-PER-M2, in square feet: lumens per unit area "
         "is illuminance, not luminance.",
+    ("S_Ab", "ElectricConductivity"):
+        "The same QUDT slip as the WAIVED_UPSTREAM entry for this unit, seen "
+        "from the other side: having given the absiemens a conductivity's "
+        "dimension vector, QUDT files it under ElectricConductivity. It is a "
+        "conductance (10^9 S), which is what its own description and ucumCode "
+        "say, so the kind link is wrong here rather than the unit.",
     ("KiloBYTE-PER-SEC", "DataRate"):
         "QUDT gives DataRate eight applicable units: seven bit rates and this "
         "one byte rate. bovnar carries bit and byte as separate kinds with no "
@@ -1384,6 +1506,79 @@ def load_native_convertible():
     return convertible
 
 
+def check_cross_reference(cache, convertible, verbose):
+    """QUDT's ucumCode/udunitsCode links, as a check of one table against another.
+
+    WHAT THIS SEES THAT NOTHING ELSE DOES. Every other comparison here is one
+    bovnar table against one publisher. This is one bovnar table against
+    ANOTHER, with a publisher's own cross-reference as the claim that the two
+    rows describe the same unit: QUDT states, for most of the units it defines,
+    the UCUM code and the UDUNITS code for that unit, and bovnar maps all three
+    vocabularies independently. So `qudt:X` and `ucum:<X's ucumCode>` must land
+    on units that are inter-convertible — same dimension AND same quantity kind.
+
+    Three defects it found that neither the factor comparison nor
+    check_quantity_kinds could:
+
+      qudt:NP-PER-SEC -> s^-1        a neper per second is not a reciprocal
+                                     second. QUDT files it under a quantity kind
+                                     literally named "Unknown", so the kind check
+                                     had nothing to compare; its ucumCode "Np/s"
+                                     said so plainly.
+      qudt:IU-PER-MilliGM -> µmol/kg QUDT models the international unit as an
+                                     amount of substance and is self-consistent
+                                     about it, so nothing internal to QUDT could
+                                     object. Its ucumCode is "[IU].mg-1", and
+                                     UCUM declares [IU] ARBITRARY — bovnar's own
+                                     ucum table carries it as an opaque unit
+                                     commensurable with nothing. One library,
+                                     two answers for one quantity.
+      qudt:S_Ab -> a conductivity    QUDT gives the absiemens the dimension
+                                     vector of the siemens per metre, and its
+                                     quantity kind to match, so both internal
+                                     checks agreed with it. Its ucumCode is "GS".
+
+    A cross-reference is EVIDENCE, not proof — the same standing `class Unece`
+    has, and for the same reason: a disagreement says one of the two tables is
+    wrong, never which. Seventeen of them are QUDT's own (a code that reads
+    "TW/h" for the terawatt-hour, "d/Cel" for the gram per degree Celsius, a
+    thermal conductivity whose UCUM form has lost its foot), and each is waived
+    by name in WAIVED_XREF with what the evidence was."""
+    units = parse_ttl(os.path.join(cache, "qudt-units.ttl"), "unit")
+    doc = bvnr_data.load(open(os.path.join(GENDATA, "qudt.bvnr"), "rb").read())
+    tgt = {m["code"]: m["bovnar"] for m in doc.get("mapped", [])}
+    bad, notes, checked, unreachable = [], [], 0, 0
+    for local in sorted(units):
+        mine = tgt.get(local)
+        if mine is None:
+            continue
+        for pred, ns in (("ucumCode", "ucum"), ("udunitsCode", "udunits")):
+            for raw in units[local].get(pred, []):
+                code = raw.split("^^")[0].strip().strip('"')
+                if not code:
+                    continue
+                if (local, code) in WAIVED_XREF:
+                    notes.append("  %-26s ~ %s:%-24s %s"
+                                 % (local, ns, code, WAIVED_XREF[(local, code)]))
+                    continue
+                ok = convertible(mine, "%s:%s" % (ns, code))
+                if ok is None:
+                    # The library refuses the cross-referenced spelling — the
+                    # code names something that vocabulary does not define, or
+                    # something bovnar carries as unsupported. Not a claim about
+                    # the row under test.
+                    unreachable += 1
+                    continue
+                checked += 1
+                if not ok:
+                    bad.append("  %-26s -> %-20s is not convertible with "
+                               "%s:%s" % (local, mine, ns, code))
+                elif verbose:
+                    print("    xref ok %-24s -> %-14s ~ %s:%s"
+                          % (local, mine, ns, code))
+    return bad, notes, checked, unreachable
+
+
 def check_quantity_kinds(cache, convertible, verbose):
     """QUDT's own unit -> quantity-kind links, as a check on both tables.
 
@@ -1527,7 +1722,45 @@ def check_profile(ns, vocab, native, native_index, verbose):
             missing.append("  %-22s == native %-12s (%.10g)" % (code, hit[0],
                                                                 hit[1]))
 
-    return mismatch, dead, missing, notes, checked
+    # STALE REFUSALS. A code in `.unsupported` whose value an existing native
+    # expression already covers.
+    #
+    # The MISSING sweep above only looks at codes the table has NOT declared, so
+    # a refusal is invisible to it forever: the reason was true when it was
+    # written and nothing re-asks. That is how om:are (a centihectare),
+    # om:poundal (lb·ft/s²), qudt:DeciM3-PER-MIN (a litre per minute) and forty
+    # more sat refused while the registry could spell every one of them, and how
+    # a refusal written because a unit was missing outlives the unit being
+    # added.
+    #
+    # Advisory, like MISSING, and for a stronger reason: the value matching is
+    # not proof. A dimensionless refusal matches the first dimensionless native
+    # unit by construction, om:shake (1e-8 s) "matches" c~P/bar because the
+    # dimensions happen to agree, and a footcandle matches cd/ft² — a LUMINANCE
+    # — as readily as the lm/ft² it actually is. The output is a list to read,
+    # not a list to apply.
+    stale = []
+    for r in doc.get("unsupported", []):
+        code = str(r["code"])
+        try:
+            up = vocab.resolve(code)
+        except Exception:
+            continue
+        if up is None:
+            continue
+        # A DIMENSIONLESS refusal matches something dimensionless by
+        # construction -- every native ratio, the bit, the radian and the
+        # decibel share the empty vector -- and "nothing here can tell which
+        # one it is" is the reason most of them were refused. Reporting those
+        # would bury the real finds under nine hundred non-answers.
+        if not any(up[1]):
+            continue
+        hit = native_index.match(vocab, up)
+        if hit:
+            stale.append("  %-28s == native %-16s (refused: %s)"
+                         % (code, hit[0], r.get("why", "")[:44]))
+
+    return mismatch, dead, missing, notes, checked, stale
 
 
 def fetch(cache, which):
@@ -1593,11 +1826,12 @@ def main(argv):
 
     native_index = NativeIndex(native)
     total_mismatch = total_dead = total_missing = total_checked = 0
+    total_stale = 0
     for ns in available:
         vocab = VOCABS[ns](args.cache)
         if args.verbose:
             print("  %s:" % ns)
-        mism, dead, missing, notes, checked = check_profile(
+        mism, dead, missing, notes, checked, stale = check_profile(
             ns, vocab, native, native_index, args.verbose)
         if getattr(vocab, "secondary", False):
             doc = bvnr_data.load(
@@ -1634,6 +1868,13 @@ def main(argv):
                   "are unmapped (%d, advisory):" % (ns.upper(), len(missing)))
             for line in missing:
                 print(line)
+        if stale and args.verbose:
+            print("\n%s — REFUSALS an existing native expression now covers "
+                  "(%d, advisory — read them, do not apply them):"
+                  % (ns.upper(), len(stale)))
+            for line in stale:
+                print(line)
+        total_stale += len(stale)
         total_mismatch += len(mism)
         total_dead += len(dead)
         total_missing += len(missing)
@@ -1641,6 +1882,7 @@ def main(argv):
     # The one comparison that is not a number against a number. It needs both
     # QUDT vocabularies cached, since it is QUDT's own link between them.
     kind_bad, kind_checked = [], 0
+    xref_bad, xref_checked, xref_skipped = [], 0, 0
     if "qudt" in available and "qudt-qk" in available:
         convertible = load_native_convertible()
         if convertible is not None:
@@ -1657,16 +1899,37 @@ def main(argv):
                       % len(kind_bad))
                 for line in kind_bad:
                     print(line)
+            xref_bad, xref_notes, xref_checked, xref_skipped = \
+                check_cross_reference(args.cache, convertible, args.verbose)
+            if xref_notes:
+                print("\nCROSS-REFERENCE — waived, QUDT's own code does not "
+                      "describe the unit it is attached to (%d):"
+                      % len(xref_notes))
+                for line in xref_notes:
+                    print(line)
+            if xref_bad:
+                print("\nCROSS-REFERENCE — bovnar's translation of a QUDT code "
+                      "and of the UCUM/UDUNITS code QUDT gives for it are not "
+                      "the same unit (%d):" % len(xref_bad))
+                for line in xref_bad:
+                    print(line)
 
     print("\ncheck_profile_factors: %d row(s) compared across %s; "
           "%d mismatch, %d dead, %d unmapped-but-exact%s"
           % (total_checked, ", ".join(available), total_mismatch, total_dead,
              total_missing, "" if args.verbose else
              " (--verbose to list the last two)"))
+    print("check_profile_factors: %d refusal(s) an existing native expression "
+          "would now cover%s" % (total_stale, "" if args.verbose else
+          " (--verbose to list them)"))
     if kind_checked:
         print("check_profile_factors: %d unit/quantity-kind pair(s) checked "
               "for quantity kind; %d disagree" % (kind_checked, len(kind_bad)))
-    if total_mismatch or kind_bad:
+    if xref_checked:
+        print("check_profile_factors: %d QUDT cross-reference(s) compared "
+              "against the ucum/udunits tables; %d disagree (%d not reachable)"
+              % (xref_checked, len(xref_bad), xref_skipped))
+    if total_mismatch or kind_bad or xref_bad:
         return 1
     if total_dead and args.strict_dead:
         return 1

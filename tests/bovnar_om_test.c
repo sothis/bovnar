@@ -262,16 +262,29 @@ static void test_refusals(void)
 	chk_error("om:UnitedStatesDollar", error_unit_profile_unsupported);
 	chk_error("om:euro",               error_unit_profile_unsupported);
 
-	/* Dimension one is spelled by omitting the unit, so OM's ratios have no
-	 * translation that would not make a count equal a percentage. */
-	chk_error("om:one",           error_unit_profile_unsupported);
-	chk_error("om:metrePerMetre", error_unit_profile_unsupported);
-	chk_error("om:dozen",         error_unit_profile_unsupported);
+	/* Dimension one is spelled by omitting the unit, so a code that means
+	 * "the number one" has no translation that would not make a count equal a
+	 * percentage. */
+	chk_error("om:one",   error_unit_profile_unsupported);
+	chk_error("om:dozen", error_unit_profile_unsupported);
+
+	/* A ratio of two of the SAME unit is not that code. It says what it is a
+	 * ratio OF, and bovnar can spell it, so it maps to the compound rather than
+	 * being collapsed onto the generic ratio unit -- which is the distinction
+	 * unece.bvnr already draws (3H is k~g/k~g; the mg/kg-shaped codes worth
+	 * exactly ppm stay out). This used to be refused alongside om:one. */
+	chk_str("om:metrePerMetre",             "m/m");
+	chk_str("om:kilogramPerKilogram",       "k~g/k~g");
+	chk_str("om:squareMetrePerSquareMetre", "m²/m²");
 
 	/* An affine unit means nothing away from exponent 1 or beside another
-	 * component (doc/11 §3.8), and OM has units that do exactly that. */
-	chk_error("om:degreeCelsiusPerHour",    error_unit_profile_unsupported);
-	chk_error("om:reciprocalDegreeCelsius", error_unit_profile_unsupported);
+	 * component (doc/11 §3.8) -- which is exactly why a degree Celsius appearing
+	 * in a compound is the INTERVAL, and the interval is the kelvin. qudt.bvnr
+	 * has always read DEG_C-PER-SEC as K/s; these agree with it now instead of
+	 * refusing the same construct in the other vocabulary. */
+	chk_str("om:degreeCelsiusPerHour",    "K/h");
+	chk_str("om:reciprocalDegreeCelsius", "K⁻¹");
+	chk_str("om:degreeCelsiusDay",        "K·d");
 
 	/* A unit OM defines without stating a magnitude cannot be carried: OM gives
 	 * calorie-15C a dimension and no factor. */

@@ -978,7 +978,15 @@ typedef enum bvnr_unit_rule_mode_e {
  * the caller has NAMED, so a value it cannot be applied to is
  * error_unit_mismatch rather than a value left alone: silence would defeat the
  * point of naming it. That includes a value with no unit at all -- ".speed is
- * m/s" is not satisfied by a bare number. */
+ * m/s" is not satisfied by a bare number.
+ *
+ * It also includes a value the reader cannot LOCATE. A key path is recorded to a
+ * bounded depth and length; a document that outruns either leaves the position
+ * of everything below it unknown, and a rule that cannot be evaluated is refused
+ * with error_unit_mismatch rather than skipped -- "I could not check it" is not
+ * "it holds". `targets`, `normalise`, `require_unit` and `require_dimension_of`
+ * ask about the value rather than about where it sits and are unaffected, so a
+ * document of any depth reads normally under those. See doc/06 section 2.7. */
 typedef struct bvnr_unit_rule_s {
 	const char*		path;
 	const char*		unit;

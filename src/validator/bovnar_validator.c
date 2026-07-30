@@ -260,7 +260,7 @@ int32_t bvn_policy_match_rule(const bvn_unit_policy_state_t* pol,
 	char     cur[BVN_PATH_MAX_BYTES + BVN_PATH_MAX_KEY + 2u];
 	uint32_t cur_len = 0u;
 	if (!bvn_path_current(path, cur, (uint32_t)sizeof cur, &cur_len))
-		return -1;
+		return BVN_POLICY_PATH_UNKNOWN;
 	for (uint32_t i = 0; i < pol->num_rules; i++) {
 		if (bvn_path_matches(&pol->rule[i], cur, cur_len))
 			return (int32_t)i;
@@ -555,6 +555,30 @@ static bool bvn_apply_unit_assertions(bvnr_reader_t* r, token_type_t tt,
 	 * target is. */
 	if (v->policy.num_rules) {
 		int32_t idx = bvn_policy_match_rule(&v->policy, &v->path);
+		/*
+		 * The position could not be established -- the document nested deeper
+		 * than BVN_PATH_MAX_DEPTH, or a key path outgrew BVN_PATH_MAX_BYTES.
+		 * The path machinery is careful never to report a WRONG position (see
+		 * bvn_key_path_t), which leaves exactly two honest answers here, and
+		 * this used to take the quieter one: no rule matched, carry on.
+		 *
+		 * That is the silence this whole mechanism refuses everywhere else. A
+		 * per-field rule is an ASSERTION the caller made by naming a field, and
+		 * the header says so: a value a rule cannot be applied to is
+		 * error_unit_mismatch rather than a value left alone, "silence would
+		 * defeat the point of naming it". A rule that stops asserting because
+		 * the document got deep is that defeat with no way to notice it --
+		 * `.reactor.…35 levels….pressure is a pressure` simply stopped being
+		 * checked, and the parse still said yes.
+		 *
+		 * So it refuses. error_unit_mismatch is the policy's own code and this
+		 * is a policy requirement that could not be met; a document this deep
+		 * can still be read with whole-document `targets`, which need no path.
+		 */
+		if (idx == BVN_POLICY_PATH_UNKNOWN) {
+			v->last_error = error_unit_mismatch;
+			return false;
+		}
 		if (idx >= 0) {
 			const bvn_unit_rule_state_t* rl = &v->policy.rule[idx];
 			if (!bvn_policy_selects(d->value_unit, rl->unit)) {

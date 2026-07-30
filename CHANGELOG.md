@@ -20,6 +20,91 @@ rebuild consumers against the new headers. **SOVERSION is bumped 1 → 2**
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
 
+### Fixed — three more profile mappings, found by comparing two of our own tables
+
+The quantity-kind gate added last pass compares a QUDT unit against the QUDT
+quantity kind it is filed under. A defect survives that by being consistent
+*within* its own vocabulary, and three were:
+
+```
+qudt:NP-PER-SEC       -> s^-1        a neper per second is not a reciprocal second.
+                                     QUDT files it under a kind literally named
+                                     "Unknown", so there was nothing to compare it to.
+qudt:IU-PER-MilliGM   -> µ~mol/k~g   QUDT models the international unit as an amount of
+                                     substance THROUGHOUT, so nothing internal to QUDT
+                                     objected. UCUM declares [IU] arbitrary and bovnar
+                                     carries it as an opaque unit commensurable with
+                                     nothing — one library, two answers, and an IU is
+                                     assay-defined (0.3 µg retinol, 0.025 µg vitamin D).
+qudt:S_Ab             -> a conductivity   QUDT gives the absiemens the dimension vector
+                                     of the siemens per METRE, and a matching quantity
+                                     kind, so both internal checks agreed with it.
+```
+
+What settled all three was QUDT's own `ucumCode`: `Np/s`, `[IU].mg-1`, `GS`.
+`check_cross_reference` makes that a gate — 2640 published cross-references
+compared, each asking whether bovnar's translation of a QUDT code and of the
+UCUM or UDUNITS code QUDT gives for it are the same unit. It is the first check
+here that compares two of *our* tables rather than one of ours against a
+publisher, which is exactly the axis a self-consistent publisher error hides in.
+
+Eighteen disagreements are QUDT's own and waived by name: a terawatt-hour whose
+code reads `TW/h`, a gram per degree Celsius written `d/Cel` (the day), a thermal
+conductivity whose UCUM form has lost its foot, `fl oz` for the fluid ounce —
+where a space multiplies in UDUNITS and `fl` is a femtolitre. It then caught
+three more the moment new rows were added, all publisher slips: a mass unit
+cross-referenced to `fldr` (a volume), and two codes with a cubed or missing
+minute.
+
+### Fixed — a per-field rule stopped asserting when a document got deep
+
+A key path is recorded to a bounded depth and length. Past either, the reader
+cannot say where a value sits — and a policy rule naming that field silently
+stopped applying. `targets` on the same document kept working, so nothing looked
+wrong.
+
+The path machinery is careful never to report a position it is unsure of, which
+leaves two honest answers, and this took the quieter one. It is the silence the
+mechanism refuses everywhere else: the header says a value a rule cannot be
+applied to is `error_unit_mismatch` because "silence would defeat the point of
+naming it", and a rule that stops asserting because a document nested past 32
+structs is that defeat with nothing to notice it by. Both the reader and the
+writer now refuse an undecidable rule. `targets`, `normalise`, `require_unit`
+and `require_dimension_of` ask about the value rather than about where it sits
+and are unaffected, so a document of any depth still reads normally under those.
+
+### Added — 100+ refusals an existing native expression already covered
+
+A refusal is written once and nothing re-asks it, so a reason that was true
+becomes a reason that is stale — most obviously when the unit it named as
+missing is later added. Sweeping every profile's `.unsupported` list against the
+native registry found:
+
+* **a degree Celsius inside a compound**, refused in `om` and in half of `qudt`
+  while `qudt:DEG_C-PER-SEC` had always read `K/s`. K in a compound *is* the
+  interval, so `om:degreeCelsiusPerHour`, `qudt:DEG_C-PER-HR`, `PER-DEG_C`,
+  `BAR-PER-DEG_C` and the Fahrenheit and BTU_IT families now read K and Δ°F, as
+  their already-mapped siblings do;
+* **a ratio of two of the same unit** — `om:metrePerMetre`, `gramPerGram`,
+  `kilogramPerKilogram` — refused as "dimension one" while `unece:3H` spells
+  exactly that as `k~g/k~g`. The compound keeps *a ratio of what*;
+* **units the registry had under another spelling**: `om:are` is a
+  centihectare, `om:poundApothecaries` the troy pound, `om:degreeReaumur` the
+  Réaumur degree that was there all along, `qudt:DeciM3-PER-MIN` a litre per
+  minute;
+* **compounds the registry can build**: a poundal is `lb·ft/s²`, a footcandle a
+  lumen per square foot — *not* `cd/ft²`, which is what matching on dimension
+  alone picks and is a luminance;
+* **`unece:DRA`, `unece:LBT`, `qudt:DRAM_US`, `LB_T`, `Hundredweight_UK`**,
+  which the apothecary dram, troy pound and long hundredweight unblocked.
+
+The sweep is now part of `check_profile_factors.py` as a `--verbose` advisory,
+so a refusal that goes stale is visible rather than permanent. Advisory rather
+than fatal, and for a stronger reason than the coverage suggestion beside it:
+matching on value is not proof. A dimensionless refusal matches the first
+dimensionless native unit by construction, and `om:shake` "matches" `c~P/bar`
+because the dimensions happen to agree. It is a list to read, not to apply.
+
 ### Fixed — seven profile mappings turned an information quantity into a frequency
 
 `qudt-qk:BitRate` translated to **`Hz`**. `ByteRate` to `Hz`. `BitTransmissionRate` and

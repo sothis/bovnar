@@ -9409,6 +9409,20 @@ the reason in [4.2](#42-a-bare-number-matches-only-no_unit).
 
 Every unit string is parsed by the setter, so the strings themselves need not outlive the call.
 
+**A rule needs to know where a value sits, and there is a depth past which the reader cannot say.**
+A key path is recorded to a bounded depth (32 nested structs) and a bounded length (256 bytes, with
+each key at most 64); a document that outruns either leaves the position of everything below it
+*unknown*. The path machinery never reports a position it is unsure of — matching the wrong field
+is the one failure a per-field rule must not have — so below that point a rule cannot be evaluated,
+and **the parse fails with `error_unit_mismatch`**.
+
+Refusing is the point. A rule is an assertion the caller made by naming a field, so "I could not
+check it" is not "it holds"; a rule that quietly stopped applying once a document got deep would be
+exactly the silence [§2.1](#21-per-field-rules) refuses for a value a rule cannot be applied to.
+Nothing else in a policy is affected — `targets`, `normalise`, `require_unit` and
+`require_dimension_of` ask about the value and never about where it sits, so a document of any
+depth reads normally under those.
+
 ---
 
 ## 3. Resolution order
@@ -9555,7 +9569,7 @@ error in somebody else's file. A rejected policy leaves the previous one in forc
 
 | Error | Raised by |
 |---|---|
-| `error_unit_mismatch` | `require_unit` on a bare value; `require_dimension_of` matching nothing; a value at a path a rule names that is not convertible to the rule's unit |
+| `error_unit_mismatch` | `require_unit` on a bare value; `require_dimension_of` matching nothing; a value at a path a rule names that is not convertible to the rule's unit; a value nested too deep for a rule to be evaluated at all ([§2.7](#27-limits-and-lifetime)) |
 | `error_unit_inexact` | a conversion that cannot be delivered exactly, under `bvnr_inexact_error` |
 
 ---

@@ -22,7 +22,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <meta property="article:published_time" content="2026-07-27">
-<meta property="article:modified_time" content="2026-07-28">
+<meta property="article:modified_time" content="2026-07-30">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar Unit Policy Reference">
@@ -32,7 +32,7 @@
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
 <link rel="alternate" type="text/markdown" href="/doc/06_bovnar_unit_policy.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Unit Policy Reference", "description": "The Bovnar unit policy: what it validates, what it converts, the order it resolves in, and the errors it raises, on both the reader and the writer.", "url": "https://www.bovnar.io/docs/policy/", "mainEntityOfPage": "https://www.bovnar.io/docs/policy/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-07-27", "dateModified": "2026-07-28", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Unit Policy Reference", "item": "https://www.bovnar.io/docs/policy/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Unit Policy Reference", "description": "The Bovnar unit policy: what it validates, what it converts, the order it resolves in, and the errors it raises, on both the reader and the writer.", "url": "https://www.bovnar.io/docs/policy/", "mainEntityOfPage": "https://www.bovnar.io/docs/policy/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-07-27", "dateModified": "2026-07-30", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Unit Policy Reference", "item": "https://www.bovnar.io/docs/policy/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
@@ -218,6 +218,18 @@ the reason in <a href="#42-a-bare-number-matches-only-no_unit">4.2</a>.</p>
 </tbody>
 </table>
 <p>Every unit string is parsed by the setter, so the strings themselves need not outlive the call.</p>
+<p><strong>A rule needs to know where a value sits, and there is a depth past which the reader cannot say.</strong>
+A key path is recorded to a bounded depth (32 nested structs) and a bounded length (256 bytes, with
+each key at most 64); a document that outruns either leaves the position of everything below it
+<em>unknown</em>. The path machinery never reports a position it is unsure of — matching the wrong field
+is the one failure a per-field rule must not have — so below that point a rule cannot be evaluated,
+and <strong>the parse fails with <code>error_unit_mismatch</code></strong>.</p>
+<p>Refusing is the point. A rule is an assertion the caller made by naming a field, so "I could not
+check it" is not "it holds"; a rule that quietly stopped applying once a document got deep would be
+exactly the silence <a href="#21-per-field-rules">§2.1</a> refuses for a value a rule cannot be applied to.
+Nothing else in a policy is affected — <code>targets</code>, <code>normalise</code>, <code>require_unit</code> and
+<code>require_dimension_of</code> ask about the value and never about where it sits, so a document of any
+depth reads normally under those.</p>
 <hr />
 <h2 id="3-resolution-order">3. Resolution order</h2>
 <h3 id="31-the-ladder">3.1 The ladder</h3>
@@ -329,7 +341,7 @@ error in somebody else's file. A rejected policy leaves the previous one in forc
 <tbody>
 <tr>
 <td><code>error_unit_mismatch</code></td>
-<td><code>require_unit</code> on a bare value; <code>require_dimension_of</code> matching nothing; a value at a path a rule names that is not convertible to the rule's unit</td>
+<td><code>require_unit</code> on a bare value; <code>require_dimension_of</code> matching nothing; a value at a path a rule names that is not convertible to the rule's unit; a value nested too deep for a rule to be evaluated at all (<a href="#27-limits-and-lifetime">§2.7</a>)</td>
 </tr>
 <tr>
 <td><code>error_unit_inexact</code></td>

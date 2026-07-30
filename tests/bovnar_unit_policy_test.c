@@ -1215,9 +1215,22 @@ static void test_rule_paths_unwind(void)
 	ASSERT_STR(c.text[2], "1000",   "unwind: the sibling after the array");
 }
 
-/* Deeper than the path buffer can describe, the position is UNKNOWN — and an
- * unknown position must match nothing rather than match wrongly. */
-static void test_rule_ignores_unrepresentable_paths(void)
+/*
+ * Deeper than the path buffer can describe, the position is UNKNOWN — and a
+ * rule whose applicability cannot be decided is REFUSED, not skipped.
+ *
+ * There are three things this could do and only one of them is honest. Matching
+ * anyway would be matching the wrong field, which a per-field rule must never
+ * do (see bvn_key_path_t). Matching nothing was the answer here until it was
+ * noticed that it is the silence this mechanism exists to refuse: a rule is an
+ * assertion the caller made by NAMING a field, the header says a value a rule
+ * cannot be applied to is error_unit_mismatch because "silence would defeat the
+ * point of naming it", and a rule that quietly stops asserting once a document
+ * gets deep is that defeat with nothing to notice it by. So it refuses, and a
+ * document this deep can still be read with whole-document `targets`, which
+ * need no path at all — which is what the second half of this test pins.
+ */
+static void test_rule_refuses_unrepresentable_paths(void)
 {
 	static const bvnr_unit_rule_t rules[] = {
 		{ ".a.b", "m", 0, bvnr_rule_convert },
@@ -1225,8 +1238,7 @@ static void test_rule_ignores_unrepresentable_paths(void)
 	bvnr_unit_policy_t p = {0};
 	p.rules = rules; p.num_rules = 1;
 
-	/* 40 levels of nesting — past BVN_PATH_MAX_DEPTH (32). Nothing matches, and
-	 * nothing is misapplied; the document still parses. */
+	/* 40 levels of nesting — past BVN_PATH_MAX_DEPTH (32). */
 	char doc[4096];
 	size_t pos = 0;
 	for (int i = 0; i < 40; i++)
@@ -1237,10 +1249,19 @@ static void test_rule_ignores_unrepresentable_paths(void)
 		pos += (size_t)snprintf(doc + pos, sizeof doc - pos, "};");
 
 	pol_ctx_t c = {0};
-	run_policy(doc, &p, &c, true, error_none);
-	ASSERT_EQ_INT(c.n, 1, "deep: the value still arrives");
-	if (c.n == 1)
-		ASSERT_TRUE(!c.converted[0], "deep: an unknown path matches no rule");
+	run_policy(doc, &p, &c, false, error_unit_mismatch);
+
+	/* The same document under a whole-document target: no path is consulted, so
+	 * nothing is undecidable and the value converts. The refusal above is about
+	 * an assertion that could not be evaluated, not about the document. */
+	static const bvnr_unit_target_t targets[] = { { "m", 0 } };
+	bvnr_unit_policy_t tp = {0};
+	tp.targets = targets; tp.num_targets = 1;
+	pol_ctx_t tc = {0};
+	run_policy(doc, &tp, &tc, true, error_none);
+	ASSERT_EQ_INT(tc.n, 1, "deep+targets: the value still arrives");
+	if (tc.n == 1)
+		ASSERT_STR(tc.text[0], "0.3048", "deep+targets: and converts");
 }
 
 /*
@@ -2327,7 +2348,7 @@ int main(void)
 	test_rule_across_array_of_structs();
 	test_rule_array_of_structs_two_keys();
 	test_rule_paths_unwind();
-	test_rule_ignores_unrepresentable_paths();
+	test_rule_refuses_unrepresentable_paths();
 	test_rule_paths_over_random_shapes();
 
 	test_writer_require_unit();

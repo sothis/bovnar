@@ -171,7 +171,14 @@ void bvn_path_pop(bvn_key_path_t* p);
  * may be applied to this value. */
 bool bvn_path_current(const bvn_key_path_t* p, char* out, uint32_t cap,
 		      uint32_t* out_len);
-/* Index of the first rule whose path matches, or -1. */
+/* bvn_policy_match_rule could not tell WHERE this value sits, so it cannot say
+ * whether a rule names it. Distinct from -1 ("no rule matches"), and the caller
+ * must not treat the two alike: a rule is an assertion the caller asked for by
+ * naming a field, and "I could not check it" is not "it holds". See the note at
+ * the call site in bvn_apply_unit_assertions. */
+#define BVN_POLICY_PATH_UNKNOWN (-2)
+/* Index of the first rule whose path matches, -1 if none does, or
+ * BVN_POLICY_PATH_UNKNOWN if the position could not be established. */
 int32_t bvn_policy_match_rule(const bvn_unit_policy_state_t* pol,
 			      const bvn_key_path_t* path);
 #define BVN_TYPE_CACHE_KEY_CAP  64u

@@ -1,16 +1,24 @@
 #!/usr/bin/env python3
-"""strip_lang_comments.py -- strip comments from everything but C.
+"""strip_lang_comments.py -- strip comments, in every language this tree uses.
 
-C is strip_comments.sh's job. This handles the other eight languages in the
-tree: Bovnar, Python, CMake, HTML, XML, JavaScript, CSS and Markdown. merge.sh
-runs both tools over a throwaway staging copy to build the comment-free half of
-the bundle; neither is meant to be pointed at the working tree.
+C, Bovnar, Python, CMake, HTML, XML, JavaScript, CSS and Markdown. merge.sh runs
+it over a throwaway staging copy to build the comment-free half of the bundle;
+it is not meant to be pointed at the working tree.
+
+It replaces two scripts. strip_comments.sh did C only, with no verification, and
+removed the licence header along with everything else -- so both of its callers
+carried an awk to cut that block out first and paste it back after. strip.sh was
+the second of those callers: it rewrote src/ and include/ in the working tree in
+place, which is why it needed a clean-tree guard and a --force. The C path here
+is byte-for-byte compatible with strip_comments.sh, checked over all 82 C files
+in the tree before that script was deleted.
 
 Why not a regex per language
 ----------------------------
 Every one of these formats has a way to write the comment marker without
 starting a comment, and this repository uses most of them:
 
+    C       char *s = "/* not a comment */";
     CMake   string(REGEX MATCHALL "# Subtest: [a-z_]+" _groups "${_tap}")
             "#!bovnar 1.1\\n"                     -- a hash inside a quoted or a
             [[literal #hash]]                        bracket argument is data
@@ -38,6 +46,11 @@ written, and one that fails is left alone and reported rather than shipped:
 
     Python  ast.dump(ast.parse(...)) identical before and after, which makes
             the two files the same program by construction
+    C       identical token stream, with comments reduced to separators on both
+            sides -- so a/**/b staying two tokens is checked, not assumed. This
+            is the weakest of the checks, because it shares its scanner with the
+            strip; what actually proves the C path is building the stripped tree
+            and running the suite, which merge.sh documents how to do
     XML     ElementTree canonicalisation identical (comments are not part of
             it, so equality proves nothing else moved)
     Bovnar  identical token stream, identical line count, and every octet
@@ -61,9 +74,9 @@ What is kept
 Comments that are not documentation but interface:
 
     * an SPDX/copyright header block, in every language that has one -- the MIT
-      licence requires the notice to be retained (the rule strip.sh applies to
-      C), and a vendored /*! ... @license ... */ banner is the same obligation
-      wearing a minifier's convention
+      licence requires the notice to be retained -- and a vendored
+      /*! ... @license ... */ banner, which is the same obligation wearing a
+      minifier's convention
     * the FIRST comment of a Bovnar document, always. `#!bovnar 1.1` is a
       version directive only as the very first comment (doc/12_bovnar.ebnf), so
       dropping an ordinary comment ahead of one would PROMOTE it and change the
@@ -79,6 +92,12 @@ Comments that are not documentation but interface:
 Lint, typing and coverage pragmas (`# noqa`, `# type:`, `# pragma: no cover`)
 are NOT kept. They address tools that never run against this bundle, and the
 verification above proves they do not change the program.
+
+C keeps one behaviour of strip_comments.sh that goes beyond removing comments:
+it also normalises line endings to LF, strips trailing horizontal whitespace and
+drops every blank line. That is not tidiness for its own sake -- the amalgamation
+and every bundle built so far contain exactly that output, and changing it would
+rewrite them all. The other languages only remove what a comment leaves behind.
 
 Left alone deliberately: `*.min.js`, which has no comments beyond the licence
 banner that must be retained anyway, and where a tokenizer would be taking a
@@ -189,6 +208,127 @@ def spdx_header_rows(lines, is_comment):
     if "SPDX-License-Identifier" in "".join(texts):
         return set(rows)
     return set()
+
+
+# --------------------------------------------------------------------------
+# C
+#
+# Ported from strip_comments.sh, which this replaces, and deliberately
+# byte-for-byte compatible with it: the amalgamation and every bundle built so
+# far contain its output, so a "cleanup" here would silently rewrite them all.
+# ISO C99 5.1.1.2 phase 3, as a state machine over the source:
+#
+#   * a block comment becomes ONE SPACE, because it separates tokens: a/**/b is
+#     two tokens, not one
+#   * a line comment's terminating newline is kept -- it is not part of the
+#     comment -- and newlines inside a block comment are kept too, so that the
+#     cleanup pass below can count those lines as empty and drop them
+#   * a string or character literal is never touched, which is the whole reason
+#     this is a state machine and not a regex
+#
+# Not handled, exactly as strip_comments.sh did not handle it: phase 2 line
+# splicing, where a backslash-newline at the end of a // comment continues that
+# comment onto the next line. No file in the tree does that, and the token check
+# below would catch it if one started.
+
+C_LEADING_BLOCK = re.compile(r"\A/\*.*?\*/", re.S)
+C_TRAILING_HWS = re.compile(r"[^\S\n]+$", re.M)
+
+(C_NORMAL, C_SLASH, C_LINE, C_BLOCK, C_BLOCK_STAR,
+ C_STR, C_STR_ESC, C_CHR, C_CHR_ESC) = range(9)
+
+
+def c_uncomment(src):
+    """src with every comment replaced by whitespace, literals untouched."""
+    out = []
+    state = C_NORMAL
+    for c in src:
+        if state == C_NORMAL:
+            if c == "/":
+                state = C_SLASH
+            elif c == '"':
+                out.append(c)
+                state = C_STR
+            elif c == "'":
+                out.append(c)
+                state = C_CHR
+            else:
+                out.append(c)
+        elif state == C_SLASH:
+            if c == "/":
+                state = C_LINE
+            elif c == "*":
+                state = C_BLOCK
+            else:
+                out.append("/")
+                out.append(c)
+                state = C_NORMAL
+        elif state == C_LINE:
+            if c == "\n":
+                out.append("\n")
+                state = C_NORMAL
+        elif state == C_BLOCK:
+            if c == "*":
+                state = C_BLOCK_STAR
+            elif c == "\n":
+                out.append("\n")
+        elif state == C_BLOCK_STAR:
+            if c == "/":
+                out.append(" ")
+                state = C_NORMAL
+            elif c != "*":
+                if c == "\n":
+                    out.append("\n")
+                state = C_BLOCK
+        elif state == C_STR:
+            out.append(c)
+            if c == "\\":
+                state = C_STR_ESC
+            elif c == '"':
+                state = C_NORMAL
+        elif state == C_STR_ESC:
+            out.append(c)
+            state = C_STR
+        elif state == C_CHR:
+            out.append(c)
+            if c == "\\":
+                state = C_CHR_ESC
+            elif c == "'":
+                state = C_NORMAL
+        elif state == C_CHR_ESC:
+            out.append(c)
+            state = C_CHR
+    if state in (C_BLOCK, C_BLOCK_STAR):
+        out.append(" ")
+    if state == C_SLASH:
+        out.append("/")
+    return "".join(out)
+
+
+def c_tokens(src):
+    """The code of a translation unit, comments reduced to separators."""
+    return c_uncomment(src).split()
+
+
+def strip_c(src):
+    src = src.replace("\r\n", "\n").replace("\r", "\n")
+    # The licence block has to survive, and it IS a comment.  strip_comments.sh
+    # could not do this itself, so strip.sh and merge.sh each carried their own
+    # awk to cut the block out beforehand and paste it back after; doing it here
+    # means one copy of the rule for all nine languages.
+    header = ""
+    m = C_LEADING_BLOCK.match(src)
+    if m and "SPDX-License-Identifier" in m.group(0):
+        header = m.group(0).rstrip("\n") + "\n"
+
+    body = c_uncomment(src)
+    body = C_TRAILING_HWS.sub("", body)
+    lines = [l for l in body.split("\n") if l]
+    out = ("\n".join(lines) + "\n") if lines else ""
+    out = header + out
+    if c_tokens(src) != c_tokens(out):
+        raise StripError("stripping changed the C token stream")
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -1074,6 +1214,8 @@ def verify_html(old, new):
 
 # suffix (or exact name) -> (stripper, binary?)
 BY_SUFFIX = [
+    (".c", strip_c, False),
+    (".h", strip_c, False),
     (".py", strip_python, False),
     (".cmake", strip_cmake, False),
     (".cmake.in", strip_cmake, False),
@@ -1143,7 +1285,11 @@ def main(argv):
                 with open(path, "rb") as fh:
                     src = fh.read()
             else:
-                with open(path, "r", encoding="utf-8") as fh:
+                # surrogateescape, as strip_comments.sh did: a stray non-UTF-8
+                # byte in a comment must not stop the run, and writing back the
+                # same way restores it byte for byte.
+                with open(path, "r", encoding="utf-8",
+                          errors="surrogateescape") as fh:
                     src = fh.read()
         except (OSError, UnicodeDecodeError) as exc:
             sys.stderr.write("%s: error: %s: %s\n" % (PROG, path, exc))
@@ -1169,7 +1315,8 @@ def main(argv):
                     with open(tmp, "wb") as fh:
                         fh.write(out)
                 else:
-                    with open(tmp, "w", encoding="utf-8") as fh:
+                    with open(tmp, "w", encoding="utf-8",
+                              errors="surrogateescape") as fh:
                         fh.write(out)
                 os.replace(tmp, path)
         else:

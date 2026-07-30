@@ -9,45 +9,47 @@
 #   bvnr_src.txt … bvnr_py_src_exmpl_doc_web.txt
 #                               cumulative concatenated text dumps
 #                               (C → +python → +examples → +doc → +web)
+#   bvnr_src-nocomments.txt …   the same five dumps, comment-free
 #
-# Both zips are always written. The text dumps follow --strip: without it they
-# carry comments and keep their historical names, with it they are built from
-# the comment-free sources and are written as bvnr_*-nocomments.txt, so a
-# stripped dump can never be mistaken for a full one.
+# Everything is written on every run: two zips and both dump sets, side by side.
+# There is no option to pick one. A dump is a few megabytes next to a build tree
+# that is hundreds, the comment-free set costs one extra pass over a staging copy
+# that has to be made for the zip anyway, and a flag that changes which files
+# appear under fixed names is a trap -- bvnr_src.txt would mean one thing on
+# Tuesday and another on Wednesday. The -nocomments suffix says which is which.
 #
-# usage: ./merge.sh [-s|--strip] [--no-strip] [-h|--help]
+# usage: ./merge.sh [-h|--help]
 #
 # Comment stripping
 # -----------------
-# Two tools, because no one scanner knows nine languages:
+# One tool, strip_lang_comments.py, with a scanner per language. That is not
+# pedantry: every one of these formats can write its comment marker without
+# starting a comment, and this tree does. `#` appears inside CMake quoted
+# arguments in its own CTest registry, `<!--` inside a <script> on the landing
+# page, `//` inside strings and regexes in the vendored highlighter, `/*` inside
+# a C string literal, and a Bovnar octet stream carries arbitrary bytes -- `#`,
+# LF, NUL -- in length-prefixed chunks.
 #
-#   strip_comments.sh       C sources and headers (ISO C99 translation phase 3,
-#                           so a /* inside a string literal is left alone)
-#   strip_lang_comments.py  everything else, each language scanned with
-#                           something that knows its literals. That is not
-#                           pedantry: `#` appears inside CMake quoted arguments
-#                           in this repository's own CTest registry, `<!--`
-#                           inside a <script> on the landing page, `//` inside
-#                           strings and regexes in the vendored highlighter, and
-#                           a Bovnar octet stream carries arbitrary bytes --
-#                           `#`, LF, NUL -- in length-prefixed chunks.
+# It replaces strip_comments.sh (C only, no verification, and it deleted the
+# licence header) and strip.sh (which rewrote the working tree in place, needed a
+# clean-tree guard for it, and had no caller). Its C path is byte-for-byte
+# compatible with strip_comments.sh, checked against it over all 82 files before
+# that script was removed.
 #
-# Everything happens in a throwaway staging copy, so the tree is never modified
-# and the clean-tree guard strip.sh needs does not apply here.
+# Everything happens in a throwaway staging copy, so the tree is never modified.
 #
-# The leading SPDX/copyright block of every file survives: it IS a comment, so
-# a stripper removes it, and the MIT licence requires the notice to be retained.
-# strip.sh applies that rule to C by capturing the block and putting it back;
-# the same dance is done below for C, while strip_lang_comments.py does it
-# internally for the rest -- along with a vendored /*! @license */ banner, a
-# `#!` shebang, a PEP 263 coding cookie, IE conditional comments, the
-# `<!-- bovnar:retired-path -->` markers three doc checkers read, and the first
-# comment of a Bovnar document, which is the only place `#!bovnar 1.1` can be.
+# The leading SPDX/copyright block of every file survives: it IS a comment, so a
+# stripper removes it, and the MIT licence requires the notice to be retained.
+# The tool now applies that rule itself, in all nine languages -- along with a
+# vendored /*! @license */ banner, a `#!` shebang, a PEP 263 coding cookie, IE
+# conditional comments, the `<!-- bovnar:retired-path -->` markers three doc
+# checkers read, and the first comment of a Bovnar document, which is the only
+# place `#!bovnar 1.1` can be.
 #
 # Nothing here is taken on trust. strip_lang_comments.py refuses to write a file
 # whose syntax tree, token stream, canonical XML or parse events changed, and a
-# build of the stripped tree is the check for C -- see the "Verifying" section at
-# the bottom of this file.
+# build of the stripped tree is what proves the C strip -- see the "Verifying"
+# section at the bottom of this file.
 #
 # NOT stripped: JSON and TOML (pyproject.toml keeps its comments), plain text,
 # *.min.js (no comments beyond the licence banner, and minified regex-versus-
@@ -93,15 +95,12 @@
 set -euo pipefail
 shopt -s failglob
 
-STRIP=0
 while (($#)); do
     case "$1" in
-        -s|--strip)   STRIP=1 ;;
-        --no-strip)   STRIP=0 ;;
         -h|--help)
             sed -n '/^# usage:/{s/^# //;p;q}' "$0"
-            printf '  -s, --strip   build the text dumps from the comment-free\n'
-            printf '                sources (both zips are written either way)\n'
+            printf 'Writes two zips and both dump sets, with and without\n'
+            printf 'comments, on every run. There is nothing to select.\n'
             exit 0 ;;
         *)
             printf 'merge.sh: unknown option: %s (try --help)\n' "$1" >&2
@@ -114,23 +113,18 @@ OUT=./build/merged
 mkdir -p "$OUT"
 OUTABS="$(cd "$OUT" && pwd)"
 
-for t in ./strip_comments.sh ./strip_lang_comments.py; do
-    [[ -f "$t" ]] || {
-        printf 'merge.sh: %s not found — run this from the repo root\n' "$t" >&2
-        exit 1
-    }
-done
+[[ -f ./strip_lang_comments.py ]] || {
+    printf 'merge.sh: ./strip_lang_comments.py not found — run this from the '\
+'repo root\n' >&2
+    exit 1
+}
 
 DUMPS=(bvnr_src bvnr_py_src bvnr_py_src_exmpl bvnr_py_src_exmpl_doc
        bvnr_py_src_exmpl_doc_web)
-SUF=""
-((STRIP)) && SUF="-nocomments"
 
 # Recreate everything from scratch so a failed run can never leave a stale file
-# looking like a current one.  Both dump name sets go, not just the one about to
-# be written: a bvnr_src.txt left by yesterday's unstripped run says nothing
-# about today's tree.  (No `zip -u` either: a fresh archive can never return
-# zip's benign "nothing to do" exit code 12, which set -e would treat as a
+# looking like a current one.  (No `zip -u` either: a fresh archive can never
+# return zip's benign "nothing to do" exit code 12, which set -e would treat as a
 # failure, and it can never retain stale entries from a previous run.)
 rm -f "$OUT"/bovnar.zip "$OUT"/bovnar-nocomments.zip
 for d in "${DUMPS[@]}"; do
@@ -191,57 +185,27 @@ STAGE="$TMP/stage"
 mkdir -p "$STAGE"
 tar --no-recursion -cf - -T "$TMP"/all | tar -xf - -C "$STAGE"
 
-# C: capture each leading SPDX block, strip, then put the blocks back.  One
-# strip_comments.sh call for the whole set: it starts a python interpreter per
-# invocation, not per file.
-mapfile -d '' -t CFILES < <(
-    find "$STAGE" -type f \( -iname '*.c' -o -iname '*.h' \) -print0)
-((${#CFILES[@]})) || { printf 'merge.sh: no C sources staged\n' >&2; exit 1; }
-
-HDRS=()
-for f in "${CFILES[@]}"; do
-    hdr="$(awk '
-        NR==1 && $0 !~ /^\/\*/ { exit }
-        { print }
-        /\*\// && NR>1 { exit }
-    ' "$f")"
-    [[ "$hdr" == *SPDX-License-Identifier* ]] || hdr=""
-    HDRS+=("$hdr")
-done
-
-./strip_comments.sh -i "${CFILES[@]}"
-
-for i in "${!CFILES[@]}"; do
-    [[ -n "${HDRS[$i]}" ]] || continue
-    printf '%s\n' "${HDRS[$i]}" | cat - "${CFILES[$i]}" > "${CFILES[$i]}.hdr$$"
-    mv -- "${CFILES[$i]}.hdr$$" "${CFILES[$i]}"
-done
-
-# Everything else.  strip_lang_comments.py keeps the SPDX block itself and
-# verifies each file against its own parser before writing it, so a file it
-# cannot prove unchanged fails the run rather than shipping mangled.  It decides
-# per file what it can handle, so passing it a *.min.js (which it declines) or a
-# .cmake.in costs nothing.
-mapfile -d '' -t LFILES < <(
-    find "$STAGE" -type f \( -iname '*.py' -o -iname '*.cmake' \
-        -o -iname '*.cmake.in' -o -iname 'CMakeLists*.txt' \
-        -o -iname '*.html' -o -iname '*.htm' -o -iname '*.bvnr' \
-        -o -iname '*.xml' -o -iname '*.js' -o -iname '*.mjs' \
-        -o -iname '*.cjs' -o -iname '*.css' \
+# One pass over everything.  strip_lang_comments.py keeps each file's SPDX block
+# itself and verifies the result against that language's own parser before
+# writing it, so a file it cannot prove unchanged fails the run rather than
+# shipping mangled.  It decides per file what it can handle, so handing it a
+# *.min.js (which it declines) or a .cmake.in costs nothing.
+mapfile -d '' -t SFILES < <(
+    find "$STAGE" -type f \( -iname '*.c' -o -iname '*.h' \
+        -o -iname '*.py' -o -iname '*.cmake' -o -iname '*.cmake.in' \
+        -o -iname 'CMakeLists*.txt' -o -iname '*.html' -o -iname '*.htm' \
+        -o -iname '*.bvnr' -o -iname '*.xml' -o -iname '*.js' \
+        -o -iname '*.mjs' -o -iname '*.cjs' -o -iname '*.css' \
         -o -iname '*.md' \) -print0)
-((${#LFILES[@]})) || {
-    printf 'merge.sh: no non-C sources staged\n' >&2
-    exit 1
-}
-python3 ./strip_lang_comments.py -i "${LFILES[@]}"
+((${#SFILES[@]})) || { printf 'merge.sh: no sources staged\n' >&2; exit 1; }
+python3 ./strip_lang_comments.py -i "${SFILES[@]}"
 
 ( cd "$STAGE" && zip -q9y "$OUTABS"/bovnar-nocomments.zip -@ ) < "$TMP"/zip
 
 # ------------------------------------------------------------------- dumps --
-# Where dump_files reads content from.  Names in the dump are always
-# tree-relative, so the two variants differ in comments and in nothing else.
+# ROOT is where dump_files reads content from; the names it writes are always
+# tree-relative, so the two sets differ in comments and in nothing else.
 ROOT="."
-((STRIP)) && ROOT="$STAGE"
 
 # Expand the arguments to regular files, recursing into any directory, sorted so
 # the dump is reproducible.
@@ -268,7 +232,7 @@ dump_files() {
             # from the tree.  True only for files no stripper touches
             # (doc/pdf/*.pdf, __pycache__/*.pyc, doc/ietf/.refcache/*.xml) --
             # a strippable file reaching this point would be an unstripped file
-            # in a dump that claims to have none, so it stops the run instead.
+            # in the -nocomments dump, so it stops the run instead.
             case "$f" in
                 *.c|*.h|*.C|*.H|*.py|*.cmake|*.cmake.in|*.html|*.htm \
                 |*.bvnr|*.xml|*.js|*.mjs|*.cjs|*.css|*.md \
@@ -288,37 +252,49 @@ dump_files() {
     done
 }
 
-expand_files CMakeLists.txt CMakeLists_tests.txt cmake \
-             src include tests/*.c tests/json \
-    | dump_files > "$OUT/bvnr_src$SUF.txt"
+# The five cumulative dumps, read out of $1 and suffixed with $2.  The file LIST
+# always comes from the tree, even when the content comes from the staging copy,
+# so both sets name exactly the same files in the same order.
+write_dumps() {
+    ROOT="$1"
+    local suf="$2"
 
-{ expand_files python/bovnar python/tests pyproject.toml | dump_files
-  cat "$OUT/bvnr_src$SUF.txt"; } > "$OUT/bvnr_py_src$SUF.txt"
+    expand_files CMakeLists.txt CMakeLists_tests.txt cmake \
+                 src include tests/*.c tests/json \
+        | dump_files > "$OUT/bvnr_src$suf.txt"
 
-{ expand_files examples | dump_files
-  cat "$OUT/bvnr_py_src$SUF.txt"; } > "$OUT/bvnr_py_src_exmpl$SUF.txt"
+    { expand_files python/bovnar python/tests pyproject.toml | dump_files
+      cat "$OUT/bvnr_src$suf.txt"; } > "$OUT/bvnr_py_src$suf.txt"
 
-{ expand_files doc | dump_files
-  cat "$OUT/bvnr_py_src_exmpl$SUF.txt"; } > "$OUT/bvnr_py_src_exmpl_doc$SUF.txt"
+    { expand_files examples | dump_files
+      cat "$OUT/bvnr_py_src$suf.txt"; } > "$OUT/bvnr_py_src_exmpl$suf.txt"
 
-{ expand_files web/*.html | dump_files
-  cat "$OUT/bvnr_py_src_exmpl_doc$SUF.txt"; } \
-    > "$OUT/bvnr_py_src_exmpl_doc_web$SUF.txt"
+    { expand_files doc | dump_files
+      cat "$OUT/bvnr_py_src_exmpl$suf.txt"; } \
+        > "$OUT/bvnr_py_src_exmpl_doc$suf.txt"
+
+    { expand_files web/*.html | dump_files
+      cat "$OUT/bvnr_py_src_exmpl_doc$suf.txt"; } \
+        > "$OUT/bvnr_py_src_exmpl_doc_web$suf.txt"
+}
+
+write_dumps "." ""
+write_dumps "$STAGE" "-nocomments"
 
 printf 'merged -> %s\n' "$OUT"
-printf '  zips  : bovnar.zip (comments intact)\n'
-printf '          bovnar-nocomments.zip (%d C, %d other file(s) through the strippers)\n' \
-       "${#CFILES[@]}" "${#LFILES[@]}"
-printf '  dumps : bvnr_*%s.txt (%s)\n' "$SUF" \
-       "$( ((STRIP)) && echo 'comments stripped' || echo 'comments intact')"
+printf '  zips  : bovnar.zip, bovnar-nocomments.zip (%d file(s) through the '\
+'stripper)\n' "${#SFILES[@]}"
+printf '  dumps : bvnr_*.txt and bvnr_*-nocomments.txt (%d each)\n' \
+       "${#DUMPS[@]}"
 printf '  git-ignored paths left out of the zips: %s\n' "$IGNORED_COUNT"
 
 # ---------------------------------------------------------------- verifying --
-# strip_lang_comments.py proves each of its own eight languages -- a file whose
-# syntax tree, token stream, canonical XML or parse events changed is refused
-# rather than written -- but nothing above proves the C strip, and nothing proves
-# the result still builds. The check for that is to build both zips and compare,
-# and it is worth redoing after any change to the stripping step:
+# strip_lang_comments.py checks each file against its own language before writing
+# it -- a syntax tree, token stream, canonical XML or parse-event set that moved
+# means the file is refused, not shipped. For C that check shares its scanner
+# with the strip, so it is the weakest of the nine, and nothing above proves the
+# result still builds either way. The check for both is to build the two zips and
+# compare, and it is worth redoing after any change to the stripping step:
 #
 #   out=$PWD/build/merged
 #   for z in bovnar bovnar-nocomments; do

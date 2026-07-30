@@ -236,7 +236,13 @@ The surrounding file is the authority. In summary:
 - **Tabs for indentation**, K&R bracing with a function's opening brace on its
   own line, roughly 80 columns.
 - Every source file carries the SPDX header (`SPDX-License-Identifier: MIT`)
-  used across the tree.
+  used across the tree. A file that **quotes identifiers from one of the unit
+  vocabularies** — a profile test's vectors, say — carries an `SPDX-FileComment:`
+  line under it naming whose those identifiers are and pointing at
+  `THIRD_PARTY_NOTICES.md`, because a licence scanner reads the tag and not the
+  notices. `tests/bovnar_ucum_test.c` is the pattern. Codes appearing as
+  namespace names in error strings or enums (`"ucum:"`) are not that, and need
+  nothing.
 - Public API in `include/`; implementation-internal headers sit beside their
   code as `src/<area>/bvn_*_impl.h`.
 - Python is 4-space indented and targets plain CPython 3 with no compiled
@@ -307,8 +313,48 @@ when the subject cannot carry it.
 
 ## Licensing
 
-Bovnar is MIT licensed. By contributing you agree that your contribution is
-licensed under the same terms. There is no CLA.
+**There is no CLA, and you retain copyright in what you write.** By contributing
+you agree that your contribution is licensed under the terms this project already
+publishes for the part of the tree you are contributing to — inbound matching
+outbound, in the words of the usual formula:
+
+| What you touch | The terms your contribution is under |
+|---|---|
+| Source code — C, Python, CMake, build files | [MIT](LICENSE) |
+| Documentation — `doc/`, and Markdown that serves as documentation | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| `examples/` | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+
+This used to read "Bovnar is MIT licensed, contributions are under the same
+terms", which was not true of two of those three rows and asked doc and example
+contributors to grant something other than what the project publishes.
 
 When adding a new file, copy the SPDX header from an existing one and add your
-own copyright line; you retain copyright in what you write.
+own copyright line.
+
+### If your patch brings in someone else's work
+
+`LICENSE` clauses 4 and 5 and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
+exist because this project ships material it did not author: identifier strings
+from six unit vocabularies, two webfonts, two JavaScript libraries, NASA imagery,
+Emscripten's runtime code. **Nothing in the build can detect that you have added
+to that set** — a licence gate would have to understand where a string came from —
+so it is a review question, and this section is where it is asked.
+
+* **A new vocabulary, or new rows in an existing profile table.** The `.bvnr`
+  file's `SOURCE, VERSION AND LICENSING` header block and the matching entry in
+  `THIRD_PARTY_NOTICES.md` Part 1 are part of the patch, not a follow-up: the
+  exact published version, the retrieval date, the licence, and what was
+  extracted. `check_profile_factors.py` must pin a *versioned* upstream URI, never
+  a `current/` alias, or the provenance you recorded cannot be reproduced later.
+* **A file under `web/`** — a font, a library, an image. An entry in Part 2, and,
+  where the licence requires its text to travel with the file (the SIL Open Font
+  License does), that text served beside it, as `web/fonts/OFL.txt` is.
+* **Code adapted from a published implementation**, rather than written from a
+  specification. Credit it in the file's header, as `bvn_gregorian_date.h` does,
+  and add it to Part 2 even when the terms demand nothing.
+* **Quoting foreign identifiers in a new test or table** — see the SPDX note
+  under [Code Style](#code-style).
+
+If you are unsure whether something counts, say so in the pull request. An
+unrecorded dependency is a great deal more expensive to find later than an
+unnecessary paragraph is to delete.

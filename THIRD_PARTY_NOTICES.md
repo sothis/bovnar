@@ -444,6 +444,32 @@ sweep of every source comment in `src/`, `include/` and `python/bovnar/` for
 external URLs and for the phrases a derivation is normally marked with, which
 found this and nothing else.
 
+## Contributor Covenant — CODE_OF_CONDUCT.md
+
+| | |
+|---|---|
+| **File** | `CODE_OF_CONDUCT.md` |
+| **Adapted from** | Contributor Covenant, version 2.1 |
+| **Source** | <https://www.contributor-covenant.org/version/2/1/code_of_conduct.html> |
+
+> This Code of Conduct is adapted from the Contributor Covenant, version 2.1.
+> The Community Impact Guidelines in it were inspired by Mozilla's code of
+> conduct enforcement ladder.
+
+That attribution is the one the Contributor Covenant supplies with the text, and
+the file has carried it in its own Attribution section since it was added. It is
+listed here so that every piece of adapted third-party text in the tree is in one
+inventory rather than only in the file it lives in.
+
+**The licence of the text is not clearly stated by its publisher.** The
+`EthicalSource/contributor_covenant` repository carries the Hippocratic License
+3.0, which covers the website's source; the version 2.1 page states no licence
+for the code-of-conduct text itself, and neither does the text. Older
+descriptions of the project as CC BY 4.0 are widely repeated and could not be
+confirmed against anything the publisher says today, so this entry does not
+repeat them. What is certain is that the Covenant asks to be attributed when
+adapted, and it is.
+
 ## Not third-party, despite appearances
 
 * `web/bovnar_highlight.js`, `web/bovnar_wasm.js`, `web/bovnar_parser_wasm.js`

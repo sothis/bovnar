@@ -5,7 +5,8 @@
 #   bovnar.zip                  the tree as it is, comments intact
 #   bovnar-nocomments.zip       the same tree with the comments stripped out of
 #                               every language in it: C, Bovnar, Python, CMake,
-#                               HTML, XML, JavaScript, CSS and Markdown
+#                               HTML, XML, JavaScript, CSS, Markdown, TOML and
+#                               JSON
 #   bvnr_src.txt … bvnr_py_src_exmpl_doc_web.txt
 #                               cumulative concatenated text dumps
 #                               (C → +python → +examples → +doc → +web)
@@ -51,10 +52,12 @@
 # build of the stripped tree is what proves the C strip -- see the "Verifying"
 # section at the bottom of this file.
 #
-# NOT stripped: JSON and TOML (pyproject.toml keeps its comments), plain text,
-# *.min.js (no comments beyond the licence banner, and minified regex-versus-
-# division is a real risk for no gain), and JavaScript or CSS comments that sit
-# inside an HTML <script>/<style> element rather than in a .js/.css file.
+# NOT stripped: plain text, *.min.js (no comments beyond the licence banner, and
+# minified regex-versus-division is a real risk for no gain), and JavaScript or
+# CSS comments that sit inside an HTML <script>/<style> element rather than in a
+# .js/.css file. Strict JSON cannot carry a comment, so the .json files come
+# through unchanged and the tool proves it -- except the two JSONC ones, a VS
+# Code settings file and a colour theme, where `//` really is a comment.
 #
 # Hardening:
 #   set -e          abort on the first failing command (e.g. an unreadable file)
@@ -196,7 +199,7 @@ mapfile -d '' -t SFILES < <(
         -o -iname 'CMakeLists*.txt' -o -iname '*.html' -o -iname '*.htm' \
         -o -iname '*.bvnr' -o -iname '*.xml' -o -iname '*.js' \
         -o -iname '*.mjs' -o -iname '*.cjs' -o -iname '*.css' \
-        -o -iname '*.md' \) -print0)
+        -o -iname '*.toml' -o -iname '*.json' -o -iname '*.md' \) -print0)
 ((${#SFILES[@]})) || { printf 'merge.sh: no sources staged\n' >&2; exit 1; }
 python3 ./strip_lang_comments.py -i "${SFILES[@]}"
 
@@ -235,7 +238,7 @@ dump_files() {
             # in the -nocomments dump, so it stops the run instead.
             case "$f" in
                 *.c|*.h|*.C|*.H|*.py|*.cmake|*.cmake.in|*.html|*.htm \
-                |*.bvnr|*.xml|*.js|*.mjs|*.cjs|*.css|*.md \
+                |*.bvnr|*.xml|*.js|*.mjs|*.cjs|*.css|*.toml|*.json|*.md \
                 |CMakeLists*.txt|*/CMakeLists*.txt)
                     printf 'merge.sh: %s is not in the staging copy\n' "$f" >&2
                     exit 1 ;;

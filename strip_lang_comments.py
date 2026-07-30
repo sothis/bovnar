@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """strip_lang_comments.py -- strip comments, in every language this tree uses.
 
-C, Bovnar, Python, CMake, HTML, XML, JavaScript, CSS and Markdown. merge.sh runs
-it over a throwaway staging copy to build the comment-free half of the bundle;
-it is not meant to be pointed at the working tree.
+C, Bovnar, Python, CMake, HTML, XML, JavaScript, CSS, Markdown, TOML and JSON.
+merge.sh runs it over a throwaway staging copy to build the comment-free half of
+the bundle; it is not meant to be pointed at the working tree.
 
 It replaces two scripts. strip_comments.sh did C only, with no verification, and
 removed the licence header along with everything else -- so both of its callers
@@ -33,6 +33,9 @@ starting a comment, and this repository uses most of them:
                                                      of this kind
     CSS     content: "/*";
     MD      a fenced block containing <!-- -->    -- literal example text
+    TOML    hash = 'a#b'   in any of TOML's four string forms
+    JSON    "url": "https://x/a//b"                -- all 22 of the '//' in
+                                                     web/i18n/de.json are these
 
 So each language is scanned with something that knows its literals: Python's
 own `tokenize`, `html.parser` (which implements the HTML5 raw-text rules), and
@@ -59,6 +62,14 @@ written, and one that fails is left alone and reported rather than shipped:
     JS      identical token stream, plus `node --check` in the same dialect
             (script or module) the original passed in, where node exists
     CSS     identical token stream
+    TOML    identical parsed document, via tomllib -- the strongest check here,
+            since tomllib is nothing to do with the scanner that did the strip
+    JSON    identical parsed document for a file that already parses. For JSONC
+            -- VS Code settings, colour themes -- the original by definition does
+            not parse, so only the RESULT can be checked, and the check is that
+            it is valid JSON. That is weaker, and it is the one asymmetry in this
+            table: it does catch the realistic mistake, since eating a `//` that
+            was inside a string takes the closing quote with it to end of line
     HTML    identical parse events -- tags, attributes, text with
             insignificant whitespace collapsed, exact text inside <pre>
     MD      identical block structure: fences, headings and the code inside
@@ -101,8 +112,12 @@ rewrite them all. The other languages only remove what a comment leaves behind.
 
 Left alone deliberately: `*.min.js`, which has no comments beyond the licence
 banner that must be retained anyway, and where a tokenizer would be taking a
-real risk with regex-versus-division in minified code for no gain. JSON has no
-comments to strip.
+real risk with regex-versus-division in minified code for no gain. Plain text,
+and every other extension not in the dispatch table at the bottom.
+
+Strict JSON has no comments, so for most .json files this tool proves it changed
+nothing and leaves them alone -- which is the whole point of running it over them
+anyway: `//` inside a string is common, and a naive pass would eat it.
 
 Usage
 -----
@@ -119,6 +134,7 @@ Exit status
 
 import ast
 import io
+import json
 import os
 import re
 import shutil
@@ -128,6 +144,11 @@ import tempfile
 import tokenize
 import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
+
+try:
+    import tomllib                     # 3.11+; without it TOML is unverifiable
+except ImportError:                     # pragma: no cover
+    tomllib = None
 
 PROG = os.path.basename(sys.argv[0])
 
@@ -1004,6 +1025,166 @@ def strip_css(src):
 
 
 # --------------------------------------------------------------------------
+# TOML
+#
+# A `#` outside a string starts a comment. The strings are the catch: TOML has
+# four kinds, and only the two double-quoted ones honour a backslash escape --
+# 'a\' is a complete literal string, backslash and all.
+
+TOML_STRINGS = ('"""', "\'\'\'", '"', "\'")
+
+
+def scan_toml(src):
+    """Split TOML into (kind, start, end) spans: 'comment', 'string', 'data'."""
+    spans = []
+    i, n = 0, len(src)
+    while i < n:
+        c = src[i]
+        if c == "#":
+            j = src.find("\n", i)
+            j = n if j == -1 else j
+            spans.append(("comment", i, j))
+            i = j
+            continue
+        for q in TOML_STRINGS:
+            if not src.startswith(q, i):
+                continue
+            escapes = q[0] == '"'      # only a basic string has escapes
+            j = i + len(q)
+            while j < n:
+                if escapes and src[j] == "\\":
+                    j += 2
+                    continue
+                if src.startswith(q, j):
+                    j += len(q)
+                    break
+                j += 1
+            else:
+                raise StripError("unterminated string at offset %d" % i)
+            spans.append(("string", i, j))
+            i = j
+            break
+        else:
+            j = i
+            while j < n and src[j] != "#" \
+                    and not any(src.startswith(q, j) for q in TOML_STRINGS):
+                j += 1
+            spans.append(("data", i, max(j, i + 1)))
+            i = max(j, i + 1)
+    return spans
+
+
+def strip_toml(src):
+    if tomllib is None:
+        raise Unverifiable("no tomllib in this interpreter (needs 3.11+)")
+    try:
+        before = repr(tomllib.loads(src))
+    except (tomllib.TOMLDecodeError, ValueError) as exc:
+        raise Unverifiable("does not parse as TOML: %s" % exc)
+    try:
+        spans = scan_toml(src)
+    except StripError as exc:
+        raise Unverifiable("cannot scan as TOML: %s" % exc)
+
+    lines = src.splitlines(keepends=True)
+    keep_rows = spdx_header_rows(lines, lambda l: l.lstrip().startswith("#"))
+    cuts = []
+    for kind, start, end in spans:
+        if kind != "comment":
+            continue
+        row = src.count("\n", 0, start) + 1
+        if row in keep_rows or LICENCE.search(src[start:end]):
+            continue
+        cuts.append((start, end, DROP))
+    out = apply_cuts(src, cuts)
+    try:
+        after = repr(tomllib.loads(out))
+    except (tomllib.TOMLDecodeError, ValueError) as exc:
+        raise StripError("stripping produced invalid TOML: %s" % exc)
+    # repr rather than ==, so a NaN value cannot fail its own equality test.
+    if before != after:
+        raise StripError("stripping changed the TOML document")
+    return out
+
+
+# --------------------------------------------------------------------------
+# JSON
+#
+# JSON has no comments at all, so for a file that already parses there is
+# nothing to do and this must prove it did nothing: strip, re-parse, and require
+# the same data. What makes the pass worth having is JSONC -- VS Code settings
+# and colour themes -- where `//` really is a comment. A file that does not parse
+# even after the comments come out is some other dialect again (JSON5 trailing
+# commas, single quotes) and is left alone.
+#
+# The check is therefore exact for a file that parses and only "the result is
+# valid JSON" for one that does not. See the Verification note in the module
+# docstring for why that is still enough to catch the mistake that matters.
+
+
+def scan_json_comments(src):
+    """// and /* */ spans outside strings."""
+    spans = []
+    i, n = 0, len(src)
+    while i < n:
+        c = src[i]
+        if c == '"':
+            j = i + 1
+            while j < n:
+                if src[j] == "\\":
+                    j += 2
+                    continue
+                if src[j] == '"':
+                    j += 1
+                    break
+                j += 1
+            else:
+                raise StripError("unterminated string at offset %d" % i)
+            i = j
+        elif src.startswith("//", i):
+            j = src.find("\n", i)
+            j = n if j == -1 else j
+            spans.append((i, j))
+            i = j
+        elif src.startswith("/*", i):
+            j = src.find("*/", i + 2)
+            if j == -1:
+                raise StripError("unterminated block comment at offset %d" % i)
+            spans.append((i, j + 2))
+            i = j + 2
+        else:
+            i += 1
+    return spans
+
+
+def strip_json(src):
+    try:
+        before = repr(json.loads(src))
+        strict = True
+    except ValueError:
+        before, strict = None, False
+    try:
+        comments = scan_json_comments(src)
+    except StripError as exc:
+        raise Unverifiable("cannot scan as JSON: %s" % exc)
+
+    cuts = [(start, end, DROP) for start, end in comments
+            if not LICENCE.search(src[start:end])]
+    if not cuts:
+        return src                      # strict JSON: the normal case
+    out = apply_cuts(src, cuts)
+    try:
+        after = repr(json.loads(out))
+    except ValueError as exc:
+        if not strict:
+            raise Unverifiable("not JSON even with the comments out: %s" % exc)
+        raise StripError("stripping produced invalid JSON: %s" % exc)
+    if strict and before != after:
+        raise StripError("stripping changed the JSON document")
+    return out
+
+
+# --------------------------------------------------------------------------
 # Markdown
 
 FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
@@ -1263,6 +1444,8 @@ BY_SUFFIX = [
     (".cjs", strip_js, False),           # source web/bovnar_wasm.js must match,
                                          # and a ctest gate compares the two
     (".css", strip_css, False),
+    (".toml", strip_toml, False),
+    (".json", strip_json, False),
     (".md", strip_markdown, False),
     (".html", strip_html, False),
     (".htm", strip_html, False),

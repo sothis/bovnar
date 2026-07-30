@@ -99,6 +99,9 @@ typedef struct {
 	uint32_t value_len;
 	value_type_spec_t vt;
 	token_type_t value_tok;
+	/* The unit the reader resolved for the value, so a test can compare what
+	 * came back against what it asked to be written. */
+	value_unit_t unit;
 } last_event_t;
 
 static bool on_rt(void *ud, bvnr_event_t ev, bvnr_data_t *d)
@@ -116,6 +119,7 @@ static bool on_rt(void *ud, bvnr_event_t ev, bvnr_data_t *d)
 		le->value_len = d->length;
 		le->value[d->length] = '\0';
 		le->value_tok = d->type;
+		le->unit      = d->value_unit;
 
 		if (le->vt.family == vt_plain)
 			le->vt = d->value_type;
@@ -1971,6 +1975,106 @@ static uint64_t gram_seq(const bvnr_event_t *evs, const token_type_t *toks,
 	return nbytes;
 }
 
+/*
+ * The six unit-carrying writers nothing called.
+ *
+ * bvnr_write_uint_unit and bvnr_write_float_unit were exercised here and in
+ * three other files. The other six -- signed integers, fixed point, decimal
+ * floats, and the two arbitrary-precision families -- were public API with NO
+ * caller anywhere in the tree: not a test, not the Python bindings, not the
+ * fuzz harnesses. They happen to work; nothing said so, and nothing would have
+ * said otherwise. These are precisely the families this format exists for, so
+ * "it compiles" was the whole of the guarantee on the path that attaches a unit
+ * to a 128-bit integer.
+ *
+ * Each is written, read back, and checked on the two things that can go wrong
+ * independently: the VALUE survives, and the UNIT survives as the same
+ * value_unit_t rather than as text that merely looks similar.
+ */
+static void test_every_unit_writer_round_trips(void)
+{
+	printf("  test_every_unit_writer_round_trips...\n");
+
+	/* One case per entry point: a key, the unit to attach, and the unit as the
+	 * reader should hand it back. */
+	struct {
+		const char *key;
+		const char *unit;
+	} want[] = {
+		{ "si",  "m/s"  },   /* bvnr_write_sint_unit       */
+		{ "fx",  "k~g"  },   /* bvnr_write_float_fix_unit  */
+		{ "dc",  "\xc2\xb0" "C" },  /* bvnr_write_float_dec_unit  (°C) */
+		{ "bf",  "Pa"   },   /* bvnr_write_bvnf_unit       */
+		{ "bfb", "Pa"   },   /* bvnr_write_bvnf_base_unit  */
+		{ "bi",  "$USD" },   /* bvnr_write_bvni_unit       */
+	};
+
+	for (size_t i = 0; i < sizeof want / sizeof want[0]; i++) {
+		uint8_t output[4096];
+		bvnr_sink_t sink;
+		bvnr_writer_t *w = make_writer(output, sizeof(output), &sink);
+		ASSERT_NOT_NULL(w, "make_writer must succeed");
+		if (!w) return;
+
+		bool uok = true;
+		value_unit_t u = bvn_parse_unit((const uint8_t *)want[i].unit, &uok);
+		ASSERT_TRUE(uok, "the test's own unit string must parse");
+
+		bool wrote = false;
+		bvn_float_t *f = NULL;
+		bvn_int_t   *n = NULL;
+		switch (i) {
+		case 0:
+			wrote = bvnr_write_sint_unit(w, want[i].key, 32, -5, u);
+			break;
+		case 1:
+			wrote = bvnr_write_float_fix_unit(w, want[i].key, 32, 16, 1.5, u);
+			break;
+		case 2:
+			wrote = bvnr_write_float_dec_unit(w, want[i].key, 64, 2.5, u);
+			break;
+		case 3:
+			f = bvn_float_alloc(64);
+			wrote = f && bvn_float_from_double(f, 3.25) &&
+			        bvnr_write_bvnf_unit(w, want[i].key, f, 64, u);
+			break;
+		case 4:
+			f = bvn_float_alloc(64);
+			wrote = f && bvn_float_from_double(f, 3.25) &&
+			        bvnr_write_bvnf_base_unit(w, want[i].key, f, 64, 16, u);
+			break;
+		case 5:
+			n = bvn_int_alloc();
+			/* Wider than any machine integer, which is the point of the
+			 * entry point: a currency amount in minor units at 128 bits. */
+			wrote = n &&
+			        bvn_int_from_str(n, "123456789012345678901234567890", 10) &&
+			        bvnr_write_bvni_unit(w, want[i].key, n, 128, 10, u);
+			break;
+		default:
+			break;
+		}
+		bvn_float_free(f);
+		bvn_int_free(n);
+
+		ASSERT_TRUE(wrote, "the unit-carrying writer must succeed");
+		ASSERT_TRUE(bvnr_write_finish(w), "finish must succeed");
+		ASSERT_EQ_INT(bvnr_writer_get_error(w), error_none, "no writer error");
+
+		last_event_t le = {0};
+		ASSERT_TRUE(roundtrip(output, bvnr_writer_bytes_written(w), &le),
+		            "what it wrote must read back");
+		ASSERT_TRUE(strcmp(le.key, want[i].key) == 0, "the key survives");
+		ASSERT_TRUE(le.value_len > 0, "the value survives");
+		/* The unit is compared as a UNIT, not as text: a writer that emitted a
+		 * different spelling of the same unit is fine, and one that emitted a
+		 * similar spelling of a different unit is not. */
+		ASSERT_TRUE(bvn_unit_equal(le.unit, u),
+		            "the unit survives as the same unit");
+		bvnr_writer_destroy(w);
+	}
+}
+
 static void test_writer_event_grammar(void)
 {
 	char out[4096];
@@ -2127,6 +2231,7 @@ int main(void)
 	test_write_type_annotation_names_the_real_failure();
 	test_unwritable_unit_reports_a_unit_error();
 	test_writer_refuses_unreadable_output();
+	test_every_unit_writer_round_trips();
 	test_writer_event_grammar();
 	test_writer_accepts_only_readable_streams();
 	printf("Running bovnar_writer_test regression suite...\n");

@@ -70,6 +70,36 @@ repository can see. BVNR is named in the abstract instead.
 here may need pip or the network, and explicit about being a spelling check
 rather than a schema validator (`cffconvert --validate` stays the full one).
 
+### Added — coverage for seven unit-carrying entry points that had none
+
+`bvnr_write_uint_unit` and `bvnr_write_float_unit` were exercised in four files.
+The other six unit-carrying writers were public API with **no caller anywhere in
+the tree** — not a test, not the Python bindings, not the fuzz harnesses:
+
+```
+bvnr_write_sint_unit        signed integers
+bvnr_write_float_fix_unit   fixed point
+bvnr_write_float_dec_unit   decimal floats
+bvnr_write_bvnf_unit        arbitrary-precision floats
+bvnr_write_bvnf_base_unit   ... in a chosen base
+bvnr_write_bvni_unit        arbitrary-precision integers
+```
+
+Those are the value families this format exists for, so "it compiles" was the
+whole of the guarantee on the path that attaches a unit to a 128-bit integer.
+They turn out to work; nothing said so, and nothing would have said otherwise.
+Each is now written, read back, and checked on the two things that fail
+independently — the value survives, and the unit survives *as a
+`value_unit_t`*, not as text that merely looks similar.
+
+`bvn_dom_node_from_bigint` was in the same state, and it is worse to leave
+there: it is the only DOM constructor that takes a unit, and its header states
+an **asymmetric ownership contract** — on success the node takes the
+`bvn_int_t`, on failure the caller keeps it. That is exactly the shape that
+leaks or double-frees when nobody checks. Both halves are pinned now, with the
+refusals sharing one integer the test frees itself, so a leak checker has
+something to say if a refusal ever starts consuming it.
+
 ### Fixed — the writer emitted a code that read back as a different unit
 
 `bvn_unit_to_profile` joins a prefix to an atom with **nothing between them** —

@@ -27,6 +27,8 @@
 #include <stdint.h>
 #include <string.h>
 #include "bovnar_dom.h"
+#include "bovnar.h"
+#include "bvn_int.h"
 
 static int failures = 0;
 static int tests = 0;
@@ -992,11 +994,80 @@ static void test_dom_dimension_match_is_order_insensitive(void)
 	}
 }
 
+/*
+ * bvn_dom_node_from_bigint: a unit-carrying constructor with an ASYMMETRIC
+ * ownership contract and, until this, no caller anywhere in the tree.
+ *
+ * The header states it plainly -- on success the node takes the bvn_int_t, on
+ * failure the caller still owns it -- which is exactly the shape that leaks or
+ * double-frees when nobody checks. It is also the only DOM entry point that
+ * takes a value_unit_t, so a unit lost here is a unit lost on the whole
+ * arbitrary-precision path.
+ *
+ * Both halves are pinned: the unit survives construction, and every refusal
+ * leaves the integer for the caller to free (which it does below, so a leak
+ * checker has something to say if that ever stops being true).
+ */
+static void test_dom_bigint_node_carries_its_unit(void)
+{
+	printf("  test_dom_bigint_node_carries_its_unit...\n");
+
+	bool uok = true;
+	value_unit_t usd = bvn_parse_unit((const uint8_t *)"$USD", &uok);
+	ASSERT_TRUE(uok, "the test's own unit must parse");
+
+	/* Success: wider than any machine integer, which is the point. */
+	{
+		bvn_int_t *big = bvn_int_alloc();
+		ASSERT_TRUE(big != NULL, "bvn_int_alloc");
+		if (!big) return;
+		ASSERT_TRUE(bvn_int_from_str(
+				big, "170141183460469231731687303715884105727", 10),
+			    "a 127-bit value parses");
+		value_type_spec_t vt = { .family = vt_uint, .width = 128, .base = 10 };
+		bvn_dom_node_t *n = bvn_dom_node_from_bigint(big, vt, usd);
+		ASSERT_TRUE(n != NULL, "a 128-bit integer node is built");
+		if (n) {
+			ASSERT_TRUE(bvn_unit_equal(bvn_dom_get_unit(n), usd),
+				    "the node carries the unit it was given");
+			char ub[64];
+			int32_t k = bvn_dom_get_unit_string(n, ub, sizeof ub);
+			ASSERT_TRUE(k == 4 && strcmp(ub, "$USD") == 0,
+				    "and spells it back with the sigil");
+			/* Takes ownership: this must free the bigint too. */
+			bvn_dom_node_destroy(n);
+		} else {
+			bvn_int_free(big);
+		}
+	}
+
+	/* Every refusal, with ONE integer that the caller frees at the end. If a
+	 * refusal ever started consuming it, this is a double free rather than a
+	 * silent change of contract. */
+	{
+		bvn_int_t *big = bvn_int_alloc();
+		ASSERT_TRUE(big != NULL, "bvn_int_alloc");
+		if (!big) return;
+		ASSERT_TRUE(bvn_int_from_str(big, "5", 10), "a small value parses");
+
+		value_type_spec_t narrow = { .family = vt_uint,  .width = 64,  .base = 10 };
+		value_type_spec_t notint = { .family = vt_float, .width = 128, .base = 10 };
+		ASSERT_TRUE(bvn_dom_node_from_bigint(big, narrow, usd) == NULL,
+			    "a width a machine integer can hold is refused");
+		ASSERT_TRUE(bvn_dom_node_from_bigint(big, notint, usd) == NULL,
+			    "a non-integer family is refused");
+		ASSERT_TRUE(bvn_dom_node_from_bigint(NULL, notint, usd) == NULL,
+			    "a NULL integer is refused");
+		bvn_int_free(big);
+	}
+}
+
 int main(void)
 {
 	test_dom_accessors_fail_rather_than_lie();
 	test_dom_string_carried_numbers_are_numbers();
 	test_dom_dimension_match_is_order_insensitive();
+	test_dom_bigint_node_carries_its_unit();
 	printf("Running bovnar_dom_test regression suite...\n");
 
 	test_parse_basic_dom();

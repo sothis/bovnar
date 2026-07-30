@@ -177,8 +177,18 @@ def apply_cuts(src, cuts):
             text = text[:start] + text[end:]
             continue
         if mode == NL:
-            text = text[:line_start] + before.rstrip() + nl + after \
-                + text[line_end:]
+            if not before.strip() and not after.strip():
+                # Alone on its lines: the newline that ended the line BEFORE it
+                # is still there, so ASI is safe without adding one, and the
+                # comment leaves no blank line behind.
+                tail = line_end + 1 if line_end < len(text) else line_end
+                text = text[:line_start] + text[tail:]
+            else:
+                # Code on one side or both: the line break the comment provided
+                # has to be replaced, or `a = b /*\n*/ c = d` becomes one line
+                # and means something else.
+                text = text[:line_start] + before.rstrip() + nl + after \
+                    + text[line_end:]
             continue
         if mode == DROP and not before.strip() and not after.strip():
             # The comment was the whole line: take the newline with it, rather
@@ -320,6 +330,14 @@ def strip_c(src):
     m = C_LEADING_BLOCK.match(src)
     if m and "SPDX-License-Identifier" in m.group(0):
         header = m.group(0).rstrip("\n") + "\n"
+    else:
+        # Every licence header in the tree is a leading /* block, and
+        # strip_comments.sh handled no other kind.  A // block carries the same
+        # obligation, though, and this is now the only copy of the rule.
+        lines = src.splitlines(keepends=True)
+        rows = spdx_header_rows(lines, lambda l: l.lstrip().startswith("//"))
+        if rows:
+            header = "".join(lines[:max(rows)]).rstrip("\n") + "\n"
 
     body = c_uncomment(src)
     body = C_TRAILING_HWS.sub("", body)
@@ -341,7 +359,7 @@ def strip_python(src):
     try:
         tokens = list(tokenize.generate_tokens(io.StringIO(src).readline))
     except (tokenize.TokenError, IndentationError, SyntaxError) as exc:
-        raise StripError("not tokenizable as Python: %s" % exc)
+        raise Unverifiable("cannot tokenize as Python: %s" % exc)
 
     lines = src.splitlines(keepends=True)
     keep_rows = spdx_header_rows(lines, lambda l: l.lstrip().startswith("#"))
@@ -708,7 +726,7 @@ def strip_xml(src):
     out = apply_cuts(src, cuts)
     try:
         after = ET.canonicalize(out)
-    except ET.ParseError as exc:
+    except (ET.ParseError, ValueError) as exc:
         raise StripError("stripping produced invalid XML: %s" % exc)
     if before != after:
         raise StripError("stripping changed the XML canonical form")
@@ -722,6 +740,14 @@ def strip_xml(src):
 # depending on what came before it, and a regex body can contain '//' or '/*'.
 # The rule below is the usual one: a regex may start only where an expression
 # may start.
+#
+# That rule is not decidable from the previous token alone, and this is where it
+# gives up: after ')' or '}' it assumes division, so `if (x) /a\/\/b/.test(s)`
+# -- a regex containing '//', in a position only a real parser can tell from a
+# division -- would be misread, and the '//' inside it taken for a comment. That
+# is why node --check runs over the RESULT: deleting the tail of a line like that
+# leaves code node refuses, so the file fails loudly instead of shipping broken.
+# No file in this tree does it, and the check would say so if one started.
 
 JS_REGEX_OK_AFTER = {
     "return", "typeof", "instanceof", "in", "of", "new", "delete", "void",
@@ -779,20 +805,30 @@ def scan_js(src):
             prev = src[i:j]
             i = j
         elif c == "`":
-            j, depth = i + 1, 0
+            # Inside ${...} the braces have to be counted, or `${ {a:1}.a }`
+            # ends the substitution at the inner one and the rest of the
+            # template gets scanned as code.  Nothing inside a substitution is
+            # treated as a comment, which errs towards leaving one in place.
+            j, subst, braces = i + 1, False, 0
             while j < n:
                 if src[j] == "\\":
                     j += 2
                     continue
-                if depth == 0 and src.startswith("${", j):
-                    depth = 1
-                    j += 2
-                    continue
-                if depth and src[j] == "}":
-                    depth = 0
+                if subst:
+                    if src[j] == "{":
+                        braces += 1
+                    elif src[j] == "}":
+                        if braces:
+                            braces -= 1
+                        else:
+                            subst = False
                     j += 1
                     continue
-                if depth == 0 and src[j] == "`":
+                if src.startswith("${", j):
+                    subst, braces = True, 0
+                    j += 2
+                    continue
+                if src[j] == "`":
                     j += 1
                     break
                 j += 1
@@ -888,8 +924,8 @@ def js_dialect(src):
 def node_check(src, suffix):
     with tempfile.NamedTemporaryFile("w", suffix="." + suffix,
                                      encoding="utf-8", delete=False) as fh:
-        fh.write(src)
-        tmp = fh.name
+        tmp = fh.name                   # named before the write, so a failing
+        fh.write(src)                   # write cannot leak the file
     try:
         return subprocess.run(["node", "--check", tmp],
                               stdout=subprocess.DEVNULL,

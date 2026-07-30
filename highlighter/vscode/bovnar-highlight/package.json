@@ -4,6 +4,8 @@
   "description": "Syntax highlighting for Bovnar files (spec 1.1: version directive, datetime literals, \\u/\\x escapes, reference indexing)",
   "version": "1.1.0",
   "publisher": "bovnar",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/sothis/bovnar.git", "directory": "highlighter/vscode/bovnar-highlight" },
   "engines": { "vscode": "^1.70.0" },
   "contributes": {
     "languages": [

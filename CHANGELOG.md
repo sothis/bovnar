@@ -20,6 +20,54 @@ rebuild consumers against the new headers. **SOVERSION is bumped 1 → 2**
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
 
+### Changed — the licence now says what it can and cannot grant
+
+**Read this if you redistribute Bovnar.** `LICENSE` gains clauses 4 and 5, and
+clauses 1–3 become subject to them. The MIT grant covers this project's own
+contribution — the native unit registry, the translation targets, the refusal
+rationales, the generators, the code and the prose. It does **not** cover the
+identifier strings the unit-profile tables carry from UCUM, QUDT, OM 2,
+UDUNITS-2, the CF standard name table and UN/ECE Recommendations 20 and 21, nor
+the webfonts, JavaScript libraries and imagery the website serves. It never did;
+the file said otherwise, which offered recipients a right to sublicense and sell
+material this project has never held a right in.
+
+The new `THIRD_PARTY_NOTICES.md` records, per source: publisher, the exact
+published version each table is verified against, the licence, what was
+extracted, and the modification statement CC BY 4.0 requires. **It must
+accompany any redistribution** — `pack_artifacts.cmake` copies it into every
+binary archive and the amalgamation drop, the Python wheel carries it under
+`dist-info/licenses/`, and `dist/wasm/README.md` (the README npm publishes)
+points at it. Two of these obligations bind binary distributions specifically:
+UDUNITS-2's BSD-3 clause 2, and CC BY 4.0's attribution, whose §6(a) terminates
+the grant on breach. Nothing about the library's own MIT terms changed, and no
+vocabulary has a ShareAlike clause, so this reaches no downstream code.
+
+Two questions are open and are recorded as open rather than settled. UCUM's
+licence is revocable and bars derivative works of its table; written permission
+for the derived mapping is being sought, and `-DBVNR_WITH_UCUM_PROFILE=OFF`
+drops it meanwhile. The CF standard name table states no licence at all — the
+conventions *document* is CC0, the table is maintained separately and carries no
+rights statement — and a declaration has been requested.
+
+Alongside: the webfonts now ship the SIL Open Font License text the OFL requires
+to accompany every copy (`web/fonts/OFL.txt`), the Impressum gains a
+*Bildnachweis*, `doc/11` gains §18, and `CITATION.cff` gains a `references:`
+block naming all six vocabularies with their licences.
+
+### Fixed — `CITATION.cff` failed schema validation, silently
+
+One line — `abbreviation: BVNR` — sat at the **top level**, where CFF 1.2 sets
+`additionalProperties: false`. The key is real and legal *inside* a `references:`
+entry; at the top level it invalidated the whole document. Nothing reported it,
+because that file's only readers are GitHub's citation widget, Zenodo and
+`cffconvert`, and they degrade quietly rather than raising an error the
+repository can see. BVNR is named in the abstract instead.
+
+`check_citation.py` gates the key spelling now — dependency-free, because no gate
+here may need pip or the network, and explicit about being a spelling check
+rather than a schema validator (`cffconvert --validate` stays the full one).
+
 ### Fixed — the writer emitted a code that read back as a different unit
 
 `bvn_unit_to_profile` joins a prefix to an atom with **nothing between them** —

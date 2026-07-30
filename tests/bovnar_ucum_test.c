@@ -1,5 +1,8 @@
 /*
  * SPDX-License-Identifier: MIT
+ * SPDX-FileComment: The test vectors below quote UCUM atom codes. Those
+ * identifiers are Regenstrief Institute's and are not covered by the MIT grant
+ * below; see THIRD_PARTY_NOTICES.md.
  *
  * Copyright (c) 2026 Janos Sonntag
  *

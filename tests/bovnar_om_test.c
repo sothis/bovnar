@@ -1,5 +1,8 @@
 /*
  * SPDX-License-Identifier: MIT
+ * SPDX-FileComment: The test vectors below quote OM 2 local names. Those
+ * identifiers are the OM authors' and are not covered by the MIT grant
+ * below; see THIRD_PARTY_NOTICES.md.
  *
  * Copyright (c) 2026 Janos Sonntag
  *

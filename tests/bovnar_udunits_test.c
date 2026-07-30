@@ -1,5 +1,8 @@
 /*
  * SPDX-License-Identifier: MIT
+ * SPDX-FileComment: The test vectors below quote UDUNITS-2 spellings. Those
+ * identifiers are UCAR/Unidata's and are not covered by the MIT grant
+ * below; see THIRD_PARTY_NOTICES.md.
  *
  * Copyright (c) 2026 Janos Sonntag
  *

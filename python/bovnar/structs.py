@@ -173,6 +173,41 @@ class ValueUnit(ctypes.Structure):
         return (f"ValueUnit(n={self.num_components}, "
                 f"components={self.active_components()!r})")
 
+    def __eq__(self, other) -> bool:
+        """Unit equality, as `bvn_unit_equal` defines it.
+
+        A ctypes Structure defines no `__eq__`, so `==` fell back to identity
+        and `parse_unit("m") == parse_unit("m")` was **False** — the natural
+        Python spelling of the question silently gave the wrong answer, with no
+        `units_equal` exported to reach for instead. The C API has had
+        `bvn_unit_equal` throughout; only the binding was missing.
+
+        `Quantity.__eq__` never had the bug because it compares `unit_str`, and
+        the Python suite compares formatted spellings everywhere, so nothing in
+        the repo exercised this.
+        """
+        if not isinstance(other, ValueUnit):
+            return NotImplemented
+        from ._ffi import get_library
+        return bool(get_library().bvn_unit_equal(self, other))
+
+    def __hash__(self) -> int:
+        """Consistent with `__eq__`, and with `Unit.__hash__`.
+
+        The same multiset of (base, exponent, prefix) triples that `Unit` uses,
+        deliberately and not coincidentally: `Unit.__eq__` accepts a bare
+        `ValueUnit` and reports True for an equal one, so Python's contract
+        requires the two to hash alike. Hashing this struct any other way would
+        make `{Unit.parse("m"): 1}[parse_unit("m")]` a KeyError for a key the
+        dict considers present.
+
+        Order-independent, because `bvn_unit_equal` is.
+        """
+        return hash(frozenset(
+            (int(c.base), int(c.exponent),
+             int(c.prefix.system), int(c.prefix.id.si))
+            for c in self.components[:self.num_components]))
+
 class ValueTypeSpec(ctypes.Structure):
     _fields_ = [
         ('family', ctypes.c_int),

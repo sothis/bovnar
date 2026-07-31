@@ -171,6 +171,29 @@ def units_compatible(a: ValueUnit, b: ValueUnit) -> bool:
     return bool(get_library().bvn_units_compatible(a, b))
 
 
+def units_equal(a: ValueUnit, b: ValueUnit) -> bool:
+    """Return True when *a* and *b* are the SAME unit, not merely commensurate.
+
+    The strictest of the three questions. `units_compatible` asks whether the
+    dimensions and kinds line up, `units_convertible` whether a conversion can
+    be performed, and this whether there is anything to convert at all:
+
+      units_equal(parse_unit("m"),   parse_unit("m"))     → True
+      units_equal(parse_unit("m"),   parse_unit("k~m"))   → False (convertible)
+      units_equal(parse_unit("N"),   parse_unit("k~g·m/s²"))
+                                                          → False (same SI form)
+
+    A UCUM annotation is a comment and never a discriminator, so it does not
+    affect the answer — `ucum:{RBC}/uL` equals `ucum:{cells}/uL`, exactly as
+    the [profiles document](../../doc/11_bovnar_unit_profiles.md) §3.4 says.
+
+    This is also what `==` between two `ValueUnit`s now means. It did not used
+    to mean anything: a ctypes Structure defines no `__eq__`, so `==` compared
+    identities and `parse_unit("m") == parse_unit("m")` was False.
+    """
+    return bool(get_library().bvn_unit_equal(a, b))
+
+
 def units_convertible(a: ValueUnit, b: ValueUnit) -> bool:
     """Return True when the library can actually convert *a* to *b*.
 

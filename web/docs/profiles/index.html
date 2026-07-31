@@ -2455,8 +2455,8 @@ Verified against the native parser:</p>
 <tr>
 <td><code>Gb</code></td>
 <td>gigabit (<code>G~b</code>, factor <code>1e9</code>)</td>
-<td><em>refused</em> — <code>b</code> is non-metric in UCUM, so <code>G</code>+<code>b</code> is not a legal code</td>
-<td>a prefixed reading that exists natively and not in the profile</td>
+<td><strong>gilbert</strong>, <code>Oe·c~m</code> ≈ <code>0.7958</code> A, magnetomotive force</td>
+<td>a data size read as a magnetomotive force</td>
 </tr>
 <tr>
 <td><code>a</code></td>
@@ -2493,10 +2493,17 @@ Verified against the native parser:</p>
 <p>Every row above is asserted in <code>tests/bovnar_ucum_test.c</code>, and the cross-vocabulary suite pins the
 same shape across the other four (§14.2). <a href="https://www.bovnar.io/docs/ambiguities/">Unit Ambiguities §17</a> is
 the reader-facing index of all of them.</p>
-<p><code>st</code> is the dangerous one, because both sides parse and the dimensions differ. It is also the
-argument for the namespace being mandatory rather than a fallback: there is no reading of a bare
-<code>st</code> that could be made to serve both, and a profile that guessed would be wrong for one of the two
-populations every time.</p>
+<p><code>st</code> and <code>Gb</code> are the dangerous two, because on those rows <strong>both sides parse and the dimensions
+differ</strong> — everything else in the table fails on one side and is caught. They are also the argument
+for the namespace being mandatory rather than a fallback: there is no reading of a bare <code>st</code> that
+could be made to serve both populations, and a profile that guessed would be wrong for one of them
+every time.</p>
+<p><code>Gb</code> earns a second look, because the plausible reading of it is the wrong one. UCUM's <code>b</code> is the
+barn and is <strong>non-metric</strong>, so <code>G</code> + <code>b</code> genuinely is not a legal prefixed code — which invites the
+conclusion that <code>ucum:Gb</code> must therefore be refused. It is not: <code>Gb</code> is an atom in its own right,
+the gilbert. The code resolves, to a magnetomotive force, while the same bytes read natively are a
+gigabit. "This prefix cannot attach to that atom" and "these bytes are not a code" are different
+statements, and only the first is true here.</p>
 <h3 id="63-traps-that-are-not-spelling-collisions">6.3 Traps that are not spelling collisions</h3>
 <p>Rows where the spellings differ but the meanings are close enough to be mapped wrongly by
 hand. Each is a factor error, not a syntax error, so nothing would catch it downstream.</p>
@@ -2520,7 +2527,7 @@ the exact decimal UCUM states. Only <code>[Btu_39]</code> is still refused — U
 defines it, and one publisher naming a unit is a request rather than the corroboration the others
 had. UDUNITS runs the other way and is a trap in the mirror image (§13.3).</p>
 <p><strong>The apothecary dram is not the avoirdupois dram.</strong> <code>[dr_ap]</code> is 3.8879346 g and bovnar's <code>dr</code> is
-1.7718 g — a factor of 2.2 apart. Both map, to <em>different</em> native units: <code>[dr_av]</code> → <code>dr</code>,
+1.7718451953125 g — a factor of 2.2 apart. Both map, to <em>different</em> native units: <code>[dr_av]</code> → <code>dr</code>,
 <code>[dr_ap]</code> → <code>dr_ap</code>. The apothecary <em>ounce</em> and <em>pound</em> are the troy ones, so <code>[oz_ap]</code> and
 <code>[lb_ap]</code> land on <code>oz_t</code> and <code>lb_t</code> beside <code>[oz_tr]</code> and <code>[lb_tr]</code> — which is exactly what made the
 dram a trap while it had no native unit of its own.</p>

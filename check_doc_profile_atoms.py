@@ -108,6 +108,65 @@ def rows(path):
         yield n, cells
 
 
+COLLISION_START = "### 6.2"
+COLLISION_END = "### 6.3"
+
+
+def collision_rows(path):
+    """(line number, spelling, native cell, ucum cell) for §6.2's table."""
+    with open(path, encoding="utf-8") as f:
+        lines = f.read().split("\n")
+    inside, header = False, None
+    for n, line in enumerate(lines, 1):
+        if line.startswith(COLLISION_START):
+            inside = True
+            continue
+        if line.startswith(COLLISION_END):
+            return
+        if not inside or not line.startswith("|"):
+            continue
+        if SEPARATOR.match(line.strip()):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if header is None:
+            header = cells
+            continue
+        if len(cells) >= 3:
+            spell = TICK.findall(cells[0])
+            if spell:
+                yield n, spell[0], cells[1], cells[2]
+
+
+def check_collisions(path, parse):
+    """doc/11 §6.2 — each spelling parses (or does not) on each side, as stated.
+
+    The table's whole point is which of the two namespaces resolves the same
+    bytes, so a row that says one side refuses is the row worth checking. It
+    said `ucum:Gb` was refused because UCUM's `b` (the barn) is non-metric and
+    `G`+`b` is not a legal prefixed code — all true, and beside the point: `Gb`
+    is an atom in its own right, the gilbert. The code resolves, to a
+    magnetomotive force, against a native gigabit. That is the dangerous shape
+    the table exists to enumerate, and it was listed as the harmless one.
+    """
+    problems, checked = [], 0
+    for lineno, spelling, native_cell, ucum_cell in collision_rows(path):
+        for cell, expr, side in ((native_cell, spelling, "natively"),
+                                 (ucum_cell, "ucum:" + spelling, "as UCUM")):
+            claims_absent = ("not a unit" in cell or "*refused*" in cell
+                             or "refused" in cell.lower())
+            resolves = parse(expr) is not None
+            checked += 1
+            if claims_absent and resolves:
+                problems.append(
+                    "%s:%d: §6.2 says `%s` does not resolve %s; it does"
+                    % (DOC, lineno, spelling, side))
+            elif not claims_absent and not resolves:
+                problems.append(
+                    "%s:%d: §6.2 describes `%s` %s; it does not resolve"
+                    % (DOC, lineno, spelling, side))
+    return problems, checked
+
+
 def main(argv):
     repo = os.path.abspath(argv[1]) if len(argv) > 1 else REPO
     sys.path.insert(0, repo)
@@ -129,9 +188,8 @@ def main(argv):
     mapped = {m["code"] for m in data.get("mapped", [])}
     opaque = {o["code"] for o in data.get("opaque", [])}
 
-    bad = []
+    bad, checked = check_collisions(path, parse)
     seen = set()
-    checked = 0
     for lineno, cells in rows(path):
         codes = TICK.findall(cells[0])
         if not codes:
@@ -185,8 +243,8 @@ def main(argv):
         sys.stderr.write("\nsrc/gendata is the source of truth; fix the "
                          "document.\n")
         return 1
-    print("check_doc_profile_atoms: %s §6.1 — %d row(s) checked against the "
-          "reader, all %d mapped UCUM codes present"
+    print("check_doc_profile_atoms: %s §6.1 and §6.2 — %d row(s) checked "
+          "against the reader, all %d mapped UCUM codes present"
           % (DOC, checked, len(mapped)))
     return 0
 

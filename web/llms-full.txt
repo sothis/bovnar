@@ -16464,7 +16464,7 @@ Verified against the native parser:
 | `st` | stone, `6.35029318` kg, dimension `[0,1,0,…]` | stere, `m³`, dimension `[3,0,0,…]` | mass read as volume |
 | `B` | byte, information | bel, `da~dB` | a data size read as a level |
 | `b` | bit, information | barn, `1e-28` m² | a data size read as an area |
-| `Gb` | gigabit (`G~b`, factor `1e9`) | *refused* — `b` is non-metric in UCUM, so `G`+`b` is not a legal code | a prefixed reading that exists natively and not in the profile |
+| `Gb` | gigabit (`G~b`, factor `1e9`) | **gilbert**, `Oe·c~m` ≈ `0.7958` A, magnetomotive force | a data size read as a magnetomotive force |
 | `a` | *not a unit* | year (Julian) | — (Bovnar declines the ambiguity; see [Unit Ambiguities](07_bovnar_unit_ambiguities.md)) |
 | `ar` | *not a unit* | are, `c~ha` | — (the hectare is `ucum:har`, an easy off-by-100) |
 | `AU` | *not a unit* | astronomical unit | — (Bovnar spells it `au`) |
@@ -16475,10 +16475,18 @@ Every row above is asserted in `tests/bovnar_ucum_test.c`, and the cross-vocabul
 same shape across the other four (§14.2). [Unit Ambiguities §17](07_bovnar_unit_ambiguities.md) is
 the reader-facing index of all of them.
 
-`st` is the dangerous one, because both sides parse and the dimensions differ. It is also the
-argument for the namespace being mandatory rather than a fallback: there is no reading of a bare
-`st` that could be made to serve both, and a profile that guessed would be wrong for one of the two
-populations every time.
+`st` and `Gb` are the dangerous two, because on those rows **both sides parse and the dimensions
+differ** — everything else in the table fails on one side and is caught. They are also the argument
+for the namespace being mandatory rather than a fallback: there is no reading of a bare `st` that
+could be made to serve both populations, and a profile that guessed would be wrong for one of them
+every time.
+
+`Gb` earns a second look, because the plausible reading of it is the wrong one. UCUM's `b` is the
+barn and is **non-metric**, so `G` + `b` genuinely is not a legal prefixed code — which invites the
+conclusion that `ucum:Gb` must therefore be refused. It is not: `Gb` is an atom in its own right,
+the gilbert. The code resolves, to a magnetomotive force, while the same bytes read natively are a
+gigabit. "This prefix cannot attach to that atom" and "these bytes are not a code" are different
+statements, and only the first is true here.
 
 ### 6.3 Traps that are not spelling collisions
 
@@ -16508,7 +16516,7 @@ defines it, and one publisher naming a unit is a request rather than the corrobo
 had. UDUNITS runs the other way and is a trap in the mirror image (§13.3).
 
 **The apothecary dram is not the avoirdupois dram.** `[dr_ap]` is 3.8879346 g and bovnar's `dr` is
-1.7718 g — a factor of 2.2 apart. Both map, to *different* native units: `[dr_av]` → `dr`,
+1.7718451953125 g — a factor of 2.2 apart. Both map, to *different* native units: `[dr_av]` → `dr`,
 `[dr_ap]` → `dr_ap`. The apothecary *ounce* and *pound* are the troy ones, so `[oz_ap]` and
 `[lb_ap]` land on `oz_t` and `lb_t` beside `[oz_tr]` and `[lb_tr]` — which is exactly what made the
 dram a trap while it had no native unit of its own.

@@ -12,8 +12,14 @@ with it lived somewhere else, as a module-level function taking the struct back:
 
 so the obvious question ("what unit is this?") was answered by a function the
 caller had to know to look for, and printing a Quantity's unit meant importing
-the package root. Worse, the struct compares by ctypes identity, so ``==`` on two
+the package root. Worse, the struct compared by ctypes identity, so ``==`` on two
 ValueUnits meaning the same thing was False.
+
+``ValueUnit`` now carries the same ``__eq__`` and a matching ``__hash__``, so the
+raw struct ``parse_unit`` returns compares correctly too — the wrapper is the
+place the operations live, not the only place equality works. The two hash
+identically on purpose: ``Unit.__eq__`` accepts a bare ``ValueUnit``, so Python's
+contract requires it.
 
 ``Unit`` is that struct with its own operations attached. It carries no state
 beyond the struct -- ``Unit.raw`` is the same ``ValueUnit``, so anything that

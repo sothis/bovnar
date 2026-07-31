@@ -43,6 +43,55 @@ Julian month at 2 629 800 s, the fortnight at 1 209 600, `mH2O` at 9 806.65 Pa,
 the IT calorie at 4.1868 J against the thermochemical 4.184, the assay ton at
 175/6 g, `sph` at 4π sr, `rev` at 2π rad and 9 `den` to the `tex`.
 
+### Fixed — `parse_unit("m") == parse_unit("m")` was False
+
+`ValueUnit` is a ctypes `Structure`, which defines no `__eq__`, so `==` fell
+back to identity: the natural Python spelling of the natural question silently
+answered "no", and there was no `units_equal` exported to reach for instead.
+`bvn_unit_equal` has been in the C API throughout — only the binding was
+missing.
+
+`Unit` had already fixed this for `Quantity.unit`, and its module docstring
+names the defect exactly ("what the ctypes default denied"). But `parse_unit` —
+the entry point every document and example uses — returns the bare struct, so
+the hole stayed open on the path most callers take. Nothing in the repo caught
+it: `Quantity.__eq__` compares `unit_str`, and the Python suite compares
+formatted spellings throughout.
+
+`ValueUnit` now carries `__eq__` (delegating to `bvn_unit_equal`) and a
+`__hash__` that is **the same function `Unit` uses**, not merely a consistent
+one. That matters: `Unit.__eq__` accepts a bare `ValueUnit` and reports True for
+an equal one, so Python's contract requires the two to hash alike — otherwise
+`{Unit.parse("m"): 1}[parse_unit("m")]` is a `KeyError` for a key the dict
+considers present. Both directions are tested.
+
+`units_equal(a, b)` is exported beside `units_compatible` and
+`units_convertible`, completing the three questions: same unit, commensurate
+unit, convertible unit.
+
+### Fixed — `ucum:Gb` is the gilbert, and doc/11 called it a refusal
+
+doc/11 §6.2 tabulates the spellings that name different quantities in the two
+namespaces. Its `Gb` row said UCUM refuses the code, on reasoning that is
+entirely correct and beside the point: UCUM's `b` is the barn and is non-metric,
+so `G`+`b` is indeed not a legal *prefixed* code — but `Gb` is an atom in its
+own right, the **gilbert**, and `src/gendata/ucum.bvnr` has always mapped it to
+`Oe·c~m`. So the row belonged in the dangerous class, not the harmless one:
+native `Gb` is a gigabit, `ucum:Gb` is a magnetomotive force, both sides parse,
+and the dimensions are unrelated. The section said `st` was the only row of that
+shape; there are two.
+
+`check_doc_profile_atoms.py` now checks §6.2 as well as §6.1 — for every row,
+whether each side resolves, against what the row claims. Verified by mutation:
+restoring the old wording is caught.
+
+Also in §6.3, the avoirdupois dram is stated at its exact `1.7718451953125` g
+rather than a truncated `1.7718`, beside the exact `3.8879346` it is contrasted
+with. Every other claim in §6.2 and §6.3 was put to the library and holds: the
+stone-versus-stere and byte-versus-bel collisions, `val` at 0.5, the calorie and
+BTU conventions including `[Btu]` landing on `Btu_th`, the nine survey-series
+mappings, the named British refusals, and annotation-insensitive equality.
+
 ### Fixed — the unit-policy reference blamed the wrong value for an inexact `--si` run
 
 doc/06 §2.4 illustrated `error_unit_inexact` with a document whose heading is in

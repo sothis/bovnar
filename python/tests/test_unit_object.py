@@ -143,3 +143,58 @@ class TestQuantityValidation:
         assert Quantity("1.0", vt, bovnar.parse_unit("m")).unit == "m"
         assert Quantity("1.0", vt, Unit.parse("m")).unit == "m"
         assert Quantity("1.0", vt, None).unit.is_dimensionless
+
+
+class TestRawValueUnitEqualityMatchesUnit:
+    """The raw struct compares like the object that wraps it.
+
+    Unit fixed `==` for the type Quantity.unit hands back, but parse_unit --
+    the entry point every document and example uses -- still returns a bare
+    ValueUnit, and a ctypes Structure defines no __eq__. So the natural Python
+    spelling of the natural question silently answered by identity:
+    parse_unit("m") == parse_unit("m") was False. Nothing in the repo caught it
+    because Quantity.__eq__ compares unit_str and the suite compares formatted
+    spellings throughout.
+    """
+
+    def test_two_parses_of_the_same_unit_are_equal(self):
+        assert bovnar.parse_unit("m") == bovnar.parse_unit("m")
+        assert bovnar.parse_unit("k~g·m/s²") == bovnar.parse_unit("k~g·m/s²")
+
+    def test_different_units_are_not_equal(self):
+        assert bovnar.parse_unit("m") != bovnar.parse_unit("k~m")
+        assert bovnar.parse_unit("N") != bovnar.parse_unit("k~g·m/s²")
+
+    def test_equality_is_the_librarys_not_the_formatters(self):
+        # Same unit reached through two vocabularies.
+        assert bovnar.parse_unit("mmHg") == bovnar.parse_unit("ucum:mm[Hg]")
+        # A UCUM annotation is a comment, never a discriminator (doc/11 3.4).
+        assert (bovnar.parse_unit("ucum:{RBC}/uL")
+                == bovnar.parse_unit("ucum:{cells}/uL"))
+
+    def test_comparison_with_a_foreign_type_is_false_not_an_error(self):
+        assert bovnar.parse_unit("m") != "m"
+        assert bovnar.parse_unit("m") != None          # noqa: E711
+
+    def test_units_equal_is_exported_and_agrees(self):
+        a, b = bovnar.parse_unit("m"), bovnar.parse_unit("k~m")
+        assert bovnar.units_equal(a, a) is True
+        assert bovnar.units_equal(a, b) is False
+        assert bovnar.units_equal(a, b) == (a == b)
+
+    def test_hash_agrees_with_Unit_so_the_two_share_a_dict(self):
+        """Unit.__eq__ accepts a bare ValueUnit and reports True for an equal
+        one, so Python's contract requires the two to hash alike."""
+        vu, u = bovnar.parse_unit("m"), Unit.parse("m")
+        assert u == vu and vu == u
+        assert hash(u) == hash(vu)
+        assert {u: 1}[vu] == 1
+        assert {vu: 2}[u] == 2
+        assert len({u, vu}) == 1
+
+    def test_hash_separates_units_that_differ(self):
+        assert (hash(bovnar.parse_unit("m"))
+                != hash(bovnar.parse_unit("k~m")))
+        assert len({bovnar.parse_unit("m"),
+                    bovnar.parse_unit("m"),
+                    bovnar.parse_unit("k~m")}) == 2

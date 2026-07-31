@@ -18,8 +18,12 @@ In scientific and industrial systems, the expensive failures are rarely bad synt
 
 Bovnar closes that gap. Every value in a `.bvnr` document carries its own type family, bit-width, numeric base, and **physical unit** — inline, in the byte stream, with no external schema. The unit is not a comment or a naming convention; it is part of the value and is validated by the parser. Annotate a measurement as `m/s` and write a mismatched inline unit, and parsing fails with `error_unit_mismatch`. Hand the file to anyone and they have everything required to interpret — and to dimensionally trust — every reading.
 
+<!-- bovnar-example: illustrative -->
 ```bovnar
-#!bovnar 1.1                                 # optional spec-version directive
+#!bovnar 1.1
+# The optional spec-version directive above carries the version and nothing
+# else; a comment on that line is error_invalid_spec_version. Comments like
+# this one, and the trailing ones below, are ordinary and inert.
 # A self-describing configuration document
 .config = {
     .host      = "api.example.com";

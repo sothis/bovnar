@@ -190,6 +190,39 @@ def check_codes(p):
     return seen
 
 
+def check_codes_reachable(p):
+    """A code an EXPRESSION profile could never read whole.
+
+    In an expression grammar a trailing run of ASCII digits is an EXPONENT --
+    "m2" is m², "m100" is m¹⁰⁰ -- so the scanner strips those digits before it
+    ever consults the atom table. A code that ends in one is therefore looked up
+    without its tail: `astronomical_unit_BIPM_2006` was asked for as
+    `astronomical_unit_BIPM_`, which is not a code, and the row sat in .mapped
+    for a translation that could not happen. Worse than dead in the general
+    case -- if the stem HAD been a code, the row would have resolved to a
+    different unit raised to a power.
+
+    A flat profile is unaffected: a flat code is one whole token with no
+    exponent production, and 3118 of them carry digits perfectly safely.
+
+    Refused at GENERATION time, before a table exists to test, so the mistake
+    cannot reach a build. check_profile_factors.py round-trips every code
+    against the built library afterwards, which is the general form of this and
+    catches whatever this shape rule does not."""
+    if p.grammar == "flat":
+        return
+    for listname in ("mapped", "opaque"):
+        for rec in p.list(listname):
+            code = rec["code"]
+            if code and code[-1].isdigit() and not code[0].isdigit():
+                die(p, "the code %r ends in a digit, and this is an expression "
+                       "profile where a trailing digit run is an exponent — the "
+                       "parser would look up %r and never find it, so the row "
+                       "could never be read. Move it to .unsupported with a why,"
+                       " or spell the unit some other way."
+                       % (code, code.rstrip("0123456789")))
+
+
 def check_prefixes(p):
     prefixes = p.list("prefixes")
     if prefixes and p.grammar == "flat":
@@ -667,6 +700,7 @@ def main(argv):
     for p in PROFILES:
         p.doc = load(os.path.join(gendata, p.data))
         check_codes(p)
+        check_codes_reachable(p)
         check_prefixes(p)
 
     units, pfx, allpfx, iec = native_registry()

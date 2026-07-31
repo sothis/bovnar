@@ -314,13 +314,20 @@ opened with `strict_version` instead rejects any unsupported version
 `<major>.<minor>` when `major` equals its own and `minor` is ≤ its own
 (`BVNR_SPEC_VERSION_*`).
 
-```bovnar
-#!bovnar 1.1        # current — accepted
-#!bovnar 1.0        # older minor — accepted
-#!bovnar 1.9        # newer minor — lenient: accepted; strict: error
-#!bovnar 2.0        # newer major — lenient: accepted; strict: error
-#!bovnar 1          # malformed (no minor) — error_invalid_spec_version
-```
+| Directive line | Outcome |
+|---|---|
+| `#!bovnar 1.1` | current — accepted |
+| `#!bovnar 1.0` | older minor — accepted |
+| `#!bovnar 1.9` | newer minor — lenient: accepted; strict: error |
+| `#!bovnar 2.0` | newer major — lenient: accepted; strict: error |
+| `#!bovnar 1` | malformed (no minor) — `error_invalid_spec_version` |
+| `#!bovnar 1.1 # note` | **trailing junk** — `error_invalid_spec_version` |
+
+The outcomes are given in a table rather than as comments on the directives
+themselves, because a comment there is precisely the *trailing junk* the rule
+above forbids: `#!bovnar 1.1 # current` is not an annotated directive, it is a
+rejected one. The directive line carries the version and nothing else. Comments
+resume on the next line, where they are ordinary and inert.
 
 ---
 

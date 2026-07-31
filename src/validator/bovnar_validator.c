@@ -816,9 +816,22 @@ static bool bvn_apply_want_unit(bvnr_reader_t* r, token_type_t tt, bvnr_data_t* 
 		 *
 		 * A target the HOOK named is different: the caller chose it for this
 		 * value, and a mismatch there is the error it was documented as.
+		 *
+		 * ...but only when the units really do not match. The engine also
+		 * refuses a pair it AGREES about when the exact factor outgrows
+		 * bvn_int_t: `Q~m¹⁰⁰·Q~g¹⁰⁰` to `q~m¹⁰⁰·q~g¹⁰⁰` is the same bases at
+		 * the same exponents and needs 10^12000, past BVN_INT_MAX_BITS. Calling
+		 * that error_unit_mismatch tells the caller their units are
+		 * incompatible, which is a false statement about their document; the
+		 * conversion is defined and merely too large to represent, which is
+		 * what error_value_out_of_range already says for a literal too extreme
+		 * to build a rational from. Ask the cheap question the engine's own
+		 * screen answers rather than restating its capacity rule here.
 		 */
 		if (from_policy) return true;
-		v->last_error = error_unit_mismatch;
+		v->last_error = bvn_units_convertible(d->value_unit, want)
+			      ? error_value_out_of_range
+			      : error_unit_mismatch;
 		return false;
 	}
 	if (!exact) {

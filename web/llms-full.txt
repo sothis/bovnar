@@ -24,8 +24,12 @@ In scientific and industrial systems, the expensive failures are rarely bad synt
 
 Bovnar closes that gap. Every value in a `.bvnr` document carries its own type family, bit-width, numeric base, and **physical unit** — inline, in the byte stream, with no external schema. The unit is not a comment or a naming convention; it is part of the value and is validated by the parser. Annotate a measurement as `m/s` and write a mismatched inline unit, and parsing fails with `error_unit_mismatch`. Hand the file to anyone and they have everything required to interpret — and to dimensionally trust — every reading.
 
+<!-- bovnar-example: illustrative -->
 ```bovnar
-#!bovnar 1.1                                 # optional spec-version directive
+#!bovnar 1.1
+# The optional spec-version directive above carries the version and nothing
+# else; a comment on that line is error_invalid_spec_version. Comments like
+# this one, and the trailing ones below, are ordinary and inert.
 # A self-describing configuration document
 .config = {
     .host      = "api.example.com";
@@ -2969,13 +2973,20 @@ opened with `strict_version` instead rejects any unsupported version
 `<major>.<minor>` when `major` equals its own and `minor` is ≤ its own
 (`BVNR_SPEC_VERSION_*`).
 
-```bovnar
-#!bovnar 1.1        # current — accepted
-#!bovnar 1.0        # older minor — accepted
-#!bovnar 1.9        # newer minor — lenient: accepted; strict: error
-#!bovnar 2.0        # newer major — lenient: accepted; strict: error
-#!bovnar 1          # malformed (no minor) — error_invalid_spec_version
-```
+| Directive line | Outcome |
+|---|---|
+| `#!bovnar 1.1` | current — accepted |
+| `#!bovnar 1.0` | older minor — accepted |
+| `#!bovnar 1.9` | newer minor — lenient: accepted; strict: error |
+| `#!bovnar 2.0` | newer major — lenient: accepted; strict: error |
+| `#!bovnar 1` | malformed (no minor) — `error_invalid_spec_version` |
+| `#!bovnar 1.1 # note` | **trailing junk** — `error_invalid_spec_version` |
+
+The outcomes are given in a table rather than as comments on the directives
+themselves, because a comment there is precisely the *trailing junk* the rule
+above forbids: `#!bovnar 1.1 # current` is not an annotated directive, it is a
+rejected one. The directive line carries the version and nothing else. Comments
+resume on the next line, where they are ordinary and inert.
 
 ---
 
@@ -14947,6 +14958,7 @@ an inline unit suffix. Parameter ordering stays free (doc/05 §2.1) and the anno
 (doc/05 §2.2) is unchanged — the comparison is on the parsed `value_unit_t`, so the two spellings
 may differ as long as they mean the same thing:
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 #!bovnar 1.2
 .a = <float:64,ucum:mm[Hg]> 120.0;
@@ -15512,7 +15524,7 @@ reaches every decade: `g` alone spells the microgram `ug`. A flat profile has no
 *(base, decade)* and a base contributes as many rows as it has codes. Keying a flat profile by base
 alone would leave whichever code happened to be shortest and make every other decade unwritable.
 
-It remains **partial by construction**, and in two different ways:
+It remains **partial by construction**, and in three different ways:
 
 - *No table is complete.* A native unit outside a transliteration table has nowhere to go — the Old
   German units, the water-hardness degrees, the turbidity kinds, `PSU`, `CF`, `mph`, `kph`, `rpm`,
@@ -15520,6 +15532,12 @@ It remains **partial by construction**, and in two different ways:
 - *A flat profile can only write a single component.* A flat code names a whole unit, so there is no
   way to compose one out of parts: `unece:MSK` reads back as `m/s²`, but a native `m/s²` has no
   UNECE spelling this function can construct. The expression profiles have no such limit.
+- *The dimensionless unit is spellable only in an expression profile.* `1` is a bare integer factor
+  of 10⁰ in that grammar, so `ucum:1` and `udunits:1` read back as the dimensionless unit. A flat
+  vocabulary has no integer-factor production, and the two that do own a unity code refuse it on
+  purpose — QUDT's `UNITLESS` and `NUM` and OM's `one` are all `.unsupported`, reading *"the absence
+  of a unit — write no unit at all"*. So the five flat namespaces refuse it, `cf` included, which is
+  read-only anyway (§17.3).
 
 | Native | `ucum` | `unece` | `qudt` | `udunits` |
 |---|---|---|---|---|
@@ -15528,6 +15546,7 @@ It remains **partial by construction**, and in two different ways:
 | `m/s` | `m.s-1` | — | — | `m.s-1` |
 | `Mi~B` | — | — | `MebiBYTE` | — |
 | `mph` | — | — | — | — |
+| *(dimensionless)* | `1` | — | — | `1` |
 
 The asymmetry is worth stating plainly: these profiles are good *readers* and partial *writers*. A
 round trip that starts in a vocabulary returns to it; one that starts in Bovnar's native registry

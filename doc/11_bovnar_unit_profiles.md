@@ -316,6 +316,7 @@ an inline unit suffix. Parameter ordering stays free (doc/05 §2.1) and the anno
 (doc/05 §2.2) is unchanged — the comparison is on the parsed `value_unit_t`, so the two spellings
 may differ as long as they mean the same thing:
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 #!bovnar 1.2
 .a = <float:64,ucum:mm[Hg]> 120.0;

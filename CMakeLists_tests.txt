@@ -1309,7 +1309,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 160)   # 129 base + i18n_de + wrapper_sync + doc_counts
+set(BVNR_EXPECTED_TEST_COUNT 161)   # 129 base + i18n_de + wrapper_sync + doc_counts + doc_examples
                                     #             + citation
                                     #         + profiles_off_build
                                     # + om_test + cf_test
@@ -1592,6 +1592,25 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_co
                      ${CMAKE_CURRENT_SOURCE_DIR})
     set_tests_properties(bvnr_doc_counts PROPERTIES
         LABELS "docs;units;gendata" TIMEOUT 60)
+endif()
+
+# ── The documents embedded in the docs parse ───────────────────────────────
+# Counts and tables are gated above; the EXAMPLES were not, and the front door
+# was wrong because of it. README.md's first example -- the first bovnar
+# document most readers ever see -- opened with a comment on the spec-version
+# directive line, which is error_invalid_spec_version: the annotation is the
+# "trailing junk" doc/03 forbids four lines above its own example block, and
+# conformance case VER-013 asserts the rejection. Prose, reader and suite all
+# agreed; the two most-read examples disagreed with all three.
+#
+# Needs the built CLI, so it skips rather than fails when there is none.
+if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_examples.py)
+    add_test(NAME bvnr_doc_examples
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_examples.py)
+    set_tests_properties(bvnr_doc_examples PROPERTIES
+        LABELS "docs" TIMEOUT 120
+        ENVIRONMENT "BOVNAR_CLI=$<TARGET_FILE:bovnar>")
 endif()
 
 # ── The installed header set is self-contained ─────────────────────────────

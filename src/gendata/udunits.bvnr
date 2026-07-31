@@ -497,9 +497,16 @@
   # "unified_atomic_mass_unit" is UDUNITS' fourth spelling and now maps too, in
   # the completion block below. It could not when this block was written: at 24
   # bytes it pushed this profile's worst-case emitted string past
-  # BVNR_UNIT_STRING_MAX, which gen_profiles.py refuses to generate. Closing the
-  # table admitted a longer code still -- "astronomical_unit_BIPM_2006", 27
-  # bytes -- and the constant went from 1024 to 1088 to take it.
+  # BVNR_UNIT_STRING_MAX, which gen_profiles.py refuses to generate, and the
+  # constant went from 1024 to 1088 to take it.
+  #
+  # It was raised further than 24 bytes alone needed, for
+  # "astronomical_unit_BIPM_2006" at 27 -- a row since found UNREACHABLE (see
+  # the head of .unsupported) and moved out of the emitted set. 24 bytes is the
+  # longest emittable code again, so the bound this profile actually requires is
+  # back under 1024. The constant STAYS at 1088: a maximum larger than the
+  # tables need costs a caller nothing, while shrinking a published constant
+  # every consumer sizes its buffers from is churn no defect asks for.
   { .code = "u";                  .bovnar = "Da"; .metric = false; },
   { .code = "amu";                .bovnar = "Da"; .metric = false; },
   { .code = "atomic_mass_unit";   .bovnar = "Da"; .metric = false; },
@@ -556,7 +563,6 @@
   { .code = "angular_second";          .bovnar = "arcsec";        .metric = false; .reverse = false; },  # alias of arcsecond
   { .code = "unified_atomic_mass_unit"; .bovnar = "Da";            .metric = false; .reverse = false; },  # alias of u
   { .code = "atomicmassunit";          .bovnar = "Da";            .metric = false; .reverse = false; },  # alias of u
-  { .code = "astronomical_unit_BIPM_2006"; .bovnar = "au";            .metric = false; .reverse = false; },  # alias of ua
   { .code = "knot_international";      .bovnar = "kn";            .metric = false; .reverse = false; },  # alias of international_knot
   { .code = "Å";                       .bovnar = "Å";             .metric = false; .reverse = false; },  # alias of Å
   { .code = "ångström";                .bovnar = "Å";             .metric = false; .reverse = false; },  # alias of Å
@@ -699,6 +705,23 @@
 .opaque = [];
 
 .unsupported = [
+  # ── Unreachable through this profile's own grammar ───────────────────────
+  # UDUNITS is an EXPRESSION profile, so a trailing run of digits is an
+  # EXPONENT: "m2" is m² and "m100" is m¹⁰⁰. A code that ends in digits can
+  # therefore never be looked up whole -- the scanner takes "2006" as the
+  # exponent and asks the atom table for "astronomical_unit_BIPM_", which is
+  # not a code, so the whole token fails.
+  #
+  # It sat in .mapped for exactly that reason: nothing checked that a code can
+  # be READ through the grammar it belongs to, only that its .bovnar target
+  # parses. gen_profiles.py now round-trips every code and refuses a table with
+  # a row it cannot reach, so this cannot be re-added by mistake.
+  #
+  # Listed here rather than deleted so a producer who sends it is told "known,
+  # and not carryable" instead of "that is not a code". Nothing is lost: UDUNITS
+  # spells the same unit "au", "ua" and "astronomical_unit", and all three work.
+  { .code = "astronomical_unit_BIPM_2006"; .why = "a code ending in digits cannot be read in an expression profile — the digits scan as an exponent; write au, ua or astronomical_unit"; },
+
   # ── Reference time ───────────────────────────────────────────────────────
   # The construct this profile is most often asked for, and the one it cannot
   # carry. A bovnar timestamp is <datetime:width,epoch>: the EPOCH lives in the

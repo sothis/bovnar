@@ -907,7 +907,16 @@ static bool parse_component(const bvn_profile_t* p, const char* s,
 			k++;
 		}
 		if (k >= len) {
-			*status = bvni_profile_illegal;
+			/* The marker with no digits after it -- "10*", "10^". Bare UNSUPPORTED
+			 * rather than illegal, so the whole numeric-base family answers with
+			 * one voice: `10`, `10*3` and `10^-6` are all "known, and bovnar has
+			 * no component for a numeric factor", and a producer who truncated one
+			 * of them should be told the same thing rather than "that is not a
+			 * code". ucum.bvnr carries both spellings as named refusals saying
+			 * exactly that, and this is the path that has to deliver it -- the
+			 * unsupported table is consulted only for tokens that reach it, and a
+			 * "10"-prefixed one never does. */
+			*status = bvni_profile_unsupported;
 			return false;
 		}
 		int32_t v = 0;

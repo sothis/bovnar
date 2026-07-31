@@ -114,11 +114,22 @@ BVN_API bool bvn_unit_convert_value(double value, value_unit_t from,
 /* Lossless (exact arbitrary-precision) unit conversion. Converts the exact
  * rational value vnum/vden from unit `from` into unit `to`, writing the exact
  * result to out_num/out_den (caller-allocated, reduced to lowest terms, den>0).
- * Returns false when the units are dimensionally incompatible or the unit is
- * structurally invalid. *exact is set false when the true conversion factor is
- * irrational (π-based angles): the result is then only an approximation and a
- * lossless consumer must reject it. This is the engine behind the reader's
- * want_unit hook; it is exact for any value width and any base. */
+ * Returns false in three cases, which a caller who reports a diagnosis must
+ * tell apart -- ask bvn_units_convertible to separate the first two from the
+ * third:
+ *   - the units are dimensionally incompatible;
+ *   - the unit is structurally invalid;
+ *   - CAPACITY: the units agree and the conversion is defined, but the exact
+ *     factor needs more than BVN_INT_MAX_BITS. Reachable only from deliberately
+ *     extreme units -- `Q~m¹⁰⁰·Q~g¹⁰⁰` to `q~m¹⁰⁰·q~g¹⁰⁰` needs 10^12000 --
+ *     and NOT a statement that the units disagree. Nothing is truncated: the
+ *     arbitrary-precision helpers report their own overflow and this refuses on
+ *     it rather than computing with the low bits.
+ * *exact is set false when the true conversion factor is irrational (π-based
+ * angles): the result is then only an approximation and a lossless consumer
+ * must reject it. On any false return *exact is unspecified. This is the engine
+ * behind the reader's want_unit hook; it is exact for any value width and any
+ * base. */
 BVN_API bool bvn_unit_convert_rational(const bvn_int_t *vnum, const bvn_int_t *vden,
                                 value_unit_t from, value_unit_t to,
                                 bvn_int_t *out_num, bvn_int_t *out_den, bool *exact);

@@ -63,6 +63,7 @@ Usage:
 """
 import os
 import re
+import string
 import sys
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -189,10 +190,25 @@ def check_exponent_range(text, where, facts, problems, verbose):
     lo = facts["BVN_EXPONENT_MIN"]
     hi = facts["BVN_EXPONENT_MAX"]
 
-    # The old wording, in every spelling it appeared in.
+    # The old wording, in every spelling it appeared in -- INCLUDING ABNF.
+    #
+    # The three prose spellings were what this check began with, and they were
+    # not enough: the draft's Appendix A said the same thing in ABNF, as
+    # `%x31-39` and a `sup-digit` set with U+2070 missing, and no prose pattern
+    # matches that. So the fix landed in the prose (Table 8 correctly says "one
+    # to three digits" and `^[+-]?[0-9]{1,3}`) while the formal grammar an
+    # implementer actually builds from kept the single-digit rule -- the
+    # document disagreeing with itself, with the machine-readable half wrong.
     for pat, what in ((r"[Oo]ne digit 1-9", "\"one digit 1-9\""),
                       (r"\^\[\+-\]\?\[1-9\]", "`^[+-]?[1-9]`"),
-                      (r"single digit", "\"single digit\"")):
+                      (r"single digit", "\"single digit\""),
+                      (r'caret-exp\s*=\s*"\^"\s*\[\s*"\+"\s*/\s*"-"\s*\]\s*%x31-39',
+                       "the ABNF `caret-exp = \"^\" [ \"+\" / \"-\" ] %x31-39`"),
+                      (r'\[\s*"\+"\s*/\s*"-"\s*\]\s*%x31-39\s*\)',
+                       "the inline ABNF `[ \"+\" / \"-\" ] %x31-39`"),
+                      (r"sup-exp\s*=\s*\[\s*sup-sign\s*\]\s*sup-digit\b",
+                       "the ABNF `sup-exp = [ sup-sign ] sup-digit` "
+                       "(one superscript digit)")):
         if re.search(pat, text):
             problems.append(
                 "%s describes the exponent form as %s; the range is [%d, %d] "
@@ -212,6 +228,93 @@ def check_exponent_range(text, where, facts, problems, verbose):
                           lo, hi))
     elif verbose and ranges:
         print("  ok  %s: exponent range [%d, %d]" % (where, lo, hi))
+
+
+def check_base_unit_char(text, where, problems, verbose):
+    """The draft's `base-unit-char` must admit every character a symbol uses.
+
+    The draft is the ONLY document that enumerates the characters a unit symbol
+    may be built from. doc/12's EBNF deliberately does not -- it says "a symbol
+    looked up in the fixed unit table", deferring to the registry -- which is
+    exactly why doc/12 did not go stale when the registry grew and the draft
+    did. An enumeration is a copy, and a copy of a growing thing rots.
+
+    It rotted twice, silently:
+      * U+0394 GREEK CAPITAL DELTA, absent, which excluded all eight
+        temperature-INTERVAL spellings (ΔK, Δ°C, Δ°F, Δ°De, Δ°N, Δ°Ra);
+      * DIGIT, absent altogether, which excluded mH2O.
+    A parser built from the draft rejected nine spellings this library accepts
+    and emits.
+
+    Checked against src/gendata/units.bvnr rather than against a list here, so
+    the next symbol with an unusual character fails this instead of shipping."""
+    m = re.search(r"base-unit-char\s*=(.*?)(?:\ncurrency-code|\n\s*\n)",
+                  text, re.S)
+    if not m:
+        problems.append("%s has no base-unit-char production to check" % where)
+        return
+    block = m.group(1)
+
+    allowed = set()
+    if re.search(r"\bALPHA\b", block):
+        allowed |= set(string.ascii_letters)
+    if re.search(r"\bDIGIT\b", block):
+        allowed |= set(string.digits)
+    for lit in re.findall(r'"(.)"', block):
+        allowed.add(lit)
+    # %xC2.B0 and friends: UTF-8 byte sequences, decoded back to the character.
+    for hexrun in re.findall(r"%x([0-9A-Fa-f]{2}(?:\.[0-9A-Fa-f]{2})*)", block):
+        try:
+            allowed.add(bytes(int(b, 16) for b in hexrun.split(".")).decode("utf-8"))
+        except (UnicodeDecodeError, ValueError):
+            pass
+    # ...and the codepoints the comments name, which is how the ohm and the
+    # angstrom are given (two encodings, one character each).
+    for cp in re.findall(r"U\+([0-9A-Fa-f]{4,6})", block):
+        allowed.add(chr(int(cp, 16)))
+
+    spellings = registry_spellings()
+    if spellings is None:
+        if verbose:
+            print("  ..  %s: base-unit-char not checked (no src/gendata)" % where)
+        return
+    missing = {}
+    for text_ in spellings:
+        for ch in text_:
+            if ch not in allowed:
+                missing.setdefault(ch, set()).add(text_)
+    if missing:
+        detail = "; ".join(
+            "U+%04X (in %s)" % (ord(ch), ", ".join(sorted(ex)[:4]))
+            for ch, ex in sorted(missing.items(), key=lambda kv: ord(kv[0])))
+        problems.append(
+            "%s: base-unit-char does not admit %d character(s) that real unit "
+            "symbols use — %s. A parser built from this grammar rejects them, "
+            "and the library accepts and emits them"
+            % (where, len(missing), detail))
+    elif verbose:
+        print("  ok  %s: base-unit-char covers all %d registry spellings"
+              % (where, len(spellings)))
+
+
+def registry_spellings():
+    """Every accepted input spelling in src/gendata/units.bvnr, or None."""
+    repo = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(repo, "src", "gendata", "units.bvnr")
+    if not os.path.exists(path):
+        return None
+    sys.path.insert(0, repo)
+    try:
+        import bvnr_data
+        doc = bvnr_data.load(open(path, encoding="utf-8").read())
+    except Exception:
+        return None
+    out = set()
+    for u in doc.get("units", []):
+        out.update(u.get("aliases", []))
+        if u.get("symbol"):
+            out.add(u["symbol"])
+    return out
 
 
 def check_macro_values(text, where, facts, problems, verbose):
@@ -294,6 +397,7 @@ def main(argv):
     check_errors(text, where, facts, problems, verbose)
     check_component_limit(text, where, facts, problems, verbose)
     check_exponent_range(text, where, facts, problems, verbose)
+    check_base_unit_char(text, where, problems, verbose)
     check_macro_values(text, where, facts, problems, verbose)
     check_spec_version(text, where, facts, problems, verbose)
     check_epochs(text, where, problems, verbose)

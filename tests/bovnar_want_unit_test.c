@@ -27,6 +27,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "bovnar.h"
+#include "bovnar_si_units.h"   /* bvn_units_convertible */
 
 static int failures = 0;
 static int tests = 0;
@@ -339,6 +340,45 @@ static void test_want_unit_unrepresentable_value_is_error(void)
 			 error_value_out_of_range);
 }
 
+static void test_want_unit_oversized_factor_is_not_a_mismatch(void)
+{
+	/*
+	 * A conversion the units AGREE about, refused only because the exact factor
+	 * does not fit bvn_int_t.
+	 *
+	 * `Q~m¹⁰⁰·Q~g¹⁰⁰` to `q~m¹⁰⁰·q~g¹⁰⁰` is the same two bases at the same two
+	 * exponents; only the prefixes differ, and the factor between them is
+	 * 10^12000 -- past BVN_INT_MAX_BITS. bvn_unit_convert_rational returns
+	 * false, and the reader used to report every false return as
+	 * error_unit_mismatch, which told the caller their units were incompatible
+	 * when the library itself says they are convertible. That is a false
+	 * statement about the caller's document, and it is the one diagnosis a
+	 * consumer acts on differently: a mismatch means fix the units, a range
+	 * error means the value cannot be carried.
+	 *
+	 * The two halves are asserted together on purpose. Reporting
+	 * value_out_of_range for the oversized pair is only right if a genuinely
+	 * incompatible pair still reports unit_mismatch -- a fix that collapsed both
+	 * into one code would pass the first check and destroy the distinction.
+	 */
+	want_ctx_t ctx = {0};
+	bool ok = false;
+	ctx.want = bvn_parse_unit((const uint8_t *)"q~m^100·q~g^100", &ok);
+	ASSERT_TRUE(ok, "want: the oversized target parses");
+	ctx.request = true;
+	ASSERT_TRUE(bvn_units_convertible(
+			bvn_parse_unit((const uint8_t *)"Q~m^100·Q~g^100", &ok), ctx.want),
+		    "want: the library agrees the two units are convertible");
+	run_want(".d = <float:64,Q~m^100·Q~g^100> 1.0;", &ctx, false,
+			 error_value_out_of_range);
+
+	/* ...and a pair that really does not match still says so. */
+	want_ctx_t mism = {0};
+	mism.want    = BVN_UNIT_NO_PREFIX(bu_second);
+	mism.request = true;
+	run_want(".d = <float:64,m> 1.0;", &mism, false, error_unit_mismatch);
+}
+
 static void test_want_unit_special_floats_pass_through(void)
 {
 	/* nan/inf carry no finite value: nothing to convert, and no error either. */
@@ -614,6 +654,7 @@ int main(void)
 	test_want_unit_nonterminating_opt_in();
 	test_want_unit_irrational_ignores_opt_in();
 	test_want_unit_unrepresentable_value_is_error();
+	test_want_unit_oversized_factor_is_not_a_mismatch();
 	test_want_unit_special_floats_pass_through();
 	test_want_unit_high_bases();
 	test_want_unit_native_high_base_kept();

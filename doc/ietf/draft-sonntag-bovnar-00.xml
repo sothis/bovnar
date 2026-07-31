@@ -1196,8 +1196,8 @@ unit-factor   = unit-component / "(" unit-expr ")"
 unit-sep      = "*" / "/" / %xC2.B7        ; "*" or U+00B7 or "/"
 unit-component = [ prefix [ "~" ] ] base-unit [ unit-exp ]
                / [ prefix [ "~" ] ] "$" currency-code
-unit-exp      = ( "^" [ "+" / "-" ] %x31-39 )
-              / ( [ sup-sign ] sup-digit )
+unit-exp      = ( "^" [ "+" / "-" ] 1*3DIGIT )
+              / ( [ sup-sign ] 1*3sup-digit )
 ]]></sourcecode></figure>
 
 <t>This is the <em>semantic</em> grammar of a resolved unit, applied to the octets
@@ -1216,7 +1216,7 @@ multiplication and are semantically identical; <spanx style="verb">·</spanx> is
 
 <t><strong>Division latches.</strong> The first <spanx style="verb">/</spanx> moves every subsequent factor at that
 level into the denominator; further <spanx style="verb">/</spanx> separators never toggle back.
-<spanx style="verb">m/s/s</spanx> is therefore <spanx style="verb">m·s⁻²</spanx>, not <spanx style="verb">m</spanx>.</t>
+<spanx style="verb">m/s/s</spanx> therefore has the dimensions of <spanx style="verb">m·s⁻²</spanx>, not of <spanx style="verb">m</spanx>. It is not the SAME unit as <spanx style="verb">m·s⁻²</spanx>: repeated bases are not merged, so <spanx style="verb">m/s/s</spanx> carries <spanx style="verb">s⁻¹</spanx> twice where <spanx style="verb">m·s⁻²</spanx> carries <spanx style="verb">s⁻²</spanx> once, and the two compare unequal while converting with factor 1.</t>
 
 <t><strong>Grouping.</strong> A parenthesised sub-expression is evaluated independently
 and, like any factor, obeys the latching denominator: a <spanx style="verb">/</spanx> before a
@@ -3034,14 +3034,20 @@ unit-component = [ prefix [ "~" ] ] base-unit [ unit-exp ]
 ; of it. Section 8.3 lists the two spellings refused by name.
 
 base-unit      = 1*base-unit-char
-base-unit-char = ALPHA / "_" / "%"
+base-unit-char = ALPHA / DIGIT / "_" / "%"
                / %xC2.B0                    ; U+00B0 DEGREE SIGN
+               / %xCE.94                    ; U+0394 GREEK CAPITAL DELTA
                / %xC3.85 / %xCC.8A          ; U+00C5, U+030A (angstrom)
                / %xCE.A9 / %xE2.84.A6       ; U+03A9, U+2126 (ohm)
                / %xE2.84.A7                 ; U+2127 MHO
                / %xE2.84.AB                 ; U+212B ANGSTROM SIGN
                / %xE2.80.B0 / %xE2.80.B1    ; U+2030, U+2031 (per mille)
 currency-code  = 3*4( %x41-5A )             ; uppercase ASCII, registry lookup
+
+; DIGIT occurs INSIDE a symbol (mH2O) and never at its end: a trailing
+; run of digits is scanned as the exponent, so no registry symbol may
+; terminate in one. A profile code that does is unreachable for the same
+; reason (Section 8.6).
 
 prefix        = si-prefix / iec-prefix
 si-prefix     = "Q" / "R" / "Y" / "Z" / "E" / "P" / "T" / "G" / "M"
@@ -3055,12 +3061,17 @@ iec-prefix    = "Ki" / "Mi" / "Gi" / "Ti" / "Pi" / "Ei" / "Zi" / "Yi"
 ; a currency is error_unit_illegal (Section 8.4).
 
 unit-exp      = caret-exp / sup-exp
-caret-exp     = "^" [ "+" / "-" ] %x31-39
-sup-exp       = [ sup-sign ] sup-digit
+caret-exp     = "^" [ "+" / "-" ] 1*3DIGIT
+sup-exp       = [ sup-sign ] 1*3sup-digit
 sup-sign      = %xE2.81.BA / %xE2.81.BB     ; U+207A, U+207B
-sup-digit     = %xC2.B9 / %xC2.B2 / %xC2.B3 ; U+00B9, U+00B2, U+00B3
+sup-digit     = %xE2.81.B0                  ; U+2070 SUPERSCRIPT ZERO
+              / %xC2.B9 / %xC2.B2 / %xC2.B3 ; U+00B9, U+00B2, U+00B3
               / %xE2.81.B4 / %xE2.81.B5 / %xE2.81.B6
               / %xE2.81.B7 / %xE2.81.B8 / %xE2.81.B9  ; U+2074-U+2079
+
+; The grammar bounds the SHAPE; the VALUE is bounded by Section 8.2.
+; An exponent is an integer in [-100, 100] with zero reserved, so of
+; the three-digit forms only 100 and -100 are units.
 ]]></sourcecode></figure>
 
 </section>

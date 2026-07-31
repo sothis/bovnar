@@ -636,8 +636,14 @@ typedef struct bvnr_read_flags_s {
 	 *                             or the result does not terminate in the output
 	 *                             base and want_unit_allow_nonterminating is off.
 	 *   error_value_out_of_range— the literal is finite but too extreme to build
-	 *                             an exact rational from (e.g. 1e1000000). The
-	 *                             value is NOT silently passed through unconverted.
+	 *                             an exact rational from (e.g. 1e1000000), OR the
+	 *                             units agree and the exact FACTOR between them
+	 *                             does not fit (`Q~m¹⁰⁰·Q~g¹⁰⁰` to
+	 *                             `q~m¹⁰⁰·q~g¹⁰⁰` needs 10^12000). Both are "too
+	 *                             large to represent" and neither is a mismatch:
+	 *                             a `want` this reports is one the value really
+	 *                             could have been converted to. The value is NOT
+	 *                             silently passed through unconverted.
 	 *   error_invalid_argument  — unusable *want_base, or out of memory.
 	 * Only nan/inf are delivered untouched (converted == false, no error): they
 	 * carry no finite value to convert. Never consulted for datetime. */

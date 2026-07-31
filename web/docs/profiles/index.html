@@ -399,6 +399,8 @@ version accepts.</p>
 an inline unit suffix. Parameter ordering stays free (doc/05 §2.1) and the annotation/inline agreement rule
 (doc/05 §2.2) is unchanged — the comparison is on the parsed <code>value_unit_t</code>, so the two spellings
 may differ as long as they mean the same thing:</p>
+<!-- bovnar-example: rejected -->
+
 <div class="codehilite"><pre><code class="language-bovnar">#!bovnar 1.2
 .a = &lt;float:64,ucum:mm[Hg]&gt; 120.0;
 .b = 120.0 ucum:mm[Hg];

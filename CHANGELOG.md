@@ -57,6 +57,164 @@ to accompany every copy (`web/fonts/OFL.txt`), the Impressum gains a
 *Bildnachweis*, `doc/11` gains §18, and `CITATION.cff` gains a `references:`
 block naming all six vocabularies with their licences.
 
+### Fixed — a conversion too large to compute was reported as a unit mismatch
+
+`want_unit` refused a pair the library itself calls **convertible**, and blamed
+the units for it:
+
+```
+Q~m¹⁰⁰·Q~g¹⁰⁰  ->  q~m¹⁰⁰·q~g¹⁰⁰    convertible=YES   reader said: unit_mismatch
+```
+
+Same two bases, same two exponents; only the prefixes differ. The conversion is
+defined and the factor is 10¹²⁰⁰⁰ — past `BVN_INT_MAX_BITS`, so
+`bvn_unit_convert_rational` returns false. The reader mapped *every* false
+return to `error_unit_mismatch`, which tells a consumer their units are
+incompatible when they are not. That is the one diagnosis a consumer acts on
+differently: a mismatch means fix the units, a range error means the value
+cannot be carried.
+
+Capacity now reports `error_value_out_of_range`, the code already documented for
+a literal too extreme to build a rational from. A genuinely incompatible pair
+still reports `error_unit_mismatch`, and the test asserts both halves — a fix
+that collapsed them into one code would have destroyed the distinction while
+passing the new check. Nothing was ever computed with truncated digits: the
+arbitrary-precision helpers report their own overflow and the engine refuses on
+it. `bvn_unit_convert_rational` and the `want_unit` contract now name capacity as
+a failure mode; they had listed only "incompatible" and "structurally invalid".
+
+### Fixed — a profile row no grammar could reach, and the constant it widened
+
+`udunits:astronomical_unit_BIPM_2006` sat in `.mapped` and could never be read.
+UDUNITS is an **expression** profile, where a trailing run of digits is an
+exponent — `udunits:m2` is m², `udunits:m100` is m¹⁰⁰ — so the scanner took
+`2006` as the exponent and asked the atom table for `astronomical_unit_BIPM_`,
+which is not a code.
+
+It cost more than itself. At 27 bytes it was the longest code in the profile, and
+it drove the worst-case emitted string to 1032 bytes — over the then-current
+`BVNR_UNIT_STRING_MAX` of 1024, which is why that constant was raised to **1088**.
+Every buffer sized from it grew to hold a mapping that could not happen. With the
+row out of the emitted set the profile needs 936. The constant **stays at 1088**:
+a maximum larger than the tables need costs a caller nothing, and shrinking a
+published constant is churn no defect asks for.
+
+The row is now a named refusal rather than deleted, so a producer who sends it is
+told "known, and not carryable" instead of "that is not a code". UDUNITS spells
+the same unit `au`, `ua` and `astronomical_unit`, and all three work.
+
+Two gates, because the failure has a general shape and a specific one.
+`gen_profiles.py` refuses an expression-profile code that ends in a digit, at
+generation time, before a table exists. `check_profile_factors.py` round-trips
+**every** code in every profile against the built library — 10 762 mapped, 66
+opaque — which catches a row that reads back as the *wrong* unit too, something
+a shape rule cannot see. Neither existed: `check_targets_parse` proved a row's
+`.bovnar` target parses and nothing ever asked whether its `.code` did.
+
+### Fixed — two named refusals delivered the wrong diagnosis
+
+`ucum:10*` and `ucum:10^` are `.unsupported` rows reading "the number ten — a
+numeric base for UCUM exponents, not a unit", and reported `error_unit_illegal`.
+The rest of the family reported `error_unit_profile_unsupported`:
+
+```
+ucum:10      unsupported        ucum:10*   ILLEGAL
+ucum:10*3    unsupported        ucum:10^   ILLEGAL
+ucum:10^-6   unsupported
+```
+
+A truncated numeric base hit the decade path and failed before the unsupported
+table was consulted, so a producer got "that is not a code" for the truncation
+and "known, not carryable" for the complete form. The whole family now answers
+with one voice, and the read-back gate above checks all **2050** named refusals
+report the code they declare.
+
+### Fixed — the pint bridge's mapping was complete but ungated
+
+Nothing asserted that `BASE_UNIT_TO_PINT` covers every native unit. The parity
+sweep iterates the **map**, so a unit added to `src/gendata` and wired into
+`BaseUnit` but never given a pint token is simply absent from it and every
+assertion still passes; the bridge ships incomplete and the hole surfaces at a
+user's runtime as `no pint mapping for bovnar base unit code NNNNNN`. Two
+closures added — the map against the enum, and the bridge's hand-written
+`_AFFINE` set against what the library actually reports as affine — completing
+the chain `test_enums.py` starts at `src/gendata` → `BaseUnit`.
+
+The sweep itself was looser than it looked. `checked > 100` was its floor against
+a real total of 209, and three `except: continue` arms could drop a unit out of
+the comparison unseen. It now asserts every row is either compared or named as
+affine, and that the two account for all of them. A dead exclusion set
+(`{'byte', 'bit', 'decibel', 'neper'}`, which never matched because the map
+spells them `bvnr_byte` and friends) is gone: all four were being compared and
+agreeing the whole time.
+
+### Fixed — the spec's own version-directive examples were all rejected
+
+doc/03 states that a directive followed by "trailing junk" is
+`error_invalid_spec_version`, and four lines later showed:
+
+```
+#!bovnar 1.1        # current — accepted
+```
+
+The annotation *is* the trailing junk. All four lines it labelled "accepted" are
+`error_invalid_spec_version` as written; strip the comment and all four parse as
+labelled. Conformance case **VER-013** asserts the rejection, so the reader, the
+suite and the prose agreed and the example disagreed with all three. The
+outcomes are now a table, and the directive lines stand alone.
+
+The same error opened **README.md** and **web/index.md** — the first bovnar
+document most readers ever see, propagating into `web/index.html` and
+`web/llms-full.txt`. Every other line in that block carries a legal trailing
+comment, so the construct looked legal by induction; it is not, on line 1 only.
+
+`check_doc_examples.py` is new: it hands every ```bovnar fence that holds a whole
+document to the reference reader — 21 of them — and checks the directive line of
+every fence, including ones exempted from parsing. Blocks that are sketches
+(README's `.payload = \x00 … binary stream … \x00` is a placeholder, not syntax)
+or deliberate refusals are marked with an HTML comment rather than guessed at,
+and a block marked as a refusal that starts parsing cleanly is also a failure.
+
+### Fixed — the IETF draft's grammar rejected units the library emits
+
+The draft's **prose** was current: Table 8 says "one to three digits",
+`^[+-]?[0-9]{1,3}`, and gives `m¹⁰⁰` as an example. Its **Appendix A ABNF** — the
+machine-readable half an implementer builds from — still had the pre-widening
+grammar:
+
+```abnf
+caret-exp = "^" [ "+" / "-" ] %x31-39     ; one digit, 1-9
+sup-exp   = [ sup-sign ] sup-digit         ; one superscript digit
+sup-digit = ... U+00B9, U+00B2, U+00B3, U+2074-U+2079   ; U+2070 absent
+```
+
+So the document disagreed with itself, with the wrong half being the normative
+one. `m^10`, `m^100`, `m^-100` and `m^12` are all outside it, and the library
+does not merely accept them — it **emits** them: exponent 100 is written back as
+`m¹⁰⁰`.
+
+Two further holes in the same block, both from the draft being the only document
+that **enumerates** the characters a symbol may use (doc/12 defers to the
+registry, which is why doc/12 never rotted):
+
+- `base-unit-char` omitted **U+0394 Δ**, excluding all eight temperature-interval
+  spellings — `ΔK`, `Δ°C`, `Δ°F`, `Δ°De`, `Δ°N`, `Δ°Ra`;
+- it had no **DIGIT** rule at all, excluding `mH2O`.
+
+Nine spellings the library accepts and emits, rejected by its own specification.
+
+`check_ietf_draft.py` gained the ABNF spellings of the exponent mistake — it
+matched only the three *prose* phrasings, which is exactly how the fix landed in
+Table 8 and missed Appendix A — and now checks `base-unit-char` against all
+**646** registry spellings from `src/gendata`, so the enumeration cannot drift
+behind the registry again.
+
+Also reworded: §8.2's *"m/s/s is therefore m·s⁻², not m"*. The "not m" half is
+right — they are not even convertible — but `m/s/s` carries three components to
+`m·s⁻²`'s two and the two compare **unequal**, while every neighbouring "is" in
+that section is an exact equality (`k~g/(m·s²)` **is** `k~g·m⁻¹·s⁻²` **is**
+`k~g/m·s²`, all verified).
+
 ### Fixed — the writer spelled the dimensionless unit in five namespaces that cannot read it
 
 `bvn_unit_to_profile(ns, u, …)` with a **dimensionless** `u` returned success and

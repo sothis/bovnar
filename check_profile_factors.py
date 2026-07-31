@@ -1477,6 +1477,98 @@ class NativeIndex:
         return None
 
 
+def check_codes_read_back(verbose):
+    """Every code the tables declare must be READABLE through its own profile.
+
+    The one direction nothing checked. check_targets_parse (gen_profiles.py)
+    proves a row's `.bovnar` TARGET parses; check_profile below proves the
+    resulting factor matches the publisher. Neither asks whether the `.code`
+    itself survives the grammar it belongs to, and in an EXPRESSION profile it
+    may not: a trailing run of digits is an exponent there, so "m2" is m² and
+    "m100" is m¹⁰⁰. `udunits:astronomical_unit_BIPM_2006` sat in .mapped for
+    exactly that reason -- the scanner took "2006" as the exponent, asked the
+    atom table for "astronomical_unit_BIPM_", and refused the whole token. The
+    row was dead, and its 27 bytes had pushed BVNR_UNIT_STRING_MAX from 1024 to
+    1088 on the way in.
+
+    Stated as a round trip against the built library rather than as a rule about
+    digits, because the failure is "the grammar cannot reach this row" and a
+    restatement of the grammar here would drift from it. A code that resolves to
+    the WRONG unit is caught by the same comparison, which a shape rule would
+    miss entirely.
+
+    Needs no publisher data, so it runs whether or not the cache is present.
+    """
+    sys.path.insert(0, os.path.join(REPO, "python"))
+    try:
+        import bovnar
+        from bovnar.enums import ErrorCode
+        bovnar._ffi.load_library()
+    except Exception:
+        return None, 0
+
+    unsupported = int(ErrorCode.UNIT_PROFILE_UNSUPPORTED)
+    problems = []
+    checked = 0
+    for ns in sorted(VOCABS):
+        path = os.path.join(GENDATA, ns + ".bvnr")
+        if not os.path.exists(path):
+            continue
+        doc = bvnr_data.load(open(path, "rb").read().decode("utf-8"))
+
+        for rec in doc.get("mapped", []):
+            checked += 1
+            qualified = "%s:%s" % (ns, rec["code"])
+            try:
+                got = bovnar.parse_unit(qualified)
+            except Exception:
+                problems.append(
+                    "%s is declared .mapped -> %r but the profile cannot READ "
+                    "it; in an expression grammar a code ending in digits is "
+                    "unreachable (the digits scan as an exponent)"
+                    % (qualified, rec["bovnar"]))
+                continue
+            try:
+                want = bovnar.parse_unit(rec["bovnar"])
+            except Exception:
+                problems.append("%s declares the target %r, which does not parse"
+                                % (qualified, rec["bovnar"]))
+                continue
+            if bovnar.unit_to_str(got) != bovnar.unit_to_str(want):
+                problems.append(
+                    "%s reads back as %s, but the row declares %s (%r)"
+                    % (qualified, bovnar.unit_to_str(got),
+                       bovnar.unit_to_str(want), rec["bovnar"]))
+
+        for rec in doc.get("opaque", []):
+            checked += 1
+            qualified = "%s:%s" % (ns, rec["code"])
+            try:
+                bovnar.parse_unit(qualified)
+            except Exception:
+                problems.append(
+                    "%s is declared .opaque but the profile cannot read it"
+                    % qualified)
+
+        # A named refusal must arrive as "known, and not carryable" rather than
+        # as "that is not a code" -- the distinction the whole .unsupported list
+        # exists to make, and one no test had ever exercised at scale.
+        for rec in doc.get("unsupported", []):
+            checked += 1
+            qualified = "%s:%s" % (ns, rec["code"])
+            code = bovnar.unit_error_code(qualified)
+            if int(code) != unsupported:
+                problems.append(
+                    "%s is a named refusal, so it must report "
+                    "unit_profile_unsupported; it reports %s"
+                    % (qualified, getattr(code, "name", code)))
+
+    if verbose:
+        print("  read-back: %d codes checked, %d problem(s)"
+              % (checked, len(problems)))
+    return problems, checked
+
+
 def load_native_convertible():
     """A bound `bvn_units_convertible`, or None.
 
@@ -1820,6 +1912,22 @@ def main(argv):
             return 1
         print("check_profile_factors: SKIPPED — %s" % msg)
         return 0
+
+    # Before anything that needs the network: the tables' own read direction.
+    # This asks only the built library and src/gendata, so it runs on every
+    # invocation rather than only the ones with a populated cache.
+    rb_problems, rb_checked = check_codes_read_back(args.verbose)
+    if rb_problems:
+        print("check_profile_factors: %d code(s) the tables declare cannot be "
+              "read back as declared:" % len(rb_problems))
+        for msg in rb_problems[:20]:
+            print("  %s" % msg)
+        if len(rb_problems) > 20:
+            print("  ... and %d more" % (len(rb_problems) - 20))
+        return 1
+    if rb_checked:
+        print("check_profile_factors: %d profile codes read back as declared"
+              % rb_checked)
 
     available = [ns for ns in which if have_cache(args.cache, ns)]
     if not available:

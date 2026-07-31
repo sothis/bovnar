@@ -5,7 +5,7 @@ files here; the C tables are generated from them. So the enum, conversion table,
 symbol map, parse/alias tables, prefix scale/policy tables, and currency
 catalogue cannot drift out of sync. Covers 215 physical units (646 accepted
 spellings), 34 SI/IEC prefixes, 216 currencies, and the atom tables of seven unit
-profiles — 10 829 mapped codes and 2050 named refusals, which is every code UCUM,
+profiles — 10 828 mapped codes and 2051 named refusals, which is every code UCUM,
 UDUNITS-2, QUDT, OM 2 and the CF standard name table define, plus every UN/ECE
 code QUDT's cross-reference reaches (doc/11 §15–§17).
 

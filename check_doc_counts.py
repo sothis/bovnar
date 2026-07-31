@@ -65,7 +65,21 @@ def counts(repo):
     # growing catalogue, in two documents whose tables listed every unit
     # correctly.
     native_last = 100000 + len(units) - 1
+    # BVN_EXPONENT_MAX, read from the header that defines it. Stated in prose in
+    # a dozen places and stale in six of them at once: the range grew from ±9 to
+    # ±100 and the sentences describing it did not, in doc/08, in two Python
+    # docstrings, in an OverflowError message a user reads at runtime, and in the
+    # public header's own note. Each was a bound a caller would code against.
+    exp_max = 100
+    try:
+        with open(os.path.join(repo, "include", "bovnar.h"), encoding="utf-8") as f:
+            m = re.search(r"#define\s+BVN_EXPONENT_MAX\s+\(?\s*(\d+)", f.read())
+            if m:
+                exp_max = int(m.group(1))
+    except OSError:
+        pass
     return {
+        "exponent_max": exp_max,
         "native_last": native_last,
         "native_last_name": "bu_" + units[-1]["name"],
         "ucum_opaque": opaque["ucum"],
@@ -118,6 +132,14 @@ CLAIMS = [
     (_phrase(r"\b(\d+)", r"(?:named|physical|base)(?:%s(?:named|physical|base))*"
              % _G, r"units\b"),                                 "units"),
     (_phrase(r"registry(?:'s)?", r"(\d+)", r"units\b"),         "units"),
+    # The exponent bound, wherever a sentence states it as the CURRENT range.
+    # Anchored on phrasings that assert rather than recall: "±9 the format can
+    # spell" is a claim, "used to stop at ±9" is history and must stay.
+    (_phrase(r"±(\d+)", "the", "format", "can", r"spell\b"),   "exponent_max"),
+    (_phrase(r"exponent", "outside", r"±(\d+)"),               "exponent_max"),
+    (_phrase(r"exponent", "range", r"±(\d+)"),                 "exponent_max"),
+    (_phrase(r"summed", "exponent", "past", r"±(\d+)"),        "exponent_max"),
+    (_phrase(r"summed", "exponent", "outside", r"±(\d+)"),     "exponent_max"),
     (_phrase(r"\b(\d+)", "units", "and", r"\d+", r"currencies\b"), "units"),
     (_phrase(r"\b(\d+)", "accepted", r"spellings\b"),           "spellings"),
     (_phrase(r"\b(\d+)", "spellings", "in", r"total\b"),        "spellings"),

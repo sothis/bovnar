@@ -248,7 +248,7 @@ for lossless round-trips:</p>
 <span class="n">doc</span>  <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">bvnr</span><span class="p">,</span> <span class="n">typed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">q</span>    <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;pressure&quot;</span><span class="p">]</span>     <span class="c1"># Quantity(&#39;101325.0&#39;, FLOAT [Pa])</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">q</span><span class="o">.</span><span class="n">raw</span><span class="p">)</span>               <span class="c1"># &#39;101325.0&#39;</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">q</span><span class="o">.</span><span class="n">unit_str</span><span class="p">())</span>        <span class="c1"># &#39;Pa&#39;</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">q</span><span class="o">.</span><span class="n">unit_str</span><span class="p">)</span>        <span class="c1"># &#39;Pa&#39;</span>
 
 <span class="c1"># dumps() accepts Quantity values — annotation and raw text are re-emitted as-is</span>
 <span class="n">out</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">doc</span><span class="p">)</span>
@@ -784,32 +784,32 @@ validates the width for the chosen family.</p>
 <td>Decode <code>raw</code> to the closest native Python scalar (<code>int</code>, <code>float</code>, <code>str</code>, <code>bool</code>) — <strong>lossy</strong> for <code>float_dec</code> / <code>float_fix</code> / <code>float:128</code>+ (goes through a C <code>double</code>)</td>
 </tr>
 <tr>
-<td><code>q.unit_str()</code></td>
+<td><code>q.unit_str</code></td>
 <td><code>str</code></td>
 <td>Canonical unit string (e.g. <code>'m/s²'</code>), or <code>''</code> when dimensionless</td>
 </tr>
 <tr>
-<td><code>q.decimal()</code></td>
+<td><code>q.decimal</code></td>
 <td><code>Decimal</code></td>
 <td><strong>Exact</strong> value as <code>decimal.Decimal</code> from the verbatim literal — lossless at any width; raises for non-numeric families</td>
 </tr>
 <tr>
-<td><code>q.fraction()</code></td>
+<td><code>q.fraction</code></td>
 <td><code>Fraction</code></td>
 <td>Exact value as <code>fractions.Fraction</code> (for <code>float_fix</code>, the exact <code>mantissa / 2**frac</code>)</td>
 </tr>
 <tr>
-<td><code>q.fixed_point()</code></td>
+<td><code>q.fixed_point</code></td>
 <td><code>(int, int)</code></td>
 <td><code>(mantissa, frac_bits)</code> of a <code>float_fix</code> value; the value is <code>mantissa / 2**frac_bits</code></td>
 </tr>
 <tr>
-<td><code>q.stored_value()</code></td>
+<td><code>q.stored_value</code></td>
 <td><code>Decimal</code></td>
-<td>The value materialised into the declared IEEE/fixed format (round-to-nearest-even) — differs from <code>decimal()</code> only when the literal carries more precision than the format holds</td>
+<td>The value materialised into the declared IEEE/fixed format (round-to-nearest-even) — differs from <code>decimal</code> only when the literal carries more precision than the format holds</td>
 </tr>
 <tr>
-<td><code>q.ieee_bits()</code></td>
+<td><code>q.ieee_bits</code></td>
 <td><code>bytes</code></td>
 <td>IEEE-754 interchange bytes (binary16…256 for <code>float</code>, decimal16…256 for <code>float_dec</code>), little-endian word order</td>
 </tr>
@@ -838,12 +838,12 @@ instead use the verbatim literal text (and bovnar's arbitrary-precision
 <div class="codehilite"><pre><span></span><code><span class="n">q</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;.p=&lt;float_dec:64&gt; 3.141592653589793238462643383279503;&#39;</span><span class="p">,</span>
                  <span class="n">typed</span><span class="o">=</span><span class="kc">True</span><span class="p">)[</span><span class="s1">&#39;p&#39;</span><span class="p">]</span>
 <span class="n">q</span><span class="o">.</span><span class="n">value</span>          <span class="c1"># 3.141592653589793   (lossy C double)</span>
-<span class="n">q</span><span class="o">.</span><span class="n">decimal</span><span class="p">()</span>      <span class="c1"># Decimal(&#39;3.141592653589793238462643383279503&#39;)  (exact literal)</span>
-<span class="n">q</span><span class="o">.</span><span class="n">stored_value</span><span class="p">()</span> <span class="c1"># Decimal(&#39;3.141592653589793&#39;)  (the decimal64-rounded value)</span>
+<span class="n">q</span><span class="o">.</span><span class="n">decimal</span>      <span class="c1"># Decimal(&#39;3.141592653589793238462643383279503&#39;)  (exact literal)</span>
+<span class="n">q</span><span class="o">.</span><span class="n">stored_value</span> <span class="c1"># Decimal(&#39;3.141592653589793&#39;)  (the decimal64-rounded value)</span>
 
 <span class="n">f</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;.x=&lt;float_fix:32,q8&gt; 3.27;&#39;</span><span class="p">,</span> <span class="n">typed</span><span class="o">=</span><span class="kc">True</span><span class="p">)[</span><span class="s1">&#39;x&#39;</span><span class="p">]</span>
-<span class="n">f</span><span class="o">.</span><span class="n">fraction</span><span class="p">()</span>     <span class="c1"># Fraction(837, 256)</span>
-<span class="n">f</span><span class="o">.</span><span class="n">fixed_point</span><span class="p">()</span>  <span class="c1"># (837, 8)</span>
+<span class="n">f</span><span class="o">.</span><span class="n">fraction</span>     <span class="c1"># Fraction(837, 256)</span>
+<span class="n">f</span><span class="o">.</span><span class="n">fixed_point</span>  <span class="c1"># (837, 8)</span>
 </code></pre></div>
 
 <p>These materialise over the <strong>full</strong> representable range, including exponents the

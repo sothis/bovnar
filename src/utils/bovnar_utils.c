@@ -1622,11 +1622,11 @@ int32_t bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t bufsize,
 		/*
 		 * An overflowing reduction does not produce a shorter spelling of the
 		 * same unit — it produces a DIFFERENT one. bvn_unit_reduce raises this
-		 * flag when a summed exponent leaves the ±9 the format can spell, when
+		 * flag when a summed exponent leaves the ±100 the format can spell, when
 		 * more bases survive than a unit may carry, or when the folded scale
-		 * leaves float range; in each case a component is dropped, so m⁹·m²
-		 * (which is m¹¹) came back with no components at all and formatted as
-		 * "no_unit", and m⁹·m²·s as "s". Dimensionless, and not compatible with
+		 * leaves float range; in each case a component is dropped, so m⁵⁰·m⁵¹
+		 * (which is m¹⁰¹) came back with no components at all and formatted as
+		 * "no_unit", and m⁵⁰·m⁵¹·s as "s". Dimensionless, and not compatible with
 		 * what it replaced — the wrong-unit-is-worse-than-a-refused-one failure
 		 * this format exists to prevent, handed to the caller as a success.
 		 *

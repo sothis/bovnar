@@ -917,8 +917,16 @@ if(_bvnr_have_pytest AND BVNR_ALL_PROFILES)
                     --tb=short
         WORKING_DIRECTORY "${_py_src}"
     )
+    # WHY 300 AND NOT 120. Both aggregates cost ~80s here, and the cost tracks
+    # the CATALOGUE: the pint bridge compares every pair of base units and the
+    # unit-table integrity check is parameterised per unit, so both grow with
+    # the square of a number that only ever goes up (215 units at the 1.1
+    # release, 261 now). 120 was 1.5x headroom on this machine and none at all
+    # on a CI runner half its speed. A timeout that trips on a slow runner
+    # reports "the Python bindings are broken" for a suite that passes, which
+    # is worse than a slow test.
     set_tests_properties(bvnr_py_all PROPERTIES
-        TIMEOUT     120
+        TIMEOUT     300
         LABELS      "python;python_all"
         ENVIRONMENT "${_bvnr_lib_env}"
     )
@@ -932,8 +940,13 @@ if(_bvnr_have_pytest AND BVNR_ALL_PROFILES)
                     --tb=short
         WORKING_DIRECTORY "${_py_src}"
     )
+    # The same 300, for the same reason and one more: this is a SUBSET of
+    # bvnr_py_all that costs the same as the whole, because everything slow in
+    # the suite is library-free (the pure-Python decimal and binary encoders,
+    # the pint bridge, the round-trip property tests). It carried half its
+    # superset's budget, which is how it came to be the one that tripped.
     set_tests_properties(bvnr_py_pure_all PROPERTIES
-        TIMEOUT 60
+        TIMEOUT 300
         LABELS  "python;python_pure"
     )
 
@@ -1309,7 +1322,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 165)   # 129 base + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples
+set(BVNR_EXPECTED_TEST_COUNT 166)   # 129 base + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy
                                     #             + citation
                                     #         + profiles_off_build
                                     # + om_test + cf_test
@@ -1649,6 +1662,21 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_py
                      ${CMAKE_CURRENT_SOURCE_DIR})
     set_tests_properties(bvnr_doc_python_examples PROPERTIES
         LABELS "docs;python;units" TIMEOUT 60)
+endif()
+
+# ── doc/06's unit-policy claims, put to the library ────────────────────────
+# doc/06 was the only unit document with no gate at all, and it cost doc/06 §2.4:
+# an `error_unit_inexact` example whose degrees line was glossed as if
+# --leave-inexact had saved it, when doc/06 §2.3 leaves every dimensionless unit
+# alone
+# and the strict run actually fails on the k~m/h two lines below.
+if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_policy.py)
+    add_test(NAME bvnr_doc_policy
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_policy.py
+                     ${CMAKE_CURRENT_SOURCE_DIR})
+    set_tests_properties(bvnr_doc_policy PROPERTIES
+        LABELS "docs;units" TIMEOUT 120)
 endif()
 
 # ── The catalogue counts stated in prose match src/gendata ─────────────────

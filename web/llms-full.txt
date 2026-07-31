@@ -9970,30 +9970,47 @@ dimensionless unit (`%`, `ppm`, `dB`, `pH`, `rad`, `°`).
 behaviour when the caller named a target deliberately.
 
 `bvnr_inexact_leave` delivers the value untouched instead, with `converted == false`. It exists
-for `bvnr_normalise_si`, where *every* value is a conversion candidate and a single 5/18 factor
-would otherwise reject an ordinary document. A consumer using it must read `converted` to know
-which values it happened to.
+for `bvnr_normalise_si`, where every value *that has a coherent SI form* is a conversion candidate
+and a single 5/18 factor would otherwise reject an ordinary document. A consumer using it must
+read `converted` to know which values it happened to.
 
 It applies to **every** result the conversion cannot deliver exactly — a rational with no
-terminating expansion in the output base, and equally a genuinely **irrational** factor (a π-based
-angle, a parsec, a water hardness scale):
+terminating expansion in the output base, and equally a genuinely **irrational** factor (a parsec,
+a water hardness scale, a π-based angle converted to radian).
+
+**"Exactly" is a property of the result, not of the factor**, so a rational factor rejects some
+values in a document and not others: km/h → m/s is 5/18, and `90` converts to exactly `25` while
+`100` converts to `250/9` and does not. Two speeds in one file, one accepted and one refused, is
+the expected behaviour rather than a bug — an irrational factor is the only kind that fails for
+every value:
 
 ```console
 $ bovnar events --si heading.bvnr
-… unit_inexact
+… unit_inexact at line 2 col 32          the k~m/h, not the heading
 
 $ bovnar events --si --leave-inexact heading.bvnr
-"90.0" <float:64,_10,°>          left in degrees
+"90.0" <float:64,_10,°>          left — dimensionless, never a candidate (§2.3)
 "100.0" <float:64,_10,k~m/h>     left, 250/9 does not terminate
 "5.0"  <float:64,_10,m>          already SI
 ```
+
+**Read that first line carefully: it is the `k~m/h` that fails, not the degrees.** Under
+`bvnr_normalise_si` a degree is not an inexact conversion — it is not a conversion at all, because
+[§2.3](#23-normalisation) leaves every dimensionless unit alone. The heading validates under the
+strict run too. What *does* abort a `--si` run on an irrational factor is a **dimensioned** one: a
+parsec or a `°dH` water hardness, both of which have a coherent SI form and so are candidates.
+
+A π-based angle reaches this path only when a target names its SI form outright —
+`targets = {"rad"}` on a `°` value is `error_unit_inexact` strictly, and left untouched under
+`bvnr_inexact_leave`. That is the same mechanism, reached deliberately rather than by
+normalisation.
 
 The tempting distinction — that an irrational factor is special because there is no rational to
 hand over — belongs to [`want_unit_allow_nonterminating`](08_bovnar_readwrite_api.md), whose
 fallback *is* the rational. This mode's fallback is the **native value**, and that works for an
 irrational factor exactly as well as for a non-terminating one. It has to: a document carrying a
-heading in degrees is entirely ordinary, and under `bvnr_normalise_si` the strict reading would
-reject it — which is the case this mode exists for.
+speed in km/h is entirely ordinary, and under `bvnr_normalise_si` the strict reading would reject
+it — which is the case this mode exists for.
 
 Only a **policy-chosen** target takes this path. A target named by the `want_unit` hook keeps the
 strict all-or-nothing contract that hook was documented with, whatever `on_inexact` says
@@ -12440,7 +12457,7 @@ These flags can be OR-combined. The writer uses `bvn_unit_to_string_ex` internal
 
 > **`BVN_UNIT_REDUCE` here returns only the reduced UNIT.** `bvn_unit_to_string_ex` discards the scale `bvn_unit_reduce` folded out, so `k~g` serialises as `"g"` — a string denoting a quantity 1000× smaller than the unit passed in. The writer above moves the value with it; nothing else does.
 >
-> **A direct caller must not reach for `bvn_unit_reduce`'s `scale` to do it.** That scale is to the *fully reduced* unit, and this function does not always emit the fully reduced unit: where the reduction lands on a named SI unit the formatter re-attaches the prefix, so `k~N` comes back `"k~N"` with nothing to rescale while `bvn_unit_reduce` still reports 1000 — and `k~g` comes back `"g"`, where the 1000 must be applied. The two are indistinguishable from outside, both being a lone unit with a kilo prefix, so the scale has to come from the unit that is actually emitted: format with this function, parse the result back, and convert from the original to *that*. The [unit-system reference](05_bovnar_unit_system.md) §12.2 gives the eight lines, which are the ones `bvn_ser_reduced_number` runs. The collapse never substitutes one named unit for another: `Sv` stays `Sv`, `Bq` stays `Bq`. A lone base at an exponent other than 1 still collapses, though — `s⁻¹` becomes `Hz` and `m~s⁻¹` becomes `k~Hz`. And a reduction that **overflows** (a summed exponent past ±9, too many surviving bases, or a scale out of float range) returns `-1`: it drops a component, so what it produces is a different unit rather than a shorter spelling of the same one.
+> **A direct caller must not reach for `bvn_unit_reduce`'s `scale` to do it.** That scale is to the *fully reduced* unit, and this function does not always emit the fully reduced unit: where the reduction lands on a named SI unit the formatter re-attaches the prefix, so `k~N` comes back `"k~N"` with nothing to rescale while `bvn_unit_reduce` still reports 1000 — and `k~g` comes back `"g"`, where the 1000 must be applied. The two are indistinguishable from outside, both being a lone unit with a kilo prefix, so the scale has to come from the unit that is actually emitted: format with this function, parse the result back, and convert from the original to *that*. The [unit-system reference](05_bovnar_unit_system.md) §12.2 gives the eight lines, which are the ones `bvn_ser_reduced_number` runs. The collapse never substitutes one named unit for another: `Sv` stays `Sv`, `Bq` stays `Bq`. A lone base at an exponent other than 1 still collapses, though — `s⁻¹` becomes `Hz` and `m~s⁻¹` becomes `k~Hz`. And a reduction that **overflows** (a summed exponent outside ±100, too many surviving bases, or a scale out of float range) returns `-1`: it drops a component, so what it produces is a different unit rather than a shorter spelling of the same one.
 
 > **Note on writer usage:** When driving the writer manually via `bvnr_write_event`, do **not** pass a unit string in `bvnr_data_t.data` for the `ev_type_annotation_start` event — the serialiser ignores that field and derives the annotation from `data->value_type` and the subsequent parameter events. Use `bvnr_write_type_annotation` (§3.1) to emit a complete, correct type annotation in one call.
 
@@ -13270,7 +13287,7 @@ bvnr = b".pressure = <float:32,Pa> 101325.0;"
 doc  = bovnar.loads(bvnr, typed=True)
 q    = doc["pressure"]     # Quantity('101325.0', FLOAT [Pa])
 print(q.raw)               # '101325.0'
-print(q.unit_str())        # 'Pa'
+print(q.unit_str)        # 'Pa'
 
 # dumps() accepts Quantity values — annotation and raw text are re-emitted as-is
 out = bovnar.dumps(doc)
@@ -13832,12 +13849,12 @@ validates the width for the chosen family.
 | `q.vtype` | `ValueTypeSpec` | Type family, bit width, and numeral base |
 | `q.unit` | `ValueUnit` | Physical unit (`BVN_UNIT_NONE` when dimensionless) |
 | `q.value` | property | Decode `raw` to the closest native Python scalar (`int`, `float`, `str`, `bool`) — **lossy** for `float_dec` / `float_fix` / `float:128`+ (goes through a C `double`) |
-| `q.unit_str()` | `str` | Canonical unit string (e.g. `'m/s²'`), or `''` when dimensionless |
-| `q.decimal()` | `Decimal` | **Exact** value as `decimal.Decimal` from the verbatim literal — lossless at any width; raises for non-numeric families |
-| `q.fraction()` | `Fraction` | Exact value as `fractions.Fraction` (for `float_fix`, the exact `mantissa / 2**frac`) |
-| `q.fixed_point()` | `(int, int)` | `(mantissa, frac_bits)` of a `float_fix` value; the value is `mantissa / 2**frac_bits` |
-| `q.stored_value()` | `Decimal` | The value materialised into the declared IEEE/fixed format (round-to-nearest-even) — differs from `decimal()` only when the literal carries more precision than the format holds |
-| `q.ieee_bits()` | `bytes` | IEEE-754 interchange bytes (binary16…256 for `float`, decimal16…256 for `float_dec`), little-endian word order |
+| `q.unit_str` | `str` | Canonical unit string (e.g. `'m/s²'`), or `''` when dimensionless |
+| `q.decimal` | `Decimal` | **Exact** value as `decimal.Decimal` from the verbatim literal — lossless at any width; raises for non-numeric families |
+| `q.fraction` | `Fraction` | Exact value as `fractions.Fraction` (for `float_fix`, the exact `mantissa / 2**frac`) |
+| `q.fixed_point` | `(int, int)` | `(mantissa, frac_bits)` of a `float_fix` value; the value is `mantissa / 2**frac_bits` |
+| `q.stored_value` | `Decimal` | The value materialised into the declared IEEE/fixed format (round-to-nearest-even) — differs from `decimal` only when the literal carries more precision than the format holds |
+| `q.ieee_bits` | `bytes` | IEEE-754 interchange bytes (binary16…256 for `float`, decimal16…256 for `float_dec`), little-endian word order |
 | `q.epoch_name` | `str \| None` | For a `datetime`, the epoch name (`"unix"`, `"tai"`, …); `None` otherwise |
 | `q.epoch_mjd` | `int \| None` | For a `datetime`, the epoch's Modified Julian Day; `None` otherwise |
 | `q.datetime_fraction` | `str \| None` | For a `datetime` written as a literal with a fractional second, the verbatim sub-second digits (spec 1.1); `None` otherwise |
@@ -13853,12 +13870,12 @@ instead use the verbatim literal text (and bovnar's arbitrary-precision
 q = bovnar.loads(b'.p=<float_dec:64> 3.141592653589793238462643383279503;',
                  typed=True)['p']
 q.value          # 3.141592653589793   (lossy C double)
-q.decimal()      # Decimal('3.141592653589793238462643383279503')  (exact literal)
-q.stored_value() # Decimal('3.141592653589793')  (the decimal64-rounded value)
+q.decimal      # Decimal('3.141592653589793238462643383279503')  (exact literal)
+q.stored_value # Decimal('3.141592653589793')  (the decimal64-rounded value)
 
 f = bovnar.loads(b'.x=<float_fix:32,q8> 3.27;', typed=True)['x']
-f.fraction()     # Fraction(837, 256)
-f.fixed_point()  # (837, 8)
+f.fraction     # Fraction(837, 256)
+f.fixed_point  # (837, 8)
 ```
 
 These materialise over the **full** representable range, including exponents the

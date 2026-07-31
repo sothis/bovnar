@@ -192,27 +192,41 @@ dimensionless unit (<code>%</code>, <code>ppm</code>, <code>dB</code>, <code>pH<
 <p><code>bvnr_inexact_error</code> (the default) aborts the parse with <code>error_unit_inexact</code>. That is the right
 behaviour when the caller named a target deliberately.</p>
 <p><code>bvnr_inexact_leave</code> delivers the value untouched instead, with <code>converted == false</code>. It exists
-for <code>bvnr_normalise_si</code>, where <em>every</em> value is a conversion candidate and a single 5/18 factor
-would otherwise reject an ordinary document. A consumer using it must read <code>converted</code> to know
-which values it happened to.</p>
+for <code>bvnr_normalise_si</code>, where every value <em>that has a coherent SI form</em> is a conversion candidate
+and a single 5/18 factor would otherwise reject an ordinary document. A consumer using it must
+read <code>converted</code> to know which values it happened to.</p>
 <p>It applies to <strong>every</strong> result the conversion cannot deliver exactly — a rational with no
-terminating expansion in the output base, and equally a genuinely <strong>irrational</strong> factor (a π-based
-angle, a parsec, a water hardness scale):</p>
+terminating expansion in the output base, and equally a genuinely <strong>irrational</strong> factor (a parsec,
+a water hardness scale, a π-based angle converted to radian).</p>
+<p><strong>"Exactly" is a property of the result, not of the factor</strong>, so a rational factor rejects some
+values in a document and not others: km/h → m/s is 5/18, and <code>90</code> converts to exactly <code>25</code> while
+<code>100</code> converts to <code>250/9</code> and does not. Two speeds in one file, one accepted and one refused, is
+the expected behaviour rather than a bug — an irrational factor is the only kind that fails for
+every value:</p>
 <div class="codehilite"><pre><span></span><code><span class="gp">$ </span>bovnar<span class="w"> </span>events<span class="w"> </span>--si<span class="w"> </span>heading.bvnr
-<span class="go">… unit_inexact</span>
+<span class="go">… unit_inexact at line 2 col 32          the k~m/h, not the heading</span>
 
 <span class="gp">$ </span>bovnar<span class="w"> </span>events<span class="w"> </span>--si<span class="w"> </span>--leave-inexact<span class="w"> </span>heading.bvnr
-<span class="go">&quot;90.0&quot; &lt;float:64,_10,°&gt;          left in degrees</span>
+<span class="go">&quot;90.0&quot; &lt;float:64,_10,°&gt;          left — dimensionless, never a candidate (§2.3)</span>
 <span class="go">&quot;100.0&quot; &lt;float:64,_10,k~m/h&gt;     left, 250/9 does not terminate</span>
 <span class="go">&quot;5.0&quot;  &lt;float:64,_10,m&gt;          already SI</span>
 </code></pre></div>
 
+<p><strong>Read that first line carefully: it is the <code>k~m/h</code> that fails, not the degrees.</strong> Under
+<code>bvnr_normalise_si</code> a degree is not an inexact conversion — it is not a conversion at all, because
+<a href="#23-normalisation">§2.3</a> leaves every dimensionless unit alone. The heading validates under the
+strict run too. What <em>does</em> abort a <code>--si</code> run on an irrational factor is a <strong>dimensioned</strong> one: a
+parsec or a <code>°dH</code> water hardness, both of which have a coherent SI form and so are candidates.</p>
+<p>A π-based angle reaches this path only when a target names its SI form outright —
+<code>targets = {"rad"}</code> on a <code>°</code> value is <code>error_unit_inexact</code> strictly, and left untouched under
+<code>bvnr_inexact_leave</code>. That is the same mechanism, reached deliberately rather than by
+normalisation.</p>
 <p>The tempting distinction — that an irrational factor is special because there is no rational to
 hand over — belongs to <a href="https://www.bovnar.io/docs/api/"><code>want_unit_allow_nonterminating</code></a>, whose
 fallback <em>is</em> the rational. This mode's fallback is the <strong>native value</strong>, and that works for an
 irrational factor exactly as well as for a non-terminating one. It has to: a document carrying a
-heading in degrees is entirely ordinary, and under <code>bvnr_normalise_si</code> the strict reading would
-reject it — which is the case this mode exists for.</p>
+speed in km/h is entirely ordinary, and under <code>bvnr_normalise_si</code> the strict reading would reject
+it — which is the case this mode exists for.</p>
 <p>Only a <strong>policy-chosen</strong> target takes this path. A target named by the <code>want_unit</code> hook keeps the
 strict all-or-nothing contract that hook was documented with, whatever <code>on_inexact</code> says
 (<a href="#13-a-policy-and-the-want_unit-hook">1.3</a>).</p>

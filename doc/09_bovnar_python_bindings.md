@@ -191,7 +191,7 @@ bvnr = b".pressure = <float:32,Pa> 101325.0;"
 doc  = bovnar.loads(bvnr, typed=True)
 q    = doc["pressure"]     # Quantity('101325.0', FLOAT [Pa])
 print(q.raw)               # '101325.0'
-print(q.unit_str())        # 'Pa'
+print(q.unit_str)        # 'Pa'
 
 # dumps() accepts Quantity values — annotation and raw text are re-emitted as-is
 out = bovnar.dumps(doc)
@@ -753,12 +753,12 @@ validates the width for the chosen family.
 | `q.vtype` | `ValueTypeSpec` | Type family, bit width, and numeral base |
 | `q.unit` | `ValueUnit` | Physical unit (`BVN_UNIT_NONE` when dimensionless) |
 | `q.value` | property | Decode `raw` to the closest native Python scalar (`int`, `float`, `str`, `bool`) — **lossy** for `float_dec` / `float_fix` / `float:128`+ (goes through a C `double`) |
-| `q.unit_str()` | `str` | Canonical unit string (e.g. `'m/s²'`), or `''` when dimensionless |
-| `q.decimal()` | `Decimal` | **Exact** value as `decimal.Decimal` from the verbatim literal — lossless at any width; raises for non-numeric families |
-| `q.fraction()` | `Fraction` | Exact value as `fractions.Fraction` (for `float_fix`, the exact `mantissa / 2**frac`) |
-| `q.fixed_point()` | `(int, int)` | `(mantissa, frac_bits)` of a `float_fix` value; the value is `mantissa / 2**frac_bits` |
-| `q.stored_value()` | `Decimal` | The value materialised into the declared IEEE/fixed format (round-to-nearest-even) — differs from `decimal()` only when the literal carries more precision than the format holds |
-| `q.ieee_bits()` | `bytes` | IEEE-754 interchange bytes (binary16…256 for `float`, decimal16…256 for `float_dec`), little-endian word order |
+| `q.unit_str` | `str` | Canonical unit string (e.g. `'m/s²'`), or `''` when dimensionless |
+| `q.decimal` | `Decimal` | **Exact** value as `decimal.Decimal` from the verbatim literal — lossless at any width; raises for non-numeric families |
+| `q.fraction` | `Fraction` | Exact value as `fractions.Fraction` (for `float_fix`, the exact `mantissa / 2**frac`) |
+| `q.fixed_point` | `(int, int)` | `(mantissa, frac_bits)` of a `float_fix` value; the value is `mantissa / 2**frac_bits` |
+| `q.stored_value` | `Decimal` | The value materialised into the declared IEEE/fixed format (round-to-nearest-even) — differs from `decimal` only when the literal carries more precision than the format holds |
+| `q.ieee_bits` | `bytes` | IEEE-754 interchange bytes (binary16…256 for `float`, decimal16…256 for `float_dec`), little-endian word order |
 | `q.epoch_name` | `str \| None` | For a `datetime`, the epoch name (`"unix"`, `"tai"`, …); `None` otherwise |
 | `q.epoch_mjd` | `int \| None` | For a `datetime`, the epoch's Modified Julian Day; `None` otherwise |
 | `q.datetime_fraction` | `str \| None` | For a `datetime` written as a literal with a fractional second, the verbatim sub-second digits (spec 1.1); `None` otherwise |
@@ -774,12 +774,12 @@ instead use the verbatim literal text (and bovnar's arbitrary-precision
 q = bovnar.loads(b'.p=<float_dec:64> 3.141592653589793238462643383279503;',
                  typed=True)['p']
 q.value          # 3.141592653589793   (lossy C double)
-q.decimal()      # Decimal('3.141592653589793238462643383279503')  (exact literal)
-q.stored_value() # Decimal('3.141592653589793')  (the decimal64-rounded value)
+q.decimal      # Decimal('3.141592653589793238462643383279503')  (exact literal)
+q.stored_value # Decimal('3.141592653589793')  (the decimal64-rounded value)
 
 f = bovnar.loads(b'.x=<float_fix:32,q8> 3.27;', typed=True)['x']
-f.fraction()     # Fraction(837, 256)
-f.fixed_point()  # (837, 8)
+f.fraction     # Fraction(837, 256)
+f.fixed_point  # (837, 8)
 ```
 
 These materialise over the **full** representable range, including exponents the

@@ -676,9 +676,17 @@ typedef uint32_t bvn_unit_flags_t;
  * error_value_out_of_range rather than rounding.
  *
  * Note for direct callers of bvn_unit_to_string_ex: that function returns only
- * the reduced unit and discards bvn_unit_reduce's scale, so if you format a unit
- * yourself you must apply that scale to your value. The writer does this for
- * you; nothing else does. */
+ * the reduced unit, so if you format a unit yourself you must move your value
+ * with it. The writer does that for you; nothing else does.
+ *
+ * DO NOT take the scale from bvn_unit_reduce to do it. That is the scale to the
+ * FULLY reduced unit, and the formatter does not always emit the fully reduced
+ * unit: where the reduction lands on a named SI unit it re-attaches the prefix,
+ * so k~N comes back "k~N" with nothing to rescale while bvn_unit_reduce still
+ * reports 1000, and k~g comes back "g" where the 1000 must be applied. The two
+ * are indistinguishable from outside. Take the scale from the unit actually
+ * emitted -- format, parse the result back, convert from the original to that --
+ * which is what bvn_ser_reduced_number does; doc/05 §12.2 spells it out. */
 #define BVN_UNIT_REDUCE     ((bvn_unit_flags_t)(1u << 0))
 #define BVN_UNIT_ASCII_EXP  ((bvn_unit_flags_t)(1u << 1))
 /* Render a rescaled FLOAT in float shape: append ".0" when reducing leaves the

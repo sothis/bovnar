@@ -20,6 +20,70 @@ rebuild consumers against the new headers. **SOVERSION is bumped 1 → 2**
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
 
+### Fixed — the unit-policy reference blamed the wrong value for an inexact `--si` run
+
+doc/06 §2.4 illustrated `error_unit_inexact` with a document whose heading is in
+degrees, glossed that line as "left in degrees" under `--leave-inexact`, and
+named "a π-based angle" first among the factors that take the path. None of it
+held. Under `bvnr_normalise_si` a degree is not an inexact conversion but **not a
+conversion at all** — §2.3 leaves every dimensionless unit alone, so the heading
+validates under the strict run too. The strict run in that very example fails two
+lines below, on the `k~m/h`. A reader debugging a `--si` refusal was pointed at
+the one value in the file that was never a candidate.
+
+The section now separates the two paths: under normalisation the candidates that
+can fail are the **dimensioned** ones (a parsec, a `°dH` water hardness, a
+non-terminating rational like 5/18), while a π-based angle reaches
+`error_unit_inexact` only when a target names `rad` outright.
+
+It also now states what the old text obscured — **"exactly" is a property of the
+result, not of the factor.** km/h → m/s is 5/18, so `90` converts to exactly `25`
+and is accepted while `100` converts to `250/9` and is refused. Two speeds in one
+document, one accepted and one rejected, is correct behaviour; only an irrational
+factor fails for every value.
+
+`check_doc_policy.py` is new and gates the document that had no gate — the §2.7
+limit table against the headers (including the three key-path bounds that live in
+`src/lexer/bvn_val_impl.h`, not the public header), §2.3's "left alone" list
+against the whole catalogue rather than only the units it names, and the five
+behaviours §2.4 now distinguishes.
+
+### Fixed — doc/09 documented six `Quantity` properties as method calls
+
+`q.decimal()`, `.fraction()`, `.fixed_point()`, `.stored_value()`, `.unit_str()`
+and `.ieee_bits()` were unified into properties, and the Python reference went on
+spelling all six as calls — eleven sites, including the member table that is the
+reference for them. `python/tests/test_unit_object.py` asserts that calling one
+raises `TypeError`, so the library was right, the reference was wrong, and
+nothing compared the two. `check_doc_python_examples.py` now sweeps every
+document for a property written as a call, which is unambiguous in a way the
+reverse is not; `CHANGELOG.md` and the release notes are exempt, since a dated
+record has to be able to quote the spelling it is retiring.
+
+The same gate stopped skipping two thirds of what it was written to check. It
+executed blocks a line at a time, so every multi-line call, `with` and `def`
+raised `SyntaxError` or `IndentationError` on its first line and abandoned the
+block — which then counted as "needs something this gate cannot supply". It now
+parses with `ast`, attaches a standalone `# →` line to the statement above it,
+compares a `print(...)` claim against what actually reached stdout, and strips
+the `> ` of a fenced block nested in a blockquote. 16 expectations evaluated
+before, 26 now, and the skip count fell from 32 blocks to 13.
+
+One of those bugs was in the gate's own comment stripper: `\s*#\s*→` let `\s*`
+match the preceding newline, deleting the line and shifting every later claim
+onto the following statement, which produced four confident and entirely bogus
+failures.
+
+### Fixed — the pure-Python test aggregate carried half its superset's timeout
+
+`bvnr_py_pure_all` is a subset of `bvnr_py_all` that costs the same as the whole,
+because everything slow in the suite is library-free: the pure-Python decimal and
+binary encoders, the pint bridge, the round-trip property tests. It had a 60 s
+budget against its superset's 120 s, and the catalogue growing to 261 units took
+it past 60. Both are now 300 s. The cost tracks the square of the catalogue —
+the pint bridge compares every pair of base units — so a budget set against
+today's measurement is a flake scheduled for the next release.
+
 ### Fixed — a temperature difference that cancelled to itself came out a temperature
 
 `ΔK·m/m` was **compatible with `K`** — a temperature *scale* — and **incompatible

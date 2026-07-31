@@ -267,15 +267,18 @@ def unit_reduce(unit: ValueUnit) -> ReducedUnit:
     """
     Simplify *unit* to its canonical named SI unit where possible.
 
-    Example – kg·m·s⁻² reduces to N (newton) with scale 1.0.
+    Example – k~g·m·s⁻² reduces to (m·g/s², 1000.0): every prefix folds into the
+    scale and repeated bases combine. It does NOT produce the named SI unit —
+    unit_to_str_ex(vu, UnitFlags.REDUCE) is what gives "N", and that collapse is
+    the formatter's alone.
 
     *scale* is the factor the reduction moved out of the unit and into the
     number: reducing k~m gives (m, 1000.0), so a value carrying the reduced unit
     must be multiplied by r.scale to still mean the same quantity.
 
     OverflowError is raised when the reduction cannot be represented — the
-    accumulated scale left float range, a summed exponent left the ±9 the format
-    can spell, or more distinct bases survived than a unit may carry.
+    accumulated scale left float range, a summed exponent left the ±100 the
+    format can spell, or more distinct bases survived than a unit may carry.
     """
     lib      = get_library()
     scale    = ctypes.c_double(1.0)
@@ -286,7 +289,7 @@ def unit_reduce(unit: ValueUnit) -> ReducedUnit:
     if overflow.value:
         raise OverflowError(
             "unit_reduce: the reduced unit is not representable (scale out of "
-            "float range, exponent outside ±9, or too many components)")
+            "float range, exponent outside ±100, or too many components)")
     return ReducedUnit(reduced, float(scale.value))
 
 
@@ -302,22 +305,33 @@ def unit_to_str_ex(unit: ValueUnit,
                             superscripts (e.g. m/s^2 instead of m/s²)
 
     .. warning::
-       UnitFlags.REDUCE returns only the reduced UNIT and discards the scale the
-       reduction folded out, so the string can denote a different magnitude from
-       what you passed in: k~g serialises as "g". If you use REDUCE here you must
-       apply unit_reduce(unit).scale to your value yourself. (The writer does
-       this for you; nothing else does.)
+       UnitFlags.REDUCE returns only the reduced UNIT, so the string can denote a
+       different magnitude from what you passed in: k~g serialises as "g". Moving
+       the value with it is your job. (The writer does it for you; nothing else
+       does.)
+
+       Do NOT use ``unit_reduce(unit).scale`` for that. It is the scale to the
+       *fully reduced* unit, and this function does not always emit the fully
+       reduced unit: where the reduction lands on a named SI unit the formatter
+       re-attaches the prefix, so ``k~N`` comes back ``"k~N"`` with nothing to
+       rescale while ``unit_reduce`` still reports ``1000.0``. Take the scale
+       from the unit actually emitted::
+
+           emitted = parse_unit(unit_to_str_ex(vu, UnitFlags.REDUCE))
+           value  *= convert_value(1.0, vu, emitted)   # 1.0 for k~N, 1000.0 for k~g
 
     Raises BovnarArgumentError when *unit* has no serialisation: it is
     structurally invalid, it carries a bu_none component that has no spelling
     (anything past a bare "no_unit"), the reduction overflows under REDUCE (see
-    below), or the rendered form exceeds the 256-byte buffer.
+    below), or the rendered form exceeds ``UNIT_STRING_MAX`` bytes (the buffer
+    this function allocates, and the bound sized for the longest unit the
+    catalogue can emit).
 
-    Under REDUCE, a reduction that **overflows** — a summed exponent past the ±9
-    the format can spell, more surviving bases than a unit may carry, or a folded
-    scale out of float range — is refused rather than written. It drops a
-    component, so what it would produce is a *different* unit: ``m⁹·m²`` is
-    ``m¹¹`` and used to come back as ``"no_unit"``. Without REDUCE such a unit
+    Under REDUCE, a reduction that **overflows** — a summed exponent outside the
+    ±100 the format can spell, more surviving bases than a unit may carry, or a
+    folded scale out of float range — is refused rather than written. It drops a
+    component, so what it would produce is a *different* unit: ``m⁵⁰·m⁵⁰``
+    reduces to ``m¹⁰⁰`` and ``m⁵⁰·m⁵¹`` is refused. Without REDUCE such a unit
     serialises normally.
     """
     lib = get_library()

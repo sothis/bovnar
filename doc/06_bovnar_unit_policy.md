@@ -169,30 +169,47 @@ dimensionless unit (`%`, `ppm`, `dB`, `pH`, `rad`, `°`).
 behaviour when the caller named a target deliberately.
 
 `bvnr_inexact_leave` delivers the value untouched instead, with `converted == false`. It exists
-for `bvnr_normalise_si`, where *every* value is a conversion candidate and a single 5/18 factor
-would otherwise reject an ordinary document. A consumer using it must read `converted` to know
-which values it happened to.
+for `bvnr_normalise_si`, where every value *that has a coherent SI form* is a conversion candidate
+and a single 5/18 factor would otherwise reject an ordinary document. A consumer using it must
+read `converted` to know which values it happened to.
 
 It applies to **every** result the conversion cannot deliver exactly — a rational with no
-terminating expansion in the output base, and equally a genuinely **irrational** factor (a π-based
-angle, a parsec, a water hardness scale):
+terminating expansion in the output base, and equally a genuinely **irrational** factor (a parsec,
+a water hardness scale, a π-based angle converted to radian).
+
+**"Exactly" is a property of the result, not of the factor**, so a rational factor rejects some
+values in a document and not others: km/h → m/s is 5/18, and `90` converts to exactly `25` while
+`100` converts to `250/9` and does not. Two speeds in one file, one accepted and one refused, is
+the expected behaviour rather than a bug — an irrational factor is the only kind that fails for
+every value:
 
 ```console
 $ bovnar events --si heading.bvnr
-… unit_inexact
+… unit_inexact at line 2 col 32          the k~m/h, not the heading
 
 $ bovnar events --si --leave-inexact heading.bvnr
-"90.0" <float:64,_10,°>          left in degrees
+"90.0" <float:64,_10,°>          left — dimensionless, never a candidate (§2.3)
 "100.0" <float:64,_10,k~m/h>     left, 250/9 does not terminate
 "5.0"  <float:64,_10,m>          already SI
 ```
+
+**Read that first line carefully: it is the `k~m/h` that fails, not the degrees.** Under
+`bvnr_normalise_si` a degree is not an inexact conversion — it is not a conversion at all, because
+[§2.3](#23-normalisation) leaves every dimensionless unit alone. The heading validates under the
+strict run too. What *does* abort a `--si` run on an irrational factor is a **dimensioned** one: a
+parsec or a `°dH` water hardness, both of which have a coherent SI form and so are candidates.
+
+A π-based angle reaches this path only when a target names its SI form outright —
+`targets = {"rad"}` on a `°` value is `error_unit_inexact` strictly, and left untouched under
+`bvnr_inexact_leave`. That is the same mechanism, reached deliberately rather than by
+normalisation.
 
 The tempting distinction — that an irrational factor is special because there is no rational to
 hand over — belongs to [`want_unit_allow_nonterminating`](08_bovnar_readwrite_api.md), whose
 fallback *is* the rational. This mode's fallback is the **native value**, and that works for an
 irrational factor exactly as well as for a non-terminating one. It has to: a document carrying a
-heading in degrees is entirely ordinary, and under `bvnr_normalise_si` the strict reading would
-reject it — which is the case this mode exists for.
+speed in km/h is entirely ordinary, and under `bvnr_normalise_si` the strict reading would reject
+it — which is the case this mode exists for.
 
 Only a **policy-chosen** target takes this path. A target named by the `want_unit` hook keeps the
 strict all-or-nothing contract that hook was documented with, whatever `on_inexact` says

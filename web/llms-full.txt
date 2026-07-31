@@ -9591,9 +9591,30 @@ for `bvnr_normalise_si`, where *every* value is a conversion candidate and a sin
 would otherwise reject an ordinary document. A consumer using it must read `converted` to know
 which values it happened to.
 
-It applies only to a result that is exact as a rational but has no terminating expansion in the
-output base. A genuinely irrational factor still aborts — there is nothing exact to hand over
-either way.
+It applies to **every** result the conversion cannot deliver exactly — a rational with no
+terminating expansion in the output base, and equally a genuinely **irrational** factor (a π-based
+angle, a parsec, a water hardness scale):
+
+```console
+$ bovnar events --si heading.bvnr
+… unit_inexact
+
+$ bovnar events --si --leave-inexact heading.bvnr
+"90.0" <float:64,_10,°>          left in degrees
+"100.0" <float:64,_10,k~m/h>     left, 250/9 does not terminate
+"5.0"  <float:64,_10,m>          already SI
+```
+
+The tempting distinction — that an irrational factor is special because there is no rational to
+hand over — belongs to [`want_unit_allow_nonterminating`](08_bovnar_readwrite_api.md), whose
+fallback *is* the rational. This mode's fallback is the **native value**, and that works for an
+irrational factor exactly as well as for a non-terminating one. It has to: a document carrying a
+heading in degrees is entirely ordinary, and under `bvnr_normalise_si` the strict reading would
+reject it — which is the case this mode exists for.
+
+Only a **policy-chosen** target takes this path. A target named by the `want_unit` hook keeps the
+strict all-or-nothing contract that hook was documented with, whatever `on_inexact` says
+([1.3](#13-a-policy-and-the-want_unit-hook)).
 
 ### 2.5 Requiring a unit
 

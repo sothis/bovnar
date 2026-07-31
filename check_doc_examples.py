@@ -105,7 +105,7 @@ def main(argv):
         return 0
 
     problems = []
-    checked = illustrative = rejected = 0
+    checked = illustrative = rejected = undirected = 0
 
     for rel in SOURCES:
         path = os.path.join(REPO, rel)
@@ -115,7 +115,20 @@ def main(argv):
         for m in FENCE.finditer(text):
             preceding, body = m.group(1), m.group(2)
             if not body.lstrip().startswith("#!bovnar"):
-                continue          # a fragment, not a document
+                # The version directive is OPTIONAL, so most examples in the
+                # tutorial and the spec do not carry one, and this check has
+                # never looked at them. Counted and reported rather than passed
+                # over in silence: a gate that covers a tenth of its subject
+                # while printing an unqualified success is worse than one that
+                # says what it skipped.
+                #
+                # Not simply parsed, because a large share of them are
+                # DELIBERATELY invalid -- ".123invalid = 1;  # error: starts
+                # with a digit" and its like -- and classifying those needs the
+                # judgement the marker exists to record, not a guess at intent
+                # from the presence of the word "error" in a comment.
+                undirected += 1
+                continue          # no version directive: see above
             line = text[:m.start(2)].count("\n") + 1
             where = "%s:%d" % (rel, line)
             mark = MARK.search(preceding)
@@ -171,6 +184,10 @@ def main(argv):
 
     print("check_doc_examples: %d embedded document(s) parse, %d refuse as "
           "marked, %d illustrative" % (checked, rejected, illustrative))
+    if undirected:
+        print("  ...and %d ```bovnar block(s) carry no #!bovnar directive and "
+              "are NOT checked — mostly deliberate negative examples, which need "
+              "a marker rather than a guess at intent" % undirected)
     return 0
 
 

@@ -57,6 +57,53 @@ to accompany every copy (`web/fonts/OFL.txt`), the Impressum gains a
 *Bildnachweis*, `doc/11` gains §18, and `CITATION.cff` gains a `references:`
 block naming all six vocabularies with their licences.
 
+### Fixed — two documents said an irrational factor still aborts; it does not
+
+`bvnr_inexact_leave` delivers a value untouched instead of aborting when the
+conversion cannot be exact. Both places it is described — `bovnar.h`'s
+`bvnr_unit_inexact_policy_t` and doc/06 §2.4 — said it
+
+> Applies only to a result that is exact as a rational but has no terminating
+> expansion in the output base; **a genuinely irrational factor still aborts**,
+> since there is nothing exact to hand over either way.
+
+It does not abort. With the mode set, a π-based angle is left in its native unit
+like any other value the conversion cannot deliver:
+
+```
+--unit rad                    on 90 °   ->  error_unit_inexact
+--unit rad --leave-inexact    on 90 °   ->  delivered untouched
+```
+
+The implementation is deliberate and `test_irrational_is_left_under_leave`
+already pinned it — with a comment naming the confusion exactly: *"The
+alternative reading — that an irrational factor is special because there is no
+rational to hand over — belongs to `want_unit_allow_nonterminating`, whose
+fallback IS the rational. This flag's fallback is the native value, and that
+works for an irrational factor exactly as well as for a non-terminating one."*
+The stale sentence describes a different knob.
+
+It also contradicted the mode's own stated purpose. `bvnr_inexact_leave` exists
+for `bvnr_normalise_si`, "where every value is a conversion candidate and one
+5/18 factor would otherwise reject an ordinary document" — and a document
+carrying a heading in degrees is entirely ordinary. Under the strict reading
+`--si --leave-inexact` would reject it; it does not.
+
+Both sites corrected, with a transcript (doc/06 promises its transcripts are
+output rather than illustration, and this one is), and both now also state the
+half neither did: only a **policy-chosen** target takes this path, since a target
+named by the `want_unit` hook keeps its strict all-or-nothing contract whatever
+`on_inexact` says.
+
+### Changed — check_doc_examples.py reports what it does not check
+
+It parses ```bovnar blocks that carry a `#!bovnar` directive: 24 of them. The
+directive is optional, so 188 blocks have none and were passed over in silence
+while the tool printed an unqualified success. It now says so. They are not
+simply parsed because a large share are deliberately invalid (`.123invalid = 1;
+# error: starts with a digit`), and classifying those wants the marker the tool
+already has rather than a guess at intent from the word "error" in a comment.
+
 ### Fixed — the unitless fence was documented in one direction only
 
 `bvn_policy_selects` fences unitless values off from the ratio units **both

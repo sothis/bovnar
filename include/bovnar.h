@@ -1028,9 +1028,21 @@ typedef enum bvnr_unit_inexact_policy_e {
 	 * Meant for bvnr_normalise_si, where EVERY value is a conversion candidate
 	 * and one 5/18 factor would otherwise reject an ordinary document. The
 	 * consumer must read `converted` to know which values this happened to.
-	 * Applies only to a result that is exact as a rational but has no
-	 * terminating expansion in the output base; a genuinely irrational factor
-	 * still aborts, since there is nothing exact to hand over either way. */
+	 *
+	 * Applies to EVERY result the conversion cannot deliver exactly, including
+	 * a genuinely irrational factor (a π-based angle, a parsec, a water
+	 * hardness scale). The tempting distinction -- that an irrational factor is
+	 * special because there is no rational to hand over -- belongs to
+	 * want_unit_allow_nonterminating, whose fallback IS the rational. This
+	 * flag's fallback is the NATIVE VALUE, and that works for an irrational
+	 * factor exactly as well as for a non-terminating one. It has to: a
+	 * document carrying a heading in degrees is entirely ordinary, and under
+	 * bvnr_normalise_si the strict reading would reject it, which is the case
+	 * this mode exists for.
+	 *
+	 * Only a POLICY-chosen target takes this path. A target named by the
+	 * want_unit hook keeps the strict all-or-nothing contract that hook was
+	 * documented with, whatever this field says. */
 	bvnr_inexact_leave  = 1
 } bvnr_unit_inexact_policy_t;
 typedef struct bvnr_unit_policy_s {

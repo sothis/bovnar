@@ -198,3 +198,57 @@ class TestRawValueUnitEqualityMatchesUnit:
         assert len({bovnar.parse_unit("m"),
                     bovnar.parse_unit("m"),
                     bovnar.parse_unit("k~m")}) == 2
+
+
+class TestValueTypeSpecEquality:
+    """The same ctypes gap, on the other struct a caller compares.
+
+    make_type_spec is exported and doc/09 prints a ValueTypeSpec, so
+    `node.value_type == other.value_type` is the obvious way to ask whether two
+    values share a type. It answered by identity. Quantity.__eq__ compares
+    family, width and base one at a time, which is the workaround.
+    """
+
+    def test_equal_specs_compare_equal(self):
+        f = bovnar.ValueTypeFamily.FLOAT
+        assert bovnar.make_type_spec(f, 64, 0) == bovnar.make_type_spec(f, 64, 0)
+
+    def test_differing_specs_do_not(self):
+        f = bovnar.ValueTypeFamily.FLOAT
+        assert bovnar.make_type_spec(f, 64, 0) != bovnar.make_type_spec(f, 32, 0)
+        assert bovnar.make_type_spec(f, 64, 0) != bovnar.make_type_spec(f, 64, 16)
+        assert (bovnar.make_type_spec(f, 64, 0)
+                != bovnar.make_type_spec(bovnar.ValueTypeFamily.UINT, 64, 0))
+
+    def test_hashable_and_foreign_types_are_unequal(self):
+        f = bovnar.ValueTypeFamily.FLOAT
+        assert (hash(bovnar.make_type_spec(f, 64, 0))
+                == hash(bovnar.make_type_spec(f, 64, 0)))
+        assert len({bovnar.make_type_spec(f, 64, 0),
+                    bovnar.make_type_spec(f, 64, 0),
+                    bovnar.make_type_spec(f, 32, 0)}) == 2
+        assert bovnar.make_type_spec(f, 64, 0) != "float64"
+
+    def test_components_compare_by_value(self):
+        a = bovnar.parse_unit("k~m").components[0]
+        b = bovnar.parse_unit("k~m").components[0]
+        c = bovnar.parse_unit("m").components[0]
+        assert a == b and hash(a) == hash(b)
+        assert a != c
+        assert a.prefix == b.prefix and a.prefix != c.prefix
+
+
+def test_unit_and_valueunit_hash_alike_across_the_catalogue():
+    """One hash implementation, not two that agree today.
+
+    Unit.__hash__ and ValueUnit.__hash__ were separate copies of the same
+    multiset formula; nesting the prefix key in one of them was enough to make
+    {Unit.parse("m"): 1}[parse_unit("m")] a KeyError. Unit now delegates.
+    """
+    for spelling in ("m", "k~m", "k~g·m/s²", "µ~L⁻¹", "ucum:mm[Hg]", "°C",
+                     "Ki~B/s", "no_unit"):
+        vu = bovnar.parse_unit(spelling)
+        u = Unit.parse(spelling)
+        assert u == vu and vu == u
+        assert hash(u) == hash(vu), spelling
+        assert {u: 1}[vu] == 1

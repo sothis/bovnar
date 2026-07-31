@@ -114,6 +114,18 @@ class ValueUnitPrefix(ctypes.Structure):
             return f"ValueUnitPrefix(si={self.si_prefix.name})"
         return f"ValueUnitPrefix(iec={self.iec_prefix.name})"
 
+    def _key(self):
+        # id is a union, so id.si covers the IEC member's storage too.
+        return (int(self.system), int(self.id.si))
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, ValueUnitPrefix):
+            return NotImplemented
+        return self._key() == other._key()
+
+    def __hash__(self) -> int:
+        return hash(self._key())
+
 
 class ValueUnitComponent(ctypes.Structure):
     _fields_ = [
@@ -150,6 +162,23 @@ class ValueUnitComponent(ctypes.Structure):
             pfx = f"iec={self.iec_prefix.name}"
         return (f"ValueUnitComponent(base={self.base_unit.name}, "
                 f"exp={self.exp.name}, {pfx})")
+
+    def _key(self):
+        return (int(self.base), int(self.exponent), self.prefix._key())
+
+    def __eq__(self, other) -> bool:
+        """By value, so a component survives a round trip through a set.
+
+        `ValueUnit.__eq__` asks the library; this is the piecewise question a
+        caller iterating `active_components()` would otherwise have to spell
+        out field by field.
+        """
+        if not isinstance(other, ValueUnitComponent):
+            return NotImplemented
+        return self._key() == other._key()
+
+    def __hash__(self) -> int:
+        return hash(self._key())
 
 class ValueUnit(ctypes.Structure):
     _fields_ = [
@@ -203,10 +232,8 @@ class ValueUnit(ctypes.Structure):
 
         Order-independent, because `bvn_unit_equal` is.
         """
-        return hash(frozenset(
-            (int(c.base), int(c.exponent),
-             int(c.prefix.system), int(c.prefix.id.si))
-            for c in self.components[:self.num_components]))
+        return hash(frozenset(c._key()
+                              for c in self.components[:self.num_components]))
 
 class ValueTypeSpec(ctypes.Structure):
     _fields_ = [
@@ -222,6 +249,26 @@ class ValueTypeSpec(ctypes.Structure):
     def __repr__(self) -> str:
         f = self.type_family
         return f"ValueTypeSpec(family={f.name}, width={self.width}, base={self.base})"
+
+    def _key(self):
+        return (int(self.family), int(self.width), int(self.base))
+
+    def __eq__(self, other) -> bool:
+        """By value — the three fields, which is all this struct is.
+
+        Same reason as `ValueUnit`: a ctypes Structure has no `__eq__`, so
+        `make_type_spec(FLOAT, 64, 0) == make_type_spec(FLOAT, 64, 0)` was
+        False, and `node.value_type == other.value_type` — the obvious way to
+        ask whether two values share a type — silently answered "no".
+        `Quantity.__eq__` compares `family`, `width` and `base` one at a time,
+        which is the workaround this removes the need for.
+        """
+        if not isinstance(other, ValueTypeSpec):
+            return NotImplemented
+        return self._key() == other._key()
+
+    def __hash__(self) -> int:
+        return hash(self._key())
 
 class BvnrConverted(ctypes.Structure):
     # Mirrors C `bvnr_converted_t`: the exact result of a lossless read-time

@@ -148,16 +148,16 @@ class Unit:
         return eq if eq is NotImplemented else not eq
 
     def __hash__(self) -> int:
-        """Consistent with __eq__: the multiset of (base, exponent, prefix)
-        triples, order-independent because bvn_unit_equal is."""
-        n = int(self._vu.num_components)
-        triples = frozenset(
-            (int(self._vu.components[i].base),
-             int(self._vu.components[i].exponent),
-             int(self._vu.components[i].prefix.system),
-             int(self._vu.components[i].prefix.id.si))
-            for i in range(n))
-        return hash(triples)
+        """Delegated to the struct, so the two can never drift apart.
+
+        ``__eq__`` above accepts a bare ``ValueUnit`` and reports True for an
+        equal one, so Python's contract requires ``hash(Unit.parse("m")) ==
+        hash(parse_unit("m"))``. This was two copies of the same multiset
+        formula until one of them nested its prefix key and
+        ``{Unit.parse("m"): 1}[parse_unit("m")]`` became a KeyError for a key
+        the dict considered present. One implementation, in ``ValueUnit``.
+        """
+        return hash(self._vu)
 
     def __bool__(self) -> bool:
         """False for the dimensionless unit, so ``if q.unit:`` reads."""

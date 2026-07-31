@@ -69,6 +69,18 @@ considers present. Both directions are tested.
 `units_convertible`, completing the three questions: same unit, commensurate
 unit, convertible unit.
 
+The same gap was on `ValueTypeSpec`, which is exported with a public
+`make_type_spec` constructor and which doc/09 prints: `node.value_type ==
+other.value_type`, the obvious way to ask whether two values share a type,
+answered by identity. It compares by value now, as do `ValueUnitComponent` and
+`ValueUnitPrefix`.
+
+`Unit.__hash__` delegates to `ValueUnit.__hash__` rather than repeating its
+multiset formula. The two copies were not hypothetical drift: nesting the prefix
+key in one of them while writing this was enough to make
+`{Unit.parse("m"): 1}[parse_unit("m")]` a `KeyError`, and hash parity is now
+asserted across the whole catalogue.
+
 ### Fixed — `ucum:Gb` is the gilbert, and doc/11 called it a refusal
 
 doc/11 §6.2 tabulates the spellings that name different quantities in the two

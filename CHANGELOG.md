@@ -20,6 +20,29 @@ rebuild consumers against the new headers. **SOVERSION is bumped 1 → 2**
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
 
+### Fixed — two documents still said `ppt` reads as the picopint
+
+Making the compact token `ppt` a parse error left three descriptions of it
+behind, and doc/05 contradicted itself inside one paragraph: "`ppt` already
+resolves — as the compact form of `p~pt`, the picopint" four lines above "the
+compact token `ppt` is refused outright". doc/02 carried the same present tense.
+Both now state what the parser does — `ppt` is refused, and `pptr`, `‰` or
+`p~pt` is what to write — while keeping the past-tense reason the spelling could
+not simply be reassigned. doc/07's account was already correct.
+
+`check_doc_counts.py` now checks doc/02's base-unit inventory **as a
+breakdown**, not just as a total: its 42 categories must sum to the stated 261
+and to the catalogue. Every count in it was individually plausible, so a unit
+moved between two rows — or a row not bumped when the catalogue grew — was
+invisible to every gate in the repo. Verified by mutation.
+
+Nothing else in that inventory was wrong. Each of its factor claims was put to
+the library and holds: `at` at 98 066.5 Pa against `atm` at 101 325, the metric
+horsepower at 735.49875 W, the electric at 746 and the boiler at 9 809.5, the
+Julian month at 2 629 800 s, the fortnight at 1 209 600, `mH2O` at 9 806.65 Pa,
+the IT calorie at 4.1868 J against the thermochemical 4.184, the assay ton at
+175/6 g, `sph` at 4π sr, `rev` at 2π rad and 9 `den` to the `tex`.
+
 ### Fixed — the unit-policy reference blamed the wrong value for an inexact `--si` run
 
 doc/06 §2.4 illustrated `error_unit_inexact` with a document whose heading is in

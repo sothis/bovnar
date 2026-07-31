@@ -1835,7 +1835,7 @@ a mismatch is `error_unit_mismatch`.
 - **2 textile linear density units** — **tex** (1 g/km = 10⁻⁶ kg/m, ISO 1144), **denier** (`den`, 1 g/9 000 m; 9 den = 1 tex).
 - **13 Old German units** — **Pfund** (`Pfd`), **Zentner** (`Ztr`), **Doppelzentner**, **Lot** (mass); **Prussian line, Zoll, Fuß, Elle, Rute**, **Klafter**, and **German (geographical) mile** (length); **Morgen** (area); **Scheffel** (volume). None accept an SI or IEC prefix.
 - **7 surveying & signalling units** — **US survey foot**, **league**, **cable length**, **hand** (length); **quintal**, **scruple** (mass); **baud** (`Bd`, signalling rate).
-- **8 ratio / proportion units** — **percent** (`%`), **per mille** (`‰`), **per myriad** (`‱`), **per cent mille** (`pcm`), **ppm**, **ppb**, **parts per trillion** (`pptr`, 10⁻¹²) and **parts per quadrillion** (`ppq`, 10⁻¹⁵) — dimensionless scaling factors that take no prefix. The last two are spelled `pptr`/`ppq` rather than `ppt`/`ppq` because `ppt` already reads as `p~pt`, the picopint, and because `ppt` means parts per *thousand* in some industries; UCUM makes the same split, spelling them `[ppth]` and `[pptr]`.
+- **8 ratio / proportion units** — **percent** (`%`), **per mille** (`‰`), **per myriad** (`‱`), **per cent mille** (`pcm`), **ppm**, **ppb**, **parts per trillion** (`pptr`, 10⁻¹²) and **parts per quadrillion** (`ppq`, 10⁻¹⁵) — dimensionless scaling factors that take no prefix. The last two are spelled `pptr`/`ppq` rather than `ppt`/`ppq` because `ppt` resolved as `p~pt`, the picopint, and because `ppt` means parts per *thousand* in some industries; UCUM makes the same split, spelling them `[ppth]` and `[pptr]`. The compact token `ppt` is now **refused outright** rather than read as either — the two ratios it might mean are 10⁹ apart, and only the author can say which. Write `pptr`, `‰`, or `p~pt`.
 - **1 acidity scale** — **pH** (`pH`), a logarithm of hydrogen-ion activity; its own quantity kind, so it never converts to a percentage or a plain number.
 - **2 named speed units** — **mile per hour** (`mph`), **kilometre per hour** (`kph`, also `kmh`). Neither takes a prefix; `mi/h` and `k~m/h` remain valid as compounds.
 - **7 water-analysis units** — the five hardness degrees **German** (`°dH`), **English/Clark** (`°e`), **French** (`°fH`), **Russian** (`°rH`), **American** (`°aH`), plus **grains per US gallon** (`gpg`) and the **equivalent** (`val`, ½ mol as water analysis uses it). The six degrees are amount concentrations and all inter-convert.
@@ -7692,10 +7692,10 @@ they do **not** accept SI or IEC prefixes (a prefixed `%` is meaningless).
 | `ppq` | `parts_per_quadrillion`, `ppqv` | parts per quadrillion | `bu_ppq` | 10⁻¹⁵ |
 
 > **Why `pptr` and not `ppt`.** Two independent reasons, and either alone would
-> settle it. `ppt` already resolves — as the compact form of `p~pt`, the
-> picopint — so claiming it as an alias would take a spelling away from the unit
-> that has it, which §4.3's guarantee forbids and `gen_units.py` refuses at build
-> time. And `ppt` is ambiguous in the field: parts per **thousand** in some
+> settle it. `ppt` already resolved — as the compact form of `p~pt`, the
+> picopint — so claiming it as an alias would have taken a spelling away from the
+> unit that held it, which §4.3's guarantee forbids and `gen_units.py` refuses at
+> build time. And `ppt` is ambiguous in the field: parts per **thousand** in some
 > industries, parts per **trillion** in atmospheric chemistry, a factor of 10⁹
 > apart. UCUM splits the same ambiguity the same way — `[ppth]` for per thousand,
 > `[pptr]` for per trillion — so the symbol here is borrowed rather than

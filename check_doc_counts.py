@@ -206,10 +206,54 @@ def files(repo):
             yield os.path.join(root, n)
 
 
+INVENTORY_DOC = "doc/02_bovnar_faq.md"
+INVENTORY_HEAD = "**How many base units does Bovnar support?**"
+
+
+def inventory(repo, want):
+    """doc/02's per-category inventory must SUM to the catalogue.
+
+    The FAQ answers "how many base units" with a total and then 42 categories
+    that account for every one of them. Each category count is checkable only
+    against the others: a unit moved between two rows, or a row whose count was
+    not bumped when the catalogue grew, leaves the total right and the breakdown
+    wrong. Nothing else in this file would notice, because every individual
+    number stays plausible.
+    """
+    path = os.path.join(repo, INVENTORY_DOC)
+    if not os.path.exists(path):
+        return [], 0
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    if INVENTORY_HEAD not in text:
+        return ["%s: the base-unit inventory heading is gone; the category "
+                "breakdown is no longer checked" % INVENTORY_DOC], 0
+    section = text.split(INVENTORY_HEAD, 1)[1].split("\n\nThe `bu_gram`", 1)[0]
+    m = re.search(r"(\d+) named base units", section)
+    if not m:
+        return ["%s: the inventory no longer states a total" % INVENTORY_DOC], 0
+    stated = int(m.group(1))
+    rows = re.findall(r"^- \*\*(\d+) ", section, re.M)
+    total = sum(int(n) for n in rows)
+    problems = []
+    if stated != want["units"]:
+        problems.append("%s: the inventory says %d named base units; "
+                        "src/gendata has %d"
+                        % (INVENTORY_DOC, stated, want["units"]))
+    if total != stated:
+        problems.append("%s: the inventory's %d categories sum to %d, but it "
+                        "states %d — a unit is in two rows or in none"
+                        % (INVENTORY_DOC, len(rows), total, stated))
+    return problems, 2
+
+
 def main(argv):
     repo = os.path.abspath(argv[1]) if len(argv) > 1 else REPO
     want = counts(repo)
     bad, checked = [], 0
+    inv_bad, inv_checked = inventory(repo, want)
+    bad += inv_bad
+    checked += inv_checked
     for path in files(repo):
         try:
             with open(path, encoding="utf-8") as f:

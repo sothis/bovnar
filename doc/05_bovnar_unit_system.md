@@ -698,10 +698,10 @@ they do **not** accept SI or IEC prefixes (a prefixed `%` is meaningless).
 | `ppq` | `parts_per_quadrillion`, `ppqv` | parts per quadrillion | `bu_ppq` | 10⁻¹⁵ |
 
 > **Why `pptr` and not `ppt`.** Two independent reasons, and either alone would
-> settle it. `ppt` already resolves — as the compact form of `p~pt`, the
-> picopint — so claiming it as an alias would take a spelling away from the unit
-> that has it, which §4.3's guarantee forbids and `gen_units.py` refuses at build
-> time. And `ppt` is ambiguous in the field: parts per **thousand** in some
+> settle it. `ppt` already resolved — as the compact form of `p~pt`, the
+> picopint — so claiming it as an alias would have taken a spelling away from the
+> unit that held it, which §4.3's guarantee forbids and `gen_units.py` refuses at
+> build time. And `ppt` is ambiguous in the field: parts per **thousand** in some
 > industries, parts per **trillion** in atmospheric chemistry, a factor of 10⁹
 > apart. UCUM splits the same ambiguity the same way — `[ppth]` for per thousand,
 > `[pptr]` for per trillion — so the symbol here is borrowed rather than

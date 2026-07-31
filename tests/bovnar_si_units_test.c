@@ -2602,6 +2602,20 @@ static void test_temperature_difference_is_its_own_quantity_kind(void)
 		ASSERT_TRUE(bvn_unit_convert_value(6.5, with_delta, with_kelvin, &out),
 			    "and the conversion is the identity");
 		ASSERT_TRUE(fabs(out - 6.5) < 1e-12, "factor 1, no rescale");
+		/*
+		 * "The same unit" means bvn_unit_equal, not merely compatible, and
+		 * this line is the one that was missing. Compatibility was already
+		 * true and the assertion above already SAID "the same unit", so the
+		 * gap was invisible: bvn_unit_equal compares bases structurally, and
+		 * bu_delta_kelvin is not bu_kelvin, so the two spellings the design
+		 * calls one unit were separated one layer up from the kind scoping.
+		 * Equality is what the annotation/inline agreement rule uses, so a
+		 * document annotated `W/(m²·ΔK)` with an inline `W/(m²·K)` suffix was
+		 * refused as error_unit_mismatch -- the exact U-value the scoping rule
+		 * exists to keep working.
+		 */
+		ASSERT_TRUE(bvn_unit_equal(with_delta, with_kelvin),
+			    "...and EQUAL, which is what the document rule compares");
 	}
 	/* Same at a negative exponent alone: an expansion coefficient. */
 	value_unit_t inv_delta  = { .num_components = 1, .components = {
@@ -2612,6 +2626,40 @@ static void test_temperature_difference_is_its_own_quantity_kind(void)
 		  .prefix = {prefix_si, .id.si = si_none} } } };
 	ASSERT_TRUE(bvn_units_compatible(inv_delta, inv_kelvin),
 		    "ΔK^-1 and K^-1 are the same unit");
+	ASSERT_TRUE(bvn_unit_equal(inv_delta, inv_kelvin),
+		    "ΔK^-1 and K^-1 are EQUAL too");
+
+	/*
+	 * And the hazard is untouched: the scoping is "a lone component at
+	 * exponent 1", so THERE the two must stay apart. Asserted beside the
+	 * merge, because a fix that folded ΔK into K unconditionally would satisfy
+	 * every line above and destroy the reason the unit exists.
+	 */
+	ASSERT_TRUE(!bvn_unit_equal(dK, BVN_UNIT_NO_PREFIX(bu_kelvin)),
+		    "a lone ΔK at exponent 1 is still NOT equal to K");
+	ASSERT_TRUE(!bvn_units_compatible(dK, BVN_UNIT_NO_PREFIX(bu_kelvin)),
+		    "...nor compatible with it");
+	/* A prefixed interval in a compound folds the same way. */
+	value_unit_t m_delta = { .num_components = 2, .components = {
+		{ .base = bu_delta_kelvin, .exponent = exp_linear,
+		  .prefix = {prefix_si, .id.si = si_milli} },
+		{ .base = bu_meter, .exponent = exp_neg_linear,
+		  .prefix = {prefix_si, .id.si = si_none} } } };
+	value_unit_t m_kelvin = { .num_components = 2, .components = {
+		{ .base = bu_kelvin, .exponent = exp_linear,
+		  .prefix = {prefix_si, .id.si = si_milli} },
+		{ .base = bu_meter, .exponent = exp_neg_linear,
+		  .prefix = {prefix_si, .id.si = si_none} } } };
+	ASSERT_TRUE(bvn_unit_equal(m_delta, m_kelvin),
+		    "m~ΔK/m equals m~K/m — the prefix rides along");
+	/* ...and the OTHER five interval units do not fold: Δ°F is 5/9 K, not a
+	 * spelling of the kelvin, and its scale counterpart is affine. */
+	ASSERT_TRUE(!bvn_unit_equal(
+			bvni_test_u2(bu_delta_fahrenheit, exp_linear,
+				     bu_meter, exp_neg_linear),
+			bvni_test_u2(bu_kelvin, exp_linear,
+				     bu_meter, exp_neg_linear)),
+		    "Δ°F/m is not K/m — only ΔK folds");
 }
 
 static void test_photometric_units_carry_the_steradian(void)

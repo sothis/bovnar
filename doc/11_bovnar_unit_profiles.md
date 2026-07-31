@@ -885,8 +885,9 @@ alone would leave whichever code happened to be shortest and make every other de
 It remains **partial by construction**, and in three different ways:
 
 - *No table is complete.* A native unit outside a transliteration table has nowhere to go — the Old
-  German units, the water-hardness degrees, the turbidity kinds, `PSU`, `CF`, `mph`, `kph`, `rpm`,
-  and every currency.
+  German units, the water-hardness degrees, the turbidity kinds, `PSU`, `CF`, `kph`, `rpm`,
+  and every currency. Membership here is per-unit and not per-family: `mph` has both a UN/ECE
+  and a QUDT code while `kph` has neither, and `NTU` is writable where `PSU` is not.
 - *A flat profile can only write a single component.* A flat code names a whole unit, so there is no
   way to compose one out of parts: `unece:MSK` reads back as `m/s²`, but a native `m/s²` has no
   UNECE spelling this function can construct. The expression profiles have no such limit.
@@ -902,8 +903,9 @@ It remains **partial by construction**, and in three different ways:
 | `k~g` | `kg` | `KGM` | `KiloGM` | `kg` |
 | `h~Pa` | `hPa` | `A97` | `HectoPA` | `hPa` |
 | `m/s` | `m.s-1` | — | — | `m.s-1` |
-| `Mi~B` | — | — | `MebiBYTE` | — |
-| `mph` | — | — | — | — |
+| `Mi~B` | — | `E63` | `MebiBYTE` | — |
+| `mph` | — | `HM` | `MI-PER-HR` | — |
+| `kph` | — | — | — | — |
 | *(dimensionless)* | `1` | — | — | `1` |
 
 The asymmetry is worth stating plainly: these profiles are good *readers* and partial *writers*. A

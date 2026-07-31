@@ -1033,8 +1033,9 @@ alone would leave whichever code happened to be shortest and make every other de
 <p>It remains <strong>partial by construction</strong>, and in three different ways:</p>
 <ul>
 <li><em>No table is complete.</em> A native unit outside a transliteration table has nowhere to go — the Old
-  German units, the water-hardness degrees, the turbidity kinds, <code>PSU</code>, <code>CF</code>, <code>mph</code>, <code>kph</code>, <code>rpm</code>,
-  and every currency.</li>
+  German units, the water-hardness degrees, the turbidity kinds, <code>PSU</code>, <code>CF</code>, <code>kph</code>, <code>rpm</code>,
+  and every currency. Membership here is per-unit and not per-family: <code>mph</code> has both a UN/ECE
+  and a QUDT code while <code>kph</code> has neither, and <code>NTU</code> is writable where <code>PSU</code> is not.</li>
 <li><em>A flat profile can only write a single component.</em> A flat code names a whole unit, so there is no
   way to compose one out of parts: <code>unece:MSK</code> reads back as <code>m/s²</code>, but a native <code>m/s²</code> has no
   UNECE spelling this function can construct. The expression profiles have no such limit.</li>
@@ -1080,12 +1081,19 @@ alone would leave whichever code happened to be shortest and make every other de
 <tr>
 <td><code>Mi~B</code></td>
 <td>—</td>
-<td>—</td>
+<td><code>E63</code></td>
 <td><code>MebiBYTE</code></td>
 <td>—</td>
 </tr>
 <tr>
 <td><code>mph</code></td>
+<td>—</td>
+<td><code>HM</code></td>
+<td><code>MI-PER-HR</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>kph</code></td>
 <td>—</td>
 <td>—</td>
 <td>—</td>

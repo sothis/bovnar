@@ -57,6 +57,67 @@ to accompany every copy (`web/fonts/OFL.txt`), the Impressum gains a
 *Bildnachweis*, `doc/11` gains §18, and `CITATION.cff` gains a `references:`
 block naming all six vocabularies with their licences.
 
+### Fixed — `W/(m²·ΔK)` and `W/(m²·K)` were not the same unit, though four documents said so
+
+The temperature-interval kind is scoped to **a lone component at exponent 1** —
+the one place `bvn_unit_to_si_factor` applies an affine offset, and so the only
+place a difference could ever be read as a scale. Everywhere else an affine scale
+cannot appear at all, so a `K` in a compound was already an interval and there is
+nothing to separate. `doc/temperature_difference.md` §4.2 states the rule, tabulates
+the cases, and records that the alternative was **considered and rejected**:
+
+```
+ΔK        vs  K          incompatible    the hazard, and the whole point
+ΔK/k~m    vs  K/k~m      the SAME unit   a lapse rate
+W/(m²·ΔK) vs  W/(m²·K)   the SAME unit   a U-value
+```
+
+`bvni_kind_exponents` applied the scoping, so `bvn_units_convertible` agreed —
+those pairs convert with factor 1. **Equality did not.** It compares bases
+structurally and `bu_delta_kelvin` is not `bu_kelvin`, so the two spellings the
+design calls one unit were separated one layer up from the kind scoping. Since
+the annotation/inline agreement rule compares with `bvn_unit_equal`, a document
+was refused for writing both:
+
+```
+.u_value = <float:64,W/(m²·ΔK)> 0.25 W/(m²·K);   ->  error_unit_mismatch
+.lapse   = <float:64,ΔK/k~m>    6.5  K/k~m;       ->  error_unit_mismatch
+```
+
+Exactly the U-value and lapse rate the scoping rule exists to keep working. Both
+now parse. The hazard is untouched: a lone `ΔK` at exponent 1 is still neither
+equal nor compatible with `K`.
+
+Only `ΔK` folds. The other five interval units are not spellings of a kelvin —
+`Δ°F` is 5/9 K, and its scale counterpart is affine and unusable in a compound
+anyway — so there is no pair to merge, and the test asserts that too.
+
+The existing test is why this survived: it asserted `bvn_units_compatible` under
+the message *"ΔK and K are the same unit inside a compound"*. The claim was in
+the message and the weaker predicate was in the assertion, so the gap was
+invisible. It now asserts `bvn_unit_equal` beside it, and asserts the lone case
+stays separated — a fix that folded `ΔK` into `K` unconditionally would have
+satisfied every other line and destroyed the reason the unit exists.
+
+### Fixed — doc/11's profile spelling table understated the writer
+
+Two hand-maintained claims about `bvn_unit_to_profile`, neither compared to it,
+both stale in the direction nothing notices — they claimed *less* capability than
+exists, and no test fails when a capability goes unclaimed:
+
+- the §5.3 table showed `Mi~B` with no UN/ECE spelling (it is `E63`) and `mph`
+  with none at all (UN/ECE `HM`, QUDT `MI-PER-HR`);
+- the prose listed `mph` among the units that "have nowhere to go", beside `kph`
+  and `rpm`, which genuinely have none.
+
+A reader takes that as the answer and writes their own translation, or concludes
+the profile is thinner than it is. The table gains a `kph` row so the contrast is
+explicit — `mph` has two spellings, `kph` has none — and the prose now says
+membership is per-unit rather than per-family.
+
+`check_profile_factors.py` gained the gate: it parses that table and that
+sentence and checks all 28 claims against the built writer.
+
 ### Fixed — a conversion too large to compute was reported as a unit mismatch
 
 `want_unit` refused a pair the library itself calls **convertible**, and blamed

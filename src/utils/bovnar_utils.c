@@ -1375,6 +1375,39 @@ static bool bvn_unit_component_identical(const value_unit_component_t *ca,
  * compare as equal. We therefore match components as multisets: every component
  * of a must pair with a distinct, identical component of b.
  */
+/*
+ * ΔK and K, where the temperature-interval kind does not count.
+ *
+ * The interval kind is scoped to A LONE COMPONENT AT EXPONENT 1, which is
+ * exactly where the hazard lives: bvn_unit_to_si_factor applies an affine offset
+ * only there, so that is the only place a difference could ever be read as a
+ * scale. Everywhere else an affine scale cannot appear at all, so a `K` in a
+ * compound was ALREADY an interval and there is nothing to separate --
+ * `W/(m²·ΔK)` and `W/(m²·K)` are one unit, as are `ΔK/k~m` and `K/k~m`, and
+ * `ΔK⁻¹` and `K⁻¹`.
+ *
+ * bvni_kind_exponents applies that scoping, so bvn_units_convertible already
+ * agreed: the pairs above convert with factor 1. Equality did not, because it
+ * compares bases structurally and bu_delta_kelvin is not bu_kelvin -- so the two
+ * spellings the design calls one unit were separated one layer up, and a
+ * document annotated `W/(m²·ΔK)` with an inline `W/(m²·K)` suffix was refused
+ * as error_unit_mismatch. That is precisely the U-value the scoping rule exists
+ * to keep working.
+ *
+ * Only ΔK folds. The other five interval units are not spellings of a kelvin:
+ * Δ°F is 5/9 K, and its scale counterpart °F is affine and unusable in a
+ * compound anyway, so there is no pair to merge.
+ */
+static value_base_unit_t bvni_equality_base(value_unit_t u, uint32_t i)
+{
+	const value_unit_component_t *c = &u.components[i];
+	if (c->base != bu_delta_kelvin)
+		return c->base;
+	bool lone = (u.num_components == 1u);
+	return (lone && bvn_exponent_to_int(c->exponent) == 1)
+	     ? c->base                       /* the hazard: ΔK is not K */
+	     : bu_kelvin;
+}
 bool bvn_unit_equal(value_unit_t a, value_unit_t b)
 {
 	if (a.num_components != b.num_components)
@@ -1384,11 +1417,14 @@ bool bvn_unit_equal(value_unit_t a, value_unit_t b)
 	bool matched[BVNR_MAX_UNIT_COMPONENTS] = { false };
 	for (uint32_t i = 0; i < n; i++) {
 		bool found = false;
+		value_unit_component_t ca = a.components[i];
+		ca.base = bvni_equality_base(a, i);
 		for (uint32_t j = 0; j < n; j++) {
 			if (matched[j])
 				continue;
-			if (bvn_unit_component_identical(&a.components[i],
-			                                 &b.components[j])) {
+			value_unit_component_t cb = b.components[j];
+			cb.base = bvni_equality_base(b, j);
+			if (bvn_unit_component_identical(&ca, &cb)) {
 				matched[j] = true;
 				found = true;
 				break;

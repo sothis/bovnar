@@ -1569,6 +1569,94 @@ def check_codes_read_back(verbose):
     return problems, checked
 
 
+def check_doc_profile_spellings(verbose):
+    """doc/11 §5.3's spelling table, and its "nowhere to go" list, against the
+    writer they describe.
+
+    Two hand-maintained claims about `bvn_unit_to_profile`, and nothing compared
+    either to it. Both had gone STALE IN THE SAFE-LOOKING DIRECTION -- they
+    understated what the writer can do, which no test notices because nothing
+    fails when a capability is unclaimed:
+
+      * the table showed `Mi~B` with no UN/ECE spelling (it is `E63`) and `mph`
+        with none anywhere (UN/ECE `HM`, QUDT `MI-PER-HR`);
+      * the prose listed `mph` among the units that "have nowhere to go", beside
+        `kph` and `rpm`, which genuinely have none.
+
+    A reader takes those as the answer and writes their own translation, or
+    concludes the profile is thinner than it is. Checked here rather than in
+    check_doc_unit_tables.py because that tool compares doc/04 and doc/05 to
+    src/gendata, and this is a different question: what the WRITER emits, which
+    only the built library can answer."""
+    sys.path.insert(0, os.path.join(REPO, "python"))
+    try:
+        import bovnar
+        bovnar._ffi.load_library()
+    except Exception:
+        return None, 0
+
+    path = os.path.join(REPO, "doc", "11_bovnar_unit_profiles.md")
+    if not os.path.exists(path):
+        return [], 0
+    text = open(path, encoding="utf-8").read()
+    problems = []
+    checked = 0
+
+    def emitted(ns, unit):
+        try:
+            return bovnar.unit_to_profile(ns, bovnar.parse_unit(unit))
+        except Exception:
+            return None
+
+    # --- the table: | Native | `ucum` | `unece` | `qudt` | `udunits` | -------
+    m = re.search(r"\|\s*Native\s*\|\s*`ucum`\s*\|\s*`unece`\s*\|\s*`qudt`\s*\|"
+                  r"\s*`udunits`\s*\|\n\|[-\s|]+\|\n((?:\|.*\|\n)+)", text)
+    if not m:
+        problems.append("doc/11: the §5.3 spelling table is not where this "
+                        "check expects it — it cannot be verified")
+    else:
+        cols = ["ucum", "unece", "qudt", "udunits"]
+        for row in m.group(1).strip().splitlines():
+            cells = [c.strip() for c in row.strip().strip("|").split("|")]
+            if len(cells) != 5:
+                continue
+            native = cells[0].strip("`")
+            if native.startswith("*"):          # the "(dimensionless)" row
+                continue
+            for ns, cell in zip(cols, cells[1:]):
+                checked += 1
+                want = None if cell in ("—", "-", "") else cell.strip("`")
+                got = emitted(ns, native)
+                if got != want:
+                    problems.append(
+                        "doc/11 §5.3: the table says %s writes as %s in `%s`; "
+                        "the writer emits %s"
+                        % (native, "—" if want is None else repr(want),
+                           ns, "nothing" if got is None else repr(got)))
+
+    # --- the prose: units said to have nowhere to go -------------------------
+    m = re.search(r"\*No table is complete\.\*(.+?)\n-\s", text, re.S)
+    if m:
+        sentence = m.group(1)
+        # Only the run before the per-unit caveat, which names units that DO
+        # have spellings in order to make the point that membership varies.
+        sentence = sentence.split("Membership here")[0]
+        for unit in re.findall(r"`([^`]+)`", sentence):
+            checked += 1
+            have = {ns: emitted(ns, unit) for ns in sorted(VOCABS)}
+            have = {k: v for k, v in have.items() if v}
+            if have:
+                problems.append(
+                    "doc/11 §5.3 lists %s among the units with nowhere to go, "
+                    "but the writer emits %s"
+                    % (unit, ", ".join("%s:%s" % kv for kv in sorted(have.items()))))
+
+    if verbose:
+        print("  doc/11 §5.3: %d spelling claim(s) checked, %d problem(s)"
+              % (checked, len(problems)))
+    return problems, checked
+
+
 def load_native_convertible():
     """A bound `bvn_units_convertible`, or None.
 
@@ -1928,6 +2016,18 @@ def main(argv):
     if rb_checked:
         print("check_profile_factors: %d profile codes read back as declared"
               % rb_checked)
+
+    # ...and the documentation's account of what the WRITER emits.
+    ds_problems, ds_checked = check_doc_profile_spellings(args.verbose)
+    if ds_problems:
+        print("check_profile_factors: %d documented spelling(s) disagree with "
+              "the writer:" % len(ds_problems))
+        for msg in ds_problems:
+            print("  %s" % msg)
+        return 1
+    if ds_checked:
+        print("check_profile_factors: %d documented spelling claims agree with "
+              "the writer" % ds_checked)
 
     available = [ns for ns in which if have_cache(args.cache, ns)]
     if not available:

@@ -143,6 +143,15 @@ The regression test was checked by removing the fix and watching it fail.
 doc/05 §12.4 no longer contradicts itself, and now says which side closes the
 gap.
 
+The document now calls the screen a **superset** whose gap is "one shape wide",
+and `python/tests/test_convertible_implies_convertible.py` is the assertion
+behind that word: it sweeps 120 000 pairs drawn from the catalogue and its
+quotients and squares, and requires every pair that passes `units_convertible`
+and is then refused by `convert_value` to be the affine-in-a-compound shape.
+Nothing else was in the gap when it was written — 64 refusals out of 4 130
+screened pairs in a wider 500 000-pair run, all of them that one shape. A second
+shape opening is how the sentence in doc/05 would quietly become false again.
+
 ### Fixed — the unit-policy reference blamed the wrong value for an inexact `--si` run
 
 doc/06 §2.4 illustrated `error_unit_inexact` with a document whose heading is in

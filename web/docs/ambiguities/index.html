@@ -785,7 +785,7 @@ bare-letter form, and it is unambiguous because <code>K</code> is the kelvin and
 <p>The SI dimension vector cannot tell these apart — they are all dimensionally equal — yet they are
 not interchangeable in meaning. Bovnar's compatibility check is dimension-based, so it <strong>accepts</strong>
 conversions in the first group; the second group is protected by an explicit quantity-kind rule.</p>
-<p><strong>Dimensionally equal, and Bovnar will convert between them (factor 1) — the distinction is yours to keep:</strong></p>
+<p><strong>Dimensionally equal, and Bovnar will convert between them — the distinction is yours to keep:</strong></p>
 <table>
 <thead>
 <tr>
@@ -822,11 +822,82 @@ conversions in the first group; the second group is protected by an explicit qua
 </tr>
 </tbody>
 </table>
+<p><strong>The factor is not always 1, and that is the part to read twice.</strong> Each row above
+names the units that happen to be worth <em>one</em> of each other, but what the
+compatibility check actually accepts is the whole <strong>dimensional family</strong> — every
+native unit of that dimension converts to every other, at whatever factor relates
+them. Most of those conversions are exactly right: <code>cal</code> → <code>J</code>, <code>Ci</code> → <code>Bq</code>,
+<code>hp</code> → <code>W</code>. The ones that cross a quantity boundary Bovnar cannot see are right
+about the arithmetic and wrong about the quantity, and then the <strong>number changes
+too</strong>, so the result does not look like a relabelling:</p>
+<table>
+<thead>
+<tr>
+<th>Written</th>
+<th>Read as</th>
+<th>Bovnar returns</th>
+<th>What just happened</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>1 Ci</code></td>
+<td><code>Hz</code></td>
+<td>3.7×10¹⁰</td>
+<td>a radioactive source read as a frequency</td>
+</tr>
+<tr>
+<td><code>1 rem</code></td>
+<td><code>Gy</code></td>
+<td>0.01</td>
+<td>an equivalent dose read as an absorbed dose</td>
+</tr>
+<tr>
+<td><code>1 hp</code></td>
+<td><code>var</code></td>
+<td>745.6998715822702</td>
+<td>a mechanical power read as reactive power</td>
+</tr>
+<tr>
+<td><code>1 cal</code></td>
+<td><code>N·m</code></td>
+<td>4.184</td>
+<td>an energy read as a torque</td>
+</tr>
+<tr>
+<td><code>1 rpm</code></td>
+<td><code>Bq</code></td>
+<td>1/60</td>
+<td>a rotation rate read as an activity</td>
+</tr>
+</tbody>
+</table>
+<p>The families, in full, are: <code>Hz</code> <code>Bq</code> <code>Bd</code> <code>Ci</code> <code>rpm</code> (s⁻¹); <code>Gy</code> <code>Sv</code> <code>rem</code>
+(m²·s⁻²); <code>W</code> <code>var</code> <code>VA</code> <code>PS</code> <code>hp</code> <code>ton_ref</code> (kg·m²·s⁻³); and the ten energy
+units <code>eV</code> <code>erg</code> <code>J</code> <code>ft_lb</code> <code>cal</code> <code>cal_IT</code> <code>Btu_th</code> <code>Btu</code> <code>thm</code> <code>thm_ec</code>
+(kg·m²·s⁻²), which <code>N·m</code> joins as a compound.</p>
 <blockquote>
+<p><strong>Why these are not given quantity kinds, when <code>b</code>/<code>B</code> and <code>lm</code>/<code>cd</code> are.</strong>
+A kind works where the distinction is carried by a <em>unit</em> that appears in the
+definition: <code>sr</code> holds the photometric kind, so <code>cd·sr</code> inherits it and
+<code>lm</code> ↔ <code>cd·sr</code> keeps working while <code>lm</code> ↔ <code>cd</code> is refused. Nothing plays that
+part here — a dose weighting factor and a power factor are dimensionless and
+equal to 1 by convention. So a kind on <code>Sv</code> would have to refuse <code>Sv</code> ↔ <code>J/kg</code>
+as well, and one on <code>VA</code> would refuse <code>VA</code> ↔ <code>V·A</code>, which is what a
+volt-ampere <em>is</em>; leaving those accepted instead would make <code>Gy</code> ≡ <code>J/kg</code> ≡
+<code>Sv</code> while <code>Gy</code> ≢ <code>Sv</code>, and code that screens targets with
+<code>bvn_units_convertible</code> would then depend on which spelling it was handed.
+The distinction belongs to a quantity-kind vocabulary rather than to a unit,
+which is where Bovnar carries it: <code>qudt-qk</code> maps QUDT's kinds to their coherent
+SI units, and that is what separates <code>Torque</code> from <code>Work</code>.</p>
 <p>Offering the conversion is not the same as rewriting the annotation.
 <code>BVN_UNIT_REDUCE</code> leaves every unit in this table alone: a <code>Sv</code> serialises as
-<code>Sv</code>, never as <code>Gy</code>. The collapse folds a <em>compound</em> into the named unit it
-spells out (<code>A·s</code> → <code>C</code>); it never substitutes one named unit for another.</p>
+<code>Sv</code>, never as <code>Gy</code>, and a <code>Ci</code> never becomes <code>3.7e10 Hz</code>. The collapse folds a
+<em>compound</em> into the named unit it spells out (<code>A·s</code> → <code>C</code>); it never
+substitutes one named unit for another. Crossing one of these lines takes an
+explicit conversion request — a <code>want_unit</code> target, a unit policy, or <code>--unit</code>
+on the command line — so the risk is in what a <em>consumer</em> asks for, not in what
+a document says.</p>
 </blockquote>
 <p><strong>Dimensionless but <em>not</em> interchangeable — Bovnar refuses these conversions:</strong></p>
 <table>

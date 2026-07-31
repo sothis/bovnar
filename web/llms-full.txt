@@ -10328,7 +10328,7 @@ The SI dimension vector cannot tell these apart — they are all dimensionally e
 not interchangeable in meaning. Bovnar's compatibility check is dimension-based, so it **accepts**
 conversions in the first group; the second group is protected by an explicit quantity-kind rule.
 
-**Dimensionally equal, and Bovnar will convert between them (factor 1) — the distinction is yours to keep:**
+**Dimensionally equal, and Bovnar will convert between them — the distinction is yours to keep:**
 
 | Units | Shared dimension | The distinction Bovnar cannot see |
 |-------|------------------|-----------------------------------|
@@ -10338,10 +10338,50 @@ conversions in the first group; the second group is protected by an explicit qua
 | `Hz`, `Bq`, `Bd` | s⁻¹ | frequency, radioactivity, symbol rate |
 | `mph`, `kn`, `m/s` | m·s⁻¹ | genuinely interchangeable — just different scales |
 
+**The factor is not always 1, and that is the part to read twice.** Each row above
+names the units that happen to be worth *one* of each other, but what the
+compatibility check actually accepts is the whole **dimensional family** — every
+native unit of that dimension converts to every other, at whatever factor relates
+them. Most of those conversions are exactly right: `cal` → `J`, `Ci` → `Bq`,
+`hp` → `W`. The ones that cross a quantity boundary Bovnar cannot see are right
+about the arithmetic and wrong about the quantity, and then the **number changes
+too**, so the result does not look like a relabelling:
+
+| Written | Read as | Bovnar returns | What just happened |
+|---------|---------|----------------|--------------------|
+| `1 Ci` | `Hz` | 3.7×10¹⁰ | a radioactive source read as a frequency |
+| `1 rem` | `Gy` | 0.01 | an equivalent dose read as an absorbed dose |
+| `1 hp` | `var` | 745.6998715822702 | a mechanical power read as reactive power |
+| `1 cal` | `N·m` | 4.184 | an energy read as a torque |
+| `1 rpm` | `Bq` | 1/60 | a rotation rate read as an activity |
+
+The families, in full, are: `Hz` `Bq` `Bd` `Ci` `rpm` (s⁻¹); `Gy` `Sv` `rem`
+(m²·s⁻²); `W` `var` `VA` `PS` `hp` `ton_ref` (kg·m²·s⁻³); and the ten energy
+units `eV` `erg` `J` `ft_lb` `cal` `cal_IT` `Btu_th` `Btu` `thm` `thm_ec`
+(kg·m²·s⁻²), which `N·m` joins as a compound.
+
+> **Why these are not given quantity kinds, when `b`/`B` and `lm`/`cd` are.**
+> A kind works where the distinction is carried by a *unit* that appears in the
+> definition: `sr` holds the photometric kind, so `cd·sr` inherits it and
+> `lm` ↔ `cd·sr` keeps working while `lm` ↔ `cd` is refused. Nothing plays that
+> part here — a dose weighting factor and a power factor are dimensionless and
+> equal to 1 by convention. So a kind on `Sv` would have to refuse `Sv` ↔ `J/kg`
+> as well, and one on `VA` would refuse `VA` ↔ `V·A`, which is what a
+> volt-ampere *is*; leaving those accepted instead would make `Gy` ≡ `J/kg` ≡
+> `Sv` while `Gy` ≢ `Sv`, and code that screens targets with
+> `bvn_units_convertible` would then depend on which spelling it was handed.
+> The distinction belongs to a quantity-kind vocabulary rather than to a unit,
+> which is where Bovnar carries it: `qudt-qk` maps QUDT's kinds to their coherent
+> SI units, and that is what separates `Torque` from `Work`.
+
 > Offering the conversion is not the same as rewriting the annotation.
 > `BVN_UNIT_REDUCE` leaves every unit in this table alone: a `Sv` serialises as
-> `Sv`, never as `Gy`. The collapse folds a *compound* into the named unit it
-> spells out (`A·s` → `C`); it never substitutes one named unit for another.
+> `Sv`, never as `Gy`, and a `Ci` never becomes `3.7e10 Hz`. The collapse folds a
+> *compound* into the named unit it spells out (`A·s` → `C`); it never
+> substitutes one named unit for another. Crossing one of these lines takes an
+> explicit conversion request — a `want_unit` target, a unit policy, or `--unit`
+> on the command line — so the risk is in what a *consumer* asks for, not in what
+> a document says.
 
 **Dimensionless but *not* interchangeable — Bovnar refuses these conversions:**
 

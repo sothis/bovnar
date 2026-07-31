@@ -121,6 +121,40 @@ did:
 is neither the international acre-foot (1233.48183755) nor the survey one
 (1233.48923847), i.e. an acre and a foot from different systems.
 
+### Fixed — doc/07 §9 said "(factor 1)" about a rule that is not about factors
+
+The section listing the units Bovnar converts between despite their meaning
+different things — `Gy`/`Sv`, `Hz`/`Bq`/`Bd`, `W`/`VA`/`var`, `J`/`N·m` —
+introduced them as converting "(factor 1)". That is true of the pairs it names
+and not of what the compatibility check accepts, which is the whole **dimensional
+family**. A reader took away "the worst case is a mislabelling"; the worst case
+is a different number:
+
+| Written | Read as | Returns |
+|---|---|---|
+| `1 Ci` | `Hz` | 3.7×10¹⁰ |
+| `1 rem` | `Gy` | 0.01 |
+| `1 hp` | `var` | 745.6998715822702 |
+| `1 cal` | `N·m` | 4.184 |
+| `1 rpm` | `Bq` | 1/60 |
+
+§9 now states the families in full — `Hz` `Bq` `Bd` `Ci` `rpm`; `Gy` `Sv` `rem`;
+`W` `var` `VA` `PS` `hp` `ton_ref`; the ten energy units — and says where the
+line is actually crossed: only on an explicit conversion request, since
+`BVN_UNIT_REDUCE` never substitutes one named unit for another. It also records
+why these get no quantity kind when `b`/`B` and `lm`/`cd` do: a kind needs a
+*unit* to carry it (`sr` does the work for photometry), and a dose weighting
+factor is dimensionless and 1 by convention — so a kind on `Sv` would have to
+refuse `Sv` ↔ `J/kg`, and one on `VA` would refuse `VA` ↔ `V·A`, while leaving
+them accepted would make `Gy` ≡ `J/kg` ≡ `Sv` with `Gy` ≢ `Sv`, which callers
+screening on `bvn_units_convertible` cannot rely on.
+
+doc/07's header promises "every row here was checked against the reference
+parser", so `check_doc_unit_factors.py` now performs all five conversions and
+checks each family is both mutually convertible and **closed** — a new native
+unit of one of those dimensions joins the family whether or not anybody updates
+the sentence, and that is now a build failure rather than a silent one.
+
 ### Added — three gates over the unit documentation, and the drift they found
 
 **`check_doc_unit_factors.py` — the Factor column.**

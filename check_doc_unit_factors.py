@@ -504,6 +504,120 @@ def rows(path):
         yield n, cells[si], cells[fi]
 
 
+# doc/07 §9's conversion-hazard table, against the library.
+#
+# §9 used to say the units in it convert "(factor 1)", which is true of the
+# pairs it names and not of the FAMILY the compatibility check actually accepts:
+# a curie converts to a hertz at 3.7e10 and a rem to a gray at 0.01, so the
+# result of crossing one of those quantity boundaries does not look like a
+# relabelling. The table that says so states five numbers, and doc/07's own
+# header promises that "every row here was checked against the reference
+# parser" -- so they are, here, by performing the conversion.
+#
+# Also checked: the "families, in full" sentence beside it. That list is a claim
+# about which units are mutually convertible, and it is the kind of claim a
+# growing catalogue invalidates silently -- a new unit of one of those
+# dimensions joins the family whether or not anybody updates the sentence.
+HAZARD_DOC = "doc/07_bovnar_unit_ambiguities.md"
+HAZARD_HEAD = ("Written", "Read as", "Bovnar returns", "What just happened")
+FAMILY_LINE = re.compile(
+    r"The families, in full, are:(.*?)\(kg·m²·s⁻²\)", re.S)
+FAMILY_GROUP = re.compile(r"((?:`[^`]+`\s*)+)\(([^)]+)\)")
+
+
+def check_hazard_table(repo, cat):
+    """-> (problems, rows checked). Needs the built library; skips without one."""
+    path = os.path.join(repo, HAZARD_DOC)
+    if not os.path.exists(path):
+        return [], 0
+    sys.path.insert(0, os.path.join(repo, "python"))
+    try:
+        import bovnar
+        bovnar._ffi.load_library()
+    except Exception:
+        return [], 0
+
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    lines = text.split("\n")
+    ev = Evaluator(cat)
+    problems, checked = [], 0
+    header = None
+    for n, line in enumerate(lines, 1):
+        if not line.startswith("|"):
+            header = None
+            continue
+        if SEPARATOR.match(line.strip()):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if header is None:
+            header = tuple(cells)
+            continue
+        if header[:4] != HAZARD_HEAD or len(cells) < 3:
+            continue
+        written = TICK.findall(cells[0])
+        target = TICK.findall(cells[1])
+        if not written or not target:
+            continue
+        # "1 Ci" -> the unit is what follows the value
+        m = re.match(r"^([\d.]+)\s+(.+)$", written[0])
+        if not m:
+            problems.append("%s:%d: %r is not a `<value> <unit>` cell"
+                            % (HAZARD_DOC, n, written[0]))
+            continue
+        value, from_u, to_u = float(m.group(1)), m.group(2), target[0]
+        try:
+            got = bovnar.convert_value(value,
+                                       bovnar.parse_unit(from_u),
+                                       bovnar.parse_unit(to_u))
+        except Exception as exc:
+            problems.append("%s:%d: %s -> %s does not convert (%s) -- the row "
+                            "claims it does" % (HAZARD_DOC, n, from_u, to_u,
+                                                type(exc).__name__))
+            continue
+        checked += 1
+        try:
+            want, _ = ev.eval(normalise(cells[2]))
+        except (Unparseable, ValueError, ZeroDivisionError, IndexError):
+            problems.append("%s:%d: %r is not a number this gate can read"
+                            % (HAZARD_DOC, n, cells[2]))
+            continue
+        w = want.as_float()
+        if w == 0.0 or abs(got - w) > 1e-12 * abs(w):
+            problems.append("%s:%d: %g %s in %s is %.17g; the table says %s"
+                            % (HAZARD_DOC, n, value, from_u, to_u, got, cells[2]))
+
+    # The prose list of families, each group mutually convertible and closed:
+    # no other native unit may share the dimension without being named.
+    m = FAMILY_LINE.search(text)
+    if m:
+        for members, _label in FAMILY_GROUP.findall(m.group(0)):
+            names = TICK.findall(members)
+            if len(names) < 2:
+                continue
+            rep = bovnar.parse_unit(names[0])
+            checked += 1
+            for other in names[1:]:
+                if not bovnar.units_convertible(bovnar.parse_unit(other), rep):
+                    problems.append("%s: §9 lists %s in the same family as %s, "
+                                    "and they do not convert"
+                                    % (HAZARD_DOC, other, names[0]))
+            listed = set(names)
+            for u in cat.units:
+                if u["symbol"] in listed:
+                    continue
+                try:
+                    cand = bovnar.parse_unit(u["symbol"])
+                except Exception:
+                    continue
+                if bovnar.units_convertible(cand, rep):
+                    problems.append(
+                        "%s: §9's %s family omits `%s`, which converts to `%s` "
+                        "-- the sentence says \"in full\""
+                        % (HAZARD_DOC, names[0], u["symbol"], names[0]))
+    return problems, checked
+
+
 def agrees_as_double(got, want, unit):
     """True when a documented value differs from the catalogue's only by
     rounding to the same IEEE-754 double.
@@ -670,6 +784,8 @@ def main(argv):
     problems, checked, prose = check(repo)
     api_problems, api_count = check_api_named(repo)
     problems += api_problems
+    hazard_problems, hazard_count = check_hazard_table(repo, Catalogue(repo))
+    problems += hazard_problems
     if problems:
         sys.stderr.write(
             "check_doc_unit_factors: %d documented factor(s) disagree with "
@@ -680,7 +796,8 @@ def main(argv):
         return 1
     print("check_doc_unit_factors: %d factor cell(s) checked against "
           "src/gendata, %d prose, all matching; %d bovnar_si_units.h "
-          "export(s) named in %s." % (checked, prose, api_count, API_DOC))
+          "export(s) named in %s; %d doc/07 §9 conversion claim(s) performed."
+          % (checked, prose, api_count, API_DOC, hazard_count))
     return 0
 
 

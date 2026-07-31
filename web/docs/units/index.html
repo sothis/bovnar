@@ -197,8 +197,9 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 <p><strong>A unit may also be written in a foreign notation.</strong> A <code>name:</code> namespace hands
 the parameter to a <strong>unit profile</strong>, which translates it into the same
 <code>value_unit_t</code> this document describes — so <code>&lt;float_dec:64,ucum:mm[Hg]&gt;</code> and
-<code>&lt;float_dec:64,mmHg&gt;</code> are the same unit to every part of the library. One
-namespace is defined, <code>ucum</code>; everything in this reference applies to the
+<code>&lt;float_dec:64,mmHg&gt;</code> are the same unit to every part of the library. Seven
+namespaces are defined — <code>ucum</code>, <code>unece</code>, <code>qudt</code>, <code>qudt-qk</code>, <code>udunits</code>, <code>om</code>
+and <code>cf</code>; everything in this reference applies to the
 result unchanged. <strong>The notation is under implementation</strong> — it is not part of a
 published specification, and a document must opt in with a <code>#!bovnar 1.2</code>
 directive that this build does not itself advertise. A native unit is

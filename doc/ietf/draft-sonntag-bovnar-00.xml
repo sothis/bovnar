@@ -1438,9 +1438,9 @@ commutes: <spanx style="verb">N·m</spanx> and <spanx style="verb">m·N</spanx> 
 <spanx style="verb">namespace:code</spanx> - exists in
 the reference implementation but is <strong>not part of any released format
 version</strong>, is reachable only by declaring a version the implementation
-does not advertise, and its eventual version number is unsettled. Five
+does not advertise, and its eventual version number is unsettled. Seven
 namespaces are defined there so far: <spanx style="verb">ucum</spanx> <xref target="UCUM"/>, <spanx style="verb">unece</spanx> <xref target="UNECE20"/>,
-<spanx style="verb">qudt</spanx> and <spanx style="verb">qudt-qk</spanx> <xref target="QUDT"/>, and <spanx style="verb">udunits</spanx> <xref target="UDUNITS"/>.</t>
+<spanx style="verb">qudt</spanx> and <spanx style="verb">qudt-qk</spanx> <xref target="QUDT"/>, <spanx style="verb">udunits</spanx> <xref target="UDUNITS"/>, <spanx style="verb">om</spanx> <xref target="OM2"/> and <spanx style="verb">cf</spanx> <xref target="CF"/>.</t>
 
 <t>It is mentioned here only so that implementers encountering it in
 <xref target="BOVNAR-SPEC"/> know its status. It is not specified by this document,
@@ -2795,6 +2795,15 @@ may reveal more about a system than the value does.</t>
     <title>NetCDF Climate and Forecast (CF) Metadata Conventions</title>
     <author >
       <organization>CF Conventions Committee</organization>
+    </author>
+    <date year="n.d."/>
+  </front>
+</reference>
+<reference anchor="OM2" target="https://github.com/HajoRijgersberg/OM">
+  <front>
+    <title>Ontology of units of Measure (OM) 2</title>
+    <author >
+      <organization>Wageningen University and Research</organization>
     </author>
     <date year="n.d."/>
   </front>

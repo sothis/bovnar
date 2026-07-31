@@ -298,6 +298,14 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvn_unit_is_profile_only.restype  = c_bool
     lib.bvn_unit_is_profile_only.argtypes = [ValueUnit]
 
+    # The reporting pair. Each unit profile is a COMPILE-TIME switch, so which
+    # ones a given libbvnr carries is a property of that build -- and a Python
+    # caller who installed a wheel has no other way to find out.
+    lib.bvn_unit_profile_count.restype  = c_uint32
+    lib.bvn_unit_profile_count.argtypes = []
+    lib.bvn_unit_profile_name.restype   = c_char_p
+    lib.bvn_unit_profile_name.argtypes  = [c_uint32]
+
     lib.bvn_unit_to_profile.restype  = c_int32
     lib.bvn_unit_to_profile.argtypes = [c_char_p, ValueUnit, c_char_p, c_size_t]
 

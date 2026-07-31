@@ -7018,8 +7018,9 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 > **A unit may also be written in a foreign notation.** A `name:` namespace hands
 > the parameter to a **unit profile**, which translates it into the same
 > `value_unit_t` this document describes — so `<float_dec:64,ucum:mm[Hg]>` and
-> `<float_dec:64,mmHg>` are the same unit to every part of the library. One
-> namespace is defined, `ucum`; everything in this reference applies to the
+> `<float_dec:64,mmHg>` are the same unit to every part of the library. Seven
+> namespaces are defined — `ucum`, `unece`, `qudt`, `qudt-qk`, `udunits`, `om`
+> and `cf`; everything in this reference applies to the
 > result unchanged. **The notation is under implementation** — it is not part of a
 > published specification, and a document must opt in with a `#!bovnar 1.2`
 > directive that this build does not itself advertise. A native unit is
@@ -13024,8 +13025,10 @@ f = bovnar.unit_factor("h")    # → 1.0  (NOT 3600.0)
 
 **These notations are under implementation**: they are not part of a published specification and the version they will ship under is not settled. `parse_unit` takes a profile notation as readily as the native one, and returns
 the same `ValueUnit` either way — so everything else in this chapter works on the
-result unchanged. Five namespaces are accepted: `ucum:`, `unece:`, `qudt:`,
-`qudt-qk:` and `udunits:`. Four helpers cover what a caller needs around them:
+result unchanged. **Seven** namespaces are accepted — `ucum:`, `unece:`, `qudt:`,
+`qudt-qk:`, `udunits:`, `om:` and `cf:` — but each is a *compile-time* switch, so
+which of them a given build carries is a question to ask rather than assume; see
+`available_profiles()` below. Helpers cover what a caller needs around them:
 
 ```python
 import bovnar
@@ -13034,6 +13037,13 @@ vu = bovnar.parse_unit("ucum:mm[Hg]")
 bovnar.unit_to_str(vu)              # → "mmHg"   — the native canonical form
 bovnar.unit_to_ucum(vu)             # → "mm[Hg]" — back to a UCUM code
 bovnar.units_compatible(vu, bovnar.parse_unit("k~Pa"))   # → True
+
+# Which profiles THIS build carries. Each namespace is a compile-time switch,
+# so a wheel may have been built without some of them; a namespace that is
+# absent raises BovnarArgumentError("unknown unit profile") rather than being
+# reported as a bad unit.
+bovnar.available_profiles()
+# → ('ucum', 'unece', 'qudt', 'qudt-qk', 'udunits', 'om', 'cf')
 
 # The same unit, five ways — all one ValueUnit
 kg = bovnar.parse_unit("k~g")
@@ -14913,8 +14923,8 @@ constraint, and §3.1 exists to hold it: a profile expression either becomes a r
 `value_unit_t` or it becomes an error. There is no third state in which a value carries a unit the
 rest of the library cannot reason about.
 
-The general form is `namespace:code`, and five namespaces are defined: `ucum`, `unece`, `qudt`,
-`qudt-qk` and `udunits`. An unknown namespace is an error (`error_unit_profile_unknown`), never a
+The general form is `namespace:code`, and seven namespaces are defined: `ucum`, `unece`, `qudt`,
+`qudt-qk`, `udunits`, `om` and `cf`. An unknown namespace is an error (`error_unit_profile_unknown`), never a
 passthrough — a consumer reads that code as "this build has no such profile", which is a different
 problem from "that is not a unit".
 

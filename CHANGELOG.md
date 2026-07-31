@@ -95,6 +95,42 @@ half neither did: only a **policy-chosen** target takes this path, since a targe
 named by the `want_unit` hook keeps its strict all-or-nothing contract whatever
 `on_inexact` says.
 
+### Added — `available_profiles()`, and the namespace count five documents got wrong
+
+**The bindings could not report which profiles a build carries.** Every unit
+profile is a compile-time switch, so which of the seven a given `libbvnr` has is
+a property of *that build*. The C side exposes `bvn_unit_profile_count` /
+`bvn_unit_profile_name` for exactly this, and doc/11 §9.4 presents them as how a
+consumer tells "this build has no ucum" (`error_unit_profile_unknown`) from "that
+is not a unit" (`error_unit_illegal`). Nothing in Python called them, and a
+caller who installed a wheel had no way to ask.
+
+`bovnar.available_profiles()` returns them in registry order:
+
+```python
+>>> bovnar.available_profiles()
+('ucum', 'unece', 'qudt', 'qudt-qk', 'udunits', 'om', 'cf')
+```
+
+**And the count was wrong in five places.** `om` and `cf` shipped, and the
+sentence that names the namespaces did not follow:
+
+| | said | |
+|---|---|---|
+| doc/05 §2 | **one** — "One namespace is defined, `ucum`" | |
+| doc/09 §5.1 | five | the Python reference |
+| doc/11 §2.1 | five | while doc/11's own header says **seven**, 160 lines above |
+| IETF draft (.md, .txt, .xml) | five | the normative document |
+
+Every one understated what the library does, and doc/11 managed to contradict
+itself within one file. The draft's `om` citation needed a bibliography entry
+that did not exist, so `OM2` is added to all three renderings that carry
+references.
+
+`check_doc_counts.py` gained the gate. The count is spelled as a **word** in
+every one of those sentences, which is why 46 numeral-based claims sailed past
+it; it now reads the word forms too, and checks 53 claims. Mutation-checked.
+
 ### Fixed — the Python bindings could not format a unit the library had just written
 
 Every unit formatter in the bindings allocated **256 bytes** and passed **256**

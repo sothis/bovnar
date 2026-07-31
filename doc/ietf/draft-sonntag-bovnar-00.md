@@ -111,6 +111,11 @@ informative:
     author:
       - org: CF Conventions Committee
     target: https://cfconventions.org/
+  OM2:
+    title: "Ontology of units of Measure (OM) 2"
+    author:
+      - org: Wageningen University and Research
+    target: https://github.com/HajoRijgersberg/OM
   UNECE20:
     title: "UN/CEFACT Recommendation 20 - Codes for Units of Measure Used in International Trade"
     author:
@@ -1368,9 +1373,9 @@ A facility for expressing a unit in a foreign notation - written
 `namespace:code` - exists in the reference implementation but is **not
 part of any released format version**, is reachable only by declaring a
 version the implementation does not advertise, and its eventual version
-number is unsettled. Five namespaces are defined there so far: `ucum`
-{{UCUM}}, `unece` {{UNECE20}}, `qudt` and `qudt-qk` {{QUDT}}, and
-`udunits` {{UDUNITS}}.
+number is unsettled. Seven namespaces are defined there so far: `ucum`
+{{UCUM}}, `unece` {{UNECE20}}, `qudt` and `qudt-qk` {{QUDT}},
+`udunits` {{UDUNITS}}, `om` {{OM2}} and `cf` {{CF}}.
 
 It is mentioned here only so that implementers encountering it in
 {{BOVNAR-SPEC}} know its status. It is not specified by this document,

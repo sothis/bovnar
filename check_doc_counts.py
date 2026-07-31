@@ -49,12 +49,15 @@ def counts(repo):
     units = load("units.bvnr")["units"]
     curr = load("currencies.bvnr")["currencies"]
     pfx = load("prefixes.bvnr")
+    profiles = ("ucum", "unece", "qudt", "qudt-qk", "udunits", "om", "cf")
     mapped = refused = 0
-    for ns in ("ucum", "unece", "qudt", "qudt-qk", "udunits", "om", "cf"):
+    for ns in profiles:
         d = load(ns + ".bvnr")
         mapped += len(d.get("mapped", [])) + len(d.get("opaque", []))
         refused += len(d.get("unsupported", []))
+    _ = profiles
     return {
+        "profiles": len(profiles),
         "mapped_codes": mapped,
         "refusals": refused,
         "units": len(units),
@@ -82,6 +85,13 @@ def _phrase(*words):
 # (regex, key) — the regex must capture exactly one number, and the phrase must
 # leave no doubt what that number counts. Add a phrasing here rather than
 # loosening one that already works.
+# The namespace count, stated as a WORD in four documents. doc/11 managed to say
+# "seven" in its own header and "five" 160 lines later, and doc/09 said "five"
+# long after om and cf shipped -- a count nothing gated because it is spelled out
+# rather than written as a numeral.
+_WORD = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+         "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+
 CLAIMS = [
     (_phrase(r"\b(\d+)", "physical", r"units\b"),               "units"),
     (_phrase(r"\b(\d+)", "physical", "base", r"units\b"),       "units"),
@@ -149,6 +159,19 @@ def main(argv):
         except (UnicodeDecodeError, OSError):
             continue
         rel = os.path.relpath(path, repo)
+        # The word-form namespace claim, checked before the numeral claims
+        # because its value is a word and the shared loop parses an integer.
+        for m in re.finditer(
+                r"\b([Oo]ne|[Tt]wo|[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|"
+                r"[Ee]ight|[Nn]ine|[Tt]en)" + _G + r"namespaces?" + _G +
+                r"(?:are|is)" + _G + r"(?:defined|accepted)", text):
+            checked += 1
+            got = _WORD[m.group(1).lower()]
+            if got != want["profiles"]:
+                line = text.count("\n", 0, m.start()) + 1
+                bad.append("%s:%d: says %d namespaces, src/gendata defines %d  (%r)"
+                           % (rel, line, got, want["profiles"],
+                              " ".join(m.group(0).split())))
         for pattern, key in CLAIMS:
             for m in re.finditer(pattern, text):
                 checked += 1

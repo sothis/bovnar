@@ -1769,3 +1769,45 @@ def _literal_fraction(lit: str, base: int):
         v += Fraction(val(fp), base ** len(fp))
     v *= (Fraction(2) if base == 16 and exp else Fraction(base)) ** exp
     return -v if neg else v
+
+
+@needs_lib
+class TestAvailableProfiles:
+    """The reporting pair, which the bindings had no equivalent of.
+
+    Each unit profile is a compile-time switch, so which of the seven a given
+    libbvnr carries is a property of that build. The C side exposes
+    bvn_unit_profile_count / bvn_unit_profile_name for exactly that question and
+    doc/11 §9.4 presents them as how a consumer distinguishes "this build has no
+    ucum" from "that is not a unit" -- but nothing in Python called them, and a
+    caller who installed a wheel had no way to ask.
+    """
+
+    def test_reports_the_names_the_library_reports(self):
+        names = bovnar.available_profiles()
+        assert isinstance(names, tuple)
+        assert all(isinstance(n, str) for n in names)
+        # No duplicates and no holes: bvn_unit_profile_name(i) walks the
+        # compiled-in profiles, skipping absent rows, and returns NULL one past
+        # the end. A walk that ran off the end would show up as a repeat.
+        assert len(set(names)) == len(names)
+
+    def test_every_reported_profile_actually_parses(self):
+        """The list is not decoration: a namespace it names must be readable."""
+        probe = {'ucum': 'ucum:m', 'unece': 'unece:MTR', 'qudt': 'qudt:M',
+                 'qudt-qk': 'qudt-qk:Length', 'udunits': 'udunits:m',
+                 'om': 'om:metre', 'cf': 'cf:air_temperature'}
+        for ns in bovnar.available_profiles():
+            assert ns in probe, "unknown profile %r — extend this probe" % ns
+            bovnar.parse_unit(probe[ns])      # raises if the build lacks it
+
+    def test_a_namespace_not_reported_is_unknown_not_illegal(self):
+        """The distinction the pair exists to let a caller act on."""
+        from bovnar.enums import ErrorCode
+        assert 'nosuch' not in bovnar.available_profiles()
+        assert (ErrorCode(bovnar.unit_error_code('nosuch:m'))
+                == ErrorCode.UNIT_PROFILE_UNKNOWN)
+        # ...against a bad code inside a namespace the build DOES have.
+        if 'ucum' in bovnar.available_profiles():
+            assert (ErrorCode(bovnar.unit_error_code('ucum:notacode'))
+                    == ErrorCode.UNIT_ILLEGAL)

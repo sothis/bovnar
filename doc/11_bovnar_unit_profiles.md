@@ -165,8 +165,8 @@ constraint, and §3.1 exists to hold it: a profile expression either becomes a r
 `value_unit_t` or it becomes an error. There is no third state in which a value carries a unit the
 rest of the library cannot reason about.
 
-The general form is `namespace:code`, and five namespaces are defined: `ucum`, `unece`, `qudt`,
-`qudt-qk` and `udunits`. An unknown namespace is an error (`error_unit_profile_unknown`), never a
+The general form is `namespace:code`, and seven namespaces are defined: `ucum`, `unece`, `qudt`,
+`qudt-qk`, `udunits`, `om` and `cf`. An unknown namespace is an error (`error_unit_profile_unknown`), never a
 passthrough — a consumer reads that code as "this build has no such profile", which is a different
 problem from "that is not a unit".
 

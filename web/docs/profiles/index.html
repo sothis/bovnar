@@ -280,8 +280,8 @@ the reader and writer unit policies, <code>bvnr_normalise_si</code>, the DOM and
 constraint, and §3.1 exists to hold it: a profile expression either becomes a real
 <code>value_unit_t</code> or it becomes an error. There is no third state in which a value carries a unit the
 rest of the library cannot reason about.</p>
-<p>The general form is <code>namespace:code</code>, and five namespaces are defined: <code>ucum</code>, <code>unece</code>, <code>qudt</code>,
-<code>qudt-qk</code> and <code>udunits</code>. An unknown namespace is an error (<code>error_unit_profile_unknown</code>), never a
+<p>The general form is <code>namespace:code</code>, and seven namespaces are defined: <code>ucum</code>, <code>unece</code>, <code>qudt</code>,
+<code>qudt-qk</code>, <code>udunits</code>, <code>om</code> and <code>cf</code>. An unknown namespace is an error (<code>error_unit_profile_unknown</code>), never a
 passthrough — a consumer reads that code as "this build has no such profile", which is a different
 problem from "that is not a unit".</p>
 <p>Everything sections 2–10 say about <code>ucum:</code> describes the shared mechanism, because every profile

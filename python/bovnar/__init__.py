@@ -74,6 +74,7 @@ __all__ = [
     'unit_factor', 'unit_to_str', 'parse_unit',
     'Unit',
     'unit_to_profile', 'unit_to_ucum', 'unit_is_profile_only',
+    'available_profiles',
     'unit_error_code',
     'write_array',
     'Quantity',
@@ -335,6 +336,42 @@ def unit_is_profile_only(unit: ValueUnit) -> bool:
     """
     from ._ffi import get_library
     return bool(get_library().bvn_unit_is_profile_only(unit))
+
+
+def available_profiles() -> tuple:
+    """
+    The unit-profile namespaces this build of libbvnr carries, in registry order.
+
+    Each profile is a COMPILE-TIME switch (``BVNR_WITH_UCUM_PROFILE`` and its six
+    siblings), so the answer is a property of the shared library that happens to
+    be loaded, not of the format. A caller who installed a wheel has no other way
+    to find out, which is why the C side exposes ``bvn_unit_profile_count`` /
+    ``bvn_unit_profile_name`` and why they belong here too.
+
+    The distinction this makes possible is the one the codes exist for: a
+    namespace this build lacks refuses with ``error_unit_profile_unknown`` — "the
+    document is fine, this build cannot read it" — while a bad code inside a
+    namespace it *does* have is ``error_unit_illegal``. Without asking, a
+    consumer cannot tell a missing feature from a malformed document.
+
+        >>> import bovnar
+        >>> bovnar.available_profiles()
+        ('ucum', 'unece', 'qudt', 'qudt-qk', 'udunits', 'om', 'cf')
+        >>> 'cf' in bovnar.available_profiles()
+        True
+
+    Returns an empty tuple for a build with every profile switched off, which is
+    a supported configuration and not an error.
+    """
+    from ._ffi import get_library
+    lib = get_library()
+    out = []
+    for i in range(lib.bvn_unit_profile_count()):
+        name = lib.bvn_unit_profile_name(i)
+        if not name:            # the C contract: NULL one past the end
+            break
+        out.append(name.decode('utf-8'))
+    return tuple(out)
 
 
 def unit_error_code(unit_str: str) -> int:

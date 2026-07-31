@@ -142,8 +142,9 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 > **A unit may also be written in a foreign notation.** A `name:` namespace hands
 > the parameter to a **unit profile**, which translates it into the same
 > `value_unit_t` this document describes — so `<float_dec:64,ucum:mm[Hg]>` and
-> `<float_dec:64,mmHg>` are the same unit to every part of the library. One
-> namespace is defined, `ucum`; everything in this reference applies to the
+> `<float_dec:64,mmHg>` are the same unit to every part of the library. Seven
+> namespaces are defined — `ucum`, `unece`, `qudt`, `qudt-qk`, `udunits`, `om`
+> and `cf`; everything in this reference applies to the
 > result unchanged. **The notation is under implementation** — it is not part of a
 > published specification, and a document must opt in with a `#!bovnar 1.2`
 > directive that this build does not itself advertise. A native unit is

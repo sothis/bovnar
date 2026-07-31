@@ -1734,9 +1734,9 @@ Internet-Draft              The Bovnar Format                  July 2026
    namespace:code - exists in the reference implementation but is *not
    part of any released format version*, is reachable only by declaring
    a version the implementation does not advertise, and its eventual
-   version number is unsettled.  Five namespaces are defined there so
-   far: ucum [UCUM], unece [UNECE20], qudt and qudt-qk [QUDT], and
-   udunits [UDUNITS].
+   version number is unsettled.  Seven namespaces are defined there so
+   far: ucum [UCUM], unece [UNECE20], qudt and qudt-qk [QUDT], udunits
+   [UDUNITS], om [OM2] and cf [CF].
 
 
 
@@ -3071,6 +3071,10 @@ Internet-Draft              The Bovnar Format                  July 2026
 
    [MCO]      NASA, "Mars Climate Orbiter Mishap Investigation Board
               Phase I Report", 10 November 1999.
+
+   [OM2]      Wageningen University and Research, "Ontology of units
+              of Measure (OM) 2", n.d.,
+              <https://github.com/HajoRijgersberg/OM>.
 
    [QUDT]     QUDT.org, "QUDT - Quantities, Units, Dimensions and Data
               Types Ontologies", n.d., <https://qudt.org/>.

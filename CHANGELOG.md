@@ -57,6 +57,55 @@ to accompany every copy (`web/fonts/OFL.txt`), the Impressum gains a
 *Bildnachweis*, `doc/11` gains §18, and `CITATION.cff` gains a `references:`
 block naming all six vocabularies with their licences.
 
+### Fixed — a quoted number literal lost its unit, and was not rescaled
+
+Two defects in the writer, both from the same cause: a **quoted number literal**
+is a `token_is_string` carrying a numeric annotation, and two things that belong
+to every numeric value lived only under `token_is_number`.
+
+**The inline unit was dropped.** With no flags set at all, on an ordinary write:
+
+```
+.a = <uint:64,_16> "7" k~m;    ->    .a = <uint:64,_16> "7";
+```
+
+Seven kilometres rewritten as a bare, dimensionless seven. A value losing its
+unit is the one outcome this format exists to make impossible. The append was the
+last statement of the number branch and nothing else called it; it is now a
+helper (`bvn_ser_append_inline_unit`) that both branches use.
+
+**`BVN_UNIT_REDUCE` reduced the unit without moving the value.** The annotation
+is written by the common path and was reduced regardless, so:
+
+```
+<uint:64,_10,k~m> "7"       ->   <uint:64,_10,m> "7"
+<float:64,_16,k~m> "1p0"    ->   <float:64,_16,m> "1p0"
+```
+
+Seven kilometres written back as seven metres, silently, with a successful
+return — exactly what `bvn_ser_reduced_number`'s own comment says it exists to
+prevent (*"the annotation said one thing and the digits another"*). It is now
+called on the string path too, and the rescale is exact in the value's own base:
+
+```
+<uint:64,_2,k~m>  "111"  ->  "1101101011000" m      (7000 in binary)
+<uint:64,_36,k~m> "z"    ->  "r08" m                (35000 in base 36)
+<float:64,_16,k~m> "1p0" ->  "3e8" m                (1000 in hex)
+```
+
+**Why this shape and not an exotic one:** the spec *requires* the quoted form for
+every non-decimal base (§4.6 — `e` is a hex digit, so a base-16 float must be
+written `"1.8p+2"`). So the quoted literal was not a corner case; it was the only
+way to write a base-16 value at all, and every one of them carrying a prefixed
+unit was exposed — the first defect on any write, the second through
+`pretty-print --canonical`.
+
+Both are now tested across bases 2, 10, 16 and 36 for `uint` and `float`, with
+the inline-unit case asserted separately (unit on the value, no annotation — an
+annotated unit takes the other path and never showed the bug), and with a plain
+`utf8` string asserted untouched so the new call sites cannot start rewriting
+text. Each test was mutation-checked against its own fix.
+
 ### Fixed — `W/(m²·ΔK)` and `W/(m²·K)` were not the same unit, though four documents said so
 
 The temperature-interval kind is scoped to **a lone component at exponent 1** —

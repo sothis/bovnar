@@ -1549,6 +1549,148 @@ static int reduce_emit(char *out, size_t cap, value_unit_t u,
 	return ok ? 0 : (int)err;
 }
 
+/*
+ * The same, for a QUOTED number literal.
+ *
+ * A quoted numeric is a `token_is_string` carrying a numeric annotation, and the
+ * rescale used to live only under `token_is_number`. The ANNOTATION is written
+ * by the common path and was reduced regardless, so the unit lost its prefix
+ * while the digits stayed put:
+ *
+ *     <uint:64,_10,k~m> "7"     ->  <uint:64,_10,m> "7"
+ *     <float:64,_16,k~m> "1p0"  ->  <float:64,_16,m> "1p0"
+ *
+ * Seven kilometres written back as seven metres, silently, with a successful
+ * return. It hit the NON-DECIMAL bases hardest because they have no alternative
+ * -- the spec requires the quoted form for a base-16 float -- so every such
+ * value with a prefixed unit was exposed to `pretty-print --canonical`.
+ *
+ * Driven through the same writer the bare-number case uses, with only the token
+ * type and the base changed, so a regression in either shape shows up here.
+ */
+static int reduce_emit_quoted(char *out, size_t cap, value_unit_t u,
+			      value_type_spec_t vt, const char *lit)
+{
+	memset(out, 0, cap);
+	bvnr_sink_t sink;
+	bvnr_sink_to_mem(&sink, out, cap);
+	bvnr_writer_t *w = bvnr_writer_create();
+	if (!w) return -1;
+	bvnr_write_flags_t wf;
+	memset(&wf, 0, sizeof wf);
+	wf.unit_flags = BVN_UNIT_REDUCE;
+	if (!bvnr_open_write_sink(w, &sink, false, &wf)) {
+		bvnr_writer_destroy(w); return -1;
+	}
+	bvnr_data_t d;
+	memset(&d, 0, sizeof d);
+	bvnr_write_event(w, ev_stream_start, &d);
+	d.type = token_is_identifier; d.data = "d"; d.length = 1;
+	bvnr_write_event(w, ev_assignment_start, &d);
+	memset(&d, 0, sizeof d);
+	d.type       = token_is_string;      /* the quoted form */
+	d.value_type = vt;
+	d.value_unit = u;
+	d.data       = lit;
+	d.length     = (uint32_t)strlen(lit);
+	bool ok = bvnr_write_event(w, ev_data, &d);
+	error_code_t err = bvnr_writer_get_error(w);
+	memset(&d, 0, sizeof d);
+	bvnr_write_event(w, ev_stream_end, &d);
+	bvnr_writer_destroy(w);
+	return ok ? 0 : (int)err;
+}
+
+static void test_unit_reduce_rescales_a_quoted_literal(void)
+{
+	char out[512];
+	value_unit_t km = BVN_UNIT_SI(bu_meter, si_kilo);
+	static const struct { uint8_t base; value_type_family_t fam;
+			      const char *lit; const char *want; const char *what; }
+	cases[] = {
+		{ 10, vt_uint,  "7",   ".d=\"7000\" m",          "base 10, uint"  },
+		{ 16, vt_uint,  "7",   ".d=\"1b58\" m",          "base 16, uint"  },
+		{  2, vt_uint,  "111", ".d=\"1101101011000\" m", "base 2, uint"   },
+		{ 36, vt_uint,  "z",   ".d=\"r08\" m",           "base 36, uint"  },
+		{ 16, vt_float, "1p0", ".d=\"3e8\" m",           "base 16, float" },
+		{ 10, vt_float, "1.0", ".d=\"1000\" m",          "base 10, float" },
+	};
+	for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+		value_type_spec_t vt;
+		memset(&vt, 0, sizeof vt);
+		vt.family = cases[i].fam;
+		vt.width  = 64;
+		vt.base   = cases[i].base;
+		int rc = reduce_emit_quoted(out, sizeof out, km, vt, cases[i].lit);
+		ASSERT_EQ_INT(rc, 0, cases[i].what);
+		ASSERT_TRUE(strstr(out, cases[i].want) != NULL, cases[i].what);
+		if (!strstr(out, cases[i].want))
+			fprintf(stderr, "  %s: wanted %s in %s\n",
+				cases[i].what, cases[i].want, out);
+	}
+
+	/*
+	 * THE INLINE UNIT SURVIVES, which is a separate failure from the rescale
+	 * above and a worse one. The append lived in the token_is_number branch and
+	 * nowhere else, so a quoted literal carrying a value-side unit lost it
+	 * outright -- with NO flags set at all, on an ordinary write:
+	 *
+	 *     <uint:64,_16> "7" k~m   ->   <uint:64,_16> "7"
+	 *
+	 * Seven kilometres rewritten as a bare dimensionless seven. A value losing
+	 * its unit is the one outcome this format exists to make impossible, and the
+	 * quoted form is not exotic -- the spec requires it for every non-decimal
+	 * base, so it was the ONLY way to write a base-16 value at all.
+	 *
+	 * Asserted with the unit on the VALUE (no annotation carrying it), because
+	 * an annotated unit takes the other path and never showed the bug.
+	 */
+	{
+		char nf[512];
+		memset(nf, 0, sizeof nf);
+		bvnr_sink_t sink;
+		bvnr_sink_to_mem(&sink, nf, sizeof nf);
+		bvnr_writer_t *w = bvnr_writer_create();
+		ASSERT_TRUE(w != NULL, "writer for the inline-unit case");
+		bvnr_write_flags_t wf;
+		memset(&wf, 0, sizeof wf);      /* no unit_flags: plain write */
+		ASSERT_TRUE(bvnr_open_write_sink(w, &sink, false, &wf), "open");
+		bvnr_data_t d;
+		memset(&d, 0, sizeof d);
+		bvnr_write_event(w, ev_stream_start, &d);
+		d.type = token_is_identifier; d.data = "d"; d.length = 1;
+		bvnr_write_event(w, ev_assignment_start, &d);
+		memset(&d, 0, sizeof d);
+		d.type              = token_is_string;
+		d.value_type.family = vt_uint;
+		d.value_type.width  = 64;
+		d.value_type.base   = 16;
+		d.value_unit        = km;
+		d.data              = "7";
+		d.length            = 1;
+		ASSERT_TRUE(bvnr_write_event(w, ev_data, &d),
+			    "a quoted literal with an inline unit writes");
+		memset(&d, 0, sizeof d);
+		bvnr_write_event(w, ev_stream_end, &d);
+		bvnr_writer_destroy(w);
+		ASSERT_TRUE(strstr(nf, "k~m") != NULL,
+			    "...and KEEPS its inline unit — losing it makes 7 km a bare 7");
+		if (!strstr(nf, "k~m"))
+			fprintf(stderr, "  inline unit dropped, wrote: %s\n", nf);
+	}
+
+	/* A genuine string carries no unit and must pass through untouched --
+	 * bvn_ser_reduced_number answers 0 for a non-numeric type, and this is what
+	 * proves the new call site did not start rewriting text. */
+	value_type_spec_t utf8;
+	memset(&utf8, 0, sizeof utf8);
+	utf8.family = vt_utf8;
+	int rc = reduce_emit_quoted(out, sizeof out, BVN_UNIT_NONE, utf8, "hello");
+	ASSERT_EQ_INT(rc, 0, "a utf8 string still writes");
+	ASSERT_TRUE(strstr(out, "\"hello\"") != NULL,
+		    "...and its text is untouched by the reduce path");
+}
+
 static void test_unit_reduce_rescales_the_value(void)
 {
 	char out[512];
@@ -2227,6 +2369,7 @@ static void test_writer_accepts_only_readable_streams(void)
 int main(void)
 {
 	test_unit_reduce_rescales_the_value();
+	test_unit_reduce_rescales_a_quoted_literal();
 	test_unit_reduce_annotation_matches_the_value();
 	test_write_type_annotation_names_the_real_failure();
 	test_unwritable_unit_reports_a_unit_error();

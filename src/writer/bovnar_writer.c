@@ -1071,6 +1071,46 @@ static void bvn_ser_mark_value_done(bvnr_serializer_t* s)
  * the digit growth is bounded by the prefix exponent and there is no unbounded
  * work here.
  */
+/*
+ * An inline unit ("<float:64> 9.81 m/s") lives on the VALUE, not the annotation,
+ * so it was not emitted as a type parameter and has to be appended after the
+ * literal. A unit given in the annotation set emitted_unit (skip, else it would
+ * double); datetime carries no unit, so this is skipped for it.
+ *
+ * A HELPER rather than inline code, because it was inline in the token_is_number
+ * branch and nowhere else -- so a QUOTED literal carrying an inline unit lost it
+ * outright:
+ *
+ *     .a = <uint:64,_16> "7" k~m;   ->   .a = <uint:64,_16> "7";
+ *
+ * Seven kilometres rewritten as a bare, dimensionless seven, on an ordinary
+ * pretty-print with no flags at all. A value losing its unit is the one outcome
+ * this format exists to make impossible, and a quoted literal is not an exotic
+ * shape: the spec REQUIRES it for every non-decimal base.
+ */
+static bool bvn_ser_append_inline_unit(bvnr_serializer_t *s,
+				       const bvnr_data_t *d)
+{
+	if (s->emitted_unit)                              return true;
+	if (d->value_unit.num_components == 0u)           return true;
+	if (BVN_UNIT_IS_NO_UNIT(d->value_unit))           return true;
+	char ubuf[BVNR_UNIT_STRING_MAX];
+	/* Honour the writer's unit_flags (reduce / ASCII-exponent) so a value-side
+	 * inline unit canonicalises identically to one given in the annotation,
+	 * which uses bvn_unit_to_string_ex too. A unit that overflows ubuf is a
+	 * hard error, not a silent drop, or the value would lose its unit (and thus
+	 * its meaning) on round-trip. */
+	int32_t un = bvn_unit_to_string_ex(d->value_unit, ubuf, sizeof ubuf,
+					   s->unit_flags);
+	if (un <= 0) {
+		/* Say WHICH failure. Without this the refusal this comment describes
+		 * was reported as whatever ser_error happened to hold. */
+		s->ser_error = error_unit_illegal;
+		return false;
+	}
+	if (!bvn_ser_push_byte(s, ' ')) return false;
+	return bvn_ser_push(s, ubuf, (uint32_t)un);
+}
 static int bvn_ser_reduced_number(bvnr_serializer_t *s, const bvnr_data_t *d,
 				  char **text, int32_t *len)
 {
@@ -1603,40 +1643,52 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 					return false;
 				}
 			}
-			/* An inline unit ("<float:64> 9.81 m/s") lives on the value, not
-			 * the annotation, so it was NOT emitted as a type parameter above.
-			 * Append it after the number so the unit — and thus the decoded
-			 * value — survives canonicalisation. A unit given in the annotation
-			 * set emitted_unit (skip, else it would double); datetime carries no
-			 * unit (value_unit is no_unit, so this is skipped). */
-			if (!s->emitted_unit &&
-			    d->value_unit.num_components > 0u &&
-			    !BVN_UNIT_IS_NO_UNIT(d->value_unit)) {
-				char ubuf[BVNR_UNIT_STRING_MAX];
-				/* Honour the writer's unit_flags (reduce / ASCII-exponent)
-				 * so a value-side inline unit canonicalises identically to
-				 * one given in the annotation, which uses
-				 * bvn_unit_to_string_ex too. A unit that overflows ubuf is a
-				 * hard error, not a silent drop, or the value would lose its
-				 * unit (and thus its meaning) on round-trip. */
-				int32_t un = bvn_unit_to_string_ex(d->value_unit,
-					ubuf, sizeof ubuf, s->unit_flags);
-				if (un <= 0) {
-					/* Say WHICH failure. Without this the refusal this comment
-					 * describes was reported as whatever ser_error happened to
-					 * hold. */
-					s->ser_error = error_unit_illegal;
-					return false;
-				}
-				if (!bvn_ser_push_byte(s, ' ')) return false;
-				if (!bvn_ser_push(s, ubuf, (uint32_t)un))
-					return false;
-			}
+			if (!bvn_ser_append_inline_unit(s, d)) return false;
 		} else if (d->type == token_is_string ||
 				   d->type == token_is_array_string) {
-			if (!bvn_ser_serialize_string(s,
-					(const uint8_t*)d->data, d->length))
+			/*
+			 * A QUOTED NUMBER LITERAL is a string token carrying a numeric
+			 * annotation, and it has to be rescaled by BVN_UNIT_REDUCE exactly
+			 * like a bare one. The rescale used to live only under
+			 * token_is_number, while the ANNOTATION is written by the common
+			 * code above and reduced there regardless — so the unit lost its
+			 * prefix and the digits stayed put:
+			 *
+			 *     <uint:64,_10,k~m> "7"      ->  <uint:64,_10,m> "7"
+			 *     <float:64,_16,k~m> "1p0"   ->  <float:64,_16,m> "1p0"
+			 *
+			 * Seven kilometres written back as seven metres, silently, exit 0.
+			 * That is the unit confusion this format exists to prevent, and it
+			 * was reachable from `pretty-print --canonical` on any prefixed
+			 * unit. It bites the NON-DECIMAL bases hardest because they have no
+			 * choice: §4.6 requires the quoted form for a base-16 float, so
+			 * every such value with a prefix was exposed.
+			 *
+			 * bvn_ser_reduced_number answers 0 for anything that is not a
+			 * numeric value with a scale to apply, so a genuine utf8 string --
+			 * which cannot carry a unit at all (doc/05 §2.3) -- passes straight
+			 * through here.
+			 */
+			char   *rtext = NULL;
+			int32_t rlen  = 0;
+			int     rr    = bvn_ser_reduced_number(s, d, &rtext, &rlen);
+			if (rr < 0)
 				return false;
+			if (rr > 0) {
+				bool okp = bvn_ser_serialize_string(
+					s, (const uint8_t*)rtext, (uint32_t)rlen);
+				free(s->ser_value_text);
+				s->ser_value_text = rtext;
+				s->ser_value_len  = (uint32_t)rlen;
+				s->ser_value_unit = s->ser_reduced_unit;
+				if (!okp) return false;
+			} else if (!bvn_ser_serialize_string(s,
+					(const uint8_t*)d->data, d->length)) {
+				return false;
+			}
+			/* ...and the inline unit, for the same reason the number branch
+			 * appends it: it is not in the annotation, so nothing else will. */
+			if (!bvn_ser_append_inline_unit(s, d)) return false;
 		} else if (d->type == token_is_bool) {
 			const char* bs = (const char*)d->data;
 			uint32_t    bn = d->length;

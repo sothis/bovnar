@@ -123,6 +123,27 @@ value that cannot be applied to it is `error_unit_mismatch` rather than a value 
 quietly. Silence would defeat the point of naming it. A bare number fails a rule too — `.speed is
 m/s` is not satisfied by a value with no unit.
 
+**A rule that matches nothing is satisfied.** The assertion is about values the rule *reaches*, so
+a path no value sits at makes no claim and the document passes:
+
+```
+--require-field .inlet.speed=m/s   on a document with .inlet.speed      asserted
+--require-field .inlet.sped=m/s    on the same document                 ACCEPTED, checks nothing
+--require-field .nope.*=m          on a document with no .nope          ACCEPTED, checks nothing
+```
+
+Read that line beside [§2.7](#27-limits-and-lifetime), which is the case it is most easily confused
+with and which behaves the *opposite* way: a value the reader **cannot locate** — one nested past
+the recorded path depth or length — is `error_unit_mismatch`, because "I could not check it" is not
+"it holds". The distinction is between a rule that *found nothing to check* and one that *could not
+check what it found*. Only the second is an error.
+
+The practical consequence is worth stating plainly, because it runs against what the flag name
+suggests: **`--require-field` does not require the field to exist.** A typo in the path — or a
+rename in the document the policy was not updated for — turns that rule off silently, and the
+document still validates. Nothing detects this for you; if a policy is load-bearing, assert that
+the paths it names are the ones the document actually uses.
+
 ### 2.2 Conversion targets
 
 `targets` applies to the whole document. Each numeric value is converted to the **first** target

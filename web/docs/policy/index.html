@@ -22,7 +22,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <meta property="article:published_time" content="2026-07-27">
-<meta property="article:modified_time" content="2026-07-30">
+<meta property="article:modified_time" content="2026-07-31">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar Unit Policy Reference">
@@ -32,7 +32,7 @@
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
 <link rel="alternate" type="text/markdown" href="/doc/06_bovnar_unit_policy.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Unit Policy Reference", "description": "The Bovnar unit policy: what it validates, what it converts, the order it resolves in, and the errors it raises, on both the reader and the writer.", "url": "https://www.bovnar.io/docs/policy/", "mainEntityOfPage": "https://www.bovnar.io/docs/policy/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-07-27", "dateModified": "2026-07-30", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Unit Policy Reference", "item": "https://www.bovnar.io/docs/policy/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Unit Policy Reference", "description": "The Bovnar unit policy: what it validates, what it converts, the order it resolves in, and the errors it raises, on both the reader and the writer.", "url": "https://www.bovnar.io/docs/policy/", "mainEntityOfPage": "https://www.bovnar.io/docs/policy/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-07-27", "dateModified": "2026-07-31", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Unit Policy Reference", "item": "https://www.bovnar.io/docs/policy/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
@@ -158,6 +158,23 @@ exactly as written — "this field is a length, in whatever length unit it chose
 value that cannot be applied to it is <code>error_unit_mismatch</code> rather than a value passed through
 quietly. Silence would defeat the point of naming it. A bare number fails a rule too — <code>.speed is
 m/s</code> is not satisfied by a value with no unit.</p>
+<p><strong>A rule that matches nothing is satisfied.</strong> The assertion is about values the rule <em>reaches</em>, so
+a path no value sits at makes no claim and the document passes:</p>
+<div class="codehilite"><pre><span></span><code>--require-field .inlet.speed=m/s   on a document with .inlet.speed      asserted
+--require-field .inlet.sped=m/s    on the same document                 ACCEPTED, checks nothing
+--require-field .nope.*=m          on a document with no .nope          ACCEPTED, checks nothing
+</code></pre></div>
+
+<p>Read that line beside <a href="#27-limits-and-lifetime">§2.7</a>, which is the case it is most easily confused
+with and which behaves the <em>opposite</em> way: a value the reader <strong>cannot locate</strong> — one nested past
+the recorded path depth or length — is <code>error_unit_mismatch</code>, because "I could not check it" is not
+"it holds". The distinction is between a rule that <em>found nothing to check</em> and one that <em>could not
+check what it found</em>. Only the second is an error.</p>
+<p>The practical consequence is worth stating plainly, because it runs against what the flag name
+suggests: <strong><code>--require-field</code> does not require the field to exist.</strong> A typo in the path — or a
+rename in the document the policy was not updated for — turns that rule off silently, and the
+document still validates. Nothing detects this for you; if a policy is load-bearing, assert that
+the paths it names are the ones the document actually uses.</p>
 <h3 id="22-conversion-targets">2.2 Conversion targets</h3>
 <p><code>targets</code> applies to the whole document. Each numeric value is converted to the <strong>first</strong> target
 it can validly convert to, so order is significant: a list of <code>{"m", "k~m"}</code> never selects

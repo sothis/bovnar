@@ -992,7 +992,19 @@ typedef enum bvnr_unit_rule_mode_e {
  * with error_unit_mismatch rather than skipped -- "I could not check it" is not
  * "it holds". `targets`, `normalise`, `require_unit` and `require_dimension_of`
  * ask about the value rather than about where it sits and are unaffected, so a
- * document of any depth reads normally under those. See doc/06 section 2.7. */
+ * document of any depth reads normally under those. See doc/06 section 2.7.
+ *
+ * A rule that MATCHES NOTHING is satisfied, and this is the opposite of the case
+ * above -- read the two together. The assertion is about values the rule reaches,
+ * so a path no value sits at makes no claim and the document passes. The
+ * distinction is between a rule that found nothing to check (fine) and one that
+ * could not check what it found (an error).
+ *
+ * The consequence runs against what the name suggests: a rule does NOT require
+ * its field to exist. A typo in `path`, or a rename in the document the policy
+ * was not updated for, turns that rule off silently and the document still
+ * validates. Nothing detects it here; a caller whose policy is load-bearing
+ * should assert that the paths it names are the ones the document uses. */
 typedef struct bvnr_unit_rule_s {
 	const char*		path;
 	const char*		unit;

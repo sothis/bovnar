@@ -57,6 +57,38 @@ to accompany every copy (`web/fonts/OFL.txt`), the Impressum gains a
 *Bildnachweis*, `doc/11` gains §18, and `CITATION.cff` gains a `references:`
 block naming all six vocabularies with their licences.
 
+### Fixed — a unit rule that matches nothing was silently satisfied, and undocumented
+
+`bvnr_rule_require` / `--require-field` **does not require the field to exist**. A
+rule whose path no value sits at makes no claim, and the document passes:
+
+```
+--require-field .inlet.speed=m/s   on a document with .inlet.speed   asserted
+--require-field .inlet.sped=m/s    on the same document              ACCEPTED, checks nothing
+--require-field .nope.*=m          on a document with no .nope       ACCEPTED, checks nothing
+```
+
+So a typo in a path — or a rename the policy was not updated for — turns that rule
+off and nothing says so. The behaviour itself is defensible and is left alone;
+what was wrong is that it was **unwritten**, in a contract that goes to unusual
+lengths over the case next door. The header already spent two paragraphs
+explaining that a value the reader cannot *locate* is `error_unit_mismatch`
+because *"I could not check it" is not "it holds"* — and never said what happens
+when the field is simply absent, which is the case a user actually hits, from a
+typo, and which behaves the opposite way.
+
+Both are now stated together in `bovnar.h` and doc/06 §2.1, with the distinction
+named: a rule that *found nothing to check* is fine; a rule that *could not check
+what it found* is an error. The consequence is spelled out, because it runs
+against what the name suggests.
+
+Pinned by a test that asserts the pair — a hit both ways round, then four ways of
+naming nothing (a typo'd leaf, an absent top-level key, a path deeper than any
+value, an absent subtree), each with a unit the document's one value would
+*fail*, so a pass can only mean the rule never fired rather than fired and agreed.
+This is a silent behaviour: nothing breaks when a rule stops applying, so without
+this nothing would report a change in either direction.
+
 ### Fixed — a quoted number literal lost its unit, and was not rescaled
 
 Two defects in the writer, both from the same cause: a **quoted number literal**

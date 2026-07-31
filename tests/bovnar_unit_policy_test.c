@@ -1641,6 +1641,71 @@ static void test_writer_and_reader_agree(void)
 	ASSERT_EQ_INT(c.n, 2, "roundtrip: the reader accepts what the writer emitted");
 }
 
+/*
+ * A rule that MATCHES NOTHING is satisfied — and the neighbouring case, a value
+ * the reader cannot LOCATE, is not. The two behave oppositely and are easy to
+ * confuse, so they are asserted together.
+ *
+ * The distinction: a rule that found nothing to check is fine; a rule that could
+ * not check what it found is an error. What that means in practice runs against
+ * what the name suggests — `--require-field` / bvnr_rule_require does NOT
+ * require the field to exist. A typo in the path, or a rename the policy was not
+ * updated for, turns the rule off silently and the document still validates.
+ *
+ * Pinned here because it is a SILENT behaviour: nothing fails when a rule stops
+ * applying, so if it ever changed in either direction no other test would say
+ * so. doc/06 §2.1 states it, and this is what keeps that statement true.
+ */
+static void test_a_rule_matching_nothing_is_satisfied(void)
+{
+	static const char doc[] =
+		"#!bovnar 1.2\n.inlet = {\n  .speed = <float:64,m/s> 9.81;\n};\n";
+	pol_ctx_t c;
+
+	/* The path that exists: asserted for real, both ways round. */
+	{
+		static const bvnr_unit_rule_t hit[] = {
+			{ ".inlet.speed", "m/s", 0, bvnr_rule_require } };
+		bvnr_unit_policy_t p = {0};
+		p.rules = hit; p.num_rules = 1;
+		memset(&c, 0, sizeof c);
+		run_policy(doc, &p, &c, true, error_none);
+	}
+	{
+		static const bvnr_unit_rule_t wrong[] = {
+			{ ".inlet.speed", "s", 0, bvnr_rule_require } };
+		bvnr_unit_policy_t p = {0};
+		p.rules = wrong; p.num_rules = 1;
+		memset(&c, 0, sizeof c);
+		run_policy(doc, &p, &c, false, error_unit_mismatch);
+	}
+
+	/* ...and every way of naming a path no value sits at: a typo, an absent
+	 * top-level key, a path deeper than any value, and an absent subtree. Each
+	 * one silently checks nothing. */
+	static const char *nowhere[] = {
+		".inlet.sped",            /* a typo in the leaf */
+		".nope",                  /* an absent top-level key */
+		".inlet.speed.deeper",    /* deeper than any value goes */
+		".nope.*",                /* an absent subtree */
+	};
+	for (size_t i = 0; i < sizeof nowhere / sizeof nowhere[0]; i++) {
+		bvnr_unit_rule_t miss[1];
+		miss[0].path = nowhere[i];
+		miss[0].unit = "m/s";
+		miss[0].base = 0;
+		miss[0].mode = bvnr_rule_require;
+		bvnr_unit_policy_t p = {0};
+		p.rules = miss; p.num_rules = 1;
+		memset(&c, 0, sizeof c);
+		/* Deliberately a unit the document's one value would FAIL, so a pass
+		 * here can only mean the rule never fired -- not that it fired and
+		 * happened to agree. */
+		miss[0].unit = "s";
+		run_policy(doc, &p, &c, true, error_none);
+	}
+}
+
 /* The writer takes rules too — in require mode, since a convert rule would
  * rewrite the value being written and that door belongs to BVN_UNIT_REDUCE. */
 static void test_writer_rules(void)
@@ -2358,6 +2423,7 @@ int main(void)
 	test_writer_refuses_the_conversion_fields();
 	test_writer_array_under_one_annotation();
 	test_writer_and_reader_agree();
+	test_a_rule_matching_nothing_is_satisfied();
 	test_writer_rules();
 	test_writer_rules_are_path_scoped();
 	test_writer_rules_across_array_of_structs();

@@ -1142,6 +1142,42 @@ class TestNewUnitSerialization:
     def test_roundtrip_gi(self):          self._roundtrip("gi")
     def test_roundtrip_gi_uk(self):       self._roundtrip("gi_uk")
 
+    def test_a_long_unit_formats_at_all(self):
+        """The binding must not be narrower than the library it binds.
+
+        Every unit formatter here allocated 256 bytes and passed 256 as the
+        capacity -- two separate literals, neither a bound on anything. The C
+        side allows BVNR_UNIT_STRING_MAX (1088), and a perfectly legal
+        32-component unit reaches 597 bytes once the exponents render as
+        superscripts. C formatted it; Python raised "output buffer overflow" on
+        a unit its own library had just produced, and no caller could work
+        around it.
+
+        Built from long symbols at three-digit exponents rather than asserted
+        against a fixed string, so it keeps testing the bound rather than a
+        spelling.
+        """
+        from bovnar.structs import UNIT_STRING_MAX
+        sym = "·".join(["da~ton_ref^-100", "da~cal_IT^100",
+                        "da~Btu_th^-100", "da~fath^100"] * 8)
+        vu = bovnar.parse_unit(sym)
+        assert vu.num_components == 32
+
+        text = bovnar.unit_to_str(vu)
+        assert len(text.encode()) > 256, \
+            "the case is only interesting past the old 256-byte buffer"
+        assert len(text.encode()) <= UNIT_STRING_MAX
+
+        # ...and it is the same unit coming back.
+        again = bovnar.parse_unit(text)
+        assert bovnar.unit_to_str(again) == text
+
+        # The other formatters share the buffer and the bug.
+        from bovnar.units import unit_to_str_ex, UnitFlags
+        ascii_form = unit_to_str_ex(vu, UnitFlags.ASCII_EXP)
+        assert len(ascii_form.encode()) > 256
+        assert bovnar.unit_to_str(bovnar.parse_unit(ascii_form)) == text
+
 
 @needs_lib
 class TestNewUnitCompatibility:

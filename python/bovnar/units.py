@@ -26,7 +26,7 @@ from enum import IntFlag
 
 from ._ffi import get_library
 from .enums import BaseUnit, SIPrefix, IECPrefix, Exponent
-from .structs import ValueUnit, ValueUnitPrefix, make_unit_compound
+from .structs import ValueUnit, ValueUnitPrefix, make_unit_compound, UNIT_STRING_MAX
 from .exceptions import BovnarArgumentError
 
 _SI_DIM_COUNT = 7
@@ -321,8 +321,8 @@ def unit_to_str_ex(unit: ValueUnit,
     serialises normally.
     """
     lib = get_library()
-    buf = ctypes.create_string_buffer(256)
-    n   = lib.bvn_unit_to_string_ex(unit, buf, 256, int(flags))
+    buf = ctypes.create_string_buffer(UNIT_STRING_MAX)
+    n   = lib.bvn_unit_to_string_ex(unit, buf, UNIT_STRING_MAX, int(flags))
     if n < 0:
         # -1 covers four distinct causes; say which, rather than blaming the
         # buffer for a unit that unit_valid() itself calls valid. (Adding the

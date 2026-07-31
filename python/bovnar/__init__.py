@@ -32,6 +32,7 @@ from .structs import (
     BvnrReadFlags, BvnrWriteFlags,
     make_type_spec, make_unit_dimensionless, make_unit_none,
     make_unit_si, make_unit_iec, make_unit_compound,
+    UNIT_STRING_MAX,
 )
 from .exceptions import (
     BovnarError, BovnarLibraryNotFound,
@@ -265,8 +266,8 @@ def unit_to_str(unit: ValueUnit) -> str:
     import ctypes as _ct
     from ._ffi import get_library
     lib = get_library()
-    buf = _ct.create_string_buffer(256)
-    n   = lib.bvn_unit_to_string(unit, buf, 256)
+    buf = _ct.create_string_buffer(UNIT_STRING_MAX)
+    n   = lib.bvn_unit_to_string(unit, buf, UNIT_STRING_MAX)
     if n < 0:
         raise BovnarArgumentError("unit_to_str: output buffer overflow")
     return buf.raw[:n].decode('utf-8')
@@ -295,8 +296,9 @@ def unit_to_profile(namespace: str, unit: ValueUnit) -> str:
     import ctypes as _ct
     from ._ffi import get_library
     lib = get_library()
-    buf = _ct.create_string_buffer(256)
-    n   = lib.bvn_unit_to_profile(namespace.encode('utf-8'), unit, buf, 256)
+    buf = _ct.create_string_buffer(UNIT_STRING_MAX)
+    n   = lib.bvn_unit_to_profile(namespace.encode('utf-8'), unit, buf,
+                                  UNIT_STRING_MAX)
     if n < 0:
         raise BovnarArgumentError(
             "unit_to_profile: this unit has no %s code" % namespace)
@@ -313,8 +315,8 @@ def unit_to_ucum(unit: ValueUnit) -> str:
     import ctypes as _ct
     from ._ffi import get_library
     lib = get_library()
-    buf = _ct.create_string_buffer(256)
-    n   = lib.bvn_unit_to_ucum(unit, buf, 256)
+    buf = _ct.create_string_buffer(UNIT_STRING_MAX)
+    n   = lib.bvn_unit_to_ucum(unit, buf, UNIT_STRING_MAX)
     if n < 0:
         raise BovnarArgumentError("unit_to_ucum: this unit has no UCUM code")
     return buf.raw[:n].decode('utf-8')

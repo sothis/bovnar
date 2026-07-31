@@ -45,6 +45,22 @@ _OPAQUE_WORDS = OPAQUE_BYTES // 8
 # contains a unit. tests/test_abi.py compares the two sizes on every run.
 MAX_UNIT_COMPONENTS = 32
 
+# Must match BVNR_UNIT_STRING_MAX in include/bovnar.h: the longest unit string
+# the library will produce, and therefore the smallest buffer that can always
+# receive one.
+#
+# Every unit formatter here used to allocate 256 bytes, which is not a bound on
+# anything -- the C side allows 1088, and a legal 32-component unit reaches 597:
+#
+#     "·".join(["da~ton_ref^-100", "da~cal_IT^100",
+#               "da~Btu_th^-100",  "da~fath^100"] * 8)
+#
+# C formats that; Python raised "output buffer overflow" on a unit its own
+# library had just written. A binding narrower than the library it binds is a
+# defect a caller cannot work around, so the size comes from the header's
+# constant rather than from a round number.
+UNIT_STRING_MAX = 1088
+
 ON_ERROR_FUNC = ctypes.CFUNCTYPE(
     None,
     ctypes.c_void_p,

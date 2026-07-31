@@ -26,7 +26,7 @@ from typing import Iterator
 
 from ._ffi import get_library
 from .enums import ErrorCode, ValueTypeFamily
-from .structs import ValueTypeSpec, ValueUnit, BvnDomEntry
+from .structs import ValueTypeSpec, ValueUnit, BvnDomEntry, UNIT_STRING_MAX
 from .exceptions import BovnarArgumentError, BovnarParseError
 
 class DomType(IntEnum):
@@ -67,8 +67,8 @@ class DomNode:
     @property
     def unit_str(self) -> str:
         lib = get_library()
-        buf = ctypes.create_string_buffer(256)
-        n   = lib.bvn_dom_get_unit_string(self._ptr, buf, 256)
+        buf = ctypes.create_string_buffer(UNIT_STRING_MAX)
+        n   = lib.bvn_dom_get_unit_string(self._ptr, buf, UNIT_STRING_MAX)
         if n < 0:
             return ''
         return buf.raw[:n].decode('utf-8')

@@ -36,6 +36,7 @@ from .structs import (
     build_unit_policy,
     make_type_spec, make_unit_dimensionless, make_unit_none,
     make_unit_si, make_unit_iec,
+    UNIT_STRING_MAX,
 )
 
 DEFAULT_MEM_CAP = 4 * 1024 * 1024
@@ -411,9 +412,10 @@ class Writer:
         # that as a unit produces an illegal "<datetime:…,no_unit>" annotation.
         if vu.num_components > 0 and fam != int(ValueTypeFamily.DATETIME):
             lib = self._lib
-            ubuf = ctypes.create_string_buffer(256)
+            ubuf = ctypes.create_string_buffer(UNIT_STRING_MAX)
             unit_flags = lib.bvnr_writer_unit_flags(self._ptr)
-            ulen = lib.bvn_unit_to_string_ex(vu, ubuf, 256, unit_flags)
+            ulen = lib.bvn_unit_to_string_ex(vu, ubuf, UNIT_STRING_MAX,
+                                             unit_flags)
             if ulen < 0:
                 # Skipping the parameter on failure writes the value with its
                 # unit silently GONE -- the annotation says <float:64> for a

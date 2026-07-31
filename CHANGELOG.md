@@ -95,6 +95,31 @@ half neither did: only a **policy-chosen** target takes this path, since a targe
 named by the `want_unit` hook keeps its strict all-or-nothing contract whatever
 `on_inexact` says.
 
+### Fixed — the Python bindings could not format a unit the library had just written
+
+Every unit formatter in the bindings allocated **256 bytes** and passed **256**
+as the capacity — two separate literals, neither of them a bound on anything. The
+C side allows `BVNR_UNIT_STRING_MAX` (1088), and a perfectly legal 32-component
+unit reaches 597 bytes once its exponents render as superscripts:
+
+```python
+"·".join(["da~ton_ref^-100", "da~cal_IT^100",
+          "da~Btu_th^-100",  "da~fath^100"] * 8)
+```
+
+C formats that. Python raised `BovnarArgumentError: unit_to_str: output buffer
+overflow` — on a unit its own library had produced, with no way for a caller to
+work around it. Six call sites were affected: `unit_to_str`, `unit_to_profile`,
+`unit_to_ucum`, `units.unit_to_str_ex`, `dom.unit_str` and the writer's
+annotation path.
+
+`UNIT_STRING_MAX` now lives in `bovnar.structs` beside `MAX_UNIT_COMPONENTS`,
+carrying the same "must match include/bovnar.h" note, and all six sites take both
+the buffer and the capacity from it. Pinned by a test that builds the unit from
+long symbols at three-digit exponents rather than asserting a fixed string, so it
+keeps testing the bound rather than a spelling; mutation-checked by putting the
+constant back to 256.
+
 ### Fixed — doc/11's UCUM refusal tables listed ten codes that now map
 
 §6.4 tabulates what a UCUM code does and §6.3 explains the near-misses in prose.

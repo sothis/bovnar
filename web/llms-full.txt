@@ -13499,7 +13499,7 @@ from the top-level `bovnar` namespace and from `bovnar.units`.
 from bovnar import (
     unit_valid, unit_prefix_factor, unit_prefix_exponent,
     prefix_unit_valid,
-    unit_to_si_factor, units_compatible,
+    unit_to_si_factor, units_compatible, units_equal,
     unit_convert_factor, unit_dimension_vector,
     unit_reduce, unit_to_str_ex,
     exponent_to_int, int_to_exponent,
@@ -13742,10 +13742,10 @@ A policy carrying `targets`, `normalise_si`, `base` or `leave_inexact` raises
 rewriting is `UnitFlags.REDUCE`'s job, and two rewriting modes with different
 rules about exactness is how a document ends up meaning two things.
 
-Two module-level helpers back the same decisions outside the reader:
+Module-level helpers back the same decisions outside the reader:
 
 ```python
-from bovnar import (units_compatible, units_convertible,
+from bovnar import (units_equal, units_compatible, units_convertible,
                     unit_si_normal_form, parse_unit)
 
 # units_compatible is the wrong screen for a conversion target: a currency
@@ -13758,6 +13758,32 @@ unit_si_normal_form(parse_unit("g"))    # → k~g  (the SI base unit for mass)
 unit_si_normal_form(parse_unit("%"))    # → None (dimensionless)
 unit_si_normal_form(parse_unit("lm"))   # → None (carries the steradian's kind)
 ```
+
+**Three questions, in decreasing strictness.** `units_equal` asks whether the two
+are the *same* unit, `units_compatible` whether their dimensions and quantity
+kinds line up, `units_convertible` whether a conversion can actually be
+performed. Only the last is the right screen for a conversion target.
+
+```python
+units_equal(parse_unit("m"), parse_unit("m"))       # → True
+units_equal(parse_unit("m"), parse_unit("k~m"))     # → False — convertible, not equal
+units_equal(parse_unit("N"), parse_unit("k~g·m/s²"))  # → False — same SI form
+units_equal(parse_unit("mmHg"), parse_unit("ucum:mm[Hg]"))   # → True
+```
+
+`units_equal` is also what `==` means between two units, whether they are
+`ValueUnit`s or `Unit`s, and the two hash alike so they share a dict:
+
+```python
+parse_unit("m") == parse_unit("m")                  # → True
+```
+
+That comparison used to be **False**. `ValueUnit` is a `ctypes.Structure`, which
+defines no `__eq__`, so `==` fell back to identity — see the note in
+[§5.7](#57-building-a-valueunit) on why the raw struct is worth knowing about at
+all. `ValueTypeSpec` carried the same gap and compares by value now too, so
+`node.value_type == other.value_type` answers the question it looks like it is
+answering.
 
 ### 5.7 Building a `ValueUnit`
 

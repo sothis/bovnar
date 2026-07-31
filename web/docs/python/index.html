@@ -463,7 +463,7 @@ from the top-level <code>bovnar</code> namespace and from <code>bovnar.units</co
 <div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">unit_valid</span><span class="p">,</span> <span class="n">unit_prefix_factor</span><span class="p">,</span> <span class="n">unit_prefix_exponent</span><span class="p">,</span>
     <span class="n">prefix_unit_valid</span><span class="p">,</span>
-    <span class="n">unit_to_si_factor</span><span class="p">,</span> <span class="n">units_compatible</span><span class="p">,</span>
+    <span class="n">unit_to_si_factor</span><span class="p">,</span> <span class="n">units_compatible</span><span class="p">,</span> <span class="n">units_equal</span><span class="p">,</span>
     <span class="n">unit_convert_factor</span><span class="p">,</span> <span class="n">unit_dimension_vector</span><span class="p">,</span>
     <span class="n">unit_reduce</span><span class="p">,</span> <span class="n">unit_to_str_ex</span><span class="p">,</span>
     <span class="n">exponent_to_int</span><span class="p">,</span> <span class="n">int_to_exponent</span><span class="p">,</span>
@@ -670,8 +670,8 @@ a bare number reaching the file:</p>
 <code>BovnarArgumentError</code> there rather than being half-honoured: write-side unit
 rewriting is <code>UnitFlags.REDUCE</code>'s job, and two rewriting modes with different
 rules about exactness is how a document ends up meaning two things.</p>
-<p>Two module-level helpers back the same decisions outside the reader:</p>
-<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">units_compatible</span><span class="p">,</span> <span class="n">units_convertible</span><span class="p">,</span>
+<p>Module-level helpers back the same decisions outside the reader:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">units_equal</span><span class="p">,</span> <span class="n">units_compatible</span><span class="p">,</span> <span class="n">units_convertible</span><span class="p">,</span>
                     <span class="n">unit_si_normal_form</span><span class="p">,</span> <span class="n">parse_unit</span><span class="p">)</span>
 
 <span class="c1"># units_compatible is the wrong screen for a conversion target: a currency</span>
@@ -685,6 +685,27 @@ rules about exactness is how a document ends up meaning two things.</p>
 <span class="n">unit_si_normal_form</span><span class="p">(</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;lm&quot;</span><span class="p">))</span>   <span class="c1"># → None (carries the steradian&#39;s kind)</span>
 </code></pre></div>
 
+<p><strong>Three questions, in decreasing strictness.</strong> <code>units_equal</code> asks whether the two
+are the <em>same</em> unit, <code>units_compatible</code> whether their dimensions and quantity
+kinds line up, <code>units_convertible</code> whether a conversion can actually be
+performed. Only the last is the right screen for a conversion target.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">units_equal</span><span class="p">(</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;m&quot;</span><span class="p">),</span> <span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;m&quot;</span><span class="p">))</span>       <span class="c1"># → True</span>
+<span class="n">units_equal</span><span class="p">(</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;m&quot;</span><span class="p">),</span> <span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;k~m&quot;</span><span class="p">))</span>     <span class="c1"># → False — convertible, not equal</span>
+<span class="n">units_equal</span><span class="p">(</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;N&quot;</span><span class="p">),</span> <span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;k~g·m/s²&quot;</span><span class="p">))</span>  <span class="c1"># → False — same SI form</span>
+<span class="n">units_equal</span><span class="p">(</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;mmHg&quot;</span><span class="p">),</span> <span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;ucum:mm[Hg]&quot;</span><span class="p">))</span>   <span class="c1"># → True</span>
+</code></pre></div>
+
+<p><code>units_equal</code> is also what <code>==</code> means between two units, whether they are
+<code>ValueUnit</code>s or <code>Unit</code>s, and the two hash alike so they share a dict:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;m&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;m&quot;</span><span class="p">)</span>                  <span class="c1"># → True</span>
+</code></pre></div>
+
+<p>That comparison used to be <strong>False</strong>. <code>ValueUnit</code> is a <code>ctypes.Structure</code>, which
+defines no <code>__eq__</code>, so <code>==</code> fell back to identity — see the note in
+<a href="#57-building-a-valueunit">§5.7</a> on why the raw struct is worth knowing about at
+all. <code>ValueTypeSpec</code> carried the same gap and compares by value now too, so
+<code>node.value_type == other.value_type</code> answers the question it looks like it is
+answering.</p>
 <h3 id="57-building-a-valueunit">5.7 Building a <code>ValueUnit</code></h3>
 <p><code>parse_unit</code> builds a unit from text. To build one programmatically — without going
 through the notation — use the <code>make_unit_*</code> constructors, exported from the top-level

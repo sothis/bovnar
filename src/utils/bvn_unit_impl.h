@@ -221,6 +221,10 @@ static inline bool bvni_is_neg_exp(unit_exponent_t e)
 /* bovnar_si_units.c — true when two units carry the same amount of every
  * dimensionless quantity kind (information, angle, logarithmic ratio). */
 bool bvni_kinds_match(value_unit_t a, value_unit_t b);
+/* bovnar_si_units.c — true when an affine scale sits where it means nothing
+ * (any exponent but 1, or beside another component). The reader uses it to
+ * tell that refusal from a factor too large to represent; see the note there. */
+bool bvni_unit_affine_misplaced(value_unit_t u);
 static inline int32_t bvni_exp_abs(unit_exponent_t e)
 {
 	int32_t v = bvn_exponent_to_int(e);

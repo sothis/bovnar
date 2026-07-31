@@ -121,6 +121,56 @@ did:
 is neither the international acre-foot (1233.48183755) nor the survey one
 (1233.48923847), i.e. an acre and a foot from different systems.
 
+### Fixed — `°C/h` was reported as the value being out of range
+
+Reading `°C/h` and asking `want_unit` for `K/h` raised
+`error_value_out_of_range`, about a document whose value is `1.0`. doc/05 §12.4
+and doc/08 §1.10 both promise `error_unit_mismatch`, and the reader has to tell
+two failures apart that the conversion engine reports identically: a pair whose
+units genuinely disagree, and a pair it agrees about whose exact factor outgrows
+`bvn_int_t` (`Q~m¹⁰⁰·Q~g¹⁰⁰` needs 10^12000).
+
+It told them apart by asking `bvn_units_convertible` — which is a **screen**, and
+passes an affine scale in a compound by design: `s/°C` is dimensionally `s/K`.
+So the affine case fell into the capacity branch and came back as a complaint
+about the number, sending a caller to look at their value instead of their unit.
+
+`bvni_unit_affine_misplaced` now asks only *where* the affine component sits — at
+an exponent other than 1, or beside another component — which no magnitude can
+confuse. `°C/h`, `°C·m`, `°C²` and `s/°C` are `error_unit_mismatch` in either
+direction; the capacity refusal keeps `error_value_out_of_range`; and a lone `°C`
+at exponent 1 still converts. Seven cases pinned in `bovnar_unit_policy_test.c`,
+which gained a `want_unit` driver: the hook's contract differs from a policy's
+(a policy names a preference and delivers the value untouched, a hook names a
+demand and the parse stops) and only the policy half was covered.
+
+### Fixed — three claims in doc/09's `UnitFlags.REDUCE` section, and a gate for the rest
+
+Reading doc/09 line by line against the library:
+
+- §5.2 called `unit_reduce` "reduce a compound unit to its **canonical named SI
+  unit**". It never produces one: `unit_reduce(parse_unit("k~g·m/s²")).unit` is
+  `m·g/s²`, and `N` is what `unit_to_str_ex(…, UnitFlags.REDUCE)` gives. The
+  named-SI collapse is the formatter's, exclusively.
+- §5.3 told a caller to apply `unit_reduce(vu).scale` to a value it is also going
+  to serialise — the same double-application fixed in doc/05 and doc/08 last
+  release: `k~N` emits `"k~N"` with nothing to rescale while `unit_reduce`
+  reports `1000.0`. The section now carries the three-line Python recipe, run
+  verbatim to produce this entry.
+- §5.3 said a reduction overflows the **±9** exponent range. It is ±100:
+  `m⁵⁰·m⁵⁰` reduces to `m¹⁰⁰`, `m⁵⁰·m⁵¹` raises.
+
+Everything else in §5, §5.1, §5.5, §5.6 and §8 was verified correct, including
+the asymmetry §5.1 calls out — `unece:KMH` parses to `k~m/h`, and
+`unit_to_profile("unece", k~m/h)` refuses it, because a flat vocabulary spells one
+whole code and has no operator to build a compound from.
+
+**`check_doc_python_examples.py`** now evaluates doc/09's `# →` expectations
+against the library. Nothing had ever run them: 76 KB of Python was the copy no
+gate executed, and all three defects above lived in it. Blocks needing a file, a
+handler or an optional import are skipped, and the skipped count is printed on
+every run so that "nothing is checked any more" cannot look like success.
+
 ### Fixed — the tutorial and the FAQ described the wrong dimensionless encoding
 
 doc/03 §11.8 has it right and doc/01 §6.4 and doc/02 §4 had it backwards.

@@ -34,6 +34,10 @@
 #include "bvn_float.h"
 #include "bvn_gregorian_date.h"
 #include "bvn_datetime.h"
+/* bovnar_si_units.c. Declared here rather than pulled in through
+ * bvn_unit_impl.h, whose generated prefix tables are static and would be
+ * duplicated into this translation unit for one predicate. */
+bool bvni_unit_affine_misplaced(value_unit_t u);
 #include "bvn_profile_impl.h"
 /*
  * ===========================================================================
@@ -829,9 +833,24 @@ static bool bvn_apply_want_unit(bvnr_reader_t* r, token_type_t tt, bvnr_data_t* 
 		 * screen answers rather than restating its capacity rule here.
 		 */
 		if (from_policy) return true;
-		v->last_error = bvn_units_convertible(d->value_unit, want)
-			      ? error_value_out_of_range
-			      : error_unit_mismatch;
+		/*
+		 * ...and the capacity question is asked STRUCTURALLY, not through the
+		 * screen. bvn_units_convertible passes an affine scale in a compound by
+		 * design -- it is a screen, and `s/°C` is dimensionally `s/K` -- so
+		 * asking it alone reported `°C/h -> K/h` as error_value_out_of_range,
+		 * which says the VALUE is extreme about a document whose value is 1.0,
+		 * and sends the caller looking at their number instead of their unit.
+		 * doc/05 §12.4 and doc/08 §1.10 both promise error_unit_mismatch there.
+		 * bvni_unit_affine_misplaced asks only where the affine component sits,
+		 * so it separates the two without restating the engine's rules.
+		 */
+		if (bvni_unit_affine_misplaced(d->value_unit) ||
+		    bvni_unit_affine_misplaced(want))
+			v->last_error = error_unit_mismatch;
+		else
+			v->last_error = bvn_units_convertible(d->value_unit, want)
+				      ? error_value_out_of_range
+				      : error_unit_mismatch;
 		return false;
 	}
 	if (!exact) {

@@ -587,6 +587,35 @@ static bool bvni_unit_is_temp_interval(value_unit_t u)
 		return false;
 	return k[BVNI_KIND_TEMP_INTERVAL] != 0;
 }
+/*
+ * True when `u` carries an affine scale somewhere it has no meaning: at an
+ * exponent other than 1, or beside any other component.
+ *
+ * This is the STRUCTURAL half of the refusal bvn_unit_to_si_factor makes, split
+ * out because the reader has to tell two failures apart that the factor path
+ * reports identically. Both `°C/h -> K/h` and `Q~m¹⁰⁰·Q~g¹⁰⁰ -> q~m¹⁰⁰·q~g¹⁰⁰`
+ * pass bvn_units_convertible and fail bvn_unit_convert_rational, and both leave
+ * *ok false -- but one is a unit that means nothing and the other is a factor
+ * too large to hold. Reporting the first as error_value_out_of_range says the
+ * VALUE is extreme, which of `1.0 °C/h` is simply untrue and sends the caller
+ * looking in the wrong place; doc/05 §12.4 and doc/08 §1.10 both promise
+ * error_unit_mismatch for it.
+ *
+ * Magnitude never enters here, which is what makes it a usable discriminator:
+ * it asks only where the affine component sits.
+ */
+bool bvni_unit_affine_misplaced(value_unit_t u)
+{
+	for (uint32_t i = 0; i < u.num_components && i < BVNR_MAX_UNIT_COMPONENTS; i++) {
+		const value_unit_component_t *c = &u.components[i];
+		const bvn_si_conv_entry_t *conv = bvn_find_si_conv(c->base);
+		if (!conv || !conv->is_affine)
+			continue;
+		if (u.num_components != 1u || bvn_exponent_to_int(c->exponent) != 1)
+			return true;
+	}
+	return false;
+}
 /* True when both units carry the same amount of every quantity kind. Exposed
  * within the library so the formatter's named-SI collapse can apply the same
  * test — collapsing "B/s" onto "Hz" passes the dimension check but produces a

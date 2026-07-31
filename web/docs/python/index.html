@@ -501,9 +501,11 @@ from the top-level <code>bovnar</code> namespace and from <code>bovnar.units</co
 <span class="c1"># 7-element SI dimension exponent vector [m, kg, s, A, K, mol, cd]</span>
 <span class="n">dims</span> <span class="o">=</span> <span class="n">unit_dimension_vector</span><span class="p">(</span><span class="n">vu</span><span class="p">)</span>       <span class="c1"># e.g. [1, 0, -1, 0, 0, 0, 0] for m/s</span>
 
-<span class="c1"># Reduce a compound unit to its canonical named SI unit</span>
-<span class="n">r</span> <span class="o">=</span> <span class="n">unit_reduce</span><span class="p">(</span><span class="n">vu</span><span class="p">)</span>                   <span class="c1"># r.unit, r.scale — multiply your value by</span>
-                                      <span class="c1"># r.scale, the reduction folded it out</span>
+<span class="c1"># Fold every prefix out and combine repeated bases. NOT the named-SI collapse:</span>
+<span class="c1"># unit_reduce(parse_unit(&quot;k~g·m/s²&quot;)).unit is &quot;m·g/s²&quot;, and it is</span>
+<span class="c1"># unit_to_str_ex(..., UnitFlags.REDUCE) that gives &quot;N&quot;. See the warning in §5.3</span>
+<span class="c1"># before applying r.scale to a value you are also going to serialise.</span>
+<span class="n">r</span> <span class="o">=</span> <span class="n">unit_reduce</span><span class="p">(</span><span class="n">vu</span><span class="p">)</span>                   <span class="c1"># r.unit, r.scale</span>
 
 <span class="c1"># Convert a scalar value between units (handles affine conversions)</span>
 <span class="n">kelvin</span> <span class="o">=</span> <span class="n">convert_value</span><span class="p">(</span><span class="mf">25.0</span><span class="p">,</span> <span class="n">vu_celsius</span><span class="p">,</span> <span class="n">vu_kelvin</span><span class="p">)</span>
@@ -532,13 +534,26 @@ from the top-level <code>bovnar</code> namespace and from <code>bovnar.units</co
 <p><strong><code>UnitFlags.REDUCE</code> returns the reduced unit, not a rescaled value.</strong> Reduction
 folds every prefix out, so <code>unit_to_str_ex(parse_unit("k~g"), UnitFlags.REDUCE)</code>
 is <code>"g"</code> — a string denoting a quantity 1000× smaller than the unit you passed.
-The scale is available from <code>unit_reduce(vu).scale</code>, and applying it to your own
-value is your job. (The writer does this for you; nothing else does.) Where the
-reduction folds cleanly into a named unit nothing is lost: <code>k~g·m/s²</code> → <code>"N"</code>,
-<code>k~N</code> → <code>"k~N"</code>. The collapse never substitutes one named unit for another, so a
-<code>Sv</code> stays a <code>Sv</code> rather than becoming a <code>Gy</code>. A lone base at an exponent other than 1 does
-still collapse (<code>s⁻¹</code> → <code>"Hz"</code>), and a reduction that overflows the ±9 exponent range
-raises <code>BovnarArgumentError</code> instead of returning a unit that lost a dimension.</p>
+Moving the value with it is your job. (The writer does it for you; nothing else
+does.)</p>
+<p><strong>Do not use <code>unit_reduce(vu).scale</code> for that.</strong> It is the scale to the <em>fully
+reduced</em> unit, and this function does not always emit the fully reduced unit:
+where the reduction lands on a named SI unit the formatter re-attaches the
+prefix. <code>k~N</code> comes back <code>"k~N"</code> with nothing to rescale while
+<code>unit_reduce</code> still reports <code>1000.0</code>, and <code>k~g</code> comes back <code>"g"</code> where the
+<code>1000.0</code> must be applied. The two are indistinguishable from outside — both a
+lone unit carrying a kilo prefix — so take the scale from the unit that is
+actually emitted:</p>
+<p><code>python
+emitted_str = unit_to_str_ex(vu, UnitFlags.REDUCE)
+emitted     = parse_unit(emitted_str)
+value      *= convert_value(1.0, vu, emitted)   # 1.0 for k~N, 1000.0 for k~g</code></p>
+<p>The collapse never substitutes one named unit for another, so a <code>Sv</code> stays a
+<code>Sv</code> rather than becoming a <code>Gy</code>. A lone base at an exponent other than 1 does
+still collapse (<code>s⁻¹</code> → <code>"Hz"</code>, <code>m~s⁻¹</code> → <code>"k~Hz"</code>), and a reduction whose summed
+exponent leaves the <code>±100</code> range (<code>BVN_EXPONENT_MIN</code>/<code>MAX</code>) raises
+<code>BovnarArgumentError</code> instead of returning a unit that lost a dimension —
+<code>m⁵⁰·m⁵⁰</code> reduces to <code>m¹⁰⁰</code>, <code>m⁵⁰·m⁵¹</code> raises.</p>
 </blockquote>
 <p><code>UnitFlags</code> is an <code>IntFlag</code> and its values may be OR-combined:</p>
 <div class="codehilite"><pre><span></span><code><span class="n">s</span> <span class="o">=</span> <span class="n">unit_to_str_ex</span><span class="p">(</span><span class="n">vu</span><span class="p">,</span> <span class="n">UnitFlags</span><span class="o">.</span><span class="n">REDUCE</span> <span class="o">|</span> <span class="n">UnitFlags</span><span class="o">.</span><span class="n">ASCII_EXP</span><span class="p">)</span>

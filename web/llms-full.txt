@@ -13518,9 +13518,11 @@ c = unit_convert_factor(vu_from, vu_to)
 # 7-element SI dimension exponent vector [m, kg, s, A, K, mol, cd]
 dims = unit_dimension_vector(vu)       # e.g. [1, 0, -1, 0, 0, 0, 0] for m/s
 
-# Reduce a compound unit to its canonical named SI unit
-r = unit_reduce(vu)                   # r.unit, r.scale — multiply your value by
-                                      # r.scale, the reduction folded it out
+# Fold every prefix out and combine repeated bases. NOT the named-SI collapse:
+# unit_reduce(parse_unit("k~g·m/s²")).unit is "m·g/s²", and it is
+# unit_to_str_ex(..., UnitFlags.REDUCE) that gives "N". See the warning in §5.3
+# before applying r.scale to a value you are also going to serialise.
+r = unit_reduce(vu)                   # r.unit, r.scale
 
 # Convert a scalar value between units (handles affine conversions)
 kelvin = convert_value(25.0, vu_celsius, vu_kelvin)
@@ -13551,13 +13553,30 @@ UnitFlags.ASCII_EXP # use ^N exponent notation instead of Unicode superscripts
 > **`UnitFlags.REDUCE` returns the reduced unit, not a rescaled value.** Reduction
 > folds every prefix out, so `unit_to_str_ex(parse_unit("k~g"), UnitFlags.REDUCE)`
 > is `"g"` — a string denoting a quantity 1000× smaller than the unit you passed.
-> The scale is available from `unit_reduce(vu).scale`, and applying it to your own
-> value is your job. (The writer does this for you; nothing else does.) Where the
-> reduction folds cleanly into a named unit nothing is lost: `k~g·m/s²` → `"N"`,
-> `k~N` → `"k~N"`. The collapse never substitutes one named unit for another, so a
-> `Sv` stays a `Sv` rather than becoming a `Gy`. A lone base at an exponent other than 1 does
-> still collapse (`s⁻¹` → `"Hz"`), and a reduction that overflows the ±9 exponent range
-> raises `BovnarArgumentError` instead of returning a unit that lost a dimension.
+> Moving the value with it is your job. (The writer does it for you; nothing else
+> does.)
+>
+> **Do not use `unit_reduce(vu).scale` for that.** It is the scale to the *fully
+> reduced* unit, and this function does not always emit the fully reduced unit:
+> where the reduction lands on a named SI unit the formatter re-attaches the
+> prefix. `k~N` comes back `"k~N"` with nothing to rescale while
+> `unit_reduce` still reports `1000.0`, and `k~g` comes back `"g"` where the
+> `1000.0` must be applied. The two are indistinguishable from outside — both a
+> lone unit carrying a kilo prefix — so take the scale from the unit that is
+> actually emitted:
+>
+> ```python
+> emitted_str = unit_to_str_ex(vu, UnitFlags.REDUCE)
+> emitted     = parse_unit(emitted_str)
+> value      *= convert_value(1.0, vu, emitted)   # 1.0 for k~N, 1000.0 for k~g
+> ```
+>
+> The collapse never substitutes one named unit for another, so a `Sv` stays a
+> `Sv` rather than becoming a `Gy`. A lone base at an exponent other than 1 does
+> still collapse (`s⁻¹` → `"Hz"`, `m~s⁻¹` → `"k~Hz"`), and a reduction whose summed
+> exponent leaves the `±100` range (`BVN_EXPONENT_MIN`/`MAX`) raises
+> `BovnarArgumentError` instead of returning a unit that lost a dimension —
+> `m⁵⁰·m⁵⁰` reduces to `m¹⁰⁰`, `m⁵⁰·m⁵¹` raises.
 
 `UnitFlags` is an `IntFlag` and its values may be OR-combined:
 

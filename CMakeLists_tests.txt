@@ -1309,7 +1309,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 164)   # 129 base + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities
+set(BVNR_EXPECTED_TEST_COUNT 165)   # 129 base + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples
                                     #             + citation
                                     #         + profiles_off_build
                                     # + om_test + cf_test
@@ -1630,6 +1630,25 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_am
                      ${CMAKE_CURRENT_SOURCE_DIR})
     set_tests_properties(bvnr_doc_ambiguities PROPERTIES
         LABELS "docs;units;gendata" TIMEOUT 60)
+endif()
+
+# ── doc/09's `# →` expectations are evaluated ──────────────────────────────
+# doc/09 is the Python reference and states its results the way a reader reads
+# them ("unit_to_profile(\"unece\", kg)   # -> \"KGM\""). Nothing ran any of it:
+# check_doc_examples.py parses the embedded BOVNAR documents and this file's
+# other gates cover the tables, leaving 76 KB of Python as the copy nobody
+# executed. Three claims in it were wrong at once, all around UnitFlags.REDUCE --
+# including one that told a caller to apply a scale that double-applies wherever
+# the formatter re-attaches a prefix. Blocks that need a file, a handler or an
+# optional import are skipped, and the skipped count is printed so that
+# "nothing is checked" cannot look like success.
+if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_python_examples.py)
+    add_test(NAME bvnr_doc_python_examples
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_python_examples.py
+                     ${CMAKE_CURRENT_SOURCE_DIR})
+    set_tests_properties(bvnr_doc_python_examples PROPERTIES
+        LABELS "docs;python;units" TIMEOUT 60)
 endif()
 
 # ── The catalogue counts stated in prose match src/gendata ─────────────────

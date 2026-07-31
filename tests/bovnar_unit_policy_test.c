@@ -148,6 +148,46 @@ static void run_policy(const char *payload, const bvnr_unit_policy_t *policy,
 	bvnr_reader_destroy(r);
 }
 
+/* The same, but through the want_unit HOOK rather than a policy. The two paths
+ * are deliberately different where a target cannot be applied -- a policy names
+ * a preference and delivers the value untouched, a hook names a demand and the
+ * parse stops -- so the hook's error codes need their own driver. */
+static const char *g_hook_want;
+
+static bool pol_want_unit(void *ud, const bvnr_data_t *d,
+			  value_unit_t *want, uint32_t *want_base)
+{
+	(void)ud; (void)d;
+	bool ok = false;
+	*want = bvn_parse_unit((const uint8_t *)g_hook_want, &ok);
+	if (!ok) return false;
+	*want_base = 0u;
+	return true;
+}
+
+static void run_hook(const char *payload, const char *want, pol_ctx_t *ctx,
+		     bool expect_ok, error_code_t expect_err)
+{
+	g_hook_want = want;
+	bvnr_read_flags_t flags;
+	memset(&flags, 0, sizeof(flags));
+	flags.userdata    = ctx;
+	flags.on_verified = pol_on_verified;
+	flags.want_unit   = pol_want_unit;
+
+	bvnr_reader_t *r = bvnr_reader_create();
+	ASSERT_TRUE(r != NULL, "hook: reader_create");
+	if (!r) return;
+	bool opened = bvnr_open_read_mem(r, payload, (uint32_t)strlen(payload),
+					 NULL, 0, &flags);
+	ASSERT_TRUE(opened, "hook: open_read_mem");
+	bool ok = opened && bvnr_read(r);
+	error_code_t err = bvnr_reader_get_error(r);
+	ASSERT_EQ_INT(ok, expect_ok, "hook: read result matches expectation");
+	ASSERT_EQ_INT(err, expect_err, "hook: error code matches expectation");
+	bvnr_reader_destroy(r);
+}
+
 /* ── option 1: the opaque target list ────────────────────────────────────── */
 
 /*
@@ -608,6 +648,40 @@ static void test_affine_in_compound_never_aborts(void)
 	ASSERT_EQ_INT(c.n, 1, "affine compound: target list does not abort");
 	if (c.n == 1)
 		ASSERT_TRUE(!c.converted[0], "affine compound: delivered untouched");
+
+	/*
+	 * THE HOOK IS THE OTHER HALF, and it must fail with the code the documents
+	 * promise. A target the CALLER named is not a preference the way a policy's
+	 * is, so it aborts -- and doc/05 §12.4 and doc/08 §1.10 both say the abort
+	 * is error_unit_mismatch.
+	 *
+	 * It was error_value_out_of_range. The reader told the two failures that
+	 * pass bvn_units_convertible and fail the conversion apart by asking that
+	 * screen again, and the screen passes an affine compound BY DESIGN -- so
+	 * `°C/h -> K/h` was reported as the value being out of range, about a
+	 * document whose value is 1.0. bvni_unit_affine_misplaced asks where the
+	 * affine component sits instead, which magnitude cannot confuse.
+	 */
+	static const struct { const char *doc; const char *want; error_code_t err; }
+	hook_cases[] = {
+		{ ".a = <float:64,°C/h> 1.0;",  "K/h",  error_unit_mismatch },
+		{ ".a = <float:64,°C·m> 1.0;",  "K·m",  error_unit_mismatch },
+		{ ".a = <float:64,°C²> 1.0;",   "K²",   error_unit_mismatch },
+		{ ".a = <float:64,s/°C> 1.0;",  "s/K",  error_unit_mismatch },
+		/* the affine unit in the TARGET, not the value */
+		{ ".a = <float:64,K/h> 1.0;",   "°C/h", error_unit_mismatch },
+		/* a lone affine at exponent 1 is the shape that DOES convert */
+		{ ".a = <float:64,°C> 20.0;",   "K",    error_none },
+		/* and the capacity refusal keeps its own code: the units agree and the
+		 * factor needs 10^12000, which is not a statement about the units */
+		{ ".a = <float:64,Q~m¹⁰⁰·Q~g¹⁰⁰> 1.0;", "q~m¹⁰⁰·q~g¹⁰⁰",
+		  error_value_out_of_range },
+	};
+	for (size_t i = 0; i < sizeof hook_cases / sizeof hook_cases[0]; i++) {
+		pol_ctx_t hc = {0};
+		run_hook(hook_cases[i].doc, hook_cases[i].want, &hc,
+			 hook_cases[i].err == error_none, hook_cases[i].err);
+	}
 }
 
 /*

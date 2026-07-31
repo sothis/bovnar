@@ -255,9 +255,12 @@ static void test_refusals(void)
 	 * the year stays refused -- those are compounds, not the unit itself. */
 	chk_str("om:year", "yr_greg");
 	chk_factor("om:year", 31556952.0);
-	chk_error("om:gigayear",         error_unit_profile_unsupported);
-	chk_error("om:reciprocalYear",   error_unit_profile_unsupported);
-	chk_error("om:cubicMetrePerYear", error_unit_profile_unsupported);
+	/* And everything OM builds ON the year followed it, once yr_greg existed to
+	 * build them from. Each is still a different unit from anything on native
+	 * yr, which is what the refusal was protecting. */
+	chk_str("om:gigayear",           "G~yr_greg");
+	chk_str("om:reciprocalYear",     "yr_greg⁻¹");
+	chk_str("om:cubicMetrePerYear",  "m³/yr_greg");
 
 	/* An arbitrary unit is carried by the vocabulary that gives it an identity.
 	 * UCUM's [IU] is an opaque base unit here; a second, incommensurable OM one

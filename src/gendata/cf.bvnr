@@ -112,6 +112,12 @@
 # the unit its own canonical_units states; no row carries `.reverse`
 # because the profile is unwritable and no reverse table is built.
 .mapped = [
+  # A second sweep after the 35 units landed: each of these was refused for
+  # want of a native target, and the target now exists.
+  { .code = "age_of_sea_ice";                                        .bovnar = "yr_trop"; },
+  { .code = "sea_water_age_since_surface_contact";                   .bovnar = "yr_trop"; },
+  { .code = "tendency_of_global_average_sea_level_change";           .bovnar = "m/yr_trop"; },
+  { .code = "tendency_of_sea_surface_height_above_mean_sea_level";   .bovnar = "m/yr_trop"; },
   { .code = "acoustic_centre_of_mass_in_sea_water";                            .bovnar = "m";               },  # m
   { .code = "acoustic_equivalent_area_in_sea_water";                           .bovnar = "m";               },  # m
   { .code = "acoustic_index_of_aggregation_in_sea_water";                      .bovnar = "m^-1";            },  # m-1
@@ -4571,7 +4577,6 @@
   { .code = "acoustic_target_strength_in_sea_water";                           .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "acoustic_volume_backscattering_strength_in_sea_water";            .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "aerosol_type_in_atmosphere_layer_in_air";                         .why = "dimension one — bovnar spells that by omitting the unit slot"; },
-  { .code = "age_of_sea_ice";                                                  .why = "CF's year is UDUNITS', the TROPICAL year of 31556925.9747 s; native yr is the Julian 31557600 s and no native unit states the tropical one (doc/11 §13.3)"; },
   { .code = "aggregate_quality_flag";                                          .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "angstrom_exponent_of_ambient_aerosol_in_air";                     .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "angstrom_exponent_of_volume_backwards_scattering_in_air_due_to_ambient_aerosol_particles"; .why = "dimension one — bovnar spells that by omitting the unit slot"; },
@@ -5096,7 +5101,6 @@
   { .code = "sea_surface_wave_mean_square_slope";                              .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "sea_surface_wave_mean_square_x_slope";                            .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "sea_surface_wave_mean_square_y_slope";                            .why = "dimension one — bovnar spells that by omitting the unit slot"; },
-  { .code = "sea_water_age_since_surface_contact";                             .why = "CF's year is UDUNITS', the TROPICAL year of 31556925.9747 s; native yr is the Julian 31557600 s and no native unit states the tropical one (doc/11 §13.3)"; },
   { .code = "sea_water_cox_salinity";                                          .why = "a bare scale factor: 1e-3 is a magnitude with no unit, and bovnar has no unit whose value is a pure number"; },
   { .code = "sea_water_knudsen_salinity";                                      .why = "a bare scale factor: 1e-3 is a magnitude with no unit, and bovnar has no unit whose value is a pure number"; },
   { .code = "sea_water_ph_abiotic_analogue_reported_on_total_scale";           .why = "dimension one — bovnar spells that by omitting the unit slot"; },
@@ -5149,8 +5153,6 @@
   { .code = "surface_snow_binary_mask";                                        .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "surface_specific_humidity";                                       .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "syntax_test_quality_flag";                                        .why = "dimension one — bovnar spells that by omitting the unit slot"; },
-  { .code = "tendency_of_global_average_sea_level_change";                     .why = "per tropical year, see the note on `year`"; },
-  { .code = "tendency_of_sea_surface_height_above_mean_sea_level";             .why = "per tropical year, see the note on `year`"; },
   { .code = "tendency_of_sea_water_salinity";                                  .why = "a bare scale factor per second, see the note on `1e-3`"; },
   { .code = "tendency_of_sea_water_salinity_due_to_advection";                 .why = "a bare scale factor per second, see the note on `1e-3`"; },
   { .code = "tendency_of_sea_water_salinity_due_to_horizontal_mixing";         .why = "a bare scale factor per second, see the note on `1e-3`"; },

@@ -2253,12 +2253,35 @@ Serializes `u` to a canonical UTF-8 string. Returns the number of bytes written 
 
 > **`BVN_UNIT_REDUCE` changes the unit, and this function does not change the value.**
 > Reduction folds every prefix out, so `k~g` serializes as `"g"` — a string that
-> denotes a quantity 1000× smaller than what you passed in. `bvn_unit_to_string_ex`
-> returns only the reduced unit and discards `bvn_unit_reduce`'s `scale`, so a
-> direct caller must apply that scale to its own value. The **writer** does this
-> for you (5 `k~m` is written as `5000 m`, in exact rational arithmetic); nothing
-> else does. Where the reduction folds cleanly into a named unit the scale comes
-> back as a prefix and nothing is lost — `k~g·m/s²` → `"N"`, `k~N` → `"k~N"`.
+> denotes a quantity 1000× smaller than what you passed in. The value has to move
+> with it, and the **writer** does that for you (5 `k~m` is written as `5000 m`,
+> in exact rational arithmetic); nothing else does.
+>
+> **A direct caller must not use `bvn_unit_reduce`'s `scale` for this.** That is
+> the scale to the *fully reduced* unit, and this function does not always emit
+> the fully reduced unit: where the reduction lands on a named SI unit the
+> formatter re-attaches the prefix, so `k~N` comes back `"k~N"` with nothing to
+> rescale, while `bvn_unit_reduce` still reports 1000. Applying it there
+> multiplies by a thousand twice over, and the two cases are indistinguishable
+> from outside — both are a lone unit carrying a kilo prefix.
+>
+> The recipe is to convert to the unit that is actually **emitted**, which is
+> what `bvnr_writer.c` does:
+>
+> ```c
+> char ubuf[BVNR_UNIT_STRING_MAX];
+> if (bvn_unit_to_string_ex(u, ubuf, sizeof ubuf, BVN_UNIT_REDUCE) < 0)
+>         return false;                       /* overflowing reduction */
+> bool ok = false;
+> value_unit_t emitted = bvn_parse_unit((const uint8_t *)ubuf, &ok);
+> if (!ok || bvn_unit_equal(emitted, u))
+>         return true;                        /* nothing moved */
+> /* now convert the value from `u` to `emitted` — exactly, if it must be exact */
+> bvn_unit_convert_rational(vnum, vden, u, emitted, out_num, out_den, &exact);
+> ```
+>
+> `bvn_unit_reduce`'s `scale` remains the right answer for its own returned unit;
+> it is simply not the unit this function prints.
 >
 > The collapse never *substitutes* one named unit for another. `Sv` and `Gy` share
 > a dimension vector, as do `Bq`, `Bd` and `Hz`, and `W`, `VA` and `var`; each

@@ -98,6 +98,9 @@
 ];
 
 .mapped = [
+  # A second sweep after the 35 units landed: each of these was refused for
+  # want of a native target, and the target now exists.
+  { .code = "eon";                                                   .bovnar = "G~yr_trop"; .metric = false; },
   # Unblocked by the 35 units added to units.bvnr: each was refused for
   # want of a native target and for no other reason.
   { .code = "year";                      .bovnar = "yr_trop"; .metric = false; },
@@ -899,7 +902,6 @@
   { .code = "firkin";                  .why = "firkin (a quarter barrel) — quarters are not decades"; },
   { .code = "BZ";                      .why = "bel relative to 1 mm^6/m^3 (radar reflectivity) — dB carries no reference level"; },
   { .code = "Bz";                      .why = "bel relative to 1 mm^6/m^3 (radar reflectivity) — dB carries no reference level"; },
-  { .code = "eon";                     .why = "eon (1e9 UDUNITS years) — UDUNITS' year is the tropical year and native yr is the Julian one, the same disagreement that keeps the bare year itself out of the mapped list"; },
   { .code = "water_4C"; .why = "UDUNITS builds this on water at 999.972 kg/m³; native mH2O is the CONVENTIONAL column, 1000 kg/m³ exactly. 28 ppm apart — a different water, not a different spelling"; },
   { .code = "waters_4C"; .why = "see water_4C: a 999.972 kg/m³ column, not the conventional one"; },
   { .code = "water_39F"; .why = "see water_4C: a 999.972 kg/m³ column, not the conventional one"; },

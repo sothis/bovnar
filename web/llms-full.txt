@@ -9234,12 +9234,35 @@ Serializes `u` to a canonical UTF-8 string. Returns the number of bytes written 
 
 > **`BVN_UNIT_REDUCE` changes the unit, and this function does not change the value.**
 > Reduction folds every prefix out, so `k~g` serializes as `"g"` — a string that
-> denotes a quantity 1000× smaller than what you passed in. `bvn_unit_to_string_ex`
-> returns only the reduced unit and discards `bvn_unit_reduce`'s `scale`, so a
-> direct caller must apply that scale to its own value. The **writer** does this
-> for you (5 `k~m` is written as `5000 m`, in exact rational arithmetic); nothing
-> else does. Where the reduction folds cleanly into a named unit the scale comes
-> back as a prefix and nothing is lost — `k~g·m/s²` → `"N"`, `k~N` → `"k~N"`.
+> denotes a quantity 1000× smaller than what you passed in. The value has to move
+> with it, and the **writer** does that for you (5 `k~m` is written as `5000 m`,
+> in exact rational arithmetic); nothing else does.
+>
+> **A direct caller must not use `bvn_unit_reduce`'s `scale` for this.** That is
+> the scale to the *fully reduced* unit, and this function does not always emit
+> the fully reduced unit: where the reduction lands on a named SI unit the
+> formatter re-attaches the prefix, so `k~N` comes back `"k~N"` with nothing to
+> rescale, while `bvn_unit_reduce` still reports 1000. Applying it there
+> multiplies by a thousand twice over, and the two cases are indistinguishable
+> from outside — both are a lone unit carrying a kilo prefix.
+>
+> The recipe is to convert to the unit that is actually **emitted**, which is
+> what `bvnr_writer.c` does:
+>
+> ```c
+> char ubuf[BVNR_UNIT_STRING_MAX];
+> if (bvn_unit_to_string_ex(u, ubuf, sizeof ubuf, BVN_UNIT_REDUCE) < 0)
+>         return false;                       /* overflowing reduction */
+> bool ok = false;
+> value_unit_t emitted = bvn_parse_unit((const uint8_t *)ubuf, &ok);
+> if (!ok || bvn_unit_equal(emitted, u))
+>         return true;                        /* nothing moved */
+> /* now convert the value from `u` to `emitted` — exactly, if it must be exact */
+> bvn_unit_convert_rational(vnum, vden, u, emitted, out_num, out_den, &exact);
+> ```
+>
+> `bvn_unit_reduce`'s `scale` remains the right answer for its own returned unit;
+> it is simply not the unit this function prints.
 >
 > The collapse never *substitutes* one named unit for another. `Sv` and `Gy` share
 > a dimension vector, as do `Bq`, `Bd` and `Hz`, and `W`, `VA` and `var`; each
@@ -12394,7 +12417,9 @@ Serialise a `value_unit_t` back into its canonical string form. Numerator compon
 
 These flags can be OR-combined. The writer uses `bvn_unit_to_string_ex` internally, passing the flags from `bvnr_writer_unit_flags(w)`.
 
-> **`BVN_UNIT_REDUCE` here returns only the reduced UNIT.** `bvn_unit_to_string_ex` discards the scale `bvn_unit_reduce` folded out, so `k~g` serialises as `"g"` — a string denoting a quantity 1000× smaller than the unit passed in. A direct caller must apply `bvn_unit_reduce`'s `scale` to its own value; the writer above does this for you, and nothing else does. Where the reduction folds cleanly into a named unit the scale returns as a prefix and nothing is lost (`k~g·m/s²` → `"N"`, `k~N` → `"k~N"`). The collapse never substitutes one named unit for another: `Sv` stays `Sv`, `Bq` stays `Bq`. A lone base at an exponent other than 1 still collapses, though — `s⁻¹` becomes `Hz` and `m~s⁻¹` becomes `k~Hz`. And a reduction that **overflows** (a summed exponent past ±9, too many surviving bases, or a scale out of float range) returns `-1`: it drops a component, so what it produces is a different unit rather than a shorter spelling of the same one.
+> **`BVN_UNIT_REDUCE` here returns only the reduced UNIT.** `bvn_unit_to_string_ex` discards the scale `bvn_unit_reduce` folded out, so `k~g` serialises as `"g"` — a string denoting a quantity 1000× smaller than the unit passed in. The writer above moves the value with it; nothing else does.
+>
+> **A direct caller must not reach for `bvn_unit_reduce`'s `scale` to do it.** That scale is to the *fully reduced* unit, and this function does not always emit the fully reduced unit: where the reduction lands on a named SI unit the formatter re-attaches the prefix, so `k~N` comes back `"k~N"` with nothing to rescale while `bvn_unit_reduce` still reports 1000 — and `k~g` comes back `"g"`, where the 1000 must be applied. The two are indistinguishable from outside, both being a lone unit with a kilo prefix, so the scale has to come from the unit that is actually emitted: format with this function, parse the result back, and convert from the original to *that*. The [unit-system reference](05_bovnar_unit_system.md) §12.2 gives the eight lines, which are the ones `bvn_ser_reduced_number` runs. The collapse never substitutes one named unit for another: `Sv` stays `Sv`, `Bq` stays `Bq`. A lone base at an exponent other than 1 still collapses, though — `s⁻¹` becomes `Hz` and `m~s⁻¹` becomes `k~Hz`. And a reduction that **overflows** (a summed exponent past ±9, too many surviving bases, or a scale out of float range) returns `-1`: it drops a component, so what it produces is a different unit rather than a shorter spelling of the same one.
 
 > **Note on writer usage:** When driving the writer manually via `bvnr_write_event`, do **not** pass a unit string in `bvnr_data_t.data` for the `ev_type_annotation_start` event — the serialiser ignores that field and derives the annotation from `data->value_type` and the subsequent parameter events. Use `bvnr_write_type_annotation` (§3.1) to emit a complete, correct type annotation in one call.
 

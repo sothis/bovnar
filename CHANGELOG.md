@@ -121,6 +121,50 @@ did:
 is neither the international acre-foot (1233.48183755) nor the survey one
 (1233.48923847), i.e. an acre and a foot from different systems.
 
+### Fixed — both documents told a direct caller to multiply by a thousand twice over
+
+`bvn_unit_to_string_ex(…, BVN_UNIT_REDUCE)` folds a compound into the named unit
+it spells out, and the value has to move with it. doc/05 §12.2 and doc/08 §3.3
+both said:
+
+> A direct caller must apply `bvn_unit_reduce`'s `scale` to its own value.
+
+That is the scale to the **fully reduced** unit, and the formatter does not
+always emit the fully reduced unit: where the reduction lands on a named SI unit
+it re-attaches the prefix. So `k~N` comes back `"k~N"` with nothing to rescale
+while `bvn_unit_reduce` still reports 1000, and `k~g` comes back `"g"` where the
+1000 must be applied. The two are indistinguishable from outside — both a lone
+unit carrying a kilo prefix — so a caller following the sentence is out by 1000
+on the first of them.
+
+The library was never wrong; `bvn_ser_reduced_number` converts to the unit
+actually emitted and its own comment names the trap ("using `bvn_unit_reduce`'s
+raw scale there would multiply by 1000 twice over"). Only the public contract was
+wrong, and only in the dangerous direction. Both sections now give the eight-line
+recipe the writer runs, and two tests pin it: one tabulating the five cases where
+the two scales differ, and a 20 000-unit randomised sweep asserting that a
+reduced spelling denotes the same quantity it was written from.
+
+### Added — 17 more profile codes the 35 new units unblocked
+
+A second sweep after the units landed found refusals whose reason had become
+false — including some the additions themselves invalidated. `om:franklin` and
+`qudt:FR` are the statcoulomb; `om:point-TeX` and `om:pica-TeX` are the printer's
+point and pica to a part in 10⁸; `qudt:LA_FT` is the foot-lambert; `qudt:HP_Brake`
+carries QUDT's own 9809.5 W, which is `hp_B` exactly.
+
+The tropical and Gregorian years unblocked the rest: `cf:age_of_sea_ice` and
+`cf:sea_water_age_since_surface_contact` are `yr_trop`, the two sea-level
+tendencies are `m/yr_trop`, `udunits:eon` is `G~yr_trop`, and OM's `gigayear`,
+`reciprocalYear`, `cubicMetrePerYear` and `millisecond-AnglePerYear` build on
+`yr_greg`. Four tests that asserted those refusals now assert the translation.
+
+`qudt:MI_US2` maps to `miUS²` — its name says US survey and its value agrees.
+Plain `MI2` stays refused, with a reason that now records why it cannot be
+decided: QUDT's 2 589 997.766 sits 2.7e-7 from the survey square mile and 3.7e-6
+from the international one, so the value points one way and a trade-code "square
+mile" conventionally the other.
+
 ### Added — the other 35 evidenced units, and 87 more profile codes that map
 
 The corroboration sweep found 35 refusal groups **two or more vocabularies

@@ -237,12 +237,14 @@ static void test_refusals(void)
 	chk_error("cf:region",                error_unit_profile_unsupported);
 	chk_error("cf:area_type",             error_unit_profile_unsupported);
 
-	/* CF's year is UDUNITS', the TROPICAL year of 31556925.9747 s; bovnar's yr
-	 * is the Julian 31557600 s, and doc/11 §13.3 already refuses the tropical
-	 * one rather than rounding it into the Julian. */
-	chk_error("cf:age_of_sea_ice", error_unit_profile_unsupported);
-	chk_error("cf:tendency_of_global_average_sea_level_change",
-	          error_unit_profile_unsupported);
+	/* CF's year is UDUNITS', the TROPICAL year of 31556925.9747 s, and bovnar's
+	 * yr is the Julian 31557600 s. That was a refusal until yr_trop arrived --
+	 * doc/11 §13.3 -- and it is a MAPPING now: the two are still different
+	 * units, which is the whole point, and CF's is spelled. Asserting the
+	 * translation is stronger than asserting the refusal was. */
+	chk_str("cf:age_of_sea_ice", "yr_trop");
+	chk_factor("cf:age_of_sea_ice", 31556925.9747);
+	chk_str("cf:tendency_of_global_average_sea_level_change", "m/yr_trop");
 
 	/* A DEPRECATED ALIAS is not a spelling this profile blesses: CF keeps it in
 	 * the table pointing at its replacement, and a document written today

@@ -60,6 +60,12 @@
 .schema_version = <uint:16> 1;
 
 .mapped = [
+  # A second sweep after the 35 units landed: each of these was refused for
+  # want of a native target, and the target now exists.
+  { .code = "FR";                                                    .bovnar = "statC"; },
+  { .code = "LA_FT";                                                 .bovnar = "footlambert"; },
+  { .code = "HP_Brake";                                              .bovnar = "hp_B"; },
+  { .code = "MI_US2";                                                .bovnar = "miUS^2"; },
   # Unblocked by the 35 units added to units.bvnr: each was refused for
   # want of a native target and for no other reason.
   { .code = "YR_TROPICAL";               .bovnar = "yr_trop"; },
@@ -2811,7 +2817,6 @@
   { .code = "FBM";                         .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.00236)"; },
   { .code = "FC";                          .why = "the footcandle is a lumen per square foot, which bovnar spells lm/ft^2; QUDT states it at five digits (10.764) against the exact 10.7639104167, 8 ppm past the tolerance this repository measured for publisher rounding. om:footcandle, whose own value is exact, does map"; },
   { .code = "FLIGHT";                      .why = "QUDT states no conversionMultiplier for this unit"; },
-  { .code = "FR";                          .why = "no native unit of this dimension is a decade away from QUDT's multiplier (3.335640952e-10)"; },
   { .code = "FRACTION";                    .why = "a dimensionless QUDT unit — every native ratio has the same dimension vector, so nothing here can tell which one it is; QUDT states no ucumCode or udunitsCode to settle it"; },
   { .code = "FRAME-PER-SEC";               .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "FT-PER-DEG_F";                .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.54864)"; },
@@ -2839,7 +2844,6 @@
   { .code = "HART";                        .why = "no native unit of this dimension is a decade away from QUDT's multiplier (2.302585093)"; },
   { .code = "HART-PER-SEC";                .why = "no native unit of this dimension is a decade away from QUDT's multiplier (2.302585093)"; },
   { .code = "HK";                          .why = "QUDT states no conversionMultiplier for this unit"; },
-  { .code = "HP_Brake";                    .why = "no native unit of this dimension is a decade away from QUDT's multiplier (9809.5)"; },
   { .code = "H_Stat-PER-CentiM";           .why = "no native unit of this dimension is a decade away from QUDT's multiplier (8.9876e+13)"; },
   { .code = "HeartBeat";                   .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "IN-PER-2PiRAD";               .why = "QUDT states no conversionMultiplier for this unit"; },
@@ -2871,7 +2875,6 @@
   { .code = "KiloV-A_Reactive-PER-K";      .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "KiloVAR-PER-K";               .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "LANGLEY";                     .why = "QUDT states no conversionMultiplier for this unit"; },
-  { .code = "LA_FT";                       .why = "no native unit of this dimension is a decade away from QUDT's multiplier (3.4262591)"; },
   { .code = "LB-PER-AC";                   .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.000112085)"; },
   { .code = "LB-PER-DEG_F";                .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.8164663)"; },
   { .code = "LB-PER-FT3-DEG_F";            .why = "no native unit of this dimension is a decade away from QUDT's multiplier (28.83323)"; },
@@ -2886,11 +2889,15 @@
   { .code = "MESH";                        .why = "QUDT states a non-positive conversion multiplier"; },
   { .code = "MHO_Stat";                    .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1.112650056e-12)"; },
   { .code = "MI-PER-SEC";                  .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1609.344)"; },
-  { .code = "MI2";                         .why = "no native unit of this dimension is a decade away from QUDT's multiplier (2589997.766)"; },
+  # MI_US2 is mapped above -- its NAME says US survey and its value agrees.
+  # Plain MI2 is the one that cannot be decided: QUDT's 2589997.766 sits
+  # 2.7e-7 from the survey square mile and 3.7e-6 from the international one,
+  # so the value points at the survey unit while a trade-code "square mile"
+  # conventionally means the statute one. Naming it would be a guess.
+  { .code = "MI2";                         .why = "QUDT's multiplier (2589997.766) is 2.7e-7 from the survey square mile and 3.7e-6 from the international one; the name does not say which"; },
   { .code = "MIL";                         .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.000490873852)"; },
   { .code = "MI_UK3";                      .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "MI_US-PER-SEC2";              .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1609.347)"; },
-  { .code = "MI_US2";                      .why = "no native unit of this dimension is a decade away from QUDT's multiplier (2589997.766)"; },
   { .code = "MOL-PER-HR";                  .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.000277778)"; },
   { .code = "MOL_LB";                      .why = "no native unit of this dimension is a decade away from QUDT's multiplier (453.59237)"; },
   { .code = "MOL_LB-DEG_F";                .why = "no native unit of this dimension is a decade away from QUDT's multiplier (251.9957611)"; },

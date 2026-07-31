@@ -2718,6 +2718,95 @@ static void test_temperature_difference_is_its_own_quantity_kind(void)
  * path, which is what makes them a regression test rather than a guess: the
  * exact answer is known independently of the code under test.
  */
+/* A deterministic xorshift, so the sweep below is a regression net rather than a
+ * fuzzer: the same 20 000 units every run, on every platform. */
+static uint64_t bvni_test_rnd(uint64_t *s)
+{
+	uint64_t x = *s;
+	x ^= x << 13; x ^= x >> 7; x ^= x << 17;
+	*s = x;
+	return x;
+}
+
+/*
+ * BVN_UNIT_REDUCE SERIALISATION PRESERVES THE QUANTITY, over a randomised sweep.
+ *
+ * The writer folds a compound into the named unit it spells out and moves the
+ * value with it. What a document depends on is that value×unit is unchanged, and
+ * the scale that achieves it is the one to the unit actually EMITTED -- not
+ * bvn_unit_reduce's, which is to the fully reduced unit and differs whenever the
+ * formatter re-attaches a prefix (`k~N` emits "k~N", scale 1; `k~g` emits "g",
+ * scale 1000). Both documents told a direct caller to apply the latter
+ * unconditionally, so this sweeps the identity rather than trusting the prose.
+ *
+ * Deterministic seed, bounded iterations: this is a regression net, not a fuzzer.
+ */
+static void test_reduced_serialisation_preserves_the_quantity(void)
+{
+	printf("  a reduced spelling denotes the same quantity...\n");
+	uint64_t rs = 0xdeadbeefcafef00dull;
+	char plain[BVNR_UNIT_STRING_MAX], red[BVNR_UNIT_STRING_MAX];
+	uint32_t checked = 0;
+	for (int iter = 0; iter < 20000; iter++) {
+		value_unit_t u;
+		memset(&u, 0, sizeof u);
+		uint32_t n = 1u + (uint32_t)(bvni_test_rnd(&rs) % 4u);
+		for (uint32_t i = 0; i < n; i++) {
+			value_unit_component_t c;
+			memset(&c, 0, sizeof c);
+			c.base = (value_base_unit_t)(BVN_UNIT_NATIVE_FIRST +
+				 (int)(bvni_test_rnd(&rs) % (uint64_t)BVN_UNIT_NATIVE_COUNT));
+			int e = (int)(bvni_test_rnd(&rs) % 7u) - 3;
+			if (e == 0) e = 1;
+			c.exponent = (unit_exponent_t)e;
+			c.prefix.system = prefix_si;
+			c.prefix.id.si = (si_prefix_id_t)(bvni_test_rnd(&rs) % 25u);
+			if (!bvn_prefix_unit_valid(c.prefix, c.base))
+				continue;
+			u.components[u.num_components++] = c;
+		}
+		if (u.num_components == 0u)
+			continue;
+		/* An affine scale has no SI value outside "alone, at exponent 1", so a
+		 * compound carrying one is refused by the conversion entry points by
+		 * design (doc/07 §10) and is not a candidate here. */
+		bool aff = false, fok = false;
+		(void)bvn_unit_to_si_factor(u, &aff, NULL, &fok);
+		if (!fok || aff)
+			continue;
+		if (bvn_unit_to_string(u, plain, sizeof plain) < 0)
+			continue;
+		if (bvn_unit_to_string_ex(u, red, sizeof red, BVN_UNIT_REDUCE) < 0)
+			continue;                  /* an overflowing reduction is refused */
+		bool ok = false;
+		value_unit_t r = bvn_parse_unit((const uint8_t *)red, &ok);
+		if (!ok) {
+			ASSERT_TRUE(false, "a reduced spelling parses back");
+			continue;
+		}
+		if (!bvn_units_convertible(u, r)) {
+			ASSERT_TRUE(false, "a reduced spelling is the same quantity");
+			continue;
+		}
+		double out = 0.0, back = 0.0;
+		if (!bvn_unit_convert_value(1.0, u, r, &out)) {
+			ASSERT_TRUE(false, "and the value converts into it");
+			continue;
+		}
+		if (!bvn_unit_convert_value(out, r, u, &back)) {
+			ASSERT_TRUE(false, "and back out of it");
+			continue;
+		}
+		checked++;
+		if (isfinite(back) && fabs(back - 1.0) > 1e-9) {
+			printf("    %s -> %s : 1 came back as %.17g\n", plain, red, back);
+			ASSERT_TRUE(false, "the round trip is the identity");
+		}
+	}
+	ASSERT_TRUE(checked > 5000u,
+		    "the sweep actually exercised the reduction");
+}
+
 static void test_extreme_compounds_keep_full_precision(void)
 {
 	printf("  a subnormal intermediate does not cost mantissa bits...\n");
@@ -2890,6 +2979,57 @@ static void test_named_si_collapse_never_substitutes_a_named_unit(void)
 	kN.components[0].prefix.id.si  = si_kilo;
 	ASSERT_TRUE(bvn_unit_to_string_ex(kN, buf, sizeof buf, BVN_UNIT_REDUCE) > 0 &&
 		    strcmp(buf, "k~N") == 0, "k~N keeps its prefix through REDUCE");
+
+	/*
+	 * AND THE SCALE THAT GOES WITH IT IS NOT bvn_unit_reduce's.
+	 *
+	 * That function reports the scale to the FULLY reduced unit, and the
+	 * formatter does not always emit the fully reduced unit: where the
+	 * reduction lands on a named SI unit it re-attaches the prefix. So `k~N`
+	 * comes back "k~N" with nothing to rescale while bvn_unit_reduce still says
+	 * 1000, and `k~g` comes back "g" where the 1000 must be applied. The two
+	 * are indistinguishable from outside -- both a lone unit with a kilo prefix
+	 * -- and doc/05 §12.2 and doc/08 §3.3 both told a direct caller to apply the
+	 * scale unconditionally, which multiplies by a thousand twice over on the
+	 * first of them. bvn_ser_reduced_number avoids it by converting to the unit
+	 * that is actually EMITTED; this pins that the two cases really do differ,
+	 * so the documented recipe cannot quietly become the wrong one again.
+	 */
+	{
+		static const struct { const char *in; const char *emitted;
+				      double reduce_scale; double emitted_scale; }
+		cases[] = {
+			{ "k~N",  "k~N",  1000.0, 1.0    },   /* prefix restored */
+			{ "k~g",  "g",    1000.0, 1000.0 },   /* prefix folded out */
+			{ "E~S",  "E~S",  1e18,   1.0    },
+			{ "M~Hz", "M~Hz", 1e6,    1.0    },
+			{ "c~m",  "m",    0.01,   0.01   },
+		};
+		for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+			bool pok = false;
+			value_unit_t in = bvn_parse_unit((const uint8_t *)cases[i].in, &pok);
+			ASSERT_TRUE(pok, cases[i].in);
+			char em[BVNR_UNIT_STRING_MAX];
+			ASSERT_TRUE(bvn_unit_to_string_ex(in, em, sizeof em,
+							  BVN_UNIT_REDUCE) > 0,
+				    "the reduced spelling is written");
+			ASSERT_TRUE(strcmp(em, cases[i].emitted) == 0,
+				    "and it is the documented one");
+			double rs = 0.0; bool ovf = false;
+			(void)bvn_unit_reduce(in, &rs, &ovf);
+			ASSERT_TRUE(!ovf && fabs(rs - cases[i].reduce_scale) <
+				    1e-9 * cases[i].reduce_scale,
+				    "bvn_unit_reduce reports the fully-reduced scale");
+			value_unit_t emitted = bvn_parse_unit((const uint8_t *)em, &pok);
+			ASSERT_TRUE(pok, "the emitted spelling parses back");
+			double es = 0.0;
+			ASSERT_TRUE(bvn_unit_convert_value(1.0, in, emitted, &es),
+				    "and the value converts into it");
+			ASSERT_TRUE(fabs(es - cases[i].emitted_scale) <
+				    1e-9 * cases[i].emitted_scale,
+				    "which is the scale a caller must actually apply");
+		}
+	}
 }
 
 static void test_info_prefix_rule_follows_magnitude_not_enum_order(void)
@@ -3129,6 +3269,7 @@ int main(void)
 	test_photometric_units_carry_the_steradian();
 	test_temperature_difference_is_its_own_quantity_kind();
 	test_extreme_compounds_keep_full_precision();
+	test_reduced_serialisation_preserves_the_quantity();
 	test_info_prefix_rule_follows_magnitude_not_enum_order();
 	test_rational_to_str_reports_too_long();
 	test_wide_denominator_renders_in_every_base();

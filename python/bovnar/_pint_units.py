@@ -95,6 +95,40 @@ BOVNAR_PINT_DEFINITIONS: list[str] = [
     'bvnr_bushel_uk = 0.03636872 * meter**3',
     'bvnr_clo = 0.155 * kelvin * meter**2 * watt**-1',
     'bvnr_debye = 3.335640951981521e-30 * coulomb * meter',
+    'bvnr_year_tropical = 31556925.9747 * second',
+    'bvnr_year_gregorian = 31556952.0 * second',
+    'bvnr_year_sidereal = 31558149.7632 * second',
+    'bvnr_year_common = 31536000.0 * second',
+    'bvnr_month_synodal = 2551442.976 * second',
+    'bvnr_month_tropical = 2360584.6848 * second',
+    'bvnr_month_sidereal = 2360591.5104 * second',
+    'bvnr_day_sidereal = 86164.0905 * second',
+    'bvnr_hour_sidereal = 3590.1704375 * second',
+    'bvnr_minute_sidereal = 59.836173958333336 * second',
+    'bvnr_second_sidereal = 0.9972695659722223 * second',
+    'bvnr_statvolt = 299.792458 * volt',
+    'bvnr_statampere = 3.3356409519815207e-10 * ampere',
+    'bvnr_statcoulomb = 3.3356409519815207e-10 * coulomb',
+    'bvnr_statfarad = 1.1126500560536185e-12 * farad',
+    'bvnr_statohm = 898755178736.8176 * ohm',
+    'bvnr_stathenry = 898755178736.8176 * henry',
+    'bvnr_statsiemens = 1.1126500560536185e-12 * siemens',
+    'bvnr_lambert = 3183.098861837907 * candela * meter**-2',
+    'bvnr_apostilb = 0.3183098861837907 * candela * meter**-2',
+    'bvnr_footlambert = 3.4262590996353905 * candela * meter**-2',
+    'bvnr_perm_0c = 5.72135e-11 * kilogram * pascal**-1 * second**-1 * meter**-2',
+    'bvnr_perm_23c = 5.74525e-11 * kilogram * pascal**-1 * second**-1 * meter**-2',
+    'bvnr_perm_metric = 8.68127e-11 * kilogram * pascal**-1 * second**-1 * meter**-2',
+    'bvnr_calorie_mean = 4.19002 * joule',
+    'bvnr_calorie_15c = 4.1858 * joule',
+    'bvnr_calorie_20c = 4.1819 * joule',
+    'bvnr_btu_59f = 1054.8 * joule',
+    'bvnr_btu_60f = 1054.68 * joule',
+    'bvnr_btu_mean = 1055.87 * joule',
+    'bvnr_elementary_charge = 1.602176634e-19 * coulomb',
+    'bvnr_circular_mil = 5.067074790974978e-10 * meter**2',
+    'bvnr_unit_pole = 1.2566370614359172e-07 * weber',
+    'bvnr_horsepower_water = 746.043 * watt',
     'bvnr_prussian_elle = 0.666937625 * meter',
     'bvnr_prussian_fuss = 0.313853 * meter',
     'bvnr_prussian_line = 0.002179534722222222 * meter',
@@ -397,6 +431,41 @@ BASE_UNIT_TO_PINT: dict[int, str] = {
     100223: 'bvnr_bushel_uk',                # BUSHEL_UK
     100224: 'bvnr_clo',                      # CLO
     100225: 'bvnr_debye',                    # DEBYE
+    100226: 'bvnr_year_tropical',                # YEAR_TROPICAL
+    100227: 'bvnr_year_gregorian',               # YEAR_GREGORIAN
+    100228: 'bvnr_year_sidereal',                # YEAR_SIDEREAL
+    100229: 'bvnr_year_common',                  # YEAR_COMMON
+    100230: 'bvnr_month_synodal',                # MONTH_SYNODAL
+    100231: 'bvnr_month_tropical',               # MONTH_TROPICAL
+    100232: 'bvnr_month_sidereal',               # MONTH_SIDEREAL
+    100233: 'bvnr_day_sidereal',                 # DAY_SIDEREAL
+    100234: 'bvnr_hour_sidereal',                # HOUR_SIDEREAL
+    100235: 'bvnr_minute_sidereal',              # MINUTE_SIDEREAL
+    100236: 'bvnr_second_sidereal',              # SECOND_SIDEREAL
+    100237: 'bvnr_statvolt',                     # STATVOLT
+    100238: 'bvnr_statampere',                   # STATAMPERE
+    100239: 'bvnr_statcoulomb',                  # STATCOULOMB
+    100240: 'bvnr_statfarad',                    # STATFARAD
+    100241: 'bvnr_statohm',                      # STATOHM
+    100242: 'bvnr_stathenry',                    # STATHENRY
+    100243: 'bvnr_statsiemens',                  # STATSIEMENS
+    100244: 'bvnr_lambert',                      # LAMBERT
+    100245: 'bvnr_apostilb',                     # APOSTILB
+    100246: 'bvnr_footlambert',                  # FOOTLAMBERT
+    100247: 'bvnr_perm_0c',                      # PERM_0C
+    100248: 'bvnr_perm_23c',                     # PERM_23C
+    100249: 'bvnr_perm_metric',                  # PERM_METRIC
+    100250: 'bvnr_calorie_mean',                 # CALORIE_MEAN
+    100251: 'bvnr_calorie_15c',                  # CALORIE_15C
+    100252: 'bvnr_calorie_20c',                  # CALORIE_20C
+    100253: 'bvnr_btu_59f',                      # BTU_59F
+    100254: 'bvnr_btu_60f',                      # BTU_60F
+    100255: 'bvnr_btu_mean',                     # BTU_MEAN
+    100256: 'bvnr_elementary_charge',            # ELEMENTARY_CHARGE
+    100257: 'bvnr_spere',                        # SPERE
+    100258: 'bvnr_circular_mil',                 # CIRCULAR_MIL
+    100259: 'bvnr_unit_pole',                    # UNIT_POLE
+    100260: 'bvnr_horsepower_water',             # HORSEPOWER_WATER
 
 }
 
@@ -463,6 +532,11 @@ _ANGLE_DERIVED: list[str] = [
     'bvnr_arcminute = %.17g * bvnr_radian' % (math.pi / 10800.0),
     'bvnr_arcsecond = %.17g * bvnr_radian' % (math.pi / 648000.0),
     'bvnr_steradian = bvnr_radian ** 2',
+    # The spere (spat) IS 4π steradian, and bovnar's kind table gives it the
+    # steradian's weight for that reason. Defined from bvnr_steradian rather
+    # than as a bare number, or pint would call it convertible to every plain
+    # ratio and bovnar would not.
+    'bvnr_spere = %.17g * bvnr_steradian' % (4.0 * math.pi),
     # The photometric units built on the steradian carry it here too, because
     # bovnar's kind table gives them the steradian's weight: a lumen IS
     # candela·steradian and a lux IS lumen/m². Defined from pint's `candela`

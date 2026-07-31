@@ -419,6 +419,42 @@ class BaseUnit(IntEnum):
     BUSHEL_UK          = 100223   # bsh_uk  (8 imperial gallons)
     CLO                = 100224   # clo     (0.155 K·m²/W)
     DEBYE              = 100225   # debye   (1e-21/c C·m, exact since 2019)
+    # The 35 the same corroboration sweep found next.
+    YEAR_TROPICAL      = 100226   # yr_trop
+    YEAR_GREGORIAN     = 100227   # yr_greg
+    YEAR_SIDEREAL      = 100228   # yr_sid
+    YEAR_COMMON        = 100229   # yr_com
+    MONTH_SYNODAL      = 100230   # mo_syn
+    MONTH_TROPICAL     = 100231   # mo_trop
+    MONTH_SIDEREAL     = 100232   # mo_sid
+    DAY_SIDEREAL       = 100233   # d_sid
+    HOUR_SIDEREAL      = 100234   # h_sid
+    MINUTE_SIDEREAL    = 100235   # min_sid
+    SECOND_SIDEREAL    = 100236   # s_sid
+    STATVOLT           = 100237   # statV
+    STATAMPERE         = 100238   # statA
+    STATCOULOMB        = 100239   # statC
+    STATFARAD          = 100240   # statF
+    STATOHM            = 100241   # statΩ
+    STATHENRY          = 100242   # statH
+    STATSIEMENS        = 100243   # statS
+    LAMBERT            = 100244   # Lmb
+    APOSTILB           = 100245   # apostilb
+    FOOTLAMBERT        = 100246   # footlambert
+    PERM_0C            = 100247   # perm_0C
+    PERM_23C           = 100248   # perm_23C
+    PERM_METRIC        = 100249   # perm_m
+    CALORIE_MEAN       = 100250   # cal_m
+    CALORIE_15C        = 100251   # cal_15
+    CALORIE_20C        = 100252   # cal_20
+    BTU_59F            = 100253   # Btu_59
+    BTU_60F            = 100254   # Btu_60
+    BTU_MEAN           = 100255   # Btu_m
+    ELEMENTARY_CHARGE  = 100256   # e
+    SPERE              = 100257   # sph
+    CIRCULAR_MIL       = 100258   # cml
+    UNIT_POLE          = 100259   # unit_pole
+    HORSEPOWER_WATER   = 100260   # hp_W
 
     # ---- Currencies: block 90 -------------------------------------------
     #
@@ -660,7 +696,7 @@ class BaseUnit(IntEnum):
 UNIT_BLOCK_SIZE     = 10000
 
 UNIT_NATIVE_FIRST   = BaseUnit.BIT
-UNIT_NATIVE_LAST    = BaseUnit.DEBYE
+UNIT_NATIVE_LAST    = BaseUnit.HORSEPOWER_WATER
 
 CURRENCY_FIRST      = BaseUnit.AED
 CURRENCY_LAST       = BaseUnit.RUNE

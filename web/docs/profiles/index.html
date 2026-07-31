@@ -303,7 +303,7 @@ only <code>ucum</code> does, so <code>udunits:mL{x}</code> is <code>error_unit_i
 (§3.4).</p>
 <p>Adding a vocabulary is therefore a data file and a registry row, not a second parser.</p>
 <h3 id="12-why-a-notation-rather-than-more-native-units">1.2 Why a notation rather than more native units</h3>
-<p>Bovnar's native registry is 226 physical units and 216 currencies, hand-maintained in
+<p>Bovnar's native registry is 261 physical units and 216 currencies, hand-maintained in
 <code>src/gendata/</code>. UCUM's atom table is larger — a complete clinical, apothecary, troy, avoirdupois
 and CGS inventory — and its expression language is unbounded, so the set of valid UCUM codes cannot
 be enumerated as a table of units at all.</p>
@@ -1111,9 +1111,9 @@ alone would leave whichever code happened to be shortest and make every other de
 <p>The asymmetry is worth stating plainly: these profiles are good <em>readers</em> and partial <em>writers</em>. A
 round trip that starts in a vocabulary returns to it; one that starts in Bovnar's native registry
 may have nowhere to go.</p>
-<p>Sweeping the whole native registry — all 226 physical units, each at the twelve prefixes
-<code>si_none da h k M G T d c m µ n</code> — <strong>676</strong> combinations survive a native → UCUM → native round trip
-unchanged, <strong>1659</strong> have no UCUM code, 377 are prefix/unit pairs <code>bvn_prefix_unit_valid</code> rejects
+<p>Sweeping the whole native registry — all 261 physical units, each at the twelve prefixes
+<code>si_none da h k M G T d c m µ n</code> — <strong>688</strong> combinations survive a native → UCUM → native round trip
+unchanged, <strong>2067</strong> have no UCUM code, 377 are prefix/unit pairs <code>bvn_prefix_unit_valid</code> rejects
 before the question arises, and <strong>none round-trips to a different unit</strong>. The last of those is the
 invariant; the two counts move whenever the registry gains a unit, so <code>test_sweep_round_trip</code> in
 <code>tests/bovnar_ucum_test.c</code> pins all three rather than leaving them as prose.</p>
@@ -1425,6 +1425,21 @@ reading back <code>bvn_unit_to_string</code> and the coherent-SI factor. The UCU
 <td><code>yr</code></td>
 <td><code>31557600.0</code></td>
 </tr>
+<tr>
+<td><code>a_t</code></td>
+<td><code>yr_trop</code></td>
+<td><code>31556925.9747</code></td>
+</tr>
+<tr>
+<td><code>a_g</code></td>
+<td><code>yr_greg</code></td>
+<td><code>31556952.0</code></td>
+</tr>
+<tr>
+<td><code>mo_s</code></td>
+<td><code>mo_syn</code></td>
+<td><code>2551442.976</code></td>
+</tr>
 </tbody>
 </table>
 <p>Bovnar's <code>yr</code> is 31557600 s = 365.25 d and its <code>mo</code> is 2629800 s = 30.4375 d, which are the
@@ -1479,6 +1494,11 @@ four spellings map with no loss. The tropical and gregorian variants do not (§6
 <td><code>[pH]</code></td>
 <td><code>pH</code></td>
 <td><code>1.0</code></td>
+</tr>
+<tr>
+<td><code>sph</code></td>
+<td><code>sph</code></td>
+<td><code>12.566370614359172</code></td>
 </tr>
 </tbody>
 </table>
@@ -2084,6 +2104,36 @@ about a document that never said it.</p>
 <td><code>cal_IT</code></td>
 <td><code>4.1868</code></td>
 </tr>
+<tr>
+<td><code>cal_m</code></td>
+<td><code>cal_m</code></td>
+<td><code>4.19002</code></td>
+</tr>
+<tr>
+<td><code>cal_[15]</code></td>
+<td><code>cal_15</code></td>
+<td><code>4.1858</code></td>
+</tr>
+<tr>
+<td><code>cal_[20]</code></td>
+<td><code>cal_20</code></td>
+<td><code>4.1819</code></td>
+</tr>
+<tr>
+<td><code>[Btu_59]</code></td>
+<td><code>Btu_59</code></td>
+<td><code>1054.8</code></td>
+</tr>
+<tr>
+<td><code>[Btu_60]</code></td>
+<td><code>Btu_60</code></td>
+<td><code>1054.68</code></td>
+</tr>
+<tr>
+<td><code>[Btu_m]</code></td>
+<td><code>Btu_m</code></td>
+<td><code>1055.87</code></td>
+</tr>
 </tbody>
 </table>
 <p><code>m[Hg]</code> is the row that makes the decade mechanism visible: it is a <strong>metre</strong> of mercury column, so
@@ -2172,9 +2222,19 @@ has no gram-force, but <code>g·gn</code> is gram times standard gravity, dimens
 <td><code>0.000258</code></td>
 </tr>
 <tr>
+<td><code>[e]</code></td>
+<td><code>e</code></td>
+<td><code>1.602176634e-19</code></td>
+</tr>
+<tr>
 <td><code>Gb</code></td>
 <td><code>Oe·c~m</code></td>
 <td><code>0.7957747154594768</code></td>
+</tr>
+<tr>
+<td><code>Lmb</code></td>
+<td><code>Lmb</code></td>
+<td><code>3183.098861837907</code></td>
 </tr>
 </tbody>
 </table>
@@ -2454,9 +2514,11 @@ refusing it. Native <code>Btu_th</code> (<code>1054.3502644888889</code> J) take
 <code>[Btu]</code></strong>, which is thermochemical; native <code>cal_IT</code> (<code>4.1868</code> J) takes <code>cal_IT</code>. Mapping <code>[Btu]</code>
 onto <code>Btu</code> instead would be wrong by about 0.07 %: small, dimensionally correct, and invisible to
 every later check, which is the worst shape an error can have here — so the registry gained the unit
-rather than the table gaining a refusal. What is still refused is the handful of BTU and calorie
-variants with no native counterpart: <code>[Btu_39]</code>, <code>[Btu_59]</code>, <code>[Btu_60]</code>, <code>[Btu_m]</code>, <code>cal_m</code>,
-<code>cal_[15]</code> and <code>cal_[20]</code>. UDUNITS runs the other way and is a trap in the mirror image (§13.3).</p>
+rather than the table gaining a refusal. The rest of the family followed the same way: <code>[Btu_59]</code>, <code>[Btu_60]</code>,
+<code>[Btu_m]</code>, <code>cal_m</code>, <code>cal_[15]</code> and <code>cal_[20]</code> now map onto native units of their own, each stated at
+the exact decimal UCUM states. Only <code>[Btu_39]</code> is still refused — UCUM is the sole vocabulary that
+defines it, and one publisher naming a unit is a request rather than the corroboration the others
+had. UDUNITS runs the other way and is a trap in the mirror image (§13.3).</p>
 <p><strong>The apothecary dram is not the avoirdupois dram.</strong> <code>[dr_ap]</code> is 3.8879346 g and bovnar's <code>dr</code> is
 1.7718 g — a factor of 2.2 apart. Both map, to <em>different</em> native units: <code>[dr_av]</code> → <code>dr</code>,
 <code>[dr_ap]</code> → <code>dr_ap</code>. The apothecary <em>ounce</em> and <em>pound</em> are the troy ones, so <code>[oz_ap]</code> and
@@ -2515,8 +2577,8 @@ expected the unit slot to carry the analyte.</p>
 </tr>
 <tr>
 <td>Year and month variants</td>
-<td><code>a_t</code> (tropical), <code>a_g</code> (gregorian), <code>mo_s</code>, <code>mo_g</code></td>
-<td><code>error_unit_profile_unsupported</code> — Bovnar has only the Julian forms</td>
+<td><code>mo_g</code> (mean gregorian month)</td>
+<td><code>error_unit_profile_unsupported</code> — <code>a_t</code>, <code>a_g</code> and <code>mo_s</code> now map to <code>yr_trop</code>, <code>yr_greg</code> and <code>mo_syn</code></td>
 </tr>
 <tr>
 <td>Osmolality</td>
@@ -2525,13 +2587,13 @@ expected the unit slot to carry the analyte.</p>
 </tr>
 <tr>
 <td>Constants as units</td>
-<td><code>[c]</code>, <code>[e]</code>, <code>[k]</code>, <code>[h]</code>, <code>[m_e]</code>, <code>[G]</code></td>
-<td><code>error_unit_profile_unsupported</code></td>
+<td><code>[c]</code>, <code>[k]</code>, <code>[h]</code>, <code>[m_e]</code>, <code>[G]</code></td>
+<td><code>error_unit_profile_unsupported</code> — <code>[e]</code> is the exception and maps to <code>e</code>, the elementary charge being a unit of charge rather than a dimensionless constant</td>
 </tr>
 <tr>
 <td>Energy conventions with no native counterpart</td>
-<td><code>[Btu_39]</code>, <code>[Btu_59]</code>, <code>[Btu_60]</code>, <code>[Btu_m]</code>, <code>cal_m</code>, <code>cal_[15]</code>, <code>cal_[20]</code></td>
-<td><code>error_unit_profile_unsupported</code> (§6.3)</td>
+<td><code>[Btu_39]</code></td>
+<td><code>error_unit_profile_unsupported</code> (§6.3) — the other six now map</td>
 </tr>
 <tr>
 <td>The British series</td>
@@ -2869,7 +2931,7 @@ native target is worth, and compares. <code>unece</code> is reached at one remov
 <p>The generator also emits the <strong>reverse</strong> tables §5.3 uses, choosing the canonical code for each slot
 by the grammar's rule (shortest for an expression profile, first-declared for a flat one), honouring
 <code>.reverse = false</code>, and recording that code's own decade. Deriving them rather than searching the
-forward tables at run time is what makes <code>bvn_unit_to_profile</code> deterministic; the 676 round trips
+forward tables at run time is what makes <code>bvn_unit_to_profile</code> deterministic; the 688 round trips
 quoted in §5.3 are the check that forward and reverse agree.</p>
 <h3 id="93-tests">9.3 Tests</h3>
 <p>One test file per vocabulary, each pinning the section that specifies it, plus the suite that holds

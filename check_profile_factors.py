@@ -341,6 +341,23 @@ WAIVED_UPSTREAM = {
         "wrong rather than the table: a trade code list does not mean the lunar "
         "cycle. Exactly the limit a secondary source has, and the reason this "
         "vocabulary's disagreements are evidence rather than proof.",
+    # The CGS-ESU ohm and henry, and the mean calorie. QUDT states each at five
+    # or three significant digits where the definition is exact and where the
+    # OTHER publishers of the same unit state it precisely: UDUNITS has the
+    # statohm at 898755400000 and OM at 898755200000, both within tolerance of
+    # the exact 22468879468420441/25000 that c fixes; UCUM and OM both state the
+    # mean calorie as exactly 4.19002 J. So this is QUDT rounding, corroborated
+    # by the vocabularies beside it rather than asserted here.
+    ("qudt", "OHM_Stat"):
+        "QUDT rounds the statohm to 8.9876e11 (5 digits); the exact value is "
+        "c·(10c) = 22468879468420441/25000 Ω = 898755178736.8176. 5.4 ppm — "
+        "UDUNITS and OM both state it precisely.",
+    ("qudt", "H_Stat"):
+        "QUDT rounds the stathenry to 8.9876e11, the same 5-digit rounding it "
+        "applies to the statohm, which is numerically the same value. 5.4 ppm.",
+    ("qudt", "CAL_MEAN"):
+        "QUDT rounds the mean calorie to 4.19 J (3 digits); UCUM's cal_m and "
+        "OM's calorie-Mean both state 4.19002 J exactly. 4.8 ppm.",
     ("qudt", "TORR"):
         "QUDT rounds the torr to 133.322 Pa (6 digits); native Torr is the "
         "exact 101325/760. 2.8 ppm, the same publisher rounding as UCUM's "

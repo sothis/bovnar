@@ -192,7 +192,7 @@ Adding a vocabulary is therefore a data file and a registry row, not a second pa
 
 ### 1.2 Why a notation rather than more native units
 
-Bovnar's native registry is 226 physical units and 216 currencies, hand-maintained in
+Bovnar's native registry is 261 physical units and 216 currencies, hand-maintained in
 `src/gendata/`. UCUM's atom table is larger — a complete clinical, apothecary, troy, avoirdupois
 and CGS inventory — and its expression language is unbounded, so the set of valid UCUM codes cannot
 be enumerated as a table of units at all.
@@ -912,9 +912,9 @@ The asymmetry is worth stating plainly: these profiles are good *readers* and pa
 round trip that starts in a vocabulary returns to it; one that starts in Bovnar's native registry
 may have nowhere to go.
 
-Sweeping the whole native registry — all 226 physical units, each at the twelve prefixes
-`si_none da h k M G T d c m µ n` — **676** combinations survive a native → UCUM → native round trip
-unchanged, **1659** have no UCUM code, 377 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
+Sweeping the whole native registry — all 261 physical units, each at the twelve prefixes
+`si_none da h k M G T d c m µ n` — **688** combinations survive a native → UCUM → native round trip
+unchanged, **2067** have no UCUM code, 377 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
 before the question arises, and **none round-trips to a different unit**. The last of those is the
 invariant; the two counts move whenever the registry gains a unit, so `test_sweep_round_trip` in
 `tests/bovnar_ucum_test.c` pins all three rather than leaving them as prose.
@@ -1005,6 +1005,9 @@ reading back `bvn_unit_to_string` and the coherent-SI factor. The UCUM column is
 | `mo_j` | `mo` | `2629800.0` |
 | `a` | `yr` | `31557600.0` |
 | `a_j` | `yr` | `31557600.0` |
+| `a_t` | `yr_trop` | `31556925.9747` |
+| `a_g` | `yr_greg` | `31556952.0` |
+| `mo_s` | `mo_syn` | `2551442.976` |
 
 Bovnar's `yr` is 31557600 s = 365.25 d and its `mo` is 2629800 s = 30.4375 d, which are the
 **Julian** year and month exactly — and which is what UCUM's unqualified `a` and `mo` are, so all
@@ -1022,6 +1025,7 @@ four spellings map with no loss. The tropical and gregorian variants do not (§6
 | `Np` | `Np` | `1.0` |
 | `B` | `da~dB` | `10.0` |
 | `[pH]` | `pH` | `1.0` |
+| `sph` | `sph` | `12.566370614359172` |
 
 **Temperature**
 
@@ -1165,6 +1169,12 @@ about a document that never said it.
 | `[Btu]` | `Btu_th` | `1054.3502644888888` |
 | `[Btu_th]` | `Btu_th` | `1054.3502644888888` |
 | `cal_IT` | `cal_IT` | `4.1868` |
+| `cal_m` | `cal_m` | `4.19002` |
+| `cal_[15]` | `cal_15` | `4.1858` |
+| `cal_[20]` | `cal_20` | `4.1819` |
+| `[Btu_59]` | `Btu_59` | `1054.8` |
+| `[Btu_60]` | `Btu_60` | `1054.68` |
+| `[Btu_m]` | `Btu_m` | `1055.87` |
 
 `m[Hg]` is the row that makes the decade mechanism visible: it is a **metre** of mercury column, so
 its native target carries the kilo that makes `mm[Hg]` come out as plain `mmHg`.
@@ -1191,7 +1201,9 @@ has no gram-force, but `g·gn` is gram times standard gravity, dimensions `[1,1,
 | `RAD` | `c~Gy` | `0.01` |
 | `REM` | `rem` | `0.01` |
 | `R` | `R` | `0.000258` |
+| `[e]` | `e` | `1.602176634e-19` |
 | `Gb` | `Oe·c~m` | `0.7957747154594768` |
+| `Lmb` | `Lmb` | `3183.098861837907` |
 
 `RAD` and `REM` are the case-**sensitive** spellings. UCUM's `[RAD]` and `[REM]` belong to its
 case-insensitive variant, which this profile does not implement (§10.3), so they are not codes a
@@ -1292,9 +1304,11 @@ refusing it. Native `Btu_th` (`1054.3502644888889` J) takes UCUM's `[Btu_th]` **
 `[Btu]`**, which is thermochemical; native `cal_IT` (`4.1868` J) takes `cal_IT`. Mapping `[Btu]`
 onto `Btu` instead would be wrong by about 0.07 %: small, dimensionally correct, and invisible to
 every later check, which is the worst shape an error can have here — so the registry gained the unit
-rather than the table gaining a refusal. What is still refused is the handful of BTU and calorie
-variants with no native counterpart: `[Btu_39]`, `[Btu_59]`, `[Btu_60]`, `[Btu_m]`, `cal_m`,
-`cal_[15]` and `cal_[20]`. UDUNITS runs the other way and is a trap in the mirror image (§13.3).
+rather than the table gaining a refusal. The rest of the family followed the same way: `[Btu_59]`, `[Btu_60]`,
+`[Btu_m]`, `cal_m`, `cal_[15]` and `cal_[20]` now map onto native units of their own, each stated at
+the exact decimal UCUM states. Only `[Btu_39]` is still refused — UCUM is the sole vocabulary that
+defines it, and one publisher naming a unit is a request rather than the corroboration the others
+had. UDUNITS runs the other way and is a trap in the mirror image (§13.3).
 
 **The apothecary dram is not the avoirdupois dram.** `[dr_ap]` is 3.8879346 g and bovnar's `dr` is
 1.7718 g — a factor of 2.2 apart. Both map, to *different* native units: `[dr_av]` → `dr`,
@@ -1336,10 +1350,10 @@ expected the unit slot to carry the analyte.
 | Special units with a reference | `B[SPL]`, `B[V]`, `B[W]`, `B[kW]`, `B[mV]`, `B[10.nV]` | `error_unit_profile_unsupported` (§3.7) |
 | Other special units | `[p'diop]`, `%[slope]`, `[hp'_X]`, `[m/s2/Hz^(1/2)]` | `error_unit_profile_unsupported` |
 | Scale outside a prefix decade | `10*4`, `10*5`, `10*7`, `10*8` | `error_unit_profile_unsupported` (§3.5) |
-| Year and month variants | `a_t` (tropical), `a_g` (gregorian), `mo_s`, `mo_g` | `error_unit_profile_unsupported` — Bovnar has only the Julian forms |
+| Year and month variants | `mo_g` (mean gregorian month) | `error_unit_profile_unsupported` — `a_t`, `a_g` and `mo_s` now map to `yr_trop`, `yr_greg` and `mo_syn` |
 | Osmolality | `osm`, and any expression over it | `error_unit_profile_unsupported` |
-| Constants as units | `[c]`, `[e]`, `[k]`, `[h]`, `[m_e]`, `[G]` | `error_unit_profile_unsupported` |
-| Energy conventions with no native counterpart | `[Btu_39]`, `[Btu_59]`, `[Btu_60]`, `[Btu_m]`, `cal_m`, `cal_[15]`, `cal_[20]` | `error_unit_profile_unsupported` (§6.3) |
+| Constants as units | `[c]`, `[k]`, `[h]`, `[m_e]`, `[G]` | `error_unit_profile_unsupported` — `[e]` is the exception and maps to `e`, the elementary charge being a unit of charge rather than a dimensionless constant |
+| Energy conventions with no native counterpart | `[Btu_39]` | `error_unit_profile_unsupported` (§6.3) — the other six now map |
 | The British series | `[ch_br]`, `[ft_br]`, `[yd_br]`, `[in_br]`, `[mi_br]` | `error_unit_profile_unsupported` (§6.3) — bovnar has no British foot |
 | Over 32 components | any expression exceeding `BVNR_MAX_UNIT_COMPONENTS` | `error_unit_profile_unsupported` |
 | A string that is not a UCUM atom at all | `Cal`, `[zzz]`, `notacode` | `error_unit_illegal` |
@@ -1656,7 +1670,7 @@ native target is worth, and compares. `unece` is reached at one remove; see §9.
 The generator also emits the **reverse** tables §5.3 uses, choosing the canonical code for each slot
 by the grammar's rule (shortest for an expression profile, first-declared for a flat one), honouring
 `.reverse = false`, and recording that code's own decade. Deriving them rather than searching the
-forward tables at run time is what makes `bvn_unit_to_profile` deterministic; the 676 round trips
+forward tables at run time is what makes `bvn_unit_to_profile` deterministic; the 688 round trips
 quoted in §5.3 are the check that forward and reverse agree.
 
 ### 9.3 Tests

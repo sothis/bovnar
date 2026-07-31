@@ -176,7 +176,11 @@ static void test_flatness(void)
 
 	/* QUDT's MO is the SYNODAL month (29.53 days); native mo is a twelfth of
 	 * the Julian year. Three per cent apart and dimensionally identical. */
-	chk_error("qudt:MO", error_unit_profile_unsupported);
+	/* MO is QUDT's SYNODAL (lunar) month, 29.53 d; native mo is a twelfth of
+	 * the Julian year. It was refused while bovnar had only the second; it
+	 * now maps to mo_syn, and the distinction is asserted instead. */
+	chk_str("qudt:MO", "mo_syn");
+	chk_factor("qudt:MO", 2551442.976);
 
 	/* REV-PER-MIN is an ANGULAR VELOCITY in QUDT -- 2π/60, a revolution being
 	 * 2π radians -- not the revolution-counting rpm. */

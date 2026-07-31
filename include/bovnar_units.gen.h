@@ -225,6 +225,41 @@
 	bu_bushel_uk    = 100223,
 	bu_clo          = 100224,
 	bu_debye        = 100225,
+	bu_year_tropical = 100226,
+	bu_year_gregorian = 100227,
+	bu_year_sidereal = 100228,
+	bu_year_common  = 100229,
+	bu_month_synodal = 100230,
+	bu_month_tropical = 100231,
+	bu_month_sidereal = 100232,
+	bu_day_sidereal = 100233,
+	bu_hour_sidereal = 100234,
+	bu_minute_sidereal = 100235,
+	bu_second_sidereal = 100236,
+	bu_statvolt     = 100237,
+	bu_statampere   = 100238,
+	bu_statcoulomb  = 100239,
+	bu_statfarad    = 100240,
+	bu_statohm      = 100241,
+	bu_stathenry    = 100242,
+	bu_statsiemens  = 100243,
+	bu_lambert      = 100244,
+	bu_apostilb     = 100245,
+	bu_footlambert  = 100246,
+	bu_perm_0c      = 100247,
+	bu_perm_23c     = 100248,
+	bu_perm_metric  = 100249,
+	bu_calorie_mean = 100250,
+	bu_calorie_15c  = 100251,
+	bu_calorie_20c  = 100252,
+	bu_btu_59f      = 100253,
+	bu_btu_60f      = 100254,
+	bu_btu_mean     = 100255,
+	bu_elementary_charge = 100256,
+	bu_spere        = 100257,
+	bu_circular_mil = 100258,
+	bu_unit_pole    = 100259,
+	bu_horsepower_water = 100260,
 
 /* The native block's bounds, and the dense table slot of a unit in it.
  *
@@ -235,8 +270,8 @@
  * arithmetic on the enumerator so it can be a designated-initialiser index in
  * the generated table rows: the row and the enum cannot drift apart. */
 #define BVN_UNIT_NATIVE_FIRST     100000
-#define BVN_UNIT_NATIVE_LAST      100225
-#define BVN_UNIT_NATIVE_COUNT     226
+#define BVN_UNIT_NATIVE_LAST      100260
+#define BVN_UNIT_NATIVE_COUNT     261
 #define BVN_UNIT_SLOT_NATIVE_BASE 1
 #define BVN_SLOT_NATIVE(b) \
 	(BVN_UNIT_SLOT_NATIVE_BASE + ((int)(b) - BVN_UNIT_NATIVE_FIRST))

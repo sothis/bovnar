@@ -160,12 +160,17 @@ static void test_spellings(void)
  * can catch. They are refused rather than mapped. */
 static void test_near_miss_refusals(void)
 {
-	/* UDUNITS' unqualified year is the TROPICAL year (3.15569259747e7 s),
-	 * not the Julian year native yr is. 674 s apart. */
-	chk_error("udunits:year", error_unit_profile_unsupported);
-	chk_error("udunits:yr", error_unit_profile_unsupported);
-	chk_error("udunits:month", error_unit_profile_unsupported);
+	/* UDUNITS' unqualified year is the TROPICAL year (3.15569259747e7 s), not
+	 * the Julian year native yr is. 674 s apart. Both refusals below became
+	 * MAPPINGS when yr_trop arrived; what must not be lost is the distinction,
+	 * so the assertions moved from "refused" to "a different unit from yr". A
+	 * UDUNITS or CF document that says `year` -- and they say it constantly --
+	 * could not be read at all before. */
+	chk_str("udunits:year", "yr_trop");
+	chk_str("udunits:yr", "yr_trop");
+	chk_factor("udunits:year", 31556925.9747);
 	chk_str("udunits:Julian_year", "yr");
+	chk_error("udunits:month", error_unit_profile_unsupported);
 
 	/* UDUNITS' unqualified calorie is the IT calorie (4.1868 J); native cal is
 	 * the thermochemical 4.184 J. 0.067 % apart, and both are now units, so
@@ -479,8 +484,10 @@ static void test_refusals(void)
 	/* Logarithms with a reference level, which dB cannot carry. */
 	chk_error("udunits:dBm", error_unit_profile_unsupported);
 
-	/* Years that are not the Julian year. */
-	chk_error("udunits:sidereal_year", error_unit_profile_unsupported);
+	/* Years that are not the Julian year -- each now its own unit. */
+	chk_str("udunits:sidereal_year", "yr_sid");
+	chk_str("udunits:Gregorian_year", "yr_greg");
+	chk_str("udunits:common_year", "yr_com");
 
 	/* Not UDUNITS at all. */
 	chk_error("udunits:metres_per_second", error_unit_illegal);

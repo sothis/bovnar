@@ -122,7 +122,7 @@ physical quantities lives; it needs a grammar change and a new parameter class i
 **Rejected, but for a reason worth recording.** It is the most general answer and generality is
 the problem: `Δ(m)` and `Δ(Pa)` are grammatical and meaningless, because on a **ratio** scale a
 difference has the same unit as the quantity — only an *affine* scale distinguishes them. So the
-operator would be a no-op on 186 of the registry's 226 units, and a no-op that parses is a thing
+operator would be a no-op on 186 of the registry's 261 units, and a no-op that parses is a thing
 producers will write and readers will have to strip. It also doubles the notional unit space for
 equality and normalisation (`Δ(m)` must compare equal to `m`, which is a special case in
 `bvn_unit_equal`, the formatter and the reverse profile tables).

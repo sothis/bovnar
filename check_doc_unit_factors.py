@@ -520,11 +520,21 @@ def agrees_as_double(got, want, unit):
     not that, and is reported."""
     if got.pi != want.pi:
         # A unit whose true factor is irrational (the π-based angles, the
-        # oersted, the parsec) cannot be written as a decimal at all, so a
-        # document that states one is stating the same rounding units.bvnr
-        # stores. That is allowed; stating a DIFFERENT rounding is not.
-        return (unit.get("exact", True) is False
-                and got.as_float() == unit["factor"])
+        # oersted, the parsec, the luminance and circular-mil rows) cannot be
+        # written as a decimal at all, so a document that states one is stating
+        # the same rounding units.bvnr stores. That is allowed; stating a
+        # DIFFERENT rounding is not.
+        #
+        # A FEW ULP of slack, not bit-equality. There is no exact value to be
+        # bit-equal to: `π/4 thou²` evaluated as (rational × π) and the same
+        # quantity evaluated as a chain of doubles land one ulp apart, and
+        # neither is more correct than the other. The bound is still four orders
+        # tighter than any real disagreement -- a documented value that is wrong
+        # rather than differently rounded is out by digits, not by an ulp.
+        if unit.get("exact", True) is not False:
+            return False
+        f = unit["factor"]
+        return f != 0.0 and abs(got.as_float() - f) <= 1e-15 * abs(f)
     return float(got.q) == float(want.q)
 
 

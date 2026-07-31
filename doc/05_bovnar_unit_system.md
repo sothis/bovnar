@@ -109,7 +109,7 @@ The Bovnar quantity annotation system is an **optional, per-value annotation** t
 
 Two distinct namespaces share the annotation slot:
 
-- **Physical units** — 226 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
+- **Physical units** — 261 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
 - **Currency codes** — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical — HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01 — and `ANG` coexists with its successor `XCG`, which inherited its numeric code 532; see §9.2) and 50 cryptocurrency tickers.
 
 Both namespaces are syntactically unified: the same grammar, the same `~` prefix separator, the same compound-unit operators (`·`, `*`, `/`), and the same `value_unit_t` data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.
@@ -211,7 +211,7 @@ When both are present, equality is checked after parsing via `bvn_unit_equal`, a
 
 ## 3. Physical Base Units
 
-Bovnar supports 226 physical base units. Currency codes are a separate namespace and are covered in §9.
+Bovnar supports 261 physical base units. Currency codes are a separate namespace and are covered in §9.
 
 > **Reading this section:** The *Symbol* column gives the canonical serialized form. *Long forms* are accepted on input but never produced on output. *Enum value* is the `value_base_unit_t` constant used in the C API.
 
@@ -1003,6 +1003,91 @@ digit they state.
 > milligrams recovered from one assay ton read as troy ounces per short ton, and the debye has been
 > exactly 10⁻²¹/c C·m since the 2019 SI fixed c. Their publishers state 7- and 6-digit roundings of
 > those; the rational is what they are rounding.
+
+#### And the thirty-five the same sweep found next
+
+Grouping every profile refusal by (dimension, value) turned up 35 groups **two or more vocabularies
+define**. The nine above were the first pass; these are the rest that name a real unit. What is left
+out is a *constant* rather than a unit (UCUM's `[pi]`), a value only one publisher states, or a
+dimensionless "relative permeability" that is a number.
+
+**Where the publishers disagree, the exact definition decides.** The CGS-ESU units are built on `c`,
+which the 2019 SI fixed, so every one is an exact rational and the publishers' five- to seven-digit
+decimals are roundings of it — which is why `statΩ` is 22468879468420441/25000 here and
+898 755 400 000, 898 755 200 000 and 898 760 000 000 in UDUNITS, OM and QUDT. The sidereal hour,
+minute and second are derived from the sidereal **day** rather than taken from the three slightly
+inconsistent decimals the publishers state for them, so the four stay consistent with each other.
+The π-based rows carry `.exact = false`, as the oersted and the parsec do: a value that is not a
+rational cannot be converted losslessly, and saying so is what that flag is for.
+
+**`yr` is still the Julian year and `mo` still a twelfth of it.** Naming the others does not make the
+short spellings ambiguous — it gives the other calendars somewhere to go, which is what lets a
+UDUNITS or CF document that says `year` be read at all. It was refused outright before.
+
+**Calendar and sidereal time**
+
+| Symbol | Long forms | Name | Enum | Factor |
+|--------|-----------|------|------|--------|
+| `yr_trop` | `tropical_year` | tropical year | `bu_year_tropical` | 31 556 925.9747 s (the tropical year UDUNITS and CF carry) |
+| `yr_greg` | `gregorian_year` | Gregorian year | `bu_year_gregorian` | 31 556 952 s (exact, = 365.2425 d) |
+| `yr_sid` | `sidereal_year` | sidereal year | `bu_year_sidereal` | 31 558 149.7632 s |
+| `yr_com` | `common_year` | common year | `bu_year_common` | 31 536 000 s (exact, = 365 d) |
+| `mo_syn` | `synodal_month` | synodal month | `bu_month_synodal` | 2 551 442.976 s (the synodal, lunar month) |
+| `mo_trop` | `tropical_month` | tropical month | `bu_month_tropical` | 2 360 584.6848 s |
+| `mo_sid` | `sidereal_month` | sidereal month | `bu_month_sidereal` | 2 360 591.5104 s |
+| `d_sid` | `sidereal_day` | sidereal day | `bu_day_sidereal` | 86 164.0905 s |
+| `h_sid` | `sidereal_hour` | sidereal hour | `bu_hour_sidereal` | `d_sid`/24 = 3590.1704375 s |
+| `min_sid` | `sidereal_minute` | sidereal minute | `bu_minute_sidereal` | `d_sid`/1440 |
+| `s_sid` | `sidereal_second` | sidereal second | `bu_second_sidereal` | `d_sid`/86400 |
+
+**CGS electrostatic (ESU)**
+
+| Symbol | Long forms | Name | Enum | Factor |
+|--------|-----------|------|------|--------|
+| `statV` | `statvolt` | statvolt | `bu_statvolt` | 149896229/500000 V = 299.792458 V (exact, = c×10⁻⁶) |
+| `statA` | `statampere` | statampere | `bu_statampere` | 1/2997924580 A (exact) |
+| `statC` | `statcoulomb`, `franklin` | statcoulomb (franklin) | `bu_statcoulomb` | 1/2997924580 C (exact) |
+| `statF` | `statfarad` | statfarad | `bu_statfarad` | 25000/22468879468420441 F (exact) |
+| `statΩ` | `statohm` | statohm | `bu_statohm` | 22468879468420441/25000 Ω ≈ 898 755 178 737 Ω (exact) |
+| `statH` | `stathenry` | stathenry | `bu_stathenry` | 22468879468420441/25000 H (exact) |
+| `statS` | `statsiemens`, `statmho` | statsiemens | `bu_statsiemens` | 25000/22468879468420441 S (exact) |
+
+**Luminance**
+
+| Symbol | Long forms | Name | Enum | Factor |
+|--------|-----------|------|------|--------|
+| `Lmb` | `lambert` | lambert | `bu_lambert` | 10⁴/π cd·m⁻² |
+| `apostilb` | `blondel` | apostilb (blondel) | `bu_apostilb` | 1/π cd·m⁻² |
+| `footlambert` | `foot_lambert` | foot-lambert | `bu_footlambert` | 1/π cd·ft⁻² |
+
+**Water-vapour permeance**
+
+| Symbol | Long forms | Name | Enum | Factor |
+|--------|-----------|------|------|--------|
+| `perm_0C` | — | perm (0 °C) | `bu_perm_0c` | 5.72135×10⁻¹¹ kg·Pa⁻¹·s⁻¹·m⁻² (exact) |
+| `perm_23C` | — | perm (23 °C) | `bu_perm_23c` | 5.74525×10⁻¹¹ kg·Pa⁻¹·s⁻¹·m⁻² (exact) |
+| `perm_m` | `perm_metric` | metric perm | `bu_perm_metric` | 8.68127×10⁻¹¹ kg·Pa⁻¹·s⁻¹·m⁻² (exact) |
+
+**Heat conventions**
+
+| Symbol | Long forms | Name | Enum | Factor |
+|--------|-----------|------|------|--------|
+| `cal_m` | `mean_calorie` | mean calorie | `bu_calorie_mean` | 4.19002 J (exact) |
+| `cal_15` | `calorie_15C` | 15 °C calorie | `bu_calorie_15c` | 4.1858 J (exact) |
+| `cal_20` | `calorie_20C` | 20 °C calorie | `bu_calorie_20c` | 4.1819 J (exact) |
+| `Btu_59` | `btu_59F` | 59 °F BTU | `bu_btu_59f` | 1054.8 J (exact) |
+| `Btu_60` | `btu_60F` | 60 °F BTU | `bu_btu_60f` | 1054.68 J (exact) |
+| `Btu_m` | `mean_btu` | mean BTU | `bu_btu_mean` | 1055.87 J (exact) |
+
+**And the singles**
+
+| Symbol | Long forms | Name | Enum | Factor |
+|--------|-----------|------|------|--------|
+| `e` | `elementary_charge` | elementary charge | `bu_elementary_charge` | 1.602176634×10⁻¹⁹ C (exact, the 2019 SI definition) |
+| `sph` | `spere`, `spat` | spere (spat) | `bu_spere` | 4π sr |
+| `cml` | `circular_mil` | circular mil | `bu_circular_mil` | π/4 `thou`² ≈ 5.0670748×10⁻¹⁰ m² |
+| `unit_pole` | `unitpole` | unit pole | `bu_unit_pole` | 4π×10⁻⁸ Wb |
+| `hp_W` | `water_horsepower` | water horsepower | `bu_horsepower_water` | 746.043 W |
 
 ---
 
@@ -1801,7 +1886,7 @@ A base unit's id is **blocked**, not a running counter: the leading two decimal 
 | 80 | 800000–809999 | CF standard names | `src/gendata/cf.bvnr` |
 | 90 | 900000–909999 | currencies | `src/gendata/currencies.bvnr` |
 
-`bu_none` is 0 and belongs to no block; every tag between the native units and the currencies is now taken, so a further vocabulary needs one outside 10–90. Blocks 40–80 currently contribute no ids at all: those vocabularies map every code onto a native unit, and the block tag reserves their room rather than filling it. Within block 10 the native units run contiguously from `bu_bit` = 100000 to `bu_debye` = 100225, in the order of `units.bvnr`; `BVN_UNIT_NATIVE_FIRST`, `BVN_UNIT_NATIVE_LAST` and `BVN_UNIT_NATIVE_COUNT` are generated beside the enum, so read the bounds from those rather than from this sentence. Currencies run contiguously from 900000 and — unlike every other block — have **no named `bu_*` enumerators** (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a `$` sigil, resolved by `bvn_parse_currency_str` and carried as the numeric `base` value. `bvn_unit_is_currency(base)` is a bounds check over block 90.
+`bu_none` is 0 and belongs to no block; every tag between the native units and the currencies is now taken, so a further vocabulary needs one outside 10–90. Blocks 40–80 currently contribute no ids at all: those vocabularies map every code onto a native unit, and the block tag reserves their room rather than filling it. Within block 10 the native units run contiguously from `bu_bit` = 100000 to `bu_horsepower_water` = 100260, in the order of `units.bvnr`; `BVN_UNIT_NATIVE_FIRST`, `BVN_UNIT_NATIVE_LAST` and `BVN_UNIT_NATIVE_COUNT` are generated beside the enum, so read the bounds from those rather than from this sentence. Currencies run contiguously from 900000 and — unlike every other block — have **no named `bu_*` enumerators** (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a `$` sigil, resolved by `bvn_parse_currency_str` and carried as the numeric `base` value. `bvn_unit_is_currency(base)` is a bounds check over block 90.
 
 Only a vocabulary that contributes units of its *own* takes a block. A unit profile is a spelling for the unit slot, so most of its codes translate to native units and carry native ids; the ones that get a block id of their own are the **opaque** units — codes with no native equivalent and no dimension, such as UCUM's assay-defined `[IU]` or UN/ECE's package types — which need an identity precisely because nothing else can stand in for them.
 
@@ -1958,7 +2043,7 @@ typedef enum value_base_unit_e {
 
     /* … the six units the profiles needed, the US survey lengths, the
      * typographic lengths, the US dry volumes and the trade measures, and
-     * the rest of block 10 up to bu_debye = 100225. The whole run is
+     * the rest of block 10 up to bu_horsepower_water = 100260. The whole run is
      * generated into include/bovnar_units.gen.h from
      * src/gendata/units.bvnr, in that file's order — read it there rather
      * than from this abridged listing. */

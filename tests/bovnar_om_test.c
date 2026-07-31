@@ -250,7 +250,11 @@ static void test_refusals(void)
 	 * the disagreement that would never show up in a test that does not check
 	 * the number. It is refused, and so is everything OM builds on it.
 	 */
-	chk_error("om:year",             error_unit_profile_unsupported);
+	/* om:year became a MAPPING when yr_greg arrived; the distinction it was
+	 * refused to protect is asserted directly instead. Everything OM builds on
+	 * the year stays refused -- those are compounds, not the unit itself. */
+	chk_str("om:year", "yr_greg");
+	chk_factor("om:year", 31556952.0);
 	chk_error("om:gigayear",         error_unit_profile_unsupported);
 	chk_error("om:reciprocalYear",   error_unit_profile_unsupported);
 	chk_error("om:cubicMetrePerYear", error_unit_profile_unsupported);

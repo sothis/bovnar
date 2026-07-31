@@ -1647,6 +1647,12 @@ two digits name the vocabulary it comes from.
 | 100210–100214 | `DARCY`, `THERM_EC`, `REFRIGERATION_TON`, `DOBSON`, `SHAKE` |
 | 100215–100216 | The ratios below ppb (`PPT`, `PPQ`) — spelled `pptr` and `ppq`, see §18's note |
 | 100217–100225 | Nine units two or three vocabularies define (`PRINTERS_POINT`, `PRINTERS_PICA`, `HORSEPOWER_ELECTRIC`, `HORSEPOWER_BOILER`, `ABVOLT`, `ASSAY_TON`, `BUSHEL_UK`, `CLO`, `DEBYE`) |
+| 100226–100236 | Calendar and sidereal time (`YEAR_TROPICAL`, `YEAR_GREGORIAN`, `YEAR_SIDEREAL`, `YEAR_COMMON`, `MONTH_SYNODAL`, `MONTH_TROPICAL`, `MONTH_SIDEREAL`, `DAY_SIDEREAL`, `HOUR_SIDEREAL`, `MINUTE_SIDEREAL`, `SECOND_SIDEREAL`) |
+| 100237–100243 | CGS electrostatic (`STATVOLT`, `STATAMPERE`, `STATCOULOMB`, `STATFARAD`, `STATOHM`, `STATHENRY`, `STATSIEMENS`) |
+| 100244–100246 | Luminance (`LAMBERT`, `APOSTILB`, `FOOTLAMBERT`) |
+| 100247–100249 | Water-vapour permeance (`PERM_0C`, `PERM_23C`, `PERM_METRIC`) |
+| 100250–100255 | Heat conventions (`CALORIE_MEAN`, `CALORIE_15C`, `CALORIE_20C`, `BTU_59F`, `BTU_60F`, `BTU_MEAN`) |
+| 100256–100260 | `ELEMENTARY_CHARGE`, `SPERE`, `CIRCULAR_MIL`, `UNIT_POLE`, `HORSEPOWER_WATER` |
 | 900000–900165 | ISO 4217 fiat currencies (`AED` … `ZWL`), block 90 — see `CURRENCY_FIRST` |
 | 900166–900215 | Cryptocurrencies (`BTC` … `RUNE`), the rest of block 90 — see `CURRENCY_LAST` |
 

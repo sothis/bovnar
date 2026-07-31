@@ -1,5 +1,5 @@
 #!bovnar 1.1
-# units.bvnr — single source of truth for all 226 physical base units.
+# units.bvnr — single source of truth for all 261 physical base units.
 #
 # HOW THIS WORKS
 #   Hand-edited. gen_units.py (at the repo root) regenerates the C unit tables
@@ -3034,6 +3034,432 @@
     .factor_den = "299792458000000000000000000000";
     .prefix  = default;
     .aliases = ["debye"];
+  },
+
+  # ── The rest of the evidenced refusals ──────────────────────────────────
+  # The same sweep that produced the nine above found 26 further groups two or
+  # more vocabularies define. These are all of them that name a real unit: what
+  # is left out below is a CONSTANT rather than a unit (UCUM's [pi]), a value
+  # only one publisher states, or a dimensionless "relative permeability" that
+  # is a number.
+  #
+  # WHERE THE PUBLISHERS DISAGREE, the exact definition decides. The CGS-ESU
+  # units are built on c, which the 2019 SI fixed, so every one of them is an
+  # exact rational and the publishers' 6- and 7-digit decimals are roundings of
+  # it -- which is why statΩ is 22468879468420441/25000 here and 898755400000,
+  # 898755200000 and 898760000000 in UDUNITS, OM and QUDT. The sidereal hour,
+  # minute and second are derived from the sidereal DAY rather than taken from
+  # the three slightly inconsistent decimals the publishers state for them.
+  #
+  # The π-based ones carry .exact = false, as the oersted and the parsec do: a
+  # value that is not a rational cannot be converted losslessly, and saying so
+  # is the whole point of that flag.
+  {
+    .id      = <uint:32> 100226;
+    .name    = "year_tropical";
+    .symbol  = "yr_trop";
+    .factor  = 31556925.9747;
+    .dims    = { .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["tropical_year", "yr_trop"];
+  },
+  {
+    .id      = <uint:32> 100227;
+    .name    = "year_gregorian";
+    .symbol  = "yr_greg";
+    .factor  = 31556952.0;
+    .dims    = { .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["gregorian_year", "yr_greg"];
+  },
+  {
+    .id      = <uint:32> 100228;
+    .name    = "year_sidereal";
+    .symbol  = "yr_sid";
+    .factor  = 31558149.7632;
+    .dims    = { .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["sidereal_year", "yr_sid"];
+  },
+  {
+    .id      = <uint:32> 100229;
+    .name    = "year_common";
+    .symbol  = "yr_com";
+    .factor  = 31536000.0;
+    .dims    = { .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["common_year", "yr_com"];
+  },
+  {
+    .id      = <uint:32> 100230;
+    .name    = "month_synodal";
+    .symbol  = "mo_syn";
+    .factor  = 2551442.976;
+    .dims    = { .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["synodal_month", "mo_syn"];
+  },
+  {
+    .id      = <uint:32> 100231;
+    .name    = "month_tropical";
+    .symbol  = "mo_trop";
+    .factor  = 2360584.6848;
+    .dims    = { .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["tropical_month", "mo_trop"];
+  },
+  {
+    .id      = <uint:32> 100232;
+    .name    = "month_sidereal";
+    .symbol  = "mo_sid";
+    .factor  = 2360591.5104;
+    .dims    = { .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["sidereal_month", "mo_sid"];
+  },
+  {
+    .id      = <uint:32> 100233;
+    .name    = "day_sidereal";
+    .symbol  = "d_sid";
+    .factor  = 86164.0905;
+    .dims    = { .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["sidereal_day", "d_sid"];
+  },
+  {
+    .id      = <uint:32> 100234;
+    .name    = "hour_sidereal";
+    .symbol  = "h_sid";
+    .factor  = 3590.1704375;
+    .dims    = { .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["sidereal_hour", "h_sid"];
+  },
+  {
+    .id      = <uint:32> 100235;
+    .name    = "minute_sidereal";
+    .symbol  = "min_sid";
+    .factor  = 59.83617395833333;
+    .dims    = { .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 57442727;
+    .factor_den = <sint:64> 960000;
+    .prefix  = default;
+    .aliases = ["sidereal_minute", "min_sid"];
+  },
+  {
+    .id      = <uint:32> 100236;
+    .name    = "second_sidereal";
+    .symbol  = "s_sid";
+    .factor  = 0.9972695659722223;
+    .dims    = { .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 57442727;
+    .factor_den = <sint:64> 57600000;
+    .prefix  = default;
+    .aliases = ["sidereal_second", "s_sid"];
+  },
+  {
+    .id      = <uint:32> 100237;
+    .name    = "statvolt";
+    .symbol  = "statV";
+    .factor  = 299.792458;
+    .dims    = { .length = 2; .mass = 1; .time = -3; .current = -1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["statvolt", "statV"];
+  },
+  {
+    .id      = <uint:32> 100238;
+    .name    = "statampere";
+    .symbol  = "statA";
+    .factor  = 3.3356409519815207e-10;
+    .dims    = { .current = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 1;
+    .factor_den = <sint:64> 2997924580;
+    .prefix  = default;
+    .aliases = ["statampere", "statA"];
+  },
+  {
+    .id      = <uint:32> 100239;
+    .name    = "statcoulomb";
+    .symbol  = "statC";
+    .factor  = 3.3356409519815207e-10;
+    .dims    = { .time = 1; .current = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 1;
+    .factor_den = <sint:64> 2997924580;
+    .prefix  = default;
+    .aliases = ["statcoulomb", "franklin", "statC"];
+  },
+  {
+    .id      = <uint:32> 100240;
+    .name    = "statfarad";
+    .symbol  = "statF";
+    .factor  = 1.1126500560536185e-12;
+    .dims    = { .length = -2; .mass = -1; .time = 4; .current = 2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 25000;
+    .factor_den = <sint:64> 22468879468420441;
+    .prefix  = default;
+    .aliases = ["statfarad", "statF"];
+  },
+  {
+    .id      = <uint:32> 100241;
+    .name    = "statohm";
+    .symbol  = "statΩ";
+    .factor  = 898755178736.8176;
+    .dims    = { .length = 2; .mass = 1; .time = -3; .current = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 22468879468420441;
+    .factor_den = <sint:64> 25000;
+    .prefix  = default;
+    .aliases = ["statohm", "statΩ"];
+  },
+  {
+    .id      = <uint:32> 100242;
+    .name    = "stathenry";
+    .symbol  = "statH";
+    .factor  = 898755178736.8176;
+    .dims    = { .length = 2; .mass = 1; .time = -2; .current = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 22468879468420441;
+    .factor_den = <sint:64> 25000;
+    .prefix  = default;
+    .aliases = ["stathenry", "statH"];
+  },
+  {
+    .id      = <uint:32> 100243;
+    .name    = "statsiemens";
+    .symbol  = "statS";
+    .factor  = 1.1126500560536185e-12;
+    .dims    = { .length = -2; .mass = -1; .time = 3; .current = 2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 25000;
+    .factor_den = <sint:64> 22468879468420441;
+    .prefix  = default;
+    .aliases = ["statsiemens", "statmho", "statS"];
+  },
+  {
+    .id      = <uint:32> 100244;
+    .name    = "lambert";
+    .symbol  = "Lmb";
+    .factor  = 3183.098861837907;
+    .dims    = { .length = -2; .luminosity = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .exact   = false;
+    .prefix  = default;
+    .aliases = ["lambert", "Lmb"];
+  },
+  {
+    .id      = <uint:32> 100245;
+    .name    = "apostilb";
+    .symbol  = "apostilb";
+    .factor  = 0.3183098861837907;
+    .dims    = { .length = -2; .luminosity = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .exact   = false;
+    .prefix  = default;
+    .aliases = ["blondel", "apostilb"];
+  },
+  {
+    .id      = <uint:32> 100246;
+    .name    = "footlambert";
+    .symbol  = "footlambert";
+    .factor  = 3.4262590996353905;
+    .dims    = { .length = -2; .luminosity = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .exact   = false;
+    .prefix  = default;
+    .aliases = ["foot_lambert", "footlambert"];
+  },
+  {
+    .id      = <uint:32> 100247;
+    .name    = "perm_0c";
+    .symbol  = "perm_0C";
+    .factor  = 5.72135e-11;
+    .dims    = { .length = -1; .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["perm_0C"];
+  },
+  {
+    .id      = <uint:32> 100248;
+    .name    = "perm_23c";
+    .symbol  = "perm_23C";
+    .factor  = 5.74525e-11;
+    .dims    = { .length = -1; .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["perm_23C"];
+  },
+  {
+    .id      = <uint:32> 100249;
+    .name    = "perm_metric";
+    .symbol  = "perm_m";
+    .factor  = 8.68127e-11;
+    .dims    = { .length = -1; .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["perm_metric", "perm_m"];
+  },
+  {
+    .id      = <uint:32> 100250;
+    .name    = "calorie_mean";
+    .symbol  = "cal_m";
+    .factor  = 4.19002;
+    .dims    = { .length = 2; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["mean_calorie", "cal_m"];
+  },
+  {
+    .id      = <uint:32> 100251;
+    .name    = "calorie_15c";
+    .symbol  = "cal_15";
+    .factor  = 4.1858;
+    .dims    = { .length = 2; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["calorie_15C", "cal_15"];
+  },
+  {
+    .id      = <uint:32> 100252;
+    .name    = "calorie_20c";
+    .symbol  = "cal_20";
+    .factor  = 4.1819;
+    .dims    = { .length = 2; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["calorie_20C", "cal_20"];
+  },
+  {
+    .id      = <uint:32> 100253;
+    .name    = "btu_59f";
+    .symbol  = "Btu_59";
+    .factor  = 1054.8;
+    .dims    = { .length = 2; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["btu_59F", "Btu_59"];
+  },
+  {
+    .id      = <uint:32> 100254;
+    .name    = "btu_60f";
+    .symbol  = "Btu_60";
+    .factor  = 1054.68;
+    .dims    = { .length = 2; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["btu_60F", "Btu_60"];
+  },
+  {
+    .id      = <uint:32> 100255;
+    .name    = "btu_mean";
+    .symbol  = "Btu_m";
+    .factor  = 1055.87;
+    .dims    = { .length = 2; .mass = 1; .time = -2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["mean_btu", "Btu_m"];
+  },
+  {
+    .id      = <uint:32> 100256;
+    .name    = "elementary_charge";
+    .symbol  = "e";
+    .factor  = 1.602176634e-19;
+    .dims    = { .time = 1; .current = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["elementary_charge", "e"];
+  },
+  {
+    .id      = <uint:32> 100257;
+    .name    = "spere";
+    .symbol  = "sph";
+    .factor  = 12.566370614359172;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .exact   = false;
+    .prefix  = default;
+    .aliases = ["spere", "spat", "sph"];
+  },
+  {
+    .id      = <uint:32> 100258;
+    .name    = "circular_mil";
+    .symbol  = "cml";
+    .factor  = 5.067074790974978e-10;
+    .dims    = { .length = 2; };
+    .affine  = false;
+    .offset  = 0.0;
+    .exact   = false;
+    .prefix  = default;
+    .aliases = ["circular_mil", "cml"];
+  },
+  {
+    .id      = <uint:32> 100259;
+    .name    = "unit_pole";
+    .symbol  = "unit_pole";
+    .factor  = 1.2566370614359172e-07;
+    .dims    = { .length = 2; .mass = 1; .time = -2; .current = -1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .exact   = false;
+    .prefix  = default;
+    .aliases = ["unitpole", "unit_pole"];
+  },
+  {
+    .id      = <uint:32> 100260;
+    .name    = "horsepower_water";
+    .symbol  = "hp_W";
+    .factor  = 746.043;
+    .dims    = { .length = 2; .mass = 1; .time = -3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["water_horsepower", "hp_W"];
   }
 ];
 

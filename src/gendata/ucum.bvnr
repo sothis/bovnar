@@ -102,6 +102,20 @@
 
 # ── Atoms that translate ────────────────────────────────────────────────────
 .mapped = [
+  # Unblocked by the 35 units added to units.bvnr: each was refused for
+  # want of a native target and for no other reason.
+  { .code = "a_t";                       .bovnar = "yr_trop"; .metric = false; },
+  { .code = "a_g";                       .bovnar = "yr_greg"; .metric = false; },
+  { .code = "mo_s";                      .bovnar = "mo_syn"; .metric = false; },
+  { .code = "[e]";                       .bovnar = "e"; .metric = false; },
+  { .code = "sph";                       .bovnar = "sph"; .metric = false; },
+  { .code = "Lmb";                       .bovnar = "Lmb"; .metric = false; },
+  { .code = "cal_m";                     .bovnar = "cal_m"; .metric = false; },
+  { .code = "cal_[15]";                  .bovnar = "cal_15"; .metric = false; },
+  { .code = "cal_[20]";                  .bovnar = "cal_20"; .metric = false; },
+  { .code = "[Btu_59]";                  .bovnar = "Btu_59"; .metric = false; },
+  { .code = "[Btu_60]";                  .bovnar = "Btu_60"; .metric = false; },
+  { .code = "[Btu_m]";                   .bovnar = "Btu_m"; .metric = false; },
   # Unblocked by the units added to units.bvnr: each was refused for want
   # of a native target and for no other reason.
   { .code = "[pnt_pr]";                 .bovnar = "pnt_pr"; .metric = false; },
@@ -546,9 +560,6 @@
 
   # Year and month variants bovnar does not carry. Its yr and mo are the Julian
   # ones and those DO map; these differ from them by enough to matter.
-  { .code = "a_t";  .why = "tropical year — native yr is the Julian year"; },
-  { .code = "a_g";  .why = "mean gregorian year — native yr is the Julian year"; },
-  { .code = "mo_s"; .why = "synodal month — native mo is the Julian month"; },
   { .code = "mo_g"; .why = "mean gregorian month — native mo is the Julian month"; },
 
   # Physical constants used as units.
@@ -557,7 +568,6 @@
   { .code = "[k]";  .why = "Boltzmann constant as a unit — no native form"; },
   { .code = "[eps_0]"; .why = "vacuum permittivity as a unit — no native form"; },
   { .code = "[mu_0]";  .why = "vacuum permeability as a unit — no native form"; },
-  { .code = "[e]";     .why = "elementary charge as a unit — no native form"; },
   { .code = "[m_e]";   .why = "electron mass as a unit — no native form"; },
   { .code = "[m_p]";   .why = "proton mass as a unit — no native form"; },
   { .code = "[G]";     .why = "gravitational constant as a unit — no native form"; },
@@ -576,12 +586,6 @@
   # included, is refused. Mapping [Btu] onto Btu would be wrong by 0.07 %:
   # small, dimensionally correct, and invisible to every later check.
   { .code = "[Btu_39]"; .why = "39 degF BTU — no native form"; },
-  { .code = "[Btu_59]"; .why = "59 degF BTU — no native form"; },
-  { .code = "[Btu_60]"; .why = "60 degF BTU — no native form"; },
-  { .code = "[Btu_m]";  .why = "mean BTU — no native form"; },
-  { .code = "cal_m";    .why = "mean calorie — no native form"; },
-  { .code = "cal_[15]"; .why = "15 degC calorie — no native form"; },
-  { .code = "cal_[20]"; .why = "20 degC calorie — no native form"; },
 
   # Apothecary weights other than the ounce and the scruple. The apothecary
   # dram is 3.8879346 g and bovnar's dr is the AVOIRDUPOIS dram at 1.7718 g --
@@ -589,8 +593,6 @@
   # eager mapping worse than a refusal.
 
   # Photometric and geometric atoms with no native form.
-  { .code = "Lmb";   .why = "lambert — 1e4/pi cd/m^2, irrational against the native units"; },
-  { .code = "sph";   .why = "spere — 4*pi steradian, not a decade"; },
 
   # US survey lengths other than the foot.
   # These four used to map onto the INTERNATIONAL fur, ch, rd and ac, which are

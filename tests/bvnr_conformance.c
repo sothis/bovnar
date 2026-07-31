@@ -1964,9 +1964,16 @@ static const cf_case_t g_cases[] = {
 	      "#!bovnar 1.2\n.d = <float:64,om:kilogramPerCubicmetre> 998.2;"),
 	VALID("UPR-049", "unit_profile", "OM agrees with UCUM on the kilogram",
 	      "#!bovnar 1.2\n.m = <float:64,om:kilogram> 1.0 ucum:kg;"),
-	ERROR_CASE("UPR-050", "unit_profile", "OM's Gregorian year is not the Julian one",
-	           "#!bovnar 1.2\n.t = <float:64,om:year> 1.0;",
-	           error_unit_profile_unsupported),
+	/* OM's year is the GREGORIAN 31556952 s, and native yr is the Julian
+	 * 31557600 s. The case used to assert a refusal, which was the right answer
+	 * while bovnar had only the Julian form; it now asserts the distinction
+	 * itself, which is the thing that must not be lost -- om:year translates to
+	 * yr_greg and is NOT the same unit as yr. */
+	VALID("UPR-050", "unit_profile", "OM's Gregorian year is its own unit",
+	      "#!bovnar 1.2\n.t = <float:64,om:year> 1.0 yr_greg;"),
+	ERROR_CASE("UPR-050b", "unit_profile", "OM's Gregorian year is not the Julian one",
+	           "#!bovnar 1.2\n.t = <float:64,om:year> 1.0 yr;",
+	           error_unit_mismatch),
 	VALID("UPR-051", "unit_profile", "a CF standard name carries its canonical units",
 	      "#!bovnar 1.2\n.t = <float:64,cf:air_temperature> 288.15 K;"),
 	ERROR_CASE("UPR-052", "unit_profile", "a dimensionless CF standard name is refused",

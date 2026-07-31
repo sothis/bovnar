@@ -457,6 +457,9 @@ static const bvni_kind_entry_t bvni_kind_table[] = {
 	{ bu_grad,       BVNI_KIND_ANGLE,       1 },
 	{ bu_revolution, BVNI_KIND_ANGLE,       1 },
 	{ bu_steradian,  BVNI_KIND_ANGLE,       2 },
+	/* The spere (spat) IS 4π steradian, so it carries the steradian's weight;
+	 * without it a solid angle would convert to a plain number. */
+	{ bu_spere,      BVNI_KIND_ANGLE,       2 },
 	/* lm = cd*sr, lx = lm/m^2, ph = lm/cm^2 — each carries one steradian.
 	 * bu_candela and bu_stilb (cd/cm^2) deliberately do NOT: they are luminous
 	 * intensity and luminance, which is exactly what this separates them from. */

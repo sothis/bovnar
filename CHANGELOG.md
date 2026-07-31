@@ -121,6 +121,49 @@ did:
 is neither the international acre-foot (1233.48183755) nor the survey one
 (1233.48923847), i.e. an acre and a foot from different systems.
 
+### Added — the other 35 evidenced units, and 87 more profile codes that map
+
+The corroboration sweep found 35 refusal groups **two or more vocabularies
+define**; the nine in the entry below were the first pass and these are the rest
+that name a real unit. What is still refused is a *constant* rather than a unit
+(UCUM's `[pi]`), a value only one publisher states (`[Btu_39]`), or a
+dimensionless "relative permeability" that is a number.
+
+| Group | Units |
+|---|---|
+| Calendar and sidereal time | `yr_trop` `yr_greg` `yr_sid` `yr_com` `mo_syn` `mo_trop` `mo_sid` `d_sid` `h_sid` `min_sid` `s_sid` |
+| CGS electrostatic | `statV` `statA` `statC` `statF` `statΩ` `statH` `statS` |
+| Luminance | `Lmb` `apostilb` `footlambert` |
+| Water-vapour permeance | `perm_0C` `perm_23C` `perm_m` |
+| Heat conventions | `cal_m` `cal_15` `cal_20` `Btu_59` `Btu_60` `Btu_m` |
+| Singles | `e` `sph` `cml` `unit_pole` `hp_W` |
+
+87 profile codes across UCUM, UDUNITS-2, QUDT and OM now map instead of being
+refused — the catalogue's named refusals fall from 2013 to 1926 — with 0
+mismatch against the publishers' own files.
+
+**Where the publishers disagree, the exact definition decides.** The CGS-ESU
+units are built on `c`, which the 2019 SI fixed, so every one is an exact
+rational and the publishers' five- to seven-digit decimals are roundings of it:
+`statΩ` is 22468879468420441/25000 here against 898 755 400 000, 898 755 200 000
+and 898 760 000 000 in UDUNITS, OM and QUDT. Three QUDT rows round past the
+7.5e-7 tolerance and are waived by name, each with two other publishers stating
+the precise value as the evidence. The sidereal hour, minute and second are
+derived from the sidereal **day** rather than taken from the three slightly
+inconsistent decimals the publishers state, so the four stay consistent with each
+other. The π-based rows carry `.exact = false`, as the oersted and the parsec do.
+
+**`yr` is still the Julian year and `mo` still a twelfth of it.** Naming the
+other calendars does not make the short spellings ambiguous — it gives them
+somewhere to go. A UDUNITS or CF document that says `year`, and they say it
+constantly, could not be read **at all** before; it now reads as `yr_trop` and is
+still not `yr`. Four tests that asserted those refusals now assert the
+distinction instead, which is the thing that must not be lost.
+
+`sph` is 4π steradian, so it joins the steradian's quantity kind in
+`bvni_kind_table` and in the pint bridge — without that a solid angle would
+convert to a plain number, and the bridge's own agreement test said so.
+
 ### Added — nine units two and three vocabularies define, and doc/07's own gate
 
 A refusal reading "bovnar has no unit of this magnitude" is a request when one

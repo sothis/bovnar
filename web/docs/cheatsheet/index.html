@@ -42,7 +42,7 @@
 <blockquote>
 <p><strong>Spec version:</strong> 1.1
 <strong>Status:</strong> Reference — the symbol tables of the unit and currency registry
-<strong>Scope:</strong> 226 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.</p>
+<strong>Scope:</strong> 261 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.</p>
 </blockquote>
 <hr />
 <h2 id="table-of-contents">Table of Contents</h2>
@@ -2693,6 +2693,341 @@ thirteen times any horsepower. <code>abV</code> needed a unit because no decade 
 prefixes do not stack. <code>AT</code> and <code>debye</code> are exact rationals — 175/6 g, and 10⁻²¹/c C·m, exact
 since the 2019 SI fixed c — of which their publishers state 7- and 6-digit roundings.</p>
 </blockquote>
+<h4 id="and-the-thirty-five-the-same-sweep-found-next">And the thirty-five the same sweep found next</h4>
+<p>The rest of the refusals <strong>two or more vocabularies define</strong>. Where publishers disagree the exact
+definition decides: the CGS-ESU units are built on <code>c</code>, exact since 2019, so their five- to
+seven-digit decimals are roundings of the rational stated here. The π-based rows carry
+<code>.exact = false</code>. <code>yr</code> is still the Julian year — naming the other calendars is what lets a UDUNITS
+or CF document that says <code>year</code> be read at all.</p>
+<p><strong>Calendar and sidereal time</strong></p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>yr_trop</code></td>
+<td><code>tropical_year</code></td>
+<td>tropical year</td>
+<td><code>bu_year_tropical</code></td>
+<td>31 556 925.9747 s (the tropical year UDUNITS and CF carry)</td>
+</tr>
+<tr>
+<td><code>yr_greg</code></td>
+<td><code>gregorian_year</code></td>
+<td>Gregorian year</td>
+<td><code>bu_year_gregorian</code></td>
+<td>31 556 952 s (exact, = 365.2425 d)</td>
+</tr>
+<tr>
+<td><code>yr_sid</code></td>
+<td><code>sidereal_year</code></td>
+<td>sidereal year</td>
+<td><code>bu_year_sidereal</code></td>
+<td>31 558 149.7632 s</td>
+</tr>
+<tr>
+<td><code>yr_com</code></td>
+<td><code>common_year</code></td>
+<td>common year</td>
+<td><code>bu_year_common</code></td>
+<td>31 536 000 s (exact, = 365 d)</td>
+</tr>
+<tr>
+<td><code>mo_syn</code></td>
+<td><code>synodal_month</code></td>
+<td>synodal month</td>
+<td><code>bu_month_synodal</code></td>
+<td>2 551 442.976 s (the synodal, lunar month)</td>
+</tr>
+<tr>
+<td><code>mo_trop</code></td>
+<td><code>tropical_month</code></td>
+<td>tropical month</td>
+<td><code>bu_month_tropical</code></td>
+<td>2 360 584.6848 s</td>
+</tr>
+<tr>
+<td><code>mo_sid</code></td>
+<td><code>sidereal_month</code></td>
+<td>sidereal month</td>
+<td><code>bu_month_sidereal</code></td>
+<td>2 360 591.5104 s</td>
+</tr>
+<tr>
+<td><code>d_sid</code></td>
+<td><code>sidereal_day</code></td>
+<td>sidereal day</td>
+<td><code>bu_day_sidereal</code></td>
+<td>86 164.0905 s</td>
+</tr>
+<tr>
+<td><code>h_sid</code></td>
+<td><code>sidereal_hour</code></td>
+<td>sidereal hour</td>
+<td><code>bu_hour_sidereal</code></td>
+<td><code>d_sid</code>/24 = 3590.1704375 s</td>
+</tr>
+<tr>
+<td><code>min_sid</code></td>
+<td><code>sidereal_minute</code></td>
+<td>sidereal minute</td>
+<td><code>bu_minute_sidereal</code></td>
+<td><code>d_sid</code>/1440</td>
+</tr>
+<tr>
+<td><code>s_sid</code></td>
+<td><code>sidereal_second</code></td>
+<td>sidereal second</td>
+<td><code>bu_second_sidereal</code></td>
+<td><code>d_sid</code>/86400</td>
+</tr>
+</tbody>
+</table>
+<p><strong>CGS electrostatic (ESU)</strong></p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>statV</code></td>
+<td><code>statvolt</code></td>
+<td>statvolt</td>
+<td><code>bu_statvolt</code></td>
+<td>149896229/500000 V = 299.792458 V (exact, = c×10⁻⁶)</td>
+</tr>
+<tr>
+<td><code>statA</code></td>
+<td><code>statampere</code></td>
+<td>statampere</td>
+<td><code>bu_statampere</code></td>
+<td>1/2997924580 A (exact)</td>
+</tr>
+<tr>
+<td><code>statC</code></td>
+<td><code>statcoulomb</code>, <code>franklin</code></td>
+<td>statcoulomb (franklin)</td>
+<td><code>bu_statcoulomb</code></td>
+<td>1/2997924580 C (exact)</td>
+</tr>
+<tr>
+<td><code>statF</code></td>
+<td><code>statfarad</code></td>
+<td>statfarad</td>
+<td><code>bu_statfarad</code></td>
+<td>25000/22468879468420441 F (exact)</td>
+</tr>
+<tr>
+<td><code>statΩ</code></td>
+<td><code>statohm</code></td>
+<td>statohm</td>
+<td><code>bu_statohm</code></td>
+<td>22468879468420441/25000 Ω ≈ 898 755 178 737 Ω (exact)</td>
+</tr>
+<tr>
+<td><code>statH</code></td>
+<td><code>stathenry</code></td>
+<td>stathenry</td>
+<td><code>bu_stathenry</code></td>
+<td>22468879468420441/25000 H (exact)</td>
+</tr>
+<tr>
+<td><code>statS</code></td>
+<td><code>statsiemens</code>, <code>statmho</code></td>
+<td>statsiemens</td>
+<td><code>bu_statsiemens</code></td>
+<td>25000/22468879468420441 S (exact)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Luminance</strong></p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Lmb</code></td>
+<td><code>lambert</code></td>
+<td>lambert</td>
+<td><code>bu_lambert</code></td>
+<td>10⁴/π cd·m⁻²</td>
+</tr>
+<tr>
+<td><code>apostilb</code></td>
+<td><code>blondel</code></td>
+<td>apostilb (blondel)</td>
+<td><code>bu_apostilb</code></td>
+<td>1/π cd·m⁻²</td>
+</tr>
+<tr>
+<td><code>footlambert</code></td>
+<td><code>foot_lambert</code></td>
+<td>foot-lambert</td>
+<td><code>bu_footlambert</code></td>
+<td>1/π cd·ft⁻²</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Water-vapour permeance</strong></p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>perm_0C</code></td>
+<td>—</td>
+<td>perm (0 °C)</td>
+<td><code>bu_perm_0c</code></td>
+<td>5.72135×10⁻¹¹ kg·Pa⁻¹·s⁻¹·m⁻² (exact)</td>
+</tr>
+<tr>
+<td><code>perm_23C</code></td>
+<td>—</td>
+<td>perm (23 °C)</td>
+<td><code>bu_perm_23c</code></td>
+<td>5.74525×10⁻¹¹ kg·Pa⁻¹·s⁻¹·m⁻² (exact)</td>
+</tr>
+<tr>
+<td><code>perm_m</code></td>
+<td><code>perm_metric</code></td>
+<td>metric perm</td>
+<td><code>bu_perm_metric</code></td>
+<td>8.68127×10⁻¹¹ kg·Pa⁻¹·s⁻¹·m⁻² (exact)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Heat conventions</strong></p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cal_m</code></td>
+<td><code>mean_calorie</code></td>
+<td>mean calorie</td>
+<td><code>bu_calorie_mean</code></td>
+<td>4.19002 J (exact)</td>
+</tr>
+<tr>
+<td><code>cal_15</code></td>
+<td><code>calorie_15C</code></td>
+<td>15 °C calorie</td>
+<td><code>bu_calorie_15c</code></td>
+<td>4.1858 J (exact)</td>
+</tr>
+<tr>
+<td><code>cal_20</code></td>
+<td><code>calorie_20C</code></td>
+<td>20 °C calorie</td>
+<td><code>bu_calorie_20c</code></td>
+<td>4.1819 J (exact)</td>
+</tr>
+<tr>
+<td><code>Btu_59</code></td>
+<td><code>btu_59F</code></td>
+<td>59 °F BTU</td>
+<td><code>bu_btu_59f</code></td>
+<td>1054.8 J (exact)</td>
+</tr>
+<tr>
+<td><code>Btu_60</code></td>
+<td><code>btu_60F</code></td>
+<td>60 °F BTU</td>
+<td><code>bu_btu_60f</code></td>
+<td>1054.68 J (exact)</td>
+</tr>
+<tr>
+<td><code>Btu_m</code></td>
+<td><code>mean_btu</code></td>
+<td>mean BTU</td>
+<td><code>bu_btu_mean</code></td>
+<td>1055.87 J (exact)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>And the singles</strong></p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>e</code></td>
+<td><code>elementary_charge</code></td>
+<td>elementary charge</td>
+<td><code>bu_elementary_charge</code></td>
+<td>1.602176634×10⁻¹⁹ C (exact, the 2019 SI definition)</td>
+</tr>
+<tr>
+<td><code>sph</code></td>
+<td><code>spere</code>, <code>spat</code></td>
+<td>spere (spat)</td>
+<td><code>bu_spere</code></td>
+<td>4π sr</td>
+</tr>
+<tr>
+<td><code>cml</code></td>
+<td><code>circular_mil</code></td>
+<td>circular mil</td>
+<td><code>bu_circular_mil</code></td>
+<td>π/4 <code>thou</code>² ≈ 5.0670748×10⁻¹⁰ m²</td>
+</tr>
+<tr>
+<td><code>unit_pole</code></td>
+<td><code>unitpole</code></td>
+<td>unit pole</td>
+<td><code>bu_unit_pole</code></td>
+<td>4π×10⁻⁸ Wb</td>
+</tr>
+<tr>
+<td><code>hp_W</code></td>
+<td><code>water_horsepower</code></td>
+<td>water horsepower</td>
+<td><code>bu_horsepower_water</code></td>
+<td>746.043 W</td>
+</tr>
+</tbody>
+</table>
 <hr />
 <h2 id="5-currencies">5. Currencies</h2>
 <h3 id="51-the-mandatory-currency-sigil">5.1 The Mandatory Currency Sigil</h3>
@@ -4124,7 +4459,7 @@ abbreviations that are deliberately not units — is in <a href="https://www.bov
 <li><a href="https://www.bovnar.io/docs/profiles/">Unit Profiles</a> — writing these same units as UCUM, UNECE, QUDT or UDUNITS codes, and the profile-only units that exist in no native spelling</li>
 </ul>
 <hr />
-<p><em>The id space is blocked: the leading two digits of an id name its vocabulary. Native units 100000–100225 (226) · UCUM opaque units 200000–200040 (41) · UN/ECE opaque units 300000–300024 (25) · currencies 900000–900215 (166 fiat, 50 crypto). Blocks 40, 50, 60, 70 and 80 are reserved for QUDT, QUDT quantity kinds, UDUNITS, OM 2 and the CF standard names, which contribute no opaque units today.</em>
+<p><em>The id space is blocked: the leading two digits of an id name its vocabulary. Native units 100000–100260 (261) · UCUM opaque units 200000–200040 (41) · UN/ECE opaque units 300000–300024 (25) · currencies 900000–900215 (166 fiat, 50 crypto). Blocks 40, 50, 60, 70 and 80 are reserved for QUDT, QUDT quantity kinds, UDUNITS, OM 2 and the CF standard names, which contribute no opaque units today.</em>
 <em>The space is SPARSE — do not index an array by an id. <code>BVN_UNIT_SLOT_COUNT</code> = 247 is the row count of the library's dense tables, indexed by <code>bvni_unit_slot()</code>, and is not a bound on the enum.</em></p>
 <hr />
 <p><em>End of Bovnar — Units &amp; Currencies Cheat Sheet (Bovnar spec 1.1).</em></p>

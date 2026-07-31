@@ -556,10 +556,14 @@ needs. A longer run is not an over-large exponent but an unrecognised token:
 
 Both mean "dimensionless," but they produce distinct internal states:
 
-- Omitting the unit parameter → `BVN_UNIT_NO_PREFIX(bu_none)`:
-  `num_components == 1`, `base == bu_none`.
-- Writing `no_unit` explicitly → `BVN_UNIT_NONE`:
-  `num_components == 0`.
+- Writing `no_unit` explicitly → `BVN_UNIT_NONE`: `num_components == 0`.
+- Omitting the unit parameter *inside an annotation* (`<float:64> 1.0`) → the
+  **same** `BVN_UNIT_NONE`, `num_components == 0`. `bvn_parse_type_annotation`
+  initialises the unit to `BVN_UNIT_NONE` and only overwrites it when a
+  dimensioned unit parameter is present, so there is nothing to tell apart here.
+- A **fully untyped** value (`1.0`, no annotation at all) → the one that differs:
+  `BVN_UNIT_NO_PREFIX(bu_none)`, `num_components == 1`, `base == bu_none`, from
+  default-type synthesis.
 
 Both compare as compatible via `bvn_units_compatible` and both serialise to
 `"no_unit"` via `bvn_unit_to_string`. The distinction is expressive: explicit

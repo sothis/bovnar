@@ -455,7 +455,7 @@ Exponents can be written as Unicode superscripts (`²`, `³`, `⁻¹`) or with a
 .inv2  = <float:64,s^-1> 50.0;    # same thing
 ```
 
-The maximum number of unit components in a compound unit is 8. More than that causes a parse error.
+The maximum number of unit components in a compound unit is 32 (`BVNR_MAX_UNIT_COMPONENTS`). More than that is `error_unit_illegal`.
 
 ### 6.4 Explicitly Dimensionless: `no_unit`
 
@@ -466,7 +466,15 @@ When you want to be explicit that a value carries no physical dimension, use the
 .count = <uint:32,no_unit>  42;
 ```
 
-Explicitly writing `no_unit` yields `BVN_UNIT_NONE` (`num_components == 0`). Omitting the unit parameter entirely yields `BVN_UNIT_NO_PREFIX(bu_none)` (`num_components == 1`, `base == bu_none`). Both are semantically dimensionless and compare as compatible via `bvn_units_compatible`, and both serialise to `"no_unit"` via `bvn_unit_to_string`, but they are structurally distinct internal states. The explicit `no_unit` is useful for documentation: it tells a reader that the author actively chose dimensionless, not that they forgot.
+There are three ways to be dimensionless, and only one of them is a *different* internal state:
+
+| Written | Internal | |
+|---|---|---|
+| `<float:64,no_unit> 1.0` | `BVN_UNIT_NONE`, `num_components == 0` | you said so |
+| `<float:64> 1.0` | `BVN_UNIT_NONE`, `num_components == 0` | annotated, unit parameter omitted — the *same* state |
+| `1.0` | `BVN_UNIT_NO_PREFIX(bu_none)`, `num_components == 1` | no annotation at all; the default type is synthesised |
+
+Omitting the unit parameter *inside an annotation* is the same thing as writing `no_unit` — `bvn_parse_type_annotation` initialises the unit to `BVN_UNIT_NONE` and only overwrites it when a dimensioned unit parameter is actually present. It is a **fully untyped** value that gets the one-component form. All three compare as compatible via `bvn_units_compatible` and all three serialise to `"no_unit"` via `bvn_unit_to_string`. The explicit `no_unit` is useful for documentation: it tells a reader that the author actively chose dimensionless, not that they forgot.
 
 ### 6.5 Inline Unit Suffix
 
@@ -1718,10 +1726,14 @@ needs. A longer run is not an over-large exponent but an unrecognised token:
 
 Both mean "dimensionless," but they produce distinct internal states:
 
-- Omitting the unit parameter → `BVN_UNIT_NO_PREFIX(bu_none)`:
-  `num_components == 1`, `base == bu_none`.
-- Writing `no_unit` explicitly → `BVN_UNIT_NONE`:
-  `num_components == 0`.
+- Writing `no_unit` explicitly → `BVN_UNIT_NONE`: `num_components == 0`.
+- Omitting the unit parameter *inside an annotation* (`<float:64> 1.0`) → the
+  **same** `BVN_UNIT_NONE`, `num_components == 0`. `bvn_parse_type_annotation`
+  initialises the unit to `BVN_UNIT_NONE` and only overwrites it when a
+  dimensioned unit parameter is present, so there is nothing to tell apart here.
+- A **fully untyped** value (`1.0`, no annotation at all) → the one that differs:
+  `BVN_UNIT_NO_PREFIX(bu_none)`, `num_components == 1`, `base == bu_none`, from
+  default-type synthesis.
 
 Both compare as compatible via `bvn_units_compatible` and both serialise to
 `"no_unit"` via `bvn_unit_to_string`. The distinction is expressive: explicit

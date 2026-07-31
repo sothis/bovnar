@@ -121,6 +121,46 @@ did:
 is neither the international acre-foot (1233.48183755) nor the survey one
 (1233.48923847), i.e. an acre and a foot from different systems.
 
+### Fixed — the tutorial and the FAQ described the wrong dimensionless encoding
+
+doc/03 §11.8 has it right and doc/01 §6.4 and doc/02 §4 had it backwards.
+Omitting the unit parameter **inside an annotation** yields the same
+`BVN_UNIT_NONE` (`num_components == 0`) that writing `no_unit` does —
+`bvn_parse_type_annotation` initialises the unit to that and only overwrites it
+when a dimensioned parameter is present. It is a **fully untyped** value, with no
+annotation at all, that gets the one-component `bu_none` form from default-type
+synthesis.
+
+Both documents said the opposite, which reads as harmless until somebody
+switches on `num_components`. The difference is invisible from Python (the
+binding exposes no `num_components`) and invisible from a document (all three
+serialise to `"no_unit"` and compare compatible), so nothing else could have
+caught it; `test_the_three_dimensionless_encodings` asks
+`bvn_parse_type_annotation` directly, and reproducing the old claim makes it
+fail.
+
+The tutorial also said a compound unit may hold **8** components. It is 32
+(`BVNR_MAX_UNIT_COMPONENTS`), as the spec, the FAQ and the constraints table all
+say, and as 32 parsing and 33 refusing confirm.
+
+### Fixed — the unit-string bound explained itself with numbers two catalogues old
+
+`include/bovnar.h` said the worst case is "798 bytes + NUL … the longest
+prefixable canonical symbol (`fl_oz_uk`, 8 bytes)". `footlambert` (11 bytes)
+overtook it, and the real figure is 862; the generator's own bound is 895. The
+macro `BVNR_UNIT_STRING_MAX` (1088) was never wrong — the generators recompute
+the bound from `src/gendata` and fail the build if it is exceeded — but the
+comment a reader learns the shape from had outlived two catalogue growths.
+
+`test_longest_unit_fits_the_declared_bound` had gone stale the same way: it built
+its worst case from `bu_fluid_ounce_uk` and kept passing while no longer
+exercising the extreme. It now **sweeps every native unit** for the longest
+emission, asserts the maximum fits with its NUL and that one byte short refuses,
+and reports which symbol produced it — so a catalogue change that moves the
+extreme is visible in review instead of silently un-tested. The header comment
+now states the shape and points at the generators for the figure, rather than
+carrying a number that ages.
+
 ### Fixed — three documents named the wrong error for an over-long unit
 
 doc/05 §8 and §14, doc/03 §12.8 and doc/08 §5 all said an over-long unit string

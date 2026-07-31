@@ -98,16 +98,23 @@ extern "C" {
  * Bytes a buffer needs to hold ANY unit bvn_unit_to_string can emit, NUL
  * included. Size unit buffers from this rather than by eye.
  *
- * The worst case is 798 bytes + NUL: BVNR_MAX_UNIT_COMPONENTS components, each
- * the longest prefixable canonical symbol ("fl_oz_uk", 8 bytes) with a two-byte
- * prefix, a '~', and the twelve-byte "⁻¹⁰⁰" — negative exponents render at full
- * width only when EVERY component is negative, because a mixed unit moves them
- * into the denominator and renders them positive. The '·' separators at two
- * bytes each complete it. A profile spelling is bounded separately and lands
- * higher (1032) because "udunits:" and its long spelled-out atoms cost more
- * than the native symbols do — the worst case is 32 components of UDUNITS'
- * longest code, "astronomical_unit_BIPM_2006" at 27 bytes, each with a signed
- * exponent and a separator.
+ * The shape of the worst case is BVNR_MAX_UNIT_COMPONENTS components, each the
+ * longest prefixable canonical symbol with a two-byte prefix, a '~', and the
+ * eleven-byte "⁻¹⁰⁰" — negative exponents render at full width only when EVERY
+ * component is negative, because a mixed unit moves them into the denominator
+ * and renders them positive — joined by two-byte '·' separators. A profile
+ * spelling is bounded separately and lands higher, because "udunits:" and its
+ * long spelled-out atoms cost more than the native symbols do: the worst case
+ * there is 32 components of UDUNITS' longest code, each with a signed exponent
+ * and a separator.
+ *
+ * THE NUMBERS ARE NOT WRITTEN HERE, deliberately. They move with the catalogue:
+ * the native worst case was 798 bytes when it was "fl_oz_uk" (8 bytes) and is
+ * 862 now that `footlambert` (11) has overtaken it, and a comment stating the
+ * old figure outlived two catalogue growths while the macro below stayed
+ * correct. gen_units.py and gen_profiles.py both print the live figure against
+ * this cap on every build, and test_longest_unit_fits_the_declared_bound sweeps
+ * the table for the extreme rather than naming a symbol that can be overtaken.
  *
  * gen_units.py and gen_profiles.py recompute that bound from src/gendata on
  * every build and fail if a symbol or a code outgrows this, because the margin

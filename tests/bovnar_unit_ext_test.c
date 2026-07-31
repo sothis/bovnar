@@ -2207,6 +2207,59 @@ static void test_german_unit_prefix_restriction(void)
 #undef PFX_IEC_G
 }
 
+/*
+ * THE THREE DIMENSIONLESS ENCODINGS, asked of the function the spec names.
+ *
+ * doc/03 §11.8 has this right: omitting the unit parameter INSIDE an annotation
+ * yields the same BVN_UNIT_NONE (num_components == 0) that writing `no_unit`
+ * does, because bvn_parse_type_annotation initialises the unit to that and only
+ * overwrites it when a dimensioned parameter is present. It is a FULLY UNTYPED
+ * value that gets the one-component bu_none form, from default-type synthesis.
+ *
+ * doc/01 §6.4 and doc/02 §4 both said the opposite -- that omitting the
+ * parameter gives the one-component form -- which reads as harmless until
+ * somebody switches on num_components. Pinned here because the difference is
+ * invisible from Python (the binding exposes no num_components) and invisible
+ * from a document (all three serialise to "no_unit"), so nothing else could
+ * have caught it.
+ */
+static void test_the_three_dimensionless_encodings(void)
+{
+	printf("  no_unit, an omitted parameter and no annotation...\n");
+	static const struct { const char *ann; uint32_t components; } cases[] = {
+		{ "float:64,no_unit", 0u },   /* said so */
+		{ "float:64",         0u },   /* annotated, parameter omitted */
+		{ "float:64,m",       1u },   /* a real unit, for contrast */
+	};
+	for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+		bool tok = false, uok = false, ulong_ = false;
+		value_unit_t u;
+		memset(&u, 0, sizeof u);
+		uint8_t ubuf[256];
+		uint8_t ulen = 0;
+		(void)bvn_parse_type_annotation((const uint8_t *)cases[i].ann,
+						(uint32_t)strlen(cases[i].ann),
+						&tok, &uok, &ulong_, &u, ubuf, &ulen);
+		ASSERT_TRUE(tok, cases[i].ann);
+		ASSERT_EQ_INT((int)u.num_components, (int)cases[i].components,
+			      "the annotation yields the documented component count");
+	}
+	/* And the one that DOES differ: a fully untyped value. All three still
+	 * serialise to "no_unit" and compare compatible, which is why the
+	 * structural difference needs asserting rather than reading. */
+	value_unit_t none = BVN_UNIT_NONE;
+	value_unit_t bare = BVN_UNIT_NO_PREFIX(bu_none);
+	ASSERT_EQ_INT((int)none.num_components, 0, "BVN_UNIT_NONE has no components");
+	ASSERT_EQ_INT((int)bare.num_components, 1, "a lone bu_none has one");
+	ASSERT_TRUE(bvn_units_compatible(none, bare),
+		    "and the two are compatible all the same");
+	char a[BVNR_UNIT_STRING_MAX], b[BVNR_UNIT_STRING_MAX];
+	ASSERT_TRUE(bvn_unit_to_string(none, a, sizeof a) > 0 &&
+		    bvn_unit_to_string(bare, b, sizeof b) > 0 &&
+		    strcmp(a, "no_unit") == 0 && strcmp(b, "no_unit") == 0,
+		    "...and both serialise to \"no_unit\"");
+}
+
 static void test_longest_unit_fits_the_declared_bound(void)
 {
 	printf("  the longest emitted unit fits BVNR_UNIT_STRING_MAX...\n");
@@ -2221,30 +2274,63 @@ static void test_longest_unit_fits_the_declared_bound(void)
 	 * BVN_EXPONENT_MIN (which is written as a flat product, the one shape that
 	 * renders "\u207b\u00b9\u2070\u2070" at full width).
 	 *
-	 * 766 = 32 * (2 + 1 + 8 + 11) + 31 * 2. The generator's bound is 799: it
-	 * budgets 12 bytes for the exponent where "\u207b\u00b9\u2070\u2070" needs 11,
-	 * because \u00b9 is two bytes and the rest are three, and rounding that up is
-	 * cheaper than teaching the generator the encoding widths. */
+	 * THE EXTREME IS FOUND, NOT NAMED. This used to build its worst case from
+	 * bu_fluid_ounce_uk, "fl_oz_uk" at 8 bytes, with the arithmetic written out
+	 * beside it -- and then `footlambert` (11 bytes) was added and the test went
+	 * on passing while no longer exercising the extreme it claimed to. So it
+	 * sweeps every native unit for the longest emission instead: the assertion
+	 * that matters is that the maximum fits with its NUL, and that one byte
+	 * short REFUSES rather than truncating. The measured number is asserted too,
+	 * so a catalogue change that moves it is visible in review rather than
+	 * silent -- but which unit produces it is the table's business, not this
+	 * test's.
+	 */
+	char buf[BVNR_UNIT_STRING_MAX];
+	int32_t worst = -1;
+	value_base_unit_t worst_base = bu_none;
+	for (int32_t id = BVN_UNIT_NATIVE_FIRST; id <= BVN_UNIT_NATIVE_LAST; id++) {
+		value_unit_t probe;
+		memset(&probe, 0, sizeof probe);
+		probe.num_components = BVNR_MAX_UNIT_COMPONENTS;
+		for (uint32_t i = 0; i < BVNR_MAX_UNIT_COMPONENTS; i++) {
+			probe.components[i].base          = (value_base_unit_t)id;
+			probe.components[i].exponent      = (unit_exponent_t)BVN_EXPONENT_MIN;
+			probe.components[i].prefix.system = prefix_si;
+			probe.components[i].prefix.id.si  = si_micro;   /* two-byte µ */
+		}
+		/* A unit that takes no prefix is not the extreme; skip rather than
+		 * silently measure it without one. */
+		if (!bvn_prefix_unit_valid(probe.components[0].prefix,
+					   probe.components[0].base))
+			continue;
+		int32_t n = bvn_unit_to_string(probe, buf, sizeof buf);
+		ASSERT_TRUE(n > 0, "every native unit fits at 32 components");
+		ASSERT_TRUE((size_t)n + 1u <= (size_t)BVNR_UNIT_STRING_MAX,
+			    "...with the NUL inside the bound");
+		if (n > worst) { worst = n; worst_base = (value_base_unit_t)id; }
+	}
+	ASSERT_EQ_INT(worst, 862, "the longest native unit emits 862 bytes");
+	ASSERT_EQ_INT((int)worst_base, (int)bu_footlambert,
+		      "and `footlambert` is the symbol that produces it");
+
 	value_unit_t u;
 	memset(&u, 0, sizeof u);
 	u.num_components = BVNR_MAX_UNIT_COMPONENTS;
 	for (uint32_t i = 0; i < BVNR_MAX_UNIT_COMPONENTS; i++) {
-		u.components[i].base            = bu_fluid_ounce_uk;   /* "fl_oz_uk" */
-		u.components[i].exponent        = (unit_exponent_t)BVN_EXPONENT_MIN;
-		u.components[i].prefix.system   = prefix_si;
-		u.components[i].prefix.id.si    = si_micro;            /* two-byte "\u00b5" */
+		u.components[i].base          = worst_base;
+		u.components[i].exponent      = (unit_exponent_t)BVN_EXPONENT_MIN;
+		u.components[i].prefix.system = prefix_si;
+		u.components[i].prefix.id.si  = si_micro;
 	}
-	char buf[BVNR_UNIT_STRING_MAX];
 	int32_t n = bvn_unit_to_string(u, buf, sizeof buf);
-	ASSERT_TRUE(n > 0, "the worst-case unit fits BVNR_UNIT_STRING_MAX");
-	ASSERT_TRUE((size_t)n + 1u <= (size_t)BVNR_UNIT_STRING_MAX,
-		    "...with the NUL inside the bound");
-	ASSERT_EQ_INT(n, 766, "and it is inside the 799 gen_units.py computes");
+	ASSERT_EQ_INT(n, worst, "the worst case re-measures the same");
 	/* One byte short must REFUSE, not truncate -- and must not be mistaken for
 	 * success by a caller that only checks for a non-empty buffer. */
-	char tight[766];
-	ASSERT_TRUE(bvn_unit_to_string(u, tight, sizeof tight) < 0,
-		    "a buffer one byte short is refused");
+	{
+		char tight[862];
+		ASSERT_TRUE(bvn_unit_to_string(u, tight, sizeof tight) < 0,
+			    "a buffer one byte short is refused");
+	}
 	/* and it round-trips */
 	bool pok = false;
 	value_unit_t back = bvn_parse_unit((const uint8_t *)buf, &pok);
@@ -2287,6 +2373,7 @@ int main(void)
 	test_nonsi_prefix_tilde_disambiguation();
 	test_nonsi_compound_units();
 	test_german_unit_prefix_restriction();
+	test_the_three_dimensionless_encodings();
 	test_longest_unit_fits_the_declared_bound();
 
 	printf("\n──────────────────────────────────────\n");

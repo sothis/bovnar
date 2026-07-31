@@ -344,12 +344,39 @@
 .area2 = &lt;float:64,m^2&gt;  100.0;   # same thing
 .inv1  = &lt;float:64,s⁻¹&gt;  50.0;
 .inv2  = &lt;float:64,s^-1&gt; 50.0;    # same thing</code></pre></div>
-<p>The maximum number of unit components in a compound unit is 8. More than that causes a parse error.</p>
+<p>The maximum number of unit components in a compound unit is 32 (<code>BVNR_MAX_UNIT_COMPONENTS</code>). More than that is <code>error_unit_illegal</code>.</p>
 <h3 id="64-explicitly-dimensionless-no_unit">6.4 Explicitly Dimensionless: <code>no_unit</code></h3>
 <p>When you want to be explicit that a value carries no physical dimension, use the keyword <code>no_unit</code>:</p>
 <div class="codehilite"><pre><code class="language-bovnar">.ratio = &lt;float:64,no_unit&gt; 1.4142;
 .count = &lt;uint:32,no_unit&gt;  42;</code></pre></div>
-<p>Explicitly writing <code>no_unit</code> yields <code>BVN_UNIT_NONE</code> (<code>num_components == 0</code>). Omitting the unit parameter entirely yields <code>BVN_UNIT_NO_PREFIX(bu_none)</code> (<code>num_components == 1</code>, <code>base == bu_none</code>). Both are semantically dimensionless and compare as compatible via <code>bvn_units_compatible</code>, and both serialise to <code>"no_unit"</code> via <code>bvn_unit_to_string</code>, but they are structurally distinct internal states. The explicit <code>no_unit</code> is useful for documentation: it tells a reader that the author actively chose dimensionless, not that they forgot.</p>
+<p>There are three ways to be dimensionless, and only one of them is a <em>different</em> internal state:</p>
+<table>
+<thead>
+<tr>
+<th>Written</th>
+<th>Internal</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>&lt;float:64,no_unit&gt; 1.0</code></td>
+<td><code>BVN_UNIT_NONE</code>, <code>num_components == 0</code></td>
+<td>you said so</td>
+</tr>
+<tr>
+<td><code>&lt;float:64&gt; 1.0</code></td>
+<td><code>BVN_UNIT_NONE</code>, <code>num_components == 0</code></td>
+<td>annotated, unit parameter omitted — the <em>same</em> state</td>
+</tr>
+<tr>
+<td><code>1.0</code></td>
+<td><code>BVN_UNIT_NO_PREFIX(bu_none)</code>, <code>num_components == 1</code></td>
+<td>no annotation at all; the default type is synthesised</td>
+</tr>
+</tbody>
+</table>
+<p>Omitting the unit parameter <em>inside an annotation</em> is the same thing as writing <code>no_unit</code> — <code>bvn_parse_type_annotation</code> initialises the unit to <code>BVN_UNIT_NONE</code> and only overwrites it when a dimensioned unit parameter is actually present. It is a <strong>fully untyped</strong> value that gets the one-component form. All three compare as compatible via <code>bvn_units_compatible</code> and all three serialise to <code>"no_unit"</code> via <code>bvn_unit_to_string</code>. The explicit <code>no_unit</code> is useful for documentation: it tells a reader that the author actively chose dimensionless, not that they forgot.</p>
 <h3 id="65-inline-unit-suffix">6.5 Inline Unit Suffix</h3>
 <p>For untyped or partially-typed values, you can append a unit suffix directly after the value literal, separated by at least one whitespace character:</p>
 <div class="codehilite"><pre><code class="language-bovnar">.speed  = 9.81 m/s;       # valid

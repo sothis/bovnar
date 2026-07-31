@@ -315,8 +315,8 @@ def check_profile_string_bound(p):
     same reason: bvn_unit_to_string returns -1 without writing a NUL when the
     text does not fit, so a caller that ignores the return and formats the
     buffer with "%s" reads past it. A profile has its own worst case -- the
-    "<ns>:" prefix, and codes far longer than any native symbol ("[Amb'a'1'U]"
-    is 11 bytes against the longest native 8).
+    "<ns>:" prefix, and codes far longer than any native symbol (UDUNITS'
+    "astronomical_unit_BIPM_2006" is 27 bytes against the longest native 11).
 
     The bound mirrors the writers in bovnar_profiles.c: "<ns>:", then per
     component a prefix, the code and a signed one-digit exponent, joined by a

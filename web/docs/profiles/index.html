@@ -2187,28 +2187,40 @@ hand. Each is a factor error, not a syntax error, so nothing would catch it down
 <code>eq</code> → <code>val</code> would be <strong>wrong by exactly a factor of two</strong> on every clinical electrolyte value.
 The table maps <code>eq</code> → <code>mol</code> and <code>meq/L</code> → <code>m~mol/L</code>, and leaves <code>val</code> alone as the water-analysis
 unit it is.</p>
-<p><strong>The calorie lines up and the BTU does not.</strong> Bovnar's <code>cal</code> is <code>4.184</code> J — the thermochemical
-calorie, which is what UCUM's unqualified <code>cal</code> is, so <code>cal</code> and <code>cal_th</code> both map. Bovnar's <code>Btu</code>
-is <code>1055.05585262</code> J, the <strong>IT</strong> BTU: only <code>[Btu_IT]</code> maps, and every other BTU variant — the
-unqualified <code>[Btu]</code> included — is refused as <code>error_unit_profile_unsupported</code>. Mapping <code>[Btu]</code> onto
-<code>Btu</code> would be wrong by about 0.07 %: small, dimensionally correct, and invisible to every later
-check, which is the worst shape an error can have here. UDUNITS runs the other way and is a trap in
-the mirror image (§13.3).</p>
+<p><strong>The calorie and the BTU each need two native units.</strong> Bovnar's <code>cal</code> is <code>4.184</code> J — the
+thermochemical calorie, which is what UCUM's unqualified <code>cal</code> is, so <code>cal</code> and <code>cal_th</code> both map to
+it. Bovnar's <code>Btu</code> is <code>1055.05585262</code> J, the <strong>IT</strong> BTU, and <code>[Btu_IT]</code> maps to that.</p>
+<p>The trap is the <em>other</em> convention in each pair, and it is closed by carrying it rather than by
+refusing it. Native <code>Btu_th</code> (<code>1054.3502644888889</code> J) takes UCUM's <code>[Btu_th]</code> <strong>and its unqualified
+<code>[Btu]</code></strong>, which is thermochemical; native <code>cal_IT</code> (<code>4.1868</code> J) takes <code>cal_IT</code>. Mapping <code>[Btu]</code>
+onto <code>Btu</code> instead would be wrong by about 0.07 %: small, dimensionally correct, and invisible to
+every later check, which is the worst shape an error can have here — so the registry gained the unit
+rather than the table gaining a refusal. What is still refused is the handful of BTU and calorie
+variants with no native counterpart: <code>[Btu_39]</code>, <code>[Btu_59]</code>, <code>[Btu_60]</code>, <code>[Btu_m]</code>, <code>cal_m</code>,
+<code>cal_[15]</code> and <code>cal_[20]</code>. UDUNITS runs the other way and is a trap in the mirror image (§13.3).</p>
 <p><strong>The apothecary dram is not the avoirdupois dram.</strong> <code>[dr_ap]</code> is 3.8879346 g and bovnar's <code>dr</code> is
-1.7718 g — a factor of 2.2 apart. <code>[dr_av]</code> maps; <code>[dr_ap]</code> is refused. The apothecary <em>ounce</em> is
-the troy ounce and does map, which is exactly what makes the dram a trap.</p>
+1.7718 g — a factor of 2.2 apart. Both map, to <em>different</em> native units: <code>[dr_av]</code> → <code>dr</code>,
+<code>[dr_ap]</code> → <code>dr_ap</code>. The apothecary <em>ounce</em> and <em>pound</em> are the troy ones, so <code>[oz_ap]</code> and
+<code>[lb_ap]</code> land on <code>oz_t</code> and <code>lb_t</code> beside <code>[oz_tr]</code> and <code>[lb_tr]</code> — which is exactly what made the
+dram a trap while it had no native unit of its own.</p>
 <p><strong>The survey series is not the international series, at 2 ppm.</strong> <code>[fur_us]</code>, <code>[ch_us]</code>, <code>[rd_us]</code>
 and <code>[acr_us]</code> are built on the US survey foot (1200/3937 m); native <code>fur</code>, <code>ch</code>, <code>rd</code> and <code>ac</code> are
-international. They were mapped onto the international atoms and are now refused: 2 ppm for the
-lengths, 4 ppm for the area, dimensionally perfect, and far inside anything a later check would
-notice. UCUM defines no international chain, rod or furlong, so there is nothing to map them to —
-<code>[ft_us]</code> maps to native <code>ftUS</code> because that is the one survey unit the registry carries.</p>
-<p><strong>The British series is not in the table at all.</strong> <code>[ch_br]</code>, <code>[ft_br]</code>, <code>[yd_br]</code> and the rest sit
-<code>7.9e-7</code> from the international units of the same name — a genuinely different foot, and close
-enough that the factor proof matched the British chain to the international one until its tolerance
-was tightened on the strength of exactly this pair (§9.5). They are <code>error_unit_illegal</code>: absent
-rather than refused, because the vocabulary side of the decision is "bovnar has no British foot",
-not "this code cannot be carried".</p>
+international. They were once mapped onto the international atoms — 2 ppm for the lengths, 4 ppm for
+the area, dimensionally perfect, and far inside anything a later check would notice — and were
+refused for a while on that account.</p>
+<p>The registry now carries the survey series itself, so they map to their own units and the near-miss
+is gone rather than merely fenced off: <code>[ft_us]</code> → <code>ftUS</code>, <code>[in_us]</code> → <code>inUS</code>, <code>[mi_us]</code> → <code>miUS</code>,
+<code>[rd_us]</code> → <code>rdUS</code>, <code>[ch_us]</code> → <code>chUS</code>, <code>[lk_us]</code> → <code>lkUS</code>, <code>[fth_us]</code> → <code>fathUS</code>,
+<code>[fur_us]</code> → <code>furUS</code>, <code>[acr_us]</code> → <code>acUS</code>.</p>
+<p><strong>The British series has no native unit, and is refused by name.</strong> <code>[ch_br]</code>, <code>[ft_br]</code>, <code>[yd_br]</code>
+and the rest sit <code>7.9e-7</code> from the international units of the same name — a genuinely different
+foot, and close enough that the factor proof matched the British chain to the international one
+until its tolerance was tightened on the strength of exactly this pair (§9.5). Bovnar has no British
+foot, so there is nothing to map them to.</p>
+<p>They are <code>error_unit_profile_unsupported</code> — <em>named</em> refusals, not absences. That is the general
+arrangement §15 describes: every code the publisher defines and this build cannot carry is listed,
+so a producer who sends <code>[ft_br]</code> is told "you wrote it right, and this build cannot carry it"
+rather than "that is not a code".</p>
 <p><strong>The annotation is not a discriminator.</strong> <code>ucum:{RBC}/uL</code> and <code>ucum:{cells}/uL</code> compare equal
 (§3.4). That is UCUM's semantics faithfully implemented, and it is still a trap for anyone who
 expected the unit slot to carry the analyte.</p>
@@ -2258,14 +2270,14 @@ expected the unit slot to carry the analyte.</p>
 <td><code>error_unit_profile_unsupported</code></td>
 </tr>
 <tr>
-<td>Energy conventions</td>
-<td><code>[Btu]</code>, <code>[Btu_th]</code>, <code>cal_IT</code>, <code>cal_m</code></td>
+<td>Energy conventions with no native counterpart</td>
+<td><code>[Btu_39]</code>, <code>[Btu_59]</code>, <code>[Btu_60]</code>, <code>[Btu_m]</code>, <code>cal_m</code>, <code>cal_[15]</code>, <code>cal_[20]</code></td>
 <td><code>error_unit_profile_unsupported</code> (§6.3)</td>
 </tr>
 <tr>
-<td>Survey and apothecary near-misses</td>
-<td><code>[ch_us]</code>, <code>[acr_us]</code>, <code>[dr_ap]</code>, <code>[lb_ap]</code></td>
-<td><code>error_unit_profile_unsupported</code> (§6.3)</td>
+<td>The British series</td>
+<td><code>[ch_br]</code>, <code>[ft_br]</code>, <code>[yd_br]</code>, <code>[in_br]</code>, <code>[mi_br]</code></td>
+<td><code>error_unit_profile_unsupported</code> (§6.3) — bovnar has no British foot</td>
 </tr>
 <tr>
 <td>Over 32 components</td>
@@ -2273,12 +2285,17 @@ expected the unit slot to carry the analyte.</p>
 <td><code>error_unit_profile_unsupported</code></td>
 </tr>
 <tr>
-<td>An atom UCUM defines and this table has never heard of</td>
-<td><code>[ch_br]</code>, <code>[ft_br]</code>, <code>[yd_br]</code></td>
+<td>A string that is not a UCUM atom at all</td>
+<td><code>Cal</code>, <code>[zzz]</code>, <code>notacode</code></td>
 <td><code>error_unit_illegal</code></td>
 </tr>
 </tbody>
 </table>
+<p><code>error_unit_illegal</code> is the last row and <em>only</em> the last row. Every atom UCUM actually defines is
+either mapped, profile-only or named in the refusal list (§15), so a real code never falls through
+as "not a code" — that outcome is reserved for a typo. The survey and apothecary series used to sit
+here and no longer do: the registry gained <code>ftUS</code>, <code>chUS</code>, <code>acUS</code>, <code>dr_ap</code>, <code>Btu_th</code>, <code>cal_IT</code> and
+their siblings, so those codes map (§6.3).</p>
 <p>The middle rows are the honest cost of the design. A clinical corpus will hit
 <code>error_unit_profile_unsupported</code> on real codes, and the profile does not pretend otherwise: it
 names the failure rather than accepting the string and leaving the consumer to discover the

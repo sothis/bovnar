@@ -1569,6 +1569,103 @@ def check_codes_read_back(verbose):
     return problems, checked
 
 
+def check_doc_error_claims(verbose):
+    """Every "`code` … error_unit_*" claim in the profile docs, against the reader.
+
+    doc/11 §6.4 tabulates what UCUM codes do — refused, profile-only, or not a
+    code at all — and doc/11 §6.3 explains the near-misses in prose. Both are
+    hand-maintained copies of what `src/gendata/ucum.bvnr` decides, and both went
+    stale the moment the registry grew: `[Btu]`, `[Btu_th]`, `cal_IT`, `[ch_us]`,
+    `[acr_us]`, `[dr_ap]` and `[lb_ap]` were listed as
+    `error_unit_profile_unsupported` long after native units arrived that let
+    them map, and `[ch_br]`/`[ft_br]`/`[yd_br]` were listed as
+    `error_unit_illegal` after they became named refusals.
+
+    None of that broke anything — the docs understated the profile, which is the
+    direction no test notices, because nothing fails when a capability goes
+    unclaimed. That is precisely why it needs a gate rather than a reading.
+
+    The claims are extracted rather than restated here: a backticked token
+    followed by an `error_unit_*` code on the same line, in a table row or a
+    sentence, with the namespace taken from the surrounding section. Restating
+    them would create a third copy to drift."""
+    sys.path.insert(0, os.path.join(REPO, "python"))
+    try:
+        import bovnar
+        from bovnar.enums import ErrorCode
+        bovnar._ffi.load_library()
+    except Exception:
+        return None, 0
+
+    path = os.path.join(REPO, "doc", "11_bovnar_unit_profiles.md")
+    if not os.path.exists(path):
+        return [], 0
+
+    # A code is only meaningful inside its namespace, and §6.3/§6.4 are UCUM's.
+    section = re.compile(r"^#{2,4}\s+(\d+)")
+    err = re.compile(r"error_unit_(?:illegal|profile_unsupported|profile_unknown)")
+    tick = re.compile(r"`([^`\n]+)`")
+
+    def claims(line):
+        """(token, expected) pairs. A TABLE ROW states one outcome for a whole
+        list of examples, so every backticked token in the example cells is a
+        claim -- taking only the one nearest the error code checked a tenth of
+        the table and is how the stale rows survived a reading."""
+        if line.lstrip().startswith("|") and line.count("|") >= 3:
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            outcome = next((c for c in reversed(cells) if err.search(c)), None)
+            if not outcome:
+                return
+            want = err.search(outcome).group(0)
+            for cell in cells:
+                if err.search(cell):
+                    continue          # the outcome cell itself
+                for t in tick.findall(cell):
+                    yield t, want
+            return
+        m = err.search(line)
+        if not m:
+            return
+        toks = tick.findall(line[:m.start()])
+        if toks:
+            yield toks[-1], m.group(0)
+
+    problems = []
+    checked = 0
+    in_ucum = False
+    for line in open(path, encoding="utf-8"):
+        m = section.match(line)
+        if m:
+            in_ucum = m.group(1) == "6"
+        if not in_ucum:
+            continue
+        for tok, want in claims(line):
+            # Only bracket/word atoms; skip prose, identifiers and macros.
+            if not re.fullmatch(r"[\[\]A-Za-z0-9_'./*%^()-]{1,32}", tok):
+                continue
+            if tok.isupper() and "_" in tok and not tok.startswith("["):
+                continue          # BVNR_MAX_UNIT_COMPONENTS and friends
+            checked += 1
+            got = "error_" + ErrorCode(
+                bovnar.unit_error_code("ucum:" + tok)).name.lower()
+            if got != want:
+                extra = ""
+                if got == "error_none":
+                    try:
+                        u = bovnar.parse_unit("ucum:" + tok)
+                        extra = (" (profile-only)" if bovnar.unit_is_profile_only(u)
+                                 else " (it maps to %s)" % bovnar.unit_to_str(u))
+                    except Exception:
+                        pass
+                problems.append(
+                    "doc/11 §6: `ucum:%s` is documented as %s; the reader says "
+                    "%s%s" % (tok, want, got, extra))
+    if verbose:
+        print("  doc/11 §6: %d error claim(s) checked, %d problem(s)"
+              % (checked, len(problems)))
+    return problems, checked
+
+
 def check_doc_profile_spellings(verbose):
     """doc/11 §5.3's spelling table, and its "nowhere to go" list, against the
     writer they describe.
@@ -2028,6 +2125,17 @@ def main(argv):
     if ds_checked:
         print("check_profile_factors: %d documented spelling claims agree with "
               "the writer" % ds_checked)
+
+    ec_problems, ec_checked = check_doc_error_claims(args.verbose)
+    if ec_problems:
+        print("check_profile_factors: %d documented error claim(s) disagree "
+              "with the reader:" % len(ec_problems))
+        for msg in ec_problems:
+            print("  %s" % msg)
+        return 1
+    if ec_checked:
+        print("check_profile_factors: %d documented error claims agree with the "
+              "reader" % ec_checked)
 
     available = [ns for ns in which if have_cache(args.cache, ns)]
     if not available:

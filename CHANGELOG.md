@@ -95,6 +95,45 @@ half neither did: only a **policy-chosen** target takes this path, since a targe
 named by the `want_unit` hook keeps its strict all-or-nothing contract whatever
 `on_inexact` says.
 
+### Fixed — doc/11's UCUM refusal tables listed ten codes that now map
+
+§6.4 tabulates what a UCUM code does and §6.3 explains the near-misses in prose.
+Both are hand-maintained copies of what `src/gendata/ucum.bvnr` decides, and both
+went stale as the registry grew — during **this** release, from the units added
+for exactly these codes:
+
+| documented | actually |
+|---|---|
+| `[Btu]`, `[Btu_th]` refused | map to native `Btu_th` |
+| `cal_IT` refused | maps to native `cal_IT` |
+| `[ch_us]`, `[acr_us]` refused | map to `chUS`, `acUS` |
+| `[dr_ap]`, `[lb_ap]` refused | map to `dr_ap`, `lb_t` |
+| `[ch_br]`, `[ft_br]`, `[yd_br]` are `error_unit_illegal` | named refusals — `error_unit_profile_unsupported` |
+
+Nothing was broken by it: the docs **understated** the profile, which is the
+direction nothing notices, because no test fails when a capability goes
+unclaimed. A reader planning a clinical or survey corpus would have concluded
+those codes were unusable and written their own translation.
+
+§6.3's four near-miss paragraphs are rewritten against the implementation. Two of
+them now describe a better outcome than they used to: the BTU and calorie traps
+are closed by *carrying both conventions* (`Btu` is the IT one, `Btu_th` the
+thermochemical, and UCUM's unqualified `[Btu]` is thermochemical so it lands on
+the latter) rather than by refusing, and the whole US survey series maps to its
+own native units instead of being fenced off at 2 ppm from the international one.
+
+§6.4's table gains the rule its rows had stopped illustrating: **`error_unit_illegal`
+is the last row and only the last row.** Every atom UCUM defines is mapped,
+profile-only, or named in the refusal list, so a real code never falls through as
+"not a code" — that outcome is reserved for a typo. This is what §15 already
+claimed and what §6.4's examples had quietly stopped showing.
+
+`check_profile_factors.py` gained the gate: it extracts every "`code` …
+`error_unit_*`" claim in §6 — 40 of them — and checks each against the reader.
+Table rows are read as a list, since one outcome governs every example in the row
+and taking only the token nearest the error code is how the stale rows survived a
+reading in the first place. Mutation-checked against the original defect.
+
 ### Added — every embedded example is checked, not a tenth of them
 
 `check_doc_examples.py` parsed only the fences opening with `#!bovnar` — **24 of

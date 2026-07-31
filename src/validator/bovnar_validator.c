@@ -430,6 +430,34 @@ bool bvn_policy_selects(value_unit_t native, value_unit_t target)
 {
 	if (BVN_UNIT_IS_UNITLESS(native) != BVN_UNIT_IS_UNITLESS(target))
 		return false;
+	/*
+	 * An affine scale outside "alone, at exponent 1" is the second fence the
+	 * engine's screen does not have, and for the same reason as the first:
+	 * bvn_units_convertible is deliberately a DIMENSIONAL screen, and `°C/h` is
+	 * dimensionally `K/h`, so it says yes to a pair the conversion entry points
+	 * then refuse (doc/07 §10 -- the offset is a number of kelvin and a product
+	 * has nowhere to add it).
+	 *
+	 * Asking the screen alone made a policy claim a value it could not deliver.
+	 * A target selected `°C/h -> K/h`, the conversion failed, and the failure
+	 * was swallowed because an unmatched target is allowed to pass a value
+	 * through untouched -- so `query --unit K/h` printed the °C/h number as
+	 * though it had answered the request. Worse for a RULE, which is an
+	 * assertion the caller made by naming the field: `--field .rate=K/h` and
+	 * `--require-field .rate=K/h` both reported OK on a document that cannot
+	 * satisfy either, which is precisely the silence the header refuses ("a
+	 * value that cannot be applied to it is error_unit_mismatch rather than a
+	 * value passed through quietly").
+	 *
+	 * Declining here gets all three right at once, because rules,
+	 * require_dimension_of and targets are all decided through this one
+	 * function: the rule and the dimension requirement fail loudly, and the
+	 * target simply does not match, which leaves the value untouched as an
+	 * unmatched target should.
+	 */
+	if (bvni_unit_affine_misplaced(native) ||
+	    bvni_unit_affine_misplaced(target))
+		return false;
 	return bvn_units_convertible(native, target);
 }
 /*

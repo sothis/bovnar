@@ -104,6 +104,45 @@ stone-versus-stere and byte-versus-bel collisions, `val` at 0.5, the calorie and
 BTU conventions including `[Btu]` landing on `Btu_th`, the nine survey-series
 mappings, the named British refusals, and annotation-insensitive equality.
 
+### Fixed — a unit policy claimed `°C/h` and then quietly failed to deliver it
+
+`bvn_policy_selects` screened targets and rules on `bvn_units_convertible`
+alone. That function is deliberately a **dimensional** screen — `°C/h` is
+dimensionally `K/h` — and the conversion entry points then refuse the pair,
+because an affine scale outside "alone, at exponent 1" has nowhere to put its
+offset (doc/07 §10). doc/05 §12.4 said in one paragraph that convertible is
+"exactly the set `bvn_unit_convert_value` and `bvn_unit_convert_rational`
+accept" and in the next that it is "a screen, not a guarantee, `s/°C` passes
+here and the conversion entry points still refuse it". The second paragraph was
+right.
+
+Three user-visible consequences, all of them silent:
+
+- `bovnar query --unit K/h` on a `°C/h` document printed the °C/h number, as
+  though it had answered the request. The target selected the pair, the
+  conversion failed, and the failure was swallowed — an unmatched target is
+  allowed to pass a value through untouched, and this one had matched.
+- `bovnar validate --field .rate=K/h` reported **OK** against that document.
+- `bovnar validate --require-field .rate=K/h` reported **OK** too, as did
+  `--require-dimension K/h`.
+
+The last two are the serious ones. A rule is an assertion the caller made by
+naming the field, and the header says what that costs: "a value that cannot be
+applied to it is `error_unit_mismatch` rather than a value passed through
+quietly. Silence would defeat the point of naming it." Three ways of asking
+`.rate` to be a `K/h` all answered yes about a value that is not one.
+
+`bvn_policy_selects` now asks `bvni_unit_affine_misplaced` before it asks the
+dimensional screen. Rules, `require_dimension_of` and targets are all decided
+through that one function, so all three land correctly at once: the rule and the
+dimension requirement are `error_unit_mismatch`, and the target simply does not
+match — which leaves the value untouched, as an unmatched target should. A lone
+affine still converts and an ordinary compound is untouched; both are asserted.
+
+The regression test was checked by removing the fix and watching it fail.
+doc/05 §12.4 no longer contradicts itself, and now says which side closes the
+gap.
+
 ### Fixed — the unit-policy reference blamed the wrong value for an inexact `--si` run
 
 doc/06 §2.4 illustrated `error_unit_inexact` with a document whose heading is in

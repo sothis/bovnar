@@ -1132,6 +1132,80 @@ static void test_rule_is_an_assertion(void)
 	run_policy(".speed = <float:64> 42.0;", &p, &c, false, error_unit_mismatch);
 }
 
+/*
+ * An affine scale outside "alone, at exponent 1" has no SI value, so no policy
+ * may claim it -- and the three ways a policy can claim one must each say so in
+ * the way that mode says things.
+ *
+ * bvn_policy_selects screened on bvn_units_convertible alone, which is a
+ * DIMENSIONAL screen and passes `°C/h -> K/h` by design. So a target selected
+ * the pair, the conversion refused, and the refusal was swallowed because an
+ * unmatched target may pass a value through: `query --unit K/h` printed the
+ * °C/h number as though it had answered. A RULE was worse -- `--field
+ * .rate=K/h` and `--require-field .rate=K/h` both reported OK on a document
+ * that satisfies neither, which is exactly the silence a rule exists to refuse.
+ */
+static void test_affine_in_a_compound_is_claimed_by_no_policy(void)
+{
+	const char* doc = ".rate = <float:64,°C/h> 1.0;";
+
+	/* A rule is an assertion in either mode: both refuse. */
+	static const bvnr_unit_rule_t conv[] = {
+		{ ".rate", "K/h", 0, bvnr_rule_convert },
+	};
+	static const bvnr_unit_rule_t req[] = {
+		{ ".rate", "K/h", 0, bvnr_rule_require },
+	};
+	bvnr_unit_policy_t p = {0};
+	pol_ctx_t c = {0};
+
+	p.rules = conv; p.num_rules = 1;
+	run_policy(doc, &p, &c, false, error_unit_mismatch);
+
+	memset(&p, 0, sizeof p); memset(&c, 0, sizeof c);
+	p.rules = req; p.num_rules = 1;
+	run_policy(doc, &p, &c, false, error_unit_mismatch);
+
+	/* require_dimension_of is an assertion too. */
+	static const char* const dims[] = { "K/h" };
+	memset(&p, 0, sizeof p); memset(&c, 0, sizeof c);
+	p.require_dimension_of = dims; p.num_require_dimension_of = 1;
+	run_policy(doc, &p, &c, false, error_unit_mismatch);
+
+	/* A whole-document target is not an assertion: it simply does not match,
+	 * and an unmatched target delivers the value exactly as written. */
+	static const bvnr_unit_target_t tgts[] = { { "K/h", 0 } };
+	memset(&p, 0, sizeof p); memset(&c, 0, sizeof c);
+	p.targets = tgts; p.num_targets = 1;
+	run_policy(doc, &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 1, "affine compound: one value");
+	if (c.n == 1) {
+		ASSERT_TRUE(!c.converted[0],
+			    "affine compound: target must not claim it");
+		ASSERT_STR(c.native[0], "°C/h",
+			   "affine compound: delivered as written");
+	}
+
+	/* None of this may touch a LONE affine, which converts normally... */
+	memset(&p, 0, sizeof p); memset(&c, 0, sizeof c);
+	static const bvnr_unit_target_t kelvin[] = { { "K", 0 } };
+	p.targets = kelvin; p.num_targets = 1;
+	run_policy(".rate = <float:64,°C> 25.0;", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 1, "lone affine: one value");
+	if (c.n == 1)
+		ASSERT_TRUE(c.converted[0], "lone affine: still converts");
+
+	/* ...nor an ordinary compound with no affine component in it. */
+	memset(&c, 0, sizeof c);
+	static const bvnr_unit_target_t mps[] = { { "m/s", 0 } };
+	memset(&p, 0, sizeof p);
+	p.targets = mps; p.num_targets = 1;
+	run_policy(".rate = <float:64,k~m/h> 90.0;", &p, &c, true, error_none);
+	ASSERT_EQ_INT(c.n, 1, "ordinary compound: one value");
+	if (c.n == 1)
+		ASSERT_TRUE(c.converted[0], "ordinary compound: still converts");
+}
+
 /* Rules are the most specific thing a policy can say, so they outrank the
  * whole-document target list and the normalisation fallback alike. */
 static void test_rule_outranks_targets_and_normalise(void)
@@ -2481,6 +2555,7 @@ int main(void)
 	test_rule_wildcard();
 	test_rule_wildcard_respects_component_boundary();
 	test_rule_is_an_assertion();
+	test_affine_in_a_compound_is_claimed_by_no_policy();
 	test_rule_outranks_targets_and_normalise();
 	test_rule_covers_array_elements();
 	test_rule_path_argument_checking();

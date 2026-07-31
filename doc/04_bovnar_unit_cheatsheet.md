@@ -2,7 +2,7 @@
 
 > **Spec version:** 1.1
 > **Status:** Reference — the symbol tables of the unit and currency registry
-> **Scope:** 215 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.
+> **Scope:** 217 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.
 
 ---
 
@@ -242,7 +242,7 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly
 | `tn_l`  | `long_ton`, `long_tons` | long ton (UK) | `bu_long_ton` | 1016.0469088 kg (exact) |
 | `oz_t`  | `troy_ounce`, `troy_ounces` | troy ounce | `bu_troy_ounce` | 0.0311034768 kg (exact) |
 | `ct`    | `carat`, `carats` | metric carat | `bu_carat` | 2×10⁻⁴ kg (exact) |
-| `slug`  | `slugs` | slug | `bu_slug` | 14.593902937 kg |
+| `slug`  | `slugs` | slug | `bu_slug` | 14.593902937206364 kg (= `lb`·`gn`/`ft`) |
 | `dr`    | `dram`, `drams` | dram (avoirdupois) | `bu_dram` | 1.7718451953125×10⁻³ kg (exact) |
 | `dwt`   | `pennyweight`, `pennyweights` | pennyweight (troy) | `bu_pennyweight` | 1.55517384×10⁻³ kg (exact) |
 | `lb_t`  | `troy_pound`, `troy_pounds`, `apothecary_pound` | troy pound (= apothecary pound) | `bu_troy_pound` | 0.3732417216 kg (exact, = 12 `oz_t`) |
@@ -300,7 +300,7 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly
 | `Btu`   | `btu`, `BTU` | International Table BTU | `bu_btu` | 1055.05585262 J |
 | `erg`   | `ergs` | erg | `bu_erg` | 10⁻⁷ J (exact) |
 | `thm`   | `therm`, `therms` | US therm | `bu_therm` | 1.05480400×10⁸ J (exact) |
-| `ft_lb` | `foot_pound`, `foot_pounds` | foot-pound | `bu_foot_pound` | 1.3558179483 J |
+| `ft_lb` | `foot_pound`, `foot_pounds` | foot-pound | `bu_foot_pound` | 1.3558179483314003 J (= `lbf`·`ft`) |
 | `cal_IT` | `calorie_IT` | International Table calorie | `bu_calorie_it` | 4.1868 J (exact) |
 | `Btu_th` | `BTU_th`, `btu_th` | thermochemical BTU | `bu_btu_th` | 23 722 880 951/22 500 000 J ≈ 1054.35026449 J |
 
@@ -310,7 +310,7 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly
 
 | Symbol | Long forms | Name | Enum | Factor |
 |--------|-----------|------|------|--------|
-| `hp`   | `horsepower` | mechanical horsepower | `bu_horsepower` | 745.69987158227 W |
+| `hp`   | `horsepower` | mechanical horsepower | `bu_horsepower` | 745.6998715822702 W (= 550 `ft_lb`/s) |
 | `PS`   | `CV`, `metric_horsepower` | metric horsepower | `bu_metric_horsepower` | 735.49875 W (exact) |
 
 ### 4.10 Force
@@ -467,8 +467,8 @@ No Old German unit accepts any SI or IEC prefix (`bvn_prefix_unit_valid` rejects
 
 | Symbol    | Long forms | Name | Enum | Factor |
 |-----------|-----------|------|------|--------|
-| `prln`    | `prussian_line`, `linie` | Prussian line | `bu_prussian_line` | 2.17953×10⁻³ m |
-| `prz`     | `prussian_zoll`, `zoll` | Prussian Zoll | `bu_prussian_zoll` | 2.61544×10⁻² m |
+| `prln`    | `prussian_line`, `linie` | Prussian line | `bu_prussian_line` | 313853/144000000 m ≈ 2.1795347×10⁻³ m |
+| `prz`     | `prussian_zoll`, `zoll` | Prussian Zoll | `bu_prussian_zoll` | 313853/12000000 m ≈ 2.6154417×10⁻² m |
 | `prf`     | `prussian_fuss`, `preussischer_fuss` | Prussian Fuß | `bu_prussian_fuss` | 3.13853×10⁻¹ m |
 | `elle`    | `prussian_elle`, `preussische_elle` | Prussian Elle | `bu_prussian_elle` | 6.66937625×10⁻¹ m (exact) |
 | `rute`    | `prussian_rute`, `preussische_rute` | Prussian Rute | `bu_prussian_rute` | 3.766236 m (exact) |
@@ -525,6 +525,8 @@ Dimensionless scaling factors: `5 %` ≡ `0.05`, `250 ppm` ≡ `0.00025`. These 
 | `pcm` | `per_cent_mille` | per cent mille | `bu_per_cent_mille` | 10⁻⁵ |
 | `ppm` | — | parts per million | `bu_ppm` | 10⁻⁶ |
 | `ppb` | — | parts per billion | `bu_ppb` | 10⁻⁹ |
+| `pptr` | `parts_per_trillion`, `pptv` | parts per trillion | `bu_ppt` | 10⁻¹² |
+| `ppq` | `parts_per_quadrillion`, `ppqv` | parts per quadrillion | `bu_ppq` | 10⁻¹⁵ |
 
 ---
 
@@ -950,7 +952,7 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 
 ---
 
-*The id space is blocked: the leading two digits of an id name its vocabulary. Native units 100000–100179 (180) · UCUM opaque units 200000–200040 (41) · UN/ECE opaque units 300000–300024 (25) · currencies 900000–900215 (166 fiat, 50 crypto). Blocks 40, 50 and 60 are reserved for QUDT, QUDT quantity kinds and UDUNITS, which contribute no opaque units today; 70 and 80 are free.*
+*The id space is blocked: the leading two digits of an id name its vocabulary. Native units 100000–100216 (217) · UCUM opaque units 200000–200040 (41) · UN/ECE opaque units 300000–300024 (25) · currencies 900000–900215 (166 fiat, 50 crypto). Blocks 40, 50, 60, 70 and 80 are reserved for QUDT, QUDT quantity kinds, UDUNITS, OM 2 and the CF standard names, which contribute no opaque units today.*
 *The space is SPARSE — do not index an array by an id. `BVN_UNIT_SLOT_COUNT` = 247 is the row count of the library's dense tables, indexed by `bvni_unit_slot()`, and is not a bound on the enum.*
 
 ---

@@ -214,6 +214,8 @@
 	bu_refrigeration_ton = 100212,
 	bu_dobson       = 100213,
 	bu_shake        = 100214,
+	bu_ppt          = 100215,
+	bu_ppq          = 100216,
 
 /* The native block's bounds, and the dense table slot of a unit in it.
  *
@@ -224,8 +226,8 @@
  * arithmetic on the enumerator so it can be a designated-initialiser index in
  * the generated table rows: the row and the enum cannot drift apart. */
 #define BVN_UNIT_NATIVE_FIRST     100000
-#define BVN_UNIT_NATIVE_LAST      100214
-#define BVN_UNIT_NATIVE_COUNT     215
+#define BVN_UNIT_NATIVE_LAST      100216
+#define BVN_UNIT_NATIVE_COUNT     217
 #define BVN_UNIT_SLOT_NATIVE_BASE 1
 #define BVN_SLOT_NATIVE(b) \
 	(BVN_UNIT_SLOT_NATIVE_BASE + ((int)(b) - BVN_UNIT_NATIVE_FIRST))

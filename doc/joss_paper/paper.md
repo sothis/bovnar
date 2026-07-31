@@ -41,7 +41,7 @@ chose to write them.
 The reference implementation is a dependency-free C99 library providing a
 streaming (SAX-style) reader, a DOM API, a canonicalizing writer, a
 command-line tool, a WebAssembly build, and pure-`ctypes` Python bindings with
-optional NumPy and Pint [@pint] bridges. It ships a registry of 215 physical
+optional NumPy and Pint [@pint] bridges. It ships a registry of 217 physical
 units (SI base and derived units, IEC binary prefixes [@si; @iec80000-13]),
 216 fiat and cryptocurrency denominations treated as first-class dimensions,
 and nine time epochs, with leap seconds resolved from the IERS TAI-UTC table:

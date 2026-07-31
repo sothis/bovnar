@@ -633,7 +633,7 @@ a mismatch is `error_unit_mismatch`.
 
 **How many base units does Bovnar support?**
 
-215 named base units across the following categories:
+217 named base units across the following categories:
 
 - **7 SI base units** — second, meter, gram, ampere, kelvin, mole, candela.
 - **21 named SI-derived units** — hertz through katal (Hz, N, Pa, J, W, V, Ω, F, C, S, Wb, T, H, lm, lx, Bq, Gy, Sv, kat, rad, sr).
@@ -661,7 +661,7 @@ a mismatch is `error_unit_mismatch`.
 - **2 textile linear density units** — **tex** (1 g/km = 10⁻⁶ kg/m, ISO 1144), **denier** (`den`, 1 g/9 000 m; 9 den = 1 tex).
 - **13 Old German units** — **Pfund** (`Pfd`), **Zentner** (`Ztr`), **Doppelzentner**, **Lot** (mass); **Prussian line, Zoll, Fuß, Elle, Rute**, **Klafter**, and **German (geographical) mile** (length); **Morgen** (area); **Scheffel** (volume). None accept an SI or IEC prefix.
 - **7 surveying & signalling units** — **US survey foot**, **league**, **cable length**, **hand** (length); **quintal**, **scruple** (mass); **baud** (`Bd`, signalling rate).
-- **6 ratio / proportion units** — **percent** (`%`), **per mille** (`‰`), **per myriad** (`‱`), **per cent mille** (`pcm`), **ppm**, **ppb** — dimensionless scaling factors that take no prefix.
+- **8 ratio / proportion units** — **percent** (`%`), **per mille** (`‰`), **per myriad** (`‱`), **per cent mille** (`pcm`), **ppm**, **ppb**, **parts per trillion** (`pptr`, 10⁻¹²) and **parts per quadrillion** (`ppq`, 10⁻¹⁵) — dimensionless scaling factors that take no prefix. The last two are spelled `pptr`/`ppq` rather than `ppt`/`ppq` because `ppt` already reads as `p~pt`, the picopint, and because `ppt` means parts per *thousand* in some industries; UCUM makes the same split, spelling them `[ppth]` and `[pptr]`.
 - **1 acidity scale** — **pH** (`pH`), a logarithm of hydrogen-ion activity; its own quantity kind, so it never converts to a percentage or a plain number.
 - **2 named speed units** — **mile per hour** (`mph`), **kilometre per hour** (`kph`, also `kmh`). Neither takes a prefix; `mi/h` and `k~m/h` remain valid as compounds.
 - **7 water-analysis units** — the five hardness degrees **German** (`°dH`), **English/Clark** (`°e`), **French** (`°fH`), **Russian** (`°rH`), **American** (`°aH`), plus **grains per US gallon** (`gpg`) and the **equivalent** (`val`, ½ mol as water analysis uses it). The six degrees are amount concentrations and all inter-convert.

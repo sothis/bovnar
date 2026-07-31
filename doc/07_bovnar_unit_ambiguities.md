@@ -105,17 +105,26 @@ Both are deterministic, not ambiguous — but neither is guessable. Write `d~at`
 
 ## 4. Refused outright
 
-Two tokens are `error_unit_illegal` on purpose, listed in `.compact_exceptions` in
+Three tokens are `error_unit_illegal` on purpose, listed in `.compact_exceptions` in
 `src/gendata/units.bvnr`. Accepting them would turn a parse error into a quietly wrong unit.
 
 | Token | Would have resolved as | Actually means, in the wild | Write |
 |-------|------------------------|-----------------------------|-------|
 | `kt` | kilo-tonne | kilotonne **or** knot, depending on the field | `k~t` (mass) or `kn` (speed) |
 | `usb` | micro-stilb | the bus | `u~sb` (or `µ~sb`) if you really mean microstilb |
+| `ppt` | pico-pint (a **volume**) | parts per trillion **or** parts per thousand | `pptr` (10⁻¹²), `‰` (10⁻³), or `p~pt` if you really mean the picopint |
 
-`kt` is the harder case: both readings are units Bovnar models, so no table lookup can settle it.
-Reading a speed as a mass is exactly the failure this format exists to prevent, so the author is
-asked to say which.
+`kt` is the harder case of the first two: both readings are units Bovnar models, so no table lookup
+can settle it. Reading a speed as a mass is exactly the failure this format exists to prevent, so
+the author is asked to say which.
+
+`ppt` is the same argument twice over. The compact form resolved it as the picopint, so a
+dimensionless ratio read as a volume; and the two things a writer might have meant differ by 10⁹.
+Bovnar's parts per trillion is spelled **`pptr`**, following UCUM, which splits the same ambiguity
+the same way (`[ppth]` for per thousand, `[pptr]` for per trillion). Note the asymmetry with §2:
+`ppt` is *not* claimed by the new unit, because a bare alias would have taken the spelling away
+from `p~pt` — see the note in `units.bvnr`, and rule 2's guarantee that no existing document
+changes meaning. Making it an error takes nothing away silently.
 
 ---
 
@@ -304,7 +313,7 @@ conversions in the first group; the second group is protected by an explicit qua
 | `JTU` | turbidity, visual candle | ditto |
 | `PSU` | practical salinity | `‰`, `g/kg`, plain numbers |
 | `ΔK`, `Δ°C`, `Δ°F`, `Δ°Ra`, `Δ°De`, `Δ°N`, `Δ°Re`, `Δ°Ro` | temperature **interval** (one shared kind, so `Δ°F` → `ΔK` works at 5/9) | `K`, `°C`, `°F` and every other temperature *scale*: 25 °C is 298.15 K, a *rise* of 25 degrees is 25 K |
-| `%`, `‰`, `‱`, `pcm`, `ppm`, `ppb` | pure ratios | *(freely interconvertible, and with a plain number: 1 % → 0.01)* |
+| `%`, `‰`, `‱`, `pcm`, `ppm`, `ppb`, `pptr`, `ppq` | pure ratios | *(freely interconvertible, and with a plain number: 1 % → 0.01)* |
 
 Water chemistry calls the American hardness scale "ppm" (milligrams of CaCO₃ per litre). Bovnar's
 `ppm` is the **dimensionless** 10⁻⁶ and the hardness scale is `°aH`, an amount concentration — the

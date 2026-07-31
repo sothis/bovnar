@@ -3,7 +3,7 @@
 check_doc_unit_tables.py — the unit and currency tables in doc/ against gendata.
 
 doc/04 (the cheatsheet) and doc/05 (the unit system) between them carry every one
-of the 215 physical units and all 216 currencies, twice over, as hand-written
+of the 217 physical units and all 216 currencies, twice over, as hand-written
 markdown: a canonical symbol, the accepted long forms, the bu_* enumerator, and
 for money the ISO numeric code and minor-unit count. Roughly 1150 rows.
 
@@ -26,12 +26,18 @@ What is checked, per row that names one:
   coverage    every unit and every currency appears in each document, and no row
               names something gendata does not define.
 
-Not checked: the Factor column. It is prose as much as data -- "10⁻⁴ m²·s⁻¹",
-"101 325/760 Pa", "2π rad", "1/9 000 000 kg/m" -- and a parser for it would be
-guessing at intent. The factors are gated where they are machine-readable
-instead: test_unit_factors_derived.py checks the generated C table against
-units.bvnr, and check_profile_factors.py checks the profiles against their
-publishers' own files.
+Also checked, in a document that has no `bu_*` column to key on: doc/09 §18
+summarises the whole BaseUnit enum as a table of id RANGES, so the coverage rule
+above cannot see it. Contiguity is checked instead -- the ranges must tile block
+10 and block 90 end to end.
+
+Not checked here: the Factor column. It is a grammar rather than free prose and
+it has its own gate, check_doc_unit_factors.py, which evaluates every cell in
+exact rational arithmetic and compares the value, the dimension and the
+"(exact)" claim. The factors are gated on the other side too:
+test_unit_factors_derived.py checks the generated C table against units.bvnr,
+and check_profile_factors.py checks the profiles against their publishers' own
+files.
 
 Usage:  python3 check_doc_unit_tables.py [repo-root]
 Exit 0 when the documents agree with gendata, 1 with a list when they do not.
@@ -170,6 +176,64 @@ def check_document(path, units, curr, bad):
     return len(seen_units), len(seen_curr)
 
 
+# doc/09 §18 summarises the whole BaseUnit enum as a table of id RANGES rather
+# than a row per member, so the unit-coverage check above cannot see it: there
+# is no `bu_*` cell to key on. It drifted exactly the way that invisibility
+# predicts -- the table stopped at 100179 and the 35 members from 100180 up (the
+# six temperature differences, the US survey lengths, the typographic lengths,
+# the dry volumes and the rest) were simply absent, with the build green. What
+# is checkable without parsing prose is CONTIGUITY: the ranges must tile block
+# 10 and block 90 end to end, with no gap and no overlap.
+RANGE_DOC = "doc/09_bovnar_python_bindings.md"
+RANGE_ROW = re.compile(r"^(\d+)(?:[–-](\d+))?$")
+
+
+def check_id_range_table(units, curr, bad):
+    path = os.path.join(REPO, RANGE_DOC)
+    if not os.path.exists(path):
+        return 0
+    spans = []
+    for ln, header, row in tables(path):
+        if header[:2] != ("Range", "Members") or len(row) < 2:
+            continue
+        m = RANGE_ROW.match(row[0].strip())
+        if not m:
+            bad.append("%s:%d: %r is not an id or id range"
+                       % (RANGE_DOC, ln, row[0]))
+            continue
+        lo = int(m.group(1))
+        hi = int(m.group(2)) if m.group(2) else lo
+        if hi < lo:
+            bad.append("%s:%d: range %s runs backwards" % (RANGE_DOC, ln, row[0]))
+        spans.append((lo, hi, ln))
+    if not spans:
+        bad.append("%s: the BaseUnit id-range table is gone" % RANGE_DOC)
+        return 0
+    want = [(0, 0),
+            (100000, 100000 + len(units) - 1),
+            (900000, 900000 + len(curr) - 1)]
+    spans.sort()
+    cursor = None
+    for lo, hi, ln in spans:
+        if cursor is None or lo != cursor:
+            # a new block must open exactly where src/gendata says it does
+            if not any(lo == blo for blo, _ in want):
+                bad.append("%s:%d: the range table jumps to %d, which opens no "
+                           "block src/gendata defines" % (RANGE_DOC, ln, lo))
+        cursor = hi + 1
+    for blo, bhi in want:
+        covered = set()
+        for lo, hi, _ in spans:
+            if lo >= blo and hi <= bhi:
+                covered.update(range(lo, hi + 1))
+        gap = sorted(set(range(blo, bhi + 1)) - covered)
+        if gap:
+            bad.append("%s: the BaseUnit range table does not cover %d–%d: %d "
+                       "id(s) missing, first %d, last %d"
+                       % (RANGE_DOC, blo, bhi, len(gap), gap[0], gap[-1]))
+    return len(spans)
+
+
 def main(argv):
     global REPO
     if len(argv) > 1:
@@ -179,6 +243,7 @@ def main(argv):
     totals = []
     for path in DOCS:
         totals.append((path,) + check_document(path, units, curr, bad))
+    nranges = check_id_range_table(units, curr, bad)
     if bad:
         print("check_doc_unit_tables: the documents disagree with src/gendata:",
               file=sys.stderr)
@@ -190,6 +255,8 @@ def main(argv):
     for path, nu, nc in totals:
         print("check_doc_unit_tables: %s — %d units, %d currencies, all "
               "matching src/gendata" % (path, nu, nc))
+    print("check_doc_unit_tables: %s — %d id range(s), covering every "
+          "BaseUnit member" % (RANGE_DOC, nranges))
     return 0
 
 

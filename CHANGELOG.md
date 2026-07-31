@@ -20,6 +20,148 @@ rebuild consumers against the new headers. **SOVERSION is bumped 1 → 2**
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
 
+### Fixed — a temperature difference that cancelled to itself came out a temperature
+
+`ΔK·m/m` was **compatible with `K`** — a temperature *scale* — and **incompatible
+with `ΔK`**, the interval it literally spells. So was `ΔK²/ΔK`, and every other
+compound that cancels down to a lone interval.
+
+The interval kind is scoped to "a lone unit at exponent 1", because that is the
+only shape where an affine offset could ever have been applied; inside a compound
+`ΔK` and `K` are the same unit, which is what keeps `W/(m²·ΔK)` a U-value. That
+rule was being asked of the components **as written** rather than of the unit
+after cancellation, so three components that reduce to one counted as a compound
+and the kind went uncounted.
+
+The consequence went further than a compatibility answer. `bvn_unit_reduce` turns
+`ΔK·m/m` *into* a lone `ΔK`, so reduction produced a unit its own input could not
+convert to — `bvn_unit_convert_value` refused the pair — and `BVN_UNIT_REDUCE`
+would have rewritten a difference into a reading. Exactly the substitution the Δ
+units exist to prevent, reached through the compound door.
+
+`bvni_kind_exponents` now folds repeated bases into a net exponent before asking
+whether the unit is lone. Every row of the documented table in doc/07 §9 is
+unchanged — `ΔK` vs `K` still incompatible, `W/(m²·ΔK)` still a U-value,
+`1/ΔK` still an expansion coefficient — and the fold is neutral for the other
+kinds, which count `weight × exponent` either way. Found by a randomised sweep
+over compound units, not by reading: every shape in that table was already right.
+
+### Fixed — a unit conversion lost 5 digits, or refused, when an intermediate went subnormal
+
+A compound's per-component SI factors can each sit far outside a double's range
+while the **product** sits comfortably inside it. `bvn_unit_to_si_factor`
+accumulated in a plain double, so the running value walked through the subnormal
+range and lost mantissa bits it never got back:
+
+| unit | true factor | was | now |
+|---|---|---|---|
+| `n~m·r~Da⁴·r~tn_l⁴` | 9.9999999999999996e-226 | 5.3e-5 relative error | within 1 ulp |
+| `z~fl_oz_uk⁴·y~var·r~barn⁴/µ~qt_uk³` | 9.9999999999999991e-199 | **refused** | within 1 ulp |
+| `r~chUS⁴/R~ha⁴·R~tn_sh³` | 1e-297 | 4.6e-8 relative error | within 1 ulp |
+
+The middle row is the sharper failure: the factor is an ordinary 10⁻¹⁹⁸, both
+sides underflowed to zero on the way, and the conversion came back refused —
+while `bvn_unit_convert_rational` performed it exactly. `bvn_unit_reduce` had the
+same defect in its `*scale`, which underflowed to **zero** with `*overflow` left
+`false`, so a caller multiplying by it lost every value it touched. (Both
+`bovnar.h` and doc/08 already said a scale "out of float range" sets the flag;
+only the `isinf` half was implemented.)
+
+The unit engine now accumulates through `bvni_scaled_t` — a mantissa and a
+separate binary exponent, renormalised after every multiply. Powers of two are
+exact in binary floating point, so the split costs nothing, and overflow and
+underflow are decided once at the end, where they are a property of the answer
+rather than of the order the components happened to be written in.
+`bvn_unit_convert_factor` divides in that representation too, so a representable
+**ratio** is no longer refused because neither operand is representable alone.
+
+Found by a randomised sweep of 600 000 compound units checked against the exact
+rational path; `test_extreme_compounds_keep_full_precision` pins all three.
+
+### Added — `pptr` and `ppq`, the two ratios below `ppb`
+
+The dimensionless ratio family stopped at `ppb`, and five profile codes were
+refused for that one reason: `ucum:[pptr]`, and `udunits:ppt` / `pptv` / `ppq` /
+`ppqv`. Both publishers state them exactly (10⁻¹² and 10⁻¹⁵) and agree with each
+other. All five now map.
+
+**The symbol is `pptr`, not `ppt`**, for two independent reasons. `ppt` already
+resolves — as the compact form of `p~pt`, the picopint — and `units.bvnr` forbids
+a new alias that changes what an existing spelling means (`gen_units.py` refuses
+it at build time). And `ppt` is ambiguous in the field: parts per **thousand** in
+some industries, parts per **trillion** in atmospheric chemistry, 10⁹ apart. UCUM
+splits the same ambiguity the same way (`[ppth]`, `[pptr]`), so the symbol is
+borrowed rather than invented.
+
+The bare token `ppt` joins `.compact_exceptions` and is now `error_unit_illegal`:
+reading a dimensionless ratio as a *volume* is the failure this format exists to
+prevent, and no table lookup can settle which ratio was meant. `p~pt` still means
+the picopint, `‰` still means per thousand.
+
+### Fixed — five profile refusals the catalogue had outgrown, and one that named a unit it has
+
+A refusal is written once and nothing re-asks it, so it outlives the reason. Six
+did:
+
+- `ucum:[mil_us]`, `[srd_us]`, `[smi_us]` and `[sct]` were refused under a
+  comment reading "bovnar carries the survey foot and nothing else built on it" —
+  after the nine US survey units above them had landed. Each is exact:
+  `m~inUS`, `rdUS²`, `miUS²`, `miUS²`.
+- `qudt:AC-FT` matches native `ac·ft` **exactly** and was refused as "no native
+  unit of this dimension is a decade away", which is a statement about single
+  units; an acre-foot is a product of two.
+- `udunits:EC_therm` and `om:therm-EC` were refused as "native thm is the US
+  therm" and "bovnar has no unit of this magnitude" — both written before
+  `thm_ec` existed. Both publishers state the EC therm rounded to six digits
+  (1.05506e8 J against the exact 105 505 585.262 J), and both state the US therm
+  exactly in the same file, which is what a rounding rather than a different unit
+  looks like. Waived by name in `check_profile_factors.py`.
+
+`qudt:AC-FT_US` stays refused, with a reason that now says why: QUDT's 1233.484266
+is neither the international acre-foot (1233.48183755) nor the survey one
+(1233.48923847), i.e. an acre and a foot from different systems.
+
+### Added — three gates over the unit documentation, and the drift they found
+
+**`check_doc_unit_factors.py` — the Factor column.**
+`check_doc_unit_tables.py` compares roughly 1150 documented rows and says in its
+own header that it does not compare the Factor column, "prose as much as data".
+That is the one column a reader *uses*, and it turned out to be a small grammar
+rather than prose. All 381 cells are now evaluated in exact rational arithmetic
+(with π carried symbolically) and compared against `units.bvnr` — value,
+**dimension**, and the `(exact)` claim, since calling a rounded decimal exact is
+wrong even when the digits agree. It found five truncated factors (`slug`,
+`ft_lb`, `hp`, `prln`, `prz` — `hp` was documented as 745.69987158227, a
+different double from the catalogue's 745.6998715822702) and a section of doc/05
+written in ASCII-degraded notation (`m2`, `4.462e-4 mol.m-2`, `` `acUS`.`ftUS` ``,
+and a mangled `` `ftUS`squared ``) while both documents use `m²`, `·` and `×10⁻³`
+everywhere else. The same gate now also requires every `bovnar_si_units.h` export
+to be *named* in doc/05: four were not, including `bvn_units_convertible` and
+`bvn_unit_si_normal_form` — the two the reader's unit policy is built on, and the
+two whose header comments say every hand-written `want_unit` hook screens its
+targets wrongly without them. Both are now documented in §12.4.
+
+**`check_doc_profile_atoms.py` — doc/11 §6.1's completeness.**
+§6.1 opens with "What follows is the whole mapped list" and it was not: 188 UCUM
+codes were mapped and 155 appeared, so a third of the profile was invisible in
+the one place that promises completeness. Worse, the same section said the US
+survey series "is **refused**" while §6.3, a hundred lines down, correctly listed
+all nine as mapped — the document contradicting itself about a capability the
+library has had for some time. Every row's target and factor is now checked
+against the reader, and a mapped code missing from §6.1 is a failure.
+
+**`check_doc_counts.py` — the phrasings and the id-space bounds it missed.**
+doc/05 §3 opened with "Bovnar supports 180 named physical base units" against an
+actual 215; the gate's five fixed phrasings covered four of the five adjective
+orderings and missed that one. The claim is now an optional adjective run.
+Added alongside: the id-space **bounds**, which are count claims wearing a
+different hat and had been left behind by a growing catalogue —
+doc/04's "Native units 100000–100179 (180)" and doc/05's "`bu_bit` = 100000 to
+`bu_long_hundredweight` = 100191". `check_doc_unit_tables.py` gained the matching
+check for doc/09 §18, whose BaseUnit range table stopped at 100179 and omitted 35
+members outright, and whose `CUP` note cited enum values 81 and 167 — two
+generations of id space ago, against today's 100080 and 900033.
+
 ### Changed — the licence now says what it can and cannot grant
 
 **Read this if you redistribute Bovnar.** `LICENSE` gains clauses 4 and 5, and

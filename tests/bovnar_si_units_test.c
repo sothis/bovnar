@@ -2660,6 +2660,105 @@ static void test_temperature_difference_is_its_own_quantity_kind(void)
 			bvni_test_u2(bu_kelvin, exp_linear,
 				     bu_meter, exp_neg_linear)),
 		    "Δ°F/m is not K/m — only ΔK folds");
+
+	/*
+	 * "LONE" IS THE SHAPE AFTER CANCELLATION, not the shape as written, and
+	 * this block is the one that was missing.
+	 *
+	 * `ΔK·m/m` is three components, so the interval kind went uncounted and the
+	 * unit came out COMPATIBLE WITH K -- a temperature scale -- while being
+	 * incompatible with the ΔK it literally spells. That is the hazard the kind
+	 * exists for, reached through the compound door. And bvn_unit_reduce turns
+	 * `ΔK·m/m` INTO a lone ΔK, so reduction produced a unit its own input could
+	 * not convert to and BVN_UNIT_REDUCE would have rewritten a difference into
+	 * a reading.
+	 *
+	 * Found by a randomised sweep over compound units, not by reading: every
+	 * shape in the documented table above is right, and this one is not in it.
+	 */
+	static const char *cancels_to_a_lone_interval[] = {
+		"ΔK·m/m", "ΔK²/ΔK", "ΔK·ΔK/ΔK", "Δ°F·s/s",
+	};
+	for (size_t i = 0; i < sizeof cancels_to_a_lone_interval /
+			       sizeof cancels_to_a_lone_interval[0]; i++) {
+		const char *expr = cancels_to_a_lone_interval[i];
+		bool pok = false;
+		value_unit_t u = bvn_parse_unit((const uint8_t *)expr, &pok);
+		ASSERT_TRUE(pok, expr);
+		ASSERT_TRUE(!bvn_units_compatible(u, K),
+			    "a compound that cancels to a lone interval is not K");
+		double scale = 0.0; bool ovf = true;
+		value_unit_t r = bvn_unit_reduce(u, &scale, &ovf);
+		ASSERT_TRUE(!ovf, "...reduces without overflow");
+		ASSERT_TRUE(bvn_units_convertible(u, r),
+			    "...and reduce yields a unit its own input converts to");
+		out = 0.0;
+		ASSERT_TRUE(bvn_unit_convert_value(7.5, u, r, &out),
+			    "...which the conversion entry point agrees with");
+	}
+	/* The other direction of the same rule: a compound that cancels to a lone
+	 * KELVIN stays a scale, so it must NOT become an interval. */
+	{
+		bool pok = false;
+		value_unit_t km = bvn_parse_unit((const uint8_t *)"K·m/m", &pok);
+		ASSERT_TRUE(pok, "K·m/m parses");
+		ASSERT_TRUE(bvn_units_compatible(km, K), "K·m/m is K");
+		ASSERT_TRUE(!bvn_units_compatible(km, dK), "K·m/m is not ΔK");
+	}
+}
+
+/*
+ * A compound's per-component SI factors can each sit far outside a double's
+ * range while the PRODUCT sits comfortably inside it. Accumulating in a plain
+ * double then walks the running value through the subnormal range, where it
+ * loses mantissa bits it never gets back -- so the answer came out quietly
+ * wrong rather than obviously so.
+ *
+ * Every unit below was found by a randomised sweep against the exact rational
+ * path, which is what makes them a regression test rather than a guess: the
+ * exact answer is known independently of the code under test.
+ */
+static void test_extreme_compounds_keep_full_precision(void)
+{
+	printf("  a subnormal intermediate does not cost mantissa bits...\n");
+	static const struct {
+		const char *expr;
+		double      si_factor;   /* the exact value, to 17 digits */
+	} cases[] = {
+		/* 5.3e-5 relative error before the scaled accumulator */
+		{ "n~m·r~Da⁴·r~tn_l⁴",                 9.9999999999999996e-226 },
+		/* refused outright before it: both sides underflowed on the way */
+		{ "z~fl_oz_uk⁴·y~var·r~barn⁴/µ~qt_uk³", 9.9999999999999991e-199 },
+		/* 4.6e-8 relative error before */
+		{ "r~chUS⁴/R~ha⁴·R~tn_sh³",             1e-297 },
+	};
+	for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+		bool pok = false;
+		value_unit_t u = bvn_parse_unit((const uint8_t *)cases[i].expr, &pok);
+		ASSERT_TRUE(pok, cases[i].expr);
+
+		/* The reduced unit is the same quantity, so converting 1 of the unit
+		 * into it must yield exactly the unit's own SI factor over the reduced
+		 * one -- which for these is the whole prefix fold. Both halves are
+		 * checked because the bug lived in both: the conversion path lost
+		 * precision, and bvn_unit_reduce's *scale underflowed to zero with
+		 * *overflow left false. */
+		double scale = 0.0; bool ovf = true;
+		value_unit_t r = bvn_unit_reduce(u, &scale, &ovf);
+		ASSERT_TRUE(!ovf, "the reduction is representable");
+		ASSERT_TRUE(scale != 0.0, "and its scale did not underflow to zero");
+		double conv = 0.0;
+		ASSERT_TRUE(bvn_unit_convert_value(1.0, u, r, &conv),
+			    "the conversion is performed, not refused");
+		/* Within a few ulp of the exact rational. The old code was 5e-5 out,
+		 * so the bound does not need to be tight to be decisive. */
+		ASSERT_TRUE(fabs(conv - cases[i].si_factor) <=
+			    1e-13 * fabs(cases[i].si_factor),
+			    "and it agrees with the exact rational conversion");
+		ASSERT_TRUE(fabs(scale - cases[i].si_factor) <=
+			    1e-13 * fabs(cases[i].si_factor),
+			    "as does the scale bvn_unit_reduce reports");
+	}
 }
 
 static void test_photometric_units_carry_the_steradian(void)
@@ -3029,6 +3128,7 @@ int main(void)
 	test_affine_unit_in_a_product_has_no_si_value();
 	test_photometric_units_carry_the_steradian();
 	test_temperature_difference_is_its_own_quantity_kind();
+	test_extreme_compounds_keep_full_precision();
 	test_info_prefix_rule_follows_magnitude_not_enum_order();
 	test_rational_to_str_reports_too_long();
 	test_wide_denominator_renders_in_every_base();

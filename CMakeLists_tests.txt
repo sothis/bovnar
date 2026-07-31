@@ -1309,7 +1309,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 161)   # 129 base + i18n_de + wrapper_sync + doc_counts + doc_examples
+set(BVNR_EXPECTED_TEST_COUNT 163)   # 129 base + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms
                                     #             + citation
                                     #         + profiles_off_build
                                     # + om_test + cf_test
@@ -1575,6 +1575,42 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_un
                      ${CMAKE_CURRENT_SOURCE_DIR})
     set_tests_properties(bvnr_doc_unit_tables PROPERTIES
         LABELS "docs;units;gendata" TIMEOUT 60)
+endif()
+
+# ── The Factor column in doc/04 and doc/05 matches src/gendata ─────────────
+# The gate above compares symbols, spellings and enumerators and says in its own
+# header that it does not compare the Factor column, "prose as much as data".
+# That column is the one a reader USES -- it is where somebody looking up `inHg`
+# learns the number to multiply by -- and it turned out to be a small grammar
+# rather than prose, so it is now evaluated in exact rational arithmetic (with π
+# carried symbolically) and compared, along with the DIMENSION the cell's own
+# unit product implies and its "(exact)" claim. It found five truncated factors
+# and a section written in ASCII-degraded notation.
+if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_unit_factors.py)
+    add_test(NAME bvnr_doc_unit_factors
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_unit_factors.py
+                     ${CMAKE_CURRENT_SOURCE_DIR})
+    set_tests_properties(bvnr_doc_unit_factors PROPERTIES
+        LABELS "docs;units;gendata" TIMEOUT 60)
+endif()
+
+# ── doc/11 §6.1 lists every mapped UCUM atom, and lists it right ───────────
+# §6.1 opens with "What follows is the whole mapped list" and it was not: 188
+# codes are mapped and 155 appeared, so a third of the profile was invisible in
+# the one place that promises completeness -- and the same section said the US
+# survey series "is refused" while §6.3 correctly listed all nine as mapped.
+# check_doc_error_claims (in check_profile_factors.py) could not see either,
+# because it keys on an `error_unit_*` token and plain English carries none.
+# This asks the completeness question instead, and checks every row's target and
+# factor against the reader rather than against a restatement of its rules.
+if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_profile_atoms.py)
+    add_test(NAME bvnr_doc_profile_atoms
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_profile_atoms.py
+                     ${CMAKE_CURRENT_SOURCE_DIR})
+    set_tests_properties(bvnr_doc_profile_atoms PROPERTIES
+        LABELS "docs;units;gendata;profiles" TIMEOUT 60)
 endif()
 
 # ── The catalogue counts stated in prose match src/gendata ─────────────────

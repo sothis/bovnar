@@ -187,6 +187,59 @@ static const bvn_si_conv_entry_t *bvn_find_si_conv(value_base_unit_t bu)
  * Every out-parameter is optional; NULL means "do not report this one". See the
  * note on out-parameters in bovnar_si_units.h.
  */
+/*
+ * The scaled half of bvn_unit_to_si_factor: the same walk, accumulating into a
+ * bvni_scaled_t so no intermediate can overflow or denormalise. Split out
+ * because bvn_unit_convert_factor wants the RATIO of two of these, and a ratio
+ * is perfectly representable in cases where neither operand is —
+ * `z~fl_oz_uk⁴·y~var·r~barn⁴/µ~qt_uk³` against its own reduced form is 10⁻¹⁹⁸
+ * over 10⁻¹⁹⁸, which the old fa/fb refused because both sides underflowed on
+ * the way. Returns false for the structural refusals (an invalid exponent, an
+ * opaque unit, a bad prefix, an affine scale out of position); the
+ * representability question is left to the caller, which is the whole point.
+ */
+static bool bvni_unit_si_scaled(value_unit_t u, bvni_scaled_t *out,
+				bool *is_affine, double *affine_offset)
+{
+	bvn_verify_conv_table();
+	bvni_scaled_t f = bvni_scaled_one();
+	*is_affine     = false;
+	*affine_offset = 0.0;
+	for (uint32_t i = 0; i < u.num_components && i < BVNR_MAX_UNIT_COMPONENTS; i++) {
+		const value_unit_component_t *c = &u.components[i];
+		if (c->exponent == exp_invalid)
+			return false;
+		/* spec 1.2 — a UCUM arbitrary unit is assay-defined and commensurable
+		 * with nothing, so it has no SI factor to report. See the note in
+		 * bvn_unit_to_si_factor. */
+		if (bvni_is_opaque(c->base))
+			return false;
+		if (!bvn_prefix_unit_valid(c->prefix, c->base))
+			return false;
+		int32_t uexp = bvn_exponent_to_int(c->exponent);
+		if (uexp == 0)
+			return false;
+		int32_t abs_exp = bvni_exp_abs(c->exponent);
+		const bvn_si_conv_entry_t *conv = bvn_find_si_conv(c->base);
+		if (!conv)
+			return false;
+		bvni_scaled_t comp =
+			bvni_scaled_mul(bvni_scaled_ipow(bvni_prefix_factor(*c), abs_exp),
+					bvni_scaled_ipow(conv->to_si_factor, abs_exp));
+		f = (uexp < 0) ? bvni_scaled_div(f, comp) : bvni_scaled_mul(f, comp);
+		if (conv->is_affine) {
+			/* An affine scale has an SI meaning only ALONE and at exponent 1
+			 * — see the long note in bvn_unit_to_si_factor. */
+			if (uexp != 1 || u.num_components != 1)
+				return false;
+			*is_affine     = true;
+			*affine_offset = conv->affine_offset;
+		}
+	}
+	*out = f;
+	return true;
+}
+
 double bvn_unit_to_si_factor(value_unit_t u,
 			     bool *is_affine,
 			     double *affine_offset,
@@ -197,88 +250,58 @@ double bvn_unit_to_si_factor(value_unit_t u,
 	if (!is_affine)     is_affine     = &aff_scratch;
 	if (!affine_offset) affine_offset = &off_scratch;
 	if (!ok)            ok            = &ok_scratch;
-	bvn_verify_conv_table();
-	double f = 1.0;
-	*is_affine     = false;
-	*affine_offset = 0.0;
-	*ok            = true;
-	for (uint32_t i = 0; i < u.num_components && i < BVNR_MAX_UNIT_COMPONENTS; i++) {
-		const value_unit_component_t *c = &u.components[i];
-		if (c->exponent == exp_invalid) {
-			*ok = false;
-			return f;
-		}
-		/*
-		 * spec 1.2 — a UCUM arbitrary unit is assay-defined and commensurable
-		 * with nothing, so it has no SI factor to report. Refusing here is what
-		 * enforces that: bvn_units_compatible and bvn_unit_convert_factor are
-		 * both built on this function and on bvn_unit_dimension_vector, so one
-		 * refusal in each place makes [IU] incompatible with mol, with a plain
-		 * count, and with [PFU] — while bvn_unit_convert_factor's prefix-only
-		 * fallback still relates [IU]/L to [IU]/mL, exactly as it does for a
-		 * currency, which has no SI row for the same reason.
-		 */
-		if (bvni_is_opaque(c->base)) {
-			*ok = false;
-			return f;
-		}
-		if (!bvn_prefix_unit_valid(c->prefix, c->base)) {
-			*ok = false;
-			return f;
-		}
-		int32_t uexp = bvn_exponent_to_int(c->exponent);
-		if (uexp == 0) {
-			*ok = false;
-			return f;
-		}
-		int32_t abs_exp = bvni_exp_abs(c->exponent);
-		double prefix_contrib = bvni_ipow(bvni_prefix_factor(*c), abs_exp);
-		const bvn_si_conv_entry_t *conv = bvn_find_si_conv(c->base);
-		if (!conv) {
-			*ok = false;
-			return f;
-		}
-		double bu_contrib = bvni_ipow(conv->to_si_factor, abs_exp);
-		double comp_total = prefix_contrib * bu_contrib;
-		if (uexp < 0)
-			comp_total = 1.0 / comp_total;
-		f *= comp_total;
-		if (conv->is_affine) {
-			/* An affine scale has an SI meaning only ALONE and at exponent 1.
-			 * The offset is a number of kelvin; there is nowhere to add it in a
-			 * product whose SI unit is K/s or K*m, and the code that tried
-			 * added it unscaled — so 20 °C/h converted to K/h as 983360, and
-			 * 20 °C*m to K*m as 293.15 whatever the metres did. Both are
-			 * arithmetic on a quantity that does not exist. Refusing is what
-			 * the reader turns into error_unit_mismatch, and it agrees with
-			 * pint, which forbids an offset unit in a product outright.
-			 * `°C/h` still PARSES and is still a valid annotation — a consumer
-			 * that means a temperature difference can read the components
-			 * itself; what it no longer gets is a wrong SI value. */
-			if (uexp != 1 || u.num_components != 1) {
-				*ok = false;
-				return f;
-			}
-			*is_affine     = true;
-			*affine_offset = conv->affine_offset;
-		}
-	}
-	/* Extreme prefix/exponent combinations (e.g. Q~m^9, or several huge
-	 * components multiplied together) can overflow the running product to ±inf,
-	 * or produce nan via 0*inf. Surfacing that as a failure — rather than handing
-	 * back a non-finite factor with *ok still true — mirrors how bvn_unit_reduce
-	 * flags isinf, and stops callers like bvn_dom_get_value_in_base_units from
-	 * silently emitting inf/nan values.
+	/*
+	 * The walk lives in bvni_unit_si_scaled, which accumulates into a mantissa
+	 * and a separate binary exponent. Doing it in a plain double instead cost
+	 * real precision on ordinary-looking units: a compound's per-component
+	 * factors can each sit far outside a double's range while the PRODUCT sits
+	 * comfortably inside it, and the running value then passes through the
+	 * subnormal range and loses mantissa bits it never gets back. A randomised
+	 * sweep put `n~m·r~Da⁴·r~tn_l⁴` 5.3e-5 off its exact value, and
+	 * `z~fl_oz_uk⁴·y~var·r~barn⁴/µ~qt_uk³` — factor 10⁻¹⁹⁸, nothing extreme
+	 * about the answer — underflowed to zero and was refused outright, while
+	 * bvn_unit_convert_rational converted it exactly.
 	 *
-	 * Zero is the same failure at the other end and was not caught, because 0.0
-	 * is perfectly finite. q~m^100 is 10^-3000, which underflows to exactly
-	 * 0.0, and the function reported success with a factor of zero — so every
-	 * value in that unit converted to 0 with nothing to say it had not. No real
-	 * unit has an SI factor of zero (every to_si_factor and every prefix is
-	 * positive and non-zero), so a zero here can only be underflow. */
-	if (!isfinite(f) || f == 0.0) {
-		*ok = false;
+	 * spec 1.2 — a UCUM arbitrary unit is assay-defined and commensurable with
+	 * nothing, so it has no SI factor to report. Refusing it (inside the walk)
+	 * is what enforces that: bvn_units_compatible and bvn_unit_convert_factor
+	 * are both built on this function and on bvn_unit_dimension_vector, so one
+	 * refusal in each place makes [IU] incompatible with mol, with a plain
+	 * count, and with [PFU] — while bvn_unit_convert_factor's prefix-only
+	 * fallback still relates [IU]/L to [IU]/mL, exactly as it does for a
+	 * currency, which has no SI row for the same reason.
+	 *
+	 * An affine scale has an SI meaning only ALONE and at exponent 1. The offset
+	 * is a number of kelvin; there is nowhere to add it in a product whose SI
+	 * unit is K/s or K*m, and the code that tried added it unscaled — so
+	 * 20 °C/h converted to K/h as 983360, and 20 °C*m to K*m as 293.15 whatever
+	 * the metres did. Both are arithmetic on a quantity that does not exist.
+	 * Refusing is what the reader turns into error_unit_mismatch, and it agrees
+	 * with pint, which forbids an offset unit in a product outright. `°C/h`
+	 * still PARSES and is still a valid annotation — a consumer that means a
+	 * temperature difference can read the components itself; what it no longer
+	 * gets is a wrong SI value.
+	 */
+	bvni_scaled_t s;
+	double f = 1.0;
+	if (!bvni_unit_si_scaled(u, &s, is_affine, affine_offset)) {
+		*is_affine     = false;
+		*affine_offset = 0.0;
+		*ok            = false;
+		return f;
 	}
+	/* The one place overflow and underflow are decided. Handing back a
+	 * non-finite factor with *ok still true would let callers like
+	 * bvn_dom_get_value_in_base_units emit inf/nan values; handing back a zero
+	 * would be worse, because 0.0 is perfectly finite and every value in the
+	 * unit would convert to 0 with nothing to say it had not. No real unit has
+	 * an SI factor of zero — every to_si_factor and every prefix is positive
+	 * and non-zero — so a zero here can only be underflow. */
+	if (!bvni_scaled_to_double(s, &f)) {
+		*ok = false;
+		return 1.0;
+	}
+	*ok = true;
 	return f;
 }
 /*
@@ -484,18 +507,62 @@ static const bvni_kind_entry_t bvni_kind_table[] = {
  * all. Counting the kind there would make W/(m²·ΔK) a different unit from
  * W/(m²·K) and break every U-value written to date, in exchange for separating
  * two spellings of one quantity.
+ *
+ * "LONE" IS ASKED OF THE UNIT AFTER CANCELLATION, not of the components as
+ * written, and that distinction is the whole of the bug it fixes. `ΔK·m/m` is
+ * three components and reduces to one; asking the written shape called it a
+ * compound, so the interval kind went uncounted and the unit came out
+ * compatible with K -- a temperature SCALE -- while being incompatible with the
+ * ΔK it literally spells. Worse, bvn_unit_reduce turns it INTO that ΔK, so
+ * reduction produced a unit its own input could not convert to, and
+ * BVN_UNIT_REDUCE would rewrite a difference into a reading. Folding first
+ * makes the rule mean what its own table says: after cancellation `ΔK·m/m` is a
+ * lone ΔK and `ΔK²/ΔK` is too, while `W/(m²·ΔK)` still has three components and
+ * `1/ΔK` still sits at exponent -1.
+ *
+ * The fold is neutral for every other kind, which is why it is done once here
+ * rather than only for the interval: those count weight*exponent per component,
+ * and summing the exponents of one base before multiplying gives the same total
+ * (b·b is 2 either way, b/b is 0 either way). Prefixes are not folded because no
+ * kind depends on one.
  */
 static bool bvni_kind_exponents(value_unit_t u, int32_t out[BVNI_KIND_COUNT])
 {
 	for (uint32_t k = 0; k < BVNI_KIND_COUNT; k++)
 		out[k] = 0;
-	bool lone = (u.num_components == 1u);
+	/* Fold repeated bases into one net exponent, dropping the ones that
+	 * cancel, so the shape tested below is the unit's ACTUAL shape. */
+	value_base_unit_t base[BVNR_MAX_UNIT_COMPONENTS];
+	int32_t           net[BVNR_MAX_UNIT_COMPONENTS];
+	uint32_t          n = 0;
 	for (uint32_t i = 0; i < u.num_components && i < BVNR_MAX_UNIT_COMPONENTS; i++) {
 		int32_t e = bvn_exponent_to_int(u.components[i].exponent);
 		if (e == 0)
 			return false;
+		uint32_t j = 0;
+		for (; j < n; j++) {
+			if (base[j] == u.components[i].base) {
+				net[j] += e;
+				break;
+			}
+		}
+		if (j == n) {
+			base[n] = u.components[i].base;
+			net[n]  = e;
+			n++;
+		}
+	}
+	uint32_t live = 0;
+	for (uint32_t j = 0; j < n; j++)
+		if (net[j] != 0)
+			live++;
+	bool lone = (live == 1u);
+	for (uint32_t j = 0; j < n; j++) {
+		int32_t e = net[j];
+		if (e == 0)
+			continue;                /* cancelled out of the unit */
 		for (uint32_t t = 0; t < BVNI_KIND_TABLE_COUNT; t++) {
-			if (bvni_kind_table[t].base != u.components[i].base)
+			if (bvni_kind_table[t].base != base[j])
 				continue;
 			if (bvni_kind_table[t].kind == BVNI_KIND_TEMP_INTERVAL
 			    && !(lone && e == 1))
@@ -770,10 +837,25 @@ double bvn_unit_convert_factor(value_unit_t a, value_unit_t b,
 	}
 	bool aff_a = false, aff_b = false;
 	double off_a = 0.0, off_b = 0.0;
-	bool ok_a = true, ok_b = true;
-	double fa = bvn_unit_to_si_factor(a, &aff_a, &off_a, &ok_a);
-	double fb = bvn_unit_to_si_factor(b, &aff_b, &off_b, &ok_b);
-	if (!ok_a || !ok_b) {
+	/*
+	 * The RATIO is the answer, so the ratio is what has to be representable —
+	 * not each side on its own. Taking two doubles from bvn_unit_to_si_factor
+	 * and dividing them refused every pair whose SI factors both sit outside a
+	 * double, however ordinary the factor between them: converting
+	 * `z~fl_oz_uk⁴·y~var·r~barn⁴/µ~qt_uk³` to its own reduced form is 10⁻¹⁹⁸
+	 * over 10⁻¹⁹⁸, and both sides underflowed on the way, so the whole
+	 * conversion came back refused while bvn_unit_convert_rational performed it
+	 * exactly. Dividing in the scaled representation and collapsing once at the
+	 * end also keeps the mantissa whole, which the two-double form did not.
+	 */
+	bvni_scaled_t sa, sb;
+	if (!bvni_unit_si_scaled(a, &sa, &aff_a, &off_a) ||
+	    !bvni_unit_si_scaled(b, &sb, &aff_b, &off_b)) {
+		*ok = false;
+		return 0.0;
+	}
+	double ratio = 0.0;
+	if (!bvni_scaled_to_double(bvni_scaled_div(sa, sb), &ratio)) {
 		*ok = false;
 		return 0.0;
 	}
@@ -782,11 +864,11 @@ double bvn_unit_convert_factor(value_unit_t a, value_unit_t b,
 		if (aff_a && aff_b &&
 		    fabs(off_a - off_b) <=
 		        DBL_EPSILON * fabs(off_a + off_b) + DBL_EPSILON)
-			return fa / fb;
+			return ratio;
 		*ok = false;
 		return 0.0;
 	}
-	return fa / fb;
+	return ratio;
 }
 /*
  * Convert one numeric quantity from `from` into `to`, handling both the simple
@@ -1235,6 +1317,14 @@ value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overflow)
 	*scale = 1.0;
 	if (overflow)
 		*overflow = false;
+	/* The scale is a product of prefix decades and, for a dropped component, of
+	 * SI factors -- and it is accumulated in the scaled representation for the
+	 * reason bvn_unit_to_si_factor is: `q~ha⁹·y~rd¹⁰·R~F⁷` folds 10⁻²⁷⁰ against
+	 * 10²¹⁰ and a running double hits zero in between, so the function reported
+	 * a scale of 0 with *overflow false while the conversion path computed the
+	 * answer correctly. A zero scale is not a small number, it is the loss of
+	 * every value the caller was about to multiply by it. */
+	bvni_scaled_t sc = bvni_scaled_one();
 	typedef struct {
 		value_base_unit_t base;
 		int32_t           exp_sum;
@@ -1258,12 +1348,10 @@ value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overflow)
 		 * drop it. (bvn_unit_to_si_rational had the same defect; this was the
 		 * last function that still disagreed about a dimensionless kilo.) */
 		if (c->base == bu_none) {
-			if (pexp != 0) {
-				*scale *= (c->prefix.system == prefix_iec)
-					? bvni_ipow(2.0, pexp) : bvni_pow10(pexp);
-				if (isinf(*scale) && overflow)
-					*overflow = true;
-			}
+			if (pexp != 0)
+				sc = bvni_scaled_mul(sc, bvni_scaled_ipow(
+					(c->prefix.system == prefix_iec) ? 2.0 : 10.0,
+					pexp));
 			continue;
 		}
 		accum_t *a = NULL;
@@ -1288,16 +1376,10 @@ value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overflow)
 	value_unit_t result = { .num_components = 0 };
 	for (uint32_t ai = 0; ai < acc_count; ai++) {
 		accum_t *a = &acc[ai];
-		if (a->si_pexp_sum != 0) {
-			*scale *= bvni_pow10(a->si_pexp_sum);
-			if (isinf(*scale) && overflow)
-				*overflow = true;
-		}
-		if (a->iec_pexp_sum != 0) {
-			*scale *= bvni_ipow(2.0, a->iec_pexp_sum);
-			if (isinf(*scale) && overflow)
-				*overflow = true;
-		}
+		if (a->si_pexp_sum != 0)
+			sc = bvni_scaled_mul(sc, bvni_scaled_ipow(10.0, a->si_pexp_sum));
+		if (a->iec_pexp_sum != 0)
+			sc = bvni_scaled_mul(sc, bvni_scaled_ipow(2.0, a->iec_pexp_sum));
 		if (a->exp_sum == 0)
 			continue;
 		if (result.num_components >= BVNR_MAX_UNIT_COMPONENTS) {
@@ -1312,11 +1394,10 @@ value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overflow)
 			const bvn_si_conv_entry_t *conv =
 			        bvn_find_si_conv(a->base);
 			if (conv) {
-				double contrib = bvni_ipow(conv->to_si_factor, abs_sum);
-				if (a->exp_sum < 0)
-					*scale /= contrib;
-				else
-					*scale *= contrib;
+				bvni_scaled_t contrib =
+					bvni_scaled_ipow(conv->to_si_factor, abs_sum);
+				sc = (a->exp_sum < 0) ? bvni_scaled_div(sc, contrib)
+				                      : bvni_scaled_mul(sc, contrib);
 			}
 			continue;
 		}
@@ -1353,6 +1434,16 @@ value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overflow)
 			j--;
 		}
 		result.components[j] = tmp;
+	}
+	/* Collapse the scale once, here. A value that does not fit a double is the
+	 * same failure as a summed exponent the notation cannot carry -- the reduced
+	 * unit is not the one that was asked for -- so it is reported through the
+	 * same flag, and *scale is left at 1.0 rather than at an inf or a zero a
+	 * caller ignoring the flag would silently multiply by. */
+	if (!bvni_scaled_to_double(sc, scale)) {
+		*scale = 1.0;
+		if (overflow)
+			*overflow = true;
 	}
 	return result;
 }

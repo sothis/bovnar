@@ -37,7 +37,7 @@ DOCS = [
     ("04_bovnar_unit_cheatsheet.md","Unit & currency cheatsheet",
      "Every unit symbol, prefix, and currency code in one reference table."),
     ("05_bovnar_unit_system.md",  "Unit system",
-     "The 215 physical units, SI/IEC prefixes, and 216 currencies, with dimensions and factors."),
+     "The 217 physical units, SI/IEC prefixes, and 216 currencies, with dimensions and factors."),
     ("06_bovnar_unit_policy.md",  "Unit policy",
      "What a policy validates and converts, the order it resolves in, and the errors it raises."),
     ("07_bovnar_unit_ambiguities.md","Unit ambiguities",

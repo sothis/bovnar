@@ -1,5 +1,5 @@
 #!bovnar 1.1
-# units.bvnr — single source of truth for all 215 physical base units.
+# units.bvnr — single source of truth for all 217 physical base units.
 #
 # HOW THIS WORKS
 #   Hand-edited. gen_units.py (at the repo root) regenerates the C unit tables
@@ -2848,6 +2848,54 @@
     .factor_den = <sint:64> 100000000;
     .prefix  = default;
     .aliases = ["shakes", "shake"];
+  },
+
+  # ── The ratio family below ppb ──────────────────────────────────────────
+  # The dimensionless ratios stopped at ppb, and five profile codes were
+  # refused for that one reason: ucum:[pptr], and udunits:ppt / pptv / ppq /
+  # ppqv. Both publishers state them exactly (1e-12 and 1e-15) and both agree
+  # with each other, which is the evidence a factor needs.
+  #
+  # THE SYMBOL IS "pptr", NOT "ppt", and for two independent reasons.
+  #
+  # The binding one is the rule at the top of this file: no existing document
+  # may change meaning. "ppt" already resolves — as the compact form of p~pt,
+  # the picopint — so claiming it would take a spelling away from the unit that
+  # has it. check_alias_prefix_collisions in gen_units.py refuses exactly that,
+  # and KNOWN_ALIAS_SHADOWS is not an escape hatch for a NEW unit.
+  #
+  # The second reason is that it would be the wrong symbol anyway. "ppt" is
+  # ambiguous in the wild — parts per thousand in some industries, parts per
+  # trillion in atmospheric chemistry, a factor of 10^9 apart, which is the
+  # shape of the "kt" problem the compact-exception list refuses outright.
+  # UCUM resolves it by spelling the two [ppth] and [pptr]; "pptr" is UCUM's
+  # own token for this unit, so the symbol is borrowed rather than invented and
+  # it cannot be read as per-thousand by anybody. A document that means per
+  # thousand writes ‰, which has been the spelling for it all along.
+  #
+  # "pptv"/"ppqv" (the "by volume" spellings) are accepted as aliases because
+  # UDUNITS defines them as the same 1e-12 and 1e-15; neither collides.
+  {
+    .id      = <uint:32> 100215;
+    .name    = "ppt";
+    .symbol  = "pptr";
+    .factor  = 1e-12;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = ratio;
+    .aliases = ["parts_per_trillion", "pptr", "pptv"];
+  },
+  {
+    .id      = <uint:32> 100216;
+    .name    = "ppq";
+    .symbol  = "ppq";
+    .factor  = 1e-15;
+    .dims    = {};
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = ratio;
+    .aliases = ["parts_per_quadrillion", "ppqv", "ppq"];
   }
 ];
 
@@ -2876,5 +2924,13 @@
 
 .compact_exceptions = [
   { .spelling = "usb"; .why = "the bus, not microstilb (write u~sb or µ~sb)"; },
-  { .spelling = "kt";  .why = "kilotonne or knot — say which (k~t or kn)";     }
+  { .spelling = "kt";  .why = "kilotonne or knot — say which (k~t or kn)";     },
+  # "ppt" resolves as p~pt, the PICOPINT — a volume. Nobody writing "ppt" means
+  # that: in the wild it is parts per trillion or parts per thousand, both
+  # dimensionless ratios, and reading either as a volume is the whole failure
+  # this format exists to prevent. Neither reading can be granted, because the
+  # two differ by 10^9 and only the author knows which; so, as with "usb", the
+  # compact spelling becomes an error and the separated form keeps its meaning.
+  # p~pt is still the picopint, pptr is parts per trillion, ‰ is per thousand.
+  { .spelling = "ppt"; .why = "parts per trillion (pptr), per thousand (‰), or the picopint (p~pt) — say which"; }
 ];

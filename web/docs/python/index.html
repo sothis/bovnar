@@ -2062,6 +2062,34 @@ two digits name the vocabulary it comes from.</p>
 <td>Turbidity, salinity and conductivity (<code>TURBIDITY_NTU</code>, <code>TURBIDITY_FNU</code>, <code>PRACTICAL_SALINITY</code>, <code>CONDUCTIVITY_FACTOR</code>, <code>TURBIDITY_FTU</code>, <code>TURBIDITY_FAU</code>, <code>TURBIDITY_JTU</code>)</td>
 </tr>
 <tr>
+<td>100180–100185</td>
+<td>Temperature <em>differences</em> (<code>DELTA_KELVIN</code>, <code>DELTA_FAHRENHEIT</code>, <code>DELTA_DELISLE</code>, <code>DELTA_NEWTON_TEMP</code>, <code>DELTA_REAUMUR</code>, <code>DELTA_ROMER</code>) — <code>Δ°C</code> shares <code>DELTA_KELVIN</code> and <code>Δ°Ra</code> shares <code>DELTA_FAHRENHEIT</code></td>
+</tr>
+<tr>
+<td>100186–100191</td>
+<td>The six units the profiles needed (<code>METER_WATER</code>, <code>CALORIE_IT</code>, <code>BTU_TH</code>, <code>TROY_POUND</code>, <code>APOTHECARY_DRAM</code>, <code>LONG_HUNDREDWEIGHT</code>)</td>
+</tr>
+<tr>
+<td>100192–100200</td>
+<td>US survey lengths (<code>SURVEY_INCH</code> … <code>SURVEY_ACRE</code>)</td>
+</tr>
+<tr>
+<td>100201–100203</td>
+<td>Typographic lengths (<code>POINT</code>, <code>PICA</code>, <code>LINE</code>)</td>
+</tr>
+<tr>
+<td>100204–100209</td>
+<td>US dry volumes and the trade measures (<code>DRY_GALLON</code>, <code>DRY_QUART</code>, <code>DRY_PINT</code>, <code>BOARD_FOOT</code>, <code>CORD</code>, <code>SURVEY_ACRE_FOOT</code>)</td>
+</tr>
+<tr>
+<td>100210–100214</td>
+<td><code>DARCY</code>, <code>THERM_EC</code>, <code>REFRIGERATION_TON</code>, <code>DOBSON</code>, <code>SHAKE</code></td>
+</tr>
+<tr>
+<td>100215–100216</td>
+<td>The ratios below ppb (<code>PPT</code>, <code>PPQ</code>) — spelled <code>pptr</code> and <code>ppq</code>, see §18's note</td>
+</tr>
+<tr>
 <td>900000–900165</td>
 <td>ISO 4217 fiat currencies (<code>AED</code> … <code>ZWL</code>), block 90 — see <code>CURRENCY_FIRST</code></td>
 </tr>
@@ -2089,8 +2117,8 @@ Python name to mirror. A unit carrying one is still fully usable: <code>parse_un
 raw base taken from a profile-only unit.</p>
 <p><strong>Note on <code>CUP</code>:</strong> the Cuban-Peso currency is exposed as <strong><code>BaseUnit.CUP_</code></strong> (trailing
 underscore), not <code>BaseUnit.CUP</code>. The plain name <code>CUP</code> is the US-cup volume unit
-(enum value 81); since Python enum member names must be unique, the currency at
-value 167 takes the suffixed name. This affects the Python member name only — the
+(enum value 100080); since Python enum member names must be unique, the currency
+at value 900033 takes the suffixed name. This affects the Python member name only — the
 <code>.bvnr</code> wire token is still the bare uppercase <code>CUP</code>, and case stays load-bearing
 (<code>cup</code> = volume, <code>CUP</code> = currency).</p>
 </blockquote>

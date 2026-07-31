@@ -445,6 +445,13 @@
   { .code = "IT_Btu";                 .bovnar = "Btu";  .metric = false; },
   { .code = "therm";                  .bovnar = "thm";  .metric = false; },
   { .code = "US_therm";               .bovnar = "thm";  .metric = false; },
+  # The EC therm. This was refused as "native thm is the US therm" long after
+  # thm_ec arrived -- true about thm, and not the question. UDUNITS states the
+  # EC therm as 1.05506e8 J, a six-digit rounding of the exact 100 000 Btu_IT =
+  # 105 505 585.262 J that native thm_ec carries; the row two lines up shows the
+  # same file stating the US therm exactly, which is what a rounding rather than
+  # a different unit looks like. Waived by name in check_profile_factors.py.
+  { .code = "EC_therm";               .bovnar = "thm_ec";  .metric = false; },
   { .code = "erg";                    .bovnar = "erg";  .metric = false; },
   { .code = "electron_volt";          .bovnar = "eV";   .metric = true;  },
   { .code = "horsepower";             .bovnar = "hp";   .metric = false; },
@@ -516,6 +523,11 @@
   { .code = "%";         .bovnar = "%";   .metric = false; },
   { .code = "ppm";       .bovnar = "ppm"; .metric = false; },
   { .code = "ppb";       .bovnar = "ppb"; .metric = false; },
+  # The two below ppb. UDUNITS states them exactly (1e-12, 1e-15) and agrees
+  # with UCUM's [pptr]; the native symbol is `pptr` rather than `ppt` because
+  # `ppt` already resolves as p~pt, the picopint -- see the note in units.bvnr.
+  { .code = "ppt";       .bovnar = "pptr"; .metric = false; },
+  { .code = "ppq";       .bovnar = "ppq"; .metric = false; },
   { .code = "dB";        .bovnar = "dB";  .metric = false; },
   { .code = "decibel";   .bovnar = "dB";  .metric = false; },
   { .code = "Np";        .bovnar = "Np";  .metric = true;  },
@@ -592,6 +604,8 @@
   { .code = "kts";                     .bovnar = "kn";            .metric = false; .reverse = false; },  # alias of kt
   { .code = "ppmv";                    .bovnar = "ppm";           .metric = false; .reverse = false; },  # alias of ppm
   { .code = "ppbv";                    .bovnar = "ppb";           .metric = false; .reverse = false; },  # alias of ppb
+  { .code = "pptv";                    .bovnar = "pptr";          .metric = false; .reverse = false; },  # alias of ppt
+  { .code = "ppqv";                    .bovnar = "ppq";           .metric = false; .reverse = false; },  # alias of ppq
   { .code = "B";                       .bovnar = "da~dB";         .metric = false; .reverse = false; },
   { .code = "gr";                      .bovnar = "gr";            .metric = false; .reverse = false; },  # alias of grain
   { .code = "short_hundredweight";     .bovnar = "h~lb";          .metric = false; .reverse = false; },
@@ -821,10 +835,6 @@
   { .code = "einstein";                .why = "a mole of photons; UDUNITS defines it as the bare mole, and carrying it as mol would lose the photon"; },
   { .code = "avogadro_constant";       .why = "Avogadro's number — a constant, not a unit"; },
   { .code = "ppv";                     .why = "parts per volume — UDUNITS defines it as the number one, which is worth what every native ratio is worth"; },
-  { .code = "ppt";                     .why = "parts per trillion — native ratios stop at ppb"; },
-  { .code = "pptv";                    .why = "parts per trillion — native ratios stop at ppb"; },
-  { .code = "ppq";                     .why = "parts per quadrillion — native ratios stop at ppb"; },
-  { .code = "ppqv";                    .why = "parts per quadrillion — native ratios stop at ppb"; },
   { .code = "degree_N";                .why = "a coordinate direction, not a unit"; },
   { .code = "degrees_N";               .why = "a coordinate direction, not a unit"; },
   { .code = "degreeN";                 .why = "a coordinate direction, not a unit"; },
@@ -883,7 +893,6 @@
   { .code = "inch_Hg_60F";             .why = "60 degF inch of mercury — native inHg is the conventional 0 degC one"; },
   { .code = "inches_Hg_60F";           .why = "60 degF inch of mercury — native inHg is the conventional 0 degC one"; },
   { .code = "B_SPL";                   .why = "bel SPL — dB carries no reference level"; },
-  { .code = "EC_therm";                .why = "EC therm (1.05506e8 J) — native thm is the US therm, 1.054804e8 J"; },
   { .code = "boiler_horsepower";       .why = "boiler horsepower — no native form"; },
   { .code = "electric_horsepower";     .why = "electric horsepower (746 W) — native hp is the mechanical one"; },
   { .code = "water_horsepower";        .why = "water horsepower — no native form"; },

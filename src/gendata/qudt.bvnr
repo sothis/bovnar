@@ -109,6 +109,7 @@
   { .code = "IN3";        .bovnar = "in^3";   },
   { .code = "FT3";        .bovnar = "ft^3";   },
   { .code = "YD3";        .bovnar = "yd^3";   },
+  { .code = "AC-FT";      .bovnar = "ac·ft";  },
 
   # Mass
   { .code = "GM";         .bovnar = "g";      },
@@ -2482,8 +2483,20 @@
   # off any native unit of that dimension, or it is dimensionless and nothing
   # here can say which ratio it is.
   { .code = "A-HR-PER-DEG_C";              .why = "no native unit of this dimension is a decade away from QUDT's multiplier (3600)"; },
-  { .code = "AC-FT";                       .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1233.481838)"; },
-  { .code = "AC-FT_US";                    .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1233.484266)"; },
+  # AC-FT is mapped above, to the compound ac·ft, and matches QUDT's multiplier
+  # exactly. It sat here because the refusal reason is a statement about single
+  # native units ("no native unit of this dimension is a decade away") and an
+  # acre-foot is a PRODUCT of two — the same blind spot that keeps
+  # check_profile_factors' stale sweep from proposing it, since that sweep can
+  # only offer a compound some profile already writes down.
+  #
+  # AC-FT_US stays out. QUDT states 1233.484266, which is neither the
+  # international acre-foot (1233.48183755, the row above) nor the survey one
+  # native ac_ft carries (1233.48923847): it is 4 ppm from the survey unit and
+  # 2 ppm from the international one, i.e. an acre and a foot from DIFFERENT
+  # systems. Guessing which is exactly the class of error doc/11 §6.3 warns
+  # about.
+  { .code = "AC-FT_US";                    .why = "QUDT's multiplier (1233.484266) is neither the international acre-foot (1233.48183755) nor the survey one (1233.48923847)"; },
   { .code = "AT-PER-IN";                   .why = "no native unit of this dimension is a decade away from QUDT's multiplier (39.3700787)"; },
   { .code = "A_Stat";                      .why = "no native unit of this dimension is a decade away from QUDT's multiplier (3.335641e-10)"; },
   { .code = "A_Stat-PER-CentiM2";          .why = "no native unit of this dimension is a decade away from QUDT's multiplier (3.335641e-06)"; },

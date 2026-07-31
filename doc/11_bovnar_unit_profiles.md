@@ -192,7 +192,7 @@ Adding a vocabulary is therefore a data file and a registry row, not a second pa
 
 ### 1.2 Why a notation rather than more native units
 
-Bovnar's native registry is 215 physical units and 216 currencies, hand-maintained in
+Bovnar's native registry is 217 physical units and 216 currencies, hand-maintained in
 `src/gendata/`. UCUM's atom table is larger — a complete clinical, apothecary, troy, avoirdupois
 and CGS inventory — and its expression language is unbounded, so the set of valid UCUM codes cannot
 be enumerated as a table of units at all.
@@ -912,9 +912,9 @@ The asymmetry is worth stating plainly: these profiles are good *readers* and pa
 round trip that starts in a vocabulary returns to it; one that starts in Bovnar's native registry
 may have nowhere to go.
 
-Sweeping the whole native registry — all 215 physical units, each at the twelve prefixes
-`si_none da h k M G T d c m µ n` — **672** combinations survive a native → UCUM → native round trip
-unchanged, **1553** have no UCUM code, 355 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
+Sweeping the whole native registry — all 217 physical units, each at the twelve prefixes
+`si_none da h k M G T d c m µ n` — **673** combinations survive a native → UCUM → native round trip
+unchanged, **1554** have no UCUM code, 377 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
 before the question arises, and **none round-trips to a different unit**. The last of those is the
 invariant; the two counts move whenever the registry gains a unit, so `test_sweep_round_trip` in
 `tests/bovnar_ucum_test.c` pins all three rather than leaving them as prose.
@@ -925,9 +925,10 @@ invariant; the two counts move whenever the registry gains a unit, so `test_swee
 
 ### 6.1 Verified mappings
 
-The shipped table is `src/gendata/ucum.bvnr`: 157 mapped **atoms**, 41 arbitrary units, 114 known
+The shipped table is `src/gendata/ucum.bvnr`: 188 mapped **atoms**, 41 arbitrary units, 83 known
 but refused, and UCUM's 20 prefix spellings. What follows is the whole mapped list, grouped as the
-data file groups it. Note that these are *atoms*, which is how the table is organised and not how a
+data file groups it — and it is the whole of it, checked row by row against the reference
+implementation by `check_doc_profile_atoms.py`, which also fails if a mapped code is missing here. Note that these are *atoms*, which is how the table is organised and not how a
 producer meets it — `mg/dL` is three atoms and two prefixes, not a row. §6.4 reads the same table
 back in terms of whole codes.
 
@@ -1031,7 +1032,7 @@ four spellings map with no loss. The tropical and gregorian variants do not (§6
 | `[degRe]` | `°Re` | `1.25` |
 | `[degR]` | `°Ra` | `0.5555555555555556` |
 
-**Length, US and Imperial**
+**Length and area, US and Imperial**
 
 | UCUM | Bovnar | 1 UCUM unit in coherent SI |
 |---|---|---|
@@ -1044,10 +1045,36 @@ four spellings map with no loss. The tropical and gregorian variants do not (§6
 | `[fth_i]` | `fath` | `1.8288` |
 | `[ly]` | `ly` | `9460730472580800.0` |
 | `[mil_i]` | `thou` | `2.54e-05` |
+| `[hd_i]` | `hand` | `0.1016` |
+| `[in_us]` | `inUS` | `0.0254000508001016` |
+| `[yd_us]` | `ydUS` | `0.9144018288036576` |
+| `[fth_us]` | `fathUS` | `1.8288036576073152` |
+| `[rd_us]` | `rdUS` | `5.029210058420117` |
+| `[ch_us]` | `chUS` | `20.116840233680467` |
+| `[lk_us]` | `lkUS` | `0.20116840233680466` |
+| `[fur_us]` | `furUS` | `201.16840233680466` |
+| `[mi_us]` | `miUS` | `1609.3472186944373` |
+| `[mil_us]` | `m~inUS` | `2.54000508001016e-05` |
+| `[rch_us]` | `h~ftUS` | `30.480060960121918` |
+| `[rlk_us]` | `ftUS` | `0.3048006096012192` |
+| `[pnt]` | `pnt` | `0.00035277777777777776` |
+| `[pca]` | `pca` | `0.004233333333333334` |
+| `[lne]` | `lne` | `0.002116666666666667` |
+| `[mesh_i]` | `in⁻¹` | `39.37007874015748` |
+| `[sin_i]` | `in²` | `0.00064516` |
+| `[sft_i]` | `ft²` | `0.09290304` |
+| `[syd_i]` | `yd²` | `0.83612736` |
+| `[acr_us]` | `acUS` | `4046.872609874252` |
+| `[srd_us]` | `rdUS²` | `25.292953811714074` |
+| `[smi_us]` | `miUS²` | `2589998.470319521` |
+| `[sct]` | `miUS²` | `2589998.470319521` |
 
-The rest of the survey series — `[fur_us]`, `[ch_us]`, `[rd_us]`, `[acr_us]`, `[in_us]`, `[yd_us]`,
-`[mi_us]` — is **refused**, and the British series `[ch_br]`, `[ft_br]`, `[yd_br]` is absent
-entirely. §6.3 says why both.
+The **whole** survey series maps, onto native units built on the survey foot rather than onto the
+international ones they are 2 ppm from — that is what `inUS`, `ydUS`, `rdUS` and the rest above are
+for, and §6.3 explains why the distinction is worth a unit each. Ramden's chain and link
+(`[rch_us]`, `[rlk_us]`) are the survey foot at a hecto prefix and bare. The **British** series
+`[ch_br]`, `[ft_br]`, `[yd_br]` is a different matter and is refused: those sit 7.9e-7 from the
+international units of the same name, which §6.3 also covers.
 
 **Mass**
 
@@ -1065,6 +1092,11 @@ entirely. §6.3 says why both.
 | `[oz_ap]` | `oz_t` | `0.0311034768` |
 | `[ston_av]` | `tn_sh` | `907.18474` |
 | `[lton_av]` | `tn_l` | `1016.0469088` |
+| `[scwt_av]` | `h~lb` | `45.359237` |
+| `[lcwt_av]` | `cwt_l` | `50.80234544` |
+| `[lb_tr]` | `lb_t` | `0.3732417216` |
+| `[lb_ap]` | `lb_t` | `0.3732417216` |
+| `[dr_ap]` | `dr_ap` | `0.0038879346` |
 
 `[oz_ap]` is read and never written (`.reverse = false`, §5.3): the apothecary ounce *is* the troy
 ounce by value, and writing a troy ounce back as `[oz_ap]` would tell a UCUM reader "apothecary"
@@ -1092,6 +1124,15 @@ about a document that never said it.
 | `[pt_br]` | `pt_uk` | `0.00056826125` |
 | `[foz_br]` | `fl_oz_uk` | `2.84130625e-05` |
 | `[gil_br]` | `gi_uk` | `0.0001420653125` |
+| `[cin_i]` | `in³` | `1.6387064e-05` |
+| `[cft_i]` | `ft³` | `0.028316846592000004` |
+| `[cyd_i]` | `yd³` | `0.764554857984` |
+| `[gal_wi]` | `gal_dry` | `0.00440488377086` |
+| `[dqt_us]` | `qt_dry` | `0.001101220942715` |
+| `[dpt_us]` | `pt_dry` | `0.0005506104713575` |
+| `[bf_i]` | `fbm` | `0.002359737216` |
+| `[cr_i]` | `cord` | `3.624556363776` |
+| `[crd_us]` | `cord` | `3.624556363776` |
 
 **Pressure, energy, force, power**
 
@@ -1113,6 +1154,14 @@ about a document that never said it.
 | `gf` | `g·gn` | `0.00980665` |
 | `[lbf_av]` | `lbf` | `4.4482216152605` |
 | `[g]` | `gn` | `9.80665` |
+| `m[H2O]` | `mH2O` | `9806.65` |
+| `[in_i'Hg]` | `inHg` | `3386.388640341` |
+| `[in_i'H2O]` | `in·mH2O/m` | `249.08890999999997` |
+| `[PRU]` | `mmHg·s/m~L` | `133322387.415` |
+| `[wood'U]` | `mmHg·min/L` | `7999343.2449` |
+| `[Btu]` | `Btu_th` | `1054.3502644888888` |
+| `[Btu_th]` | `Btu_th` | `1054.3502644888888` |
+| `cal_IT` | `cal_IT` | `4.1868` |
 
 `m[Hg]` is the row that makes the decade mechanism visible: it is a **metre** of mercury column, so
 its native target carries the kilo that makes `mm[Hg]` come out as plain `mmHg`.
@@ -1139,6 +1188,7 @@ has no gram-force, but `g·gn` is gram times standard gravity, dimensions `[1,1,
 | `RAD` | `c~Gy` | `0.01` |
 | `REM` | `rem` | `0.01` |
 | `R` | `R` | `0.000258` |
+| `Gb` | `Oe·c~m` | `0.7957747154594768` |
 
 `RAD` and `REM` are the case-**sensitive** spellings. UCUM's `[RAD]` and `[REM]` belong to its
 case-insensitive variant, which this profile does not implement (§10.3), so they are not codes a
@@ -1153,6 +1203,7 @@ conforming producer of the case-sensitive vocabulary can emit and are not in the
 | `Bd` | `Bd` | `1.0` |
 | `%` | `%` | `0.01` |
 | `[ppth]` | `‰` | `0.001` |
+| `[pptr]` | `pptr` | `1e-12` |
 | `[ppm]` | `ppm` | `1e-06` |
 | `[ppb]` | `ppb` | `1e-09` |
 
@@ -1162,6 +1213,7 @@ conforming producer of the case-sensitive vocabulary can emit and are not in the
 |---|---|---|
 | `eq` | `mol` | `1.0` |
 | `U` | `µ~mol/min` | `1.6666666666666667e-08` |
+| `g%` | `g/d~L` | `10.0` |
 
 **Optics**
 
@@ -1601,7 +1653,7 @@ native target is worth, and compares. `unece` is reached at one remove; see §9.
 The generator also emits the **reverse** tables §5.3 uses, choosing the canonical code for each slot
 by the grammar's rule (shortest for an expression profile, first-declared for a flat one), honouring
 `.reverse = false`, and recording that code's own decade. Deriving them rather than searching the
-forward tables at run time is what makes `bvn_unit_to_profile` deterministic; the 672 round trips
+forward tables at run time is what makes `bvn_unit_to_profile` deterministic; the 673 round trips
 quoted in §5.3 are the check that forward and reverse agree.
 
 ### 9.3 Tests

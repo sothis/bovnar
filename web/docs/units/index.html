@@ -169,7 +169,7 @@
 <p>The Bovnar quantity annotation system is an <strong>optional, per-value annotation</strong> that attaches a physical unit or currency denomination to any numeric field. It is part of the type annotation (<code>&lt;family:width,_base,unit&gt;</code>) and applies to the <code>uint</code>, <code>sint</code>, <code>float</code>, <code>float_fix</code>, and <code>float_dec</code> type families.</p>
 <p>Two distinct namespaces share the annotation slot:</p>
 <ul>
-<li><strong>Physical units</strong> — 215 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.</li>
+<li><strong>Physical units</strong> — 217 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.</li>
 <li><strong>Currency codes</strong> — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical — HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01 — and <code>ANG</code> coexists with its successor <code>XCG</code>, which inherited its numeric code 532; see §9.2) and 50 cryptocurrency tickers.</li>
 </ul>
 <p>Both namespaces are syntactically unified: the same grammar, the same <code>~</code> prefix separator, the same compound-unit operators (<code>·</code>, <code>*</code>, <code>/</code>), and the same <code>value_unit_t</code> data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.</p>
@@ -297,7 +297,7 @@ unaffected in every version. See
 </table>
 <hr />
 <h2 id="3-physical-base-units">3. Physical Base Units</h2>
-<p>Bovnar supports 180 named physical base units. Currency codes are a separate namespace and are covered in §9.</p>
+<p>Bovnar supports 217 physical base units. Currency codes are a separate namespace and are covered in §9.</p>
 <blockquote>
 <p><strong>Reading this section:</strong> The <em>Symbol</em> column gives the canonical serialized form. <em>Long forms</em> are accepted on input but never produced on output. <em>Enum value</em> is the <code>value_base_unit_t</code> constant used in the C API.</p>
 </blockquote>
@@ -859,7 +859,7 @@ the <code>sr</code> silently dropped. What holds now:</p>
 <td><code>slugs</code></td>
 <td>slug</td>
 <td><code>bu_slug</code></td>
-<td>14.593902937 kg</td>
+<td>14.593902937206364 kg (= <code>lb</code>·<code>gn</code>/<code>ft</code>)</td>
 </tr>
 <tr>
 <td><code>dr</code></td>
@@ -1161,7 +1161,7 @@ rounded onto this one.</p>
 <td><code>foot_pound</code>, <code>foot_pounds</code></td>
 <td>foot-pound</td>
 <td><code>bu_foot_pound</code></td>
-<td>1.3558179483 J</td>
+<td>1.3558179483314003 J (= <code>lbf</code>·<code>ft</code>)</td>
 </tr>
 <tr>
 <td><code>cal_IT</code></td>
@@ -1208,7 +1208,7 @@ rational rather than a decimal.</p>
 <td><code>horsepower</code></td>
 <td>mechanical horsepower</td>
 <td><code>bu_horsepower</code></td>
-<td>745.69987158227 W</td>
+<td>745.6998715822702 W (= 550 <code>ft_lb</code>/s)</td>
 </tr>
 <tr>
 <td><code>PS</code></td>
@@ -1862,14 +1862,14 @@ are restricted to kilo and above (§6.3).</p>
 <td><code>prussian_line</code>, <code>linie</code></td>
 <td>Prussian line</td>
 <td><code>bu_prussian_line</code></td>
-<td>2.17953×10⁻³ m</td>
+<td>313853/144000000 m ≈ 2.1795347×10⁻³ m</td>
 </tr>
 <tr>
 <td><code>prz</code></td>
 <td><code>prussian_zoll</code>, <code>zoll</code></td>
 <td>Prussian Zoll</td>
 <td><code>bu_prussian_zoll</code></td>
-<td>2.61544×10⁻² m</td>
+<td>313853/12000000 m ≈ 2.6154417×10⁻² m</td>
 </tr>
 <tr>
 <td><code>prf</code></td>
@@ -2130,8 +2130,38 @@ they do <strong>not</strong> accept SI or IEC prefixes (a prefixed <code>%</code
 <td><code>bu_ppb</code></td>
 <td>10⁻⁹</td>
 </tr>
+<tr>
+<td><code>pptr</code></td>
+<td><code>parts_per_trillion</code>, <code>pptv</code></td>
+<td>parts per trillion</td>
+<td><code>bu_ppt</code></td>
+<td>10⁻¹²</td>
+</tr>
+<tr>
+<td><code>ppq</code></td>
+<td><code>parts_per_quadrillion</code>, <code>ppqv</code></td>
+<td>parts per quadrillion</td>
+<td><code>bu_ppq</code></td>
+<td>10⁻¹⁵</td>
+</tr>
 </tbody>
 </table>
+<blockquote>
+<p><strong>Why <code>pptr</code> and not <code>ppt</code>.</strong> Two independent reasons, and either alone would
+settle it. <code>ppt</code> already resolves — as the compact form of <code>p~pt</code>, the
+picopint — so claiming it as an alias would take a spelling away from the unit
+that has it, which §4.3's guarantee forbids and <code>gen_units.py</code> refuses at build
+time. And <code>ppt</code> is ambiguous in the field: parts per <strong>thousand</strong> in some
+industries, parts per <strong>trillion</strong> in atmospheric chemistry, a factor of 10⁹
+apart. UCUM splits the same ambiguity the same way — <code>[ppth]</code> for per thousand,
+<code>[pptr]</code> for per trillion — so the symbol here is borrowed rather than
+invented. The compact token <code>ppt</code> is refused outright (§4.3); write <code>pptr</code>,
+<code>‰</code>, or <code>p~pt</code> if the picopint really is what you meant.</p>
+<p><code>pptv</code> and <code>ppqv</code>, the "by volume" spellings, are accepted as aliases because
+UDUNITS-2 defines them as the same 10⁻¹² and 10⁻¹⁵. Both profiles that name
+these units — UCUM's <code>[pptr]</code> and UDUNITS' <code>ppt</code>/<code>pptv</code>/<code>ppq</code>/<code>ppqv</code> — were
+refused for want of a native target until these rows existed.</p>
+</blockquote>
 <h3 id="326-named-speed-units">3.26 Named Speed Units</h3>
 <p>Speeds people write as one token. <code>mi/h</code> and <code>k~m/h</code> express the same quantities
 as compounds and remain valid; these are separate base units, not shorthands the
@@ -2627,7 +2657,7 @@ survey foot's 1200/3937 m.</p>
 <td><code>survey_acre</code>, <code>survey_acres</code></td>
 <td>US survey acre</td>
 <td><code>bu_survey_acre</code></td>
-<td>43 560 <code>ftUS</code>squared = 62726400000/15499969 m2</td>
+<td>43 560 <code>ftUS</code>² = 62726400000/15499969 m²</td>
 </tr>
 </tbody>
 </table>
@@ -2701,42 +2731,42 @@ document that meant dry had no way to say so.</p>
 <td><code>dry_gallon</code>, <code>dry_gallons</code></td>
 <td>US dry gallon</td>
 <td><code>bu_dry_gallon</code></td>
-<td>268.8025 in3 = 4.40488377086e-3 m3</td>
+<td>268.8025 in³ = 4.40488377086×10⁻³ m³</td>
 </tr>
 <tr>
 <td><code>qt_dry</code></td>
 <td><code>dry_quart</code>, <code>dry_quarts</code></td>
 <td>US dry quart</td>
 <td><code>bu_dry_quart</code></td>
-<td>1.101220942715e-3 m3</td>
+<td>1.101220942715×10⁻³ m³</td>
 </tr>
 <tr>
 <td><code>pt_dry</code></td>
 <td><code>dry_pint</code>, <code>dry_pints</code></td>
 <td>US dry pint</td>
 <td><code>bu_dry_pint</code></td>
-<td>5.506104713575e-4 m3</td>
+<td>5.506104713575×10⁻⁴ m³</td>
 </tr>
 <tr>
 <td><code>fbm</code></td>
 <td><code>board_foot</code>, <code>board_feet</code></td>
-<td>board foot (144 in3)</td>
+<td>board foot (144 in³)</td>
 <td><code>bu_board_foot</code></td>
-<td>2.359737216e-3 m3</td>
+<td>2.359737216×10⁻³ m³</td>
 </tr>
 <tr>
 <td><code>cord</code></td>
 <td><code>cord</code>, <code>cords</code></td>
-<td>cord (128 ft3)</td>
+<td>cord (128 ft³)</td>
 <td><code>bu_cord</code></td>
-<td>3.624556363776 m3</td>
+<td>3.624556363776 m³</td>
 </tr>
 <tr>
 <td><code>ac_ft</code></td>
 <td><code>acre_foot</code>, <code>acre_feet</code></td>
 <td>acre-foot (survey)</td>
 <td><code>bu_survey_acre_foot</code></td>
-<td><code>acUS</code>.<code>ftUS</code> = 1233.4892384681489 m3</td>
+<td><code>acUS</code>·<code>ftUS</code> = 1233.4892384681489 m³</td>
 </tr>
 </tbody>
 </table>
@@ -2762,14 +2792,14 @@ away, and a different unit rather than a rounding.</p>
 <td><code>darcy</code>, <code>darcys</code>, <code>darcies</code></td>
 <td>darcy (permeability)</td>
 <td><code>bu_darcy</code></td>
-<td>1/1013250000000 m2</td>
+<td>1/1013250000000 m²</td>
 </tr>
 <tr>
 <td><code>thm_ec</code></td>
 <td><code>therm_EC</code></td>
-<td>EC therm (1e5 <code>Btu</code>)</td>
+<td>EC therm (10⁵ <code>Btu</code>)</td>
 <td><code>bu_therm_ec</code></td>
-<td>1.05505585262e8 J (exact)</td>
+<td>1.05505585262×10⁸ J (exact)</td>
 </tr>
 <tr>
 <td><code>ton_ref</code></td>
@@ -2783,14 +2813,14 @@ away, and a different unit rather than a rounding.</p>
 <td><code>dobson</code>, <code>dobson_unit</code>, <code>dobson_units</code></td>
 <td>Dobson unit (ozone column)</td>
 <td><code>bu_dobson</code></td>
-<td>4.462e-4 mol.m-2 (exact)</td>
+<td>4.462×10⁻⁴ mol·m⁻² (exact)</td>
 </tr>
 <tr>
 <td><code>shake</code></td>
 <td><code>shake</code>, <code>shakes</code></td>
 <td>shake</td>
 <td><code>bu_shake</code></td>
-<td>1e-8 s (exact)</td>
+<td>10⁻⁸ s (exact)</td>
 </tr>
 </tbody>
 </table>
@@ -3104,7 +3134,7 @@ no SI prefix at 10⁻⁸.</p>
 <li><strong>IEC prefixes</strong> (<code>Ki</code>…<code>Qi</code>) are only permitted on <code>b</code> and <code>B</code>. <code>Ki~m</code> → <code>error_unit_illegal</code>.</li>
 <li><strong>SI sub-kilo prefixes</strong> (<code>d</code>, <code>c</code>, <code>m</code>, <code>µ</code>, <code>n</code>, <code>p</code>, <code>f</code>, <code>a</code>, <code>z</code>, <code>y</code>, <code>r</code>, <code>q</code>, <code>da</code>, <code>h</code>) are forbidden on <code>b</code> and <code>B</code>.</li>
 <li><strong>German units</strong> (<code>bu_pfund</code> through <code>bu_scheffel</code>) accept only <code>si_none</code>/<code>iec_none</code>.</li>
-<li><strong>Ratio units</strong> (<code>%</code>, <code>‰</code>, <code>‱</code>, <code>pcm</code>, <code>ppm</code>, <code>ppb</code>) likewise: a prefixed per-cent is meaningless. <code>k~%</code> → <code>error_unit_illegal</code> (§3.25).</li>
+<li><strong>Ratio units</strong> (<code>%</code>, <code>‰</code>, <code>‱</code>, <code>pcm</code>, <code>ppm</code>, <code>ppb</code>, <code>pptr</code>, <code>ppq</code>) likewise: a prefixed per-cent is meaningless. <code>k~%</code> → <code>error_unit_illegal</code> (§3.25).</li>
 <li><strong>Scales that are already a scale</strong> — <code>pH</code>, <code>mph</code>, <code>kph</code>, the five water-hardness degrees, <code>gpg</code>, <code>CF</code>, <code>PSU</code>, <code>JTU</code> — take no prefix either. Each carries its reason in §3.26–§3.30; <code>NTU</code>, <code>FNU</code>, <code>FTU</code> and <code>FAU</code> <em>do</em> take one, because a milli-NTU is a real ultrapure-water measurement.</li>
 <li><strong>Currency units</strong> accept SI prefixes of any magnitude (see §9.4). IEC prefixes are forbidden on all currency codes.</li>
 </ul>
@@ -3158,14 +3188,21 @@ no SI prefix at 10⁻⁸.</p>
 <td><em>also</em> the knot</td>
 <td><code>k~t</code> (mass) or <code>kn</code> (speed)</td>
 </tr>
+<tr>
+<td><code>ppt</code></td>
+<td>picopint (a volume)</td>
+<td>parts per trillion, <em>or</em> per thousand</td>
+<td><code>pptr</code> (10⁻¹²), <code>‰</code> (10⁻³), <code>p~pt</code> (the volume)</td>
+</tr>
 </tbody>
 </table>
 <p><code>pH</code>, <code>mph</code> and <code>kph</code> were on this list until the quantities they name became
   units of their own (§3.26, §3.27). A bare alias outranks any prefixed reading,
   so they now need no exception — and <code>p~H</code>, <code>m~ph</code>, <code>k~ph</code> still mean what they
   always did.</p>
-<p>The last row is the harder case: <code>kt</code> is a standard abbreviation for two units Bovnar <em>does</em> model — the kilotonne in climate and energy data, the knot in marine and aviation data — and reading a speed as a mass is precisely what this format exists to stop. A token only the author can resolve is one the author has to resolve.</p>
-<p>The list lives in <code>src/gendata/units.bvnr</code> (<code>.compact_exceptions</code>) and applies to the compact spelling only — <code>p~H</code> is still picohenry, <code>k~t</code> still the kilotonne.</p>
+<p>The last two rows are the harder cases. <code>kt</code> is a standard abbreviation for two units Bovnar <em>does</em> model — the kilotonne in climate and energy data, the knot in marine and aviation data — and reading a speed as a mass is precisely what this format exists to stop. <code>ppt</code> is worse: the compact rule makes it a <em>volume</em>, while every real use of the token is a dimensionless ratio, and the two ratios it might mean are 10⁹ apart. A token only the author can resolve is one the author has to resolve.</p>
+<p>Note what is <strong>not</strong> done about <code>ppt</code>: the parts-per-trillion unit added in §3.25 does not claim the spelling. A bare alias outranks any prefixed reading (rule 2 above), so claiming it would take <code>ppt</code> away from <code>p~pt</code> and change what an existing document means — which the rule at the top of <code>units.bvnr</code> forbids and <code>gen_units.py</code> refuses at build time. The unit is spelled <code>pptr</code>, following UCUM's own <code>[pptr]</code>, and the ambiguous token is refused instead.</p>
+<p>The list lives in <code>src/gendata/units.bvnr</code> (<code>.compact_exceptions</code>) and applies to the compact spelling only — <code>p~H</code> is still picohenry, <code>k~t</code> still the kilotonne, <code>p~pt</code> still the picopint.</p>
 <p>Because a compact spelling is only ever reached where the separated form would have been a parse error, no document that parsed before this existed can parse differently now.</p>
 <p>For a token-by-token list of every spelling that could be read two ways — including case traps, look-alike characters and abbreviations that are deliberately not units — see <a href="https://www.bovnar.io/docs/ambiguities/"><code>07_bovnar_unit_ambiguities.md</code></a>.</p>
 <p>Currencies take the compact prefix too — <code>k$EUR</code> is <code>k~$EUR</code>. The <code>$</code> sigil already separates the prefix from the code (no prefix symbol and no currency code contains a <code>$</code>), so nothing is left for the <code>~</code> to resolve. What the sigil rule still requires is the sigil itself: <code>kUSD</code> is <code>error_unit_illegal</code>, because a bare code is never a currency (§10.4).</p>
@@ -5174,7 +5211,7 @@ whole string fails to resolve.</p>
 </tr>
 </tbody>
 </table>
-<p><code>bu_none</code> is 0 and belongs to no block; every tag between the native units and the currencies is now taken, so a further vocabulary needs one outside 10–90. Blocks 40–80 currently contribute no ids at all: those vocabularies map every code onto a native unit, and the block tag reserves their room rather than filling it. Within block 10 the native units run contiguously from <code>bu_bit</code> = 100000 to <code>bu_long_hundredweight</code> = 100191, in the order of <code>units.bvnr</code>; <code>BVN_UNIT_NATIVE_FIRST</code>, <code>BVN_UNIT_NATIVE_LAST</code> and <code>BVN_UNIT_NATIVE_COUNT</code> are generated beside the enum, so read the bounds from those rather than from this sentence. Currencies run contiguously from 900000 and — unlike every other block — have <strong>no named <code>bu_*</code> enumerators</strong> (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a <code>$</code> sigil, resolved by <code>bvn_parse_currency_str</code> and carried as the numeric <code>base</code> value. <code>bvn_unit_is_currency(base)</code> is a bounds check over block 90.</p>
+<p><code>bu_none</code> is 0 and belongs to no block; every tag between the native units and the currencies is now taken, so a further vocabulary needs one outside 10–90. Blocks 40–80 currently contribute no ids at all: those vocabularies map every code onto a native unit, and the block tag reserves their room rather than filling it. Within block 10 the native units run contiguously from <code>bu_bit</code> = 100000 to <code>bu_ppq</code> = 100216, in the order of <code>units.bvnr</code>; <code>BVN_UNIT_NATIVE_FIRST</code>, <code>BVN_UNIT_NATIVE_LAST</code> and <code>BVN_UNIT_NATIVE_COUNT</code> are generated beside the enum, so read the bounds from those rather than from this sentence. Currencies run contiguously from 900000 and — unlike every other block — have <strong>no named <code>bu_*</code> enumerators</strong> (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a <code>$</code> sigil, resolved by <code>bvn_parse_currency_str</code> and carried as the numeric <code>base</code> value. <code>bvn_unit_is_currency(base)</code> is a bounds check over block 90.</p>
 <p>Only a vocabulary that contributes units of its <em>own</em> takes a block. A unit profile is a spelling for the unit slot, so most of its codes translate to native units and carry native ids; the ones that get a block id of their own are the <strong>opaque</strong> units — codes with no native equivalent and no dimension, such as UCUM's assay-defined <code>[IU]</code> or UN/ECE's package types — which need an identity precisely because nothing else can stand in for them.</p>
 <blockquote>
 <p><strong>Why blocks.</strong> One flat counter makes every vocabulary's ids a function of every other vocabulary's size, and that was not hypothetical. This space previously had physical units at 1–133 <em>and again</em> at 348–396 because the currencies had been dropped in between; two currencies stranded at 378–379, outside their own range, because that range had been frozen; and the profiles' units pinned above all of it. Adding a currency shifted units. The 2.0 renumbering ended that, and made an id self-describing: 200017 is UCUM's, whatever else the build contains.</p>
@@ -5312,18 +5349,26 @@ whole string fails to resolve.</p>
 <span class="w">    </span><span class="cm">/* Historical temperature scales */</span>
 <span class="w">    </span><span class="n">bu_delisle</span><span class="p">,</span><span class="w"> </span><span class="n">bu_newton_temp</span><span class="p">,</span><span class="w"> </span><span class="n">bu_reaumur</span><span class="p">,</span><span class="w"> </span><span class="n">bu_romer</span><span class="p">,</span>
 
+<span class="w">    </span><span class="cm">/* Dimensionless ratio units */</span>
+<span class="w">    </span><span class="n">bu_percent</span><span class="p">,</span><span class="w"> </span><span class="n">bu_per_mille</span><span class="p">,</span><span class="w"> </span><span class="n">bu_per_myriad</span><span class="p">,</span>
+<span class="w">    </span><span class="n">bu_per_cent_mille</span><span class="p">,</span><span class="w"> </span><span class="n">bu_ppm</span><span class="p">,</span><span class="w"> </span><span class="n">bu_ppb</span><span class="p">,</span><span class="w">   </span><span class="cm">/* bu_ppt and bu_ppq close</span>
+<span class="cm">                                          * block 10 — see the note below */</span>
+
+<span class="w">    </span><span class="cm">/* … the pH scale, the named speed units, the five water-hardness</span>
+<span class="cm">     * degrees, the concentration units, and the turbidity and salinity</span>
+<span class="cm">     * scales — then: */</span>
+
 <span class="w">    </span><span class="cm">/* Temperature differences (Δ°C shares bu_delta_kelvin, Δ°Ra shares</span>
 <span class="cm">     * bu_delta_fahrenheit — the same interval, so an alias not an id) */</span>
 <span class="w">    </span><span class="n">bu_delta_kelvin</span><span class="p">,</span><span class="w"> </span><span class="n">bu_delta_fahrenheit</span><span class="p">,</span><span class="w"> </span><span class="n">bu_delta_delisle</span><span class="p">,</span>
 <span class="w">    </span><span class="n">bu_delta_newton_temp</span><span class="p">,</span><span class="w"> </span><span class="n">bu_delta_reaumur</span><span class="p">,</span><span class="w"> </span><span class="n">bu_delta_romer</span><span class="p">,</span>
 
-<span class="w">    </span><span class="cm">/* Dimensionless ratio units */</span>
-<span class="w">    </span><span class="n">bu_percent</span><span class="p">,</span><span class="w"> </span><span class="n">bu_per_mille</span><span class="p">,</span><span class="w"> </span><span class="n">bu_per_myriad</span><span class="p">,</span>
-<span class="w">    </span><span class="n">bu_per_cent_mille</span><span class="p">,</span><span class="w"> </span><span class="n">bu_ppm</span><span class="p">,</span><span class="w"> </span><span class="n">bu_ppb</span><span class="p">,</span>
-
-<span class="w">    </span><span class="cm">/* … water hardness, turbidity and the rest of block 10, up to</span>
-<span class="cm">     * bu_delta_romer = 100185. The whole run is generated into</span>
-<span class="cm">     * include/bovnar_units.gen.h from src/gendata/units.bvnr. */</span>
+<span class="w">    </span><span class="cm">/* … the six units the profiles needed, the US survey lengths, the</span>
+<span class="cm">     * typographic lengths, the US dry volumes and the trade measures, and</span>
+<span class="cm">     * the rest of block 10 up to bu_ppq = 100216. The whole run is</span>
+<span class="cm">     * generated into include/bovnar_units.gen.h from</span>
+<span class="cm">     * src/gendata/units.bvnr, in that file&#39;s order — read it there rather</span>
+<span class="cm">     * than from this abridged listing. */</span>
 
 <span class="w">    </span><span class="cm">/* Block 90 — the currencies — has NO named enumerators: a currency is</span>
 <span class="cm">     * resolved by string via bvn_parse_currency_str and carried as the</span>
@@ -5563,7 +5608,7 @@ does when a caller asks.</p>
 <p><strong>The sum is only meaningful when one prefix system is in play.</strong> SI exponents are powers of ten and IEC exponents powers of two, and this function adds them into a single integer: <code>Ki~B/k~s</code> returns <code>7</code>, which is neither 2⁷ nor 10⁷ — the actual scale is 1.024. For a mixed unit use <code>bvn_unit_prefix_factor</code>, which multiplies the two systems' factors correctly, or read the components yourself.</p>
 </blockquote>
 <h3 id="124-si-conversion-api">12.4 SI Conversion API</h3>
-<p>Functions in <code>bovnar_si_units.h</code> provide dimensional analysis, compatibility checking, and value conversion between compatible physical units. <strong>These functions reject currency units</strong> — <code>bvn_find_si_conv</code> returns <code>NULL</code> for any <code>value_base_unit_t</code> for which <code>bvn_unit_is_currency</code> is true, causing <code>*ok = false</code>.</p>
+<p>Functions in <code>bovnar_si_units.h</code> provide dimensional analysis, compatibility checking, and value conversion between compatible physical units. <strong>A currency has no SI conversion row at all</strong> — it has a catalogue row in <code>bovnar_currency.c</code> instead — so <code>bvn_unit_to_si_factor</code> and <code>bvn_unit_dimension_vector</code> set <code>*ok = false</code> / return <code>false</code> for one, and <code>bvn_units_compatible</code> reports a currency incompatible even with itself. <code>bvn_units_convertible</code>, <code>bvn_unit_convert_value</code> and <code>bvn_unit_convert_rational</code> still handle currencies, through the prefix-only path described below; that difference is the reason the first of those three exists.</p>
 <div class="codehilite"><pre><span></span><code><span class="cm">/* Full SI factor (physical units only) */</span>
 <span class="kt">double</span><span class="w"> </span><span class="nf">bvn_unit_to_si_factor</span><span class="p">(</span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">u</span><span class="p">,</span>
 <span class="w">                              </span><span class="kt">bool</span><span class="w">   </span><span class="o">*</span><span class="n">is_affine</span><span class="p">,</span>
@@ -5577,6 +5622,12 @@ does when a caller asks.</p>
 <span class="cm">/* Dimensional compatibility check */</span>
 <span class="kt">bool</span><span class="w"> </span><span class="nf">bvn_units_compatible</span><span class="p">(</span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">b</span><span class="p">);</span>
 
+<span class="cm">/* The predicate to SCREEN a conversion target with */</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvn_units_convertible</span><span class="p">(</span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">b</span><span class="p">);</span>
+
+<span class="cm">/* The coherent SI form of a unit, if it has one */</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvn_unit_si_normal_form</span><span class="p">(</span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">u</span><span class="p">,</span><span class="w"> </span><span class="n">value_unit_t</span><span class="w"> </span><span class="o">*</span><span class="n">out</span><span class="p">);</span>
+
 <span class="cm">/* Conversion factor: value_in_b = value_in_a × k */</span>
 <span class="kt">double</span><span class="w"> </span><span class="nf">bvn_unit_convert_factor</span><span class="p">(</span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="w"> </span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">b</span><span class="p">,</span>
 <span class="w">                                </span><span class="kt">bool</span><span class="w"> </span><span class="o">*</span><span class="n">ok</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="o">*</span><span class="n">requires_affine</span><span class="p">);</span>
@@ -5589,11 +5640,32 @@ does when a caller asks.</p>
 <span class="kt">bool</span><span class="w"> </span><span class="nf">bvn_prefix_unit_valid</span><span class="p">(</span><span class="n">value_unit_prefix_t</span><span class="w"> </span><span class="n">prefix</span><span class="p">,</span>
 <span class="w">                            </span><span class="n">value_base_unit_t</span><span class="w"> </span><span class="n">base</span><span class="p">);</span>
 
+<span class="cm">/* Convert one value (handles the affine scales) */</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvn_unit_convert_value</span><span class="p">(</span><span class="kt">double</span><span class="w"> </span><span class="n">value</span><span class="p">,</span><span class="w"> </span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">from</span><span class="p">,</span>
+<span class="w">                             </span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">to</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="o">*</span><span class="n">out</span><span class="p">);</span>
+
+<span class="cm">/* Convert one EXACT rational — the lossless path */</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvn_unit_convert_rational</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvn_int_t</span><span class="w"> </span><span class="o">*</span><span class="n">vnum</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">bvn_int_t</span><span class="w"> </span><span class="o">*</span><span class="n">vden</span><span class="p">,</span>
+<span class="w">                                </span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">from</span><span class="p">,</span><span class="w"> </span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">to</span><span class="p">,</span>
+<span class="w">                                </span><span class="n">bvn_int_t</span><span class="w"> </span><span class="o">*</span><span class="n">out_num</span><span class="p">,</span><span class="w"> </span><span class="n">bvn_int_t</span><span class="w"> </span><span class="o">*</span><span class="n">out_den</span><span class="p">,</span>
+<span class="w">                                </span><span class="kt">bool</span><span class="w"> </span><span class="o">*</span><span class="n">exact</span><span class="p">);</span>
+
 <span class="cm">/* Exponent integer conversion */</span>
 <span class="kt">int32_t</span><span class="w">        </span><span class="nf">bvn_exponent_to_int</span><span class="w"> </span><span class="p">(</span><span class="n">unit_exponent_t</span><span class="w"> </span><span class="n">e</span><span class="p">);</span>
 <span class="n">unit_exponent_t</span><span class="w"> </span><span class="nf">bvn_int_to_exponent</span><span class="p">(</span><span class="kt">int32_t</span><span class="w"> </span><span class="n">n</span><span class="p">);</span>
 </code></pre></div>
 
+<p><code>bvn_unit_convert_rational</code> is the engine behind the reader's <code>want_unit</code> hook and behind every conversion a unit policy performs: it converts the exact rational <code>vnum/vden</code> in arbitrary precision, so a 1056-bit float or a 512-bit integer converts with no loss beyond the library's own declared factor. It sets <code>*exact = false</code> when the true factor is irrational (a π-based angle, a parsec, a water-hardness scale) — the result is then only an approximation and a lossless consumer must reject it. It returns <code>false</code> in three cases a caller reporting a diagnosis must tell apart: the units are dimensionally incompatible, the unit is structurally invalid, or the exact factor needs more than <code>BVN_INT_MAX_BITS</code> (reachable only from deliberately extreme units — <code>Q~m¹⁰⁰·Q~g¹⁰⁰</code> to <code>q~m¹⁰⁰·q~g¹⁰⁰</code> needs 10^12000 — and <strong>not</strong> a statement that the units disagree). Ask <code>bvn_units_convertible</code> to separate the first two from the third. To render the result, see <code>bvn_rational_to_str</code> and <code>bvn_rational_str_bufsize</code> in §3.4 of the <a href="https://www.bovnar.io/docs/api/">read/write API</a> — the renderer never truncates, so size the buffer with the second before calling the first.</p>
+<p><strong>Every out-parameter above is optional.</strong> <code>NULL</code> means "do not report this one"; the function behaves identically otherwise and its return value is unchanged. That makes <code>bvn_unit_dimension_vector(u, NULL)</code> the bare predicate "does <code>u</code> have a dimension vector at all", and <code>bvn_unit_si_normal_form(u, NULL)</code> the predicate "does <code>u</code> have an SI form". The rule does not extend to an argument the answer is made <em>of</em>: a <code>NULL</code> <code>bvn_int_t</code> in <code>bvn_unit_convert_rational</code>, or a <code>NULL</code> buffer handed to a formatter, is a refused call.</p>
+<p><strong><code>bvn_units_convertible</code> is the one to screen a conversion target with</strong>, and it is not <code>bvn_units_compatible</code>. That function answers "do these two carry the same physical dimension", and a currency deliberately carries none — so it reports <code>false</code> for <code>k~$USD → $USD</code> and even for <code>$USD → $USD</code>, both of which the conversion entry points perform correctly. <code>bvn_unit_convert_factor</code> is not the answer either: it reports <code>*ok = false</code> for <code>°F → °C</code>, because an affine conversion has no single multiplicative factor, so screening on it drops every temperature in the format. <code>bvn_units_convertible</code> is "dimensionally compatible, <strong>or</strong> the same unit apart from its prefixes", which is exactly the set <code>bvn_unit_convert_value</code> and <code>bvn_unit_convert_rational</code> accept.</p>
+<p>It is a <em>screen</em>, not a guarantee. <code>s/°C</code> is dimensionally compatible with <code>s/K</code> and passes here, and the conversion entry points still refuse it, because an affine scale means nothing at an exponent other than 1. Code that screens with this must still handle a conversion that declines — treating that as "this target does not apply to this value" rather than as an error is what the reader's unit policy does (doc/06 §4.1).</p>
+<p><strong><code>bvn_unit_si_normal_form</code></strong> writes the coherent SI form of <code>u</code> — the product of SI base units carrying the same dimension, prefixes folded out (mass comes back as <code>k~g</code>, the SI base unit for mass being the kilogram). It returns <code>false</code>, leaving <code>*out</code> untouched, when there is no such form to name:</p>
+<ul>
+<li>a <strong>currency</strong>, which has no dimension vector at all;</li>
+<li>any <strong>dimensionless</strong> unit (<code>%</code>, <code>ppm</code>, <code>dB</code>, <code>pH</code>, <code>rad</code>, <code>°</code>, the turbidity scales). Deliberate: normalising a ratio would silently turn <code>35 %</code> into a bare <code>0.35</code>, and normalising an angle would need the irrational factor between <code>°</code> and <code>rad</code>;</li>
+<li>a unit whose SI form the conversion engine would then refuse. The dimension vector does not determine a unit: <code>lm</code>, <code>lx</code> and <code>ph</code> carry the steradian's quantity kind, which no dimension vector can express, so rebuilding them from dimensions yields <code>cd</code> and <code>cd/m²</code> — a different quantity (§3.2). <code>s/°C</code> has the dimensions of <code>s/K</code> and is unconvertible for the affine reason above.</li>
+</ul>
+<p>The form returned is checked against <code>u</code> with <code>bvn_units_convertible</code> before it is returned, so a form this function gives back is one the conversion entry points accept. A temperature <strong>interval</strong> normalises to <code>ΔK</code> and never to <code>K</code>, which the dimension vector cannot say — both are Θ¹ — so the quantity kind is consulted (§3.12). This is the function <code>bvnr_normalise_si</code> is built on.</p>
 <p>For affine units (<code>bu_celsius</code>, <code>bu_fahrenheit</code>), <code>*is_affine</code> is set to <code>true</code> and <code>*affine_offset</code> receives the additive offset applied after multiplying by the returned factor.</p>
 <p><strong>An affine unit has an SI value only alone, at exponent 1.</strong> <code>°C²</code>, <code>°C·°F</code>, <code>°C/h</code> and <code>°C·m</code> all set <code>*ok = false</code>; <code>bvn_unit_convert_value</code> and <code>bvn_unit_convert_rational</code> refuse them, and the reader turns that into <code>error_unit_mismatch</code> (38). The offset is a number of kelvin, and a product whose SI unit is <code>K·s⁻¹</code> or <code>K·m</code> has nowhere to put it: the earlier code added it unscaled, so <code>20 °C/h</code> converted to <code>K/h</code> as 983360 and <code>20 °C·m</code> to <code>K·m</code> as 293.15 whatever the metres did. Both are arithmetic on a quantity that does not exist. <code>°C/h</code> still <strong>parses</strong> and is still a legal annotation — a consumer that means a temperature <em>difference</em> can read the components itself and apply its own semantics; what the library will not do is hand back a number for it. This matches pint, which forbids an offset unit inside a product outright.</p>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="n">ok</span><span class="p">,</span><span class="w"> </span><span class="n">affine</span><span class="p">;</span>

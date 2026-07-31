@@ -290,6 +290,21 @@
   { .code = "[lk_us]";  .bovnar = "lkUS";    .metric = false; },
   { .code = "[fur_us]"; .bovnar = "furUS";   .metric = false; },
   { .code = "[acr_us]"; .bovnar = "acUS";    .metric = false; },
+  # The survey lengths at an exponent, and the survey mil. These outlived the
+  # refusal that named them: the block below still said "bovnar carries the
+  # survey foot and nothing else built on it" after the nine survey units above
+  # had landed, so a square survey rod was refused while rdUS was sitting two
+  # lines away. Each is exact -- the survey units are exact rationals on
+  # 1200/3937 m, and squaring or milli-ing one stays exact.
+  #
+  # .reverse = false on the section: it IS a survey square mile, so without the
+  # flag the reverse table has two codes for miUS^2 and a square mile written
+  # back as "[sct]" would tell a UCUM reader "section" about a document that
+  # only said area.
+  { .code = "[mil_us]"; .bovnar = "m~inUS";  .metric = false; },
+  { .code = "[srd_us]"; .bovnar = "rdUS^2";  .metric = false; },
+  { .code = "[smi_us]"; .bovnar = "miUS^2";  .metric = false; },
+  { .code = "[sct]";    .bovnar = "miUS^2";  .metric = false; .reverse = false; },
   { .code = "[pnt]";    .bovnar = "pnt";     .metric = false; },
   { .code = "[pca]";    .bovnar = "pca";     .metric = false; },
   { .code = "[lne]";    .bovnar = "lne";     .metric = false; },
@@ -410,6 +425,7 @@
   { .code = "Bd";     .bovnar = "Bd";  .metric = true;  },
   { .code = "%";      .bovnar = "%";   .metric = false; },
   { .code = "[ppth]"; .bovnar = "‰";   .metric = false; },
+  { .code = "[pptr]"; .bovnar = "pptr"; .metric = false; },
   { .code = "[ppm]";  .bovnar = "ppm"; .metric = false; },
   { .code = "[ppb]";  .bovnar = "ppb"; .metric = false; },
 
@@ -605,7 +621,6 @@
   { .code = "10^";    .why = "the number ten — a numeric base for UCUM exponents, not a unit"; },
   { .code = "[pi]";   .why = "the number pi — a constant, not a unit"; },
   # Native carries ppm and ppb and stops there.
-  { .code = "[pptr]"; .why = "parts per trillion — native ratios stop at ppb"; },
 
   # Dimensionless instrument scales. UCUM defines each as the number one, which
   # makes every one of them worth exactly what a native ratio is worth and
@@ -644,13 +659,10 @@
   { .code = "[fdr_br]"; .why = "British fluid dram — native fl_dr is the US one"; },
   { .code = "[min_br]"; .why = "British minim — native minim is the US one"; },
 
-  # US SURVEY units beyond the foot and Ramden's pair, for the reason the block
-  # above gives: bovnar carries the survey foot and nothing else built on it.
-  { .code = "[srd_us]";  .why = "US survey square rod — bovnar carries only the survey foot"; },
-  { .code = "[smi_us]";  .why = "US survey square mile — bovnar carries only the survey foot"; },
-  { .code = "[sct]";     .why = "section — a survey square mile, no native form"; },
-  { .code = "[twp]";     .why = "township — 36 sections, no native form"; },
-  { .code = "[mil_us]";  .why = "US survey mil — native thou is the international mil"; },
+  # The one US survey unit still out. [srd_us], [smi_us], [sct] and [mil_us]
+  # were here beside it and are now mapped above: the survey lengths they are
+  # built from arrived, and nothing re-asked this list.
+  { .code = "[twp]";     .why = "township — 36 sections, and 36 is not a decade the unit slot can reach"; },
 
   # US dry measure below the peck, and the historical gallon it came from.
 

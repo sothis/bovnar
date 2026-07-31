@@ -1639,6 +1639,13 @@ two digits name the vocabulary it comes from.
 | 100166–100170 | Water hardness (`GERMAN_HARDNESS`, `ENGLISH_HARDNESS`, `FRENCH_HARDNESS`, `RUSSIAN_HARDNESS`, `AMERICAN_HARDNESS`) |
 | 100171–100172 | Concentration (`VAL`, `GRAINS_PER_GALLON`) |
 | 100173–100179 | Turbidity, salinity and conductivity (`TURBIDITY_NTU`, `TURBIDITY_FNU`, `PRACTICAL_SALINITY`, `CONDUCTIVITY_FACTOR`, `TURBIDITY_FTU`, `TURBIDITY_FAU`, `TURBIDITY_JTU`) |
+| 100180–100185 | Temperature *differences* (`DELTA_KELVIN`, `DELTA_FAHRENHEIT`, `DELTA_DELISLE`, `DELTA_NEWTON_TEMP`, `DELTA_REAUMUR`, `DELTA_ROMER`) — `Δ°C` shares `DELTA_KELVIN` and `Δ°Ra` shares `DELTA_FAHRENHEIT` |
+| 100186–100191 | The six units the profiles needed (`METER_WATER`, `CALORIE_IT`, `BTU_TH`, `TROY_POUND`, `APOTHECARY_DRAM`, `LONG_HUNDREDWEIGHT`) |
+| 100192–100200 | US survey lengths (`SURVEY_INCH` … `SURVEY_ACRE`) |
+| 100201–100203 | Typographic lengths (`POINT`, `PICA`, `LINE`) |
+| 100204–100209 | US dry volumes and the trade measures (`DRY_GALLON`, `DRY_QUART`, `DRY_PINT`, `BOARD_FOOT`, `CORD`, `SURVEY_ACRE_FOOT`) |
+| 100210–100214 | `DARCY`, `THERM_EC`, `REFRIGERATION_TON`, `DOBSON`, `SHAKE` |
+| 100215–100216 | The ratios below ppb (`PPT`, `PPQ`) — spelled `pptr` and `ppq`, see §18's note |
 | 900000–900165 | ISO 4217 fiat currencies (`AED` … `ZWL`), block 90 — see `CURRENCY_FIRST` |
 | 900166–900215 | Cryptocurrencies (`BTC` … `RUNE`), the rest of block 90 — see `CURRENCY_LAST` |
 
@@ -1661,8 +1668,8 @@ only invite the bounds check it can no longer support. Use `UNIT_NATIVE_FIRST`
 
 > **Note on `CUP`:** the Cuban-Peso currency is exposed as **`BaseUnit.CUP_`** (trailing
 > underscore), not `BaseUnit.CUP`. The plain name `CUP` is the US-cup volume unit
-> (enum value 81); since Python enum member names must be unique, the currency at
-> value 167 takes the suffixed name. This affects the Python member name only — the
+> (enum value 100080); since Python enum member names must be unique, the currency
+> at value 900033 takes the suffixed name. This affects the Python member name only — the
 > `.bvnr` wire token is still the bare uppercase `CUP`, and case stays load-bearing
 > (`cup` = volume, `CUP` = currency).
 

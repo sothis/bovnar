@@ -404,6 +404,11 @@ class BaseUnit(IntEnum):
     REFRIGERATION_TON  = 100212   # ton_ref
     DOBSON             = 100213   # DU
     SHAKE              = 100214   # shake
+    # The two ratios below ppb. The SYMBOL is `pptr`, not `ppt`: `ppt`
+    # already resolves as p~pt, the picopint, and units.bvnr forbids a new
+    # alias that changes an existing spelling. UCUM spells it [pptr] too.
+    PPT                = 100215   # pptr
+    PPQ                = 100216   # ppq
 
     # ---- Currencies: block 90 -------------------------------------------
     #
@@ -645,7 +650,7 @@ class BaseUnit(IntEnum):
 UNIT_BLOCK_SIZE     = 10000
 
 UNIT_NATIVE_FIRST   = BaseUnit.BIT
-UNIT_NATIVE_LAST    = BaseUnit.SHAKE
+UNIT_NATIVE_LAST    = BaseUnit.PPQ
 
 CURRENCY_FIRST      = BaseUnit.AED
 CURRENCY_LAST       = BaseUnit.RUNE

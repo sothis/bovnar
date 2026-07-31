@@ -345,6 +345,19 @@ WAIVED_UPSTREAM = {
         "QUDT rounds the torr to 133.322 Pa (6 digits); native Torr is the "
         "exact 101325/760. 2.8 ppm, the same publisher rounding as UCUM's "
         "mercury column.",
+    # The EC therm, rounded to six digits by BOTH publishers that state it. The
+    # evidence that it is a rounding rather than a different unit is in the same
+    # two files: each states the US therm exactly (1.054804e8 J), so neither is
+    # working from a different definition of a therm -- one number is written
+    # long and the other short.
+    ("udunits", "EC_therm"):
+        "UDUNITS states the EC therm as 1.05506e8 J (6 digits); native thm_ec "
+        "is the exact 100 000 Btu_IT = 105 505 585.262 J. 3.9 ppm, publisher "
+        "rounding -- the same file states the US therm exactly.",
+    ("om", "therm-EC"):
+        "OM states the EC therm as 105 506 000 J (6 digits); native thm_ec is "
+        "the exact 105 505 585.262 J. 3.9 ppm, the same rounding UDUNITS "
+        "applies to the same unit.",
     # The four information units QUDT states at a value that is not its OWN
     # model. Every other member of the family is exactly ln 2 (or 8·ln 2) times
     # the corresponding power of two — see _QUDT_INFO_MODEL — and these four are

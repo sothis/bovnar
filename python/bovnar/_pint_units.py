@@ -84,6 +84,8 @@ BOVNAR_PINT_DEFINITIONS: list[str] = [
     'bvnr_grains_per_gallon = 0.17103352162411276 * mole * meter**-3',
     'bvnr_conductivity_factor = 0.01 * siemens * meter**-1',
     'bvnr_ppb = 1e-09',
+    'bvnr_pptr = 1e-12',
+    'bvnr_ppq = 1e-15',
     'bvnr_prussian_elle = 0.666937625 * meter',
     'bvnr_prussian_fuss = 0.313853 * meter',
     'bvnr_prussian_line = 0.002179534722222222 * meter',
@@ -375,6 +377,8 @@ BASE_UNIT_TO_PINT: dict[int, str] = {
     100212: 'bvnr_refrigeration_ton',        # REFRIGERATION_TON
     100213: 'bvnr_dobson',                   # DOBSON
     100214: 'bvnr_shake',                    # SHAKE
+    100215: 'bvnr_pptr',                     # PPT
+    100216: 'bvnr_ppq',                      # PPQ
 
 }
 

@@ -1224,6 +1224,11 @@
   { .code = "teraweber";                               .bovnar = "T~Wb";                },
   { .code = "tesla";                                   .bovnar = "T";                   },
   { .code = "therm-US";                                .bovnar = "thm";                 },
+  # "bovnar has no unit of this magnitude" was written before thm_ec existed and
+  # never re-asked. OM states 105506000 J, a six-digit rounding of the exact
+  # 105 505 585.262 J -- 3.9 ppm, publisher rounding, waived by name in
+  # check_profile_factors.py.
+  { .code = "therm-EC";                                .bovnar = "thm_ec";              },
   { .code = "ton-Long";                                .bovnar = "tn_l";                },
   { .code = "ton-Short";                               .bovnar = "tn_sh";               },
   { .code = "tonOfTNT";                                .bovnar = "G~cal";               },
@@ -1565,7 +1570,6 @@
   { .code = "stattesla";                               .why = "bovnar has no unit of this magnitude"; },
   { .code = "statvolt";                                .why = "bovnar has no unit of this magnitude"; },
   { .code = "statweber";                               .why = "bovnar has no unit of this magnitude"; },
-  { .code = "therm-EC";                                .why = "bovnar has no unit of this magnitude"; },
   { .code = "thousandPiece";                           .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "ton-Register";                            .why = "OM states no factor for this unit, so its magnitude is unknown here"; },
   { .code = "ton-ShortAssay";                          .why = "bovnar has no unit of this magnitude"; },

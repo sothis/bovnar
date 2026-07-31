@@ -51,12 +51,28 @@ def counts(repo):
     pfx = load("prefixes.bvnr")
     profiles = ("ucum", "unece", "qudt", "qudt-qk", "udunits", "om", "cf")
     mapped = refused = 0
+    opaque = {}
     for ns in profiles:
         d = load(ns + ".bvnr")
         mapped += len(d.get("mapped", [])) + len(d.get("opaque", []))
         refused += len(d.get("unsupported", []))
+        opaque[ns] = len(d.get("opaque", []))
     _ = profiles
+    # The id-space BOUNDS, not just the totals. A block's last id is a function
+    # of how many rows the block holds, so "100000–100179 (180)" in doc/04 and
+    # "`bu_bit` = 100000 to `bu_long_hundredweight` = 100191" in doc/05 are
+    # count claims wearing a different hat -- and both had been left behind by a
+    # growing catalogue, in two documents whose tables listed every unit
+    # correctly.
+    native_last = 100000 + len(units) - 1
     return {
+        "native_last": native_last,
+        "native_last_name": "bu_" + units[-1]["name"],
+        "ucum_opaque": opaque["ucum"],
+        "ucum_opaque_last": 200000 + opaque["ucum"] - 1,
+        "unece_opaque": opaque["unece"],
+        "unece_opaque_last": 300000 + opaque["unece"] - 1,
+        "currency_last": 900000 + len(curr) - 1,
         "profiles": len(profiles),
         "mapped_codes": mapped,
         "refusals": refused,
@@ -93,11 +109,14 @@ _WORD = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
          "seven": 7, "eight": 8, "nine": 9, "ten": 10}
 
 CLAIMS = [
-    (_phrase(r"\b(\d+)", "physical", r"units\b"),               "units"),
-    (_phrase(r"\b(\d+)", "physical", "base", r"units\b"),       "units"),
-    (_phrase(r"\b(\d+)", "named", r"units\b"),                  "units"),
-    (_phrase(r"\b(\d+)", "named", "base", r"units\b"),          "units"),
-    (_phrase(r"\b(\d+)", "base", r"units\b"),                   "units"),
+    # An OPTIONAL adjective run between the number and "units": "215 physical
+    # units", "215 named base units", "215 named physical base units". The five
+    # fixed phrasings this replaces spelled out four of those five orderings and
+    # missed the fifth, which is exactly the one doc/05 §3 opened with -- a
+    # sentence that said 180 for as long as the registry had been growing, in
+    # the very document whose 1150 gated table rows all said otherwise.
+    (_phrase(r"\b(\d+)", r"(?:named|physical|base)(?:%s(?:named|physical|base))*"
+             % _G, r"units\b"),                                 "units"),
     (_phrase(r"registry(?:'s)?", r"(\d+)", r"units\b"),         "units"),
     (_phrase(r"\b(\d+)", "units", "and", r"\d+", r"currencies\b"), "units"),
     (_phrase(r"\b(\d+)", "accepted", r"spellings\b"),           "spellings"),
@@ -125,6 +144,23 @@ CLAIMS = [
              r"[\d\u202f\u00a0 ]+?", "named", r"refusals\b"),   "mapped_codes"),
     (_phrase(r"\b[\d\u202f\u00a0 ]+?", "mapped", "codes", "and",
              r"([\d\u202f\u00a0 ]+?)", "named", r"refusals\b"), "refusals"),
+]
+
+# The id-space BOUNDS, as opposed to the plain counts above. Each pattern
+# captures SEVERAL numbers and every one of them is compared, because a range
+# and the size beside it are two ways of stating the same fact and a document
+# that updates one and not the other is worse than one that updates neither.
+RANGE_CLAIMS = [
+    (r"Native units 100000[–-](\d+) \((\d+)\)",
+     ("native_last", "units")),
+    (r"UCUM opaque units 200000[–-](\d+) \((\d+)\)",
+     ("ucum_opaque_last", "ucum_opaque")),
+    (r"UN/ECE opaque units 300000[–-](\d+) \((\d+)\)",
+     ("unece_opaque_last", "unece_opaque")),
+    (r"currencies 900000[–-](\d+) \((\d+) fiat, (\d+) crypto\)",
+     ("currency_last", "fiat", "crypto")),
+    (_phrase(r"`bu_bit`", "=", "100000", "to", r"`(bu_\w+)`", "=", r"(\d+)"),
+     ("native_last_name", "native_last")),
 ]
 
 # Everything under these is either a historical record or generated from a file
@@ -181,6 +217,19 @@ def main(argv):
                     bad.append("%s:%d: says %d %s, src/gendata has %d  (%r)"
                                % (rel, line, got, key, want[key],
                                   m.group(0)))
+        for pattern, keys in RANGE_CLAIMS:
+            for m in re.finditer(pattern, text):
+                for group, key in enumerate(keys, 1):
+                    checked += 1
+                    raw = m.group(group)
+                    expect = want[key]
+                    got = (raw if isinstance(expect, str)
+                           else int(re.sub(r"[\s  ]", "", raw)))
+                    if got != expect:
+                        line = text.count("\n", 0, m.start()) + 1
+                        bad.append("%s:%d: says %s for %s, src/gendata has %s"
+                                   "  (%r)" % (rel, line, got, key, expect,
+                                               " ".join(m.group(0).split())))
     if bad:
         print("check_doc_counts: stated counts disagree with src/gendata:",
               file=sys.stderr)

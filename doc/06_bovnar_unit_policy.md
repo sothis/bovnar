@@ -35,7 +35,7 @@ conversion itself is the same exact arbitrary-precision path `want_unit` uses.
     - 3.3 [First match wins](#33-first-match-wins)
 4. [Conversion semantics](#4-conversion-semantics)
     - 4.1 [Compatible is not convertible](#41-compatible-is-not-convertible)
-    - 4.2 [A bare number matches only no_unit](#42-a-bare-number-matches-only-no_unit)
+    - 4.2 [A bare number matches only no_unit — and no_unit matches only a bare number](#42-a-bare-number-matches-only-no_unit--and-no_unit-matches-only-a-bare-number)
     - 4.3 [Exact, or not at all](#43-exact-or-not-at-all)
     - 4.4 [Quantity kinds keep the dimensionless units apart](#44-quantity-kinds-keep-the-dimensionless-units-apart)
 5. [Writer-side policy](#5-writer-side-policy)
@@ -189,7 +189,7 @@ the listed units: "this document is lengths and temperatures, in whatever unit i
 them". It never changes a value.
 
 A value with **no** unit satisfies this only if one of the listed units is itself `no_unit`, for
-the reason in [4.2](#42-a-bare-number-matches-only-no_unit).
+the reason in [4.2](#42-a-bare-number-matches-only-no_unit--and-no_unit-matches-only-a-bare-number).
 
 ### 2.7 Limits and lifetime
 
@@ -266,17 +266,33 @@ factor" would drop every temperature in the format. Both of these work:
  25 °C  ->  K           =  298.15
 ```
 
-### 4.2 A bare number matches only no_unit
+### 4.2 A bare number matches only no_unit — and no_unit matches only a bare number
 
-A value with no unit only ever matches a target that is itself `no_unit`.
+The fence runs **both ways**:
 
-A bare number is dimensionally compatible with `%` and with `ppm`, so without that fence a policy
-naming `"%"` would deliver `0.25` as `25` — the silent factor-of-a-hundred the format exists to
-prevent, arrived at through the machinery meant to prevent it. Under a policy with `targets =
-["%"]`, a bare `0.25` is therefore delivered untouched, with `converted == false`.
+- a value with no unit only ever matches a target that is itself `no_unit`;
+- a `no_unit` target only ever matches a value that has no unit.
 
-The fence is not "never convert dimensionless things": `ppm -> %` is a real and wanted conversion.
-It is specifically about values that carry no unit at all.
+A bare number is dimensionally compatible with `%` and with `ppm`, so without the fence a policy
+naming `"%"` would deliver `0.25` as `25`, and one naming `no_unit` would deliver `35 %` as `0.35`
+— the same silent factor-of-a-hundred from either side, arrived at through the machinery meant to
+prevent it. Under `targets = ["%"]` a bare `0.25` is therefore delivered untouched, with
+`converted == false`; under `targets = ["no_unit"]` a `35 %` is delivered untouched too.
+
+```text
+--unit %          0.25   (no unit)   delivered untouched
+--unit %          5000 ppm       ->  0.5 %
+--unit no_unit    0.25   (no unit)   matched; the conversion is the identity
+--unit no_unit    25 %             delivered untouched
+--unit no_unit    5000 ppm         delivered untouched
+```
+
+The second half is the one that surprises, so it is worth stating plainly: **`no_unit` as a target
+does not strip units off dimensionless values.** There is no policy setting that turns `35 %` into
+a bare number — by design, since that is precisely the rescale §4.2 exists to stop.
+
+The fence is not "never convert dimensionless things": `ppm -> %` is a real and wanted conversion,
+and it is unaffected. It is specifically about values that carry no unit at all.
 
 ### 4.3 Exact, or not at all
 
@@ -315,7 +331,7 @@ rad  ->  °          allowed
 
 Normalisation needs no hand-maintained skip list to keep these apart. The hazards are narrower
 than the registry suggests: currencies ([4.1](#41-compatible-is-not-convertible)) and unitless
-values ([4.2](#42-a-bare-number-matches-only-no_unit)), not the logarithmic scales.
+values ([4.2](#42-a-bare-number-matches-only-no_unit--and-no_unit-matches-only-a-bare-number)), not the logarithmic scales.
 
 ---
 

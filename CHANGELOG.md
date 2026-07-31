@@ -57,6 +57,35 @@ to accompany every copy (`web/fonts/OFL.txt`), the Impressum gains a
 *Bildnachweis*, `doc/11` gains §18, and `CITATION.cff` gains a `references:`
 block naming all six vocabularies with their licences.
 
+### Fixed — the unitless fence was documented in one direction only
+
+`bvn_policy_selects` fences unitless values off from the ratio units **both
+ways**, and its source comment says so:
+
+> a policy naming "%" would otherwise convert a bare `0.25` into `25 %`, **and
+> one naming `no_unit` would turn `35 %` into `0.35`**
+
+The implementation is symmetric (`BVN_UNIT_IS_UNITLESS(native) !=
+BVN_UNIT_IS_UNITLESS(target)`), and the test asserts both directions. Only the
+two places a *user* reads stated half of it: `bovnar.h`'s `targets` field and
+doc/06 §4.2, whose heading was literally "A bare number matches only no_unit".
+
+The missing half is the surprising one. `no_unit` as a **target** does not strip
+units off dimensionless values — there is no policy setting that turns `35 %`
+into a bare number, by design, because that is the same silent
+factor-of-a-hundred from the other side. A reader wanting "deliver everything as
+plain numbers" would reach for `--unit no_unit`, get a document back unchanged,
+and find nothing in either document explaining why.
+
+Both sites now state the fence in both directions, with a transcript of what each
+target does to a bare number, a `%` and a `ppm`, and the reminder that `ppm -> %`
+is unaffected — the fence is about values carrying no unit at all, not about
+converting dimensionless things.
+
+No code or test change: the behaviour was right and already covered by
+`test_unitless_is_fenced_from_the_ratio_units`. This was documentation catching
+up with an implementation that had been careful first.
+
 ### Fixed — a unit rule that matches nothing was silently satisfied, and undocumented
 
 `bvnr_rule_require` / `--require-field` **does not require the field to exist**. A

@@ -1055,11 +1055,19 @@ typedef struct bvnr_unit_policy_s {
 	 * conversion): `converted` then means "the policy restated this value",
 	 * not "the policy looked at it".
 	 *
-	 * A value with no unit only ever matches a target that is itself
-	 * `no_unit`. A bare number is dimensionally compatible with % and with
-	 * ppm, so without that fence a policy naming "%" would deliver `0.25` as
-	 * `25` -- the silent rescale the format exists to prevent, arrived at
-	 * through the machinery meant to prevent it. */
+	 * The unitless fence runs BOTH WAYS: a value with no unit only ever
+	 * matches a target that is itself `no_unit`, AND a `no_unit` target only
+	 * ever matches a value that has no unit. A bare number is dimensionally
+	 * compatible with % and with ppm, so without the fence a policy naming "%"
+	 * would deliver `0.25` as `25`, and one naming `no_unit` would deliver
+	 * `35 %` as `0.35` -- the same silent rescale from either side, arrived at
+	 * through the machinery meant to prevent it.
+	 *
+	 * The second half is the one that surprises: `no_unit` as a target does
+	 * NOT strip units off dimensionless values. There is no policy setting
+	 * that turns "35 %" into a bare number, by design. What the fence does not
+	 * touch is a conversion between two units -- `ppm` to `%` is real and
+	 * wanted -- so this is specifically about values carrying no unit at all. */
 	const bvnr_unit_target_t*	targets;
 	uint32_t			num_targets;
 	uint32_t			base;      /* output base for `normalise`,

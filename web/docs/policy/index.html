@@ -79,7 +79,7 @@ conversion itself is the same exact arbitrary-precision path <code>want_unit</co
 </li>
 <li><a href="#4-conversion-semantics">Conversion semantics</a><ul>
 <li>4.1 <a href="#41-compatible-is-not-convertible">Compatible is not convertible</a></li>
-<li>4.2 <a href="#42-a-bare-number-matches-only-no_unit">A bare number matches only no_unit</a></li>
+<li>4.2 <a href="#42-a-bare-number-matches-only-no_unit--and-no_unit-matches-only-a-bare-number">A bare number matches only no_unit — and no_unit matches only a bare number</a></li>
 <li>4.3 <a href="#43-exact-or-not-at-all">Exact, or not at all</a></li>
 <li>4.4 <a href="#44-quantity-kinds-keep-the-dimensionless-units-apart">Quantity kinds keep the dimensionless units apart</a></li>
 </ul>
@@ -206,7 +206,7 @@ written without a unit parameter or with an explicit <code>no_unit</code>.</p>
 the listed units: "this document is lengths and temperatures, in whatever unit it chose to write
 them". It never changes a value.</p>
 <p>A value with <strong>no</strong> unit satisfies this only if one of the listed units is itself <code>no_unit</code>, for
-the reason in <a href="#42-a-bare-number-matches-only-no_unit">4.2</a>.</p>
+the reason in <a href="#42-a-bare-number-matches-only-no_unit--and-no_unit-matches-only-a-bare-number">4.2</a>.</p>
 <h3 id="27-limits-and-lifetime">2.7 Limits and lifetime</h3>
 <table>
 <thead>
@@ -283,14 +283,29 @@ factor" would drop every temperature in the format. Both of these work:</p>
  25 °C  -&gt;  K           =  298.15
 </code></pre></div>
 
-<h3 id="42-a-bare-number-matches-only-no_unit">4.2 A bare number matches only no_unit</h3>
-<p>A value with no unit only ever matches a target that is itself <code>no_unit</code>.</p>
-<p>A bare number is dimensionally compatible with <code>%</code> and with <code>ppm</code>, so without that fence a policy
-naming <code>"%"</code> would deliver <code>0.25</code> as <code>25</code> — the silent factor-of-a-hundred the format exists to
-prevent, arrived at through the machinery meant to prevent it. Under a policy with <code>targets =
-["%"]</code>, a bare <code>0.25</code> is therefore delivered untouched, with <code>converted == false</code>.</p>
-<p>The fence is not "never convert dimensionless things": <code>ppm -&gt; %</code> is a real and wanted conversion.
-It is specifically about values that carry no unit at all.</p>
+<h3 id="42-a-bare-number-matches-only-no_unit--and-no_unit-matches-only-a-bare-number">4.2 A bare number matches only no_unit — and no_unit matches only a bare number</h3>
+<p>The fence runs <strong>both ways</strong>:</p>
+<ul>
+<li>a value with no unit only ever matches a target that is itself <code>no_unit</code>;</li>
+<li>a <code>no_unit</code> target only ever matches a value that has no unit.</li>
+</ul>
+<p>A bare number is dimensionally compatible with <code>%</code> and with <code>ppm</code>, so without the fence a policy
+naming <code>"%"</code> would deliver <code>0.25</code> as <code>25</code>, and one naming <code>no_unit</code> would deliver <code>35 %</code> as <code>0.35</code>
+— the same silent factor-of-a-hundred from either side, arrived at through the machinery meant to
+prevent it. Under <code>targets = ["%"]</code> a bare <code>0.25</code> is therefore delivered untouched, with
+<code>converted == false</code>; under <code>targets = ["no_unit"]</code> a <code>35 %</code> is delivered untouched too.</p>
+<div class="codehilite"><pre><span></span><code>--unit %          0.25   (no unit)   delivered untouched
+--unit %          5000 ppm       -&gt;  0.5 %
+--unit no_unit    0.25   (no unit)   matched; the conversion is the identity
+--unit no_unit    25 %             delivered untouched
+--unit no_unit    5000 ppm         delivered untouched
+</code></pre></div>
+
+<p>The second half is the one that surprises, so it is worth stating plainly: <strong><code>no_unit</code> as a target
+does not strip units off dimensionless values.</strong> There is no policy setting that turns <code>35 %</code> into
+a bare number — by design, since that is precisely the rescale §4.2 exists to stop.</p>
+<p>The fence is not "never convert dimensionless things": <code>ppm -&gt; %</code> is a real and wanted conversion,
+and it is unaffected. It is specifically about values that carry no unit at all.</p>
 <h3 id="43-exact-or-not-at-all">4.3 Exact, or not at all</h3>
 <p>Nothing approximate is ever delivered. An exact <strong>rational</strong> and a terminating <strong>positional
 expansion</strong> are different things, and only the second can be handed over as digits:</p>
@@ -320,7 +335,7 @@ rad  -&gt;  °          allowed
 
 <p>Normalisation needs no hand-maintained skip list to keep these apart. The hazards are narrower
 than the registry suggests: currencies (<a href="#41-compatible-is-not-convertible">4.1</a>) and unitless
-values (<a href="#42-a-bare-number-matches-only-no_unit">4.2</a>), not the logarithmic scales.</p>
+values (<a href="#42-a-bare-number-matches-only-no_unit--and-no_unit-matches-only-a-bare-number">4.2</a>), not the logarithmic scales.</p>
 <hr />
 <h2 id="5-writer-side-policy">5. Writer-side policy</h2>
 <h3 id="51-validation-only">5.1 Validation only</h3>

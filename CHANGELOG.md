@@ -121,6 +121,51 @@ did:
 is neither the international acre-foot (1233.48183755) nor the survey one
 (1233.48923847), i.e. an acre and a foot from different systems.
 
+### Added — nine units two and three vocabularies define, and doc/07's own gate
+
+A refusal reading "bovnar has no unit of this magnitude" is a request when one
+publisher makes it and **evidence** when three make it independently at the same
+value. Grouping every profile refusal by (dimension, value) turned up 35 such
+groups; these nine are the ones whose publishers agree to the last digit they
+state and whose value is exactly representable:
+
+| Symbol | Unit | Factor | Named by |
+|---|---|---|---|
+| `pnt_pr` | printer's point | 0.0003514598 m (= 0.013837 `in`) | UCUM, UDUNITS, OM |
+| `pca_pr` | printer's pica | 0.0042175176 m | UCUM, UDUNITS, OM |
+| `hp_E` | electric horsepower | 746 W exactly | UDUNITS, QUDT, OM |
+| `hp_B` | boiler horsepower | 9809.5 W | UDUNITS, QUDT, OM |
+| `abV` | abvolt | 10⁻⁸ V exactly | UDUNITS, QUDT, OM |
+| `AT` | assay ton (short) | 175/6 g | UDUNITS, QUDT, OM |
+| `bsh_uk` | imperial bushel | 0.03636872 m³ (= 8 `gal_uk`) | UCUM, QUDT |
+| `clo` | clo | 0.155 K·m²/W exactly | UDUNITS, QUDT |
+| `debye` | debye | 10⁻²¹/c C·m, exact since 2019 | QUDT, OM |
+
+26 profile codes across four vocabularies now map instead of being refused, and
+`check_profile_factors.py` reports 0 mismatch against the publishers' own files.
+
+Each is a **near neighbour** of a unit already present, which is why each needed a
+row rather than an alias: `pnt_pr` is 0.37 % off `pnt` (the DTP point), `hp_E`
+0.04 % off `hp`, `bsh_uk` 3.2 % off `bsh` (the US *dry* bushel), and `hp_B`
+thirteen times any horsepower. Folding one onto its neighbour is the error doc/11
+§6.3 warns about — dimensionally perfect, inside anything a later check would
+notice, and wrong. `doc/05` had said the printer's point "is still refused"; that
+was a statement about it being a different unit, which is an argument for giving
+it a symbol rather than for having none, and it is the argument the US survey
+lengths already won.
+
+**`check_doc_ambiguities.py`** puts every claim doc/07 makes to the reference
+parser — §2 and §3's two-readings rows, §4's and §13's refusals, §5's
+prefix-vs-unit symbols, and §9's accept-list, refuse-list and worked conversions.
+doc/07's header has always promised "every row here was checked against the
+reference parser"; nothing re-asked, and a table of REFUSALS is the one thing
+that cannot keep that promise on its own, because a refusal rots the moment the
+catalogue grows. §9's "families, in full" sentence is checked for **closure**, and
+that check earned itself immediately: adding `hp_E` and `hp_B` above put two new
+members in the kg·m²·s⁻³ family, and the build failed until the sentence said so.
+The factor gate caught a second one the same day — a `9806.5` typed for `9809.5`
+in a table this commit was adding.
+
 ### Fixed — doc/07 §9 said "(factor 1)" about a rule that is not about factors
 
 The section listing the units Bovnar converts between despite their meaning

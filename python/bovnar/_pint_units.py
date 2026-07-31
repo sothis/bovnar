@@ -86,6 +86,15 @@ BOVNAR_PINT_DEFINITIONS: list[str] = [
     'bvnr_ppb = 1e-09',
     'bvnr_pptr = 1e-12',
     'bvnr_ppq = 1e-15',
+    'bvnr_printers_point = 0.0003514598 * meter',
+    'bvnr_printers_pica = 0.0042175176 * meter',
+    'bvnr_horsepower_electric = 746.0 * watt',
+    'bvnr_horsepower_boiler = 9809.5 * watt',
+    'bvnr_abvolt = 1e-08 * volt',
+    'bvnr_assay_ton = 0.029166666666666667 * kilogram',
+    'bvnr_bushel_uk = 0.03636872 * meter**3',
+    'bvnr_clo = 0.155 * kelvin * meter**2 * watt**-1',
+    'bvnr_debye = 3.335640951981521e-30 * coulomb * meter',
     'bvnr_prussian_elle = 0.666937625 * meter',
     'bvnr_prussian_fuss = 0.313853 * meter',
     'bvnr_prussian_line = 0.002179534722222222 * meter',
@@ -379,6 +388,15 @@ BASE_UNIT_TO_PINT: dict[int, str] = {
     100214: 'bvnr_shake',                    # SHAKE
     100215: 'bvnr_pptr',                     # PPT
     100216: 'bvnr_ppq',                      # PPQ
+    100217: 'bvnr_printers_point',           # PRINTERS_POINT
+    100218: 'bvnr_printers_pica',            # PRINTERS_PICA
+    100219: 'bvnr_horsepower_electric',      # HORSEPOWER_ELECTRIC
+    100220: 'bvnr_horsepower_boiler',        # HORSEPOWER_BOILER
+    100221: 'bvnr_abvolt',                   # ABVOLT
+    100222: 'bvnr_assay_ton',                # ASSAY_TON
+    100223: 'bvnr_bushel_uk',                # BUSHEL_UK
+    100224: 'bvnr_clo',                      # CLO
+    100225: 'bvnr_debye',                    # DEBYE
 
 }
 

@@ -1646,6 +1646,7 @@ two digits name the vocabulary it comes from.
 | 100204–100209 | US dry volumes and the trade measures (`DRY_GALLON`, `DRY_QUART`, `DRY_PINT`, `BOARD_FOOT`, `CORD`, `SURVEY_ACRE_FOOT`) |
 | 100210–100214 | `DARCY`, `THERM_EC`, `REFRIGERATION_TON`, `DOBSON`, `SHAKE` |
 | 100215–100216 | The ratios below ppb (`PPT`, `PPQ`) — spelled `pptr` and `ppq`, see §18's note |
+| 100217–100225 | Nine units two or three vocabularies define (`PRINTERS_POINT`, `PRINTERS_PICA`, `HORSEPOWER_ELECTRIC`, `HORSEPOWER_BOILER`, `ABVOLT`, `ASSAY_TON`, `BUSHEL_UK`, `CLO`, `DEBYE`) |
 | 900000–900165 | ISO 4217 fiat currencies (`AED` … `ZWL`), block 90 — see `CURRENCY_FIRST` |
 | 900166–900215 | Cryptocurrencies (`BTC` … `RUNE`), the rest of block 90 — see `CURRENCY_LAST` |
 

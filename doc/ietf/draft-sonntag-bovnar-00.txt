@@ -1409,10 +1409,10 @@ Internet-Draft              The Bovnar Format                  July 2026
    [BOVNAR-UNITS] to build a conforming parser; everything else required
    is in this document.
 
-   The registry covers 217 named units across SI [SI], IEC binary
+   The registry covers 226 named units across SI [SI], IEC binary
    [IEC80000-13], imperial and US customary, CGS, radiation, electrical
    power, rotational, surveying, textile, and other families, accepting
-   652 spellings in total once long-form and plural aliases are counted;
+   668 spellings in total once long-form and plural aliases are counted;
    plus 216 currency codes (Section 8.4).
 
    Three properties govern how a unit behaves:

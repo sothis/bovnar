@@ -409,6 +409,16 @@ class BaseUnit(IntEnum):
     # alias that changes an existing spelling. UCUM spells it [pptr] too.
     PPT                = 100215   # pptr
     PPQ                = 100216   # ppq
+    # Nine units two or three vocabularies define and this table did not.
+    PRINTERS_POINT     = 100217   # pnt_pr  (0.013837 in; `pnt` is the DTP point)
+    PRINTERS_PICA      = 100218   # pca_pr
+    HORSEPOWER_ELECTRIC = 100219  # hp_E    (746 W exactly)
+    HORSEPOWER_BOILER  = 100220   # hp_B    (9809.5 W)
+    ABVOLT             = 100221   # abV     (1e-8 V; no decade prefix reaches it)
+    ASSAY_TON          = 100222   # AT      (175/6 g)
+    BUSHEL_UK          = 100223   # bsh_uk  (8 imperial gallons)
+    CLO                = 100224   # clo     (0.155 K·m²/W)
+    DEBYE              = 100225   # debye   (1e-21/c C·m, exact since 2019)
 
     # ---- Currencies: block 90 -------------------------------------------
     #
@@ -650,7 +660,7 @@ class BaseUnit(IntEnum):
 UNIT_BLOCK_SIZE     = 10000
 
 UNIT_NATIVE_FIRST   = BaseUnit.BIT
-UNIT_NATIVE_LAST    = BaseUnit.PPQ
+UNIT_NATIVE_LAST    = BaseUnit.DEBYE
 
 CURRENCY_FIRST      = BaseUnit.AED
 CURRENCY_LAST       = BaseUnit.RUNE

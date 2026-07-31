@@ -303,7 +303,7 @@ only <code>ucum</code> does, so <code>udunits:mL{x}</code> is <code>error_unit_i
 (§3.4).</p>
 <p>Adding a vocabulary is therefore a data file and a registry row, not a second parser.</p>
 <h3 id="12-why-a-notation-rather-than-more-native-units">1.2 Why a notation rather than more native units</h3>
-<p>Bovnar's native registry is 217 physical units and 216 currencies, hand-maintained in
+<p>Bovnar's native registry is 226 physical units and 216 currencies, hand-maintained in
 <code>src/gendata/</code>. UCUM's atom table is larger — a complete clinical, apothecary, troy, avoirdupois
 and CGS inventory — and its expression language is unbounded, so the set of valid UCUM codes cannot
 be enumerated as a table of units at all.</p>
@@ -1111,16 +1111,16 @@ alone would leave whichever code happened to be shortest and make every other de
 <p>The asymmetry is worth stating plainly: these profiles are good <em>readers</em> and partial <em>writers</em>. A
 round trip that starts in a vocabulary returns to it; one that starts in Bovnar's native registry
 may have nowhere to go.</p>
-<p>Sweeping the whole native registry — all 217 physical units, each at the twelve prefixes
-<code>si_none da h k M G T d c m µ n</code> — <strong>673</strong> combinations survive a native → UCUM → native round trip
-unchanged, <strong>1554</strong> have no UCUM code, 377 are prefix/unit pairs <code>bvn_prefix_unit_valid</code> rejects
+<p>Sweeping the whole native registry — all 226 physical units, each at the twelve prefixes
+<code>si_none da h k M G T d c m µ n</code> — <strong>676</strong> combinations survive a native → UCUM → native round trip
+unchanged, <strong>1659</strong> have no UCUM code, 377 are prefix/unit pairs <code>bvn_prefix_unit_valid</code> rejects
 before the question arises, and <strong>none round-trips to a different unit</strong>. The last of those is the
 invariant; the two counts move whenever the registry gains a unit, so <code>test_sweep_round_trip</code> in
 <code>tests/bovnar_ucum_test.c</code> pins all three rather than leaving them as prose.</p>
 <hr />
 <h2 id="6-the-transliteration-table">6. The transliteration table</h2>
 <h3 id="61-verified-mappings">6.1 Verified mappings</h3>
-<p>The shipped table is <code>src/gendata/ucum.bvnr</code>: 188 mapped <strong>atoms</strong>, 41 arbitrary units, 83 known
+<p>The shipped table is <code>src/gendata/ucum.bvnr</code>: 192 mapped <strong>atoms</strong>, 41 arbitrary units, 79 known
 but refused, and UCUM's 20 prefix spellings. What follows is the whole mapped list, grouped as the
 data file groups it — and it is the whole of it, checked row by row against the reference
 implementation by <code>check_doc_profile_atoms.py</code>, which also fails if a mapped code is missing here. Note that these are <em>atoms</em>, which is how the table is organised and not how a
@@ -1645,6 +1645,16 @@ four spellings map with no loss. The tropical and gregorian variants do not (§6
 <td><code>0.002116666666666667</code></td>
 </tr>
 <tr>
+<td><code>[pnt_pr]</code></td>
+<td><code>pnt_pr</code></td>
+<td><code>0.0003514598</code></td>
+</tr>
+<tr>
+<td><code>[pca_pr]</code></td>
+<td><code>pca_pr</code></td>
+<td><code>0.0042175176</code></td>
+</tr>
+<tr>
 <td><code>[mesh_i]</code></td>
 <td><code>in⁻¹</code></td>
 <td><code>39.37007874015748</code></td>
@@ -1891,6 +1901,11 @@ about a document that never said it.</p>
 <td><code>[gil_br]</code></td>
 <td><code>gi_uk</code></td>
 <td><code>0.0001420653125</code></td>
+</tr>
+<tr>
+<td><code>[bu_br]</code></td>
+<td><code>bsh_uk</code></td>
+<td><code>0.03636872</code></td>
 </tr>
 <tr>
 <td><code>[cin_i]</code></td>
@@ -2854,7 +2869,7 @@ native target is worth, and compares. <code>unece</code> is reached at one remov
 <p>The generator also emits the <strong>reverse</strong> tables §5.3 uses, choosing the canonical code for each slot
 by the grammar's rule (shortest for an expression profile, first-declared for a flat one), honouring
 <code>.reverse = false</code>, and recording that code's own decade. Deriving them rather than searching the
-forward tables at run time is what makes <code>bvn_unit_to_profile</code> deterministic; the 673 round trips
+forward tables at run time is what makes <code>bvn_unit_to_profile</code> deterministic; the 676 round trips
 quoted in §5.3 are the check that forward and reverse agree.</p>
 <h3 id="93-tests">9.3 Tests</h3>
 <p>One test file per vocabulary, each pinning the section that specifies it, plus the suite that holds

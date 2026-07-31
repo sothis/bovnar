@@ -192,7 +192,7 @@ Adding a vocabulary is therefore a data file and a registry row, not a second pa
 
 ### 1.2 Why a notation rather than more native units
 
-Bovnar's native registry is 217 physical units and 216 currencies, hand-maintained in
+Bovnar's native registry is 226 physical units and 216 currencies, hand-maintained in
 `src/gendata/`. UCUM's atom table is larger — a complete clinical, apothecary, troy, avoirdupois
 and CGS inventory — and its expression language is unbounded, so the set of valid UCUM codes cannot
 be enumerated as a table of units at all.
@@ -912,9 +912,9 @@ The asymmetry is worth stating plainly: these profiles are good *readers* and pa
 round trip that starts in a vocabulary returns to it; one that starts in Bovnar's native registry
 may have nowhere to go.
 
-Sweeping the whole native registry — all 217 physical units, each at the twelve prefixes
-`si_none da h k M G T d c m µ n` — **673** combinations survive a native → UCUM → native round trip
-unchanged, **1554** have no UCUM code, 377 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
+Sweeping the whole native registry — all 226 physical units, each at the twelve prefixes
+`si_none da h k M G T d c m µ n` — **676** combinations survive a native → UCUM → native round trip
+unchanged, **1659** have no UCUM code, 377 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
 before the question arises, and **none round-trips to a different unit**. The last of those is the
 invariant; the two counts move whenever the registry gains a unit, so `test_sweep_round_trip` in
 `tests/bovnar_ucum_test.c` pins all three rather than leaving them as prose.
@@ -925,7 +925,7 @@ invariant; the two counts move whenever the registry gains a unit, so `test_swee
 
 ### 6.1 Verified mappings
 
-The shipped table is `src/gendata/ucum.bvnr`: 188 mapped **atoms**, 41 arbitrary units, 83 known
+The shipped table is `src/gendata/ucum.bvnr`: 192 mapped **atoms**, 41 arbitrary units, 79 known
 but refused, and UCUM's 20 prefix spellings. What follows is the whole mapped list, grouped as the
 data file groups it — and it is the whole of it, checked row by row against the reference
 implementation by `check_doc_profile_atoms.py`, which also fails if a mapped code is missing here. Note that these are *atoms*, which is how the table is organised and not how a
@@ -1060,6 +1060,8 @@ four spellings map with no loss. The tropical and gregorian variants do not (§6
 | `[pnt]` | `pnt` | `0.00035277777777777776` |
 | `[pca]` | `pca` | `0.004233333333333334` |
 | `[lne]` | `lne` | `0.002116666666666667` |
+| `[pnt_pr]` | `pnt_pr` | `0.0003514598` |
+| `[pca_pr]` | `pca_pr` | `0.0042175176` |
 | `[mesh_i]` | `in⁻¹` | `39.37007874015748` |
 | `[sin_i]` | `in²` | `0.00064516` |
 | `[sft_i]` | `ft²` | `0.09290304` |
@@ -1124,6 +1126,7 @@ about a document that never said it.
 | `[pt_br]` | `pt_uk` | `0.00056826125` |
 | `[foz_br]` | `fl_oz_uk` | `2.84130625e-05` |
 | `[gil_br]` | `gi_uk` | `0.0001420653125` |
+| `[bu_br]` | `bsh_uk` | `0.03636872` |
 | `[cin_i]` | `in³` | `1.6387064e-05` |
 | `[cft_i]` | `ft³` | `0.028316846592000004` |
 | `[cyd_i]` | `yd³` | `0.764554857984` |
@@ -1653,7 +1656,7 @@ native target is worth, and compares. `unece` is reached at one remove; see §9.
 The generator also emits the **reverse** tables §5.3 uses, choosing the canonical code for each slot
 by the grammar's rule (shortest for an expression profile, first-declared for a flat one), honouring
 `.reverse = false`, and recording that code's own decade. Deriving them rather than searching the
-forward tables at run time is what makes `bvn_unit_to_profile` deterministic; the 673 round trips
+forward tables at run time is what makes `bvn_unit_to_profile` deterministic; the 676 round trips
 quoted in §5.3 are the check that forward and reverse agree.
 
 ### 9.3 Tests

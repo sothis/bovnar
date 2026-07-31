@@ -169,7 +169,7 @@
 <p>The Bovnar quantity annotation system is an <strong>optional, per-value annotation</strong> that attaches a physical unit or currency denomination to any numeric field. It is part of the type annotation (<code>&lt;family:width,_base,unit&gt;</code>) and applies to the <code>uint</code>, <code>sint</code>, <code>float</code>, <code>float_fix</code>, and <code>float_dec</code> type families.</p>
 <p>Two distinct namespaces share the annotation slot:</p>
 <ul>
-<li><strong>Physical units</strong> — 217 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.</li>
+<li><strong>Physical units</strong> — 226 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.</li>
 <li><strong>Currency codes</strong> — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical — HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01 — and <code>ANG</code> coexists with its successor <code>XCG</code>, which inherited its numeric code 532; see §9.2) and 50 cryptocurrency tickers.</li>
 </ul>
 <p>Both namespaces are syntactically unified: the same grammar, the same <code>~</code> prefix separator, the same compound-unit operators (<code>·</code>, <code>*</code>, <code>/</code>), and the same <code>value_unit_t</code> data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.</p>
@@ -297,7 +297,7 @@ unaffected in every version. See
 </table>
 <hr />
 <h2 id="3-physical-base-units">3. Physical Base Units</h2>
-<p>Bovnar supports 217 physical base units. Currency codes are a separate namespace and are covered in §9.</p>
+<p>Bovnar supports 226 physical base units. Currency codes are a separate namespace and are covered in §9.</p>
 <blockquote>
 <p><strong>Reading this section:</strong> The <em>Symbol</em> column gives the canonical serialized form. <em>Long forms</em> are accepted on input but never produced on output. <em>Enum value</em> is the <code>value_base_unit_t</code> constant used in the C API.</p>
 </blockquote>
@@ -2709,7 +2709,7 @@ of engineering drawings are written in it.</p>
 these existed; a length answering to it would change what an existing spelling means, which
 §10 forbids and which <code>gen_units.py</code> now refuses at build time. UCUM's own bracketed spellings
 <code>[pnt]</code>, <code>[pca]</code> and <code>[lne]</code> name them unambiguously, so the symbols follow those. The
-<strong>printer's</strong> point (0.013837 in) is a different unit and is still refused.</p>
+<strong>printer's</strong> point (0.013837 in) is a different unit and has a row of its own, <code>pnt_pr</code>, at the end of §3.32.</p>
 </blockquote>
 <h4 id="us-dry-volumes-and-the-trade-measures-built-on-feet">US dry volumes, and the trade measures built on feet</h4>
 <p>A dry quart is <strong>16 per cent larger</strong> than the liquid quart <code>qt</code>. The peck (<code>pk</code>) and bushel (<code>bsh</code>)
@@ -2830,6 +2830,101 @@ compactly <code>mdarcy</code>). <code>thm_ec</code> is the therm European gas bi
 therm, 0.24 per cent away, and no SI prefix reaches 10⁵ — which is why it needed a unit of its
 own rather than a prefixed <code>Btu</code>. <code>shake</code> exists for the same reason at the other end: there is
 no SI prefix at 10⁻⁸.</p>
+</blockquote>
+<hr />
+<h4 id="nine-more-from-two-and-three-vocabularies-at-once">Nine more, from two and three vocabularies at once</h4>
+<p>Each was refused across UCUM, UDUNITS-2, QUDT and OM for one reason only — no native unit of the
+magnitude. One publisher naming a unit is a request; <strong>two or three naming it independently at the
+same value</strong> is evidence, and every factor below is one all of its publishers agree on to the last
+digit they state.</p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum value</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pnt_pr</code></td>
+<td><code>printers_point</code></td>
+<td>printer's point</td>
+<td><code>bu_printers_point</code></td>
+<td>0.0003514598 m (exact, = 0.013837 <code>in</code>)</td>
+</tr>
+<tr>
+<td><code>pca_pr</code></td>
+<td><code>printers_pica</code></td>
+<td>printer's pica</td>
+<td><code>bu_printers_pica</code></td>
+<td>0.0042175176 m (exact, = 12 <code>pnt_pr</code>)</td>
+</tr>
+<tr>
+<td><code>hp_E</code></td>
+<td><code>electric_horsepower</code></td>
+<td>electric horsepower</td>
+<td><code>bu_horsepower_electric</code></td>
+<td>746 W (exact)</td>
+</tr>
+<tr>
+<td><code>hp_B</code></td>
+<td><code>boiler_horsepower</code></td>
+<td>boiler horsepower</td>
+<td><code>bu_horsepower_boiler</code></td>
+<td>9809.5 W</td>
+</tr>
+<tr>
+<td><code>abV</code></td>
+<td><code>abvolt</code></td>
+<td>abvolt (CGS-EMU)</td>
+<td><code>bu_abvolt</code></td>
+<td>10⁻⁸ V (exact)</td>
+</tr>
+<tr>
+<td><code>AT</code></td>
+<td><code>assay_ton</code></td>
+<td>assay ton (short)</td>
+<td><code>bu_assay_ton</code></td>
+<td>175/6000 kg ≈ 0.029166667 kg</td>
+</tr>
+<tr>
+<td><code>bsh_uk</code></td>
+<td><code>bushel_uk</code></td>
+<td>imperial bushel</td>
+<td><code>bu_bushel_uk</code></td>
+<td>0.03636872 m³ (exact, = 8 <code>gal_uk</code>)</td>
+</tr>
+<tr>
+<td><code>clo</code></td>
+<td>—</td>
+<td>clo</td>
+<td><code>bu_clo</code></td>
+<td>0.155 K·m²/W (exact)</td>
+</tr>
+<tr>
+<td><code>debye</code></td>
+<td>—</td>
+<td>debye</td>
+<td><code>bu_debye</code></td>
+<td>1/299792458000000000000000000000 C·m ≈ 3.3356410×10⁻³⁰ C·m</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Each is a near neighbour of a unit already here, which is why it needed its own row rather than
+an alias.</strong> <code>pnt</code> is the DTP point (¹⁄₇₂ in) and <code>pnt_pr</code> the printer's point (0.013837 in), 0.37 %
+apart; <code>hp</code> is the mechanical horsepower, <code>PS</code> the metric one and <code>hp_E</code> the electric 746 W, while
+<code>hp_B</code> is thirteen times any of them; <code>bsh</code> is the US <strong>dry</strong> bushel and <code>bsh_uk</code> the imperial one,
+3.2 % larger. Mapping any of these onto its neighbour is the error doc/11 §6.3 warns about —
+dimensionally perfect, inside anything a later check would notice, and wrong.</p>
+<p><code>abV</code> needed a unit rather than a prefix because there is no decade prefix at 10⁻⁸ and prefixes do
+not stack. <code>AT</code> and <code>debye</code> are stated as exact rationals: the assay ton is 175/6 g, chosen so that
+milligrams recovered from one assay ton read as troy ounces per short ton, and the debye has been
+exactly 10⁻²¹/c C·m since the 2019 SI fixed c. Their publishers state 7- and 6-digit roundings of
+those; the rational is what they are rounding.</p>
 </blockquote>
 <hr />
 <h2 id="4-prefixes">4. Prefixes</h2>
@@ -3227,15 +3322,20 @@ no SI prefix at 10⁻⁸.</p>
 
 <span class="k">unit-component </span><span class="err">=</span> <span class="p">[</span> <span class="k">prefix </span><span class="p">[</span> <span class="s2">&quot;~&quot;</span> <span class="p">]</span> <span class="p">]</span> <span class="k">base-unit </span><span class="p">[</span> <span class="k">unit-exponent </span><span class="p">]</span>
 
-<span class="k">unit-exponent  </span><span class="err">=</span> <span class="p">[</span> <span class="k">exp-sign </span><span class="p">]</span> <span class="k">exp-digit</span>
-               <span class="p">|</span> <span class="s2">&quot;^&quot;</span> <span class="p">[</span> <span class="s2">&quot;-&quot;</span> <span class="p">|</span> <span class="s2">&quot;+&quot;</span> <span class="p">]</span> <span class="k">ASCII-digit</span>
+<span class="k">unit-exponent  </span><span class="err">=</span> <span class="p">[</span> <span class="k">exp-sign </span><span class="p">]</span> <span class="k">exp-digit </span><span class="p">{</span> <span class="k">exp-digit </span><span class="p">}</span>
+               <span class="p">|</span> <span class="s2">&quot;^&quot;</span> <span class="p">[</span> <span class="s2">&quot;-&quot;</span> <span class="p">|</span> <span class="s2">&quot;+&quot;</span> <span class="p">]</span> <span class="k">ASCII-digit </span><span class="p">{</span> <span class="k">ASCII-digit </span><span class="p">}</span>
 
 <span class="k">exp-sign       </span><span class="err">=</span> <span class="s2">&quot;⁺&quot;</span> <span class="p">|</span> <span class="s2">&quot;⁻&quot;</span>
 
-<span class="k">exp-digit      </span><span class="err">=</span> <span class="s2">&quot;¹&quot;</span> <span class="p">|</span> <span class="s2">&quot;²&quot;</span> <span class="p">|</span> <span class="s2">&quot;³&quot;</span> <span class="p">|</span> <span class="s2">&quot;⁴&quot;</span> <span class="p">|</span> <span class="s2">&quot;⁵&quot;</span>
+<span class="k">exp-digit      </span><span class="err">=</span> <span class="s2">&quot;⁰&quot;</span> <span class="p">|</span> <span class="s2">&quot;¹&quot;</span> <span class="p">|</span> <span class="s2">&quot;²&quot;</span> <span class="p">|</span> <span class="s2">&quot;³&quot;</span> <span class="p">|</span> <span class="s2">&quot;⁴&quot;</span> <span class="p">|</span> <span class="s2">&quot;⁵&quot;</span>
                <span class="p">|</span> <span class="s2">&quot;⁶&quot;</span> <span class="p">|</span> <span class="s2">&quot;⁷&quot;</span> <span class="p">|</span> <span class="s2">&quot;⁸&quot;</span> <span class="p">|</span> <span class="s2">&quot;⁹&quot;</span>
 </code></pre></div>
 
+<p>An exponent is <strong>one or more</strong> digits in either notation — <code>m¹⁰⁰</code> and <code>m^100</code>
+are units, and this production is what §6 states in prose. <code>⁰</code> is a digit here
+only in a <em>multi-digit</em> exponent: it exists so <code>m¹⁰⁰</code> can be written, and a
+leading <code>m⁰</code> is still no unit (§6). At most three digits are scanned, so
+<code>m^1000</code> fails as an unrecognised token rather than as an over-large exponent.</p>
 <p>Currency codes participate in compound expressions using the same separators:</p>
 <div class="codehilite"><pre><code class="language-bovnar">.gold_spot    = &lt;float_dec:64,$USD/oz_t&gt;   2351.40;  # $/troy oz
 .rent         = &lt;float_dec:64,$EUR/m²&gt;       12.50;  # €/m²
@@ -5211,7 +5311,7 @@ whole string fails to resolve.</p>
 </tr>
 </tbody>
 </table>
-<p><code>bu_none</code> is 0 and belongs to no block; every tag between the native units and the currencies is now taken, so a further vocabulary needs one outside 10–90. Blocks 40–80 currently contribute no ids at all: those vocabularies map every code onto a native unit, and the block tag reserves their room rather than filling it. Within block 10 the native units run contiguously from <code>bu_bit</code> = 100000 to <code>bu_ppq</code> = 100216, in the order of <code>units.bvnr</code>; <code>BVN_UNIT_NATIVE_FIRST</code>, <code>BVN_UNIT_NATIVE_LAST</code> and <code>BVN_UNIT_NATIVE_COUNT</code> are generated beside the enum, so read the bounds from those rather than from this sentence. Currencies run contiguously from 900000 and — unlike every other block — have <strong>no named <code>bu_*</code> enumerators</strong> (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a <code>$</code> sigil, resolved by <code>bvn_parse_currency_str</code> and carried as the numeric <code>base</code> value. <code>bvn_unit_is_currency(base)</code> is a bounds check over block 90.</p>
+<p><code>bu_none</code> is 0 and belongs to no block; every tag between the native units and the currencies is now taken, so a further vocabulary needs one outside 10–90. Blocks 40–80 currently contribute no ids at all: those vocabularies map every code onto a native unit, and the block tag reserves their room rather than filling it. Within block 10 the native units run contiguously from <code>bu_bit</code> = 100000 to <code>bu_debye</code> = 100225, in the order of <code>units.bvnr</code>; <code>BVN_UNIT_NATIVE_FIRST</code>, <code>BVN_UNIT_NATIVE_LAST</code> and <code>BVN_UNIT_NATIVE_COUNT</code> are generated beside the enum, so read the bounds from those rather than from this sentence. Currencies run contiguously from 900000 and — unlike every other block — have <strong>no named <code>bu_*</code> enumerators</strong> (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a <code>$</code> sigil, resolved by <code>bvn_parse_currency_str</code> and carried as the numeric <code>base</code> value. <code>bvn_unit_is_currency(base)</code> is a bounds check over block 90.</p>
 <p>Only a vocabulary that contributes units of its <em>own</em> takes a block. A unit profile is a spelling for the unit slot, so most of its codes translate to native units and carry native ids; the ones that get a block id of their own are the <strong>opaque</strong> units — codes with no native equivalent and no dimension, such as UCUM's assay-defined <code>[IU]</code> or UN/ECE's package types — which need an identity precisely because nothing else can stand in for them.</p>
 <blockquote>
 <p><strong>Why blocks.</strong> One flat counter makes every vocabulary's ids a function of every other vocabulary's size, and that was not hypothetical. This space previously had physical units at 1–133 <em>and again</em> at 348–396 because the currencies had been dropped in between; two currencies stranded at 378–379, outside their own range, because that range had been frozen; and the profiles' units pinned above all of it. Adding a currency shifted units. The 2.0 renumbering ended that, and made an id self-describing: 200017 is UCUM's, whatever else the build contains.</p>
@@ -5365,7 +5465,7 @@ whole string fails to resolve.</p>
 
 <span class="w">    </span><span class="cm">/* … the six units the profiles needed, the US survey lengths, the</span>
 <span class="cm">     * typographic lengths, the US dry volumes and the trade measures, and</span>
-<span class="cm">     * the rest of block 10 up to bu_ppq = 100216. The whole run is</span>
+<span class="cm">     * the rest of block 10 up to bu_debye = 100225. The whole run is</span>
 <span class="cm">     * generated into include/bovnar_units.gen.h from</span>
 <span class="cm">     * src/gendata/units.bvnr, in that file&#39;s order — read it there rather</span>
 <span class="cm">     * than from this abridged listing. */</span>

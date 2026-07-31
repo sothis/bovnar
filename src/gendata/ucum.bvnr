@@ -102,6 +102,11 @@
 
 # ── Atoms that translate ────────────────────────────────────────────────────
 .mapped = [
+  # Unblocked by the units added to units.bvnr: each was refused for want
+  # of a native target and for no other reason.
+  { .code = "[pnt_pr]";                 .bovnar = "pnt_pr"; .metric = false; },
+  { .code = "[pca_pr]";                 .bovnar = "pca_pr"; .metric = false; },
+  { .code = "[bu_br]";                  .bovnar = "bsh_uk"; .metric = false; },
   # SI base units
   { .code = "m";    .bovnar = "m";   .metric = true; },
   { .code = "s";    .bovnar = "s";   .metric = true; },
@@ -655,7 +660,6 @@
   { .code = "[pc_br]";  .why = "British pace (2.5 British feet) — no native form"; },
   { .code = "[acr_br]"; .why = "British acre — native ac is the international acre"; },
   { .code = "[pk_br]";  .why = "British peck — native pk is the US dry peck"; },
-  { .code = "[bu_br]";  .why = "British bushel — native bsh is the US dry bushel"; },
   { .code = "[fdr_br]"; .why = "British fluid dram — native fl_dr is the US one"; },
   { .code = "[min_br]"; .why = "British minim — native minim is the US one"; },
 
@@ -686,8 +690,6 @@
   # Typographic and pre-metric French lengths. Both families are built on
   # twelfths and sixths of each other, so none of them is a decade off a native
   # length, and bovnar has no point, pica, ligne or pouce to land on.
-  { .code = "[pnt_pr]";  .why = "printer's point (0.013837 in) — no native typographic length"; },
-  { .code = "[pca_pr]";  .why = "printer's pica — no native typographic length"; },
   { .code = "[pied]";    .why = "pied (32.48 cm) — no native form"; },
   { .code = "[pouce]";   .why = "pouce (1/12 pied) — no native form"; },
   { .code = "[ligne]";   .why = "ligne (1/12 pouce) — no native form"; },

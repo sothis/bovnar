@@ -42,7 +42,7 @@
 <blockquote>
 <p><strong>Spec version:</strong> 1.1
 <strong>Status:</strong> Reference — the symbol tables of the unit and currency registry
-<strong>Scope:</strong> 217 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.</p>
+<strong>Scope:</strong> 226 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.</p>
 </blockquote>
 <hr />
 <h2 id="table-of-contents">Table of Contents</h2>
@@ -2483,7 +2483,7 @@ length squared — which is about ten square metres on a section of land.</p>
 <blockquote>
 <p>The symbols are not <code>pt</code> and <code>ln</code>: <code>pt</code> is the <strong>pint</strong>. A length answering to <code>pt</code> would be the
 same collision as <code>kt</code> for the knot, which §6 refuses outright. The <strong>printer's</strong> point
-(0.013837 in) is a different unit and is not carried.</p>
+(0.013837 in) is a different unit and is carried separately, as <code>pnt_pr</code> below.</p>
 </blockquote>
 <h4 id="us-dry-volumes-and-the-trade-measures">US dry volumes and the trade measures</h4>
 <p>A dry quart is 16 % larger than the liquid <code>qt</code>. The peck and bushel here have always been the dry
@@ -2606,6 +2606,92 @@ agency mean by an acre-foot. The international one is <code>ac·ft</code> = 1233
 <blockquote>
 <p><code>darcy</code> takes prefixes, so the millidarcy every reservoir report is written in is <code>m~darcy</code>.
 <code>thm_ec</code> is the European gas-billing therm; native <code>thm</code> is the US therm, 0.24 % away.</p>
+</blockquote>
+<h4 id="nine-more-the-unit-profiles-needed">Nine more the unit profiles needed</h4>
+<p>Each was refused across UCUM, UDUNITS-2, QUDT and OM for want of a native unit of the magnitude, and
+every factor below is one <strong>two or three publishers state independently</strong>, agreeing to the last digit.</p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Long forms</th>
+<th>Name</th>
+<th>Enum</th>
+<th>Factor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pnt_pr</code></td>
+<td><code>printers_point</code></td>
+<td>printer's point</td>
+<td><code>bu_printers_point</code></td>
+<td>0.0003514598 m (exact, = 0.013837 <code>in</code>)</td>
+</tr>
+<tr>
+<td><code>pca_pr</code></td>
+<td><code>printers_pica</code></td>
+<td>printer's pica</td>
+<td><code>bu_printers_pica</code></td>
+<td>0.0042175176 m (exact, = 12 <code>pnt_pr</code>)</td>
+</tr>
+<tr>
+<td><code>hp_E</code></td>
+<td><code>electric_horsepower</code></td>
+<td>electric horsepower</td>
+<td><code>bu_horsepower_electric</code></td>
+<td>746 W (exact)</td>
+</tr>
+<tr>
+<td><code>hp_B</code></td>
+<td><code>boiler_horsepower</code></td>
+<td>boiler horsepower</td>
+<td><code>bu_horsepower_boiler</code></td>
+<td>9809.5 W</td>
+</tr>
+<tr>
+<td><code>abV</code></td>
+<td><code>abvolt</code></td>
+<td>abvolt (CGS-EMU)</td>
+<td><code>bu_abvolt</code></td>
+<td>10⁻⁸ V (exact)</td>
+</tr>
+<tr>
+<td><code>AT</code></td>
+<td><code>assay_ton</code></td>
+<td>assay ton (short)</td>
+<td><code>bu_assay_ton</code></td>
+<td>175/6000 kg ≈ 0.029166667 kg</td>
+</tr>
+<tr>
+<td><code>bsh_uk</code></td>
+<td><code>bushel_uk</code></td>
+<td>imperial bushel</td>
+<td><code>bu_bushel_uk</code></td>
+<td>0.03636872 m³ (exact, = 8 <code>gal_uk</code>)</td>
+</tr>
+<tr>
+<td><code>clo</code></td>
+<td>—</td>
+<td>clo</td>
+<td><code>bu_clo</code></td>
+<td>0.155 K·m²/W (exact)</td>
+</tr>
+<tr>
+<td><code>debye</code></td>
+<td>—</td>
+<td>debye</td>
+<td><code>bu_debye</code></td>
+<td>1/299792458000000000000000000000 C·m ≈ 3.3356410×10⁻³⁰ C·m</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Each is a <strong>near neighbour</strong> of a unit already here, which is why it needed a row rather than an
+alias: <code>pnt_pr</code> is 0.37 % off <code>pnt</code>, <code>hp_E</code> 0.04 % off <code>hp</code>, <code>bsh_uk</code> 3.2 % off <code>bsh</code>, and <code>hp_B</code>
+thirteen times any horsepower. <code>abV</code> needed a unit because no decade prefix reaches 10⁻⁸ and
+prefixes do not stack. <code>AT</code> and <code>debye</code> are exact rationals — 175/6 g, and 10⁻²¹/c C·m, exact
+since the 2019 SI fixed c — of which their publishers state 7- and 6-digit roundings.</p>
 </blockquote>
 <hr />
 <h2 id="5-currencies">5. Currencies</h2>
@@ -4038,7 +4124,7 @@ abbreviations that are deliberately not units — is in <a href="https://www.bov
 <li><a href="https://www.bovnar.io/docs/profiles/">Unit Profiles</a> — writing these same units as UCUM, UNECE, QUDT or UDUNITS codes, and the profile-only units that exist in no native spelling</li>
 </ul>
 <hr />
-<p><em>The id space is blocked: the leading two digits of an id name its vocabulary. Native units 100000–100216 (217) · UCUM opaque units 200000–200040 (41) · UN/ECE opaque units 300000–300024 (25) · currencies 900000–900215 (166 fiat, 50 crypto). Blocks 40, 50, 60, 70 and 80 are reserved for QUDT, QUDT quantity kinds, UDUNITS, OM 2 and the CF standard names, which contribute no opaque units today.</em>
+<p><em>The id space is blocked: the leading two digits of an id name its vocabulary. Native units 100000–100225 (226) · UCUM opaque units 200000–200040 (41) · UN/ECE opaque units 300000–300024 (25) · currencies 900000–900215 (166 fiat, 50 crypto). Blocks 40, 50, 60, 70 and 80 are reserved for QUDT, QUDT quantity kinds, UDUNITS, OM 2 and the CF standard names, which contribute no opaque units today.</em>
 <em>The space is SPARSE — do not index an array by an id. <code>BVN_UNIT_SLOT_COUNT</code> = 247 is the row count of the library's dense tables, indexed by <code>bvni_unit_slot()</code>, and is not a bound on the enum.</em></p>
 <hr />
 <p><em>End of Bovnar — Units &amp; Currencies Cheat Sheet (Bovnar spec 1.1).</em></p>

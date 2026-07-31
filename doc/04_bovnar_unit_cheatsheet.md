@@ -2,7 +2,7 @@
 
 > **Spec version:** 1.1
 > **Status:** Reference — the symbol tables of the unit and currency registry
-> **Scope:** 217 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.
+> **Scope:** 226 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.
 
 ---
 
@@ -625,7 +625,7 @@ ignore and never small enough to be right.
 
 > The symbols are not `pt` and `ln`: `pt` is the **pint**. A length answering to `pt` would be the
 > same collision as `kt` for the knot, which §6 refuses outright. The **printer's** point
-> (0.013837 in) is a different unit and is not carried.
+> (0.013837 in) is a different unit and is carried separately, as `pnt_pr` below.
 
 #### US dry volumes and the trade measures
 
@@ -657,6 +657,29 @@ ones; the gallon, quart and pint were only the liquid ones.
 
 > `darcy` takes prefixes, so the millidarcy every reservoir report is written in is `m~darcy`.
 > `thm_ec` is the European gas-billing therm; native `thm` is the US therm, 0.24 % away.
+
+#### Nine more the unit profiles needed
+
+Each was refused across UCUM, UDUNITS-2, QUDT and OM for want of a native unit of the magnitude, and
+every factor below is one **two or three publishers state independently**, agreeing to the last digit.
+
+| Symbol | Long forms | Name | Enum | Factor |
+|--------|-----------|------|------|--------|
+| `pnt_pr` | `printers_point` | printer's point | `bu_printers_point` | 0.0003514598 m (exact, = 0.013837 `in`) |
+| `pca_pr` | `printers_pica` | printer's pica | `bu_printers_pica` | 0.0042175176 m (exact, = 12 `pnt_pr`) |
+| `hp_E` | `electric_horsepower` | electric horsepower | `bu_horsepower_electric` | 746 W (exact) |
+| `hp_B` | `boiler_horsepower` | boiler horsepower | `bu_horsepower_boiler` | 9809.5 W |
+| `abV` | `abvolt` | abvolt (CGS-EMU) | `bu_abvolt` | 10⁻⁸ V (exact) |
+| `AT` | `assay_ton` | assay ton (short) | `bu_assay_ton` | 175/6000 kg ≈ 0.029166667 kg |
+| `bsh_uk` | `bushel_uk` | imperial bushel | `bu_bushel_uk` | 0.03636872 m³ (exact, = 8 `gal_uk`) |
+| `clo` | — | clo | `bu_clo` | 0.155 K·m²/W (exact) |
+| `debye` | — | debye | `bu_debye` | 1/299792458000000000000000000000 C·m ≈ 3.3356410×10⁻³⁰ C·m |
+
+> Each is a **near neighbour** of a unit already here, which is why it needed a row rather than an
+> alias: `pnt_pr` is 0.37 % off `pnt`, `hp_E` 0.04 % off `hp`, `bsh_uk` 3.2 % off `bsh`, and `hp_B`
+> thirteen times any horsepower. `abV` needed a unit because no decade prefix reaches 10⁻⁸ and
+> prefixes do not stack. `AT` and `debye` are exact rationals — 175/6 g, and 10⁻²¹/c C·m, exact
+> since the 2019 SI fixed c — of which their publishers state 7- and 6-digit roundings.
 
 ---
 
@@ -952,7 +975,7 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 
 ---
 
-*The id space is blocked: the leading two digits of an id name its vocabulary. Native units 100000–100216 (217) · UCUM opaque units 200000–200040 (41) · UN/ECE opaque units 300000–300024 (25) · currencies 900000–900215 (166 fiat, 50 crypto). Blocks 40, 50, 60, 70 and 80 are reserved for QUDT, QUDT quantity kinds, UDUNITS, OM 2 and the CF standard names, which contribute no opaque units today.*
+*The id space is blocked: the leading two digits of an id name its vocabulary. Native units 100000–100225 (226) · UCUM opaque units 200000–200040 (41) · UN/ECE opaque units 300000–300024 (25) · currencies 900000–900215 (166 fiat, 50 crypto). Blocks 40, 50, 60, 70 and 80 are reserved for QUDT, QUDT quantity kinds, UDUNITS, OM 2 and the CF standard names, which contribute no opaque units today.*
 *The space is SPARSE — do not index an array by an id. `BVN_UNIT_SLOT_COUNT` = 247 is the row count of the library's dense tables, indexed by `bvni_unit_slot()`, and is not a bound on the enum.*
 
 ---

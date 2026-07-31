@@ -307,7 +307,7 @@ too**, so the result does not look like a relabelling:
 | `1 rpm` | `Bq` | 1/60 | a rotation rate read as an activity |
 
 The families, in full, are: `Hz` `Bq` `Bd` `Ci` `rpm` (s⁻¹); `Gy` `Sv` `rem`
-(m²·s⁻²); `W` `var` `VA` `PS` `hp` `ton_ref` (kg·m²·s⁻³); and the ten energy
+(m²·s⁻²); `W` `var` `VA` `PS` `hp` `hp_E` `hp_B` `ton_ref` (kg·m²·s⁻³); and the ten energy
 units `eV` `erg` `J` `ft_lb` `cal` `cal_IT` `Btu_th` `Btu` `thm` `thm_ec`
 (kg·m²·s⁻²), which `N·m` joins as a compound.
 

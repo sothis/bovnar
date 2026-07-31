@@ -98,6 +98,16 @@
 ];
 
 .mapped = [
+  # Unblocked by the units added to units.bvnr: each was refused for want
+  # of a native target and for no other reason.
+  { .code = "printers_point";           .bovnar = "pnt_pr"; .metric = false; },
+  { .code = "printers_pica";            .bovnar = "pca_pr"; .metric = false; },
+  { .code = "pica";                     .bovnar = "pca_pr"; .metric = false; },
+  { .code = "electric_horsepower";      .bovnar = "hp_E"; .metric = false; },
+  { .code = "boiler_horsepower";        .bovnar = "hp_B"; .metric = false; },
+  { .code = "abvolt";                   .bovnar = "abV"; .metric = false; },
+  { .code = "assay_ton";                .bovnar = "AT"; .metric = false; },
+  { .code = "clo";                      .bovnar = "clo"; .metric = false; },
   # ── SI base ──────────────────────────────────────────────────────────────
   { .code = "m";        .bovnar = "m";   .metric = true;  },
   { .code = "meter";    .bovnar = "m";   .metric = true;  },
@@ -854,11 +864,7 @@
   { .code = "degrees_W";               .why = "a coordinate direction, not a unit"; },
   { .code = "degreeW";                 .why = "a coordinate direction, not a unit"; },
   { .code = "degreesW";                .why = "a coordinate direction, not a unit"; },
-  { .code = "assay_ton";               .why = "assay ton (29.16667 g) — not a decade off any native mass"; },
   { .code = "bag";                     .why = "bag (94 lb) — 94 is not a decade"; },
-  { .code = "printers_point";          .why = "printer's point — no native typographic length"; },
-  { .code = "printers_pica";           .why = "printer's pica — no native typographic length"; },
-  { .code = "pica";                    .why = "printer's pica — no native typographic length"; },
   { .code = "barleycorn";              .why = "barleycorn (1/3 inch) — thirds are not decades"; },
   { .code = "arpentlin";               .why = "arpentlin (191.835 ft) — no native form"; },
   { .code = "rps";                     .why = "rotations per second — a rotation is 2*pi radian and 2*pi is not a decade"; },
@@ -893,14 +899,10 @@
   { .code = "inch_Hg_60F";             .why = "60 degF inch of mercury — native inHg is the conventional 0 degC one"; },
   { .code = "inches_Hg_60F";           .why = "60 degF inch of mercury — native inHg is the conventional 0 degC one"; },
   { .code = "B_SPL";                   .why = "bel SPL — dB carries no reference level"; },
-  { .code = "boiler_horsepower";       .why = "boiler horsepower — no native form"; },
-  { .code = "electric_horsepower";     .why = "electric horsepower (746 W) — native hp is the mechanical one"; },
   { .code = "water_horsepower";        .why = "water horsepower — no native form"; },
   { .code = "BW";                      .why = "bel watt — dB carries no reference level"; },
   { .code = "Bm";                      .why = "bel milliwatt — dB carries no reference level"; },
-  { .code = "clo";                     .why = "clo (0.155 K.m^2/W) — not a decade off any native thermal resistance"; },
   { .code = "statampere";              .why = "CGS electrostatic ampere — built on the speed of light, not a decade off any native unit"; },
-  { .code = "abvolt";                  .why = "abvolt (1e-8 V) — there is no decade prefix at 1e-8"; },
   { .code = "e";                       .why = "the elementary charge — a constant, not a native unit"; },
   { .code = "chemical_faraday";        .why = "chemical faraday — no native form"; },
   { .code = "physical_faraday";        .why = "physical faraday — no native form"; },

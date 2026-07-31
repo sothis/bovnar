@@ -109,7 +109,7 @@ The Bovnar quantity annotation system is an **optional, per-value annotation** t
 
 Two distinct namespaces share the annotation slot:
 
-- **Physical units** — 217 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
+- **Physical units** — 226 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
 - **Currency codes** — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical — HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01 — and `ANG` coexists with its successor `XCG`, which inherited its numeric code 532; see §9.2) and 50 cryptocurrency tickers.
 
 Both namespaces are syntactically unified: the same grammar, the same `~` prefix separator, the same compound-unit operators (`·`, `*`, `/`), and the same `value_unit_t` data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.
@@ -211,7 +211,7 @@ When both are present, equality is checked after parsing via `bvn_unit_equal`, a
 
 ## 3. Physical Base Units
 
-Bovnar supports 217 physical base units. Currency codes are a separate namespace and are covered in §9.
+Bovnar supports 226 physical base units. Currency codes are a separate namespace and are covered in §9.
 
 > **Reading this section:** The *Symbol* column gives the canonical serialized form. *Long forms* are accepted on input but never produced on output. *Enum value* is the `value_base_unit_t` constant used in the C API.
 
@@ -933,7 +933,7 @@ survey foot's 1200/3937 m.
 > these existed; a length answering to it would change what an existing spelling means, which
 > §10 forbids and which `gen_units.py` now refuses at build time. UCUM's own bracketed spellings
 > `[pnt]`, `[pca]` and `[lne]` name them unambiguously, so the symbols follow those. The
-> **printer's** point (0.013837 in) is a different unit and is still refused.
+> **printer's** point (0.013837 in) is a different unit and has a row of its own, `pnt_pr`, at the end of §3.32.
 
 #### US dry volumes, and the trade measures built on feet
 
@@ -969,6 +969,40 @@ document that meant dry had no way to say so.
 > therm, 0.24 per cent away, and no SI prefix reaches 10⁵ — which is why it needed a unit of its
 > own rather than a prefixed `Btu`. `shake` exists for the same reason at the other end: there is
 > no SI prefix at 10⁻⁸.
+
+---
+
+#### Nine more, from two and three vocabularies at once
+
+Each was refused across UCUM, UDUNITS-2, QUDT and OM for one reason only — no native unit of the
+magnitude. One publisher naming a unit is a request; **two or three naming it independently at the
+same value** is evidence, and every factor below is one all of its publishers agree on to the last
+digit they state.
+
+| Symbol | Long forms | Name | Enum value | Factor |
+|--------|-----------|------|------------|--------|
+| `pnt_pr` | `printers_point` | printer's point | `bu_printers_point` | 0.0003514598 m (exact, = 0.013837 `in`) |
+| `pca_pr` | `printers_pica` | printer's pica | `bu_printers_pica` | 0.0042175176 m (exact, = 12 `pnt_pr`) |
+| `hp_E` | `electric_horsepower` | electric horsepower | `bu_horsepower_electric` | 746 W (exact) |
+| `hp_B` | `boiler_horsepower` | boiler horsepower | `bu_horsepower_boiler` | 9809.5 W |
+| `abV` | `abvolt` | abvolt (CGS-EMU) | `bu_abvolt` | 10⁻⁸ V (exact) |
+| `AT` | `assay_ton` | assay ton (short) | `bu_assay_ton` | 175/6000 kg ≈ 0.029166667 kg |
+| `bsh_uk` | `bushel_uk` | imperial bushel | `bu_bushel_uk` | 0.03636872 m³ (exact, = 8 `gal_uk`) |
+| `clo` | — | clo | `bu_clo` | 0.155 K·m²/W (exact) |
+| `debye` | — | debye | `bu_debye` | 1/299792458000000000000000000000 C·m ≈ 3.3356410×10⁻³⁰ C·m |
+
+> **Each is a near neighbour of a unit already here, which is why it needed its own row rather than
+> an alias.** `pnt` is the DTP point (¹⁄₇₂ in) and `pnt_pr` the printer's point (0.013837 in), 0.37 %
+> apart; `hp` is the mechanical horsepower, `PS` the metric one and `hp_E` the electric 746 W, while
+> `hp_B` is thirteen times any of them; `bsh` is the US **dry** bushel and `bsh_uk` the imperial one,
+> 3.2 % larger. Mapping any of these onto its neighbour is the error doc/11 §6.3 warns about —
+> dimensionally perfect, inside anything a later check would notice, and wrong.
+>
+> `abV` needed a unit rather than a prefix because there is no decade prefix at 10⁻⁸ and prefixes do
+> not stack. `AT` and `debye` are stated as exact rationals: the assay ton is 175/6 g, chosen so that
+> milligrams recovered from one assay ton read as troy ounces per short ton, and the debye has been
+> exactly 10⁻²¹/c C·m since the 2019 SI fixed c. Their publishers state 7- and 6-digit roundings of
+> those; the rational is what they are rounding.
 
 ---
 
@@ -1143,14 +1177,20 @@ unit-sep       = "*" | "/" | "·"           (* · = U+00B7 MIDDLE DOT *)
 
 unit-component = [ prefix [ "~" ] ] base-unit [ unit-exponent ]
 
-unit-exponent  = [ exp-sign ] exp-digit
-               | "^" [ "-" | "+" ] ASCII-digit
+unit-exponent  = [ exp-sign ] exp-digit { exp-digit }
+               | "^" [ "-" | "+" ] ASCII-digit { ASCII-digit }
 
 exp-sign       = "⁺" | "⁻"
 
-exp-digit      = "¹" | "²" | "³" | "⁴" | "⁵"
+exp-digit      = "⁰" | "¹" | "²" | "³" | "⁴" | "⁵"
                | "⁶" | "⁷" | "⁸" | "⁹"
 ```
+
+An exponent is **one or more** digits in either notation — `m¹⁰⁰` and `m^100`
+are units, and this production is what §6 states in prose. `⁰` is a digit here
+only in a *multi-digit* exponent: it exists so `m¹⁰⁰` can be written, and a
+leading `m⁰` is still no unit (§6). At most three digits are scanned, so
+`m^1000` fails as an unrecognised token rather than as an over-large exponent.
 
 Currency codes participate in compound expressions using the same separators:
 
@@ -1761,7 +1801,7 @@ A base unit's id is **blocked**, not a running counter: the leading two decimal 
 | 80 | 800000–809999 | CF standard names | `src/gendata/cf.bvnr` |
 | 90 | 900000–909999 | currencies | `src/gendata/currencies.bvnr` |
 
-`bu_none` is 0 and belongs to no block; every tag between the native units and the currencies is now taken, so a further vocabulary needs one outside 10–90. Blocks 40–80 currently contribute no ids at all: those vocabularies map every code onto a native unit, and the block tag reserves their room rather than filling it. Within block 10 the native units run contiguously from `bu_bit` = 100000 to `bu_ppq` = 100216, in the order of `units.bvnr`; `BVN_UNIT_NATIVE_FIRST`, `BVN_UNIT_NATIVE_LAST` and `BVN_UNIT_NATIVE_COUNT` are generated beside the enum, so read the bounds from those rather than from this sentence. Currencies run contiguously from 900000 and — unlike every other block — have **no named `bu_*` enumerators** (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a `$` sigil, resolved by `bvn_parse_currency_str` and carried as the numeric `base` value. `bvn_unit_is_currency(base)` is a bounds check over block 90.
+`bu_none` is 0 and belongs to no block; every tag between the native units and the currencies is now taken, so a further vocabulary needs one outside 10–90. Blocks 40–80 currently contribute no ids at all: those vocabularies map every code onto a native unit, and the block tag reserves their room rather than filling it. Within block 10 the native units run contiguously from `bu_bit` = 100000 to `bu_debye` = 100225, in the order of `units.bvnr`; `BVN_UNIT_NATIVE_FIRST`, `BVN_UNIT_NATIVE_LAST` and `BVN_UNIT_NATIVE_COUNT` are generated beside the enum, so read the bounds from those rather than from this sentence. Currencies run contiguously from 900000 and — unlike every other block — have **no named `bu_*` enumerators** (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a `$` sigil, resolved by `bvn_parse_currency_str` and carried as the numeric `base` value. `bvn_unit_is_currency(base)` is a bounds check over block 90.
 
 Only a vocabulary that contributes units of its *own* takes a block. A unit profile is a spelling for the unit slot, so most of its codes translate to native units and carry native ids; the ones that get a block id of their own are the **opaque** units — codes with no native equivalent and no dimension, such as UCUM's assay-defined `[IU]` or UN/ECE's package types — which need an identity precisely because nothing else can stand in for them.
 
@@ -1918,7 +1958,7 @@ typedef enum value_base_unit_e {
 
     /* … the six units the profiles needed, the US survey lengths, the
      * typographic lengths, the US dry volumes and the trade measures, and
-     * the rest of block 10 up to bu_ppq = 100216. The whole run is
+     * the rest of block 10 up to bu_debye = 100225. The whole run is
      * generated into include/bovnar_units.gen.h from
      * src/gendata/units.bvnr, in that file's order — read it there rather
      * than from this abridged listing. */

@@ -1,5 +1,5 @@
 #!bovnar 1.1
-# units.bvnr — single source of truth for all 217 physical base units.
+# units.bvnr — single source of truth for all 226 physical base units.
 #
 # HOW THIS WORKS
 #   Hand-edited. gen_units.py (at the repo root) regenerates the C unit tables
@@ -2896,6 +2896,144 @@
     .offset  = 0.0;
     .prefix  = ratio;
     .aliases = ["parts_per_quadrillion", "ppqv", "ppq"];
+  },
+
+  # ── Nine units two or three vocabularies define and this table did not ───
+  # Each was refused across UCUM, UDUNITS-2, QUDT and OM for one reason only:
+  # no native unit of the magnitude. One publisher naming a unit is a request;
+  # three naming it independently AT THE SAME VALUE is evidence, and every value
+  # below is one all of its publishers agree on to the last digit they state.
+  {
+    # The PRINTER'S point, 0.013837 in — not the DTP point `pnt` (1/72 in) two
+    # sections up. doc/05 used to say this one "is still refused", which was a
+    # statement about it being a different unit; that is an argument for giving
+    # it a symbol of its own, not for having none, and it is the same argument
+    # the US survey lengths already won. UCUM spells the pair [pnt]/[pnt_pr].
+    .id      = <uint:32> 100217;
+    .name    = "printers_point";
+    .symbol  = "pnt_pr";
+    .factor  = 0.0003514598;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["printers_point", "pnt_pr"];
+  },
+  {
+    # Twelve printer's points, exactly — as `pca` is twelve `pnt`.
+    .id      = <uint:32> 100218;
+    .name    = "printers_pica";
+    .symbol  = "pca_pr";
+    .factor  = 0.0042175176;
+    .dims    = { .length = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["printers_pica", "pca_pr"];
+  },
+  {
+    # The ELECTRIC horsepower: 746 W exactly, by convention, and the one motor
+    # nameplates are rated in. Native hp is the mechanical 745.6998715822702 W
+    # and PS the metric 735.49875 W, so this is the third of three and the only
+    # one that was missing.
+    .id      = <uint:32> 100219;
+    .name    = "horsepower_electric";
+    .symbol  = "hp_E";
+    .factor  = 746.0;
+    .dims    = { .length = 2; .mass = 1; .time = -3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["electric_horsepower", "hp_E"];
+  },
+  {
+    # The BOILER horsepower, 9809.5 W by convention — the rating a steam boiler
+    # carries, and 13 times the mechanical one, so misreading the two is not a
+    # rounding.
+    .id      = <uint:32> 100220;
+    .name    = "horsepower_boiler";
+    .symbol  = "hp_B";
+    .factor  = 9809.5;
+    .dims    = { .length = 2; .mass = 1; .time = -3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["boiler_horsepower", "hp_B"];
+  },
+  {
+    # The CGS-EMU volt, 1e-8 V exactly. It needed a unit rather than a prefix
+    # because there is no decade prefix at 1e-8: `c~µ~V` is not a spelling this
+    # format has, prefixes not stacking.
+    .id      = <uint:32> 100221;
+    .name    = "abvolt";
+    .symbol  = "abV";
+    .factor  = 1e-08;
+    .dims    = { .length = 2; .mass = 1; .time = -3; .current = -1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["abvolt", "abV"];
+  },
+  {
+    # The (short) ASSAY TON: 175/6 g, chosen so that milligrams of precious
+    # metal recovered from one assay ton read directly as troy ounces per short
+    # ton. All three publishers state it as the 7-digit rounding 0.02916667 kg;
+    # the truth does not terminate, so it is written as the rational.
+    .id      = <uint:32> 100222;
+    .name    = "assay_ton";
+    .symbol  = "AT";
+    .factor  = 0.029166666666666667;
+    .dims    = { .mass = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 175;
+    .factor_den = <sint:64> 6000;
+    .prefix  = default;
+    .aliases = ["assay_ton", "AT"];
+  },
+  {
+    # Eight imperial gallons. The UK volume series was here from the pint up
+    # (pt_uk, qt_uk, gal_uk, gi_uk, fl_oz_uk) and stopped below the bushel;
+    # native bsh is the US DRY bushel, 3.2 % smaller.
+    .id      = <uint:32> 100223;
+    .name    = "bushel_uk";
+    .symbol  = "bsh_uk";
+    .factor  = 0.03636872;
+    .dims    = { .length = 3; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["bushel_uk", "bsh_uk"];
+  },
+  {
+    # The clo, 0.155 K·m²/W exactly: the thermal resistance of a business suit,
+    # and the unit clothing and HVAC standards state insulation in.
+    .id      = <uint:32> 100224;
+    .name    = "clo";
+    .symbol  = "clo";
+    .factor  = 0.155;
+    .dims    = { .mass = -1; .time = 3; .temperature = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["clo"];
+  },
+  {
+    # The debye, the electric dipole moment chemistry is written in: 1e-21/c
+    # C·m, which has been EXACT since the 2019 SI fixed c. Both publishers
+    # state the 6-digit rounding 3.33564e-30; the rational below is the
+    # definition they are rounding.
+    .id      = <uint:32> 100225;
+    .name    = "debye";
+    .symbol  = "debye";
+    .factor  = 3.335640951981521e-30;
+    .dims    = { .length = 1; .time = 1; .current = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .factor_num = <sint:64> 1;
+    .factor_den = "299792458000000000000000000000";
+    .prefix  = default;
+    .aliases = ["debye"];
   }
 ];
 

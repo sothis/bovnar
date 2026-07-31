@@ -1966,6 +1966,7 @@ From the application's perspective, inline units and annotation units are transp
 
 The only behavioral difference occurs when **both** are present and **disagree**: the validator raises `error_unit_mismatch` (38) and parsing fails:
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .bad = <float:64,m> 1.0 s;    /* annotation says m, inline says s → error */
 ```

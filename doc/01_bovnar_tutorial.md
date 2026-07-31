@@ -121,6 +121,7 @@ A key is the bare word after the leading dot. Identifiers follow these rules:
 
 This would fail:
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .123invalid = 1;       # error: starts with a digit
 .bad,key    = 1;       # error: comma is forbidden in identifiers
@@ -179,6 +180,7 @@ The annotation is enclosed in angle brackets and placed **between `=` and the va
 
 Placing the annotation anywhere else is a hard error:
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .port<uint:16> = 443;      # WRONG: annotation must come after '='
 ```
@@ -239,6 +241,7 @@ The base parameter starts with `_` followed by a decimal number. For `uint` and 
 
 This is the biggest surprise for newcomers: **non-decimal values must be provided as quoted strings**. A bare `ff` in value position is lexed as a *symbol*, not a number, and will produce a type mismatch error. Always quote non-decimal digits:
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .hex = <uint:8,_16>  "FF";       # correct — 255
 .hex = <uint:8,_16>  FF;         # WRONG — FF is a symbol
@@ -361,12 +364,14 @@ For untyped or partially-typed values, you can append a unit suffix directly aft
 
 This is forbidden:
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .bad = 9.81m;             # ERROR: no separator at all
 ```
 
 If a type annotation also specifies a unit and you additionally write an inline suffix, they must match exactly. A mismatch is a hard error:
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .ok  = <float:64,m/s> 9.81 m/s;   # redundant but valid: both say m/s
 .bad = <float:64,m>   9.81 s;     # ERROR: annotation says m, inline says s
@@ -598,6 +603,7 @@ The event stream reflects this: `ev_array_row_start`, elements, `ev_array_row_en
 
 The `/`-separated dimension rows of a single array must have a **consistent element count**, and (since spec 1.0) array elements are **homogeneous**: sibling sub-arrays must also match in length, so bare arrays and matrices are rectangular:
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .ok1 = [1, 2, 3]/[4, 5, 6];   # valid: both /-rows of one array have 3 elements
 .ok2 = [[1, 2], [3, 4]];       # valid: rectangular sub-arrays
@@ -693,6 +699,7 @@ A length value of `0x0000` means exactly 65536 bytes. Any tag byte other than `0
 
 In practice, you will not hand-author octet streams — the writer API does this for you. In a `.bvnr` file shown for documentation purposes it appears as an escaped binary sequence:
 
+<!-- bovnar-example: illustrative -->
 ```bovnar
 .binary = \x00\x01\x05\x00hello\x01\x03\x00bye\x00;
 ```
@@ -762,6 +769,7 @@ This produces two data events with payloads `"hello"` (5 bytes) and `"bye"` (3 b
 
 ### 17.4 Mixed Binary and Text
 
+<!-- bovnar-example: illustrative -->
 ```bovnar
 .packet = {
     .type      = data_frame;
@@ -779,43 +787,51 @@ This produces two data events with payloads `"hello"` (5 bytes) and `"bye"` (3 b
 Understanding the error codes is essential for debugging. The parser reports line, column, the offending byte, and a byte-offset into the stream.
 
 **Annotation on the wrong side of `=`:**
+<!-- bovnar-example: rejected -->
 ```bovnar
 .x<uint:32> = 42;    # error_unexpected_input_byte (< after identifier)
 ```
 
 **Non-decimal value not quoted:**
+<!-- bovnar-example: rejected -->
 ```bovnar
 .x = <uint:_16> FF;  # FF is parsed as a symbol → error_type_value_mismatch
 ```
 
 **Signed value in unsigned type:**
+<!-- bovnar-example: rejected -->
 ```bovnar
 .x = <uint:8> -1;    # error_value_out_of_range
 ```
 
 **Overflow:**
+<!-- bovnar-example: rejected -->
 ```bovnar
 .x = <uint:8> 256;   # error_value_out_of_range (max is 255)
 ```
 
 **Float with an unsupported width:**
+<!-- bovnar-example: rejected -->
 ```bovnar
 .x = <float:8>  1.0; # error_illegal_value_type
 .x = <float:12> 1.0; # error_illegal_value_type (not 16 or multiple of 32)
 ```
 
 **Base parameter on `float_fix` or `float_dec`:**
+<!-- bovnar-example: rejected -->
 ```bovnar
 .x = <float_fix:32,q8,_10> 1.0;  # error_illegal_value_type
 .x = <float_dec:64,_10>    1.0;  # error_illegal_value_type
 ```
 
 **Q value too large for `float_fix`:**
+<!-- bovnar-example: rejected -->
 ```bovnar
 .x = <float_fix:16,q16> 1.0;  # error_illegal_value_type (Q must be < width)
 ```
 
 **Empty unit component:**
+<!-- bovnar-example: rejected -->
 ```bovnar
 .x = <float:64,m//s> 1.0;    # error_unit_illegal (empty component between //)
 ```
@@ -828,16 +844,19 @@ Understanding the error codes is essential for debugging. The parser reports lin
 ```
 
 **Inline unit suffix inside array:**
+<!-- bovnar-example: rejected -->
 ```bovnar
 .x = [9.81 m/s, 3.14 m];  # error_unexpected_input_byte (units forbidden in arrays)
 ```
 
 **Comma outside array:**
+<!-- bovnar-example: rejected -->
 ```bovnar
 .x = 42,;   # error_unexpected_input_byte
 ```
 
 **Unknown escape sequence:**
+<!-- bovnar-example: rejected -->
 ```bovnar
 .x = "\q";   # error_illegal_escape_sequence (\q is not a defined escape)
 ```
@@ -845,11 +864,13 @@ Understanding the error codes is essential for debugging. The parser reports lin
 they are rejected only in a 1.0 or unversioned document.)
 
 **Unmatched struct close:**
+<!-- bovnar-example: rejected -->
 ```bovnar
 .x = 1;}   # error_illegal_struct_close (a stray '}' at the top level)
 ```
 
 **A `/`-array's dimension rows must match:**
+<!-- bovnar-example: rejected -->
 ```bovnar
 .ok  = [[1, 2]/[3, 4]];          # valid — the /-array's two rows both have 2 elements
 .bad = [[1, 2]/[3, 4, 5]];       # error_array_row_size_mismatch — 2 vs 3 (/-rows)
@@ -939,6 +960,7 @@ For structs, `ev_struct_start` and `ev_struct_end` bracket the nested assignment
 
 ## 22. Quick-Reference: Syntax Cheat Sheet
 
+<!-- bovnar-example: illustrative -->
 ```bovnar
 # ── Assignments ────────────────────────────────────────────────────
 .key = value;

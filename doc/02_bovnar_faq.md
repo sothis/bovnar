@@ -333,6 +333,7 @@ explicit annotation.
 
 Between `=` and the value — never on the key, and never after the value:
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .port = <uint:16> 443;       # correct
 .port<uint:16> = 443;        # WRONG — hard error
@@ -682,6 +683,7 @@ Yes. Bovnar's lexer distinguishes bare words (symbols) from numbers by context.
 A bare `FF` in value position is a symbol, not a hex number, and will produce
 `error_type_value_mismatch`. Any non-decimal value must be a quoted string:
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .hex = <uint:8,_16>  "FF";       # correct — 255
 .hex = <uint:8,_16>  FF;         # WRONG — FF is a symbol
@@ -895,6 +897,7 @@ Leading, trailing, or consecutive commas produce null elements:
 
 Yes, inner arrays are just element values:
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .nested = [[1, 2], [3, 4]];    # valid; rectangular sub-arrays
 .ragged = [[1, 2], [3, 4, 5]];  # error_array_row_size_mismatch — sibling sub-arrays differ in length
@@ -1101,6 +1104,7 @@ The value token is incompatible with the declared type annotation. The most
 common cause is a non-decimal number written as a bare word (symbol) instead of
 a quoted string:
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .x = <uint:8,_16> FF;   # FF is a symbol → error_type_value_mismatch
 .x = <uint:8,_16> "FF"; # correct
@@ -1113,6 +1117,7 @@ a quoted string:
 An inline unit suffix and a type-annotation unit are both present but resolve
 to different `value_unit_t` values:
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .bad = <float:64,m> 1.0 s;   # annotation says m, inline says s → error
 ```

@@ -102,6 +102,7 @@ converter that reads `units_metadata`, not a profile that reads a unit string.
 
 ### 3.1 A type-annotation parameter
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .dt = <float:64,K,delta> 25.0;        # a new parameter class
 ```
@@ -113,6 +114,7 @@ physical quantities lives; it needs a grammar change and a new parameter class i
 
 ### 3.2 A general `Δ` operator in the unit grammar
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .dt = <float:64,Δ(°C)> 25.0;          # "difference of" as a unit-expression operator
 ```
@@ -223,6 +225,7 @@ already somewhere in the tree, and `bvni_kind_exponents` carries the explanation
 `src/gendata/units.bvnr`, in the native block (ids continue at `100180`). Sketch, in the file's own
 shape:
 
+<!-- bovnar-example: illustrative -->
 ```bovnar
   {
     .id      = <uint:32> 100180;

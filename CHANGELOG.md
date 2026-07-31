@@ -95,14 +95,41 @@ half neither did: only a **policy-chosen** target takes this path, since a targe
 named by the `want_unit` hook keeps its strict all-or-nothing contract whatever
 `on_inexact` says.
 
-### Changed — check_doc_examples.py reports what it does not check
+### Added — every embedded example is checked, not a tenth of them
 
-It parses ```bovnar blocks that carry a `#!bovnar` directive: 24 of them. The
-directive is optional, so 188 blocks have none and were passed over in silence
-while the tool printed an unqualified success. It now says so. They are not
-simply parsed because a large share are deliberately invalid (`.123invalid = 1;
-# error: starts with a digit`), and classifying those wants the marker the tool
-already has rather than a guess at intent from the word "error" in a comment.
+`check_doc_examples.py` parsed only the fences opening with `#!bovnar` — **24 of
+212**. The directive is optional, so the tutorial and the spec mostly omit it and
+those 188 blocks were never looked at. All of them are classified and checked
+now:
+
+```
+157 embedded document(s) parse, 46 refuse as marked, 9 illustrative
+```
+
+Classifying them turned up **nothing broken**, which is the useful result: 136 of
+the 188 already parsed, and every one of the 52 that did not was a deliberate
+negative example (`# error: starts with a digit`, `# WRONG: annotation must come
+after '='`) or a depiction rather than a document. Two of them were rejected
+*design alternatives* in `doc/temperature_difference.md` — syntax considered and
+not adopted — which must not parse for the document to make its point.
+
+Two things the exercise established, recorded in the tool for whoever adds the
+next example:
+
+- **A profile unit needs the directive.** `<float:64,udunits:m s-1>` is
+  `error_unit_illegal` in a document declaring nothing, because spec 1.2 is where
+  profile units exist (doc/03 §11.7 says so). Several spec fragments show one
+  without a directive.
+- **`\xNN` in the docs depicts bytes**, and is not syntax an octet stream
+  accepts. Those blocks were never files.
+
+Also worth preferring: five blocks show a refusal with the offending line
+**commented out** (`# .bad = <float:64,m> 1.5 s;   # ERROR`). Those parse, stay
+unmarked, and keep the block runnable while still showing the reader the bad
+form. Where it fits, it beats a `rejected` marker.
+
+Mutation-checked both ways — removing a `rejected` marker from an invalid block
+fails, and adding one to a valid block fails.
 
 ### Fixed — the unitless fence was documented in one direction only
 

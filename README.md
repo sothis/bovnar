@@ -148,6 +148,7 @@ Neither is a rival, because neither sits at this layer. **UCUM** is a code syste
 
 This is the whole argument, and it is not about vocabulary size:
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .speed = <float:64,m/s> 9.81 k~m/h;
 #                            ^ error_unit_mismatch, at parse time, for every consumer

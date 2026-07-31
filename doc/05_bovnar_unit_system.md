@@ -189,6 +189,7 @@ A parameter carrying a **profile namespace** is the exception: there whitespace 
 
 When both are present, equality is checked after parsing via `bvn_unit_equal`, a structural comparison of the parsed `value_unit_t` values: the two units must have the same number of components and the same *set* of components (matching base, exponent, and prefix). The comparison is **order-insensitive** — unit multiplication is commutative, so components are matched as multisets and reordered spellings such as `N·m` and `m·N` (or `m·s⁻¹` and `m/s`) compare as equal. (It is *not* a raw `memcmp`, which would wrongly reject reordered components.)
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .v = <float:64,m/s> 9.81 m·s⁻¹;   # OK: both parse to m/s
 .v = <float:64,m> 1.0 s;           # ERROR: error_unit_mismatch
@@ -1033,6 +1034,7 @@ IEC 80000-13 binary prefixes are used for digital quantities (`b` and `B` only).
 - **Scales that are already a scale** — `pH`, `mph`, `kph`, the five water-hardness degrees, `gpg`, `CF`, `PSU`, `JTU` — take no prefix either. Each carries its reason in §3.26–§3.30; `NTU`, `FNU`, `FTU` and `FAU` *do* take one, because a milli-NTU is a real ultrapure-water measurement.
 - **Currency units** accept SI prefixes of any magnitude (see §9.4). IEC prefixes are forbidden on all currency codes.
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .valid1   = <uint:64,Ki~B>  8;     # OK: IEC prefix on byte
 .valid2   = <uint:32,M~b>   100;   # OK: SI mega on bit
@@ -2531,6 +2533,7 @@ All four errors are raised during the `on_unverified` → validator phase. In `c
 
 ### 15.5 Error Cases
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 # Empty component → error_unit_illegal
 .bad1 = <float:64,m//s>      1.0;

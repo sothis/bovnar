@@ -3,10 +3,10 @@
 # Copyright (c) 2026 Janos Sonntag
 """check_doc_examples.py — the documents embedded in the docs must parse.
 
-Every ```bovnar fence that holds a whole document (it begins with the `#!bovnar`
-directive) is handed to the reference reader. Nothing did this before, and the
-front door was wrong because of it: README.md's first example — the first bovnar
-document most readers ever see — opened with
+EVERY ```bovnar fence in README.md, web/index.md and doc/*.md is handed to the
+reference reader — 212 of them. Nothing did this before, and the front door was
+wrong because of it: README.md's first example — the first bovnar document most
+readers ever see — opened with
 
     #!bovnar 1.1                      # optional spec-version directive
 
@@ -40,6 +40,30 @@ Mark either with an HTML comment on the line before the fence:
 cleanly is a failure too, because the example has stopped demonstrating what it
 claims. `illustrative` is the only real escape hatch, and it is deliberately
 ugly to type so it is not reached for by habit.
+
+WHY THE SPLIT IS NOT "HAS A DIRECTIVE"
+
+This began by checking only fences that opened with `#!bovnar`, which was 24 of
+212: the directive is OPTIONAL, so the tutorial and the spec mostly omit it, and
+those 188 blocks were skipped while the tool printed an unqualified success. They
+are all classified and all checked now.
+
+Classifying them turned up nothing broken, which is the useful result — but two
+things are worth recording for whoever adds the next example:
+
+  * A PROFILE UNIT NEEDS THE DIRECTIVE. `<float:64,udunits:m s-1>` is
+    `error_unit_illegal` in a document that declares nothing, because spec 1.2 is
+    where profile units exist (doc/03 §11.7). Several spec fragments show one
+    without a directive; they are `rejected` on that account as much as on the
+    deliberate error they also carry. An example meant to PARSE and using a
+    profile unit must open with `#!bovnar 1.2`.
+  * `\\xNN` IN THE DOCS IS A DEPICTION OF BYTES, not syntax an octet stream
+    accepts. Blocks built that way are `illustrative`; they were never files.
+
+Five blocks show a refusal with the offending line COMMENTED OUT (`# .bad = ...
+# ERROR: ...`). Those parse, correctly, and stay unmarked — the technique keeps
+the block runnable while still showing the reader the bad form, and it is the one
+to prefer over a `rejected` marker where it fits.
 """
 
 import os
@@ -115,20 +139,12 @@ def main(argv):
         for m in FENCE.finditer(text):
             preceding, body = m.group(1), m.group(2)
             if not body.lstrip().startswith("#!bovnar"):
-                # The version directive is OPTIONAL, so most examples in the
-                # tutorial and the spec do not carry one, and this check has
-                # never looked at them. Counted and reported rather than passed
-                # over in silence: a gate that covers a tenth of its subject
-                # while printing an unqualified success is worse than one that
-                # says what it skipped.
-                #
-                # Not simply parsed, because a large share of them are
-                # DELIBERATELY invalid -- ".123invalid = 1;  # error: starts
-                # with a digit" and its like -- and classifying those needs the
-                # judgement the marker exists to record, not a guess at intent
-                # from the presence of the word "error" in a comment.
+                # The version directive is OPTIONAL, so most examples carry
+                # none. This once skipped every one of them -- 188 blocks
+                # against 24 checked -- and printed an unqualified success. They
+                # are all classified now and all checked; `undirected` is kept
+                # only so the split stays visible in the summary.
                 undirected += 1
-                continue          # no version directive: see above
             line = text[:m.start(2)].count("\n") + 1
             where = "%s:%d" % (rel, line)
             mark = MARK.search(preceding)
@@ -185,9 +201,8 @@ def main(argv):
     print("check_doc_examples: %d embedded document(s) parse, %d refuse as "
           "marked, %d illustrative" % (checked, rejected, illustrative))
     if undirected:
-        print("  ...and %d ```bovnar block(s) carry no #!bovnar directive and "
-              "are NOT checked — mostly deliberate negative examples, which need "
-              "a marker rather than a guess at intent" % undirected)
+        print("  (%d of them carry no #!bovnar directive; the directive is "
+              "optional and they are checked the same way)" % undirected)
     return 0
 
 

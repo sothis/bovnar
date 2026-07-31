@@ -242,6 +242,7 @@ The lexer runs a dedicated `first_comment_*` state machine over the first commen
 - A BOM (`EF BB BF`) detected **inside the first-line comment** produces `error_invalid_byte_order_mark`.
 - A BOM byte (`EF`) seen **after** the first comment line (in the `first_bom` state, before the first `.` identifier) is unhandled and produces `error_unexpected_input_byte`.
 
+<!-- bovnar-example: illustrative -->
 ```bovnar
 # BOM at byte offset 0: valid
 EF BB BF.foo = 1;
@@ -385,6 +386,7 @@ id-body   = id-start | "+" | "-" | DIGIT | UTF-8 continuation bytes
 
 **Invalid identifiers:**
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 . = 1;                 # error_empty_identifier
 .123 = 2;              # starts with digit
@@ -652,6 +654,7 @@ In all cases the annotation comes **before** the value it describes.
 
 **Incorrect placement (hard error):**
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .key<uint:32> = 42;    # ERROR: type annotation must follow '=', not the key
 ```
@@ -861,6 +864,7 @@ annotation:
 **Inside a parameter it is `error_type_param_whitespace`**, reported at the
 first byte after the whitespace:
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .e = <float:64,k g> 1.0;        # error_type_param_whitespace
 .f = <uint:6 4> 1;              # error_type_param_whitespace
@@ -887,6 +891,7 @@ the vocabulary, which decides what it means. This exists for one concrete reason
 UDUNITS multiplies with a space, and `kg m-2 s-1` is the commonest spelling of a
 flux in netCDF and CF metadata.
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .flux = <float:64,udunits:kg m-2 s-1> 0.5;   # valid — the same unit as udunits:kg*m-2*s-1
 .speed = <float:64,udunits:m s-1> 9.81;      # valid — m/s
@@ -1000,6 +1005,7 @@ A non-decimal base with a bare number literal is not caught by the validator (no
 
 **uint (unsigned integer):**
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .valid = <uint:8> 255;
 .valid = <uint:8> 0;
@@ -1010,6 +1016,7 @@ A non-decimal base with a bare number literal is not caught by the validator (no
 
 **sint (signed integer):**
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .valid = <sint:8> 127;
 .valid = <sint:8> -128;
@@ -1023,6 +1030,7 @@ A non-decimal base with a bare number literal is not caught by the validator (no
 Valid widths: `0` (default 64), `16`, or any multiple of `32` up to `32768`.
 Base `10` (default) or `16` are accepted; all other bases are rejected.
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .valid = <float:64> 3.14;
 .valid = <float:64> 1e100;
@@ -1051,6 +1059,7 @@ range is `error_value_out_of_range`, exactly as for `uint`/`sint` overflow
 overflow rather than wrapping, so a fixed-point datum can never silently decode
 to an unrelated value.
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .valid   = <float_fix:16,q8> 3.14;    # Q8 in 16-bit: range [-128, 127.99609375]
 .valid   = <float_fix:16,q8> 127.99609375;  # max in range
@@ -1072,6 +1081,7 @@ Valid widths: `0` (default 64), `16`, `32`, `64`, `128`, `256`.
 Base parameter (`_N`) is forbidden (decimal base is implicit).
 Values are written as ordinary decimal literals or special numbers.
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .valid   = <float_dec:32> 3.14;
 .valid   = <float_dec:64,Pa> 101325;
@@ -1085,6 +1095,7 @@ Values are written as ordinary decimal literals or special numbers.
 
 Digits in values are checked against the declared base:
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .value = <uint:_16> "ff";      # OK: f and f are valid in base 16
 .value = <uint:_16> "fg";      # error_digit_not_in_base: 'g' > base 16
@@ -1146,6 +1157,7 @@ The inline unit suffix is **forbidden inside arrays**; any character that would 
 | Annotation unit and inline unit **match** | Valid; the common unit is used |
 | Annotation unit and inline unit **differ** | `error_unit_mismatch` |
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 # Annotation unit with no inline unit — normal
 .dist = <float:64,m> 1.5;
@@ -1225,6 +1237,7 @@ Since spec 1.0 the elements of an array must be **homogeneous**. The rule is *"s
 - **Structs — same keys, fields free.** Sibling structs must share the same keys, in order, with the same per-field *kinds* and nesting. Differing keys are `error_struct_shape_mismatch`; a field that is a number in one record and a string in another is `error_array_element_type_mismatch`. But a scalar field may carry a **different unit** in each record, and a list field a **different length** — so a multi-currency ledger and per-record argument lists are valid.
 - **Null is a hole.** `null` / empty array elements match any shape and never establish or break homogeneity, so sparse arrays like `[1, , 3]` remain valid.
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .ok_scalars = [1, 2.5, 3];                 # valid: same (no) dimension, encodings may mix
 .ok_matrix  = [[1, 2], [3, 4]];            # valid: rectangular
@@ -1285,6 +1298,7 @@ Structs group related assignments into a nested scope:
 the top-level document. A repeated key is `error_duplicate_struct_key`, so
 lookup, references, and iteration always agree on the value of a key:
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 .bad = {.x = 1; .x = 2;};   # error_duplicate_struct_key
 .ok  = {.x = 1; .y = 2;};   # fine
@@ -1355,6 +1369,7 @@ ev_octet_stream_end    →  (emitted on the trailing 0x00)
 
 An octet stream carries raw bytes, so it cannot be written literally in a text document. The form below is the conventional *escaped* notation used throughout this specification: each `\xNN` stands for one byte of the file, not for those four characters. Pasted verbatim into a `.bvnr` file it is `error_unexpected_input_byte`; the writer API emits the real bytes.
 
+<!-- bovnar-example: illustrative -->
 ```bovnar
 .data = ;
 .binary = \x00\x01\x05\x00hello\x01\x03\x00bye\x00;
@@ -2000,6 +2015,7 @@ The unit may be written directly after the value literal instead of — or redun
 
 ### 15.4 Binary Data with Octet Stream
 
+<!-- bovnar-example: illustrative -->
 ```bovnar
 # An image file embedded as binary
 .image = \x00
@@ -2175,6 +2191,7 @@ The unit may be written directly after the value literal instead of — or redun
 
 ### 15.10 Error Examples
 
+<!-- bovnar-example: rejected -->
 ```bovnar
 # These will produce parse errors:
 

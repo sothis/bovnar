@@ -394,6 +394,8 @@
 <li>A BOM (<code>EF BB BF</code>) detected <strong>inside the first-line comment</strong> produces <code>error_invalid_byte_order_mark</code>.</li>
 <li>A BOM byte (<code>EF</code>) seen <strong>after</strong> the first comment line (in the <code>first_bom</code> state, before the first <code>.</code> identifier) is unhandled and produces <code>error_unexpected_input_byte</code>.</li>
 </ul>
+<!-- bovnar-example: illustrative -->
+
 <div class="codehilite"><pre><code class="language-bovnar"># BOM at byte offset 0: valid
 EF BB BF.foo = 1;
 
@@ -551,6 +553,8 @@ id-body   = id-start | &quot;+&quot; | &quot;-&quot; | DIGIT | UTF-8 continuatio
 .my+key = 5;           # plus allowed
 .user_defined = 6;</code></pre></div>
 <p><strong>Invalid identifiers:</strong></p>
+<!-- bovnar-example: rejected -->
+
 <div class="codehilite"><pre><code class="language-bovnar">. = 1;                 # error_empty_identifier
 .123 = 2;              # starts with digit
 .foo,bar = 3;          # comma inside identifier – error</code></pre></div>
@@ -813,6 +817,8 @@ dec-exponent  = (&quot;e&quot; | &quot;E&quot;) [ &quot;+&quot; | &quot;-&quot; 
 # Per-element annotations override the whole-array annotation
 .mixed = &lt;uint:8&gt; [1, &lt;sint:8&gt; -1, 255];</code></pre></div>
 <p><strong>Incorrect placement (hard error):</strong></p>
+<!-- bovnar-example: rejected -->
+
 <div class="codehilite"><pre><code class="language-bovnar">.key&lt;uint:32&gt; = 42;    # ERROR: type annotation must follow &#x27;=&#x27;, not the key</code></pre></div>
 <p>Seven type families are recognized in spec 1.0, plus <code>datetime</code> in spec 1.1:</p>
 <table>
@@ -1104,6 +1110,8 @@ annotation:</p>
       m/s&gt; 1.0;                 # valid — a comment stands in for the space</code></pre></div>
 <p><strong>Inside a parameter it is <code>error_type_param_whitespace</code></strong>, reported at the
 first byte after the whitespace:</p>
+<!-- bovnar-example: rejected -->
+
 <div class="codehilite"><pre><code class="language-bovnar">.e = &lt;float:64,k g&gt; 1.0;        # error_type_param_whitespace
 .f = &lt;uint:6 4&gt; 1;              # error_type_param_whitespace
 .g = &lt;float:64,m / s&gt; 1.0;      # error_type_param_whitespace</code></pre></div>
@@ -1123,6 +1131,8 @@ whitespace is neither deleted nor refused — it is <strong>kept verbatim</stron
 the vocabulary, which decides what it means. This exists for one concrete reason:
 UDUNITS multiplies with a space, and <code>kg m-2 s-1</code> is the commonest spelling of a
 flux in netCDF and CF metadata.</p>
+<!-- bovnar-example: rejected -->
+
 <div class="codehilite"><pre><code class="language-bovnar">.flux = &lt;float:64,udunits:kg m-2 s-1&gt; 0.5;   # valid — the same unit as udunits:kg*m-2*s-1
 .speed = &lt;float:64,udunits:m s-1&gt; 9.81;      # valid — m/s
 .t = &lt;float:64,udunits:ms-1&gt; 1.0;            # valid, and DIFFERENT: m~s⁻¹, a
@@ -1252,12 +1262,16 @@ available in a type annotation only.</p>
 </table>
 <h3 id="62-validation-rules-per-numeric-type">6.2 Validation Rules per Numeric Type</h3>
 <p><strong>uint (unsigned integer):</strong></p>
+<!-- bovnar-example: rejected -->
+
 <div class="codehilite"><pre><code class="language-bovnar">.valid = &lt;uint:8&gt; 255;
 .valid = &lt;uint:8&gt; 0;
 
 .invalid = &lt;uint:8&gt; -1;       # error_value_out_of_range (negative)
 .invalid = &lt;uint:8&gt; 256;      # error_value_out_of_range (overflow)</code></pre></div>
 <p><strong>sint (signed integer):</strong></p>
+<!-- bovnar-example: rejected -->
+
 <div class="codehilite"><pre><code class="language-bovnar">.valid = &lt;sint:8&gt; 127;
 .valid = &lt;sint:8&gt; -128;
 
@@ -1266,6 +1280,8 @@ available in a type annotation only.</p>
 <p><strong>float (binary floating-point):</strong></p>
 <p>Valid widths: <code>0</code> (default 64), <code>16</code>, or any multiple of <code>32</code> up to <code>32768</code>.
 Base <code>10</code> (default) or <code>16</code> are accepted; all other bases are rejected.</p>
+<!-- bovnar-example: rejected -->
+
 <div class="codehilite"><pre><code class="language-bovnar">.valid = &lt;float:64&gt; 3.14;
 .valid = &lt;float:64&gt; 1e100;
 .valid = &lt;float:64&gt; nan;
@@ -1288,6 +1304,8 @@ range is <code>error_value_out_of_range</code>, exactly as for <code>uint</code>
 <code>bvn_float_to_fixNN</code> additionally <strong>saturate</strong> to the representable extreme on
 overflow rather than wrapping, so a fixed-point datum can never silently decode
 to an unrelated value.</p>
+<!-- bovnar-example: rejected -->
+
 <div class="codehilite"><pre><code class="language-bovnar">.valid   = &lt;float_fix:16,q8&gt; 3.14;    # Q8 in 16-bit: range [-128, 127.99609375]
 .valid   = &lt;float_fix:16,q8&gt; 127.99609375;  # max in range
 .valid   = &lt;float_fix:16,q8&gt; -128;    # min in range
@@ -1304,6 +1322,8 @@ to an unrelated value.</p>
 <p>Valid widths: <code>0</code> (default 64), <code>16</code>, <code>32</code>, <code>64</code>, <code>128</code>, <code>256</code>.
 Base parameter (<code>_N</code>) is forbidden (decimal base is implicit).
 Values are written as ordinary decimal literals or special numbers.</p>
+<!-- bovnar-example: rejected -->
+
 <div class="codehilite"><pre><code class="language-bovnar">.valid   = &lt;float_dec:32&gt; 3.14;
 .valid   = &lt;float_dec:64,Pa&gt; 101325;
 .valid   = &lt;float_dec:128&gt; nan;
@@ -1312,6 +1332,8 @@ Values are written as ordinary decimal literals or special numbers.</p>
 .invalid = &lt;float_dec:64,_10&gt; 1.0;    # base param forbidden → error_illegal_value_type</code></pre></div>
 <h3 id="63-digit-validation">6.3 Digit Validation</h3>
 <p>Digits in values are checked against the declared base:</p>
+<!-- bovnar-example: rejected -->
+
 <div class="codehilite"><pre><code class="language-bovnar">.value = &lt;uint:_16&gt; &quot;ff&quot;;      # OK: f and f are valid in base 16
 .value = &lt;uint:_16&gt; &quot;fg&quot;;      # error_digit_not_in_base: &#x27;g&#x27; &gt; base 16
 .value = &lt;uint:_2&gt; &quot;1010&quot;;     # OK: valid binary
@@ -1387,6 +1409,8 @@ Values are written as ordinary decimal literals or special numbers.</p>
 </tr>
 </tbody>
 </table>
+<!-- bovnar-example: rejected -->
+
 <div class="codehilite"><pre><code class="language-bovnar"># Annotation unit with no inline unit — normal
 .dist = &lt;float:64,m&gt; 1.5;
 
@@ -1438,6 +1462,8 @@ rows, but <code>[]/[1]</code> is <code>error_array_row_size_mismatch</code>.</p>
 - <strong>Rectangular</strong> (nested arrays). Sibling sub-arrays must have the same length and recursively-matching element shape: <code>[[1,2],[3,4]]</code> is valid, <code>[[1,2],[3,4,5]]</code> is <code>error_array_row_size_mismatch</code>.
 - <strong>Structs — same keys, fields free.</strong> Sibling structs must share the same keys, in order, with the same per-field <em>kinds</em> and nesting. Differing keys are <code>error_struct_shape_mismatch</code>; a field that is a number in one record and a string in another is <code>error_array_element_type_mismatch</code>. But a scalar field may carry a <strong>different unit</strong> in each record, and a list field a <strong>different length</strong> — so a multi-currency ledger and per-record argument lists are valid.
 - <strong>Null is a hole.</strong> <code>null</code> / empty array elements match any shape and never establish or break homogeneity, so sparse arrays like <code>[1, , 3]</code> remain valid.</p>
+<!-- bovnar-example: rejected -->
+
 <div class="codehilite"><pre><code class="language-bovnar">.ok_scalars = [1, 2.5, 3];                 # valid: same (no) dimension, encodings may mix
 .ok_matrix  = [[1, 2], [3, 4]];            # valid: rectangular
 .ok_records = [{.cur = USD; .bal = &lt;float_dec:64,$USD&gt; 1.0;},
@@ -1492,6 +1518,8 @@ rows, but <code>[]/[1]</code> is <code>error_array_row_size_mismatch</code>.</p>
 <p><strong>Key uniqueness.</strong> Keys must be unique within a single scope — a struct, and
 the top-level document. A repeated key is <code>error_duplicate_struct_key</code>, so
 lookup, references, and iteration always agree on the value of a key:</p>
+<!-- bovnar-example: rejected -->
+
 <div class="codehilite"><pre><code class="language-bovnar">.bad = {.x = 1; .x = 2;};   # error_duplicate_struct_key
 .ok  = {.x = 1; .y = 2;};   # fine</code></pre></div>
 <p>The same key in <em>different</em> scopes is unrelated and always allowed (e.g.
@@ -1556,6 +1584,8 @@ ev_octet_stream_end    →  (emitted on the trailing 0x00)
 
 <h3 id="94-example">9.4 Example</h3>
 <p>An octet stream carries raw bytes, so it cannot be written literally in a text document. The form below is the conventional <em>escaped</em> notation used throughout this specification: each <code>\xNN</code> stands for one byte of the file, not for those four characters. Pasted verbatim into a <code>.bvnr</code> file it is <code>error_unexpected_input_byte</code>; the writer API emits the real bytes.</p>
+<!-- bovnar-example: illustrative -->
+
 <div class="codehilite"><pre><code class="language-bovnar">.data = ;
 .binary = \x00\x01\x05\x00hello\x01\x03\x00bye\x00;</code></pre></div>
 <p>This binary region encodes two chunks: <code>"hello"</code> (5 bytes) and <code>"bye"</code> (3 bytes), producing:</p>
@@ -2970,6 +3000,8 @@ alone would: <code>;</code> remains a boundary in every case it was one before.<
 # Annotation and inline unit differ: error_unit_mismatch
 # .bad      = &lt;float:64,m&gt; 1.5 s;    # ERROR</code></pre></div>
 <h3 id="154-binary-data-with-octet-stream">15.4 Binary Data with Octet Stream</h3>
+<!-- bovnar-example: illustrative -->
+
 <div class="codehilite"><pre><code class="language-bovnar"># An image file embedded as binary
 .image = \x00
     \x01\x10\x00\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00
@@ -3121,6 +3153,8 @@ alone would: <code>;</code> remains a boundary in every case it was one before.<
 # Fixed-point — same text representation, Q-format wire encoding
 .val_fix       = &lt;float_fix:32,q16&gt; 3.14;</code></pre></div>
 <h3 id="1510-error-examples">15.10 Error Examples</h3>
+<!-- bovnar-example: rejected -->
+
 <div class="codehilite"><pre><code class="language-bovnar"># These will produce parse errors:
 
 # Empty identifier

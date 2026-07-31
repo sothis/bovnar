@@ -27,6 +27,13 @@ WHAT IS CHECKED.
         dimensioned irrational one is (strict `normalise_si` refuses it); and a
         target that names the SI form outright refuses either way.
 
+  doc/06 §7.3  Which subcommands take a policy, and how the two that do not say
+        so: `pretty-print` rejects each flag by name and exits 2, while
+        `convert` accepts and silently ignores every one of them — including
+        the ones taking an argument. "Reports the flags as surplus arguments"
+        was the old description of a message that reads `unknown option`, and
+        a `bovnar convert --si` that appears to work has normalised nothing.
+
   doc/06 §2.7  The limit table against the headers, including the three prose bounds
         for the key path — depth, total bytes, and one key — which live in
         src/lexer/bvn_val_impl.h rather than the public header and so are the
@@ -37,7 +44,9 @@ Exit 0 when doc/06 and the library agree, 1 with a list when they do not.
 """
 import os
 import re
+import subprocess
 import sys
+import tempfile
 
 REPO = os.path.dirname(os.path.abspath(__file__))
 DOC = "doc/06_bovnar_unit_policy.md"
@@ -190,6 +199,75 @@ def catalogue_symbols(repo):
         return re.findall(r'\.symbol\s*=\s*"([^"]+)"', f.read())
 
 
+def cli_flags(text):
+    """The policy flags doc/06 §7.3 tabulates, with any argument they take."""
+    flags = []
+    for m in re.finditer(r"^\|\s*`(--[a-z-]+)([^`]*)`\s*\|", text, re.M):
+        arg = m.group(2).strip()
+        flags.append((m.group(1),
+                      {"<unit>": "m", "<path>=<unit>": ".d=m", "<N>": "10"}
+                      .get(arg)))
+    return flags
+
+
+def check_cli(repo, text):
+    """doc/06 §7.3 — which subcommands take a policy, and how the others refuse."""
+    exe = os.path.join(repo, "build", "bovnar")
+    if not os.path.exists(exe):
+        print("check_doc_policy: no built CLI; doc/06 §7.3 not checked")
+        return [], 0
+    flags = cli_flags(text)
+    if not flags:
+        return ["%s: doc/06 §7.3 no longer tabulates the policy flags" % DOC], 0
+
+    fd, path = tempfile.mkstemp(suffix=".bvnr")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(".d = <float:64,k~m> 5.0;\n")
+    problems, checked = [], 0
+    try:
+        for flag, arg in flags:
+            argv = [flag] + ([arg] if arg else [])
+            # FIRST that the flag is real. Without this the "pretty-print
+            # rejects it by name" test passes for a flag that does not exist —
+            # pretty-print says `unknown option --nosuch` just as readily — so
+            # a typo or an invented row in the table would gate green.
+            for sub, expect in (("validate", "accept"),
+                                ("events", "accept"),
+                                ("query", "accept"),
+                                ("pretty-print", "reject"),
+                                ("convert", "ignore")):
+                cmd = [exe, sub] + argv + ([".d"] if sub == "query" else []) \
+                    + [path]
+                r = subprocess.run(cmd, capture_output=True, text=True,
+                                   timeout=30)
+                checked += 1
+                err = (r.stderr or "") + (r.stdout or "")
+                if expect == "accept":
+                    if "unknown option" in err:
+                        problems.append(
+                            "%s: doc/06 §7.3 tabulates `%s`, but %s does not know "
+                            "it: %r" % (DOC, flag, sub, err.strip()[:70]))
+                elif expect == "reject":
+                    if "unknown option %s" % flag not in err:
+                        problems.append(
+                            "%s: doc/06 §7.3 says pretty-print rejects `%s` by name; "
+                            "it said %r" % (DOC, flag, err.strip()[:70]))
+                    elif r.returncode != 2:
+                        problems.append(
+                            "%s: doc/06 §7.3 says pretty-print exits 2 on `%s`; it "
+                            "exited %d" % (DOC, flag, r.returncode))
+                else:
+                    # convert warns that JSON is lossy for this document; the
+                    # claim is only that it never mentions the FLAG.
+                    if "unknown option" in err or "unrecognised" in err:
+                        problems.append(
+                            "%s: doc/06 §7.3 says convert silently ignores `%s`; "
+                            "it said %r" % (DOC, flag, err.strip()[:70]))
+    finally:
+        os.unlink(path)
+    return problems, checked
+
+
 def main(argv):
     repo = os.path.abspath(argv[1]) if len(argv) > 1 else REPO
     path = os.path.join(repo, DOC)
@@ -202,6 +280,9 @@ def main(argv):
     problems = check_limits(text, header_defines(repo))
     behaviour, checked = check_behaviour(repo, text)
     problems += behaviour
+    cli, cli_checked = check_cli(repo, text)
+    problems += cli
+    checked += cli_checked
 
     if problems:
         sys.stderr.write("check_doc_policy: %s disagrees with the library:\n"

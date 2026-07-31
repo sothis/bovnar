@@ -48,6 +48,21 @@ limit table against the headers (including the three key-path bounds that live i
 against the whole catalogue rather than only the units it names, and the five
 behaviours §2.4 now distinguishes.
 
+### Fixed — `bovnar convert` silently ignores every unit-policy flag
+
+doc/06 §7.3 said `pretty-print` "reports the flags as surplus arguments"; the
+message is `pretty-print: unknown option --si`, exit 2. The `convert` half was
+right but understated, and is the one that can cost a user something: `convert`
+**accepts and silently ignores** all eight policy flags, including the ones that
+take an argument, so a `bovnar convert --si` that appears to work has normalised
+nothing. The section now says both plainly.
+
+`check_doc_policy.py` gates the table by running every flag in it against all
+five subcommands. It requires each one to be *real* first — `validate`, `events`
+and `query` must know it — because "pretty-print rejects it by name" passes just
+as happily for a flag that does not exist, so an invented row would otherwise
+gate green.
+
 ### Fixed — doc/09 documented six `Quantity` properties as method calls
 
 `q.decimal()`, `.fraction()`, `.fixed_point()`, `.stored_value()`, `.unit_str()`

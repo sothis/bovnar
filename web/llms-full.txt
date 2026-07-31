@@ -10257,8 +10257,10 @@ A malformed unit raises `BovnarArgumentError` before a byte is read.
 ### 7.3 Command line
 
 `validate`, `events` and `query` accept the options below. `pretty-print` and `convert` do not
-take a unit policy at all — `pretty-print` reports the flags as surplus arguments, and `convert`
-ignores them without complaint.
+take a unit policy at all, and they differ in how they say so: `pretty-print` rejects each one by
+name — `pretty-print: unknown option --si`, exit 2 — while `convert` **accepts and silently
+ignores** every flag in the table, including the ones that take an argument. A `bovnar convert --si`
+that appears to work has not normalised anything.
 
 | Flag | Field |
 |---|---|

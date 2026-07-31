@@ -443,8 +443,10 @@ error in somebody else's file. A rejected policy leaves the previous one in forc
 <p>A malformed unit raises <code>BovnarArgumentError</code> before a byte is read.</p>
 <h3 id="73-command-line">7.3 Command line</h3>
 <p><code>validate</code>, <code>events</code> and <code>query</code> accept the options below. <code>pretty-print</code> and <code>convert</code> do not
-take a unit policy at all — <code>pretty-print</code> reports the flags as surplus arguments, and <code>convert</code>
-ignores them without complaint.</p>
+take a unit policy at all, and they differ in how they say so: <code>pretty-print</code> rejects each one by
+name — <code>pretty-print: unknown option --si</code>, exit 2 — while <code>convert</code> <strong>accepts and silently
+ignores</strong> every flag in the table, including the ones that take an argument. A <code>bovnar convert --si</code>
+that appears to work has not normalised anything.</p>
 <table>
 <thead>
 <tr>

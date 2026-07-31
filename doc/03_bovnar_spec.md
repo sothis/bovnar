@@ -1868,7 +1868,8 @@ Setting most fields to `0` in `bvnr_read_flags_t` substitutes an internal defaul
 | Invalid unit string | `error_unit_illegal` |
 | Compound unit exceeds `BVNR_MAX_UNIT_COMPONENTS` | `error_unit_illegal` |
 | Empty component between separators | `error_unit_illegal` |
-| Unit string too long | `error_unit_too_long` |
+| Inline unit suffix too long (255-byte lexer buffer) | `error_unit_too_long` |
+| Unit written in an annotation, over the type-annotation body cap | `error_type_too_long` |
 | Inline unit suffix differs from type-annotation unit | `error_unit_mismatch` |
 | Inline unit suffix inside an array element | `error_unexpected_input_byte` |
 

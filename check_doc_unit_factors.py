@@ -508,6 +508,63 @@ def rows(path):
         yield n, cells[si], cells[fi]
 
 
+# Every unit error code a document names must be REACHABLE, and be what the
+# reader actually raises for the case the row describes.
+#
+# The codes are a small closed set and three documents tabulate them, which is
+# exactly the shape that rots: doc/05 §8 and §14, doc/03 §12.8 and doc/08 §5 all
+# said an over-long unit string raises `error_unit_too_long`, and an over-long
+# unit written in an ANNOTATION raises `error_type_too_long` — the type body has
+# its own 255-byte cap and it counts the family name and the commas too, so a
+# unit parameter can never be the only thing over the line. doc/11 §2.5 had it
+# right and the other three did not.
+#
+# Only the codes are checked, against a document that provokes each. What a row
+# SAYS is prose; that the code it names is the one the reader raises is not.
+ERROR_CASES = [
+    ("error_unit_illegal",             ".a = <float:64,notaunit> 1.0;"),
+    ("error_unit_illegal",             ".a = <float:64,m^0> 1.0;"),
+    ("error_unit_illegal",             ".a = <float:64,m^200> 1.0;"),
+    ("error_unit_illegal",             ".a = <float:64,kt> 1.0;"),
+    ("error_unit_illegal",             ".a = <float_dec:64,USD> 1.0;"),
+    ("error_unit_illegal",             ".a = <float:64,%s> 1.0;" % "·".join(["m"] * 33)),
+    ("error_unit_mismatch",            ".a = <float:64,m/s> 1.0 k~g;"),
+    ("error_unit_profile_unknown",     "#!bovnar 1.2\n.a = <float:64,nosuchns:m> 1.0;"),
+    ("error_unit_profile_unsupported", "#!bovnar 1.2\n.a = <float:64,ucum:[Btu_39]> 1.0;"),
+    # The pair the documents had backwards. Both are provoked, so neither can be
+    # restated as the other without this failing.
+    ("error_unit_too_long",            ".a = <float:64> 1.0 %s;" % "·".join(["m"] * 400)),
+    ("error_type_too_long",            ".a = <float:64,%s> 1.0;" % "·".join(["m"] * 400)),
+]
+
+
+def check_error_codes(repo):
+    """-> (problems, cases checked). Needs the built library; skips without it."""
+    sys.path.insert(0, os.path.join(repo, "python"))
+    try:
+        import bovnar
+        from bovnar.enums import ErrorCode
+        bovnar._ffi.load_library()
+    except Exception:
+        return [], 0
+    problems = []
+    for want, src in ERROR_CASES:
+        try:
+            bovnar.loads(src)
+            problems.append("%r is documented as %s and the reader accepts it"
+                            % (src[:44], want))
+            continue
+        except Exception as exc:
+            code = getattr(exc, "code", None)
+            got = ErrorCode(code).name.lower() if code is not None else None
+        if got is None:
+            problems.append("%r raised no bovnar error code" % src[:44])
+        elif ("error_" + got) != want:
+            problems.append("%r is documented as %s; the reader raises error_%s"
+                            % (src[:44], want, got))
+    return problems, len(ERROR_CASES)
+
+
 def agrees_as_double(got, want, unit):
     """True when a documented value differs from the catalogue's only by
     rounding to the same IEEE-754 double.
@@ -684,6 +741,8 @@ def main(argv):
     problems, checked, prose = check(repo)
     api_problems, api_count = check_api_named(repo)
     problems += api_problems
+    err_problems, err_count = check_error_codes(repo)
+    problems += err_problems
     if problems:
         sys.stderr.write(
             "check_doc_unit_factors: %d documented factor(s) disagree with "
@@ -694,7 +753,8 @@ def main(argv):
         return 1
     print("check_doc_unit_factors: %d factor cell(s) checked against "
           "src/gendata, %d prose, all matching; %d bovnar_si_units.h "
-          "export(s) named in %s." % (checked, prose, api_count, API_DOC))
+          "export(s) named in %s; %d unit error code(s) provoked."
+          % (checked, prose, api_count, API_DOC, err_count))
     return 0
 
 

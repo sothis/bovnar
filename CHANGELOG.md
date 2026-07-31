@@ -121,6 +121,34 @@ did:
 is neither the international acre-foot (1233.48183755) nor the survey one
 (1233.48923847), i.e. an acre and a foot from different systems.
 
+### Fixed — three documents named the wrong error for an over-long unit
+
+doc/05 §8 and §14, doc/03 §12.8 and doc/08 §5 all said an over-long unit string
+raises `error_unit_too_long`. It does not, in the place a reader is most likely
+to hit: a unit written in an **annotation** reaches the type-annotation body's
+own 255-byte cap first — that cap counts the family name, the width and the
+commas as well, so a unit parameter can never be the only thing over the line —
+and raises `error_type_too_long` (21). `error_unit_too_long` (22) is the
+**inline** suffix's buffer, which has one to itself.
+
+doc/11 §2.5 tabulates all three caps and had it right; the other three documents
+were restating it from memory. All four now agree, and `check_doc_unit_factors.py`
+provokes eleven unit error codes against the reader — including both halves of
+this pair, so neither can be restated as the other again. Confirmed by
+reproducing the old claim and watching the gate fail.
+
+### Changed — `qudt:HP_Brake` is refused, as a QUDT modelling error
+
+It was mapped to `hp_B` on the strength of QUDT's own multiplier. QUDT's code and
+its multiplier describe different units: brake horsepower is the mechanical
+horsepower measured at the shaft — 745.7 W, which QUDT already carries as `HP` —
+and QUDT gives `HP_Brake` 9809.5 W, which is its own `HP_Boiler` to the digit.
+One of the two is a mistake and nothing in the vocabulary says which, so
+following the number carries a boiler rating under a shaft-power name and
+following the name contradicts the only value QUDT states. Refusing is the third
+answer, and the one that costs a producer an error message instead of a factor of
+thirteen.
+
 ### Fixed — both documents told a direct caller to multiply by a thousand twice over
 
 `bvn_unit_to_string_ex(…, BVN_UNIT_REDUCE)` folds a compound into the named unit

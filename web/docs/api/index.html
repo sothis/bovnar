@@ -1504,7 +1504,7 @@ table in which a rounded decimal is passed off as exact.</p>
 <td><code>error_unit_too_long</code></td>
 <td>22</td>
 <td><code>"unit_too_long"</code></td>
-<td>Unit string exceeds internal buffer</td>
+<td>An <strong>inline</strong> unit suffix exceeds its 255-byte lexer buffer; a unit in an annotation raises <code>error_type_too_long</code> instead</td>
 </tr>
 <tr>
 <td><code>error_unit_mismatch</code></td>

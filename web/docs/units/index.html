@@ -3931,8 +3931,8 @@ whole string fails to resolve.</p>
 </tr>
 <tr>
 <td>Maximum raw unit string length</td>
-<td>Enforced by type-buffer limit</td>
-<td><code>error_unit_too_long</code></td>
+<td>255 bytes, but <em>which</em> cap fires depends on where the unit is written</td>
+<td><code>error_type_too_long</code> in an annotation, <code>error_unit_too_long</code> inline — see below</td>
 </tr>
 <tr>
 <td>Null or empty unit string</td>
@@ -3942,6 +3942,15 @@ whole string fails to resolve.</p>
 </tbody>
 </table>
 <p><code>a/b/c</code> parses as <code>a / (b·c)</code> → components <code>[a, b⁻¹, c⁻¹]</code>. The "no toggle back" rule means <code>/</code> always adds to the denominator; it never re-enters the numerator.</p>
+<blockquote>
+<p><strong>An over-long unit in an <em>annotation</em> is <code>error_type_too_long</code>, not <code>error_unit_too_long</code>.</strong>
+Three 255-byte caps sit in front of the unit parser and the one that fires decides the code. The
+whole type-annotation body has its own cap, and it counts the family name, the width and the
+commas as well — so a unit parameter can never be the only thing over the line, and an annotated
+unit always reaches <code>error_type_too_long</code> first. An <strong>inline</strong> unit suffix has a buffer to
+itself and is the path that reaches <code>error_unit_too_long</code>. doc/11 §2.5
+tabulates all three caps beside the profile grammar.</p>
+</blockquote>
 <hr />
 <h2 id="9-currency-codes">9. Currency Codes</h2>
 <p>Currency amounts are dimensional quantities in financial computing. <code>$19.99 USD</code> carries a denomination dimension just as <code>9.81 m/s²</code> carries an acceleration dimension. Bovnar extends the unit system with 216 currency and cryptocurrency codes so that monetary data can be annotated and round-tripped with the same precision guarantees as physical measurements.</p>
@@ -6343,7 +6352,7 @@ ev_data   data=&quot;1500&quot;
 <tr>
 <td><code>error_unit_too_long</code></td>
 <td>22</td>
-<td>Unit string exceeds the internal type-buffer size limit</td>
+<td>An <strong>inline</strong> unit suffix exceeds its 255-byte lexer buffer. A unit written in an <em>annotation</em> reaches the type-annotation body's own cap first and raises <code>error_type_too_long</code> (21) instead — see §8</td>
 </tr>
 <tr>
 <td><code>error_unit_mismatch</code></td>

@@ -2832,8 +2832,12 @@ tool's "Validation tiers" (§3 of <code>doc/13_bovnar_conformance.md</code>).</p
 <td><code>error_unit_illegal</code></td>
 </tr>
 <tr>
-<td>Unit string too long</td>
+<td>Inline unit suffix too long (255-byte lexer buffer)</td>
 <td><code>error_unit_too_long</code></td>
+</tr>
+<tr>
+<td>Unit written in an annotation, over the type-annotation body cap</td>
+<td><code>error_type_too_long</code></td>
 </tr>
 <tr>
 <td>Inline unit suffix differs from type-annotation unit</td>

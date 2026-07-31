@@ -1558,7 +1558,7 @@ fprintf(stderr, "error: %s\n", bvn_error_to_string(bvnr_reader_get_error(r)));
 | Code | Value | String | Trigger |
 |------|-------|--------|---------|
 | `error_unit_illegal` | 32 | `"unit_illegal"` | Unparseable unit string (unknown base, bad prefix, empty component, >8 components) |
-| `error_unit_too_long` | 22 | `"unit_too_long"` | Unit string exceeds internal buffer |
+| `error_unit_too_long` | 22 | `"unit_too_long"` | An **inline** unit suffix exceeds its 255-byte lexer buffer; a unit in an annotation raises `error_type_too_long` instead |
 | `error_unit_mismatch` | 38 | `"unit_mismatch"` | Inline unit suffix present, type-annotation unit also present, and the two differ; or a `want_unit` target dimensionally incompatible with the value's unit (§1.10) |
 | `error_unit_inexact` | 47 | `"unit_inexact"` | A `want_unit` conversion could not be delivered exactly: irrational factor, or a non-terminating expansion in the output base without `want_unit_allow_nonterminating` (§1.10) |
 | `error_unit_profile_unknown` | 49 | `"unit_profile_unknown"` | A unit written in the `name:` profile notation names a profile this build does not have (profile under implementation) |

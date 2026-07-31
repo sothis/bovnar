@@ -1420,10 +1420,18 @@ The literal `no_unit` declares a value as **explicitly dimensionless**:
 |------------|-------|--------------------|
 | Maximum components per compound unit | 32 (`BVNR_MAX_UNIT_COMPONENTS`) | `error_unit_illegal` |
 | Empty component between separators (e.g. `m//s`) | Not allowed | `error_unit_illegal` |
-| Maximum raw unit string length | Enforced by type-buffer limit | `error_unit_too_long` |
+| Maximum raw unit string length | 255 bytes, but *which* cap fires depends on where the unit is written | `error_type_too_long` in an annotation, `error_unit_too_long` inline — see below |
 | Null or empty unit string | Rejected by `bvn_parse_unit` | `ok = false` |
 
 `a/b/c` parses as `a / (b·c)` → components `[a, b⁻¹, c⁻¹]`. The "no toggle back" rule means `/` always adds to the denominator; it never re-enters the numerator.
+
+> **An over-long unit in an *annotation* is `error_type_too_long`, not `error_unit_too_long`.**
+> Three 255-byte caps sit in front of the unit parser and the one that fires decides the code. The
+> whole type-annotation body has its own cap, and it counts the family name, the width and the
+> commas as well — so a unit parameter can never be the only thing over the line, and an annotated
+> unit always reaches `error_type_too_long` first. An **inline** unit suffix has a buffer to
+> itself and is the path that reaches `error_unit_too_long`. doc/11 §2.5
+> tabulates all three caps beside the profile grammar.
 
 ---
 
@@ -2630,7 +2638,7 @@ The validator raises the following unit-specific errors:
 | Error code | Value | Trigger condition |
 |------------|-------|-------------------|
 | `error_unit_illegal` | 32 | Unparseable unit string: unknown prefix, unknown base unit, unknown currency code after `$`, a bare token in neither the physical-unit table nor (lacking the `$` sigil) recognised as a currency (e.g. `XYZ`, or bare `USD`), invalid prefix–unit combination (e.g. IEC prefix on a currency, sub-kilo SI prefix on byte), empty component between separators (e.g. `m//s`), or more than `BVNR_MAX_UNIT_COMPONENTS` (32) components |
-| `error_unit_too_long` | 22 | Unit string exceeds the internal type-buffer size limit |
+| `error_unit_too_long` | 22 | An **inline** unit suffix exceeds its 255-byte lexer buffer. A unit written in an *annotation* reaches the type-annotation body's own cap first and raises `error_type_too_long` (21) instead — see §8 |
 | `error_unit_mismatch` | 38 | An inline unit suffix and an explicit type-annotation unit are both present, but parse to different `value_unit_t` representations |
 | `error_unexpected_input_byte` | 15 | An inline unit suffix appears inside an array element |
 

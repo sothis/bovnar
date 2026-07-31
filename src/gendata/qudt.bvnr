@@ -64,7 +64,6 @@
   # want of a native target, and the target now exists.
   { .code = "FR";                                                    .bovnar = "statC"; },
   { .code = "LA_FT";                                                 .bovnar = "footlambert"; },
-  { .code = "HP_Brake";                                              .bovnar = "hp_B"; },
   { .code = "MI_US2";                                                .bovnar = "miUS^2"; },
   # Unblocked by the 35 units added to units.bvnr: each was refused for
   # want of a native target and for no other reason.
@@ -2894,6 +2893,15 @@
   # 2.7e-7 from the survey square mile and 3.7e-6 from the international one,
   # so the value points at the survey unit while a trade-code "square mile"
   # conventionally means the statute one. Naming it would be a guess.
+  # QUDT's own code and its own multiplier describe different units. BRAKE
+  # horsepower is the mechanical horsepower measured at the shaft -- 745.7 W,
+  # which QUDT already carries as HP -- and QUDT gives HP_Brake 9809.5 W,
+  # which is its own HP_Boiler to the digit. One of the two is a mistake and
+  # nothing in the vocabulary says which, so following the number would carry
+  # a boiler rating under a shaft-power name and following the name would
+  # contradict the only value QUDT states. Refusing is the third answer, and
+  # the one that costs a producer an error message instead of a factor of 13.
+  { .code = "HP_Brake";                    .why = "QUDT states 9809.5 W, its own HP_Boiler value, for a name that means the mechanical horsepower it also carries as HP; the code and the multiplier disagree by a factor of 13"; },
   { .code = "MI2";                         .why = "QUDT's multiplier (2589997.766) is 2.7e-7 from the survey square mile and 3.7e-6 from the international one; the name does not say which"; },
   { .code = "MIL";                         .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.000490873852)"; },
   { .code = "MI_UK3";                      .why = "QUDT states no conversionMultiplier for this unit"; },

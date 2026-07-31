@@ -167,6 +167,74 @@ def check_collisions(path, parse):
     return problems, checked
 
 
+NEARMISS_START = "### 13.3"
+NEARMISS_END = "### 13.4"
+
+
+def nearmiss_rows(path):
+    """(line, [codes], last cell) for §13.3's near-miss table."""
+    with open(path, encoding="utf-8") as f:
+        lines = f.read().split("\n")
+    inside, header = False, None
+    for n, line in enumerate(lines, 1):
+        if line.startswith(NEARMISS_START):
+            inside = True
+            continue
+        if line.startswith(NEARMISS_END):
+            return
+        if not inside or not line.startswith("|"):
+            continue
+        if SEPARATOR.match(line.strip()):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if header is None:
+            header = cells
+            continue
+        if len(cells) >= 5:
+            codes = TICK.findall(cells[0])
+            if codes:
+                yield n, codes, cells[-1]
+
+
+def check_nearmisses(path, parse, to_str):
+    """doc/11 §13.3 — the UDUNITS codes that borrow a native unit's name.
+
+    This table said every row was refused, and eleven of its twelve rows had
+    started mapping: `udunits:year` to `yr_trop`, `calorie` to `cal_IT`, the
+    chain/rod/furlong/fathom/acre series to the US survey units, `shake` to
+    `shake`. The registry gaining those units is exactly what unblocked them —
+    §6.3 recorded the same change for UCUM's survey series and this section did
+    not. A reader was told a code is refused that resolves.
+
+    The last column names what each code maps to now, or says it is refused.
+    """
+    problems, checked = [], 0
+    for lineno, codes, verdict in nearmiss_rows(path):
+        refused = "refus" in verdict.lower()
+        targets = TICK.findall(verdict)
+        for i, code in enumerate(codes):
+            got = parse("udunits:" + code)
+            checked += 1
+            if refused:
+                if got is not None:
+                    problems.append(
+                        "%s:%d: §13.3 says `udunits:%s` is refused; it maps to %r"
+                        % (DOC, lineno, code, to_str(got)))
+                continue
+            if got is None:
+                problems.append("%s:%d: §13.3 says `udunits:%s` maps; it is "
+                                "refused" % (DOC, lineno, code))
+                continue
+            if not targets:
+                continue
+            want = targets[i] if len(targets) == len(codes) else targets[0]
+            if to_str(got) != want:
+                problems.append(
+                    "%s:%d: §13.3 says `udunits:%s` maps to `%s`; it maps to `%s`"
+                    % (DOC, lineno, code, want, to_str(got)))
+    return problems, checked
+
+
 def main(argv):
     repo = os.path.abspath(argv[1]) if len(argv) > 1 else REPO
     sys.path.insert(0, repo)
@@ -189,6 +257,9 @@ def main(argv):
     opaque = {o["code"] for o in data.get("opaque", [])}
 
     bad, checked = check_collisions(path, parse)
+    nm_bad, nm_checked = check_nearmisses(path, parse, to_str)
+    bad += nm_bad
+    checked += nm_checked
     seen = set()
     for lineno, cells in rows(path):
         codes = TICK.findall(cells[0])
@@ -236,14 +307,14 @@ def main(argv):
                    % (DOC, len(missing), len(mapped), ", ".join(missing)))
 
     if bad:
-        sys.stderr.write("check_doc_profile_atoms: doc/11 §6.1 disagrees with "
+        sys.stderr.write("check_doc_profile_atoms: doc/11 disagrees with "
                          "src/gendata/ucum.bvnr:\n")
         for line in bad:
             sys.stderr.write("    %s\n" % line)
         sys.stderr.write("\nsrc/gendata is the source of truth; fix the "
                          "document.\n")
         return 1
-    print("check_doc_profile_atoms: %s §6.1 and §6.2 — %d row(s) checked "
+    print("check_doc_profile_atoms: %s §6.1, §6.2 and §13.3 — %d row(s) checked "
           "against the reader, all %d mapped UCUM codes present"
           % (DOC, checked, len(mapped)))
     return 0

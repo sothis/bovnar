@@ -17773,21 +17773,30 @@ the same `value_unit_t`.
 ### 13.3 The near misses: codes that name a native unit and are not it
 
 UDUNITS is the profile with the most spellings that look like a native unit, carry the same
-dimension, and differ only in factor. Each is refused as `error_unit_profile_unsupported` rather
-than mapped, because a factor-only error is the one shape nothing downstream can catch — the same
+dimension, and differ only in factor. A factor-only error is the one shape nothing downstream can
+catch, so none of them may be mapped onto the native unit whose name they borrow — the same
 reasoning §6.3 applies to the BTU and the apothecary dram.
 
-| UDUNITS code | Is | Native unit of that name | Apart by |
-|---|---|---|---|
-| `year`, `yr` | tropical year, `3.15569259747e7` s | `yr`, the Julian year `31557600` s | 674 s — 11 min/yr |
-| `month` | a twelfth of the tropical year | `mo`, a twelfth of the Julian year | as above |
-| `calorie`, `cal`, `IT_calorie` | IT calorie, `4.1868` J | `cal`, thermochemical `4.184` J | 0.067 % |
-| `chain`, `rod`, `furlong`, `fathom` | built on the US **survey** foot | international, on the `0.3048` m foot | 2 ppm |
-| `acre` | US survey acre, `160` survey rod² | `ac`, international `4046.8564224` m² | 4 ppm |
-| `shake` | `1e-8` s | — | no SI prefix for 10⁻⁸ (§3.5) |
+They were refused on that account for as long as there was nothing else to send them to. **The
+registry now carries the units themselves**, so all but one map to a unit of their own and the
+near-miss is gone rather than merely fenced off:
 
-The spelled-out forms UDUNITS gives for what Bovnar actually means **do** map, and they are the way
-to write these: `Julian_year` → `yr` and `thermochemical_calorie` → `cal`, both exactly. The BTU
+| UDUNITS code | Is | Native unit of that name | Apart by | Now |
+|---|---|---|---|---|
+| `year`, `yr` | tropical year, `3.15569259747e7` s | `yr`, the Julian year `31557600` s | 674 s — 11 min/yr | → `yr_trop` |
+| `month` | a twelfth of the tropical year | `mo`, a twelfth of the Julian year | as above | **refused** |
+| `calorie`, `cal`, `IT_calorie` | IT calorie, `4.1868` J | `cal`, thermochemical `4.184` J | 0.067 % | → `cal_IT` |
+| `chain`, `rod`, `furlong`, `fathom` | built on the US **survey** foot | international, on the `0.3048` m foot | 2 ppm | → `chUS`, `rdUS`, `furUS`, `fathUS` |
+| `acre` | US survey acre, `160` survey rod² | `ac`, international `4046.8564224` m² | 4 ppm | → `acUS` |
+| `shake` | `1e-8` s | — | no SI prefix for 10⁻⁸ (§3.5) | → `shake` |
+
+`month` is the one left, and it is left for a reason the others do not share: a twelfth of the
+tropical year is not a unit anybody publishes under a name of its own, so there is nothing to add to
+the registry that would not be an invention. It stays `error_unit_profile_unsupported`, named.
+
+The spelled-out forms UDUNITS gives for what Bovnar actually means still map, and they remain the
+unambiguous way to write these: `Julian_year` → `yr` and `thermochemical_calorie` → `cal`, both
+exactly, beside `year` → `yr_trop` and `calorie` → `cal_IT`. The BTU
 runs the other way from UCUM: UDUNITS' unqualified `Btu` is the IT BTU, which is exactly what native
 `Btu` is, so it maps here although UCUM's unqualified `[Btu]` cannot (§6.3).
 
@@ -17803,8 +17812,17 @@ Two spelling traps in the same family, neither of them factor errors:
 worth recording because it has now moved twice. At 24 bytes it pushed this profile's worst-case
 emitted string past `BVNR_UNIT_STRING_MAX` and `gen_profiles.py` refused to generate the table
 (§9.2); `thermochemical_calorie` was excluded the same way when that constant was 192. Closing the
-table against the UDUNITS database admitted a longer code still — `astronomical_unit_BIPM_2006`, 27
-bytes — and the constant went from 1024 to 1088 to take it. All four spellings now map.
+table against the UDUNITS database brought a longer code still into view —
+`astronomical_unit_BIPM_2006`, 27 bytes — and the constant went from 1024 to 1088 on its account.
+All four dalton spellings map.
+
+That row was then found **unreachable**, and is refused with a reason that has nothing to do with
+its length: this is an *expression* profile, so a code ending in digits cannot be read at all — the
+`2006` scans as an exponent (§3.3). Write `au`, `ua` or `astronomical_unit`. The constant has since
+stopped depending on it either way: `BVNR_UNIT_STRING_MAX` is recomputed from `src/gendata` by both
+generators on every build, and the header deliberately names no symbol as the extreme, because
+whichever one it named would be overtaken by the next catalogue growth and the comment would outlive
+the fact.
 
 **The one thing an incomplete atom table costs that an error message cannot.** UDUNITS spells the
 pint `pt`, and that spelling was not in this table. It did not therefore fail: with no atom row the

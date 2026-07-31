@@ -369,15 +369,18 @@
 
   # ── Area ─────────────────────────────────────────────────────────────────
   # "are" is 100 m², a hundredth of the hectare, which is the same target UCUM
-  # reaches for its "ar". "acre" is NOT here: UDUNITS defines it as 160 rod²
-  # on the survey rod, so it is the US SURVEY acre and 4 ppm off native ac.
+  # reaches for its "ar". "acre" is NOT native ac: UDUNITS defines it as 160
+  # rod² on the survey rod, so it is the US SURVEY acre, 4 ppm off. It was
+  # refused for that until the registry gained acUS; it maps there now, with
+  # the survey series, below.
   { .code = "are";                 .bovnar = "c~ha"; .metric = false; },
 
   # ── Force, pressure, energy, power ───────────────────────────────────────
-  # The unqualified "calorie" is NOT here. UDUNITS defines it as 4.1868 J, the
-  # IT calorie, while bovnar's cal is the thermochemical 4.184 J -- 0.067 %
-  # apart, dimensionally identical, and invisible to every later check. Only
-  # the spelled-out thermochemical one maps; see .unsupported. UDUNITS' "Btu"
+  # The unqualified "calorie" is NOT native cal. UDUNITS defines it as 4.1868 J,
+  # the IT calorie, while bovnar's cal is the thermochemical 4.184 J -- 0.067 %
+  # apart, dimensionally identical, and invisible to every later check. It was
+  # refused for that until the registry gained cal_IT; it maps there now, and
+  # the spelled-out thermochemical_calorie still maps to cal. UDUNITS' "Btu"
   # goes the other way: it is 1.05505585262e3 J, the IT BTU, which is exactly
   # what native Btu is, so it maps where UCUM's unqualified "[Btu]" cannot.
   { .code = "psi";                    .bovnar = "psi";  .metric = false; },
@@ -838,21 +841,24 @@
   { .code = "leap_year";     .why = "366 days exactly — no native form"; },
   { .code = "lunar_month";   .why = "synodal month — no native form"; },
 
-  # ── Survey-foot lengths ──────────────────────────────────────────────────
-  # UDUNITS builds these on the US survey foot (1200/3937 m), so each is
-  # 2 ppm longer than the native atom that shares its name -- and the acre,
-  # being an area, is 4 ppm out. Mapping them would be dimensionally perfect
-  # and silently wrong, which is the one failure this format exists to stop.
-  # ucum.bvnr refuses the survey inch and mile for exactly this reason.
-
-  # ── Calories that are not the thermochemical one ─────────────────────────
-  # Native cal is 4.184 J. UDUNITS' unqualified "calorie" is the IT calorie,
-  # 4.1868 J -- 0.067 % away and dimensionally identical, so it cannot map.
+  # ── Two families that USED to be refused here ────────────────────────────
+  # The survey-foot lengths and the IT calorie were both listed below, and both
+  # are now in .mapped. They were refused for the same reason and it still
+  # holds: UDUNITS builds chain/rod/furlong/fathom/acre on the US survey foot
+  # (1200/3937 m), 2 ppm longer than the native atom sharing each name and
+  # 4 ppm for the acre; and its unqualified "calorie" is the IT 4.1868 J
+  # against native cal's thermochemical 4.184 J, 0.067 % away. Mapping either
+  # onto the native atom would be dimensionally perfect and silently wrong.
   #
-  # UDUNITS' own "thermochemical_calorie" IS native cal exactly and now maps.
-  # It could not when this block was written: at 22 bytes it put the profile's
-  # worst case over BVNR_UNIT_STRING_MAX, which was 192. That constant is 1024
-  # now, so the spelling fits and the unqualified forms below stay refused.
+  # What changed is the alternative, not the judgement: the registry gained
+  # chUS, rdUS, furUS, fathUS, acUS and cal_IT, so each code maps to a unit
+  # that IS what it means. Only "month" is still refused on these grounds --
+  # a twelfth of the tropical year is not published under a name of its own.
+  #
+  # thermochemical_calorie could not be carried at all when this block was
+  # written: at 22 bytes it put the profile's worst case over
+  # BVNR_UNIT_STRING_MAX, then 192. The constant is 1088 now and both
+  # generators recompute the live worst case against it on every build.
 
   # ── Scales with no decade to fold into ───────────────────────────────────
 

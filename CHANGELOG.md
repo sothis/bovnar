@@ -81,6 +81,48 @@ key in one of them while writing this was enough to make
 `{Unit.parse("m"): 1}[parse_unit("m")]` a `KeyError`, and hash parity is now
 asserted across the whole catalogue.
 
+### Fixed — doc/11 §13.3 said twelve UDUNITS codes are refused; eleven map
+
+The near-miss table lists the UDUNITS spellings that borrow a native unit's name
+and are not it — `year` against the Julian `yr`, `calorie` against the
+thermochemical `cal`, the chain/rod/furlong/fathom/acre series against the
+international ones, `shake`. It said each "is refused as
+`error_unit_profile_unsupported` rather than mapped". Eleven of its twelve rows
+had started mapping: `udunits:year` → `yr_trop`, `calorie` → `cal_IT`, the
+survey series → `chUS`/`rdUS`/`furUS`/`fathUS`/`acUS`, `shake` → `shake`.
+
+The registry gaining those units is exactly what unblocked them, and §6.3
+recorded the same change for UCUM's survey series — this section did not. A
+reader was told a code is refused that resolves, in the document whose purpose
+is to say which codes resolve.
+
+The judgement has not changed and the section now says so: none of them may map
+onto the native atom sharing their name, because a factor-only error is the one
+shape nothing downstream can catch. What changed is that there is now a unit
+that *is* what each of them means. `month` is the one still refused, and for a
+reason the others do not share — a twelfth of the tropical year is not published
+under a name of its own, so there is nothing to add that would not be an
+invention.
+
+Also corrected: the paragraph on `astronomical_unit_BIPM_2006` said closing the
+table "admitted" it and grew `BVNR_UNIT_STRING_MAX` from 1024 to 1088 to take
+it. The constant did grow on its account, but the row was then found
+**unreachable** and is refused for a reason that has nothing to do with length —
+this is an expression profile, so the trailing `2006` scans as an exponent. The
+constant no longer depends on it either way; both generators recompute the live
+worst case from `src/gendata` on every build.
+
+`src/gendata/udunits.bvnr` carried the same staleness in its own comments, which
+matters more because it is the hand-edited source of truth: two said a code was
+"NOT here" while its row sat elsewhere in the file, and two section headers in
+`.unsupported` explained refusals whose entries had all moved to `.mapped`,
+leaving prose describing an empty set — including a "that constant is 1024 now".
+
+`check_doc_profile_atoms.py` now gates §13.3 as well as §6.1 and §6.2: for every
+row, each code either maps to the unit the table's last column names, or is
+refused as it says. Verified by mutation in both directions — claiming a mapped
+code is refused, and naming the wrong target.
+
 ### Fixed — `ucum:Gb` is the gilbert, and doc/11 called it a refusal
 
 doc/11 §6.2 tabulates the spellings that name different quantities in the two

@@ -4291,9 +4291,12 @@ between <code>udunits:kg m-2 s-1</code> and <code>udunits:kg*m-2*s-1</code>, whi
 the same <code>value_unit_t</code>.</p>
 <h3 id="133-the-near-misses-codes-that-name-a-native-unit-and-are-not-it">13.3 The near misses: codes that name a native unit and are not it</h3>
 <p>UDUNITS is the profile with the most spellings that look like a native unit, carry the same
-dimension, and differ only in factor. Each is refused as <code>error_unit_profile_unsupported</code> rather
-than mapped, because a factor-only error is the one shape nothing downstream can catch — the same
+dimension, and differ only in factor. A factor-only error is the one shape nothing downstream can
+catch, so none of them may be mapped onto the native unit whose name they borrow — the same
 reasoning §6.3 applies to the BTU and the apothecary dram.</p>
+<p>They were refused on that account for as long as there was nothing else to send them to. <strong>The
+registry now carries the units themselves</strong>, so all but one map to a unit of their own and the
+near-miss is gone rather than merely fenced off:</p>
 <table>
 <thead>
 <tr>
@@ -4301,6 +4304,7 @@ reasoning §6.3 applies to the BTU and the apothecary dram.</p>
 <th>Is</th>
 <th>Native unit of that name</th>
 <th>Apart by</th>
+<th>Now</th>
 </tr>
 </thead>
 <tbody>
@@ -4309,41 +4313,51 @@ reasoning §6.3 applies to the BTU and the apothecary dram.</p>
 <td>tropical year, <code>3.15569259747e7</code> s</td>
 <td><code>yr</code>, the Julian year <code>31557600</code> s</td>
 <td>674 s — 11 min/yr</td>
+<td>→ <code>yr_trop</code></td>
 </tr>
 <tr>
 <td><code>month</code></td>
 <td>a twelfth of the tropical year</td>
 <td><code>mo</code>, a twelfth of the Julian year</td>
 <td>as above</td>
+<td><strong>refused</strong></td>
 </tr>
 <tr>
 <td><code>calorie</code>, <code>cal</code>, <code>IT_calorie</code></td>
 <td>IT calorie, <code>4.1868</code> J</td>
 <td><code>cal</code>, thermochemical <code>4.184</code> J</td>
 <td>0.067 %</td>
+<td>→ <code>cal_IT</code></td>
 </tr>
 <tr>
 <td><code>chain</code>, <code>rod</code>, <code>furlong</code>, <code>fathom</code></td>
 <td>built on the US <strong>survey</strong> foot</td>
 <td>international, on the <code>0.3048</code> m foot</td>
 <td>2 ppm</td>
+<td>→ <code>chUS</code>, <code>rdUS</code>, <code>furUS</code>, <code>fathUS</code></td>
 </tr>
 <tr>
 <td><code>acre</code></td>
 <td>US survey acre, <code>160</code> survey rod²</td>
 <td><code>ac</code>, international <code>4046.8564224</code> m²</td>
 <td>4 ppm</td>
+<td>→ <code>acUS</code></td>
 </tr>
 <tr>
 <td><code>shake</code></td>
 <td><code>1e-8</code> s</td>
 <td>—</td>
 <td>no SI prefix for 10⁻⁸ (§3.5)</td>
+<td>→ <code>shake</code></td>
 </tr>
 </tbody>
 </table>
-<p>The spelled-out forms UDUNITS gives for what Bovnar actually means <strong>do</strong> map, and they are the way
-to write these: <code>Julian_year</code> → <code>yr</code> and <code>thermochemical_calorie</code> → <code>cal</code>, both exactly. The BTU
+<p><code>month</code> is the one left, and it is left for a reason the others do not share: a twelfth of the
+tropical year is not a unit anybody publishes under a name of its own, so there is nothing to add to
+the registry that would not be an invention. It stays <code>error_unit_profile_unsupported</code>, named.</p>
+<p>The spelled-out forms UDUNITS gives for what Bovnar actually means still map, and they remain the
+unambiguous way to write these: <code>Julian_year</code> → <code>yr</code> and <code>thermochemical_calorie</code> → <code>cal</code>, both
+exactly, beside <code>year</code> → <code>yr_trop</code> and <code>calorie</code> → <code>cal_IT</code>. The BTU
 runs the other way from UCUM: UDUNITS' unqualified <code>Btu</code> is the IT BTU, which is exactly what native
 <code>Btu</code> is, so it maps here although UCUM's unqualified <code>[Btu]</code> cannot (§6.3).</p>
 <p>Two spelling traps in the same family, neither of them factor errors:</p>
@@ -4358,8 +4372,16 @@ runs the other way from UCUM: UDUNITS' unqualified <code>Btu</code> is the IT BT
 worth recording because it has now moved twice. At 24 bytes it pushed this profile's worst-case
 emitted string past <code>BVNR_UNIT_STRING_MAX</code> and <code>gen_profiles.py</code> refused to generate the table
 (§9.2); <code>thermochemical_calorie</code> was excluded the same way when that constant was 192. Closing the
-table against the UDUNITS database admitted a longer code still — <code>astronomical_unit_BIPM_2006</code>, 27
-bytes — and the constant went from 1024 to 1088 to take it. All four spellings now map.</p>
+table against the UDUNITS database brought a longer code still into view —
+<code>astronomical_unit_BIPM_2006</code>, 27 bytes — and the constant went from 1024 to 1088 on its account.
+All four dalton spellings map.</p>
+<p>That row was then found <strong>unreachable</strong>, and is refused with a reason that has nothing to do with
+its length: this is an <em>expression</em> profile, so a code ending in digits cannot be read at all — the
+<code>2006</code> scans as an exponent (§3.3). Write <code>au</code>, <code>ua</code> or <code>astronomical_unit</code>. The constant has since
+stopped depending on it either way: <code>BVNR_UNIT_STRING_MAX</code> is recomputed from <code>src/gendata</code> by both
+generators on every build, and the header deliberately names no symbol as the extreme, because
+whichever one it named would be overtaken by the next catalogue growth and the comment would outlive
+the fact.</p>
 <p><strong>The one thing an incomplete atom table costs that an error message cannot.</strong> UDUNITS spells the
 pint <code>pt</code>, and that spelling was not in this table. It did not therefore fail: with no atom row the
 expression parser fell back on a <em>prefixed</em> reading, <code>p</code> + <code>t</code>, and <code>udunits:pt</code> parsed clean as a

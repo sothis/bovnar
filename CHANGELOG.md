@@ -81,6 +81,27 @@ key in one of them while writing this was enough to make
 `{Unit.parse("m"): 1}[parse_unit("m")]` a `KeyError`, and hash parity is now
 asserted across the whole catalogue.
 
+### Fixed — doc/07 said `udunits:a` is refused; it is the are
+
+The cross-vocabulary collision table in the ambiguities reference — the document
+a reader consults precisely when a token could mean two things — said of the
+letter `a`: "in `udunits:` the same letter is the *prefix* atto, and there is no
+bare `a` atom, so `udunits:a` is refused". There is a bare `a` atom, an alias of
+`are`, so `udunits:a` is `c~ha`.
+
+That makes `a` the most interesting row in the table rather than a footnote: it
+is the one spelling that means a **different unit in each profile** — the Julian
+year in UCUM, the are in UDUNITS — and it demonstrates the atom-outranks-prefix
+rule on a letter that is genuinely also a prefix. The row says that now.
+
+Found by sweeping every `<vocab>:<code>` named anywhere in the documentation
+against the parser and asking whether the codes described as refused are. The
+tables in doc/07 were checked column by column and the prose column — "the
+trap", which is the point of each row — was not checked at all.
+`check_doc_ambiguities.py` now checks two claim shapes wherever they appear in a
+row: `` `ucum:st` → `m³` `` must map that way, and a code named in the same cell
+as the word "refused" must actually be refused. Both verified by mutation.
+
 ### Fixed — doc/11 §13.3 said twelve UDUNITS codes are refused; eleven map
 
 The near-miss table lists the UDUNITS spellings that borrow a native unit's name

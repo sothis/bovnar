@@ -164,6 +164,7 @@ def check(repo):
 
     for n, header, cells in rows(path):
         h = tuple(header)
+        check_profile_claims(c, n, cells)
 
         # §2 and §3 have the same shape and the same claim: the token resolves
         # one way, and the OTHER reading is reachable only by spelling it out.
@@ -321,6 +322,54 @@ def check_refuses_row(c, n, cells):
             if c.b.units_convertible(su, tu):
                 c.fail(n, "the row says `%s` is refused against `%s`, and the "
                           "library converts them" % (sname, tname))
+
+
+VOCABS = ("ucum", "unece", "qudt", "qudt-qk", "udunits", "om", "cf")
+# "`ucum:st` → `m³`" — a mapping the row states outright.
+MAPS_TO = re.compile(r"`((?:%s):[^`]+)`\s*(?:→|->)\s*`([^`]+)`" % "|".join(VOCABS))
+PROFILE_CODE = re.compile(r"`((?:%s):[^`]+)`" % "|".join(VOCABS))
+
+
+def check_profile_claims(c, n, cells):
+    """Every `<vocab>:<code>` a row names, put to the parser.
+
+    The tables in this document are checked column by column, and the prose
+    column — "the trap", the whole point of the row — was not checked at all.
+    It said of the letter `a`: "in `udunits:` the same letter is the prefix
+    atto, and there is no bare `a` atom, so `udunits:a` is refused". There is a
+    bare `a` atom, an alias of `are`, so `udunits:a` is `c~ha` — which makes
+    that letter the one spelling in the table that means a DIFFERENT unit in
+    each profile, and the row called it a refusal. In the document a reader
+    consults precisely when a token could mean two things.
+
+    Two claim shapes are checkable wherever they appear in a row:
+    "`ucum:st` → `m³`" must map that way, and a code named in the same cell as
+    the word "refused" must actually be refused.
+    """
+    for cell in cells:
+        for code, target in MAPS_TO.findall(cell):
+            c.checked += 1
+            try:
+                got = c.b.unit_to_str(c.b.parse_unit(code))
+            except Exception:
+                c.fail(n, "`%s` is stated to be `%s`; it does not resolve"
+                          % (code, target))
+                continue
+            if got != target:
+                c.fail(n, "`%s` is stated to be `%s`; it is `%s`"
+                          % (code, target, got))
+        if not re.search(r"\brefus", cell, re.I):
+            continue
+        for code in PROFILE_CODE.findall(cell):
+            if MAPS_TO.search(cell) and code in [m[0] for m in MAPS_TO.findall(cell)]:
+                continue
+            c.checked += 1
+            try:
+                got = c.b.unit_to_str(c.b.parse_unit(code))
+            except Exception:
+                continue
+            c.fail(n, "`%s` is described as refused; it resolves to `%s`"
+                      % (code, got))
 
 
 def check_hazard_row(c, n, cells):

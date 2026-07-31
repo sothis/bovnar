@@ -10970,7 +10970,7 @@ Every row below was produced by the reference implementation.
 | `st` | the **stone**, 6.35 kg | `ucum:st` → `m³`, the **stere** | The sharpest collision of the set: same two letters, different *dimension* |
 | `B` | the **byte** | `ucum:B` → `da~dB`, the **bel** | UCUM writes the byte `By`. `qudt:BYTE` and `udunits:byte` are the byte |
 | `ar` | *(not a unit)* | `ucum:ar` → `c~ha`, the **are** | The hectare is `ucum:har`, not `ucum:ar` — an easy off-by-100 |
-| `a` | *(not a unit)* | `ucum:a` → `yr`, the **Julian year** | In `udunits:` the same letter is the *prefix* atto, and there is no bare `a` atom, so `udunits:a` is refused |
+| `a` | *(not a unit)* | `ucum:a` → `yr`, the **Julian year** | The one letter that means a **different unit in each profile**: `udunits:a` is the **are**, `c~ha`. In UDUNITS `a` is also the atto prefix, and the atom wins — a whole atom outranks a prefixed reading (§16) |
 | `MI` | *(case-sensitive; not a unit)* | `qudt:MI` → `mi`, the **mile** | A flat vocabulary never decomposes a code, so this is not milli-anything |
 | `KGM` | *(not a unit)* | `unece:KGM` → `k~g` | Likewise not a `k` prefix on a `GM` that Rec 20 never defined |
 | `MTS` | *(not a unit)* | `unece:MTS` → `m/s` | Not a mega-`TS`; and `unece:MTK` one letter away is the square metre |

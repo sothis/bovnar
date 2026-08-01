@@ -452,3 +452,81 @@ class TestUnitPredicates:
         assert unit_to_str(bovnar.unit_si_normal_form(parse_unit("g"))) == "k~g"
         for none_case in ("%", "ppm", "dB", "pH", "rad", "$USD", "lm", "s/°C"):
             assert bovnar.unit_si_normal_form(parse_unit(none_case)) is None, none_case
+
+
+@needs_lib
+class TestPolicyRefusalNamesTheEntry:
+    """A refused policy must say WHICH entry, and which part of it.
+
+    ``bvnr_reader_set_unit_policy`` answers one bool for a whole policy, and
+    both bindings reported every refusal as "check the unit spellings in
+    targets / require_dimension_of". That never mentioned ``rules`` at all, and
+    described a bad rule PATH — over MAX_UNIT_PATH bytes, missing its leading
+    '.', or a bare '.*' — and an invalid base as unit spellings. The tests above
+    assert only that *something* raised, which is what let the wording drift
+    away from the causes.
+    """
+
+    BAD_UNIT = "not_a_unit_at_all"
+
+    def _msg(self, **kw):
+        from bovnar import Reader, UnitPolicy
+        with Reader() as r:
+            with pytest.raises(bovnar.BovnarArgumentError) as e:
+                r.set_unit_policy(UnitPolicy(**kw))
+        return str(e.value)
+
+    def test_targets_entry_is_named(self):
+        m = self._msg(targets=[self.BAD_UNIT])
+        assert "targets" in m and self.BAD_UNIT in m
+
+    def test_require_dimension_entry_is_named(self):
+        m = self._msg(require_dimension_of=[self.BAD_UNIT])
+        assert "require_dimension_of" in m and self.BAD_UNIT in m
+
+    def test_a_bad_rule_unit_names_the_rule_and_the_unit(self):
+        from bovnar import UnitRule
+        m = self._msg(rules=[UnitRule(".inlet.speed", self.BAD_UNIT)])
+        assert ".inlet.speed" in m and self.BAD_UNIT in m
+        # ...and calls it a unit, not a path.
+        assert "path" not in m
+
+    @pytest.mark.parametrize("path", ["a.b", ".*", "." + "a" * 97])
+    def test_a_bad_rule_path_is_called_a_path(self, path):
+        from bovnar import UnitRule
+        m = self._msg(rules=[UnitRule(path, "m")])
+        assert "path" in m
+        # The old message blamed unit spellings for every one of these.
+        assert "unit spellings" not in m
+
+    def test_a_bad_base_is_called_a_base(self):
+        from bovnar import UnitRule
+        assert "base" in self._msg(targets=[("m", 63)])
+        assert "base" in self._msg(rules=[UnitRule(".a", "m", base=63)])
+        assert "base" in self._msg(targets=["m"], base=63)
+
+    def test_the_writer_names_rules_too(self):
+        """The writer's message listed only require_dimension_of, and its
+        setter takes rules (in convert=False form)."""
+        from bovnar import Writer, UnitPolicy, UnitRule
+        w = Writer.to_mem()
+        with pytest.raises(bovnar.BovnarArgumentError) as e:
+            w.set_unit_policy(UnitPolicy(
+                rules=[UnitRule(".a", self.BAD_UNIT, convert=False)]))
+        assert ".a" in str(e.value) and self.BAD_UNIT in str(e.value)
+
+    def test_the_first_bad_entry_is_the_one_reported(self):
+        """Good entries before the bad one must not be accused."""
+        m = self._msg(targets=["m", "k~m/s", self.BAD_UNIT])
+        assert self.BAD_UNIT in m and "k~m/s" not in m
+
+    def test_a_valid_policy_is_still_accepted(self):
+        """The probe must not reject anything the setter takes."""
+        from bovnar import Reader, UnitPolicy, UnitRule
+        with Reader() as r:
+            r.set_unit_policy(UnitPolicy(
+                targets=["m", ("k~m", 16)], base=10, normalise_si=True,
+                leave_inexact=True, require_unit=False,
+                require_dimension_of=["s"],
+                rules=[UnitRule(".a.b", "m"), UnitRule(".c.*", "s",
+                                                       convert=False)]))

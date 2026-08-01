@@ -768,17 +768,106 @@ static int cli_parse_unit_opts(const char *cmd, int argc, char **argv, int *argi
 	return -1;                       /* not one of ours */
 }
 
-/* Install what cli_parse_unit_opts collected. Reports the library's refusal in
- * the caller's terms: the only way this fails is a unit the parser will not
- * take, and naming it is more use than "invalid argument". */
-static bool cli_apply_unit_policy(const char *cmd, bvnr_reader_t *r,
-				  cli_unit_policy_t *up)
+/*
+ * Ask the library about ONE policy entry, on a scratch reader so the caller's
+ * reader is left alone. Using bvnr_reader_set_unit_policy itself as the oracle
+ * -- rather than re-deriving its rules here -- is what keeps this from drifting
+ * away from bvn_unit_policy_parse the next time that grows a check.
+ *
+ * A reader it cannot allocate answers "fine", so a probe that never ran cannot
+ * accuse an argument; the caller then falls back to the general message.
+ */
+static bool cli_policy_probe(const bvnr_unit_policy_t *p)
 {
-	if (!up->any)
+	bvnr_reader_t *pr = bvnr_reader_create();
+	if (!pr)
 		return true;
-	/* One --base covers both places a base can apply: every --unit target and
-	 * the normalisation fallback. Stamped here so the flags may appear in any
-	 * order on the command line. */
+	bool ok = bvnr_reader_set_unit_policy(pr, p);
+	bvnr_reader_destroy(pr);
+	return ok;
+}
+
+/*
+ * Name the argument the caller actually has to fix.
+ *
+ * The setter answers one bool for the whole policy, and this used to be
+ * reported as "check the unit spellings passed to --unit / --require-dimension"
+ * whatever had gone wrong. That is right for two of the six things that reach
+ * it and wrong for the rest: a rule path over BVNR_MAX_UNIT_PATH bytes, one
+ * without a leading '.', and a bare ".*" are all PATH faults reported as unit
+ * spellings, and a bad unit in --field / --require-field named neither flag.
+ * The count limits (--unit, rules) and --base never get here -- cli_parse_unit_opts
+ * catches those itself, with their own messages.
+ *
+ * Each entry is re-offered on its own; the first the library refuses is the one
+ * to report. For a rule, the unit is then swapped for one that certainly parses
+ * to decide which HALF of "<path>=<unit>" is at fault.
+ */
+static void cli_report_unit_policy(const char *cmd, const cli_unit_policy_t *up)
+{
+	bvnr_unit_policy_t probe;
+
+	for (uint32_t i = 0; i < up->policy.num_targets; i++) {
+		memset(&probe, 0, sizeof(probe));
+		probe.targets     = &up->targets[i];
+		probe.num_targets = 1;
+		if (!cli_policy_probe(&probe)) {
+			fprintf(stderr, "%s: --unit '%s' is not a unit bovnar can "
+					"parse\n", cmd, up->targets[i].unit);
+			return;
+		}
+	}
+	for (uint32_t i = 0; i < up->policy.num_require_dimension_of; i++) {
+		memset(&probe, 0, sizeof(probe));
+		probe.require_dimension_of     = &up->require[i];
+		probe.num_require_dimension_of = 1;
+		if (!cli_policy_probe(&probe)) {
+			fprintf(stderr, "%s: --require-dimension '%s' is not a unit "
+					"bovnar can parse\n", cmd, up->require[i]);
+			return;
+		}
+	}
+	for (uint32_t i = 0; i < up->policy.num_rules; i++) {
+		bvnr_unit_rule_t  one  = up->rules[i];
+		const char       *flag = one.mode == bvnr_rule_require
+				       ? "--require-field" : "--field";
+
+		memset(&probe, 0, sizeof(probe));
+		probe.rules     = &one;
+		probe.num_rules = 1;
+		if (cli_policy_probe(&probe))
+			continue;
+		/* Path or unit? Re-offer the same rule with a unit that certainly
+		 * parses: if it then holds, the unit was the fault; if it still
+		 * fails, the path is. */
+		one.unit = "m";
+		if (cli_policy_probe(&probe))
+			fprintf(stderr, "%s: %s '%s=%s' — '%s' is not a unit bovnar "
+					"can parse\n", cmd, flag, up->rules[i].path,
+				up->rules[i].unit, up->rules[i].unit);
+		else
+			fprintf(stderr, "%s: %s path '%s' is unusable — a path must "
+					"start with '.', be at most %u bytes, and "
+					"cannot be just '.*'\n",
+				cmd, flag, up->rules[i].path, BVNR_MAX_UNIT_PATH);
+		return;
+	}
+	/* Nothing singled itself out -- a whole-policy refusal, or a probe that
+	 * could not run. Say only what is certain. */
+	fprintf(stderr, "%s: unusable unit policy — check the arguments passed to "
+			"--unit / --require-dimension / --field / --require-field\n",
+		cmd);
+}
+
+/*
+ * Point the policy at the collected arrays and stamp one --base across every
+ * place a base can apply, so the flags may appear in any order on the command
+ * line. Shared for the same reason cli_parse_unit_opts is: `query` kept its own
+ * copy of this, which is how the three commands drift into meaning different
+ * things by the same flag.
+ */
+static void cli_stamp_unit_policy(cli_unit_policy_t *up)
+{
 	for (uint32_t i = 0; i < up->policy.num_targets; i++)
 		up->targets[i].base = up->policy.base;
 	for (uint32_t i = 0; i < up->policy.num_rules; i++) {
@@ -788,10 +877,19 @@ static bool cli_apply_unit_policy(const char *cmd, bvnr_reader_t *r,
 	up->policy.targets              = up->targets;
 	up->policy.rules                = up->rules;
 	up->policy.require_dimension_of = up->require;
+}
+
+/* Install what cli_parse_unit_opts collected. A refusal is reported against the
+ * argument that caused it -- see cli_report_unit_policy. */
+static bool cli_apply_unit_policy(const char *cmd, bvnr_reader_t *r,
+				  cli_unit_policy_t *up)
+{
+	if (!up->any)
+		return true;
+	cli_stamp_unit_policy(up);
 	if (bvnr_reader_set_unit_policy(r, &up->policy))
 		return true;
-	fprintf(stderr, "%s: unusable unit policy — check the unit spellings "
-			"passed to --unit / --require-dimension\n", cmd);
+	cli_report_unit_policy(cmd, up);
 	return false;
 }
 static bool evt_on_unverified(void *ud, bvnr_event_t e, bvnr_data_t *d);
@@ -1169,21 +1267,29 @@ static int cmd_query(const char *path, const char *filename,
 			"`bovnar validate --text-only` instead\n");
 		return 2;
 	}
+	/*
+	 * Check the policy BEFORE the document is opened, and report it the way
+	 * validate and events do.
+	 *
+	 * This command reaches the setter through the DOM builder, which surfaces a
+	 * refused policy as error_invalid_argument on the PARSE -- so every bad
+	 * --unit, --require-dimension or --field argument came back as "Parse error
+	 * in <file>: invalid_argument". The document was blamed, by name, for a
+	 * fault in the command line, and the file was read before anyone noticed.
+	 */
+	if (up && up->any) {
+		cli_stamp_unit_policy(up);
+		if (!cli_policy_probe(&up->policy)) {
+			cli_report_unit_policy("query", up);
+			return 2;
+		}
+	}
 	int fd = open(filename, BVN_O_RDONLY);
 	if (fd < 0) { perror(filename); return 1; }
 	/* The DOM takes the same policy the streaming reader does, so a query can
 	 * assert what it expects to find and ask for the unit it wants back. */
 	bvn_dom_doc_t *doc;
 	if (up && up->any) {
-		up->policy.targets              = up->targets;
-		up->policy.rules                = up->rules;
-		up->policy.require_dimension_of = up->require;
-		for (uint32_t i = 0; i < up->policy.num_targets; i++)
-			up->targets[i].base = up->policy.base;
-		for (uint32_t i = 0; i < up->policy.num_rules; i++) {
-			if (up->rules[i].mode == bvnr_rule_convert)
-				up->rules[i].base = up->policy.base;
-		}
 		doc = bvn_dom_parse_fd_policy(fd, 0, &up->policy);
 	} else {
 		doc = bvn_dom_parse_fd(fd);

@@ -21,6 +21,7 @@
 # SOFTWARE.
 
 import ctypes
+from types import SimpleNamespace
 from .enums import (
     Event, ValueTypeFamily, PrefixSystem, SIPrefix, IECPrefix,
     BaseUnit, Exponent, ErrorCode,
@@ -561,6 +562,89 @@ def build_unit_policy(targets=(), base=0, normalise_si=False,
     cp.require_dimension_of     = c_require
     cp.num_require_dimension_of = len(require_dimension_of)
     return cp, keepalive
+
+
+UNIT_POLICY_REFUSED_GENERAL = (
+    "unusable unit policy — check the units, bases and rule paths in "
+    "targets / require_dimension_of / rules")
+
+
+def describe_unit_policy_refusal(lib, targets=(), base=0, normalise_si=False,
+                                 leave_inexact=False, require_unit=False,
+                                 require_dimension_of=(), rules=()):
+    """Name the entry the C setter refused, by offering each one on its own.
+
+    ``bvnr_reader_set_unit_policy`` answers one bool for a whole policy, so both
+    bindings reported every refusal as "check the unit spellings in targets /
+    require_dimension_of". That never mentioned ``rules`` at all, and described a
+    bad rule PATH — over ``MAX_UNIT_PATH`` bytes, missing its leading '.', or a
+    bare '.*' — and an invalid base as unit spellings.
+
+    Shared by the reader and the writer for the same reason
+    :func:`build_unit_policy` is. The setter itself is the oracle rather than a
+    re-derivation of its rules here, so this cannot drift away from
+    ``bvn_unit_policy_parse`` the next time that grows a check.
+
+    Returns the message for the first entry the library refuses, or
+    :data:`UNIT_POLICY_REFUSED_GENERAL` if nothing singles itself out.
+    """
+    rd = lib.bvnr_reader_create()
+    if not rd:
+        return UNIT_POLICY_REFUSED_GENERAL
+    try:
+        def refuses(**kw):
+            cp, keepalive = build_unit_policy(**kw)
+            ok = lib.bvnr_reader_set_unit_policy(rd, ctypes.byref(cp))
+            del keepalive
+            return not ok
+
+        for t in targets:
+            if not refuses(targets=[t]):
+                continue
+            unit, tbase = (t, 0) if isinstance(t, str) else (t[0], t[1])
+            if tbase and not refuses(targets=[unit]):
+                return (f"unusable unit policy: targets entry {unit!r} asks for "
+                        f"base {tbase}, which bovnar cannot write")
+            return (f"unusable unit policy: targets entry {unit!r} is not a unit "
+                    f"bovnar can parse")
+
+        for u in require_dimension_of:
+            if refuses(require_dimension_of=[u]):
+                return (f"unusable unit policy: require_dimension_of entry {u!r} "
+                        f"is not a unit bovnar can parse")
+
+        for r in rules:
+            if not refuses(rules=[r]):
+                continue
+            # Which part? Hold the others at values that certainly parse and
+            # vary one at a time: path first, since it is the only one left
+            # when a unit that parses and no base still will not go in.
+            plain = SimpleNamespace(path=r.path, unit="m", base=0,
+                                    convert=r.convert)
+            if refuses(rules=[plain]):
+                return (f"unusable unit policy: rule path {r.path!r} is unusable "
+                        f"— a path must start with '.', be at most "
+                        f"{MAX_UNIT_PATH} bytes, and cannot be just '.*'")
+            unbased = SimpleNamespace(path=r.path, unit=r.unit, base=0,
+                                      convert=r.convert)
+            if refuses(rules=[unbased]):
+                return (f"unusable unit policy: rule {r.path!r} names unit "
+                        f"{r.unit!r}, which is not a unit bovnar can parse")
+            return (f"unusable unit policy: rule {r.path!r} asks for base "
+                    f"{r.base}, which bovnar cannot write")
+
+        # Nothing singled itself out: a whole-policy field (base, normalise,
+        # on_inexact) or a combination.
+        if base and not refuses(targets=list(targets), normalise_si=normalise_si,
+                                leave_inexact=leave_inexact,
+                                require_unit=require_unit,
+                                require_dimension_of=list(require_dimension_of),
+                                rules=list(rules)):
+            return (f"unusable unit policy: base {base} is not a base bovnar can "
+                    f"write")
+        return UNIT_POLICY_REFUSED_GENERAL
+    finally:
+        lib.bvnr_reader_destroy(rd)
 
 
 class BvnrWriteFlags(ctypes.Structure):

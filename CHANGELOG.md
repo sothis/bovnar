@@ -205,6 +205,55 @@ holding all three to the code the CLI names, and rejecting the specific shape
 that regressed: `ok: false` beside `error_name: "none"`. Mutation-tested; the
 four cases kill twelve assertions.
 
+### Fixed — a refused unit policy blamed the wrong argument, and `query` blamed the file
+
+`bvnr_reader_set_unit_policy` answers one bool for a whole policy, and every
+caller turned that into one sentence. The CLI said **"check the unit spellings
+passed to `--unit` / `--require-dimension`"** whatever had gone wrong. That is
+right for two of the six things that reach it:
+
+| what you typed | what you were told |
+|---|---|
+| `--unit nosuch` | check the unit spellings — correct |
+| `--require-dimension nosuch` | check the unit spellings — correct |
+| `--require-field .a=nosuch` | check the unit spellings *on two flags you did not use* |
+| `--require-field <97 chars>=m` | check the unit spellings — it is the **path** |
+| `--require-field a=m` (no leading `.`) | check the unit spellings — it is the **path** |
+| `--require-field .*=m` | check the unit spellings — it is the **path** |
+
+Each entry is now re-offered to the library on its own, and the first one it
+refuses is the one reported — by flag, and by which half of `<path>=<unit>` is
+at fault. Using the setter itself as the oracle, rather than re-deriving
+`bvn_unit_policy_parse`'s rules in the CLI, is what keeps the two from drifting.
+The count limits (`--unit`, rules) and `--base` never reach this: they are
+caught earlier with their own messages, and still are.
+
+**`query` was worse: it blamed the document.** It reaches the setter through the
+DOM builder, which surfaces a refused policy as `error_invalid_argument` on the
+*parse* — so every bad policy argument came back as
+`Parse error in sensors.bvnr: invalid_argument`. The file was named as the
+faulty thing, and was read before anyone noticed. It now checks the policy
+before opening the document and reports it the way `validate` and `events` do.
+The distinction that matters is preserved: a policy the *arguments* state
+correctly but the *document* cannot satisfy is still reported against the file.
+
+`query` also kept its own copy of the `--base` stamping loop, which is how three
+commands drift into meaning different things by the same flag; that is now
+shared, like the flag parsing above it.
+
+**The Python bindings had the same message and the same holes** — "check the
+unit spellings in targets / require_dimension_of", which never mentioned
+`rules` at all, and described a bad rule path or an invalid base as a unit
+spelling. `Reader.set_unit_policy` and `Writer.set_unit_policy` now share one
+probe (`describe_unit_policy_refusal`) and name the entry, the field and the
+part: unit, base, or path.
+
+Nine CLI tests and ten Python ones pin the wording against the cause; the
+`query` pair also asserts the output does *not* contain "Parse error", which is
+what makes the document-blaming shape impossible to reintroduce. Mutation-tested
+on both sides — reverting the C fix kills 6 CLI assertions and the `query` fix 2
+more, and reverting the Python probe kills 9 of its 10.
+
 ### Fixed — a string carrying a unit did not survive `dumps()`
 
 `.s = "x" m;` is legal, and the grammar says so outright —

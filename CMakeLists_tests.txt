@@ -1097,6 +1097,71 @@ set_tests_properties(bvnr_cli_policy_bad_unit_refused PROPERTIES
     TIMEOUT 30
     WILL_FAIL TRUE)
 
+# The refusal must name the ARGUMENT that caused it. bvnr_reader_set_unit_policy
+# answers one bool for the whole policy, and the CLI reported every refusal as
+# "check the unit spellings passed to --unit / --require-dimension" -- right for
+# two of the six things that reach it. A rule path over BVNR_MAX_UNIT_PATH, one
+# without a leading '.', and a bare ".*" are PATH faults reported as unit
+# spellings, and a bad unit in --field / --require-field named neither flag.
+#
+# Each case asserts the message singles out the right flag AND the right half of
+# "<path>=<unit>", so a regression to one catch-all line fails here.
+string(REPEAT "a" 97 _bvnr_long_path)
+foreach(_case
+        # name              args                                  expected regex
+        "unit_target;--unit@@nosuchunitxyz;--unit 'nosuchunitxyz'"
+        "unit_dimension;--require-dimension@@nosuchunitxyz;--require-dimension 'nosuchunitxyz'"
+        "rule_unit;--require-field@@.a=nosuchunitxyz;--require-field '\\.a=nosuchunitxyz'"
+        "field_unit;--field@@.a=nosuchunitxyz;--field '\\.a=nosuchunitxyz'"
+        "rule_path_long;--require-field@@.${_bvnr_long_path}=m;--require-field path .* is unusable"
+        "rule_path_no_dot;--require-field@@a=m;--require-field path 'a' is unusable")
+    list(GET _case 0 _n)
+    list(GET _case 1 _a)
+    list(GET _case 2 _rx)
+    string(REPLACE "@@" ";" _a "${_a}")
+    add_test(NAME bvnr_cli_policy_names_arg_${_n}
+             COMMAND bovnar validate ${_a}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/examples/units.bvnr)
+    set_tests_properties(bvnr_cli_policy_names_arg_${_n} PROPERTIES
+        LABELS  "cli;units;policy"
+        TIMEOUT 30
+        PASS_REGULAR_EXPRESSION "${_rx}")
+endforeach()
+
+# `query` reaches the setter through the DOM builder, which surfaces a refused
+# policy as error_invalid_argument on the PARSE -- so every bad policy argument
+# came back as "Parse error in <file>: invalid_argument". The document was
+# blamed, by name, for a fault in the command line, and was read before anyone
+# noticed. It now checks the policy before opening the file and reports it the
+# way validate and events do; FAIL_REGULAR_EXPRESSION is what pins that.
+foreach(_case
+        "unit;--unit@@nosuchunitxyz;--unit 'nosuchunitxyz'"
+        "rule_path;--require-field@@a=m;--require-field path 'a' is unusable")
+    list(GET _case 0 _n)
+    list(GET _case 1 _a)
+    list(GET _case 2 _rx)
+    string(REPLACE "@@" ";" _a "${_a}")
+    add_test(NAME bvnr_cli_policy_query_names_arg_${_n}
+             COMMAND bovnar query ${_a} .si_second
+                     ${CMAKE_CURRENT_SOURCE_DIR}/examples/units.bvnr)
+    set_tests_properties(bvnr_cli_policy_query_names_arg_${_n} PROPERTIES
+        LABELS  "cli;units;policy;dom"
+        TIMEOUT 30
+        PASS_REGULAR_EXPRESSION "${_rx}"
+        FAIL_REGULAR_EXPRESSION "Parse error in")
+endforeach()
+
+# The other half of that distinction, which must NOT change: a policy the
+# arguments state correctly but the DOCUMENT cannot satisfy is still reported
+# against the file. Requiring a length of a time is a document-tier failure.
+add_test(NAME bvnr_cli_policy_query_document_still_blamed
+         COMMAND bovnar query --require-field .si_second=m .si_second
+                 ${CMAKE_CURRENT_SOURCE_DIR}/examples/units.bvnr)
+set_tests_properties(bvnr_cli_policy_query_document_still_blamed PROPERTIES
+    LABELS  "cli;units;policy;dom"
+    TIMEOUT 30
+    PASS_REGULAR_EXPRESSION "Parse error in.*unit_mismatch")
+
 # An inline unit on an un-annotated value must survive canonicalisation by being
 # folded into the synthesised annotation (e.g. "9.81 m/s" -> "<float:64,_10,m/s>").
 # The idempotency test cannot catch a drop here ("no_unit" -> "no_unit" is itself
@@ -1334,7 +1399,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 166)   # 129 base + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy
+set(BVNR_EXPECTED_TEST_COUNT 175)   # 129 base + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier)
                                     #             + citation
                                     #         + profiles_off_build
                                     # + om_test + cf_test

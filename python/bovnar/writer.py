@@ -33,7 +33,7 @@ from .exceptions import BovnarWriteError, BovnarArgumentError
 from .structs import (
     BvnrSink, BvnrWriteFlags, BvnrData,
     ValueTypeSpec, ValueUnit,
-    build_unit_policy,
+    build_unit_policy, describe_unit_policy_refusal,
     make_type_spec, make_unit_dimensionless, make_unit_none,
     make_unit_si, make_unit_iec,
     UNIT_STRING_MAX,
@@ -228,9 +228,15 @@ class Writer:
         except ValueError as e:
             raise BovnarArgumentError(str(e)) from None
         if not self._lib.bvnr_writer_set_unit_policy(self._ptr, ctypes.byref(cp)):
-            raise BovnarArgumentError(
-                "unusable unit policy — check the unit spellings in "
-                "require_dimension_of")
+            # The write-side-only refusals (targets, normalise, base, inexact,
+            # convert rules) are caught above with their own message, so what
+            # reaches here is a unit or a rule path the parser will not take --
+            # exactly what the reader's setter refuses, and the same probe
+            # names it. `rules` was missing from the old message entirely.
+            raise BovnarArgumentError(describe_unit_policy_refusal(
+                self._lib, require_unit=policy.require_unit,
+                require_dimension_of=policy.require_dimension_of,
+                rules=policy.rules))
         del keepalive
 
     @property

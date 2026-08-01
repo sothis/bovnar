@@ -31,7 +31,7 @@ from .enums import Event, ErrorCode
 from .exceptions import BovnarParseError, BovnarArgumentError
 from .structs import (
     BvnrSource, BvnrSink, BvnrReadFlags, BvnrData, ValueUnit,
-    build_unit_policy, MAX_UNIT_TARGETS,
+    build_unit_policy, describe_unit_policy_refusal, MAX_UNIT_TARGETS,
     EVENT_CALLBACK_FUNC, WANT_UNIT_FUNC,
     make_unit_dimensionless,
 )
@@ -595,9 +595,10 @@ class Reader:
         # must stay referenced until the call returns, which it does by being a
         # live local here.
         if not self._lib.bvnr_reader_set_unit_policy(self._ptr, ctypes.byref(cp)):
-            raise BovnarArgumentError(
-                "unusable unit policy — check the unit spellings in "
-                "targets / require_dimension_of")
+            raise BovnarArgumentError(describe_unit_policy_refusal(
+                self._lib, policy.targets, policy.base, policy.normalise_si,
+                policy.leave_inexact, policy.require_unit,
+                policy.require_dimension_of, policy.rules))
         del keepalive
 
     @property

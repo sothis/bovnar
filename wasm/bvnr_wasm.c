@@ -655,9 +655,11 @@ char *bvnr_wasm_events(const char *buf, int len)
  * Note the interaction with this surface's resync policy: because
  * continue_on_error is on, a value the conversion rejects — dimensionally
  * incompatible with `unit`, or inexact — is skipped along with its assignment
- * rather than aborting, so it simply does not appear in `events` and the
- * top-level status stays ok. Ask for a unit compatible with what you expect, or
- * compare the event count against an unconverted run.
+ * rather than aborting, so it does not appear in `events`. The status DOES say
+ * so: `ok` is false and `error`/`error_name` carry the rejection
+ * (unit_mismatch, unit_inexact), because events_impl counts recovered errors
+ * rather than reading the reader's cleared final code. Reporting `ok` over a
+ * value it had dropped is what that count replaced.
  */
 WASM_EXPORT
 char *bvnr_wasm_events_convert(const char *buf, int len, const char *unit,
@@ -684,8 +686,13 @@ char *bvnr_wasm_events_convert(const char *buf, int len, const char *unit,
 
 /* ------- all errors (resync mode) ------- */
 typedef struct {
-	sb_t *b;
-	int   count;
+	sb_t        *b;
+	int          count;
+	/* First recovered code, for the same reason events_ud_t carries one: under
+	 * continue_on_error a document that resyncs and then reaches EOF cleanly
+	 * has the reader's final code CLEARED, so a surface reporting that code
+	 * alone says "none" beside its own non-empty errors array. */
+	error_code_t first;
 } err_ctx_t;
 
 static void err_collect(void *ud, error_code_t err,
@@ -694,6 +701,7 @@ static void err_collect(void *ud, error_code_t err,
 {
 	err_ctx_t *ctx = (err_ctx_t *)ud;
 	sb_t *b = ctx->b;
+	if (ctx->count == 0) ctx->first = err;
 	if (ctx->count++) sb_putc(b, ',');
 	sb_putc(b, '{');
 	sb_printf(b, "\"error\":%d,", (int)err);
@@ -716,7 +724,7 @@ char *bvnr_wasm_errors(const char *buf, int len)
 	if (len < 0) len = 0;
 
 	sb_t ebuf; sb_init(&ebuf);
-	err_ctx_t ctx = { &ebuf, 0 };
+	err_ctx_t ctx = { &ebuf, 0, error_none };
 
 	bvnr_reader_t *r = bvnr_reader_create();
 	bvnr_read_flags_t flags;
@@ -799,6 +807,7 @@ char *bvnr_wasm_parse(const char *buf, int len)
 	ud.ev.base = 0u;
 	ud.er.b     = &ebuf;
 	ud.er.count = 0;
+	ud.er.first = error_none;
 
 	bvnr_reader_t *r = bvnr_reader_create();
 	bvnr_read_flags_t flags;
@@ -824,8 +833,18 @@ char *bvnr_wasm_parse(const char *buf, int len)
 	 * break; tests/bovnar_reader_test.c asserts it). Using emit_status verbatim
 	 * therefore produced {"ok":true, ..., "errors":[...3 entries...]} -- self-
 	 * contradictory, and disagreeing with bvnr_wasm_errors, which computes ok
-	 * from its error COUNT. Match that instead. The exact reader code is still
-	 * reported separately in "error"/"error_name", so nothing is lost. */
+	 * from its error COUNT. Match that instead.
+	 *
+	 * "error"/"error_name" need the same treatment, and getting only the `ok`
+	 * half left this export saying {"ok":false,"error":0,"error_name":"none"}
+	 * -- a caller doing `if (!r.ok) show(r.error_name)` was told "none" went
+	 * wrong. events_impl reports the FIRST recovered code when the final one
+	 * has been cleared; this is the export index.mjs tells callers to PREFER
+	 * over events()+errors(), and the one the playground shim actually uses, so
+	 * it disagreed with the surface it replaced on the same document: events()
+	 * said unexpected_input_byte, parse() said none. Same fallback here. */
+	if (err == error_none && ud.er.count > 0)
+		err = ud.er.first;
 	sb_putc(&b, '{');
 	sb_printf(&b, "\"ok\":%s,",
 	          (err == error_none && ud.er.count == 0) ? "true" : "false");

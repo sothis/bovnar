@@ -171,6 +171,51 @@ for (const [label, text, unit, wantOk] of convCases) {
      `eventsConvert "${label}": ok=${w.ok} but data event present=${hasData}`);
 }
 
+/* The resync surfaces' STATUS, on documents whose every error the reader
+   recovers from and which then reach EOF cleanly — the case that clears the
+   reader's final code. `ok` was already computed from an error count on all
+   three, but only events() also reported the first recovered code, so parse()
+   — the export index.mjs tells callers to prefer, and the one the playground
+   shim uses — answered {"ok":false,"error":0,"error_name":"none"}: a caller
+   doing `if (!r.ok) show(r.error_name)` was told "none" went wrong, and the
+   two exports disagreed about the same document in the same module.
+
+   The reference is the CLI: `validate` stops at the FIRST error, which is the
+   one these surfaces are expected to name. */
+console.log('# recovered-error status (events/parse/errors vs the CLI)');
+const resyncCases = [
+  ['bad byte',      '.a = <sint:32> ?;\n.b = <sint:32> 7;\n'],
+  ['unit mismatch', '.a = <float:64,m/s> 1.0 k~m;\n.b = <sint:32> 7;\n'],
+  ['out of range',  '.a = <uint:8> 999;\n.b = <sint:32> 7;\n'],
+  ['unit illegal',  '.a = <float:64,m> 1.0;\n.b = <float:64,zz> 2.0;\n.c = <sint:32> 7;\n'],
+];
+for (const [label, text] of resyncCases) {
+  const c = cliValidate(text);
+  const e = b.events(text);
+  const p = typeof b.parse === 'function' ? b.parse(text) : null;
+  const r = b.errors(text);
+  // The premise: the CLI rejects it, and the reader really did recover (the
+  // document keeps producing errors past the first only if it resynced).
+  ok(!c.ok, `resync "${label}": premise — CLI must reject it`);
+  ok(r.errors.length >= 1 && !r.ok,
+     `resync "${label}": errors() ok=${r.ok} n=${r.errors.length}`);
+  // Every surface reports failure, and names the same error the CLI names.
+  ok(!e.ok && e.error_name === c.error_name,
+     `resync "${label}": events=${e.ok}/${e.error_name} cli=${c.ok}/${c.error_name}`);
+  if (p) {
+    ok(!p.ok && p.error_name === c.error_name,
+       `resync "${label}": parse=${p.ok}/${p.error_name} cli=${c.ok}/${c.error_name}`);
+    // The specific shape that regressed: a false `ok` beside a "none" code.
+    ok(!(p.ok === false && p.error_name === 'none'),
+       `resync "${label}": parse reported ok=false with error_name="none"`);
+    // parse() is documented as the union of events() and errors(); hold it to
+    // that on the status fields, not just on the two arrays.
+    ok(p.error_name === e.error_name && p.errors.length === r.errors.length,
+       `resync "${label}": parse=${p.error_name}/${p.errors.length} vs ` +
+       `events=${e.error_name} errors=${r.errors.length}`);
+  }
+}
+
 // --- report ----------------------------------------------------------------
 console.log(`\nhard: ${pass} passed, ${fail} failed   |   soft toJSON diffs: ${soft}`);
 if (fail) { console.log('\nFAILURES:'); for (const f of fails) console.log('  ✗ ' + f); process.exit(1); }

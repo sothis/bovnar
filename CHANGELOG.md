@@ -173,6 +173,38 @@ and `ok` must agree with whether a `data` event was actually delivered. That
 second assertion is the one that makes "success over a dropped value"
 impossible to reintroduce. Mutation-tested.
 
+### Fixed — the WASM `parse` said `ok: false` and `error_name: "none"`
+
+The fix above has two halves — compute `ok` from an error *count*, and report
+the first recovered code in `error`/`error_name` — and `bvnr_wasm_parse` only
+ever had the first. For a document whose errors the reader recovers from and
+which then reaches EOF cleanly, it answered
+`{"ok": false, "error": 0, "error_name": "none"}`. A caller writing the obvious
+`if (!r.ok) show(r.error_name)` was told that **none** went wrong.
+
+So the two exports disagreed about the same document in the same module:
+`.a = <sint:32> ?; .b = <sint:32> 7;` is `unexpected_input_byte` from `events()`
+and from the CLI, and `none` from `parse()`. That is the export `index.mjs`
+tells callers to **prefer** over `events()` + `errors()`, the one the playground
+shim actually uses, and the one whose own source documents it as "the union of
+what the two separate exports return". It now takes the same first-recovered
+fallback `events_impl` takes.
+
+Two comments describing the pre-fix contract went with it. The note on
+`bvnr_wasm_events_convert` still told readers a rejected conversion leaves "the
+top-level status ok" and to "compare the event count against an unconverted
+run" — the workaround for a bug that no longer exists. The wrapper's note on
+`parse` still said its `ok` matched `errors()` "not `events()`". Both now
+describe what the code does.
+
+**The status fields were pinned by nothing.** The differential asserted `ok` and
+`error_name` for `validate` and `eventsConvert`, and for `parse` asserted
+neither. It now runs four recovered-error documents — bad byte, unit mismatch,
+value out of range, illegal unit — through `events`, `parse` and `errors`,
+holding all three to the code the CLI names, and rejecting the specific shape
+that regressed: `ok: false` beside `error_name: "none"`. Mutation-tested; the
+four cases kill twelve assertions.
+
 ### Fixed — a string carrying a unit did not survive `dumps()`
 
 `.s = "x" m;` is legal, and the grammar says so outright —

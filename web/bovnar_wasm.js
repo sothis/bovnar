@@ -23,7 +23,7 @@
 // `input` may be a string (UTF-8 encoded for you) or a Uint8Array (passed
 // through verbatim — required if the document embeds octet streams with NULs).
 
-import createBovnar from './bovnar_wasm_core.js?v=6a96085592b8';
+import createBovnar from './bovnar_wasm_core.js?v=3f623cc83dee';
 
 const enc = new TextEncoder();
 
@@ -109,7 +109,12 @@ export async function loadBovnar(opts) {
     toJSON: (input) => callJson('bvnr_wasm_to_json', input),
 
     /** The reference (verified) event stream. Returns { ok, error, error_name,
-     *  events: [{ seq, ev, tok, text?, family?, width?, base?, unit?, ... }] }. */
+     *  events: [{ seq, ev, tok, text?, family?, width?, base?, unit?, ... }] }.
+     *
+     *  Runs in resync mode, so a broken assignment is skipped rather than
+     *  aborting the read and its events are simply absent. `ok` accounts for
+     *  that: it is false if ANY error was reported, including a recovered one,
+     *  and `error`/`error_name` name the first. */
     events: (input) => callJson('bvnr_wasm_events', input),
 
     /** Events AND errors from a SINGLE reader pass:
@@ -118,8 +123,11 @@ export async function loadBovnar(opts) {
      *  that walks it twice and pays two JSON round-trips.
      *
      *  `ok` is false if ANY error was reported, including ones the reader
-     *  recovered from — matching errors(), not events(). events() reports the
-     *  reader's final code, which continue_on_error clears on a clean EOF.
+     *  recovered from, and `error`/`error_name` name the first — matching
+     *  errors() and events(). All three count reported errors rather than
+     *  reading the reader's final code, which continue_on_error clears on a
+     *  clean EOF; deriving the status from that code alone reported
+     *  {"ok":false,"error_name":"none"} here, and plain {"ok":true} in events().
      *
      *  Defined only when the compiled module actually exports it: this wrapper
      *  and the core are separate URLs with separate cache entries, so a current

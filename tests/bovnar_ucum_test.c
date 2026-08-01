@@ -172,6 +172,29 @@ static void test_equivalence(void)
 
 	/* And a wrong one still is wrong. */
 	ASSERT_FALSE(bvn_unit_equal(U("ucum:m"), U("s")), "ucum:m != s");
+	/*
+	 * UCUM defines the osmole and the equivalent identically -- one mole each --
+	 * so the two rows have to agree. They did not: osm was refused as a
+	 * "species-dependent relation to the mole", which is equally true of eq
+	 * (valence) and is a fact about what an osmolality MEANS rather than about
+	 * what UCUM says the unit is worth. qudt.bvnr had meanwhile mapped
+	 * MilliOSM-PER-KiloGM onto m~mol/k~g, making the same identification a
+	 * third way.
+	 */
+	ASSERT_TRUE(bvn_unit_equal(U("ucum:osm"), U("mol")), "ucum:osm == mol");
+	ASSERT_TRUE(bvn_unit_equal(U("ucum:osm"), U("ucum:eq")), "ucum:osm == ucum:eq");
+	ASSERT_TRUE(bvn_unit_equal(U("ucum:mosm"), U("m~mol")), "ucum:mosm == m~mol");
+	/*
+	 * Both carry .reverse = false, and for osm that is load-bearing in a way it
+	 * is not for eq: "osm" and "mol" are both three bytes, so only the flag
+	 * stands between every amount of substance and being WRITTEN as an osmole.
+	 */
+	{
+		char buf[64];
+		int32_t n = bvn_unit_to_profile("ucum", U("mol"), buf, sizeof buf);
+		ASSERT_TRUE(n > 0 && strcmp(buf, "mol") == 0,
+			    "a mole writes as ucum:mol, never as osm or eq");
+	}
 }
 
 /* ── operators ──────────────────────────────────────────────────────────── */

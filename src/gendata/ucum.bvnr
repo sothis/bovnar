@@ -459,6 +459,19 @@
   # quantity that merely happens to be worth one mole, on every round trip
   # through the UCUM writer.
   { .code = "eq";  .bovnar = "mol";        .metric = true; .reverse = false; },
+  # The osmole, on exactly the same footing. UCUM defines BOTH as one mole --
+  # <value Unit="mol" value="1"/> for each -- so the two rows have to agree, and
+  # this one used to be a refusal reading "species-dependent relation to the
+  # mole". That is true of the equivalent as well (it depends on valence), and
+  # it is a fact about what an osmolality MEANS rather than about what UCUM says
+  # the unit is worth. Refusing on it while mapping "eq" was the same judgement
+  # made two ways in one file -- and qudt.bvnr had already made it the third
+  # way, mapping MilliOSM-PER-KiloGM straight onto m~mol/k~g.
+  #
+  # .reverse = false for the reason "eq" carries it, and more sharply: "osm" and
+  # "mol" are both three bytes, so a tie in the shortest-wins rule is the only
+  # thing standing between every mole and being WRITTEN as an osmole.
+  { .code = "osm"; .bovnar = "mol";        .metric = true; .reverse = false; },
   { .code = "U";   .bovnar = "u~mol/min";  .metric = true; },
   # Gram percent is UCUM's own g/dl, written the native way. It is a mass
   # concentration and not a ratio, which is why it sits here and not beside %.
@@ -571,11 +584,6 @@
   { .code = "[m_e]";   .why = "electron mass as a unit — no native form"; },
   { .code = "[m_p]";   .why = "proton mass as a unit — no native form"; },
   { .code = "[G]";     .why = "gravitational constant as a unit — no native form"; },
-
-  # Osmolality. Deliberately refused rather than guessed: the relation between
-  # an osmole and a mole depends on the dissociation of the species, which a
-  # unit table cannot know.
-  { .code = "osm";  .why = "osmole — species-dependent relation to the mole"; },
 
   # Columns of liquid other than mercury, and other pressure references bovnar
   # does not carry.

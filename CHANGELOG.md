@@ -112,6 +112,44 @@ distinction), and the blockquote under each of §11, §12, §13, §16 and §17.
 pass cost and that is a historical fact; its column is relabelled "After that
 pass" and points at §9.1 for current figures.
 
+### Fixed — four codes refused for a reason that had stopped being true
+
+**`ucum:osm`.** UCUM defines the osmole and the equivalent identically —
+`<value Unit="mol" value="1"/>` for each — and bovnar mapped `eq` → `mol` while
+refusing `osm` as a "species-dependent relation to the mole". That is equally
+true of the equivalent, which depends on valence, and it is a fact about what an
+osmolality *means* rather than about what UCUM says the unit is worth: the same
+judgement made two ways in one file. `src/gendata/qudt.bvnr` had meanwhile made
+it a third way, mapping `MilliOSM-PER-KiloGM` straight onto `m~mol/k~g`. `osm`
+now maps to `mol`, bringing `mosm` and `mosm/kg` with it, and carries
+`.reverse = false` — which matters more here than for `eq`, because `osm` and
+`mol` are both three bytes and a tie in the shortest-wins rule was the only
+thing standing between every amount of substance and being *written* as an
+osmole.
+
+**Three OM codes.** `gigayearCubicKiloparsec`, `gigayearCubicParsec` and
+`partsPerMillionPerYear` were refused as "OM's year is the GREGORIAN 31556952 s
+… and no native unit states OM's", while `om:year` two lines above already
+mapped to `yr_greg`, which is exactly 31 556 952 s. The reason outlived the unit
+it was about. OM composes each from terms that all map, so all three now do.
+
+The two `solarMass…` codes that carried the same stale reason keep their
+refusal, and now give the one that is true — "bovnar has no unit of this
+magnitude" — matching the `solarMass` and `solarMassPerCubicParsec` rows beside
+them.
+
+Not a fourth: `om:reciprocalPartsPerMillionPerYear` stays `ppm⁻¹`. OM's
+identifier says PerYear and OM's definition does not — label "reciprocal parts
+per million", symbol `ppm-1`, `hasBase partsPerMillion`, `hasExponent -1`. The
+mapping follows the definition, and now says so where a reader would otherwise
+file it as a bug.
+
+Every consequence was surfaced by the gates rather than by hand:
+`check_profile_factors.py` caught doc/11 §6 still calling `ucum:osm`
+unsupported, `check_doc_profile_atoms.py` caught §6.1's atom table missing the
+new row, and `check_doc_counts.py` caught six per-file counts and
+`src/gendata/README.md`'s totals moving under them.
+
 ### Fixed — §6.4 asked whether two units should exist, having just said they do
 
 doc/11 §6.4's class table headed its first row "Arbitrary units (32)"; there are

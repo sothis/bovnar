@@ -261,6 +261,28 @@ static void test_refusals(void)
 	chk_str("om:gigayear",           "G~yr_greg");
 	chk_str("om:reciprocalYear",     "yr_greg⁻¹");
 	chk_str("om:cubicMetrePerYear",  "m³/yr_greg");
+	/*
+	 * These three kept the Gregorian-year refusal after om:year stopped
+	 * carrying it -- the reason outlived the unit it was about, in the same
+	 * file that maps the year two lines above. OM composes each from terms that
+	 * all map: gigayear x cubicKiloparsec, gigayear x cubicParsec, ppm / year.
+	 */
+	chk_str("om:gigayearCubicKiloparsec", "G~yr_greg·k~pc³");
+	chk_str("om:gigayearCubicParsec",     "G~yr_greg·pc³");
+	chk_str("om:partsPerMillionPerYear",  "ppm/yr_greg");
+	/*
+	 * NOT a fourth. OM's identifier says PerYear and its definition does not:
+	 * label "reciprocal parts per million", symbol ppm-1, hasBase
+	 * partsPerMillion, hasExponent -1. The mapping follows the definition.
+	 */
+	chk_str("om:reciprocalPartsPerMillionPerYear", "ppm⁻¹");
+	/*
+	 * The two that stay refused do so for the reason the neighbouring solarMass
+	 * rows always gave -- bovnar has no solar mass -- and not for the year.
+	 */
+	chk_error("om:solarMass",                        error_unit_profile_unsupported);
+	chk_error("om:solarMassPerGigayearCubicParsec",  error_unit_profile_unsupported);
+	chk_error("om:solarMassPerGigayearCubicKiloparsec", error_unit_profile_unsupported);
 
 	/* An arbitrary unit is carried by the vocabulary that gives it an identity.
 	 * UCUM's [IU] is an opaque base unit here; a second, incommensurable OM one

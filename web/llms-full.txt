@@ -15236,12 +15236,12 @@ admitted after that pass, which is why they sit after it rather than beside thei
 
 | Namespace | Vocabulary | Grammar | Codes carried | Section |
 |---|---|---|---|---|
-| `ucum:` | UCUM — Unified Code for Units of Measure | expression | 204 mapped + 41 arbitrary, **all 312 UCUM defines** | [2](#2-syntax)–[10](#10-cost-risk-and-what-is-left-out) |
+| `ucum:` | UCUM — Unified Code for Units of Measure | expression | 205 mapped + 41 arbitrary, **all 312 UCUM defines** | [2](#2-syntax)–[10](#10-cost-risk-and-what-is-left-out) |
 | `unece:` | UN/ECE Recommendation 20 and 21 | flat | 1283 + 25 opaque | [11](#11-the-unece-profile) |
 | `qudt:` | QUDT unit local names | flat | 2222, **all 2808 QUDT defines** | [12](#12-the-qudt-profiles) |
 | `qudt-qk:` | QUDT quantity kinds | flat | 903, **all 1165 QUDT defines** | [12.3](#123-quantity-kinds-qudt-qk) |
 | `udunits:` | UDUNITS-2, the CF/netCDF units syntax | expression | 502, **all 584 UDUNITS defines** | [13](#13-the-udunits-profile) |
-| `om:` | OM 2 — Ontology of units of Measure | flat | 1335 + 125 refused, **every unit individual OM states** | [16](#16-the-om-2-profile) |
+| `om:` | OM 2 — Ontology of units of Measure | flat | 1338 + 122 refused, **every unit individual OM states** | [16](#16-the-om-2-profile) |
 | `cf:` | CF standard names | flat, read-only | 4454 + 617 refused, **all 5071 names of table v94** | [17](#17-the-cf-standard-name-profile) |
 
 Companion to [Unit & Currency Reference](05_bovnar_unit_system.md) (the native registry and notation
@@ -16150,7 +16150,7 @@ invariant; the two counts move whenever the registry gains a unit, so `test_swee
 
 ### 6.1 Verified mappings
 
-The shipped table is `src/gendata/ucum.bvnr`: 204 mapped **atoms**, 41 arbitrary units, 67 known
+The shipped table is `src/gendata/ucum.bvnr`: 205 mapped **atoms**, 41 arbitrary units, 66 known
 but refused, and UCUM's 20 prefix spellings. What follows is the whole mapped list, grouped as the
 data file groups it — and it is the whole of it, checked row by row against the reference
 implementation by `check_doc_profile_atoms.py`, which also fails if a mapped code is missing here. Note that these are *atoms*, which is how the table is organised and not how a
@@ -16452,6 +16452,7 @@ conforming producer of the case-sensitive vocabulary can emit and are not in the
 | UCUM | Bovnar | 1 UCUM unit in coherent SI |
 |---|---|---|
 | `eq` | `mol` | `1.0` |
+| `osm` | `mol` | `1.0` |
 | `U` | `µ~mol/min` | `1.6666666666666667e-08` |
 | `g%` | `g/d~L` | `10.0` |
 
@@ -16528,6 +16529,19 @@ hand. Each is a factor error, not a syntax error, so nothing would catch it down
 The table maps `eq` → `mol` and `meq/L` → `m~mol/L`, and leaves `val` alone as the water-analysis
 unit it is.
 
+**`osm` sits on exactly that footing, and used to be refused instead.** UCUM defines the osmole and
+the equivalent identically — `<value Unit="mol" value="1"/>` for each — so the two rows have to
+agree, and they did not: `osm` was refused as a "species-dependent relation to the mole". That is
+equally true of the equivalent, which depends on valence, and it is a fact about what an osmolality
+*means* rather than about what UCUM says the unit is worth. It was the same judgement made two ways
+in one file, and `qudt.bvnr` had already made it a third way, mapping `MilliOSM-PER-KiloGM` straight
+onto `m~mol/k~g`. `osm` now maps to `mol`, so `mosm` and `mosm/kg` come with it.
+
+Both carry `.reverse = false`, which is not cosmetic. `eq` is two bytes against `mol`'s three, so
+the shortest-wins rule made `eq` the code every mole was *written* as; `osm` and `mol` are both
+three, and a tie is the only thing that stood between every amount of substance and being written
+as an osmole.
+
 **The calorie and the BTU each need two native units.** Bovnar's `cal` is `4.184` J — the
 thermochemical calorie, which is what UCUM's unqualified `cal` is, so `cal` and `cal_th` both map to
 it. Bovnar's `Btu` is `1055.05585262` J, the **IT** BTU, and `[Btu_IT]` maps to that.
@@ -16584,7 +16598,6 @@ expected the unit slot to carry the analyte.
 | Other special units | `[p'diop]`, `%[slope]`, `[hp'_X]`, `[m/s2/Hz^(1/2)]` | `error_unit_profile_unsupported` |
 | Scale outside a prefix decade | `10*4`, `10*5`, `10*7`, `10*8` | `error_unit_profile_unsupported` (§3.5) |
 | Year and month variants | `mo_g` (mean gregorian month) | `error_unit_profile_unsupported` — `a_t`, `a_g` and `mo_s` now map to `yr_trop`, `yr_greg` and `mo_syn` |
-| Osmolality | `osm`, and any expression over it | `error_unit_profile_unsupported` |
 | Constants as units | `[c]`, `[k]`, `[h]`, `[m_e]`, `[G]` | `error_unit_profile_unsupported` — `[e]` is the exception and maps to `e`, the elementary charge being a unit of charge rather than a dimensionless constant |
 | Energy conventions with no native counterpart | `[Btu_39]` | `error_unit_profile_unsupported` (§6.3) — the other six now map |
 | The British series | `[ch_br]`, `[ft_br]`, `[yd_br]`, `[in_br]`, `[mi_br]` | `error_unit_profile_unsupported` (§6.3) — bovnar has no British foot |
@@ -16603,7 +16616,8 @@ names the failure rather than accepting the string and leaving the consumer to d
 problem. Which of these should become real native units is a registry question this document does
 not answer — and the answer has been *yes* twice already, which is why the tropical year and the
 survey series are named in the paragraph above as codes that now map rather than here as codes that
-do not. **Osmolality** and the **mean Gregorian month** are the ones still waiting.
+do not. The **mean Gregorian month** is the one still waiting; osmolality turned out not to need a unit at
+all, only consistency with the equivalent (§6.3).
 
 The last row is the distinction the whole error split exists for. An atom in the `.unsupported` list
 is refused as *known and uncarryable*; an atom in none of the three atom lists is refused as *not a
@@ -16850,12 +16864,12 @@ One hand-edited data file per namespace in `src/gendata/`, in the same shape as 
 
 | File | Lists |
 |---|---|
-| `ucum.bvnr` | 20 prefixes, 204 mapped, 41 opaque, 67 unsupported |
+| `ucum.bvnr` | 20 prefixes, 205 mapped, 41 opaque, 66 unsupported |
 | `unece.bvnr` | 1283 mapped, 25 opaque, 171 unsupported |
 | `qudt.bvnr` | 2222 mapped, 586 unsupported |
 | `qudt-qk.bvnr` | 903 mapped, 262 unsupported |
 | `udunits.bvnr` | 41 prefixes, 502 mapped, 82 unsupported |
-| `om.bvnr` | 1335 mapped, 125 unsupported |
+| `om.bvnr` | 1338 mapped, 122 unsupported |
 | `cf.bvnr` | 4454 mapped, 617 unsupported |
 
 Four list kinds, and a code belongs to exactly one of them: the vocabulary's prefix spellings with
@@ -18047,7 +18061,7 @@ Growing the native registry to reach them is a separate decision, and doc/05 is 
 
 > `om:` — OM 2, the Ontology of units of Measure (Rijgersberg, van Assem, Top; Wageningen), the
 > second unit ontology of the semantic web beside QUDT.
-> Data file `src/gendata/om.bvnr` (1335 mapped, 125 refused — every unit individual OM states);
+> Data file `src/gendata/om.bvnr` (1338 mapped, 122 refused — every unit individual OM states);
 > pinned by `tests/bovnar_om_test.c` (92 assertions); id block 70, contributing no opaque units.
 
 ### 16.1 Why this vocabulary

@@ -105,6 +105,17 @@
   { .code = "gigayear";                                              .bovnar = "G~yr_greg"; },
   { .code = "reciprocalYear";                                        .bovnar = "yr_greg^-1"; },
   { .code = "millisecond-AnglePerYear";                              .bovnar = "m~arcsec/yr_greg"; },
+  # These three were refused as "no native unit states OM's Gregorian year"
+  # while `year` two lines below already mapped to yr_greg -- the reason
+  # outlived the unit it was about. OM composes each from terms that all map:
+  # gigayear x cubicKiloparsec, gigayear x cubicParsec, and ppm / year.
+  { .code = "gigayearCubicKiloparsec";                               .bovnar = "G~yr_greg·k~pc^3"; },
+  { .code = "gigayearCubicParsec";                                   .bovnar = "G~yr_greg·pc^3"; },
+  { .code = "partsPerMillionPerYear";                                .bovnar = "ppm/yr_greg"; },
+  # NOT a fourth: OM's "reciprocalPartsPerMillionPerYear" is a misnomer in OM
+  # itself -- label "reciprocal parts per million", symbol ppm-1, hasBase
+  # partsPerMillion, hasExponent -1. There is no year in the definition, so
+  # ppm^-1 is faithful to it however the identifier reads.
   # Unblocked by the 35 units added to units.bvnr: each was refused for
   # want of a native target and for no other reason.
   { .code = "year";                      .bovnar = "yr_greg"; },
@@ -1527,8 +1538,6 @@
   { .code = "euroPerTonne";                            .why = "a currency: OM models money as a unit, bovnar carries currencies in a system of their own (doc/11 section 7.2)"; },
   { .code = "faraday";                                 .why = "OM states no factor for this unit, so its magnitude is unknown here"; },
   { .code = "fillet";                                  .why = "a household portion whose magnitude OM does not state"; },
-  { .code = "gigayearCubicKiloparsec";                 .why = "OM's year is the GREGORIAN 31556952 s; native yr is the Julian 31557600 s, and no native unit states OM's"; },
-  { .code = "gigayearCubicParsec";                     .why = "OM's year is the GREGORIAN 31556952 s; native yr is the Julian 31557600 s, and no native unit states OM's"; },
   { .code = "glass";                                   .why = "a household portion whose magnitude OM does not state"; },
   { .code = "gramOfCarbonDioxideEquivalent";           .why = "a CO2-equivalent, an accounting quantity that depends on a chosen warming horizon rather than a unit of mass"; },
   { .code = "gramOfCarbonDioxideEquivalentPerKilowattHour"; .why = "a CO2-equivalent, an accounting quantity that depends on a chosen warming horizon rather than a unit of mass"; },
@@ -1558,7 +1567,6 @@
   { .code = "minute-HourAngle";                        .why = "an ANGLE spelled like a time; bovnar has no hour-angle unit"; },
   { .code = "month";                                   .why = "OM states no factor for this unit, so its magnitude is unknown here"; },
   { .code = "one";                                     .why = "dimension one — bovnar spells that by omitting the unit slot"; },
-  { .code = "partsPerMillionPerYear";                  .why = "OM's year is the GREGORIAN 31556952 s; native yr is the Julian 31557600 s, and no native unit states OM's"; },
   { .code = "piece";                                   .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "pinch";                                   .why = "a household portion whose magnitude OM does not state"; },
   { .code = "pixel";                                   .why = "dimension one — bovnar spells that by omitting the unit slot"; },
@@ -1574,8 +1582,8 @@
   { .code = "solarLuminosity";                         .why = "bovnar has no unit of this magnitude"; },
   { .code = "solarMass";                               .why = "bovnar has no unit of this magnitude"; },
   { .code = "solarMassPerCubicParsec";                 .why = "bovnar has no unit of this magnitude"; },
-  { .code = "solarMassPerGigayearCubicKiloparsec";     .why = "OM's year is the GREGORIAN 31556952 s; native yr is the Julian 31557600 s, and no native unit states OM's"; },
-  { .code = "solarMassPerGigayearCubicParsec";         .why = "OM's year is the GREGORIAN 31556952 s; native yr is the Julian 31557600 s, and no native unit states OM's"; },
+  { .code = "solarMassPerGigayearCubicKiloparsec";     .why = "bovnar has no unit of this magnitude"; },
+  { .code = "solarMassPerGigayearCubicParsec";         .why = "bovnar has no unit of this magnitude"; },
   { .code = "solarRadius";                             .why = "bovnar has no unit of this magnitude"; },
   { .code = "spread";                                  .why = "a household portion whose magnitude OM does not state"; },
   { .code = "squareMile-Statute";                      .why = "OM states no factor for this unit, so its magnitude is unknown here"; },

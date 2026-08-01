@@ -43,6 +43,27 @@ Julian month at 2 629 800 s, the fortnight at 1 209 600, `mH2O` at 9 806.65 Pa,
 the IT calorie at 4.1868 J against the thermochemical 4.184, the assay ton at
 175/6 g, `sph` at 4π sr, `rev` at 2π rad and 9 `den` to the `tex`.
 
+### Added — the exact-rational renderer, checked against arithmetic instead of itself
+
+`converted_in_base(b)` renders an exact conversion in base *b*, or returns
+`None` when it has no terminating expansion there. Both halves are decidable
+without consulting the implementation, and the suite was spot-checking one value
+in two bases.
+
+A rational p/q in lowest terms terminates in base *b* exactly when every prime
+factor of q divides *b*; and when it does terminate, decoding the digits must
+give back p/q. `python/tests/test_base_rendering_property.py` checks both across
+seven conversions in every base the format writes — 427 (case, base) pairs, and
+140 renderings decoded back — with a third case pinning that a non-terminating
+one is really in the set, so neither property can pass over a corpus that always
+terminates.
+
+Nothing was wrong. It holds exactly: `1 m → k~m` is 1/1000 and renders in base
+10 but not in 2, 16, 36, 62, 64 or 85; `1 k~m/h → m/s` is 5/18 and needs a base
+carrying both a 2 and a 3, so base 6 gives `0.14` and base 3 gives nothing. A
+renderer that started truncating, or started claiming an expansion it could not
+produce, now fails here rather than in a document.
+
 ### Verified — the reading tiers, the `want_unit` hook, and doc/08 §1.10's error table
 
 Swept and found sound, so recorded rather than changed — and gated where it was

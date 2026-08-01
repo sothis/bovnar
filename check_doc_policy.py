@@ -263,6 +263,33 @@ def check_cli(repo, text):
                         problems.append(
                             "%s: doc/06 §7.3 says convert silently ignores `%s`; "
                             "it said %r" % (DOC, flag, err.strip()[:70]))
+        # doc/06 §7.3 — a conversion flag on `validate` changes the VERDICT.
+        # Easy to read as a no-op, since validate produces no output.
+        fd2, inexact = tempfile.mkstemp(suffix=".bvnr")
+        with os.fdopen(fd2, "w", encoding="utf-8") as f:
+            f.write(".speed = <float:64,k~m/h> 100.0;\n")
+        try:
+            plain = subprocess.run([exe, "validate", inexact],
+                                   capture_output=True, text=True, timeout=30)
+            si = subprocess.run([exe, "validate", "--si", inexact],
+                                capture_output=True, text=True, timeout=30)
+            leave = subprocess.run([exe, "validate", "--si", "--leave-inexact",
+                                    inexact], capture_output=True, text=True,
+                                   timeout=30)
+            checked += 3
+            if plain.returncode != 0:
+                problems.append("%s: doc/06 §7.3 — bare `validate` should accept "
+                                "a k~m/h document; it exited %d"
+                                % (DOC, plain.returncode))
+            if si.returncode == 0:
+                problems.append("%s: doc/06 §7.3 says a conversion flag on "
+                                "`validate` changes the verdict; `--si` still "
+                                "reported OK" % DOC)
+            if leave.returncode != 0:
+                problems.append("%s: doc/06 §7.3 says `--leave-inexact` relaxes "
+                                "it; the run still failed" % DOC)
+        finally:
+            os.unlink(inexact)
     finally:
         os.unlink(path)
     return problems, checked

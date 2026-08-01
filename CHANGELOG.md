@@ -453,6 +453,23 @@ limit table against the headers (including the three key-path bounds that live i
 against the whole catalogue rather than only the units it names, and the five
 behaviours §2.4 now distinguishes.
 
+### Fixed — `bovnar validate --si` changes the verdict, and its help did not say so
+
+`validate` produces no output, so `--unit` and `--si` read there as flags that
+could not matter. They change the answer: a conversion the policy cannot deliver
+exactly fails the parse, so `bovnar validate --si` on a document holding
+`100 k~m/h` reports `unit_inexact at line 1, col 32` where the bare `validate`
+reports OK.
+
+That makes it a useful question in its own right — *would this document survive
+normalisation?* — with `--leave-inexact` to ask the weaker one. But the CLI's
+help listed only the `--require-*` flags under `validate`, so neither the
+behaviour nor its remedy was discoverable from `bovnar --help`, and doc/06 §7.3
+said "validate, events and query accept the options below" without noting that
+three of them are load-bearing on a subcommand that prints nothing.
+
+Both now say it, and `check_doc_policy.py` runs the three cases.
+
 ### Fixed — `bovnar convert` silently ignores every unit-policy flag
 
 doc/06 §7.3 said `pretty-print` "reports the flags as surplus arguments"; the

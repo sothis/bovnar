@@ -10282,6 +10282,17 @@ that appears to work has not normalised anything.
 | `--base <N>` | `base` |
 | `--leave-inexact` | `bvnr_inexact_leave` |
 
+**A conversion flag on `validate` is not a no-op.** `validate` produces no output,
+so it is easy to read `--unit` and `--si` there as flags that could not matter —
+and they change the verdict, because a conversion the policy cannot deliver
+exactly fails the parse. `bovnar validate --si` on a document holding
+`100 k~m/h` reports `unit_inexact at line 1, col 32` where the bare `validate`
+reports OK. That makes it a useful question in its own right — *would this
+document survive normalisation?* — with `--leave-inexact` as the way to ask the
+weaker one. The CLI's own help listed only the `--require-*` flags under
+`validate` until this was written, so neither the behaviour nor its remedy was
+discoverable from `bovnar --help`.
+
 ---
 
 ## 8. Worked examples

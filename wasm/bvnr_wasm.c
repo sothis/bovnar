@@ -467,7 +467,30 @@ typedef struct {
 	evt_ctx_t           ev;
 	const value_unit_t *unit;
 	uint32_t            base;
+	/* Recovered errors. events_impl runs in resync mode, and a document that
+	 * resyncs and then reaches EOF cleanly has the reader's final code CLEARED
+	 * -- so deriving `ok` from that code alone reported success for a document
+	 * whose failing assignment had been skipped. bvnr_wasm_parse hit exactly
+	 * this and computes `ok` from an error COUNT instead; the comment there
+	 * spells out why. This is the same fix for the events path, which is where
+	 * it bites hardest: eventsConvert('.v = <float:64,k~m/h> 100.0;', 'm/s')
+	 * reported {"ok":true} with the data event simply ABSENT, because 250/9
+	 * does not terminate and the value was dropped. A well-formed stream
+	 * carrying a key and no value, and nothing saying so. */
+	uint32_t            err_count;
+	error_code_t        first_err;
 } events_ud_t;
+
+static void events_err_cb(void *ud, error_code_t err,
+                          uint64_t line, uint64_t column,
+                          uint32_t byte, uint64_t offset)
+{
+	events_ud_t *u = (events_ud_t *)ud;
+	(void)line; (void)column; (void)byte; (void)offset;
+	if (u->err_count == 0u)
+		u->first_err = err;
+	u->err_count++;
+}
 
 
 static bool evt_cb(void *ud, bvnr_event_t e, bvnr_data_t *d)
@@ -562,7 +585,7 @@ static char *events_impl(const char *buf, int len,
 	if (len < 0) len = 0;
 
 	sb_t evbuf; sb_init(&evbuf);
-	events_ud_t ud = { { &evbuf, 0, 0 }, target, base };
+	events_ud_t ud = { { &evbuf, 0, 0 }, target, base, 0u, error_none };
 
 	bvnr_reader_t *r = bvnr_reader_create();
 	bvnr_read_flags_t flags;
@@ -571,6 +594,7 @@ static char *events_impl(const char *buf, int len,
 	flags.max_array_nesting  = 255;
 	flags.userdata = &ud;
 	flags.on_verified = evt_cb;
+	flags.on_error = events_err_cb;
 	/* resync: emit verified events for every well-formed assignment, skipping
 	 * (not aborting at) a broken one — so the playground tree and the demos'
 	 * resync mode show all recoverable structure past an error. */
@@ -586,8 +610,18 @@ static char *events_impl(const char *buf, int len,
 	error_code_t err = r ? bvnr_reader_get_error(r) : error_invalid_argument;
 	if (!opened && err == error_none) err = error_invalid_argument;
 
+	/* `ok` from the error COUNT, not the final code -- see events_ud_t. The
+	 * reported code is the FIRST recovered error when the final one has been
+	 * cleared, so a caller learns what actually went wrong rather than reading
+	 * "none" beside a missing value. */
+	if (err == error_none && ud.err_count > 0u)
+		err = ud.first_err;
 	sb_putc(&b, '{');
-	emit_status(&b, err);
+	sb_printf(&b, "\"ok\":%s,",
+	          (err == error_none && ud.err_count == 0u) ? "true" : "false");
+	sb_printf(&b, "\"error\":%d,", (int)err);
+	sb_puts(&b, "\"error_name\":");
+	sb_json_cstr(&b, bvn_error_to_string(err));
 	sb_puts(&b, ",\"events\":[");
 	char *evs = sb_finish(&evbuf);
 	if (evs) { sb_puts(&b, evs); free(evs); }

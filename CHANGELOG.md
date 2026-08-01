@@ -43,6 +43,34 @@ Julian month at 2 629 800 s, the fortnight at 1 209 600, `mH2O` at 9 806.65 Pa,
 the IT calorie at 4.1868 J against the thermochemical 4.184, the assay ton at
 175/6 g, `sph` at 4π sr, `rev` at 2π rad and 9 `den` to the `tex`.
 
+### Fixed — the WASM `eventsConvert` reported success over a value it had dropped
+
+`bvnr.eventsConvert('.v = <float:64,k~m/h> 100.0;', 'm/s')` returned
+`{"ok": true, "error_name": "none"}` — with the `data` event **simply absent**.
+A well-formed stream carrying a key and no value, and nothing saying so. The CLI
+reports `unit_inexact` for the same document, because 250/9 does not terminate.
+Same for `°C/h → K/h`, which is `unit_mismatch` on every other surface.
+
+`events_impl` runs the reader in resync mode so the playground can show
+structure past a broken assignment, and a document that resyncs and then reaches
+EOF cleanly has the reader's **final error code cleared**. Deriving `ok` from
+that code alone therefore said "nothing went wrong" about a value that had been
+skipped. `bvnr_wasm_parse` hit exactly this, computes `ok` from an error *count*
+instead, and its source carries a paragraph explaining why — the events path,
+which is where it matters most, never got the same fix.
+
+It now counts recovered errors and reports the first one in
+`error`/`error_name`, so a caller learns what went wrong rather than reading
+`none` beside a missing value.
+
+**Nothing had ever exercised this entry point.** The WASM differential test
+covers `validate` (hard) and `toJSON` (soft); `eventsConvert` — the one that
+does the actual unit work — was compared against nothing. It now runs seven
+cases against the CLI's verdict, each asserted twice: the outcome must match,
+and `ok` must agree with whether a `data` event was actually delivered. That
+second assertion is the one that makes "success over a dropped value"
+impossible to reintroduce. Mutation-tested.
+
 ### Fixed — a string carrying a unit did not survive `dumps()`
 
 `.s = "x" m;` is legal, and the grammar says so outright —

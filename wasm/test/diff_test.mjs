@@ -143,6 +143,34 @@ for (const [label, text] of badCases) {
      `bad "${label}": wasm=${w.ok}/${w.error_name} cli=${c.ok}/${c.error_name}`);
 }
 
+/* eventsConvert — the entry point that does the actual unit work, and the one
+   nothing compared against the CLI. It runs the reader in resync mode, so a
+   value whose conversion the policy cannot deliver is SKIPPED; deriving `ok`
+   from the reader's final code (cleared on a clean EOF after a resync) reported
+   {"ok":true} with the data event simply absent — a stream carrying a key and
+   no value, and nothing saying so. `bvnr_wasm_parse` had already learned this
+   and computes ok from an error count; events_impl had not. */
+console.log('# eventsConvert vs the CLI');
+const convCases = [
+  ['exact metric',        '.v = <float:64,k~m/h> 90.0;',  'm/s',      true ],
+  ['non-terminating',     '.v = <float:64,k~m/h> 100.0;', 'm/s',      false],
+  ['affine, lone',        '.v = <float:64,\u00b0C> 25.0;',    'K',        true ],
+  ['affine in a compound','.v = <float:64,\u00b0C/h> 1.0;',   'K/h',      false],
+  ['currency prefix',     '.v = <float:64,$USD> 5.0;',    'k~$USD',   true ],
+  ['inline unit',         '.v = 9.81 k~m/s;',             'm/s',      true ],
+  ['unknown target',      '.v = <float:64,m> 1.0;',       'nosuchme', false],
+];
+for (const [label, text, unit, wantOk] of convCases) {
+  const w = b.eventsConvert(text, unit);
+  ok(w.ok === wantOk,
+     `eventsConvert "${label}": wasm ok=${w.ok}/${w.error_name}, expected ok=${wantOk}`);
+  /* And the invariant that makes it matter: a successful convert must actually
+     deliver the value, never report success over a dropped one. */
+  const hasData = (w.events || []).some(e => e.ev === 'data');
+  ok(w.ok === hasData,
+     `eventsConvert "${label}": ok=${w.ok} but data event present=${hasData}`);
+}
+
 // --- report ----------------------------------------------------------------
 console.log(`\nhard: ${pass} passed, ${fail} failed   |   soft toJSON diffs: ${soft}`);
 if (fail) { console.log('\nFAILURES:'); for (const f of fails) console.log('  ✗ ' + f); process.exit(1); }

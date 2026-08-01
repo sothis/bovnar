@@ -537,6 +537,76 @@ ERROR_CASES = [
     ("error_type_too_long",            ".a = <float:64,%s> 1.0;" % "·".join(["m"] * 400)),
 ]
 
+# doc/08 §1.10's table, which is about the want_unit HOOK rather than the plain
+# parse — a different code path, and one none of the cases above reaches. Each
+# row names the error the hook raises for a condition, and the whole point of
+# the table is "the value either arrives converted or the parse STOPS", so a row
+# that quietly stopped being true would be the silent-skip the section promises
+# cannot happen. (source unit, hook target, documented error).
+HOOK_ERROR_CASES = [
+    # dimensionally incompatible — seconds for a length, and one currency for
+    # another, which the row names as the same outcome for different reasons.
+    ("m",     "s",    "error_unit_mismatch"),
+    ("$USD",  "$EUR", "error_unit_mismatch"),
+    # irrational factor: a π-based angle.
+    ("°",     "rad",  "error_unit_inexact"),
+    # an affine scale inside a compound has nowhere to put its offset.
+    ("°C/h",  "K/h",  "error_unit_mismatch"),
+    # exact, but no terminating expansion in the output base, with
+    # want_unit_allow_nonterminating off.
+    ("m",     "mi",   "error_unit_inexact"),
+]
+
+
+def check_hook_error_codes(repo):
+    """-> (problems, cases checked). doc/08 §1.10's want_unit error table."""
+    sys.path.insert(0, os.path.join(repo, "python"))
+    try:
+        import bovnar
+        from bovnar.enums import ErrorCode
+        bovnar._ffi.load_library()
+    except Exception:                                         # noqa: BLE001
+        return [], 0
+    problems, checked = [], 0
+    for unit, target, want in HOOK_ERROR_CASES:
+        src = (".a = <float:64,%s> 1.0;" % unit).encode("utf-8")
+        got = None
+        try:
+            with bovnar.Reader() as r:
+                r.read_mem(src,
+                           want_unit=lambda data, t=target: bovnar.parse_unit(t))
+        except Exception as exc:                              # noqa: BLE001
+            code = getattr(exc, "code", None)
+            got = ErrorCode(code).name.lower() if code is not None else None
+        checked += 1
+        if got is None:
+            problems.append("doc/08 §1.10 says a want_unit hook asking for %r on "
+                            "a %r value is %s; the parse did not stop"
+                            % (target, unit, want))
+        elif ("error_" + got) != want:
+            problems.append("doc/08 §1.10 says a want_unit hook asking for %r on "
+                            "a %r value is %s; the reader raises error_%s"
+                            % (target, unit, want, got))
+    # ...and the other half of the same promise: nan/inf are handed over
+    # UNTOUCHED rather than refused, with converted == false.
+    for literal in ("nan", "inf", "ninf"):
+        seen = []
+        try:
+            with bovnar.Reader() as r:
+                r.read_mem((".a = <float:64,m> %s;" % literal).encode(),
+                           want_unit=lambda data: bovnar.parse_unit("k~m"),
+                           on_verified=lambda ev, d: seen.append(d.converted)
+                           if int(ev) == 9 else None)
+        except Exception as exc:                              # noqa: BLE001
+            problems.append("doc/08 §1.10 says %r is handed over untouched; the "
+                            "parse raised %s" % (literal, type(exc).__name__))
+            continue
+        checked += 1
+        if seen and seen[0]:
+            problems.append("doc/08 §1.10 says %r arrives with converted == "
+                            "false; it arrived converted" % literal)
+    return problems, checked
+
 
 def check_error_codes(repo):
     """-> (problems, cases checked). Needs the built library; skips without it."""
@@ -742,6 +812,9 @@ def main(argv):
     api_problems, api_count = check_api_named(repo)
     problems += api_problems
     err_problems, err_count = check_error_codes(repo)
+    hook_problems, hook_count = check_hook_error_codes(repo)
+    err_problems = err_problems + hook_problems
+    err_count += hook_count
     problems += err_problems
     if problems:
         sys.stderr.write(

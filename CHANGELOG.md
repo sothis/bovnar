@@ -43,6 +43,37 @@ Julian month at 2 629 800 s, the fortnight at 1 209 600, `mH2O` at 9 806.65 Pa,
 the IT calorie at 4.1868 J against the thermochemical 4.184, the assay ton at
 175/6 g, `sph` at 4π sr, `rev` at 2π rad and 9 `den` to the `tex`.
 
+### Verified — the reading tiers, the `want_unit` hook, and doc/08 §1.10's error table
+
+Swept and found sound, so recorded rather than changed — and gated where it was
+not.
+
+**The three reading tiers agree.** DOM, typed `loads()` and the streaming reader
+deliver the same unit and the same value for all 262 catalogue units in two type
+shapes (524 combinations, 0 disagreements).
+
+**The `want_unit` hook is faithful to its documented contract**, including the
+part that is easy to get wrong: it keeps the strict all-or-nothing rule
+*whatever* `on_inexact` says, so a policy set to `bvnr_inexact_leave` still gets
+a refusal through the hook. Its fallback under
+`want_unit_allow_nonterminating` really is the **rational** — `100 k~m/h → m/s`
+comes back with `converted_str() == None` and `converted_rational() == (250, 9)`
+— which is exactly the distinction doc/06 §2.4 draws between the hook's fallback
+and the policy's (the native value).
+
+**doc/08 §1.10's error table now has a gate.** All six rows were verified by
+hand and all six hold, but nothing was checking them: `check_doc_unit_factors.py`
+provoked eleven error codes and every one of them was a plain parse error, so
+the hook path — a different code path, and the one the table is *about* — was
+untested. It now provokes the five error rows plus the `nan`/`inf`/`ninf` claim
+that the value arrives untouched with `converted == false`, taking the gate from
+11 codes to 19. Mutation-tested.
+
+**`bovnar convert`'s lossy-JSON warning is complete.** Every one of the 262
+units produces a warning naming the count, and the exit status is 1 in every
+case — it never reports a silent success over a document whose units JSON
+cannot carry.
+
 ### Fixed — the WASM `eventsConvert` reported success over a value it had dropped
 
 `bvnr.eventsConvert('.v = <float:64,k~m/h> 100.0;', 'm/s')` returned

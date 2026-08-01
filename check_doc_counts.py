@@ -79,8 +79,31 @@ def counts(repo):
                 exp_max = int(m.group(1))
     except OSError:
         pass
+    # BVN_UNIT_SLOT_COUNT, read from the header that defines it. Two documents
+    # quoted it as a number and BOTH had been left behind, at two DIFFERENT
+    # stale values -- doc/04 said 247 and doc/05's transcript of the header said
+    # 259 while the generated header said 329. It is a function of the
+    # catalogue, so it moves every time a unit is added, and nothing was
+    # comparing it: the id-space bounds beside it in the same paragraph were
+    # gated and this one was not.
+    slot_count = None
+    try:
+        with open(os.path.join(repo, "include", "bovnar_profiles.gen.h"),
+                  encoding="utf-8") as f:
+            m = re.search(r"#define\s+BVN_UNIT_SLOT_COUNT\s+(\d+)", f.read())
+            if m:
+                slot_count = int(m.group(1))
+    except OSError:
+        pass
     return {
         "exponent_max": exp_max,
+        # Units a Δ() operator would be a no-op on: every unit that is not an
+        # affine scale. doc/temperature_difference.md states it beside the
+        # total, and when the total was corrected from 192 to 262 the
+        # complement stayed at 186 -- the number that made the argument, left
+        # asserting 186 of 262 when 192 - 6 was where it came from.
+        "units_non_affine": sum(1 for u in units if not u["affine"]),
+        **({"unit_slot_count": slot_count} if slot_count is not None else {}),
         "native_last": native_last,
         "native_last_name": "bu_" + units[-1]["name"],
         "ucum_opaque": opaque["ucum"],
@@ -133,6 +156,13 @@ CLAIMS = [
     (_phrase(r"\b(\d+)", r"(?:named|physical|base)(?:%s(?:named|physical|base))*"
              % _G, r"units\b"),                                 "units"),
     (_phrase(r"registry(?:'s)?", r"(\d+)", r"units\b"),         "units"),
+    # ...and the complement stated beside it. See units_non_affine above.
+    (_phrase(r"no-op", "on", r"(\d+)", "of", r"the", r"registry"),
+                                                                "units_non_affine"),
+    # The dense-table row count, wherever a document quotes the macro's value.
+    # Matches both spellings it appears in: prose ("`BVN_UNIT_SLOT_COUNT` = 331")
+    # and a transcript of the header ("#define BVN_UNIT_SLOT_COUNT 331").
+    (r"BVN_UNIT_SLOT_COUNT`?\s*(?:=|\s)\s*(\d+)",               "unit_slot_count"),
     # doc/11 §6.4's class table heads its first row "Arbitrary units (41)" --
     # UCUM's opaque list, which grew with the rest and said 32 for as long as
     # every other profile count in that document was wrong.
@@ -208,9 +238,19 @@ def _add_profile_keys(repo, want):
     return want
 
 
+def _skip_dir(d):
+    # "build" was skipped by name, but a second build tree is routine here --
+    # CI's own sanitizer pass configures build-asan/ beside it, and the
+    # amalgamation copies the generated headers into it. Those are build
+    # OUTPUT: they restate the catalogue's own numbers, so scanning them
+    # reported a stale artifact as a documentation claim and made the gate
+    # fail on which directories happened to exist.
+    return d in SKIP_DIRS or d.startswith("build-")
+
+
 def files(repo):
     for root, dirs, names in os.walk(repo):
-        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+        dirs[:] = [d for d in dirs if not _skip_dir(d)]
         for n in sorted(names):
             if n in SKIP_FILES or n.startswith(SKIP_PREFIXES):
                 continue

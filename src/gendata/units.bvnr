@@ -1,5 +1,5 @@
 #!bovnar 1.1
-# units.bvnr — single source of truth for all 262 physical base units.
+# units.bvnr — single source of truth for all 264 physical base units.
 #
 # HOW THIS WORKS
 #   Hand-edited. gen_units.py (at the repo root) regenerates the C unit tables
@@ -3481,6 +3481,41 @@
     .offset  = 0.0;
     .prefix  = default;
     .aliases = ["gregorian_month", "mo_greg"];
+  },
+  # The last two members of the ESU family. statV, statA, statC, statF, statΩ,
+  # statH and statS were all here; the magnetic pair was not, so `statWb` and
+  # `statT` were error_unit_illegal while their seven siblings parsed. Both are
+  # exactly derivable from statV, which is itself exact (299.792458 V, from the
+  # 2019 SI fixing of c), so neither needs .factor_num/.factor_den:
+  #
+  #   statWb = statV·s        = 299.792458 Wb
+  #   statT  = statV·s/cm²    = 299.792458 / 1e-4 = 2997924.58 T
+  #
+  # Both compound spellings already parsed and still do; these give the pair the
+  # conventional single names the other seven have. om:statweber and
+  # om:stattesla map here — OM states both to six digits (299.79, 2997900),
+  # 8.2 ppm low, which is why they are waived rather than matched exactly.
+  {
+    .id      = <uint:32> 100262;
+    .name    = "statweber";
+    .symbol  = "statWb";
+    .factor  = 299.792458;
+    .dims    = { .length = 2; .mass = 1; .time = -2; .current = -1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["statweber", "statWb"];
+  },
+  {
+    .id      = <uint:32> 100263;
+    .name    = "stattesla";
+    .symbol  = "statT";
+    .factor  = 2997924.58;
+    .dims    = { .mass = 1; .time = -2; .current = -1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["stattesla", "statT"];
   }
 ];
 

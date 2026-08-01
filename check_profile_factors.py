@@ -375,6 +375,20 @@ WAIVED_UPSTREAM = {
         "OM states the EC therm as 105 506 000 J (6 digits); native thm_ec is "
         "the exact 105 505 585.262 J. 3.9 ppm, the same rounding UDUNITS "
         "applies to the same unit.",
+    # The magnetic pair of the ESU family, rounded by OM at the same place and
+    # by the same ratio as each other -- 0.9999918 both, which is c truncated to
+    # 2.9979e8 rather than the exact 2.99792458e8. OM's own statvolt, statampere
+    # and statcoulomb are exact, so this is two coarse rows rather than a
+    # different definition; native statWb and statT are statV·s and statV·s/cm²,
+    # built on the c the 2019 SI fixed.
+    ("om", "statweber"):
+        "OM states the statweber as 299.79 (5 digits); native statWb is the "
+        "exact statV·s = 299.792458 Wb. 8.2 ppm, OM rounding c to 2.9979e8 -- "
+        "its own statvolt, statampere and statcoulomb are exact.",
+    ("om", "stattesla"):
+        "OM states the stattesla as 2 997 900 (5 digits); native statT is the "
+        "exact statV·s/cm² = 2 997 924.58 T. 8.2 ppm, the same rounding of c "
+        "OM applies to its statweber, and by the identical ratio.",
     # The four information units QUDT states at a value that is not its OWN
     # model. Every other member of the family is exactly ln 2 (or 8·ln 2) times
     # the corresponding power of two — see _QUDT_INFO_MODEL — and these four are
@@ -2139,7 +2153,74 @@ def check_profile(ns, vocab, native, native_index, verbose):
             stale.append("  %-28s == native %-16s (refused: %s)"
                          % (code, hit[0], r.get("why", "")[:44]))
 
-    return mismatch, dead, missing, notes, checked, stale
+    prefixed = check_prefixed_refusals(vocab, doc, native)
+    return mismatch, dead, missing, notes, checked, stale, prefixed
+
+
+# The prefixes a publisher spells as a WORD in front of a code it also defines
+# bare. Built from prefixes.bvnr so it cannot drift from the parser's own set.
+def _prefix_words():
+    doc = bvnr_data.load(open(os.path.join(GENDATA, "prefixes.bvnr"), "rb").read())
+    return {p["name"].lower(): p["symbol"] for p in doc["si_prefixes"]}
+
+
+def check_prefixed_refusals(vocab, doc, native):
+    """Refusals the table's OWN neighbours already answer.
+
+    A vocabulary that spells a prefixed unit as one token -- om:kilocalorie-Mean,
+    qudt:MilliDARCY, qudt:KiloMIL_Circ -- names the prefix in the code. When the
+    bare code beside it is already mapped, `<prefix>~<that target>` is a spelling
+    this build accepts and is worth exactly what the publisher says the prefixed
+    code is worth. A refusal in that position is not a judgement about the unit;
+    it is a row nobody revisited, and every one of them said so in terms that
+    were false -- "bovnar has no unit of this magnitude" beside a k~cal_m that
+    spells it, "no native unit of this dimension is a decade away" beside an
+    m~darcy exactly a decade away.
+
+    This is deliberately NOT the value-matching sweep above, which is advisory
+    because a factor and a dimension cannot tell a footcandle from a luminance.
+    Three things have to agree here -- the publisher's own prefix WORD, the bare
+    sibling already being mapped, and the value -- so a hit is a defect rather
+    than a coincidence, and it is reported as one. The value-only sweep proposed
+    `_100Kilometre == P~Å` and `litrePer100Kilometre == p~ha` on the same data;
+    neither survives the name test.
+    """
+    if native is None:
+        return []
+    mapped = {m["code"]: m["bovnar"] for m in doc.get("mapped", [])}
+    out = []
+    for r in doc.get("unsupported", []):
+        code = str(r["code"])
+        low = code.lower().lstrip("_")
+        for word, sym in _prefix_words().items():
+            if not low.startswith(word):
+                continue
+            rest = code[len(word):].lstrip("-_")
+            sib = next((c for c in mapped if c.lower() == rest.lower()), None)
+            if not sib:
+                break
+            expr = "%s~%s" % (sym, mapped[sib])
+            try:
+                nr = native(expr)
+            except Unresolved:
+                break
+            if nr is None:
+                break
+            try:
+                up = vocab.resolve(code)
+            except Exception:
+                break
+            if up is None:
+                break
+            uf, ud = (vocab.normalise(up, nr[1])
+                      if hasattr(vocab, "normalise") else up)
+            if list(ud) == list(nr[1]) and close(uf, nr[0]):
+                out.append("  %-26s is %s of %s, which maps to %s — so it is "
+                           "%s, not a refusal (stated reason: %s)"
+                           % (code, word, sib, mapped[sib], expr,
+                              r.get("why", "")[:40]))
+            break
+    return out
 
 
 def fetch(cache, which):
@@ -2273,12 +2354,15 @@ def main(argv):
     total_mismatch = total_dead = total_missing = total_checked = 0
     doc_row_bad = []
     total_stale = 0
+    prefixed_bad = []
     for ns in available:
         vocab = VOCABS[ns](args.cache)
         if args.verbose:
             print("  %s:" % ns)
-        mism, dead, missing, notes, checked, stale = check_profile(
+        mism, dead, missing, notes, checked, stale, prefixed = check_profile(
             ns, vocab, native, native_index, args.verbose)
+        if prefixed:
+            prefixed_bad.append((ns, prefixed))
         if getattr(vocab, "secondary", False):
             doc = bvnr_data.load(
                 open(os.path.join(GENDATA, ns + ".bvnr"), "rb").read())
@@ -2375,6 +2459,14 @@ def main(argv):
     print("check_profile_factors: %d refusal(s) an existing native expression "
           "would now cover%s" % (total_stale, "" if args.verbose else
           " (--verbose to list them)"))
+    if prefixed_bad:
+        print("\ncheck_profile_factors: refusal(s) the table's OWN mapped rows "
+              "already answer — the code names a prefix, the bare sibling is "
+              "mapped, and the value agrees:")
+        for ns, lines in prefixed_bad:
+            print("  %s:" % ns)
+            for line in lines:
+                print("  " + line)
     if kind_checked:
         print("check_profile_factors: %d unit/quantity-kind pair(s) checked "
               "for quantity kind; %d disagree" % (kind_checked, len(kind_bad)))
@@ -2390,7 +2482,7 @@ def main(argv):
     elif doc_rows:
         print("check_profile_factors: %d documented row count(s) agree with "
               "this run" % len(doc_rows))
-    if total_mismatch or kind_bad or xref_bad or doc_row_bad:
+    if total_mismatch or kind_bad or xref_bad or doc_row_bad or prefixed_bad:
         return 1
     if total_dead and args.strict_dead:
         return 1

@@ -2,7 +2,7 @@
 
 > **Spec version:** 1.1
 > **Status:** Reference — the symbol tables of the unit and currency registry
-> **Scope:** 262 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.
+> **Scope:** 264 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.
 
 ---
 
@@ -717,6 +717,8 @@ or CF document that says `year` be read at all.
 | `statΩ` | `statohm` | statohm | `bu_statohm` | 22468879468420441/25000 Ω ≈ 898 755 178 737 Ω (exact) |
 | `statH` | `stathenry` | stathenry | `bu_stathenry` | 22468879468420441/25000 H (exact) |
 | `statS` | `statsiemens`, `statmho` | statsiemens | `bu_statsiemens` | 25000/22468879468420441 S (exact) |
+| `statWb` | `statweber` | statweber | `bu_statweber` | 149896229/500000 Wb = 299.792458 Wb (exact, = statV·s) |
+| `statT` | `stattesla` | stattesla | `bu_stattesla` | 149896229/50 T = 2 997 924.58 T (exact, = statV·s/cm²) |
 
 **Luminance**
 
@@ -1049,8 +1051,8 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 
 ---
 
-*The id space is blocked: the leading two digits of an id name its vocabulary. Native units 100000–100261 (262) · UCUM opaque units 200000–200040 (41) · UN/ECE opaque units 300000–300024 (25) · currencies 900000–900215 (166 fiat, 50 crypto). Blocks 40, 50, 60, 70 and 80 are reserved for QUDT, QUDT quantity kinds, UDUNITS, OM 2 and the CF standard names, which contribute no opaque units today.*
-*The space is SPARSE — do not index an array by an id. `BVN_UNIT_SLOT_COUNT` = 247 is the row count of the library's dense tables, indexed by `bvni_unit_slot()`, and is not a bound on the enum.*
+*The id space is blocked: the leading two digits of an id name its vocabulary. Native units 100000–100263 (264) · UCUM opaque units 200000–200040 (41) · UN/ECE opaque units 300000–300024 (25) · currencies 900000–900215 (166 fiat, 50 crypto). Blocks 40, 50, 60, 70 and 80 are reserved for QUDT, QUDT quantity kinds, UDUNITS, OM 2 and the CF standard names, which contribute no opaque units today.*
+*The space is SPARSE — do not index an array by an id. `BVN_UNIT_SLOT_COUNT` = 331 is the row count of the library's dense tables, indexed by `bvni_unit_slot()`, and is not a bound on the enum.*
 
 ---
 

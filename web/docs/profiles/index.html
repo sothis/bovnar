@@ -303,7 +303,7 @@ only <code>ucum</code> does, so <code>udunits:mL{x}</code> is <code>error_unit_i
 (§3.4).</p>
 <p>Adding a vocabulary is therefore a data file and a registry row, not a second parser.</p>
 <h3 id="12-why-a-notation-rather-than-more-native-units">1.2 Why a notation rather than more native units</h3>
-<p>Bovnar's native registry is 262 physical units and 216 currencies, hand-maintained in
+<p>Bovnar's native registry is 264 physical units and 216 currencies, hand-maintained in
 <code>src/gendata/</code>. UCUM's atom table is larger — a complete clinical, apothecary, troy, avoirdupois
 and CGS inventory — and its expression language is unbounded, so the set of valid UCUM codes cannot
 be enumerated as a table of units at all.</p>
@@ -1111,9 +1111,9 @@ alone would leave whichever code happened to be shortest and make every other de
 <p>The asymmetry is worth stating plainly: these profiles are good <em>readers</em> and partial <em>writers</em>. A
 round trip that starts in a vocabulary returns to it; one that starts in Bovnar's native registry
 may have nowhere to go.</p>
-<p>Sweeping the whole native registry — all 262 physical units, each at the twelve prefixes
+<p>Sweeping the whole native registry — all 264 physical units, each at the twelve prefixes
 <code>si_none da h k M G T d c m µ n</code> — <strong>689</strong> combinations survive a native → UCUM → native round trip
-unchanged, <strong>2078</strong> have no UCUM code, 377 are prefix/unit pairs <code>bvn_prefix_unit_valid</code> rejects
+unchanged, <strong>2102</strong> have no UCUM code, 377 are prefix/unit pairs <code>bvn_prefix_unit_valid</code> rejects
 before the question arises, and <strong>none round-trips to a different unit</strong>. The last of those is the
 invariant; the two counts move whenever the registry gains a unit, so <code>test_sweep_round_trip</code> in
 <code>tests/bovnar_ucum_test.c</code> pins all three rather than leaving them as prose.</p>
@@ -2899,7 +2899,7 @@ that went in spelled <code>qudt:M-PER-SEC</code> comes out spelled <code>qudt:M-
 </tr>
 <tr>
 <td><code>qudt.bvnr</code></td>
-<td>2233 mapped, 575 unsupported</td>
+<td>2238 mapped, 570 unsupported</td>
 </tr>
 <tr>
 <td><code>qudt-qk.bvnr</code></td>
@@ -2911,7 +2911,7 @@ that went in spelled <code>qudt:M-PER-SEC</code> comes out spelled <code>qudt:M-
 </tr>
 <tr>
 <td><code>om.bvnr</code></td>
-<td>1338 mapped, 122 unsupported</td>
+<td>1341 mapped, 119 unsupported</td>
 </tr>
 <tr>
 <td><code>cf.bvnr</code></td>
@@ -3977,7 +3977,7 @@ that are equal in SI and different in meaning, and <code>C94</code>/<code>M46</c
 <hr />
 <h2 id="12-the-qudt-profiles">12. The QUDT profiles</h2>
 <blockquote>
-<p><code>qudt:</code> — QUDT unit local names (2233 mapped, 575 unsupported — every one of the 2808 local
+<p><code>qudt:</code> — QUDT unit local names (2238 mapped, 570 unsupported — every one of the 2808 local
 names QUDT defines).
 <code>qudt-qk:</code> — QUDT quantity kinds (903 mapped, 262 unsupported — every one of the 1165 kinds).
 Data files <code>src/gendata/qudt.bvnr</code> and <code>src/gendata/qudt-qk.bvnr</code>;
@@ -4665,7 +4665,7 @@ Growing the native registry to reach them is a separate decision, and doc/05 is 
 <blockquote>
 <p><code>om:</code> — OM 2, the Ontology of units of Measure (Rijgersberg, van Assem, Top; Wageningen), the
 second unit ontology of the semantic web beside QUDT.
-Data file <code>src/gendata/om.bvnr</code> (1338 mapped, 122 refused — every unit individual OM states);
+Data file <code>src/gendata/om.bvnr</code> (1341 mapped, 119 refused — every unit individual OM states);
 pinned by <code>tests/bovnar_om_test.c</code> (103 assertions); id block 70, contributing no opaque units.</p>
 </blockquote>
 <h3 id="161-why-this-vocabulary">16.1 Why this vocabulary</h3>
@@ -4750,7 +4750,7 @@ last fence, 10⁵ metres — OM's <code>_100Kilometre</code>, for which no SI pr
 refused instead.</p>
 <p>The same walk is implemented independently in <code>check_profile_factors.py</code> (<code>class Om</code>), which
 resolves every local name against <code>om-2.0.rdf</code> and compares it with what the library says the target
-is worth: <strong>1275 rows compared, no mismatch</strong>. The three shapes of resolver this brings the tool to
+is worth: <strong>1276 rows compared, no mismatch</strong>. The three shapes of resolver this brings the tool to
 — expression, table read, composition — are listed in its header.</p>
 <h3 id="163-what-the-derivation-refuses">16.3 What the derivation refuses</h3>
 <p>205 local names are carried as refusals rather than mappings, and four groups are worth naming:</p>

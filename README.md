@@ -196,7 +196,7 @@ Nine epochs are supported — `unix`, `tai`, `gps`, `mjd`, `ntp`, `galileo`, `gl
 
 ### Where Bovnar does not compete
 
-In earth-system science, CF wins and will keep winning. The entire tool ecosystem — xarray, iris, cdo, cf-python — is bound to netCDF, CF has been developed in the open since 2001 with thousands of standard names, and its known weaknesses are priced in. Bovnar's registry of 262 physical units and 216 currencies is not going to displace that, and this README does not claim it will.
+In earth-system science, CF wins and will keep winning. The entire tool ecosystem — xarray, iris, cdo, cf-python — is bound to netCDF, CF has been developed in the open since 2001 with thousands of standard names, and its known weaknesses are priced in. Bovnar's registry of 264 physical units and 216 currencies is not going to displace that, and this README does not claim it will.
 
 Bovnar's ground is where CF does not reach: heterogeneous documents rather than arrays, text and binary payloads in one file, configuration mixed with measurements, log streams, industrial telemetry, financial data with units. That is the space between JSON (no type, no unit) and netCDF (arrays, external schema, binary container).
 

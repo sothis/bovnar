@@ -1303,11 +1303,11 @@ static void test_nonsi_enum_order(void)
 	 * silently stop converting. */
 	ASSERT_EQ_INT((int)bu_bit, BVN_UNIT_NATIVE_FIRST,
 	              "the first native unit opens block 10");
-	ASSERT_EQ_INT((int)bu_month_gregorian, BVN_UNIT_NATIVE_LAST,
+	ASSERT_EQ_INT((int)bu_stattesla, BVN_UNIT_NATIVE_LAST,
 	              "the last native unit closes the run");
 	ASSERT_EQ_INT(BVN_UNIT_NATIVE_LAST - BVN_UNIT_NATIVE_FIRST + 1,
 	              BVN_UNIT_NATIVE_COUNT, "the native run has no holes");
-	ASSERT_TRUE((int)bu_month_gregorian < BVN_PROFILE_UCUM_OPAQUE_FIRST,
+	ASSERT_TRUE((int)bu_stattesla < BVN_PROFILE_UCUM_OPAQUE_FIRST,
 	            "native units sit below every profile block");
 	ASSERT_EQ_INT(BVN_UNIT_NATIVE_FIRST, 100000, "block 10 starts at 100000");
 	ASSERT_EQ_INT(BVN_PROFILE_UCUM_OPAQUE_FIRST, 200000,

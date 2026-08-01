@@ -42,7 +42,7 @@
 <blockquote>
 <p><strong>Spec version:</strong> 1.1
 <strong>Status:</strong> Reference — the symbol tables of the unit and currency registry
-<strong>Scope:</strong> 262 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.</p>
+<strong>Scope:</strong> 264 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.</p>
 </blockquote>
 <hr />
 <h2 id="table-of-contents">Table of Contents</h2>
@@ -2858,6 +2858,20 @@ or CF document that says <code>year</code> be read at all.</p>
 <td><code>bu_statsiemens</code></td>
 <td>25000/22468879468420441 S (exact)</td>
 </tr>
+<tr>
+<td><code>statWb</code></td>
+<td><code>statweber</code></td>
+<td>statweber</td>
+<td><code>bu_statweber</code></td>
+<td>149896229/500000 Wb = 299.792458 Wb (exact, = statV·s)</td>
+</tr>
+<tr>
+<td><code>statT</code></td>
+<td><code>stattesla</code></td>
+<td>stattesla</td>
+<td><code>bu_stattesla</code></td>
+<td>149896229/50 T = 2 997 924.58 T (exact, = statV·s/cm²)</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Luminance</strong></p>
@@ -4466,8 +4480,8 @@ abbreviations that are deliberately not units — is in <a href="https://www.bov
 <li><a href="https://www.bovnar.io/docs/profiles/">Unit Profiles</a> — writing these same units as UCUM, UNECE, QUDT or UDUNITS codes, and the profile-only units that exist in no native spelling</li>
 </ul>
 <hr />
-<p><em>The id space is blocked: the leading two digits of an id name its vocabulary. Native units 100000–100261 (262) · UCUM opaque units 200000–200040 (41) · UN/ECE opaque units 300000–300024 (25) · currencies 900000–900215 (166 fiat, 50 crypto). Blocks 40, 50, 60, 70 and 80 are reserved for QUDT, QUDT quantity kinds, UDUNITS, OM 2 and the CF standard names, which contribute no opaque units today.</em>
-<em>The space is SPARSE — do not index an array by an id. <code>BVN_UNIT_SLOT_COUNT</code> = 247 is the row count of the library's dense tables, indexed by <code>bvni_unit_slot()</code>, and is not a bound on the enum.</em></p>
+<p><em>The id space is blocked: the leading two digits of an id name its vocabulary. Native units 100000–100263 (264) · UCUM opaque units 200000–200040 (41) · UN/ECE opaque units 300000–300024 (25) · currencies 900000–900215 (166 fiat, 50 crypto). Blocks 40, 50, 60, 70 and 80 are reserved for QUDT, QUDT quantity kinds, UDUNITS, OM 2 and the CF standard names, which contribute no opaque units today.</em>
+<em>The space is SPARSE — do not index an array by an id. <code>BVN_UNIT_SLOT_COUNT</code> = 331 is the row count of the library's dense tables, indexed by <code>bvni_unit_slot()</code>, and is not a bound on the enum.</em></p>
 <hr />
 <p><em>End of Bovnar — Units &amp; Currencies Cheat Sheet (Bovnar spec 1.1).</em></p>
 </main>

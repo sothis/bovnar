@@ -114,6 +114,10 @@ BOVNAR_PINT_DEFINITIONS: list[str] = [
     'bvnr_statohm = 898755178736.8176 * ohm',
     'bvnr_stathenry = 898755178736.8176 * henry',
     'bvnr_statsiemens = 1.1126500560536185e-12 * siemens',
+    # The magnetic pair of the same family: statWb = statV·s and
+    # statT = statV·s/cm², both exact on the c the 2019 SI fixed.
+    'bvnr_statweber = 299.792458 * weber',
+    'bvnr_stattesla = 2997924.58 * tesla',
     'bvnr_lambert = 3183.098861837907 * candela * meter**-2',
     'bvnr_apostilb = 0.3183098861837907 * candela * meter**-2',
     'bvnr_footlambert = 3.4262590996353905 * candela * meter**-2',
@@ -450,6 +454,8 @@ BASE_UNIT_TO_PINT: dict[int, str] = {
     100241: 'bvnr_statohm',                      # STATOHM
     100242: 'bvnr_stathenry',                    # STATHENRY
     100243: 'bvnr_statsiemens',                  # STATSIEMENS
+    100262: 'bvnr_statweber',                    # STATWEBER
+    100263: 'bvnr_stattesla',                    # STATTESLA
     100244: 'bvnr_lambert',                      # LAMBERT
     100245: 'bvnr_apostilb',                     # APOSTILB
     100246: 'bvnr_footlambert',                  # FOOTLAMBERT

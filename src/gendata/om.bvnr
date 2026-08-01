@@ -126,6 +126,8 @@
   { .code = "minute-Sidereal";           .bovnar = "min_sid"; },
   { .code = "second-Sidereal";           .bovnar = "s_sid"; },
   { .code = "statvolt";                  .bovnar = "statV"; },
+  { .code = "statweber";                 .bovnar = "statWb"; },
+  { .code = "stattesla";                 .bovnar = "statT"; },
   { .code = "statampere";                .bovnar = "statA"; },
   { .code = "statcoulomb";               .bovnar = "statC"; },
   { .code = "statfarad";                 .bovnar = "statF"; },
@@ -140,6 +142,7 @@
   { .code = "unitPole";                  .bovnar = "unit_pole"; },
   { .code = "horsepower-Water";          .bovnar = "hp_W"; },
   { .code = "calorie-Mean";              .bovnar = "cal_m"; },
+  { .code = "kilocalorie-Mean";          .bovnar = "k~cal_m"; },
   # Unblocked by the units added to units.bvnr: each was refused for want
   # of a native target and for no other reason.
   { .code = "point-ATA";                .bovnar = "pnt_pr"; },
@@ -1548,7 +1551,6 @@
   { .code = "hour-HourAngle";                          .why = "an ANGLE spelled like a time; bovnar has no hour-angle unit"; },
   { .code = "hundredCount";                            .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "jansky";                                  .why = "OM states no factor for this unit, so its magnitude is unknown here"; },
-  { .code = "kilocalorie-Mean";                        .why = "bovnar has no unit of this magnitude"; },
   { .code = "kilocalorie-MeanPerDay";                  .why = "bovnar has no unit of this magnitude"; },
   { .code = "kilocalorie-MeanPerHectogram";            .why = "bovnar has no unit of this magnitude"; },
   { .code = "kilogramOfCarbonDioxideEquivalent";       .why = "a CO2-equivalent, an accounting quantity that depends on a chosen warming horizon rather than a unit of mass"; },
@@ -1587,8 +1589,6 @@
   { .code = "solarRadius";                             .why = "bovnar has no unit of this magnitude"; },
   { .code = "spread";                                  .why = "a household portion whose magnitude OM does not state"; },
   { .code = "squareMile-Statute";                      .why = "OM states no factor for this unit, so its magnitude is unknown here"; },
-  { .code = "stattesla";                               .why = "bovnar has no unit of this magnitude"; },
-  { .code = "statweber";                               .why = "bovnar has no unit of this magnitude"; },
   { .code = "thousandPiece";                           .why = "dimension one — bovnar spells that by omitting the unit slot"; },
   { .code = "ton-Register";                            .why = "OM states no factor for this unit, so its magnitude is unknown here"; },
   { .code = "tonneOfCarbonDioxideEquivalent";          .why = "a CO2-equivalent, an accounting quantity that depends on a chosen warming horizon rather than a unit of mass"; },

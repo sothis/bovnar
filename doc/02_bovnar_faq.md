@@ -637,7 +637,7 @@ a mismatch is `error_unit_mismatch`.
 
 **How many base units does Bovnar support?**
 
-262 named base units across the following categories:
+264 named base units across the following categories:
 
 - **7 SI base units** — second, meter, gram, ampere, kelvin, mole, candela.
 - **21 named SI-derived units** — hertz through katal (Hz, N, Pa, J, W, V, Ω, F, C, S, Wb, T, H, lm, lx, Bq, Gy, Sv, kat, rad, sr).
@@ -674,7 +674,7 @@ a mismatch is `error_unit_mismatch`.
 - **1 conductivity scale** — **CF** (hydroponic conductivity factor, 1 CF = 0.1 mS/cm exactly), which *does* convert, being a rescaled conductivity.
 - **6 units the unit profiles needed** — **metre of water column** (`mH2O`, the conventional 9 806.65 Pa; `c~mH2O` is the centimetre a ventilator is set in), **IT calorie** (`cal_IT`, 4.1868 J — native `cal` is the thermochemical 4.184 J), **thermochemical BTU** (`Btu_th` — native `Btu` is the international-table one), **troy pound** (`lb_t`, twelve troy ounces; also the apothecary pound), **apothecary dram** (`dr_ap`, three scruples — native `dr` is the avoirdupois dram, 2.2× smaller), and the **long hundredweight** (`cwt_l`, 112 lb; the short one is exactly `h~lb` and needs no unit of its own). Each was the sole reason a run of UCUM, UDUNITS-2, QUDT and UN/ECE codes had to be refused.
 - **12 calendar and sidereal time units** — the **tropical** (`yr_trop`), **Gregorian** (`yr_greg`), **sidereal** (`yr_sid`) and **common** (`yr_com`) years; the **synodal** (`mo_syn`), **tropical** (`mo_trop`), **sidereal** (`mo_sid`) and mean **Gregorian** (`mo_greg`, a twelfth of `yr_greg`) months; and the sidereal **day**, **hour**, **minute** and **second** (`d_sid`, `h_sid`, `min_sid`, `s_sid`). `yr` is still the Julian year and `mo` still a twelfth of it — naming the others is what lets a UDUNITS or CF document that says `year` be read at all.
-- **7 CGS electrostatic units** — **statvolt** (`statV`), **statampere** (`statA`), **statcoulomb** (`statC`, the franklin), **statfarad** (`statF`), **statohm** (`statΩ`), **stathenry** (`statH`) and **statsiemens** (`statS`). All are built on `c`, which the 2019 SI fixed, so all are exact rationals.
+- **9 CGS electrostatic units** — **statvolt** (`statV`), **statampere** (`statA`), **statcoulomb** (`statC`, the franklin), **statfarad** (`statF`), **statohm** (`statΩ`), **stathenry** (`statH`), **statsiemens** (`statS`), **statweber** (`statWb`) and **stattesla** (`statT`). All are built on `c`, which the 2019 SI fixed, so all are exact rationals.
 - **3 luminance units** — **lambert** (`Lmb`), **apostilb** (`apostilb`, the blondel) and **foot-lambert** (`footlambert`), each 1/π-based and so marked inexact.
 - **3 water-vapour permeances** — `perm_0C`, `perm_23C` and the metric `perm_m`.
 - **6 heat conventions** — the **mean** (`cal_m`), **15 °C** (`cal_15`) and **20 °C** (`cal_20`) calories, and the **59 °F** (`Btu_59`), **60 °F** (`Btu_60`) and **mean** (`Btu_m`) BTUs, beside the thermochemical and IT ones already here.

@@ -192,7 +192,7 @@ Adding a vocabulary is therefore a data file and a registry row, not a second pa
 
 ### 1.2 Why a notation rather than more native units
 
-Bovnar's native registry is 262 physical units and 216 currencies, hand-maintained in
+Bovnar's native registry is 264 physical units and 216 currencies, hand-maintained in
 `src/gendata/`. UCUM's atom table is larger — a complete clinical, apothecary, troy, avoirdupois
 and CGS inventory — and its expression language is unbounded, so the set of valid UCUM codes cannot
 be enumerated as a table of units at all.
@@ -912,9 +912,9 @@ The asymmetry is worth stating plainly: these profiles are good *readers* and pa
 round trip that starts in a vocabulary returns to it; one that starts in Bovnar's native registry
 may have nowhere to go.
 
-Sweeping the whole native registry — all 262 physical units, each at the twelve prefixes
+Sweeping the whole native registry — all 264 physical units, each at the twelve prefixes
 `si_none da h k M G T d c m µ n` — **689** combinations survive a native → UCUM → native round trip
-unchanged, **2078** have no UCUM code, 377 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
+unchanged, **2102** have no UCUM code, 377 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
 before the question arises, and **none round-trips to a different unit**. The last of those is the
 invariant; the two counts move whenever the registry gains a unit, so `test_sweep_round_trip` in
 `tests/bovnar_ucum_test.c` pins all three rather than leaving them as prose.
@@ -1643,10 +1643,10 @@ One hand-edited data file per namespace in `src/gendata/`, in the same shape as 
 |---|---|
 | `ucum.bvnr` | 20 prefixes, 206 mapped, 41 opaque, 65 unsupported |
 | `unece.bvnr` | 1298 mapped, 25 opaque, 156 unsupported |
-| `qudt.bvnr` | 2233 mapped, 575 unsupported |
+| `qudt.bvnr` | 2238 mapped, 570 unsupported |
 | `qudt-qk.bvnr` | 903 mapped, 262 unsupported |
 | `udunits.bvnr` | 41 prefixes, 499 mapped, 81 unsupported |
-| `om.bvnr` | 1338 mapped, 122 unsupported |
+| `om.bvnr` | 1341 mapped, 119 unsupported |
 | `cf.bvnr` | 4454 mapped, 617 unsupported |
 
 Four list kinds, and a code belongs to exactly one of them: the vocabulary's prefix spellings with
@@ -2336,7 +2336,7 @@ that are equal in SI and different in meaning, and `C94`/`M46` is the pair that 
 
 ## 12. The QUDT profiles
 
-> `qudt:` — QUDT unit local names (2233 mapped, 575 unsupported — every one of the 2808 local
+> `qudt:` — QUDT unit local names (2238 mapped, 570 unsupported — every one of the 2808 local
 > names QUDT defines).
 > `qudt-qk:` — QUDT quantity kinds (903 mapped, 262 unsupported — every one of the 1165 kinds).
 > Data files `src/gendata/qudt.bvnr` and `src/gendata/qudt-qk.bvnr`;
@@ -2840,7 +2840,7 @@ Growing the native registry to reach them is a separate decision, and doc/05 is 
 
 > `om:` — OM 2, the Ontology of units of Measure (Rijgersberg, van Assem, Top; Wageningen), the
 > second unit ontology of the semantic web beside QUDT.
-> Data file `src/gendata/om.bvnr` (1338 mapped, 122 refused — every unit individual OM states);
+> Data file `src/gendata/om.bvnr` (1341 mapped, 119 refused — every unit individual OM states);
 > pinned by `tests/bovnar_om_test.c` (103 assertions); id block 70, contributing no opaque units.
 
 ### 16.1 Why this vocabulary
@@ -2900,7 +2900,7 @@ refused instead.
 
 The same walk is implemented independently in `check_profile_factors.py` (`class Om`), which
 resolves every local name against `om-2.0.rdf` and compares it with what the library says the target
-is worth: **1275 rows compared, no mismatch**. The three shapes of resolver this brings the tool to
+is worth: **1276 rows compared, no mismatch**. The three shapes of resolver this brings the tool to
 — expression, table read, composition — are listed in its header.
 
 ### 16.3 What the derivation refuses

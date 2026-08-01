@@ -86,6 +86,7 @@
   { .code = "ElementaryCharge";          .bovnar = "e"; },
   { .code = "FA";                        .bovnar = "sph"; },
   { .code = "MIL_Circ";                  .bovnar = "cml"; },
+  { .code = "KiloMIL_Circ";              .bovnar = "k~cml"; },
   { .code = "UnitPole";                  .bovnar = "unit_pole"; },
   { .code = "HP_H2O";                    .bovnar = "hp_W"; },
   { .code = "CAL_MEAN";                  .bovnar = "cal_m"; },
@@ -299,6 +300,7 @@
   # QUDT's ROD is the SURVEY rod (16.5 survey feet), which is why it could
   # not map onto the international rd.
   { .code = "DARCY";                           .bovnar = "darcy";               },
+  { .code = "MilliDARCY";                      .bovnar = "m~darcy";             },
   { .code = "GAL_US_DRY";                      .bovnar = "gal_dry";             },
   { .code = "MI_US";                           .bovnar = "miUS";                },
   { .code = "PINT_US_DRY";                     .bovnar = "pt_dry";              },
@@ -327,6 +329,7 @@
   { .code = "PER-DEG_C";                       .bovnar = "K^-1";                .reverse = false; },
   { .code = "PERCENT-PER-DEG_C";               .bovnar = "%/K";                 .reverse = false; },
   { .code = "M-PER-DEG_C-M";                   .bovnar = "m/(K·m)";             .reverse = false; },
+  { .code = "MilliM-PER-DEG_C-M";              .bovnar = "m~m/(K·m)";           .reverse = false; },
   { .code = "BAR-PER-DEG_C";                   .bovnar = "bar/K";               .reverse = false; },
   { .code = "DEG_F-PER-HR";                    .bovnar = "Δ°F/h";               .reverse = false; },
   { .code = "DEG_F-PER-MIN";                   .bovnar = "Δ°F/min";             .reverse = false; },
@@ -997,6 +1000,7 @@
   { .code = "GM-PER-BAR";                    .bovnar = "g/bar";               .reverse = false; },
   { .code = "GM-PER-CentiM-BAR";             .bovnar = "g/c~m·bar";           .reverse = false; },
   { .code = "GM-PER-CentiM2";                .bovnar = "g/c~m^2";             .reverse = false; },
+  { .code = "MicroGM-PER-CentiM2";           .bovnar = "µ~g/c~m^2";           .reverse = false; },
   { .code = "GM-PER-CentiM2-YR";             .bovnar = "g/c~m^2·yr";          .reverse = false; },
   { .code = "GM-PER-CentiM3-BAR";            .bovnar = "g/c~m^3·bar";         .reverse = false; },
   { .code = "GM-PER-CentiM3-K";              .bovnar = "g/c~m^3·K";           .reverse = false; },
@@ -1157,6 +1161,7 @@
   { .code = "K-M2-PER-KiloGM-SEC";           .bovnar = "K·m^2/k~g·s";         .reverse = false; },
   { .code = "K-PA-PER-SEC";                  .bovnar = "K·Pa/s";              .reverse = false; },
   { .code = "K-PER-BAR";                     .bovnar = "K/bar";               .reverse = false; },
+  { .code = "MilliK-PER-BAR";                .bovnar = "m~K/bar";             .reverse = false; },
   { .code = "K-PER-HR";                      .bovnar = "K/h";                 .reverse = false; },
   { .code = "K-PER-K";                       .bovnar = "K/K";                 .reverse = false; },
   { .code = "K-PER-M";                       .bovnar = "K/m";                 .reverse = false; },
@@ -2861,7 +2866,15 @@
   { .code = "EarthMass";                   .why = "no native unit of this dimension is a decade away from QUDT's multiplier (5.97219e+24)"; },
   { .code = "ExaV-A";                      .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "F";                           .why = "no native unit of this dimension is a decade away from QUDT's multiplier (96485.3399)"; },
-  { .code = "FARAD_Stat";                  .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1.112650056e-18)"; },
+  # NOT "no native unit is a decade away" -- µ~statF is exactly QUDT's number.
+  # The record is damaged: qudt:symbol is "statF" and the label "Statfarad",
+  # its multiplier carries the statfarad's exact mantissa
+  # (1.112650056053618) against an exponent 1e6 too small, and the
+  # dcterms:description attached to it is a FATHOM's. Name and value cannot
+  # both be honoured and they differ by a million, so this is the "only the
+  # author can resolve it" case: mapping to statF would read a QUDT-literal
+  # producer 1e6 high, and to µ~statF would enshrine the typo.
+  { .code = "FARAD_Stat";                  .why = "QUDT states the statfarad's exact mantissa with an exponent 1e6 too small (1.112650056e-18 against 1.112650056e-12), and labels it statF; the value and the name disagree by a million"; },
   { .code = "FBM";                         .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.00236)"; },
   { .code = "FC";                          .why = "the footcandle is a lumen per square foot, which bovnar spells lm/ft^2; QUDT states it at five digits (10.764) against the exact 10.7639104167, 8 ppm past the tolerance this repository measured for publisher rounding. om:footcandle, whose own value is exact, does map"; },
   { .code = "FLIGHT";                      .why = "QUDT states no conversionMultiplier for this unit"; },
@@ -2919,7 +2932,6 @@
   { .code = "KiloLB-PER-HR";               .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "KiloLB_F-FT-PER-A";           .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1355.818009)"; },
   { .code = "KiloLB_F-FT-PER-LB";          .why = "no native unit of this dimension is a decade away from QUDT's multiplier (2989.067)"; },
-  { .code = "KiloMIL_Circ";                .why = "no native unit of this dimension is a decade away from QUDT's multiplier (5.067075e-07)"; },
   { .code = "KiloV-A_Reactive-PER-K";      .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "KiloVAR-PER-K";               .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "LANGLEY";                     .why = "QUDT states no conversionMultiplier for this unit"; },
@@ -2974,7 +2986,6 @@
   { .code = "MegaHZ-KiloM";                .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "MegaPA-M0dot5";               .why = "QUDT states no usable dimension vector for this unit"; },
   { .code = "MegaTOE";                     .why = "no native unit of this dimension is a decade away from QUDT's multiplier (4.1868e+16)"; },
-  { .code = "MicroGM-PER-CentiM2";         .why = "no native unit of this dimension, and the coherent SI product cannot carry the decade (1e-05)"; },
   { .code = "MicroGM-PER-CentiM2-WK";      .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1.6534392e-11)"; },
   { .code = "MicroGM-PER-GM-HR";           .why = "no native unit of this dimension is a decade away from QUDT's multiplier (2.777777778e-10)"; },
   { .code = "MicroGM-PER-IN2";             .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1.55e-06)"; },
@@ -2984,14 +2995,11 @@
   { .code = "MicroV-A_Reactive";           .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "MicroV-A_Reactive-PER-K";     .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "MicroVAR-PER-K";              .why = "QUDT states no conversionMultiplier for this unit"; },
-  { .code = "MilliDARCY";                  .why = "no native unit of this dimension is a decade away from QUDT's multiplier (9.869233e-16)"; },
   { .code = "MilliDEG_C";                  .why = "an affine QUDT unit — bovnar carries an offset scale only for the temperatures already mapped"; },
   { .code = "MilliGAL-PER-MO";             .why = "no native unit of this dimension is a decade away from QUDT's multiplier (3.919350773e-12)"; },
   { .code = "MilliGM-PER-GM-HR";           .why = "no native unit of this dimension is a decade away from QUDT's multiplier (2.78e-07)"; },
-  { .code = "MilliK-PER-BAR";              .why = "no native unit of this dimension, and the coherent SI product cannot carry the decade (1e-08)"; },
   { .code = "MilliK-PER-K";                .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "MilliM-PER-DAY";              .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1.15741e-08)"; },
-  { .code = "MilliM-PER-DEG_C-M";          .why = "no native unit of this dimension, and the coherent SI product cannot carry the decade (0.001)"; },
   { .code = "MilliMOL-PER-M2-HR";          .why = "no native unit of this dimension is a decade away from QUDT's multiplier (2.778e-07)"; },
   { .code = "MilliOSM";                    .why = "QUDT states a non-positive conversion multiplier"; },
   { .code = "MilliTORR";                   .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.133322)"; },

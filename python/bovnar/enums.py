@@ -456,6 +456,8 @@ class BaseUnit(IntEnum):
     UNIT_POLE          = 100259   # unit_pole
     HORSEPOWER_WATER   = 100260   # hp_W
     MONTH_GREGORIAN    = 100261   # mo_greg
+    STATWEBER          = 100262   # statWb
+    STATTESLA          = 100263   # statT
 
     # ---- Currencies: block 90 -------------------------------------------
     #
@@ -697,7 +699,7 @@ class BaseUnit(IntEnum):
 UNIT_BLOCK_SIZE     = 10000
 
 UNIT_NATIVE_FIRST   = BaseUnit.BIT
-UNIT_NATIVE_LAST    = BaseUnit.MONTH_GREGORIAN
+UNIT_NATIVE_LAST    = BaseUnit.STATTESLA
 
 CURRENCY_FIRST      = BaseUnit.AED
 CURRENCY_LAST       = BaseUnit.RUNE

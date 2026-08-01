@@ -169,7 +169,7 @@
 <p>The Bovnar quantity annotation system is an <strong>optional, per-value annotation</strong> that attaches a physical unit or currency denomination to any numeric field. It is part of the type annotation (<code>&lt;family:width,_base,unit&gt;</code>) and applies to the <code>uint</code>, <code>sint</code>, <code>float</code>, <code>float_fix</code>, and <code>float_dec</code> type families.</p>
 <p>Two distinct namespaces share the annotation slot:</p>
 <ul>
-<li><strong>Physical units</strong> — 262 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.</li>
+<li><strong>Physical units</strong> — 264 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.</li>
 <li><strong>Currency codes</strong> — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical — HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01 — and <code>ANG</code> coexists with its successor <code>XCG</code>, which inherited its numeric code 532; see §9.2) and 50 cryptocurrency tickers.</li>
 </ul>
 <p>Both namespaces are syntactically unified: the same grammar, the same <code>~</code> prefix separator, the same compound-unit operators (<code>·</code>, <code>*</code>, <code>/</code>), and the same <code>value_unit_t</code> data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.</p>
@@ -297,7 +297,7 @@ unaffected in every version. See
 </table>
 <hr />
 <h2 id="3-physical-base-units">3. Physical Base Units</h2>
-<p>Bovnar supports 262 physical base units. Currency codes are a separate namespace and are covered in §9.</p>
+<p>Bovnar supports 264 physical base units. Currency codes are a separate namespace and are covered in §9.</p>
 <blockquote>
 <p><strong>Reading this section:</strong> The <em>Symbol</em> column gives the canonical serialized form. <em>Long forms</em> are accepted on input but never produced on output. <em>Enum value</em> is the <code>value_base_unit_t</code> constant used in the C API.</p>
 </blockquote>
@@ -3101,6 +3101,20 @@ UDUNITS or CF document that says <code>year</code> be read at all. It was refuse
 <td><code>bu_statsiemens</code></td>
 <td>25000/22468879468420441 S (exact)</td>
 </tr>
+<tr>
+<td><code>statWb</code></td>
+<td><code>statweber</code></td>
+<td>statweber</td>
+<td><code>bu_statweber</code></td>
+<td>149896229/500000 Wb = 299.792458 Wb (exact, = statV·s)</td>
+</tr>
+<tr>
+<td><code>statT</code></td>
+<td><code>stattesla</code></td>
+<td>stattesla</td>
+<td><code>bu_stattesla</code></td>
+<td>149896229/50 T = 2 997 924.58 T (exact, = statV·s/cm²)</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Luminance</strong></p>
@@ -5672,7 +5686,7 @@ tabulates all three caps beside the profile grammar.</p>
 </tr>
 </tbody>
 </table>
-<p><code>bu_none</code> is 0 and belongs to no block; every tag between the native units and the currencies is now taken, so a further vocabulary needs one outside 10–90. Blocks 40–80 currently contribute no ids at all: those vocabularies map every code onto a native unit, and the block tag reserves their room rather than filling it. Within block 10 the native units run contiguously from <code>bu_bit</code> = 100000 to <code>bu_month_gregorian</code> = 100261, in the order of <code>units.bvnr</code>; <code>BVN_UNIT_NATIVE_FIRST</code>, <code>BVN_UNIT_NATIVE_LAST</code> and <code>BVN_UNIT_NATIVE_COUNT</code> are generated beside the enum, so read the bounds from those rather than from this sentence. Currencies run contiguously from 900000 and — unlike every other block — have <strong>no named <code>bu_*</code> enumerators</strong> (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a <code>$</code> sigil, resolved by <code>bvn_parse_currency_str</code> and carried as the numeric <code>base</code> value. <code>bvn_unit_is_currency(base)</code> is a bounds check over block 90.</p>
+<p><code>bu_none</code> is 0 and belongs to no block; every tag between the native units and the currencies is now taken, so a further vocabulary needs one outside 10–90. Blocks 40–80 currently contribute no ids at all: those vocabularies map every code onto a native unit, and the block tag reserves their room rather than filling it. Within block 10 the native units run contiguously from <code>bu_bit</code> = 100000 to <code>bu_stattesla</code> = 100263, in the order of <code>units.bvnr</code>; <code>BVN_UNIT_NATIVE_FIRST</code>, <code>BVN_UNIT_NATIVE_LAST</code> and <code>BVN_UNIT_NATIVE_COUNT</code> are generated beside the enum, so read the bounds from those rather than from this sentence. Currencies run contiguously from 900000 and — unlike every other block — have <strong>no named <code>bu_*</code> enumerators</strong> (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a <code>$</code> sigil, resolved by <code>bvn_parse_currency_str</code> and carried as the numeric <code>base</code> value. <code>bvn_unit_is_currency(base)</code> is a bounds check over block 90.</p>
 <p>Only a vocabulary that contributes units of its <em>own</em> takes a block. A unit profile is a spelling for the unit slot, so most of its codes translate to native units and carry native ids; the ones that get a block id of their own are the <strong>opaque</strong> units — codes with no native equivalent and no dimension, such as UCUM's assay-defined <code>[IU]</code> or UN/ECE's package types — which need an identity precisely because nothing else can stand in for them.</p>
 <blockquote>
 <p><strong>Why blocks.</strong> One flat counter makes every vocabulary's ids a function of every other vocabulary's size, and that was not hypothetical. This space previously had physical units at 1–133 <em>and again</em> at 348–396 because the currencies had been dropped in between; two currencies stranded at 378–379, outside their own range, because that range had been frozen; and the profiles' units pinned above all of it. Adding a currency shifted units. The 2.0 renumbering ended that, and made an id self-describing: 200017 is UCUM's, whatever else the build contains.</p>
@@ -5844,7 +5858,7 @@ tabulates all three caps beside the profile grammar.</p>
 <span class="cm">/* Not a member of the enum, and NOT a bound on it: the number of rows in the</span>
 <span class="cm"> * dense tables the library indexes by bvni_unit_slot(). The id space is</span>
 <span class="cm"> * sparse, so it has no &quot;one past the end&quot;. */</span>
-<span class="cm">/* #define BVN_UNIT_SLOT_COUNT 259 */</span>
+<span class="cm">/* #define BVN_UNIT_SLOT_COUNT 331 */</span>
 </code></pre></div>
 
 <h4 id="unit_exponent_t"><code>unit_exponent_t</code></h4>

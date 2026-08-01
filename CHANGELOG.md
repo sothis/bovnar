@@ -43,6 +43,27 @@ Julian month at 2 629 800 s, the fortnight at 1 209 600, `mH2O` at 9 806.65 Pa,
 the IT calorie at 4.1868 J against the thermochemical 4.184, the assay ton at
 175/6 g, `sph` at 4π sr, `rev` at 2π rad and 9 `den` to the `tex`.
 
+### Fixed — a string carrying a unit did not survive `dumps()`
+
+`.s = "x" m;` is legal, and the grammar says so outright —
+`scalar-with-unit = (number | string), ws, inline-unit`. A string may carry a
+unit, but **only as an inline suffix**: `<utf8,m>` is
+`error_illegal_value_type`, because a unit is not one of the parameters that
+family takes.
+
+`dumps()` put it in the annotation anyway, producing `<utf8:m> "x"` — so
+`loads(typed=True)` → `dumps()` → `loads()` **failed on a document the library
+had just read**, with `illegal_value_type` from its own reader. The C writer
+emits `<utf8> "x" m;` and always round-tripped, so the two writers disagreed
+about a shape only one of them could read back.
+
+The unit-parameter emission excluded `datetime` and nothing else; `utf8` is the
+same shape and is now excluded with it, which lets the value event's unit reach
+the C writer and be placed inline exactly as `bovnar pretty-print` does. Only
+`utf8` was affected — every numeric family, including a quoted non-decimal
+number carrying a unit (`<uint:8,_16,m> "FF"`), was already correct, and all
+four are asserted. Verified by mutation.
+
 ### Fixed — `parse_unit("m") == parse_unit("m")` was False
 
 `ValueUnit` is a ctypes `Structure`, which defines no `__eq__`, so `==` fell

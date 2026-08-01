@@ -410,7 +410,19 @@ class Writer:
         # sentinel (e.g. for a bare ISO literal whose annotation is inferred),
         # which bvn_unit_to_string_ex renders as the literal "no_unit"; emitting
         # that as a unit produces an illegal "<datetime:…,no_unit>" annotation.
-        if vu.num_components > 0 and fam != int(ValueTypeFamily.DATETIME):
+        #
+        # A utf8 value is the same shape and was NOT excluded. The format lets a
+        # string carry a unit — `.s = "x" m;` is legal, and the grammar says so
+        # (`scalar-with-unit = (number | string), ws, inline-unit`) — but only as
+        # an INLINE suffix; `<utf8,m>` is error_illegal_value_type. Emitting it
+        # as an annotation parameter produced `<utf8:m> "x"`, which this
+        # library's own reader refuses, so `loads(typed=True)` → `dumps` →
+        # `loads` failed on a document it had just read. The C writer places it
+        # inline (`<utf8> "x" m;`) and round-trips; leaving the parameter off
+        # lets the value event's unit reach it and do the same.
+        _no_unit_param = (int(ValueTypeFamily.DATETIME),
+                          int(ValueTypeFamily.UTF8))
+        if vu.num_components > 0 and fam not in _no_unit_param:
             lib = self._lib
             ubuf = ctypes.create_string_buffer(UNIT_STRING_MAX)
             unit_flags = lib.bvnr_writer_unit_flags(self._ptr)

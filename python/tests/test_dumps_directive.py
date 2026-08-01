@@ -64,3 +64,48 @@ def test_uses_spec_1_1_stays_safe_on_containers():
 def test_uses_spec_1_1_false_for_plain_values():
     """Plain Python values never require the directive."""
     assert bovnar._uses_spec_1_1({"a": 1, "b": [1, 2, 3], "c": "x"}) is False
+
+
+class TestUnitOnAStringRoundTrips:
+    """`.s = "x" m;` is legal, and dumps() emitted it in a form the reader refused.
+
+    The format lets a string carry a unit -- the grammar says so outright
+    (`scalar-with-unit = (number | string), ws, inline-unit`) -- but only as an
+    INLINE suffix. `<utf8,m>` is error_illegal_value_type, because a unit is not
+    one of the parameters that family takes.
+
+    dumps() put it in the annotation anyway, producing `<utf8:m> "x"`, so
+    loads(typed=True) -> dumps -> loads failed on a document the library had
+    just read. Only utf8 was affected; every numeric family, including a quoted
+    non-decimal number carrying a unit, was already right. The C writer emits
+    `<utf8> "x" m;` and always round-tripped, which is what this now matches.
+    """
+
+    def test_string_with_a_unit_survives_a_round_trip(self):
+        import bovnar
+        doc = bovnar.loads(b'.s = "x" m;', typed=True)
+        out = bovnar.dumps(doc)
+        assert b'<utf8:m>' not in out
+        assert bovnar.loads(out, typed=True) == doc
+
+    def test_the_emitted_form_is_the_one_the_c_writer_uses(self):
+        import bovnar
+        out = bovnar.dumps(bovnar.loads(b'.s = "x" m;', typed=True))
+        assert out.decode().strip() == '.s = <utf8> "x" m;'
+
+    def test_the_unit_is_still_carried(self):
+        import bovnar
+        q = bovnar.loads(b'.s = "x" m;', typed=True)["s"]
+        assert q.unit_str == "m"
+        assert q.raw == "x"
+
+    def test_numeric_families_are_unchanged(self):
+        import bovnar
+        for src, want in ((b'.n = 5 m;', '.n = <uint:64,m> 5;'),
+                          (b'.f = 1.5 m;', '.f = <float:64,m> 1.5;'),
+                          (b'.h = <uint:8,_16,m> "FF";',
+                           '.h = <uint:8,_16,m> "FF";')):
+            doc = bovnar.loads(src, typed=True)
+            out = bovnar.dumps(doc)
+            assert out.decode().strip() == want
+            assert bovnar.loads(out, typed=True) == doc

@@ -229,6 +229,13 @@ grows to that channel's largest message and is retained for reuse until
 `bvnr_demux_destroy`, so steady-state memory is the sum of per-channel high-water
 marks (bounded by 4096 channels). Channels are not reclaimed individually.
 
+That 4096 is a **hard limit**, not only a memory estimate. A chunk naming a
+4097th distinct channel cannot be attributed, so the read aborts and
+`bvnr_demux_error` latches `error_octet_stream_out_of_sync` — the demux has lost
+track of the stream, even though the wire framing was well formed. Because
+channels are never reclaimed, the count is of *distinct channel ids seen over the
+whole stream*, not of channels live at any one moment.
+
 ```c
 bvnr_demux_t* dm = bvnr_demux_create(on_message, ctx, 0 /* default cap */);
 bvnr_read_flags_t fl = { .on_verified = bvnr_demux_on_event, .userdata = dm };

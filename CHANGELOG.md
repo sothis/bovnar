@@ -254,6 +254,53 @@ what makes the document-blaming shape impossible to reintroduce. Mutation-tested
 on both sides — reverting the C fix kills 6 CLI assertions and the `query` fix 2
 more, and reverting the Python probe kills 9 of its 10.
 
+### Fixed — `frames list` exited 0 over a stream with a corrupt record in it
+
+`bovnar frames list log.bvf` printed
+
+```
+frame 0: OK
+frame 1: ERROR unexpected_input_byte
+frame 2: OK
+3 document(s)
+```
+
+and exited **0**. The per-frame verdict was printed and then dropped, so
+`frames list x.bvf || alert` never fired and a caller had to grep stdout for
+`ERROR` to learn what the command had just told it — over a log of independent
+records, which is the shape §2.3 exists to serve.
+
+The command's own sibling settles it: `mux list` already exits 1 when the demux
+latches a message-layer error, and `bovnar convert` was fixed for exactly this
+shape — a loss reported on stdout and contradicted by a zero exit. `frames list`
+was the one stream command whose status meant only "the framing was walkable".
+It now counts the failed documents and reports them, keeping the framing/IO
+error on its own separate message and return: that one says the STREAM could not
+be walked, this one that a document inside a stream that walked fine did not
+parse.
+
+`continue_past_failed` is untouched, so the listing is still complete — and the
+new test asserts both halves, so "stop at the first bad frame" cannot pass it
+either. Mutation-tested: dropping the status half and aborting-on-first-failure
+each fail, by the assertion meant for them.
+
+Also swept and found sound, so recorded rather than changed: the framing guard
+holds a claimed payload of 2^60 bytes to ~3 MB of RSS (the buffer really does
+grow with the bytes that arrive), a truncated message still lets the read
+succeed while latching `error_octet_stream_truncated` and delivering the
+complete messages beside it, `BVNR_MUX_MAX_MESSAGE` is the documented
+`65536 − 20`, and 1029 exact unit round trips over the catalogue return the
+original value.
+
+**Documented rather than changed:** the demux's 4096 channels is a *hard* limit,
+not just the memory estimate both the header and doc/10 §3.2 presented it as. A
+chunk naming a 4097th distinct channel aborts the read with
+`error_octet_stream_out_of_sync` — defensible, since an unattributable chunk
+does mean the demux has lost track of the stream, but it was not among the
+causes the docs listed, and the count is of distinct ids seen over the whole
+stream, not of channels live at once (channels are never reclaimed). Both the
+header and doc/10 now say so.
+
 ### Fixed — a string carrying a unit did not survive `dumps()`
 
 `.s = "x" m;` is legal, and the grammar says so outright —

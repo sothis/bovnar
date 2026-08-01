@@ -3266,11 +3266,15 @@ static int cmd_frames_pack(int argc, char **argv)
 
 static bool frames_on_document(void *ud, uint64_t index, bool ok, error_code_t err)
 {
-	(void)ud;
-	if (ok)
+	uint64_t *bad = (uint64_t *)ud;
+	if (ok) {
 		printf("frame %" PRIu64 ": OK\n", index);
-	else
+	} else {
 		printf("frame %" PRIu64 ": ERROR %s\n", index, bvn_error_to_string(err));
+		/* Counted, not just printed: the exit status has to carry it. See
+		 * cmd_frames_list. */
+		if (bad) (*bad)++;
+	}
 	return true;   /* keep listing even past a bad frame */
 }
 
@@ -3288,8 +3292,10 @@ static int cmd_frames_list(const char *path)
 	/* Strict per-document parsing so each frame's status is reported accurately
 	 * (no resync masking errors), but keep listing every frame regardless. */
 	fl.continue_on_error  = false;
+	uint64_t bad = 0;
 	bvnr_doc_stream_opts_t opts = {0};
 	opts.flags                = &fl;
+	opts.userdata             = &bad;
 	opts.on_document          = frames_on_document;
 	opts.continue_past_failed = true;
 	/* List every frame regardless of size: lift the per-frame guard with an
@@ -3302,6 +3308,27 @@ static int cmd_frames_list(const char *path)
 	if (!ok) {
 		fprintf(stderr, "frames list: framing/IO error after %" PRIu64
 				" document(s)\n", count);
+		return 1;
+	}
+	/*
+	 * A frame whose payload the reader rejected is a failure of the thing this
+	 * command exists to report, so it has to reach the exit status.
+	 *
+	 * continue_past_failed is on so the listing is complete, and the per-frame
+	 * verdict was PRINTED and then dropped: `bovnar frames list log.bvf`
+	 * exited 0 over a log with a corrupt record in it, so `frames list x || alert`
+	 * never fired and a caller had to grep stdout for "ERROR" to learn what the
+	 * command had just told it. The sibling `mux list` already fails on a
+	 * message-layer error, and `bovnar convert` was fixed for exactly this
+	 * shape -- a loss reported on stdout and contradicted by a 0 exit.
+	 *
+	 * The framing error above keeps its own message and its own return: that one
+	 * says the STREAM could not be walked, this one that a document in a stream
+	 * that walked fine did not parse.
+	 */
+	if (bad) {
+		fprintf(stderr, "frames list: %" PRIu64 " of %" PRIu64
+				" document(s) failed to parse\n", bad, count);
 		return 1;
 	}
 	return 0;

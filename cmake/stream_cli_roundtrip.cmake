@@ -72,3 +72,52 @@ foreach(_needle "channel 1: ${_sz1} bytes" "channel 42: ${_sz42} bytes")
         message(FATAL_ERROR "mux list missing '${_needle}'\n${_mlist}")
     endif()
 endforeach()
+
+# ── a frame whose payload does not parse must reach the EXIT STATUS ──────────
+# `frames list` runs with continue_past_failed so the listing is complete, and
+# the per-frame verdict was printed and then dropped: the command exited 0 over
+# a stream with a corrupt record in it, so `frames list x.bvf || alert` never
+# fired and a caller had to grep stdout for "ERROR" to learn what the command
+# had just told it. `mux list` already fails on a message-layer error, and
+# `bovnar convert` was fixed for exactly this shape.
+#
+# Both halves are asserted: the failure must be visible in the status AND the
+# listing must still be complete, so "return early on the first bad frame"
+# cannot pass this.
+set(_bad_dir "${TMP_DIR}/cli_frames_bad")
+file(MAKE_DIRECTORY "${_bad_dir}")
+file(WRITE "${_bad_dir}/good1.bvnr" ".a = <sint:32> 1;\n")
+file(WRITE "${_bad_dir}/bad.bvnr"   ".b = <sint:32> ?;\n")
+file(WRITE "${_bad_dir}/good2.bvnr" ".c = <sint:32> 3;\n")
+
+set(_bad_frames "${TMP_DIR}/cli_docs_bad.bvf")
+execute_process(
+    COMMAND ${EMULATOR} "${BOVNAR}" frames pack
+            "${_bad_dir}/good1.bvnr" "${_bad_dir}/bad.bvnr" "${_bad_dir}/good2.bvnr"
+    OUTPUT_FILE     "${_bad_frames}"
+    RESULT_VARIABLE _rc
+    ERROR_VARIABLE  _err)
+if(NOT _rc EQUAL 0)
+    message(FATAL_ERROR "frames pack (bad payload) failed (rc=${_rc})\n${_err}")
+endif()
+
+execute_process(
+    COMMAND         ${EMULATOR} "${BOVNAR}" frames list "${_bad_frames}"
+    OUTPUT_VARIABLE _blist
+    ERROR_VARIABLE  _berr
+    RESULT_VARIABLE _rc)
+if(_rc EQUAL 0)
+    message(FATAL_ERROR
+        "frames list exited 0 over a stream containing a document that does "
+        "not parse; the ERROR line was printed and the status contradicted it"
+        "\n${_blist}${_berr}")
+endif()
+# ...and it kept listing: every frame reported, the good ones still OK.
+foreach(_needle "frame 0: OK" "frame 1: ERROR" "frame 2: OK" "3 document(s)")
+    string(FIND "${_blist}" "${_needle}" _pos)
+    if(_pos EQUAL -1)
+        message(FATAL_ERROR
+            "frames list stopped short of a complete listing, missing "
+            "'${_needle}'\n${_blist}")
+    endif()
+endforeach()

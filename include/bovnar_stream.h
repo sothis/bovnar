@@ -201,7 +201,14 @@ typedef struct bvnr_demux_s bvnr_demux_t;
  * The demultiplexer owns one reassembly buffer per channel it has seen; each
  * buffer grows to that channel's largest message and is retained for reuse until
  * bvnr_demux_destroy, so steady-state memory is the sum of per-channel high-water
- * marks (bounded by 4096 channels). Channels are not reclaimed individually. */
+ * marks (bounded by 4096 channels). Channels are not reclaimed individually.
+ *
+ * That 4096 is a HARD limit, not only a memory estimate: a chunk naming a
+ * 4097th distinct channel cannot be attributed, so the read is aborted and
+ * bvnr_demux_error latches error_octet_stream_out_of_sync -- the demux has lost
+ * track of the stream, even though the wire framing was well formed. Since
+ * channels are never reclaimed, the count is of DISTINCT channel ids seen over
+ * the whole stream, not of channels live at any one moment. */
 BVN_API bvnr_demux_t* bvnr_demux_create(bvnr_mux_on_msg_fn on_message,
 	void* userdata, uint64_t max_message);
 BVN_API void bvnr_demux_destroy(bvnr_demux_t* dm);

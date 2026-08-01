@@ -81,6 +81,53 @@ key in one of them while writing this was enough to make
 `{Unit.parse("m"): 1}[parse_unit("m")]` a `KeyError`, and hash parity is now
 asserted across the whole catalogue.
 
+### Fixed — every per-profile count in doc/11 had drifted, some by 8×
+
+The profiles document states how many codes each vocabulary maps and refuses, in
+seven places. All of them were stale, and §9.1 — the per-file table a reader
+consults for the current figures — was the worst: `ucum.bvnr` listed at 141
+mapped against 204, `qudt.bvnr` at 263 against **2222**, `qudt-qk.bvnr` at 52
+against 903. It also omitted `om.bvnr` and `cf.bvnr` entirely, two of the seven
+files it claims to enumerate.
+
+| file | stated | actual |
+|---|---|---|
+| `ucum.bvnr` | 141 mapped, 32 opaque, 56 unsupported | 204, 41, 67 |
+| `unece.bvnr` | 252 mapped, 25 opaque, 7 unsupported | 1283, 25, 171 |
+| `qudt.bvnr` | 263 mapped, 8 unsupported | 2222, 586 |
+| `qudt-qk.bvnr` | 52 mapped, 7 unsupported | 903, 262 |
+| `udunits.bvnr` | 251 mapped, 32 unsupported | 502, 82 |
+| `om.bvnr` | *absent from the table* | 1335, 125 |
+| `cf.bvnr` | *absent from the table* | 4454, 617 |
+
+The cause is the same one behind §13.3 and the CF absence table: these grow
+whenever the registry gains a unit that unblocks a code previously refused for
+want of a target, and this cycle added 46 units. Nothing compared the sentences
+with the files.
+
+Corrected wherever the claim is about the present — the summary table at the top,
+§6.1's "192 mapped atoms" (204, and the data draws no atom/whole-code
+distinction), and the blockquote under each of §11, §12, §13, §16 and §17.
+**§15.3's before/after table is left as written**, because it records what one
+pass cost and that is a historical fact; its column is relabelled "After that
+pass" and points at §9.1 for current figures.
+
+### Fixed — doc/11 §17.4 miscounted what CF leaves out, and listed a category that no longer exists
+
+Two rows wrong and one missing, against the upstream table and `cf.bvnr`:
+`1e-3`/`1e-6` bare scale factors are **19**, not 22; the row bundling
+"per-`year` quantities, `dBZ`, °C in a product" at 11 is now **3**, because
+there are no per-`year` refusals left at all — the registry gained `yr_trop`, so
+`age_of_sea_ice`, `sea_water_age_since_surface_contact` and the two sea-level
+tendencies carry it. The 7 mole fractions were in no row. The corrected rows sum
+to the 617 of `.unsupported`, which with 4454 mapped is the 5071 the upstream
+table defines; every figure was checked against
+`build/vocab/cf-standard-name-table.xml` (5071 entries, 599 aliases, 571
+`canonical_units` of `1`, 17 with none) as well as the generated file.
+
+`check_doc_counts.py` now reads every `<vocab>.bvnr` and checks the counts stated
+in §9.1 and in each section's blockquote against it. Verified by mutation.
+
 ### Fixed — doc/07 said `udunits:a` is refused; it is the are
 
 The cross-vocabulary collision table in the ambiguities reference — the document
@@ -286,13 +333,27 @@ failures.
 
 ### Fixed — the pure-Python test aggregate carried half its superset's timeout
 
-`bvnr_py_pure_all` is a subset of `bvnr_py_all` that costs the same as the whole,
-because everything slow in the suite is library-free: the pure-Python decimal and
-binary encoders, the pint bridge, the round-trip property tests. It had a 60 s
-budget against its superset's 120 s, and the catalogue growing to 261 units took
-it past 60. Both are now 300 s. The cost tracks the square of the catalogue —
-the pint bridge compares every pair of base units — so a budget set against
-today's measurement is a flake scheduled for the next release.
+`bvnr_py_pure_all` is a subset of `bvnr_py_all` that costs the same as the whole
+— 46.1 s against 45.7 s — because everything slow in the suite is library-free:
+the pure-Python decimal and binary encoders, the pint bridge, the round-trip
+property tests. It had a 60 s budget against its superset's 120 s, which is why
+it was the one that tripped first. Both are now 300 s.
+
+**The cause is contention, not size.** Alone the suite costs ~20 s of CPU at
+100 % utilisation. Run the way CTest actually runs it — `ctest -j8` on an
+8-core box, alongside 15 other tests and its own near-duplicate aggregate, both
+launched into the same scheduling wave — it takes ~46 s of wall clock. 60 s
+covered that by 1.3×, which is no margin on a busier or slower runner.
+
+An earlier version of this entry blamed the catalogue instead, on the grounds
+that the pint bridge compares every *pair* of base units and so is quadratic in
+it. That much is true, and it is not the explanation: that test is 1.9 s of the
+20 s, and going from 215 units to 261 moved it by about a second. The 80 s
+figure behind the claim was measured while this machine was saturated by a
+parallel build — 37 s of user time inside 84 s of wall clock, which should have
+been the tell. Recorded because a wrong cause in a comment sends the next person
+optimising the wrong thing, and the timeout would have been raised again for a
+reason that was never true.
 
 ### Fixed — a temperature difference that cancelled to itself came out a temperature
 

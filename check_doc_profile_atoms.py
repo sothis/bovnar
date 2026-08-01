@@ -167,6 +167,72 @@ def check_collisions(path, parse):
     return problems, checked
 
 
+# The per-vocabulary tables outside §6.1: "| <code> | <bovnar> | ..." for UNECE
+# and, two pairs to a row, for the QUDT quantity kinds.
+VOCAB_TABLES = (
+    ("### 11.4", "## 12", "unece",   ("Rec 20", "Bovnar")),
+    ("### 12.4", "## 13", "qudt-qk", ("QUDT quantity kind", "Bovnar")),
+)
+
+
+def vocab_table_rows(path, start, end, want_header):
+    """(line, code, target) for a table whose header begins with want_header.
+
+    Anchored on the HEADER, not just the section, so a future table of another
+    shape in the same section is skipped rather than misread as code -> target.
+    A row may carry several code/target pairs side by side, as §12.4's does --
+    checking only the first pair silently halved that table's coverage.
+    """
+    with open(path, encoding="utf-8") as f:
+        lines = f.read().split("\n")
+    inside, header = False, None
+    for n, line in enumerate(lines, 1):
+        if line.startswith(start):
+            inside = True
+            continue
+        if inside and line.startswith(end):
+            return
+        if not inside or not line.startswith("|"):
+            continue
+        if SEPARATOR.match(line.strip()):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if header is None:
+            header = cells
+            if tuple(cells[:2]) != want_header:
+                header, inside = None, inside   # not our table; keep looking
+                header = None
+            continue
+        for i in range(0, len(cells) - 1, 2):
+            code = TICK.findall(cells[i])
+            target = TICK.findall(cells[i + 1])
+            if len(code) == 1 and len(target) == 1:
+                yield n, code[0], target[0]
+
+
+def check_vocab_tables(path, parse, to_str):
+    """doc/11 §11.4 and §12.4, the tables no gate had ever read.
+
+    §6.1 was checked against src/gendata and §13.3 against the parser, while the
+    UNECE reading table and the QUDT quantity-kind table -- 49 and 52 rows of
+    code-to-unit claims -- were checked by nobody. They were correct when this
+    was written; that is a fact about today, not a property of the file.
+    """
+    problems, checked = [], 0
+    for start, end, vocab, head in VOCAB_TABLES:
+        for lineno, code, target in vocab_table_rows(path, start, end, head):
+            expr = "%s:%s" % (vocab, code)
+            got = parse(expr)
+            checked += 1
+            if got is None:
+                problems.append("%s:%d: `%s` is tabulated as `%s`; it is refused"
+                                % (DOC, lineno, expr, target))
+            elif to_str(got) != target:
+                problems.append("%s:%d: `%s` is tabulated as `%s`; it is `%s`"
+                                % (DOC, lineno, expr, target, to_str(got)))
+    return problems, checked
+
+
 NEARMISS_START = "### 13.3"
 NEARMISS_END = "### 13.4"
 
@@ -260,6 +326,9 @@ def main(argv):
     nm_bad, nm_checked = check_nearmisses(path, parse, to_str)
     bad += nm_bad
     checked += nm_checked
+    vt_bad, vt_checked = check_vocab_tables(path, parse, to_str)
+    bad += vt_bad
+    checked += vt_checked
     seen = set()
     for lineno, cells in rows(path):
         codes = TICK.findall(cells[0])
@@ -314,7 +383,8 @@ def main(argv):
         sys.stderr.write("\nsrc/gendata is the source of truth; fix the "
                          "document.\n")
         return 1
-    print("check_doc_profile_atoms: %s §6.1, §6.2 and §13.3 — %d row(s) checked "
+    print("check_doc_profile_atoms: %s §6.1, §6.2, §11.4, §12.4 and §13.3 — "
+          "%d row(s) checked "
           "against the reader, all %d mapped UCUM codes present"
           % (DOC, checked, len(mapped)))
     return 0

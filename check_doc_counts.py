@@ -206,6 +206,86 @@ def files(repo):
             yield os.path.join(root, n)
 
 
+PROFILE_FILES = ("ucum", "unece", "qudt", "qudt-qk", "udunits", "om", "cf")
+
+
+def profile_counts(repo):
+    """{vocab: {mapped, opaque, unsupported, prefixes, total}} from src/gendata."""
+    sys.path.insert(0, repo)
+    try:
+        import bvnr_data
+    except ImportError:
+        return {}
+    out = {}
+    for vocab in PROFILE_FILES:
+        path = os.path.join(repo, "src", "gendata", "%s.bvnr" % vocab)
+        if not os.path.exists(path):
+            continue
+        with open(path, "rb") as f:
+            data = bvnr_data.load(f.read())
+        n = {k: len(data.get(k, [])) for k in
+             ("mapped", "opaque", "unsupported", "prefixes")}
+        n["total"] = n["mapped"] + n["opaque"] + n["unsupported"]
+        out[vocab] = n
+    return out
+
+
+def check_profile_tables(repo, counts):
+    """doc/11 §9.1's per-file table, against the files themselves.
+
+    Every number in it was stale — `ucum.bvnr` listed as 141 mapped against 204,
+    `qudt.bvnr` as 263 against 2222 — and `om.bvnr` and `cf.bvnr` were not in it
+    at all. The same figures are quoted in six other places in that document and
+    all of them had drifted the same way, because the tables grow whenever the
+    registry gains a unit that unblocks a previously-refused code, and nothing
+    compared the sentences with the files.
+
+    §9.1 is the one table this gate owns, deliberately: it is the place the
+    document points at for current figures, so it is the one that has to be
+    right. The blockquote under each vocabulary section is checked too, since
+    that is where a reader of that section looks.
+    """
+    doc = os.path.join(repo, "doc", "11_bovnar_unit_profiles.md")
+    if not os.path.exists(doc) or not counts:
+        return [], 0
+    with open(doc, encoding="utf-8") as f:
+        text = f.read()
+    problems, checked = [], 0
+    # "| `ucum.bvnr` | 20 prefixes, 204 mapped, 41 opaque, 67 unsupported |"
+    row = re.compile(r"\|\s*`([a-z-]+)\.bvnr`\s*\|([^|]*)\|")
+    for m in row.finditer(text):
+        vocab, body = m.group(1), m.group(2)
+        if vocab not in counts:
+            continue
+        line = text.count("\n", 0, m.start()) + 1
+        for stated, kind in re.findall(r"(\d+)\s+(prefixes|mapped|opaque|"
+                                       r"unsupported)", body):
+            key = kind
+            checked += 1
+            if int(stated) != counts[vocab][key]:
+                problems.append("doc/11_bovnar_unit_profiles.md:%d: says %s "
+                                "%s for %s.bvnr, src/gendata has %d"
+                                % (line, stated, kind, vocab,
+                                   counts[vocab][key]))
+    # "> Data file `src/gendata/qudt.bvnr` (2222 mapped, 586 unsupported — …"
+    quote = re.compile(r"`src/gendata/([a-z-]+)\.bvnr`\s*\(([^)]*)\)")
+    for m in quote.finditer(text):
+        vocab, body = m.group(1), m.group(2)
+        if vocab not in counts:
+            continue
+        line = text.count("\n", 0, m.start()) + 1
+        for stated, kind in re.findall(r"(\d+)\s+(prefixes|mapped|opaque|"
+                                       r"unsupported|refused)", body):
+            key = "unsupported" if kind == "refused" else kind
+            checked += 1
+            if int(stated) != counts[vocab][key]:
+                problems.append("doc/11_bovnar_unit_profiles.md:%d: says %s "
+                                "%s for %s.bvnr, src/gendata has %d"
+                                % (line, stated, kind, vocab,
+                                   counts[vocab][key]))
+    return problems, checked
+
+
 INVENTORY_DOC = "doc/02_bovnar_faq.md"
 INVENTORY_HEAD = "**How many base units does Bovnar support?**"
 
@@ -254,6 +334,9 @@ def main(argv):
     inv_bad, inv_checked = inventory(repo, want)
     bad += inv_bad
     checked += inv_checked
+    prof_bad, prof_checked = check_profile_tables(repo, profile_counts(repo))
+    bad += prof_bad
+    checked += prof_checked
     for path in files(repo):
         try:
             with open(path, encoding="utf-8") as f:

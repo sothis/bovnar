@@ -917,14 +917,23 @@ if(_bvnr_have_pytest AND BVNR_ALL_PROFILES)
                     --tb=short
         WORKING_DIRECTORY "${_py_src}"
     )
-    # WHY 300 AND NOT 120. Both aggregates cost ~80s here, and the cost tracks
-    # the CATALOGUE: the pint bridge compares every pair of base units and the
-    # unit-table integrity check is parameterised per unit, so both grow with
-    # the square of a number that only ever goes up (215 units at the 1.1
-    # release, 261 now). 120 was 1.5x headroom on this machine and none at all
-    # on a CI runner half its speed. A timeout that trips on a slow runner
-    # reports "the Python bindings are broken" for a suite that passes, which
-    # is worse than a slow test.
+    # WHY 300 AND NOT 120. Measure the suite alone and it costs ~20s of CPU at
+    # 100% utilisation. Measure it the way CTest actually runs it -- `ctest -j8`
+    # on an 8-core box, alongside 15 other tests AND its own near-duplicate
+    # aggregate, both started in the same wave -- and it takes ~46s of wall
+    # clock. The budget has to cover the second number, and 60s covered it by
+    # 1.3x, which is no margin at all on a busier or slower runner.
+    #
+    # CONTENTION, NOT SIZE. An earlier version of this comment blamed the
+    # catalogue: the pint bridge does compare every PAIR of base units and so
+    # is genuinely quadratic in it. But that test is 1.9s of the 20s, and
+    # growing the catalogue from 215 units to 261 moved it by about a second.
+    # Attributing a 60s timeout to it was a guess made from a measurement taken
+    # while this machine was saturated by a parallel build, and it would have
+    # sent the next person optimising the wrong thing.
+    #
+    # A timeout that trips under load reports "the Python bindings are broken"
+    # for a suite that passes, which is worse than a slow test.
     set_tests_properties(bvnr_py_all PROPERTIES
         TIMEOUT     300
         LABELS      "python;python_all"
@@ -941,10 +950,13 @@ if(_bvnr_have_pytest AND BVNR_ALL_PROFILES)
         WORKING_DIRECTORY "${_py_src}"
     )
     # The same 300, for the same reason and one more: this is a SUBSET of
-    # bvnr_py_all that costs the same as the whole, because everything slow in
-    # the suite is library-free (the pure-Python decimal and binary encoders,
-    # the pint bridge, the round-trip property tests). It carried half its
-    # superset's budget, which is how it came to be the one that tripped.
+    # bvnr_py_all that costs the same as the whole -- 46.1s against 45.7s in the
+    # run above -- because everything slow in the suite is library-free (the
+    # pure-Python decimal and binary encoders, the pint bridge, the round-trip
+    # property tests). Two near-identical CPU-bound aggregates launched into the
+    # same scheduling wave are also most of each other's contention. This one
+    # carried half its superset's budget, which is why it was the one that
+    # tripped first.
     set_tests_properties(bvnr_py_pure_all PROPERTIES
         TIMEOUT 300
         LABELS  "python;python_pure"

@@ -57,6 +57,15 @@ had just read**, with `illegal_value_type` from its own reader. The C writer
 emits `<utf8> "x" m;` and always round-tripped, so the two writers disagreed
 about a shape only one of them could read back.
 
+**Nothing compared the two writers.** The Python suite round-trips through
+`dumps()`, the C suite round-trips through the C writer, and each was
+self-consistent — which is exactly how a shape only one of them could read back
+survived. `python/tests/test_writers_agree.py` hands the same document to both
+and requires the two outputs to re-read to the same thing, over every catalogue
+unit in each of eight type shapes (2 096 documents; 1 048 through both writers).
+It skips rather than passes when the CLI is not built, since a green tick
+without the comparison would say the opposite of the truth. Mutation-tested.
+
 The unit-parameter emission excluded `datetime` and nothing else; `utf8` is the
 same shape and is now excluded with it, which lets the value event's unit reach
 the C writer and be placed inline exactly as `bovnar pretty-print` does. Only

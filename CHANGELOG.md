@@ -112,6 +112,52 @@ distinction), and the blockquote under each of §11, §12, §13, §16 and §17.
 pass cost and that is a historical fact; its column is relabelled "After that
 pass" and points at §9.1 for current figures.
 
+### Fixed — every *measured* figure in doc/11 had drifted too
+
+The catalogue counts were corrected above; these are the other kind of number —
+what a tool or a test actually reports when run. Eleven of them, all stale, and
+none of them checked by anything:
+
+| claim | stated | actual |
+|---|---|---|
+| `bovnar_unece_test.c` assertions | 134 | **557** |
+| `bovnar_udunits_test.c` assertions | 153 | 182 |
+| `bovnar_om_test.c` assertions | 92 | 103 |
+| `bovnar_qudt_test.c` assertions | 187 | 188 |
+| `bovnar_cf_test.c` assertions | 45 | 46 |
+| `bovnar_crossvocab_test.c` assertions | 4776 | 4789 |
+| `unit_profile` conformance cases | 47 (`UPR-001`…`UPR-047`) | **59** (…`UPR-053`) |
+| rows `check_profile_factors.py` compares | 10263 | 10652 |
+| §16.2 `om` rows compared | 1198 | 1275 |
+| §17.2 `cf` rows compared | 4430 | 4434 |
+
+§15.2's "re-proves all of it from the publishers' files on every run: 4635 rows
+compared" is left at 4635 and now says why: that was the figure for the **five**
+tables §15 closed, and §16 and §17 have since added two more vocabularies. The
+sentence pointed at a current total while quoting a historical one.
+
+Two gates close the class. `check_doc_counts.py` runs each profile test binary
+and compares its printed total with the assertion count doc/11 states, skipping
+loudly in a tree with no build rather than passing on an unread claim.
+`check_profile_factors.py` compares the per-vocabulary row counts §16.2 and
+§17.2 state against the run that just produced them. Both mutation-tested.
+
+doc/13's figures were checked and are correct: the per-group plans sum to
+exactly the 470 cases it claims, across the 23 groups.
+
+### Verified — the currency and prefix tables
+
+Swept and found sound, so recorded rather than changed. All 216 currencies
+round-trip bare and prefixed; the fiat run is 900000–900165 and the crypto run
+900166–900215 with no holes; every crypto ticker is 3–4 uppercase letters with
+`numeric_code = 0`; the four historical codes and all four successors are
+present. The one duplicate ISO numeric code — `ANG` and `XCG` both at 532 — is
+correct, the Caribbean guilder having inherited its predecessor's number, and
+doc/05 already records it in two places.
+
+All 24 SI prefixes and 10 IEC prefixes produce exactly 10^exp and 2^exp through
+the library, across the full −30…+30 and 2^10…2^100 ranges.
+
 ### Added — the mean Gregorian month, and 16 codes it and its neighbours unblocked
 
 `mo_greg`, a twelfth of the Gregorian year: **2 629 746 s** exactly. Native `mo`

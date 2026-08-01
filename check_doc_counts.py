@@ -32,6 +32,7 @@ Exit 0 when every stated count matches src/gendata, 1 with a list when not.
 """
 import os
 import re
+import subprocess
 import sys
 
 REPO = os.path.dirname(os.path.abspath(__file__))
@@ -298,6 +299,52 @@ def check_profile_tables(repo, counts):
     return problems, checked
 
 
+def check_assertion_counts(repo):
+    """doc/11's "pinned by tests/bovnar_X_test.c (N assertions)", against the run.
+
+    Five of these were stated and all five were stale — the UN/ECE one said 134
+    against an actual 557. They drift for the same reason the table counts do:
+    the tests grow whenever the tables do, and a number in prose has nothing
+    holding it to the number in the binary.
+
+    The binaries print their own total, so the honest check is to run them. A
+    tree without a build skips, loudly, rather than passing on an unread claim.
+    """
+    doc = os.path.join(repo, "doc", "11_bovnar_unit_profiles.md")
+    if not os.path.exists(doc):
+        return [], 0
+    with open(doc, encoding="utf-8") as f:
+        text = f.read()
+    claims = re.findall(r"`tests/(bovnar_(\w+)_test)\.c`\s*\((\d+) assertions\)",
+                        text)
+    if not claims:
+        return [], 0
+    problems, checked = [], 0
+    ran = False
+    for _src, vocab, stated in claims:
+        exe = os.path.join(repo, "build", "tests", "bvnr_%s_test" % vocab)
+        if not os.path.exists(exe):
+            continue
+        try:
+            out = subprocess.run([exe], capture_output=True, text=True,
+                                 timeout=120)
+        except Exception:                                     # noqa: BLE001
+            continue
+        m = re.search(r"(\d+) tests", (out.stdout or "") + (out.stderr or ""))
+        if not m:
+            continue
+        ran = True
+        checked += 1
+        if int(m.group(1)) != int(stated):
+            problems.append("doc/11_bovnar_unit_profiles.md: says "
+                            "tests/bovnar_%s_test.c has %s assertions; it runs "
+                            "%s" % (vocab, stated, m.group(1)))
+    if not ran:
+        print("check_doc_counts: no built profile tests; the %d assertion "
+              "count(s) in doc/11 were not checked" % len(claims))
+    return problems, checked
+
+
 INVENTORY_DOC = "doc/02_bovnar_faq.md"
 INVENTORY_HEAD = "**How many base units does Bovnar support?**"
 
@@ -349,6 +396,9 @@ def main(argv):
     prof_bad, prof_checked = check_profile_tables(repo, profile_counts(repo))
     bad += prof_bad
     checked += prof_checked
+    asrt_bad, asrt_checked = check_assertion_counts(repo)
+    bad += asrt_bad
+    checked += asrt_checked
     for path in files(repo):
         try:
             with open(path, encoding="utf-8") as f:

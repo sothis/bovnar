@@ -2095,6 +2095,27 @@ def have_cache(cache, ns):
                for fn, _ in SOURCES[ns])
 
 
+DOC_ROW_CLAIMS = (
+    ("om", r"is worth: \*\*(\d+) rows compared, no mismatch\*\*"),
+    ("cf", r"reading of the target\. (\d+) rows compared, no mismatch"),
+)
+
+
+def doc_row_claims():
+    """{vocab: (stated, line)} for doc/11's per-vocabulary row counts."""
+    path = os.path.join(REPO, "doc", "11_bovnar_unit_profiles.md")
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    out = {}
+    for vocab, pattern in DOC_ROW_CLAIMS:
+        m = re.search(pattern, text)
+        if m:
+            out[vocab] = (int(m.group(1)), text.count("\n", 0, m.start()) + 1)
+    return out
+
+
 def main(argv):
     ap = argparse.ArgumentParser(
         description="check the unit-profile tables against their publishers")
@@ -2167,6 +2188,12 @@ def main(argv):
         print("check_profile_factors: %d documented error claims agree with the "
               "reader" % ec_checked)
 
+    # ...and the per-vocabulary row counts the document states. These are
+    # MEASURED figures, so they go stale exactly when the tables grow: doc/11 §16.2
+    # said 1198 rows for om against 1275, and doc/11 §17.2 said 4430 for cf against
+    # 4434. Checked against this run rather than against a remembered one.
+    doc_rows = doc_row_claims()
+
     available = [ns for ns in which if have_cache(args.cache, ns)]
     if not available:
         msg = ("no publisher files under %s — run with --fetch (needs network)"
@@ -2179,6 +2206,7 @@ def main(argv):
 
     native_index = NativeIndex(native)
     total_mismatch = total_dead = total_missing = total_checked = 0
+    doc_row_bad = []
     total_stale = 0
     for ns in available:
         vocab = VOCABS[ns](args.cache)
@@ -2201,6 +2229,13 @@ def main(argv):
                 print("  %d code(s) claimed by QUDT units that disagree, so "
                       "unusable here" % len(vocab.ambiguous))
         total_checked += checked
+        if ns in doc_rows:
+            stated, line = doc_rows[ns]
+            if stated != checked:
+                doc_row_bad.append(
+                    "doc/11_bovnar_unit_profiles.md:%d: says %d rows compared "
+                    "for %s; this run compared %d"
+                    % (line, stated, ns, checked))
         if mism:
             print("\n%s — THE TABLE DISAGREES WITH THE PUBLISHER (%d):"
                   % (ns.upper(), len(mism)))
@@ -2282,7 +2317,15 @@ def main(argv):
         print("check_profile_factors: %d QUDT cross-reference(s) compared "
               "against the ucum/udunits tables; %d disagree (%d not reachable)"
               % (xref_checked, len(xref_bad), xref_skipped))
-    if total_mismatch or kind_bad or xref_bad:
+    if doc_row_bad:
+        print("\ncheck_profile_factors: %d documented row count(s) disagree "
+              "with this run:" % len(doc_row_bad))
+        for msg in doc_row_bad:
+            print("  %s" % msg)
+    elif doc_rows:
+        print("check_profile_factors: %d documented row count(s) agree with "
+              "this run" % len(doc_rows))
+    if total_mismatch or kind_bad or xref_bad or doc_row_bad:
         return 1
     if total_dead and args.strict_dead:
         return 1

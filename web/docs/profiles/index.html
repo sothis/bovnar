@@ -3030,7 +3030,7 @@ profile-only round-trip, the registry sweep of §5.3, the version gate, and the 
 <p><code>tests/bovnar_unit_ext_test.c</code> pins the block boundary: the last native unit sits below
 its profile's <code>_OPAQUE_FIRST</code>, and <code>BVN_UNIT_SLOT_COUNT</code> grows by one dense table row.</p>
 <p><strong>The conformance corpus covers the profiles too.</strong> <code>bvnr_conformance</code> carries a <code>unit_profile</code>
-group of <strong>47 cases</strong> (<code>UPR-001</code> … <code>UPR-047</code>), so a third-party implementation can be held to the
+group of <strong>59 cases</strong> (<code>UPR-001</code> … <code>UPR-053</code>), so a third-party implementation can be held to the
 same rules rather than only the reference one being tested against itself. It covers the three
 outcomes with their exact error codes, the version gate, annotations, the decade fold, the
 error-code move of §2.3 (<code>&lt;float:64,m[s]&gt;</code> was <code>error_unexpected_input_byte</code> and is now
@@ -3129,7 +3129,7 @@ dimension vector, asks the reference library what the native target is worth, an
 native side goes through <code>bvn_parse_unit</code> and <code>bvn_unit_to_si_factor</code> via the ctypes bindings, never
 through a Python reimplementation of the unit grammar — that is exactly how a table starts
 disagreeing with the parser it feeds (§9.1).</p>
-<p>As of this tree it compares <strong>10263 rows across the seven vocabularies</strong> and reports <strong>0 mismatches</strong>,
+<p>As of this tree it compares <strong>10652 rows across the seven vocabularies</strong> and reports <strong>0 mismatches</strong>,
 10 dead rows and <strong>0 coverage suggestions</strong> — the tables are closed against their publishers, so
 there is nothing left for the coverage half to propose.</p>
 <p><strong>Three outcomes, and only one fails the build.</strong></p>
@@ -3625,7 +3625,7 @@ Verbatim source preservation is next.</p>
 Recommendation 21, <em>Codes for Passengers, Types of Cargo, Packages and Packaging Materials</em>.
 Data file <code>src/gendata/unece.bvnr</code> (1298 mapped, 25 opaque, 156 unsupported — every Rec 20 code
 QUDT's cross-reference reaches, which is not the same as every Rec 20 code; §11.1);
-pinned by <code>tests/bovnar_unece_test.c</code> (134 assertions).</p>
+pinned by <code>tests/bovnar_unece_test.c</code> (557 assertions).</p>
 </blockquote>
 <h3 id="111-why-this-vocabulary">11.1 Why this vocabulary</h3>
 <p>Rec 20 is, by message volume, the most widely deployed unit code list of the five: it is the unit
@@ -3981,7 +3981,7 @@ that are equal in SI and different in meaning, and <code>C94</code>/<code>M46</c
 names QUDT defines).
 <code>qudt-qk:</code> — QUDT quantity kinds (903 mapped, 262 unsupported — every one of the 1165 kinds).
 Data files <code>src/gendata/qudt.bvnr</code> and <code>src/gendata/qudt-qk.bvnr</code>;
-pinned by <code>tests/bovnar_qudt_test.c</code> (187 assertions).</p>
+pinned by <code>tests/bovnar_qudt_test.c</code> (188 assertions).</p>
 </blockquote>
 <h3 id="121-why-this-vocabulary">12.1 Why this vocabulary</h3>
 <p>QUDT is the unit ontology of the digital-twin and building-semantics world — DTDL, Brick,
@@ -4246,7 +4246,7 @@ same equivalence class.</p>
 of netCDF and the CF conventions.
 Data file <code>src/gendata/udunits.bvnr</code> (41 prefixes, 503 mapped, 81 unsupported — every one of
 the 584 spellings the UDUNITS-2 database defines);
-pinned by <code>tests/bovnar_udunits_test.c</code> (153 assertions).</p>
+pinned by <code>tests/bovnar_udunits_test.c</code> (182 assertions).</p>
 </blockquote>
 <h3 id="131-an-expression-profile-sharing-the-ucum-parser">13.1 An expression profile, sharing the UCUM parser</h3>
 <p>UDUNITS is the second <strong>expression</strong> profile, and it runs through the same translator as UCUM with
@@ -4453,7 +4453,7 @@ says exactly this; accepting it would cost them a silently wrong instant.</p>
 <hr />
 <h2 id="14-the-cross-vocabulary-conformance-suite">14. The cross-vocabulary conformance suite</h2>
 <blockquote>
-<p><code>tests/bovnar_crossvocab_test.c</code> — 64 concepts, 6 vocabularies, 4776 assertions.</p>
+<p><code>tests/bovnar_crossvocab_test.c</code> — 64 concepts, 6 vocabularies, 4789 assertions.</p>
 </blockquote>
 <p>Every other profile test asks <em>does this vocabulary translate correctly?</em>. This one asks the
 question that only exists once there are five: <strong>do they agree?</strong></p>
@@ -4582,8 +4582,10 @@ order of preference:</p>
 </ol>
 <p><strong>Every proposal was then verified through the reference library</strong> — same factor, same dimension
 vector, same tolerance as §9.5 — and anything that did not verify became a <code>.unsupported</code> row
-instead. <code>check_profile_factors.py</code> re-proves all of it from the publishers' files on every run:
-4635 rows compared, 0 mismatches.</p>
+instead. <code>check_profile_factors.py</code> re-proves all of it from the publishers' files on every run. For the
+five tables this section closed that was 4635 rows against 0 mismatches; §16 and §17 have since
+added two more vocabularies, and <a href="#95-the-factor-proof">§9.5</a> carries the current total across all
+seven.</p>
 <h3 id="153-what-it-cost-and-what-is-still-open">15.3 What it cost, and what is still open</h3>
 <table>
 <thead>
@@ -4664,7 +4666,7 @@ Growing the native registry to reach them is a separate decision, and doc/05 is 
 <p><code>om:</code> — OM 2, the Ontology of units of Measure (Rijgersberg, van Assem, Top; Wageningen), the
 second unit ontology of the semantic web beside QUDT.
 Data file <code>src/gendata/om.bvnr</code> (1338 mapped, 122 refused — every unit individual OM states);
-pinned by <code>tests/bovnar_om_test.c</code> (92 assertions); id block 70, contributing no opaque units.</p>
+pinned by <code>tests/bovnar_om_test.c</code> (103 assertions); id block 70, contributing no opaque units.</p>
 </blockquote>
 <h3 id="161-why-this-vocabulary">16.1 Why this vocabulary</h3>
 <p>QUDT is the vocabulary of digital twins and building semantics; OM is the one agrifood, food
@@ -4748,7 +4750,7 @@ last fence, 10⁵ metres — OM's <code>_100Kilometre</code>, for which no SI pr
 refused instead.</p>
 <p>The same walk is implemented independently in <code>check_profile_factors.py</code> (<code>class Om</code>), which
 resolves every local name against <code>om-2.0.rdf</code> and compares it with what the library says the target
-is worth: <strong>1198 rows compared, no mismatch</strong>. The three shapes of resolver this brings the tool to
+is worth: <strong>1275 rows compared, no mismatch</strong>. The three shapes of resolver this brings the tool to
 — expression, table read, composition — are listed in its header.</p>
 <h3 id="163-what-the-derivation-refuses">16.3 What the derivation refuses</h3>
 <p>205 local names are carried as refusals rather than mappings, and four groups are worth naming:</p>
@@ -4813,7 +4815,7 @@ spells one whole code, so <code>bvn_unit_to_profile("om", m/s²)</code> returns 
 <p><code>cf:</code> — the CF conventions' standard names, the controlled vocabulary of netCDF climate and
 forecast data.
 Data file <code>src/gendata/cf.bvnr</code> (4454 mapped, 617 refused — all 5071 names of standard name table
-<strong>v94</strong>, 2026-06-09); pinned by <code>tests/bovnar_cf_test.c</code> (45 assertions); id block 80, contributing
+<strong>v94</strong>, 2026-06-09); pinned by <code>tests/bovnar_cf_test.c</code> (46 assertions); id block 80, contributing
 no opaque units. <strong>Read-only</strong> (§17.3).</p>
 </blockquote>
 <h3 id="171-why-this-vocabulary">17.1 Why this vocabulary</h3>
@@ -4843,7 +4845,7 @@ already require of the <code>units</code> attribute.</p>
 <p>The check is unusually strong for a profile of this size, because <strong>both sides are primary</strong>:
 <code>check_profile_factors.py</code> (<code>class Cf</code>) re-evaluates each name's <code>canonical_units</code> with the same
 UDUNITS evaluator the <code>udunits</code> profile is checked against, and compares that against the library's
-reading of the target. 4430 rows compared, no mismatch. It is not the one-remove position <code>unece</code>
+reading of the target. 4434 rows compared, no mismatch. It is not the one-remove position <code>unece</code>
 is in (§11.1): CF publishes the name-to-units mapping and Unidata publishes what the units are
 worth, and neither is being asked about the other's vocabulary.</p>
 <h3 id="173-read-only-and-why-a-namespace-may-be">17.3 Read-only, and why a namespace may be</h3>

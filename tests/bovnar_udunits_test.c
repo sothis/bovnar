@@ -121,7 +121,74 @@ static void chk_error(const char* src, error_code_t want)
 	}
 }
 
+/* What the WRITER emits for a native unit, which is the direction that decides
+ * whether a document bovnar produces can be read by anyone else. */
+static void chk_to_profile(const char* ns, const char* native, const char* want)
+{
+	bool ok = true;
+	value_unit_t u = bvn_parse_unit((const uint8_t*)native, &ok);
+	tests++;
+	if (!ok) {
+		fprintf(stderr, "FAIL: native %s does not parse\n", native);
+		failures++;
+		return;
+	}
+	char buf[128];
+	int32_t n = bvn_unit_to_profile(ns, u, buf, sizeof buf);
+	if (n <= 0 || strcmp(buf, want) != 0) {
+		fprintf(stderr, "FAIL: %s written as %s:%s, expected %s:%s\n",
+		        native, ns, n > 0 ? buf : "(none)", ns, want);
+		failures++;
+	}
+}
+
 /* ── spellings ──────────────────────────────────────────────────────────── */
+
+/*
+ * The udunits table mapped ten codes UDUNITS does not define, and the writer
+ * EMITTED five of them -- so bovnar produced documents claiming UDUNITS codes
+ * that no UDUNITS implementation can parse, which is the one thing a namespace
+ * exists to prevent. Two were worse than undefined: UDUNITS prefixes any name
+ * or symbol, so it reads "nmi" as nano + mi (a NANOMILE, 1.15e9 from the
+ * nautical mile this table gave it, in the same dimension) and "pH" as
+ * pico + H (an INDUCTANCE, not an acidity).
+ */
+static void test_codes_udunits_does_not_define(void)
+{
+	printf("  udunits: spellings UDUNITS does not define...\n");
+
+	/* Still read, as a courtesy -- each is an obvious spelling of a unit
+	 * UDUNITS does define under another name. */
+	chk_str("udunits:pc",                "pc");
+	chk_str("udunits:deg",               "°");
+	chk_str("udunits:gramme",            "g");
+	chk_str("udunits:degree_Fahrenheit", "°F");
+	chk_str("udunits:decibel",           "dB");
+
+	/* ...and NEVER written. Every code bovnar emits is one UDUNITS defines. */
+	chk_to_profile("udunits", "pc",  "parsec");
+	chk_to_profile("udunits", "°",   "arcdeg");
+	chk_to_profile("udunits", "g",   "g");
+	chk_to_profile("udunits", "°F",  "degF");
+	chk_to_profile("udunits", "nmi", "nmile");
+
+	/* The two hazards are gone. `mi` is non-metric here, so nmi now simply
+	 * fails rather than resolving to either reading; `H` IS metric, so pH
+	 * resolves the way UDUNITS resolves it. */
+	chk_error("udunits:nmi", error_unit_illegal);
+	chk_str("udunits:pH", "p~H");
+	chk_str("udunits:nmile", "nmi");
+
+	/* UDUNITS has no neper under any spelling and no prefixed reading reaches
+	 * one, so the native Np has no UDUNITS code at all. */
+	chk_error("udunits:Np",    error_unit_illegal);
+	chk_error("udunits:neper", error_unit_illegal);
+
+	/* dB is NOT in either group: UDUNITS defines B as the bel (lg(re 1)) and
+	 * prefixes it, so d + B is a real UDUNITS decibel. */
+	chk_str("udunits:dB", "dB");
+	chk_str("udunits:B",  "da~dB");
+}
 
 static void test_spellings(void)
 {
@@ -502,6 +569,7 @@ int main(void)
 	printf("UDUNITS-2 unit profile\n");
 
 	test_spellings();
+	test_codes_udunits_does_not_define();
 	test_near_miss_refusals();
 	test_operators();
 	test_no_syntax_leak();

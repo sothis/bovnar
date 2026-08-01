@@ -715,6 +715,30 @@ class Udunits:
         which are legal input even though the XML stores only the singular."""
         return code in self.defs or code in UD_BASE
 
+    # The prefix spellings UDUNITS attaches to any unit name or symbol. Only
+    # the ones that can produce a collision with a real code are needed here.
+    _PREFIXES = ("da", "deci", "centi", "milli", "micro", "nano", "pico",
+                 "femto", "atto", "kilo", "mega", "giga", "tera",
+                 "d", "c", "m", "u", "n", "p", "f", "a", "k", "M", "G", "T",
+                 "h", "E", "P", "Z", "Y")
+
+    def prefixed_reading(self, code):
+        """"<prefix> + <atom>" when UDUNITS' own language reaches `code` that
+        way, else None.
+
+        A code with no atom row is not automatically undefined: UDUNITS
+        prefixes any name or symbol, so `dB` is deci + B and a real decibel.
+        The same mechanism is what makes `nmi` a NANOMILE and `pH` a
+        PICOHENRY, which is the case worth shouting about -- the atom-table
+        walk cannot see either, and reported all three identically.
+        """
+        for pfx in sorted(self._PREFIXES, key=len, reverse=True):
+            if code.startswith(pfx) and len(code) > len(pfx):
+                rest = code[len(pfx):]
+                if rest in self.real:
+                    return "%s + %s" % (pfx, rest)
+        return None
+
     def spellings(self):
         """Only what the XML states, so a coverage suggestion never proposes
         adding "meterses"."""
@@ -1954,6 +1978,20 @@ def check_quantity_kinds(cache, convertible, verbose):
     return bad, notes, checked
 
 
+def agrees_with_split(vocab, code, split, target, native):
+    """Does our target mean the same as the publisher's prefix+atom reading?"""
+    up = vocab.resolve(code)
+    nat = native(target)
+    if up is None or nat is None:
+        return True                      # nothing comparable; do not cry wolf
+    try:
+        nf, nd = nat
+        uf, ud = vocab.normalise(up, nd) if hasattr(vocab, "normalise") else up
+        return list(ud) == list(nd) and close(uf, nf)
+    except Exception:                                         # noqa: BLE001
+        return True
+
+
 def check_profile(ns, vocab, native, native_index, verbose):
     """-> (mismatches, dead, missing) as lists of printable lines."""
     doc = bvnr_data.load(open(os.path.join(GENDATA, ns + ".bvnr"), "rb").read())
@@ -1976,8 +2014,35 @@ def check_profile(ns, vocab, native, native_index, verbose):
                          % (code, target, WAIVED_UPSTREAM[(ns, code)]))
             continue
         if not vocab.accepts(code):
-            dead.append("  %-24s -> %-16s not defined by %s"
-                        % (code, target, ns.upper()))
+            # A code the publisher does not define as an ATOM is not
+            # automatically a defect, and lumping the cases together made this
+            # report unreadable: it named ten UDUNITS rows of which one was
+            # correct, five were deliberate, and four were hazards. The three
+            # outcomes are distinguishable.
+            split = (vocab.prefixed_reading(code)
+                     if hasattr(vocab, "prefixed_reading") else None)
+            writable = m.get("reverse", True)
+            if split is not None:
+                # The publisher's own language reaches it as prefix + atom. Ours
+                # must AGREE with that reading -- `udunits:dB` is deci + B and a
+                # decibel either way, while `udunits:nmi` is nano + mi, a
+                # NANOMILE, against the nautical mile this table used to give
+                # it: 1.15e9 out, in the same dimension, undetectable. And
+                # `udunits:pH` is pico + H, an inductance rather than an
+                # acidity.
+                if not agrees_with_split(vocab, code, split, target, native):
+                    dead.append("  %-24s -> %-16s %s reads this as %s, a "
+                                "DIFFERENT quantity"
+                                % (code, target, ns.upper(), split))
+            elif writable:
+                # Nothing in the publisher's vocabulary reaches it, and we EMIT
+                # it: a document carrying this code claims one the other side
+                # cannot parse, which is the one thing a namespace exists to
+                # prevent.
+                dead.append("  %-24s -> %-16s not defined by %s, and this row "
+                            "is WRITABLE" % (code, target, ns.upper()))
+            # else: not defined, but `.reverse = false` -- accepted as a
+            # courtesy on read and never emitted. Deliberate; not reported.
             continue
         up = vocab.resolve(code)
         if up is None:

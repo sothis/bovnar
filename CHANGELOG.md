@@ -95,6 +95,56 @@ units produces a warning naming the count, and the exit status is 1 in every
 case — it never reports a silent success over a document whose units JSON
 cannot carry.
 
+### Fixed — bovnar emitted UDUNITS codes that UDUNITS does not define
+
+The `udunits:` table mapped **ten codes absent from the UDUNITS-2 database**,
+and the writer emitted five of them. `bvn_unit_to_profile("udunits", pc)`
+returned `pc`; UDUNITS' 570 names and symbols contain no `pc`. So bovnar
+produced documents claiming UDUNITS codes that no UDUNITS implementation can
+parse — the one thing a namespace exists to prevent, on the writing side, which
+is the direction that costs the other party.
+
+**Two were worse than undefined.** UDUNITS prefixes any name or symbol, so its
+own language reaches both of these — with a different answer than this table
+gave:
+
+| code | UDUNITS reads | bovnar read | apart by |
+|---|---|---|---|
+| `nmi` | nano + mi — a **nanomile** | the nautical mile | 1.15×10⁹, *same dimension* |
+| `pH` | pico + H — a **picohenry** | the acidity scale | a different dimension entirely |
+
+The `nmi` one is the shape this format exists to refuse: a billion-fold error
+that is dimensionally perfect and invisible to every later check. It is the
+`udunits:pt` → picotonne story of §13.3 in reverse — there an absent atom row
+let a prefixed reading through, here a *present* row overrode the prefixed
+reading the publisher actually means.
+
+Each of the ten now gets the outcome its evidence supports:
+
+- **Removed (4).** `nmi` and `pH`, because bovnar's meaning contradicts
+  UDUNITS; `Np` and `neper`, because UDUNITS has no neper under any spelling
+  and no prefixed reading reaches one. `mi` is non-metric here, so `nmi` now
+  simply fails rather than resolving either way; `H` is metric, so `pH`
+  resolves as UDUNITS resolves it. The native `Np` and `pH` are unaffected —
+  they never needed the namespace.
+- **Read-only (5).** `pc`, `deg`, `gramme`, `degree_Fahrenheit` and `decibel`
+  keep their rows with `.reverse = false`: obvious spellings, harmless to
+  accept, never emitted. The writer now uses `parsec`, `arcdeg`, `g`, `degF`
+  and `dB` — every one a name UDUNITS states.
+- **Kept as correct (1).** `dB` is not in either group. UDUNITS defines `B` as
+  the bel (`lg(re 1)`) and prefixes it, so `d` + `B` is a real UDUNITS decibel
+  and the row is that prefixed reading spelled out.
+
+**The gate had been reporting this for as long as it existed, and it was
+unreadable.** `check_profile_factors.py` printed "10 dead rows — not defined by
+UDUNITS", lumping one correct row, five deliberate ones and four hazards into a
+single advisory line that looked like noise. It now separates the three
+outcomes: a row the publisher's own prefix machinery reaches with a *different*
+quantity is reported as a hazard, a row nothing reaches and which is **writable**
+is reported as a defect, and a row nothing reaches which is marked read-only is
+not reported at all. UDUNITS went from 10 dead to 0, and both new shapes are
+mutation-tested.
+
 ### Fixed — the WASM `eventsConvert` reported success over a value it had dropped
 
 `bvnr.eventsConvert('.v = <float:64,k~m/h> 100.0;', 'm/s')` returned

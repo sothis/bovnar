@@ -153,7 +153,7 @@
   { .code = "second";   .bovnar = "s";   .metric = true;  },
   { .code = "g";        .bovnar = "g";   .metric = true;  },
   { .code = "gram";     .bovnar = "g";   .metric = true;  },
-  { .code = "gramme";   .bovnar = "g";   .metric = true;  },
+  { .code = "gramme";   .bovnar = "g";   .metric = true; .reverse = false;  },
   { .code = "A";        .bovnar = "A";   .metric = true;  },
   { .code = "ampere";   .bovnar = "A";   .metric = true;  },
   { .code = "amp";      .bovnar = "A";   .metric = true;  },
@@ -222,7 +222,7 @@
   { .code = "Å";        .bovnar = "Å";   .metric = false; },
   { .code = "barn";     .bovnar = "barn"; .metric = false; },
   { .code = "parsec";   .bovnar = "pc";  .metric = true;  },
-  { .code = "pc";       .bovnar = "pc";  .metric = true;  },
+  { .code = "pc";       .bovnar = "pc";  .metric = true; .reverse = false;  },
   { .code = "au";       .bovnar = "au";  .metric = false; },
   { .code = "ua";       .bovnar = "au";  .metric = false; },
   { .code = "astronomical_unit"; .bovnar = "au"; .metric = false; },
@@ -254,13 +254,42 @@
   { .code = "degree_Celsius";   .bovnar = "°C"; .metric = false; },
   { .code = "degrees_Celsius";  .bovnar = "°C"; .metric = false; },
   { .code = "degF";             .bovnar = "°F"; .metric = false; },
-  { .code = "degree_Fahrenheit"; .bovnar = "°F"; .metric = false; },
+  { .code = "degree_Fahrenheit"; .bovnar = "°F"; .metric = false; .reverse = false; },
   { .code = "degR";             .bovnar = "°Ra"; .metric = false; },
+
+  # ── Codes UDUNITS does not define ────────────────────────────────────────
+  # The rows marked `.reverse = false` for this reason are spellings UDUNITS
+  # does NOT define -- its 570 names and symbols contain no "pc", "deg",
+  # "gramme", "degree_Fahrenheit" or "decibel". bovnar accepts them because they
+  # are obvious and harmless to READ, and never emits them, because a document
+  # carrying `udunits:pc` claims a UDUNITS code that no UDUNITS implementation
+  # can parse -- and the whole point of a namespace is that the other side can.
+  # Each has a real sibling the writer uses instead: parsec, degree, gram,
+  # degF, dB.
+  #
+  # Four more were REMOVED rather than demoted, because accepting them was not
+  # harmless:
+  #
+  #   nmi  UDUNITS reads this as nano + mi, a NANOMILE. bovnar read it as the
+  #        nautical mile: 1.15e9 out, in the same dimension, undetectable
+  #        downstream. bovnar marks `mi` non-metric, so the token now simply
+  #        fails rather than resolving either way.
+  #   pH   UDUNITS reads this as pico + H, a PICOHENRY -- an inductance, not an
+  #        acidity. `H` is metric here too, so removing the row makes bovnar
+  #        agree with UDUNITS. Native pH is still `pH` without a namespace.
+  #   Np / neper   UDUNITS has no neper under any spelling, and no prefixed
+  #        reading reaches one. The native Np simply has no UDUNITS code.
+  #
+  # `dB` stays and is in neither list: UDUNITS defines `B` as the bel
+  # (`lg(re 1)`) and prefixes it, so d + B is a real UDUNITS decibel and the row
+  # is that prefixed reading spelled out. check_profile_factors reports it as a
+  # dead row because it walks the ATOM table, which is the one shape that report
+  # cannot see.
 
   # ── Angle ────────────────────────────────────────────────────────────────
   { .code = "degree";     .bovnar = "°";      .metric = false; },
   { .code = "degrees";    .bovnar = "°";      .metric = false; },
-  { .code = "deg";        .bovnar = "°";      .metric = false; },
+  { .code = "deg";        .bovnar = "°";      .metric = false; .reverse = false; },
   { .code = "arcdeg";     .bovnar = "°";      .metric = false; },
   { .code = "arcmin";     .bovnar = "arcmin"; .metric = false; },
   { .code = "arcminute";  .bovnar = "arcmin"; .metric = false; },
@@ -287,7 +316,6 @@
   { .code = "mi";                  .bovnar = "mi";   .metric = false; },
   { .code = "mile";                .bovnar = "mi";   .metric = false; },
   { .code = "international_mile";  .bovnar = "mi";   .metric = false; },
-  { .code = "nmi";                 .bovnar = "nmi";  .metric = false; },
   { .code = "nmile";               .bovnar = "nmi";  .metric = false; },
   { .code = "nautical_mile";       .bovnar = "nmi";  .metric = false; },
   { .code = "US_survey_foot";      .bovnar = "ftUS"; .metric = false; },
@@ -584,10 +612,7 @@
   { .code = "ppt";       .bovnar = "pptr"; .metric = false; },
   { .code = "ppq";       .bovnar = "ppq"; .metric = false; },
   { .code = "dB";        .bovnar = "dB";  .metric = false; },
-  { .code = "decibel";   .bovnar = "dB";  .metric = false; },
-  { .code = "Np";        .bovnar = "Np";  .metric = true;  },
-  { .code = "neper";     .bovnar = "Np";  .metric = true;  },
-  { .code = "pH";        .bovnar = "pH";  .metric = false; },
+  { .code = "decibel";   .bovnar = "dB";  .metric = false; .reverse = false; },
 
   # ── Information ──────────────────────────────────────────────────────────
   # UDUNITS' "byte" is defined as 8 (dimensionless), i.e. eight bits; bovnar

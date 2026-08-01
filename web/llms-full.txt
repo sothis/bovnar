@@ -15258,7 +15258,7 @@ admitted after that pass, which is why they sit after it rather than beside thei
 | `unece:` | UN/ECE Recommendation 20 and 21 | flat | 1298 + 25 opaque | [11](#11-the-unece-profile) |
 | `qudt:` | QUDT unit local names | flat | 2233, **all 2808 QUDT defines** | [12](#12-the-qudt-profiles) |
 | `qudt-qk:` | QUDT quantity kinds | flat | 903, **all 1165 QUDT defines** | [12.3](#123-quantity-kinds-qudt-qk) |
-| `udunits:` | UDUNITS-2, the CF/netCDF units syntax | expression | 503, **all 584 UDUNITS defines** | [13](#13-the-udunits-profile) |
+| `udunits:` | UDUNITS-2, the CF/netCDF units syntax | expression | 499, **all 580 UDUNITS defines** | [13](#13-the-udunits-profile) |
 | `om:` | OM 2 — Ontology of units of Measure | flat | 1338 + 122 refused, **every unit individual OM states** | [16](#16-the-om-2-profile) |
 | `cf:` | CF standard names | flat, read-only | 4454 + 617 refused, **all 5071 names of table v94** | [17](#17-the-cf-standard-name-profile) |
 
@@ -16888,7 +16888,7 @@ One hand-edited data file per namespace in `src/gendata/`, in the same shape as 
 | `unece.bvnr` | 1298 mapped, 25 opaque, 156 unsupported |
 | `qudt.bvnr` | 2233 mapped, 575 unsupported |
 | `qudt-qk.bvnr` | 903 mapped, 262 unsupported |
-| `udunits.bvnr` | 41 prefixes, 503 mapped, 81 unsupported |
+| `udunits.bvnr` | 41 prefixes, 499 mapped, 81 unsupported |
 | `om.bvnr` | 1338 mapped, 122 unsupported |
 | `cf.bvnr` | 4454 mapped, 617 unsupported |
 
@@ -17728,9 +17728,9 @@ same equivalence class.
 
 > `udunits:` — UDUNITS-2, Unidata's unit library, whose string grammar is the de-facto units syntax
 > of netCDF and the CF conventions.
-> Data file `src/gendata/udunits.bvnr` (41 prefixes, 503 mapped, 81 unsupported — every one of
-> the 584 spellings the UDUNITS-2 database defines);
-> pinned by `tests/bovnar_udunits_test.c` (182 assertions).
+> Data file `src/gendata/udunits.bvnr` (41 prefixes, 499 mapped, 81 unsupported — every one of
+> the 580 spellings the UDUNITS-2 database defines);
+> pinned by `tests/bovnar_udunits_test.c` (199 assertions).
 
 ### 13.1 An expression profile, sharing the UCUM parser
 

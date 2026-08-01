@@ -209,6 +209,29 @@ DERIVED = {
                 / (40.078 + 12.011 + 3 * 15.999),  "grain CaCO₃ per US gallon"),
     'val':     (0.5,                "equivalent of a divalent ion = ½ mol"),
     'CF':      (0.01,               "EC in mS/cm × 10 = 0.1 mS/cm"),
+    # Temperature scales, each from the two fixed points that define it. The
+    # SLOPE is what this table checks; the offset is checked against the same
+    # fixed points by test_affine_offsets_follow_from_their_fixed_points.
+    # Celsius, Fahrenheit and Réaumur are absent because pint defines all three
+    # itself, so the bridge already compares them against an outside authority.
+    '°De':     (-100 / 150,         "0 °De = 100 °C and 150 °De = 0 °C, so the "
+                                    "scale runs backwards at 100/150 °C per degree"),
+    '°N':      (100 / 33,           "0 °N = 0 °C and 33 °N = 100 °C"),
+    '°Ro':     (100 / (60 - 7.5),   "7.5 °Ro = 0 °C and 60 °Ro = 100 °C"),
+    # The interval units mirror their scale's slope with no offset. ΔK is the
+    # kelvin itself: the Celsius interval IS the kelvin (SI Brochure 9th ed.
+    # §2.3.1), which is why Δ°C is an alias of this row rather than its own.
+    'ΔK':      (1.0,                "the kelvin; Δ°C is the same interval"),
+    'Δ°De':    (-100 / 150,         "the Delisle degree as an interval — negative "
+                                    "because the scale descends"),
+    'Δ°N':     (100 / 33,           "the Newton degree as an interval"),
+    'Δ°Ro':    (100 / (60 - 7.5),   "the Rømer degree as an interval"),
+    # Ozone column. The conventional value pairs 1 DU with 2.687×10²⁰ molecules
+    # per square metre; dividing by the Avogadro constant gives the millimolar
+    # figure the registry stores, and both are quoted to four figures, so the
+    # comparison is to that precision rather than to the last bit.
+    'DU':      (2.687e20 / 6.02214076e23,
+                "2.687×10²⁰ molecules/m² ÷ N_A = 0.4462 mmol/m²", 2e-4),
 }
 
 
@@ -252,6 +275,18 @@ def _exact_definitions():
         # exact multiples of the conventional mmHg
         'inch_hg':        (F(254, 10) * mmhg,   "25.4 mmHg"),
         'torr':           (F(101325) / 760,     "atm / 760"),
+        # Temperature slopes. None of the three has a terminating expansion, so
+        # each is exactly the case this test exists for: a factor rounded to the
+        # repr of a double would still be advertised as exact, and every Δ°N or
+        # Δ°Ro conversion would then be quietly inexact. Each scale and its
+        # interval unit must carry the SAME rational -- that is what makes a
+        # difference on the scale convert like the interval.
+        'delisle':           (F(-2, 3),   "0 °De = 100 °C, 150 °De = 0 °C"),
+        'delta_delisle':     (F(-2, 3),   "the Delisle degree as an interval"),
+        'newton_temp':       (F(100, 33), "0 °N = 0 °C, 33 °N = 100 °C"),
+        'delta_newton_temp': (F(100, 33), "the Newton degree as an interval"),
+        'romer':             (F(40, 21),  "7.5 °Ro = 0 °C, 60 °Ro = 100 °C"),
+        'delta_romer':       (F(40, 21),  "the Rømer degree as an interval"),
     }
 
 
@@ -277,6 +312,52 @@ def test_exactly_defined_factors_are_exactly_right():
     assert not wrong, (
         "%d factor(s) are not exactly their own definition:\n%s"
         % (len(wrong), "\n".join(wrong)))
+
+
+def test_affine_offsets_follow_from_their_fixed_points():
+    """Every affine scale's offset, re-derived from the fixed points.
+
+    The offset is the kelvin value at scale reading zero, so it is a FUNCTION of
+    the slope: Rømer's is 273.15 - 7.5 x 40/21 and Fahrenheit's is
+    273.15 - 32 x 5/9, neither terminating. Nothing else compares them against
+    the definition -- the generated-table test checks the C table against
+    units.bvnr, which is the same number twice, and the pint bridge derives its
+    own definition from bovnar for the four scales pint does not carry. A wrong
+    offset is the one temperature error that survives every conversion test
+    written in terms of differences, because differences cancel it.
+    """
+    import gen_units
+    from fractions import Fraction as F
+    zero_c = F(27315, 100)                       # 0 °C in kelvin, exact
+    want = {
+        'celsius':     (zero_c,                    "0 °C = 273.15 K"),
+        'fahrenheit':  (zero_c - 32 * F(5, 9),     "0 °F is 32 °F below the ice point"),
+        'delisle':     (zero_c + 100,              "0 °De = 100 °C (the scale is inverted)"),
+        'newton_temp': (zero_c,                    "0 °N = 0 °C"),
+        'reaumur':     (zero_c,                    "0 °Re = 0 °C"),
+        'romer':       (zero_c - F(15, 2) * F(40, 21), "7.5 °Ro = 0 °C"),
+    }
+    with open(os.path.join(_ROOT, "src", "gendata", "units.bvnr"),
+              encoding="utf-8") as f:
+        units = {u["name"]: u for u in bvnr_data.load(f.read())["units"]}
+    affine = sorted(n for n, u in units.items() if u["affine"])
+    assert affine == sorted(want), (
+        "the set of affine scales has changed; derive the new one's offset here "
+        "rather than letting it ship unchecked: %s" % affine)
+    wrong = []
+    for name, (expected, how) in want.items():
+        got = gen_units.exact_rational(units[name], "offset")
+        if got != expected:
+            wrong.append("  %-14s table %s, but %s gives %s"
+                         % (name, got, how, expected))
+    assert not wrong, ("%d affine offset(s) are not their own definition:\n%s"
+                       % (len(wrong), "\n".join(wrong)))
+
+    # An interval unit is the same scale with the offset removed. A non-zero one
+    # here would reintroduce the 273.15 the Δ units exist to eliminate.
+    stray = sorted(n for n, u in units.items()
+                   if n.startswith("delta_") and float(u["offset"]) != 0.0)
+    assert not stray, "interval units must carry no offset: %s" % stray
 
 
 def test_generated_tables_match_the_source(factors):
@@ -385,18 +466,59 @@ def test_the_faq_category_breakdown_adds_up():
 
 def test_the_derivation_set_covers_the_self_defined_units(factors):
     """The point of this module is the units pint cannot check independently.
-    If a new one is added without a derivation here, say so."""
+    If a new one is added without a derivation here, say so.
+
+    THE SET IS COMPUTED, NOT LISTED. It used to be a literal of 39 symbols, and
+    that is the same shape of defect as the profile gate's native index: a
+    hand-written roster can only report on what someone remembered to put in it,
+    so a newly added self-defined unit was invisible to the very check meant to
+    catch it. The real set is 147, and the 108 the literal omitted were not
+    deliberate exemptions -- nobody had looked at them. Deriving the roster from
+    the bridge is what makes the guard's silence mean something.
+
+    A unit needs an independent derivation here when pint has no definition of
+    its own, i.e. when the bridge points it at a `bvnr_`-prefixed definition
+    generated FROM bovnar -- checking that against bovnar is circular. Two
+    escapes are legitimate and both are checked rather than assumed: a unit some
+    profile maps is compared against that publisher's own published value by
+    check_profile_factors, and a unit that is primitive or instrument-defined has
+    no arithmetic to be derived from.
+    """
+    import re
+    import sys
+    sys.path.insert(0, os.path.join(_ROOT, "python"))
+    from bovnar import _pint_units
+
     unchecked = {
         # primitive or instrument-defined, not derivable by arithmetic
         'b', 'B', 'Bd', 'pH', 'NTU', 'FNU', 'FTU', 'FAU', 'JTU', 'PSU',
         'var', 'VA', 'dB', 'Np', 'slug', 'tex', 'den', 'sc', 'gi',
     }
-    self_defined = {'fur', 'fath', 'thm', 'ac', 'G', 'Mx', 'Oe', 'ph', 'var',
-                    'rpm', 'ch', 'rd', 'Pfd', 'Ztr', 'dz', 'lot', 'prln',
-                    'prz', 'prf', 'elle', 'rute', 'klafter', 'dt_mi', 'morgen',
-                    'schffl', 'lea', 'cbl', 'qntl', '‱', 'pcm', 'ppb',
-                    '°dH', '°e', '°fH', '°rH', '°aH', 'val', 'gpg', 'CF'}
-    missing = sorted(self_defined - set(DERIVED) - unchecked)
+    with open(os.path.join(_ROOT, "src", "gendata", "units.bvnr"),
+              encoding="utf-8") as f:
+        units = bvnr_data.load(f.read())["units"]
+    by_id = {u["id"]: u for u in units}
+    self_defined = {by_id[i]["symbol"]
+                    for i, expr in _pint_units.BASE_UNIT_TO_PINT.items()
+                    if i in by_id and "bvnr_" in str(expr)}
+    assert len(self_defined) > 100, (
+        "only %d self-defined units found; the bridge's shape has changed and "
+        "this guard is no longer looking at anything" % len(self_defined))
+
+    # Units a profile maps: check_profile_factors compares each against the
+    # publisher's own factor, which is an authority outside bovnar.
+    upstream = set()
+    for ns in ("ucum", "udunits", "om", "qudt", "unece", "cf"):
+        with open(os.path.join(_ROOT, "src", "gendata", ns + ".bvnr"),
+                  encoding="utf-8") as f:
+            for row in bvnr_data.load(f.read()).get("mapped", []):
+                for token in re.split(r"[^A-Za-z0-9_µμΩΩÅÅ°Δ‰‱%]+",
+                                      row.get("bovnar", "")):
+                    if token:
+                        upstream.add(token)
+
+    missing = sorted(self_defined - set(DERIVED) - unchecked - upstream)
     assert not missing, (
         "these units are validated against a pint definition derived from "
-        "bovnar itself, and have no independent derivation here: %s" % missing)
+        "bovnar itself, no profile maps them to an outside authority, and they "
+        "have no independent derivation here: %s" % missing)

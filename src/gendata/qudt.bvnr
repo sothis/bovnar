@@ -1927,6 +1927,21 @@
   # so mapping them would make silver and gold the same unit; and the dB
   # products stay refused beside DECIBEL_M, which is already refused for
   # carrying a reference level.
+  # ── Compounds the closing pass could not see ─────────────────────────
+  # The pass matched a flat code against a SINGLE native unit by multiplier,
+  # so a code worth a native COMPOUND fell through to "no native unit of
+  # this dimension is a decade away" -- true of any single unit, and false
+  # of the expression. Each of these matches QUDT exactly.
+  #
+  # The NUM-PER-* family had already settled the modelling question: a count
+  # is no unit, so NUM-PER-X is X^-1, and NUM-PER-M2, NUM-PER-HA and a dozen
+  # siblings map that way. These four were the ones whose X is a compound.
+  { .code = "NUM-PER-KiloM2";            .bovnar = "k~m^-2";            .reverse = false; },   # a count is no unit, so this is the reciprocal area; the rest of the NUM-PER-* family already maps this way
+  { .code = "NUM-PER-M2-DAY";            .bovnar = "m^-2·d^-1";         .reverse = false; },   # as NUM-PER-M2, with the day
+  { .code = "NUM-PER-HA-YR";             .bovnar = "ha^-1·yr^-1";       .reverse = false; },   # as NUM-PER-HA, with the year
+  { .code = "REV-PER-SEC2";              .bovnar = "rev/s^2";           .reverse = false; },   # QUDT's 6.28318531 is 2*pi to nine figures; native rev is 2*pi rad
+  { .code = "REV-PER-MIN-SEC";           .bovnar = "rev/min·s";         .reverse = false; },   # as REV-PER-MIN, per second
+
   { .code = "MO_MeanGREGORIAN";              .bovnar = "mo_greg";             },
   { .code = "MO_MeanJulian";                 .bovnar = "mo";                  },
   { .code = "MO_Synodic";                    .bovnar = "mo_syn";              .reverse = false; },
@@ -2660,9 +2675,9 @@
   { .code = "CCY_ERN";                     .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "CCY_ETB";                     .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "CCY_EUR";                     .why = "QUDT states no conversionMultiplier for this unit"; },
-  { .code = "CCY_EUR-PER-KiloW-HR";        .why = "no native unit of this dimension is a decade away from QUDT's multiplier (2.777777778e-07)"; },
-  { .code = "CCY_EUR-PER-M2";              .why = "no native unit of this dimension, and the coherent SI product cannot carry the decade (1)"; },
-  { .code = "CCY_EUR-PER-W-HR";            .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.0002777777778)"; },
+  { .code = "CCY_EUR-PER-KiloW-HR";        .why = "a currency per unit energy — bovnar carries currencies in a system of their own (doc/11 section 7.2), and a currency has no dimension to build a compound on"; },
+  { .code = "CCY_EUR-PER-M2";              .why = "a currency per unit area — bovnar carries currencies in a system of their own (doc/11 section 7.2), and a currency has no dimension to build a compound on"; },
+  { .code = "CCY_EUR-PER-W-HR";            .why = "a currency per unit energy — bovnar carries currencies in a system of their own (doc/11 section 7.2), and a currency has no dimension to build a compound on"; },
   { .code = "CCY_FJD";                     .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "CCY_FKP";                     .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "CCY_GBP";                     .why = "QUDT states no conversionMultiplier for this unit"; },
@@ -2794,7 +2809,7 @@
   { .code = "CCY_ZWL";                     .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "CD_IN";                       .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "CHAIN_US";                    .why = "QUDT states no conversionMultiplier for this unit"; },
-  { .code = "CHF-PER-KiloGM";              .why = "no native unit of this dimension, and the coherent SI product cannot carry the decade (1)"; },
+  { .code = "CHF-PER-KiloGM";              .why = "a currency per unit mass — bovnar carries currencies in a system of their own (doc/11 section 7.2), and a currency has no dimension to build a compound on"; },
   { .code = "CI-PER-KiloGM";               .why = "no native unit of this dimension is a decade away from QUDT's multiplier (3.7e+10)"; },
   { .code = "CM_H2O";                      .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "CORD";                        .why = "no native unit of this dimension is a decade away from QUDT's multiplier (3.62)"; },
@@ -2867,8 +2882,8 @@
   { .code = "GAUGE_FR";                    .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.0003333333)"; },
   { .code = "GA_Charriere";                .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "GM-PER-M2-HR";                .why = "no native unit of this dimension is a decade away from QUDT's multiplier (2.777777778e-07)"; },
-  { .code = "GM_Carbon-PER-M2-DAY";        .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1.1574073e-08)"; },
-  { .code = "GM_Nitrogen-PER-M2-DAY";      .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1.1574073e-08)"; },
+  { .code = "GM_Carbon-PER-M2-DAY";        .why = "a substance-specific mass: the {C} in its ucumCode g.m-2.d-1{C} names the analyte, and a UCUM annotation is inert, so mapping it would silently drop the carbon"; },
+  { .code = "GM_Nitrogen-PER-M2-DAY";      .why = "a substance-specific mass: the {N} in its ucumCode g.m-2.d-1{N} names the analyte, and a UCUM annotation is inert, so mapping it would silently drop the nitrogen"; },
   { .code = "GR";                          .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "GT";                          .why = "QUDT states a non-positive conversion multiplier"; },
   { .code = "GigaBasePair";                .why = "a dimensionless QUDT unit — every native ratio has the same dimension vector, so nothing here can tell which one it is; QUDT states no ucumCode or udunitsCode to settle it"; },
@@ -2917,7 +2932,7 @@
   { .code = "LB-PER-SEC-DEG_F";            .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.8164663)"; },
   { .code = "LB_F-PER-IN2-DEG_F";          .why = "no native unit of this dimension is a decade away from QUDT's multiplier (12410.56)"; },
   { .code = "LunarMass";                   .why = "no native unit of this dimension is a decade away from QUDT's multiplier (7.346e+22)"; },
-  { .code = "M2-PER-GM_DRY";               .why = "no native unit of this dimension, and the coherent SI product cannot carry the decade (1000)"; },
+  { .code = "M2-PER-GM_DRY";               .why = "a substance-specific mass: the {dry} in its ucumCode m2.g-1{dry} names the basis, and a UCUM annotation is inert, so mapping it would silently drop it"; },
   { .code = "MACH";                        .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "MESH";                        .why = "QUDT states a non-positive conversion multiplier"; },
   { .code = "MHO_Stat";                    .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1.112650056e-12)"; },
@@ -2963,7 +2978,7 @@
   { .code = "MicroGM-PER-CentiM2-WK";      .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1.6534392e-11)"; },
   { .code = "MicroGM-PER-GM-HR";           .why = "no native unit of this dimension is a decade away from QUDT's multiplier (2.777777778e-10)"; },
   { .code = "MicroGM-PER-IN2";             .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1.55e-06)"; },
-  { .code = "MicroM-PER-MilliL";           .why = "no native unit of this dimension, and the coherent SI product cannot carry the decade (1)"; },
+  { .code = "MicroM-PER-MilliL";           .why = "QUDT contradicts itself: the name and the multiplier (1.0) say micrometre per millilitre, its label and ucumCode um2.mL-1 say square micron per millilitre — a factor of 1e-6 apart"; },
   { .code = "MicroSV-PER-HR";              .why = "no native unit of this dimension is a decade away from QUDT's multiplier (2.77778e-10)"; },
   { .code = "MicroTORR";                   .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.000133322)"; },
   { .code = "MicroV-A_Reactive";           .why = "QUDT states no conversionMultiplier for this unit"; },
@@ -2988,10 +3003,7 @@
   { .code = "NAT";                         .why = "a dimensionless QUDT unit — every native ratio has the same dimension vector, so nothing here can tell which one it is; QUDT states no ucumCode or udunitsCode to settle it"; },
   { .code = "NT";                          .why = "QUDT states a non-positive conversion multiplier"; },
   { .code = "NTU";                         .why = "QUDT states no conversionMultiplier for this unit"; },
-  { .code = "NUM-PER-CentiM-KiloYR";       .why = "no native unit of this dimension is a decade away from QUDT's multiplier (3.168808781e-09)"; },
-  { .code = "NUM-PER-HA-YR";               .why = "no native unit of this dimension is a decade away from QUDT's multiplier (3.168808781e-12)"; },
-  { .code = "NUM-PER-KiloM2";              .why = "no native unit of this dimension, and the coherent SI product cannot carry the decade (1e-06)"; },
-  { .code = "NUM-PER-M2-DAY";              .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1.157407407e-05)"; },
+  { .code = "NUM-PER-CentiM-KiloYR";       .why = "QUDT contradicts itself: the name and the multiplier (3.1688e-09) say per CENTIMETRE per kiloannum, its ucumCode {#}.cm-2.ka-1 says per centimetre SQUARED — a factor of 100 apart"; },
   { .code = "NanoGRAY-PER-HR";             .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "NanoGRAY-PER-MIN";            .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "NanoGRAY-PER-SEC";            .why = "QUDT states no conversionMultiplier for this unit"; },
@@ -3090,9 +3102,7 @@
   { .code = "QUAD";                        .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1.055e+18)"; },
   { .code = "Quarter_UK";                  .why = "no native unit of this dimension is a decade away from QUDT's multiplier (12.70058636)"; },
   { .code = "REV-PER-HR";                  .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.00174532925)"; },
-  { .code = "REV-PER-MIN-SEC";             .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.1047197552)"; },
   { .code = "REV-PER-SEC";                 .why = "no native unit of this dimension is a decade away from QUDT's multiplier (6.28318531)"; },
-  { .code = "REV-PER-SEC2";                .why = "no native unit of this dimension is a decade away from QUDT's multiplier (6.28318531)"; },
   { .code = "RHE";                         .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "RPK";                         .why = "a dimensionless QUDT unit — every native ratio has the same dimension vector, so nothing here can tell which one it is; QUDT states no ucumCode or udunitsCode to settle it"; },
   { .code = "RT";                          .why = "QUDT states no conversionMultiplier for this unit"; },
@@ -3122,7 +3132,7 @@
   { .code = "THERM_EC";                    .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "THERM_US";                    .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "THM_EEC";                     .why = "QUDT states no conversionMultiplier for this unit"; },
-  { .code = "THM_US-PER-HR";               .why = "no native unit of this dimension is a decade away from QUDT's multiplier (29300.1111)"; },
+  { .code = "THM_US-PER-HR";               .why = "the US therm, 105480400 J; native thm_ec is the EC therm at 1.05505585262e8 J, 240 ppm away and dimensionally identical"; },
   { .code = "TOE";                         .why = "no native unit of this dimension is a decade away from QUDT's multiplier (4.1868e+10)"; },
   { .code = "TONNE-PER-HA-YR";             .why = "no native unit of this dimension is a decade away from QUDT's multiplier (3.17e-09)"; },
   { .code = "TONNE-PER-MO";                .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.0003919350773)"; },

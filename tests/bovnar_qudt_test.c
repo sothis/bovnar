@@ -127,6 +127,47 @@ static void chk_error(const char* src, error_code_t want)
 
 /* ── qudt: the unit namespace ───────────────────────────────────────────── */
 
+/*
+ * The closing pass matched a flat QUDT code against a SINGLE native unit by
+ * multiplier, so a code worth a native COMPOUND fell through to "no native unit
+ * of this dimension is a decade away" -- true of any single unit, and false of
+ * the expression. The NUM-PER-* family had already settled the modelling
+ * question (a count is no unit, so NUM-PER-X is X^-1, and a dozen siblings map
+ * that way); these were the ones whose X is itself a compound.
+ */
+static void test_compounds_the_closing_pass_could_not_see(void)
+{
+	printf("  qudt: codes worth a native compound...\n");
+	chk_str("qudt:NUM-PER-KiloM2",   "k~m⁻²");
+	chk_str("qudt:NUM-PER-M2-DAY",   "m⁻²·d⁻¹");
+	chk_str("qudt:NUM-PER-HA-YR",    "ha⁻¹·yr⁻¹");
+	/* QUDT states 6.28318531, which is 2*pi to nine figures; native rev is
+	 * 2*pi rad, so these agree inside the 7.5e-7 the factor proof allows. */
+	chk_str("qudt:REV-PER-SEC2",     "rev/s²");
+	chk_str("qudt:REV-PER-MIN-SEC",  "rev/min·s");
+
+	/*
+	 * Their neighbours stay refused, and for reasons that are now stated rather
+	 * than inherited from the generic decade line. Two are QUDT contradicting
+	 * itself: NUM-PER-CentiM-KiloYR's name and multiplier say per CENTIMETRE
+	 * while its ucumCode says per centimetre SQUARED, and MicroM-PER-MilliL's
+	 * name and multiplier say micrometre per millilitre while its label and
+	 * ucumCode say SQUARE micron. Three are substance-specific masses whose
+	 * analyte lives in a UCUM annotation, which is inert -- mapping them would
+	 * silently drop the carbon, the nitrogen, the "dry". One is the US therm,
+	 * which native thm_ec is not.
+	 */
+	chk_error("qudt:NUM-PER-CentiM-KiloYR", error_unit_profile_unsupported);
+	chk_error("qudt:MicroM-PER-MilliL",     error_unit_profile_unsupported);
+	chk_error("qudt:GM_Carbon-PER-M2-DAY",  error_unit_profile_unsupported);
+	chk_error("qudt:GM_Nitrogen-PER-M2-DAY", error_unit_profile_unsupported);
+	chk_error("qudt:M2-PER-GM_DRY",         error_unit_profile_unsupported);
+	chk_error("qudt:THM_US-PER-HR",         error_unit_profile_unsupported);
+	/* And the currencies, which have no dimension to build a compound on. */
+	chk_error("qudt:CHF-PER-KiloGM",        error_unit_profile_unsupported);
+	chk_error("qudt:CCY_EUR-PER-M2",        error_unit_profile_unsupported);
+}
+
 static void test_units(void)
 {
 	printf("  qudt: unit local names...\n");
@@ -442,6 +483,7 @@ int main(void)
 	printf("QUDT unit and quantity-kind profiles\n");
 
 	test_units();
+	test_compounds_the_closing_pass_could_not_see();
 	test_flatness();
 	test_quantity_kinds();
 	test_kind_agrees_with_unit();

@@ -158,6 +158,50 @@ doc/05 already records it in two places.
 All 24 SI prefixes and 10 IEC prefixes produce exactly 10^exp and 2^exp through
 the library, across the full −30…+30 and 2^10…2^100 ranges.
 
+### Fixed — five more QUDT codes, and ten refusals that gave the wrong reason
+
+The pass that closed the QUDT table matched a flat code against a **single**
+native unit by multiplier, so a code worth a native *compound* fell through to
+"no native unit of this dimension is a decade away" — true of any single unit,
+and false of the expression. Five of them:
+
+`NUM-PER-KiloM2` → `k~m⁻²`, `NUM-PER-M2-DAY` → `m⁻²·d⁻¹`,
+`NUM-PER-HA-YR` → `ha⁻¹·yr⁻¹`, `REV-PER-SEC2` → `rev/s²`,
+`REV-PER-MIN-SEC` → `rev/min·s`.
+
+The `NUM-PER-*` family had already settled the modelling question — a count is
+no unit, so `NUM-PER-X` is `X⁻¹`, and `NUM-PER-M2`, `NUM-PER-HA` and a dozen
+siblings map that way. These were the ones whose `X` is itself a compound, so
+they were inconsistent with their own family.
+
+**Ten refusals kept their outcome and got the reason that is actually true.** A
+named refusal is the whole point of §15 — "you wrote it right, and this build
+cannot carry it" rather than "that is not a code" — and a *wrong* reason is
+nearly as bad as none. Four distinct truths were hiding behind one generic
+string:
+
+- **QUDT contradicting itself (2).** `NUM-PER-CentiM-KiloYR`'s name and
+  multiplier say per *centimetre* per kiloannum while its ucumCode
+  `{#}.cm-2.ka-1` says per centimetre **squared** — a factor of 100.
+  `MicroM-PER-MilliL`'s name and multiplier say micrometre per millilitre while
+  its label and ucumCode `um2.mL-1` say **square** micron — a factor of 10⁻⁶.
+- **Substance-specific masses (3).** `GM_Carbon-PER-M2-DAY`,
+  `GM_Nitrogen-PER-M2-DAY` and `M2-PER-GM_DRY` carry their analyte in a UCUM
+  annotation — `g.m-2.d-1{C}` — and an annotation is inert, so mapping them
+  would silently drop the carbon, the nitrogen, the "dry".
+- **A unit bovnar does not have (1).** `THM_US-PER-HR` is the US therm,
+  105 480 400 J; native `thm_ec` is the EC therm at 1.05505585262×10⁸ J, 240 ppm
+  away and dimensionally identical.
+- **Currencies (4).** `CCY_EUR-PER-M2`, `CCY_EUR-PER-W-HR`,
+  `CCY_EUR-PER-KiloW-HR` and `CHF-PER-KiloGM` have no dimension to build a
+  compound on.
+
+The remaining 45 coverage suggestions were read and are all correctly refused —
+dimensional coincidences the tool warns about (`CostPerArea` matching `b/m²`,
+`tendency_of_sea_water_salinity` matching `m~Bq`), deliberate decisions
+(`CelsiusTemperature`, `BitRate`, `HP_Brake`), or contradictory claimants
+(`MI2`).
+
 ### Added — the mean Gregorian month, and 16 codes it and its neighbours unblocked
 
 `mo_greg`, a twelfth of the Gregorian year: **2 629 746 s** exactly. Native `mo`

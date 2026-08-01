@@ -13,7 +13,7 @@ admitted after that pass, which is why they sit after it rather than beside thei
 |---|---|---|---|---|
 | `ucum:` | UCUM — Unified Code for Units of Measure | expression | 206 mapped + 41 arbitrary, **all 312 UCUM defines** | [2](#2-syntax)–[10](#10-cost-risk-and-what-is-left-out) |
 | `unece:` | UN/ECE Recommendation 20 and 21 | flat | 1298 + 25 opaque | [11](#11-the-unece-profile) |
-| `qudt:` | QUDT unit local names | flat | 2228, **all 2808 QUDT defines** | [12](#12-the-qudt-profiles) |
+| `qudt:` | QUDT unit local names | flat | 2233, **all 2808 QUDT defines** | [12](#12-the-qudt-profiles) |
 | `qudt-qk:` | QUDT quantity kinds | flat | 903, **all 1165 QUDT defines** | [12.3](#123-quantity-kinds-qudt-qk) |
 | `udunits:` | UDUNITS-2, the CF/netCDF units syntax | expression | 503, **all 584 UDUNITS defines** | [13](#13-the-udunits-profile) |
 | `om:` | OM 2 — Ontology of units of Measure | flat | 1338 + 122 refused, **every unit individual OM states** | [16](#16-the-om-2-profile) |
@@ -1643,7 +1643,7 @@ One hand-edited data file per namespace in `src/gendata/`, in the same shape as 
 |---|---|
 | `ucum.bvnr` | 20 prefixes, 206 mapped, 41 opaque, 65 unsupported |
 | `unece.bvnr` | 1298 mapped, 25 opaque, 156 unsupported |
-| `qudt.bvnr` | 2228 mapped, 580 unsupported |
+| `qudt.bvnr` | 2233 mapped, 575 unsupported |
 | `qudt-qk.bvnr` | 903 mapped, 262 unsupported |
 | `udunits.bvnr` | 41 prefixes, 503 mapped, 81 unsupported |
 | `om.bvnr` | 1338 mapped, 122 unsupported |
@@ -2336,11 +2336,11 @@ that are equal in SI and different in meaning, and `C94`/`M46` is the pair that 
 
 ## 12. The QUDT profiles
 
-> `qudt:` — QUDT unit local names (2228 mapped, 580 unsupported — every one of the 2808 local
+> `qudt:` — QUDT unit local names (2233 mapped, 575 unsupported — every one of the 2808 local
 > names QUDT defines).
 > `qudt-qk:` — QUDT quantity kinds (903 mapped, 262 unsupported — every one of the 1165 kinds).
 > Data files `src/gendata/qudt.bvnr` and `src/gendata/qudt-qk.bvnr`;
-> pinned by `tests/bovnar_qudt_test.c` (188 assertions).
+> pinned by `tests/bovnar_qudt_test.c` (201 assertions).
 
 ### 12.1 Why this vocabulary
 

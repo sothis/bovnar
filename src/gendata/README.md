@@ -3,9 +3,9 @@
 Units, prefixes, and currencies are defined once, as **data**, in the `*.bvnr`
 files here; the C tables are generated from them. So the enum, conversion table,
 symbol map, parse/alias tables, prefix scale/policy tables, and currency
-catalogue cannot drift out of sync. Covers 261 physical units (739 accepted
+catalogue cannot drift out of sync. Covers 262 physical units (741 accepted
 spellings), 34 SI/IEC prefixes, 216 currencies, and the atom tables of seven unit
-profiles — 10 973 mapped codes and 1906 named refusals, which is every code UCUM,
+profiles — 10 996 mapped codes and 1883 named refusals, which is every code UCUM,
 UDUNITS-2, QUDT, OM 2 and the CF standard name table define, plus every UN/ECE
 code QUDT's cross-reference reaches (doc/11 §15–§17).
 
@@ -17,7 +17,7 @@ rebuild — never edit the generated `*.gen.{h,inc}`.**
 
 | File | Location | Role |
 |------|----------|------|
-| `units.bvnr` | `src/gendata/` | the data: all 261 physical units |
+| `units.bvnr` | `src/gendata/` | the data: all 262 physical units |
 | `prefixes.bvnr` | `src/gendata/` | the data: 24 SI + 10 IEC prefixes |
 | `currencies.bvnr` | `src/gendata/` | the data: all 216 currencies |
 | `ucum.bvnr` | `src/gendata/` | the data: the UCUM profile — prefixes, mapped atoms, arbitrary (opaque) units, and the atoms that are known but refused. All 312 atoms `ucum-essence.xml` defines |

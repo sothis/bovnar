@@ -109,7 +109,7 @@ The Bovnar quantity annotation system is an **optional, per-value annotation** t
 
 Two distinct namespaces share the annotation slot:
 
-- **Physical units** — 261 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
+- **Physical units** — 262 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
 - **Currency codes** — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical — HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01 — and `ANG` coexists with its successor `XCG`, which inherited its numeric code 532; see §9.2) and 50 cryptocurrency tickers.
 
 Both namespaces are syntactically unified: the same grammar, the same `~` prefix separator, the same compound-unit operators (`·`, `*`, `/`), and the same `value_unit_t` data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.
@@ -211,7 +211,7 @@ When both are present, equality is checked after parsing via `bvn_unit_equal`, a
 
 ## 3. Physical Base Units
 
-Bovnar supports 261 physical base units. Currency codes are a separate namespace and are covered in §9.
+Bovnar supports 262 physical base units. Currency codes are a separate namespace and are covered in §9.
 
 > **Reading this section:** The *Symbol* column gives the canonical serialized form. *Long forms* are accepted on input but never produced on output. *Enum value* is the `value_base_unit_t` constant used in the C API.
 
@@ -1034,6 +1034,7 @@ UDUNITS or CF document that says `year` be read at all. It was refused outright 
 | `yr_com` | `common_year` | common year | `bu_year_common` | 31 536 000 s (exact, = 365 d) |
 | `mo_syn` | `synodal_month` | synodal month | `bu_month_synodal` | 2 551 442.976 s (the synodal, lunar month) |
 | `mo_trop` | `tropical_month` | tropical month | `bu_month_tropical` | 2 360 584.6848 s |
+| `mo_greg` | `gregorian_month` | mean Gregorian month | `bu_month_gregorian` | 2 629 746 s |
 | `mo_sid` | `sidereal_month` | sidereal month | `bu_month_sidereal` | 2 360 591.5104 s |
 | `d_sid` | `sidereal_day` | sidereal day | `bu_day_sidereal` | 86 164.0905 s |
 | `h_sid` | `sidereal_hour` | sidereal hour | `bu_hour_sidereal` | `d_sid`/24 = 3590.1704375 s |
@@ -1894,7 +1895,7 @@ A base unit's id is **blocked**, not a running counter: the leading two decimal 
 | 80 | 800000–809999 | CF standard names | `src/gendata/cf.bvnr` |
 | 90 | 900000–909999 | currencies | `src/gendata/currencies.bvnr` |
 
-`bu_none` is 0 and belongs to no block; every tag between the native units and the currencies is now taken, so a further vocabulary needs one outside 10–90. Blocks 40–80 currently contribute no ids at all: those vocabularies map every code onto a native unit, and the block tag reserves their room rather than filling it. Within block 10 the native units run contiguously from `bu_bit` = 100000 to `bu_horsepower_water` = 100260, in the order of `units.bvnr`; `BVN_UNIT_NATIVE_FIRST`, `BVN_UNIT_NATIVE_LAST` and `BVN_UNIT_NATIVE_COUNT` are generated beside the enum, so read the bounds from those rather than from this sentence. Currencies run contiguously from 900000 and — unlike every other block — have **no named `bu_*` enumerators** (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a `$` sigil, resolved by `bvn_parse_currency_str` and carried as the numeric `base` value. `bvn_unit_is_currency(base)` is a bounds check over block 90.
+`bu_none` is 0 and belongs to no block; every tag between the native units and the currencies is now taken, so a further vocabulary needs one outside 10–90. Blocks 40–80 currently contribute no ids at all: those vocabularies map every code onto a native unit, and the block tag reserves their room rather than filling it. Within block 10 the native units run contiguously from `bu_bit` = 100000 to `bu_month_gregorian` = 100261, in the order of `units.bvnr`; `BVN_UNIT_NATIVE_FIRST`, `BVN_UNIT_NATIVE_LAST` and `BVN_UNIT_NATIVE_COUNT` are generated beside the enum, so read the bounds from those rather than from this sentence. Currencies run contiguously from 900000 and — unlike every other block — have **no named `bu_*` enumerators** (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a `$` sigil, resolved by `bvn_parse_currency_str` and carried as the numeric `base` value. `bvn_unit_is_currency(base)` is a bounds check over block 90.
 
 Only a vocabulary that contributes units of its *own* takes a block. A unit profile is a spelling for the unit slot, so most of its codes translate to native units and carry native ids; the ones that get a block id of their own are the **opaque** units — codes with no native equivalent and no dimension, such as UCUM's assay-defined `[IU]` or UN/ECE's package types — which need an identity precisely because nothing else can stand in for them.
 

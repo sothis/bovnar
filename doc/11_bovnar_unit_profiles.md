@@ -11,11 +11,11 @@ admitted after that pass, which is why they sit after it rather than beside thei
 
 | Namespace | Vocabulary | Grammar | Codes carried | Section |
 |---|---|---|---|---|
-| `ucum:` | UCUM — Unified Code for Units of Measure | expression | 205 mapped + 41 arbitrary, **all 312 UCUM defines** | [2](#2-syntax)–[10](#10-cost-risk-and-what-is-left-out) |
-| `unece:` | UN/ECE Recommendation 20 and 21 | flat | 1283 + 25 opaque | [11](#11-the-unece-profile) |
-| `qudt:` | QUDT unit local names | flat | 2222, **all 2808 QUDT defines** | [12](#12-the-qudt-profiles) |
+| `ucum:` | UCUM — Unified Code for Units of Measure | expression | 206 mapped + 41 arbitrary, **all 312 UCUM defines** | [2](#2-syntax)–[10](#10-cost-risk-and-what-is-left-out) |
+| `unece:` | UN/ECE Recommendation 20 and 21 | flat | 1298 + 25 opaque | [11](#11-the-unece-profile) |
+| `qudt:` | QUDT unit local names | flat | 2228, **all 2808 QUDT defines** | [12](#12-the-qudt-profiles) |
 | `qudt-qk:` | QUDT quantity kinds | flat | 903, **all 1165 QUDT defines** | [12.3](#123-quantity-kinds-qudt-qk) |
-| `udunits:` | UDUNITS-2, the CF/netCDF units syntax | expression | 502, **all 584 UDUNITS defines** | [13](#13-the-udunits-profile) |
+| `udunits:` | UDUNITS-2, the CF/netCDF units syntax | expression | 503, **all 584 UDUNITS defines** | [13](#13-the-udunits-profile) |
 | `om:` | OM 2 — Ontology of units of Measure | flat | 1338 + 122 refused, **every unit individual OM states** | [16](#16-the-om-2-profile) |
 | `cf:` | CF standard names | flat, read-only | 4454 + 617 refused, **all 5071 names of table v94** | [17](#17-the-cf-standard-name-profile) |
 
@@ -192,7 +192,7 @@ Adding a vocabulary is therefore a data file and a registry row, not a second pa
 
 ### 1.2 Why a notation rather than more native units
 
-Bovnar's native registry is 261 physical units and 216 currencies, hand-maintained in
+Bovnar's native registry is 262 physical units and 216 currencies, hand-maintained in
 `src/gendata/`. UCUM's atom table is larger — a complete clinical, apothecary, troy, avoirdupois
 and CGS inventory — and its expression language is unbounded, so the set of valid UCUM codes cannot
 be enumerated as a table of units at all.
@@ -912,9 +912,9 @@ The asymmetry is worth stating plainly: these profiles are good *readers* and pa
 round trip that starts in a vocabulary returns to it; one that starts in Bovnar's native registry
 may have nowhere to go.
 
-Sweeping the whole native registry — all 261 physical units, each at the twelve prefixes
-`si_none da h k M G T d c m µ n` — **688** combinations survive a native → UCUM → native round trip
-unchanged, **2067** have no UCUM code, 377 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
+Sweeping the whole native registry — all 262 physical units, each at the twelve prefixes
+`si_none da h k M G T d c m µ n` — **689** combinations survive a native → UCUM → native round trip
+unchanged, **2078** have no UCUM code, 377 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
 before the question arises, and **none round-trips to a different unit**. The last of those is the
 invariant; the two counts move whenever the registry gains a unit, so `test_sweep_round_trip` in
 `tests/bovnar_ucum_test.c` pins all three rather than leaving them as prose.
@@ -925,7 +925,7 @@ invariant; the two counts move whenever the registry gains a unit, so `test_swee
 
 ### 6.1 Verified mappings
 
-The shipped table is `src/gendata/ucum.bvnr`: 205 mapped **atoms**, 41 arbitrary units, 66 known
+The shipped table is `src/gendata/ucum.bvnr`: 206 mapped **atoms**, 41 arbitrary units, 65 known
 but refused, and UCUM's 20 prefix spellings. What follows is the whole mapped list, grouped as the
 data file groups it — and it is the whole of it, checked row by row against the reference
 implementation by `check_doc_profile_atoms.py`, which also fails if a mapped code is missing here. Note that these are *atoms*, which is how the table is organised and not how a
@@ -1008,6 +1008,7 @@ reading back `bvn_unit_to_string` and the coherent-SI factor. The UCUM column is
 | `a_t` | `yr_trop` | `31556925.9747` |
 | `a_g` | `yr_greg` | `31556952.0` |
 | `mo_s` | `mo_syn` | `2551442.976` |
+| `mo_g` | `mo_greg` | `2629746.0` |
 
 Bovnar's `yr` is 31557600 s = 365.25 d and its `mo` is 2629800 s = 30.4375 d, which are the
 **Julian** year and month exactly — and which is what UCUM's unqualified `a` and `mo` are, so all
@@ -1372,7 +1373,6 @@ expected the unit slot to carry the analyte.
 | Special units with a reference | `B[SPL]`, `B[V]`, `B[W]`, `B[kW]`, `B[mV]`, `B[10.nV]` | `error_unit_profile_unsupported` (§3.7) |
 | Other special units | `[p'diop]`, `%[slope]`, `[hp'_X]`, `[m/s2/Hz^(1/2)]` | `error_unit_profile_unsupported` |
 | Scale outside a prefix decade | `10*4`, `10*5`, `10*7`, `10*8` | `error_unit_profile_unsupported` (§3.5) |
-| Year and month variants | `mo_g` (mean gregorian month) | `error_unit_profile_unsupported` — `a_t`, `a_g` and `mo_s` now map to `yr_trop`, `yr_greg` and `mo_syn` |
 | Constants as units | `[c]`, `[k]`, `[h]`, `[m_e]`, `[G]` | `error_unit_profile_unsupported` — `[e]` is the exception and maps to `e`, the elementary charge being a unit of charge rather than a dimensionless constant |
 | Energy conventions with no native counterpart | `[Btu_39]` | `error_unit_profile_unsupported` (§6.3) — the other six now map |
 | The British series | `[ch_br]`, `[ft_br]`, `[yd_br]`, `[in_br]`, `[mi_br]` | `error_unit_profile_unsupported` (§6.3) — bovnar has no British foot |
@@ -1391,8 +1391,10 @@ names the failure rather than accepting the string and leaving the consumer to d
 problem. Which of these should become real native units is a registry question this document does
 not answer — and the answer has been *yes* twice already, which is why the tropical year and the
 survey series are named in the paragraph above as codes that now map rather than here as codes that
-do not. The **mean Gregorian month** is the one still waiting; osmolality turned out not to need a unit at
-all, only consistency with the equivalent (§6.3).
+do not. Neither of the two this paragraph named last is still waiting: osmolality turned out not to need a
+unit at all, only consistency with the equivalent (§6.3), and the mean Gregorian month is now
+native as `mo_greg`. What remains here is genuinely open — a reference level for the decibel, an
+hour angle, a solar mass.
 
 The last row is the distinction the whole error split exists for. An atom in the `.unsupported` list
 is refused as *known and uncarryable*; an atom in none of the three atom lists is refused as *not a
@@ -1639,11 +1641,11 @@ One hand-edited data file per namespace in `src/gendata/`, in the same shape as 
 
 | File | Lists |
 |---|---|
-| `ucum.bvnr` | 20 prefixes, 205 mapped, 41 opaque, 66 unsupported |
-| `unece.bvnr` | 1283 mapped, 25 opaque, 171 unsupported |
-| `qudt.bvnr` | 2222 mapped, 586 unsupported |
+| `ucum.bvnr` | 20 prefixes, 206 mapped, 41 opaque, 65 unsupported |
+| `unece.bvnr` | 1298 mapped, 25 opaque, 156 unsupported |
+| `qudt.bvnr` | 2228 mapped, 580 unsupported |
 | `qudt-qk.bvnr` | 903 mapped, 262 unsupported |
-| `udunits.bvnr` | 41 prefixes, 502 mapped, 82 unsupported |
+| `udunits.bvnr` | 41 prefixes, 503 mapped, 81 unsupported |
 | `om.bvnr` | 1338 mapped, 122 unsupported |
 | `cf.bvnr` | 4454 mapped, 617 unsupported |
 
@@ -1696,7 +1698,7 @@ native target is worth, and compares. `unece` is reached at one remove; see §9.
 The generator also emits the **reverse** tables §5.3 uses, choosing the canonical code for each slot
 by the grammar's rule (shortest for an expression profile, first-declared for a flat one), honouring
 `.reverse = false`, and recording that code's own decade. Deriving them rather than searching the
-forward tables at run time is what makes `bvn_unit_to_profile` deterministic; the 688 round trips
+forward tables at run time is what makes `bvn_unit_to_profile` deterministic; the 689 round trips
 quoted in §5.3 are the check that forward and reverse agree.
 
 ### 9.3 Tests
@@ -2190,7 +2192,7 @@ Verbatim source preservation is next.
 
 > `unece:` — UN/ECE Recommendation 20, *Codes for Units of Measure Used in International Trade*, and
 > Recommendation 21, *Codes for Passengers, Types of Cargo, Packages and Packaging Materials*.
-> Data file `src/gendata/unece.bvnr` (1283 mapped, 25 opaque, 171 unsupported — every Rec 20 code
+> Data file `src/gendata/unece.bvnr` (1298 mapped, 25 opaque, 156 unsupported — every Rec 20 code
 > QUDT's cross-reference reaches, which is not the same as every Rec 20 code; §11.1);
 > pinned by `tests/bovnar_unece_test.c` (134 assertions).
 
@@ -2207,7 +2209,7 @@ effort.** The other four publish a machine-readable list of everything they defi
 the publisher states is in one of the three lists" is a condition that can be met and checked. Rec
 20 states its factors in *prose*. There is no artefact to enumerate, and this profile has always
 been reached at one remove, through the `qudt:uneceCommonCode` cross-reference (§9.5). So the table
-is now closed against **what that cross-reference reaches** — 1283 mapped and 171 refused, up from
+is now closed against **what that cross-reference reaches** — 1298 mapped and 156 refused, up from
 252 and 7 — and a Rec 20 code that no QUDT unit claims is still outside it, because nothing in this
 repository can say what it is worth. Where the cross-reference contradicts *itself*, the code is
 refused saying so: 81 codes have more than one QUDT claimant, and `J62` is claimed by both a
@@ -2334,7 +2336,7 @@ that are equal in SI and different in meaning, and `C94`/`M46` is the pair that 
 
 ## 12. The QUDT profiles
 
-> `qudt:` — QUDT unit local names (2222 mapped, 586 unsupported — every one of the 2808 local
+> `qudt:` — QUDT unit local names (2228 mapped, 580 unsupported — every one of the 2808 local
 > names QUDT defines).
 > `qudt-qk:` — QUDT quantity kinds (903 mapped, 262 unsupported — every one of the 1165 kinds).
 > Data files `src/gendata/qudt.bvnr` and `src/gendata/qudt-qk.bvnr`;
@@ -2483,7 +2485,7 @@ same equivalence class.
 
 > `udunits:` — UDUNITS-2, Unidata's unit library, whose string grammar is the de-facto units syntax
 > of netCDF and the CF conventions.
-> Data file `src/gendata/udunits.bvnr` (41 prefixes, 502 mapped, 82 unsupported — every one of
+> Data file `src/gendata/udunits.bvnr` (41 prefixes, 503 mapped, 81 unsupported — every one of
 > the 584 spellings the UDUNITS-2 database defines);
 > pinned by `tests/bovnar_udunits_test.c` (153 assertions).
 

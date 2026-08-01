@@ -112,6 +112,60 @@ distinction), and the blockquote under each of §11, §12, §13, §16 and §17.
 pass cost and that is a historical fact; its column is relabelled "After that
 pass" and points at §9.1 for current figures.
 
+### Added — the mean Gregorian month, and 16 codes it and its neighbours unblocked
+
+`mo_greg`, a twelfth of the Gregorian year: **2 629 746 s** exactly. Native `mo`
+is a twelfth of the *Julian* year and 54 s longer — 21 ppm apart, dimensionally
+identical, and invisible to anything downstream, which is the shape this format
+exists to refuse to guess at. Two publishers name it and neither could be
+carried: UCUM as `mo_g` (`a_g/12`) and QUDT as `MO_MeanGREGORIAN` with
+`ucumCode "mo_g"`. It completes the month family beside `mo`, `mo_syn`,
+`mo_trop` and `mo_sid`, and it was the last of the two classes doc/11 §6.4 named
+as still waiting — the other, osmolality, turned out to need consistency rather
+than a unit.
+
+**Sixteen profile codes stop being errors**, all found by
+`check_profile_factors.py`'s coverage report rather than by reading:
+
+- **UN/ECE, 15 codes.** Each was refused as "no native unit is a decade away
+  from what QUDT's cross-reference makes this worth" — true when written, false
+  once the registry gained the unit, and every one of them now matches its QUDT
+  claimant **exactly** rather than within a decade: `208` → `miUS²`,
+  `BUI` → `bsh_uk`, `D42` → `yr_trop`, `E86`/`E87` → `Ti~b/m³`/`Ti~b/m²`,
+  `F80` → `hp_W`, `J83` → `clo`, `K42` → `hp_B`, `L95` → `yr_com`,
+  `L96` → `yr_sid`, `M47` → `cml`, `M85` → `AT`, `N94` → `statC`,
+  `P29` → `footlambert`, `P53` → `unit_pole`.
+- **UDUNITS, 1 code.** `lunar_month` was refused as "synodal month — no native
+  form"; `mo_syn` *is* the synodal month, 29.53059 d.
+
+Three neighbours in the same sweep stay refused, and their reasons now say why
+instead of repeating the decade line — because in each case the fault is the
+cross-reference, not the registry. `M48`'s only claimant, QUDT's `MI2`, is
+labelled "Square Mile" with `ucumCode [mi_i]2` (the *international* mile) while
+stating the *survey* multiplier; `MIK` has no QUDT claimant at all, so there is
+no evidence either way; and `P30`'s claimant `LA` is labelled "Lambert" while
+stating `0.3183098862`, which is the **apostilb** — the lambert is 10⁴/π, four
+decades from it. `208` is the one square mile in the set whose claimant is
+coherent, which is why it maps and its two look-alikes do not.
+
+Seven QUDT codes were unblocked the other way, by their own `ucumCode` rather
+than by a new unit: QUDT states no `conversionMultiplier` for them, so the
+multiplier-matching that maps a flat code had nothing to match, while the code
+itself named a unit already carried — `MO_MeanGREGORIAN`, `MO_MeanJulian`,
+`MO_Synodic`, `BBL`, `B` (the bel, `da~dB`) and `MicroS2-PER-CentiM2`.
+
+Deliberately not extended past what each code itself names. `qudt:IU` and its
+per-litre forms stay refused, because an arbitrary unit belongs to the
+vocabulary that gives it an identity and `om:InternationalUnit` is refused on
+exactly that ground; the `CCY_X*` precious metals stay refused because their
+`ucumCode` is an *annotated* troy ounce and annotations are inert, so mapping
+them would make silver and gold the same unit; and `B-PER-M` was mapped and then
+**withdrawn** when the factor proof showed QUDT files it under
+`LinearLogarithmicRatio`, whose coherent unit is `m⁻¹`, which is not convertible
+with `da~dB/m` because the decibel is its own quantity kind here. Its `DeciB-PER-M`
+sibling is refused for the same reason, and a family that mapped one spelling and
+refused the other would be worse than one that refuses both.
+
 ### Fixed — four codes refused for a reason that had stopped being true
 
 **`ucum:osm`.** UCUM defines the osmole and the equivalent identically —

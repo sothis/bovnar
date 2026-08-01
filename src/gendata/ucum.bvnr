@@ -107,6 +107,7 @@
   { .code = "a_t";                       .bovnar = "yr_trop"; .metric = false; },
   { .code = "a_g";                       .bovnar = "yr_greg"; .metric = false; },
   { .code = "mo_s";                      .bovnar = "mo_syn"; .metric = false; },
+  { .code = "mo_g";                      .bovnar = "mo_greg";      .metric = false; },
   { .code = "[e]";                       .bovnar = "e"; .metric = false; },
   { .code = "sph";                       .bovnar = "sph"; .metric = false; },
   { .code = "Lmb";                       .bovnar = "Lmb"; .metric = false; },
@@ -573,7 +574,6 @@
 
   # Year and month variants bovnar does not carry. Its yr and mo are the Julian
   # ones and those DO map; these differ from them by enough to matter.
-  { .code = "mo_g"; .why = "mean gregorian month — native mo is the Julian month"; },
 
   # Physical constants used as units.
   { .code = "[c]";  .why = "speed of light as a unit — no native form"; },

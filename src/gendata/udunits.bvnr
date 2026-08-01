@@ -413,6 +413,12 @@
   { .code = "US_statute_mile";.bovnar = "miUS"; .metric = false; .reverse = false; },
   { .code = "big_point";    .bovnar = "pnt"; .metric = false; },
   { .code = "shake";        .bovnar = "shake"; .metric = false; },
+  # "no native form" was true until mo_syn arrived; UDUNITS' lunar month IS
+  # the synodal month, 29.53059 d, which is exactly what mo_syn states.
+  # It is also the only UDUNITS spelling of mo_syn, so it carries no
+  # .reverse = false: without a writable row the profile could read the unit
+  # and never write it, which gen_profiles.py refuses outright.
+  { .code = "lunar_month";  .bovnar = "mo_syn"; .metric = false; },
   { .code = "darcy";        .bovnar = "darcy"; .metric = false; },
   { .code = "acre_foot";    .bovnar = "ac_ft"; .metric = false; },
   { .code = "acre_feet";    .bovnar = "ac_ft"; .metric = false; .reverse = false; },
@@ -839,7 +845,6 @@
   # "Julian_year" is UDUNITS' own spelling for what bovnar means and it maps.
   { .code = "month";         .why = "a twelfth of the tropical year; bovnar's mo is a twelfth of the Julian year"; },
   { .code = "leap_year";     .why = "366 days exactly — no native form"; },
-  { .code = "lunar_month";   .why = "synodal month — no native form"; },
 
   # ── Two families that USED to be refused here ────────────────────────────
   # The survey-foot lengths and the IT calorie were both listed below, and both

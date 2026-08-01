@@ -100,6 +100,7 @@ BOVNAR_PINT_DEFINITIONS: list[str] = [
     'bvnr_year_sidereal = 31558149.7632 * second',
     'bvnr_year_common = 31536000.0 * second',
     'bvnr_month_synodal = 2551442.976 * second',
+    'bvnr_month_gregorian = 2629746.0 * second',
     'bvnr_month_tropical = 2360584.6848 * second',
     'bvnr_month_sidereal = 2360591.5104 * second',
     'bvnr_day_sidereal = 86164.0905 * second',
@@ -466,6 +467,7 @@ BASE_UNIT_TO_PINT: dict[int, str] = {
     100258: 'bvnr_circular_mil',                 # CIRCULAR_MIL
     100259: 'bvnr_unit_pole',                    # UNIT_POLE
     100260: 'bvnr_horsepower_water',             # HORSEPOWER_WATER
+    100261: 'bvnr_month_gregorian',              # MONTH_GREGORIAN
 
 }
 

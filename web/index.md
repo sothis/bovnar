@@ -94,7 +94,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - [FAQ](https://www.bovnar.io/doc/02_bovnar_faq.md) — Common questions on types, units, limits, encoding, and the API.
 - [Specification](https://www.bovnar.io/doc/03_bovnar_spec.md) — The complete format specification (spec 1.1): grammar, types, units, limits.
 - [Unit & currency cheatsheet](https://www.bovnar.io/doc/04_bovnar_unit_cheatsheet.md) — Every unit symbol, prefix, and currency code in one reference table.
-- [Unit system](https://www.bovnar.io/doc/05_bovnar_unit_system.md) — The 261 physical units, SI/IEC prefixes, and 216 currencies, with dimensions and factors.
+- [Unit system](https://www.bovnar.io/doc/05_bovnar_unit_system.md) — The 262 physical units, SI/IEC prefixes, and 216 currencies, with dimensions and factors.
 - [Unit policy](https://www.bovnar.io/doc/06_bovnar_unit_policy.md) — What a policy validates and converts, the order it resolves in, and the errors it raises.
 - [Unit ambiguities](https://www.bovnar.io/doc/07_bovnar_unit_ambiguities.md) — Which reading wins when a token could mean two things, and how to write the other.
 - [Read & Write C API](https://www.bovnar.io/doc/08_bovnar_readwrite_api.md) — The C reader/writer/DOM API reference (bovnar.h, bovnar_dom.h).

@@ -1019,3 +1019,29 @@ class TestNewUnitsConvertValue:
         import bovnar
         conv = unit_to_si_factor(bovnar.parse_unit("m~gn"))
         assert math.isclose(conv.factor, 9.80665e-3, rel_tol=1e-10)
+
+
+def test_the_mean_gregorian_month():
+    """The last unit two publishers named that nothing here could carry.
+
+    UCUM defines it as `mo_g` (a_g/12) and QUDT as `MO_MeanGREGORIAN` with
+    ucumCode "mo_g"; both were refused for want of a native target, and doc/11
+    6.4 named it as one of the two classes still waiting. Native `mo` is a
+    twelfth of the JULIAN year and 54 s longer -- 21 ppm apart, dimensionally
+    identical, and invisible to anything downstream, which is the shape this
+    format refuses to guess at.
+    """
+    import bovnar
+    greg = bovnar.parse_unit("mo_greg")
+    assert convert_value(1.0, greg, bovnar.parse_unit("s")) == 2629746.0
+    assert convert_value(1.0, bovnar.parse_unit("yr_greg"),
+                         bovnar.parse_unit("s")) / 12 == 2629746.0
+    assert bovnar.parse_unit("ucum:mo_g") == greg
+    assert bovnar.parse_unit("qudt:MO_MeanGREGORIAN") == greg
+    # ...and it is NOT the Julian month the registry already had.
+    assert bovnar.parse_unit("mo") != greg
+    assert convert_value(1.0, bovnar.parse_unit("mo"),
+                         bovnar.parse_unit("s")) == 2629800.0
+    # Both directions, in both vocabularies that name it.
+    assert bovnar.unit_to_profile("ucum", greg) == "mo_g"
+    assert bovnar.unit_to_profile("qudt", greg) == "MO_MeanGREGORIAN"

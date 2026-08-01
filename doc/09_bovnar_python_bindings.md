@@ -1697,7 +1697,7 @@ two digits name the vocabulary it comes from.
 | 100244–100246 | Luminance (`LAMBERT`, `APOSTILB`, `FOOTLAMBERT`) |
 | 100247–100249 | Water-vapour permeance (`PERM_0C`, `PERM_23C`, `PERM_METRIC`) |
 | 100250–100255 | Heat conventions (`CALORIE_MEAN`, `CALORIE_15C`, `CALORIE_20C`, `BTU_59F`, `BTU_60F`, `BTU_MEAN`) |
-| 100256–100260 | `ELEMENTARY_CHARGE`, `SPERE`, `CIRCULAR_MIL`, `UNIT_POLE`, `HORSEPOWER_WATER` |
+| 100256–100261 | `ELEMENTARY_CHARGE`, `SPERE`, `CIRCULAR_MIL`, `UNIT_POLE`, `HORSEPOWER_WATER`, `MONTH_GREGORIAN` |
 | 900000–900165 | ISO 4217 fiat currencies (`AED` … `ZWL`), block 90 — see `CURRENCY_FIRST` |
 | 900166–900215 | Cryptocurrencies (`BTC` … `RUNE`), the rest of block 90 — see `CURRENCY_LAST` |
 

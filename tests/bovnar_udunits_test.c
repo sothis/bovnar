@@ -130,6 +130,9 @@ static void test_spellings(void)
 	/* UDUNITS accepts symbols and spelled-out names for units AND prefixes, and
 	 * all four combinations have to land on the same unit. */
 	chk_str("udunits:m",          "m");
+	/* "synodal month — no native form" was true until mo_syn arrived.
+	 * UDUNITS' lunar month IS the synodal month, 29.53059 d. */
+	chk_str("udunits:lunar_month", "mo_syn");
 	chk_str("udunits:meter",      "m");
 	chk_str("udunits:metre",      "m");
 	chk_str("udunits:km",         "k~m");

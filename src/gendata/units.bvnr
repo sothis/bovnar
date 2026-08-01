@@ -1,5 +1,5 @@
 #!bovnar 1.1
-# units.bvnr — single source of truth for all 261 physical base units.
+# units.bvnr — single source of truth for all 262 physical base units.
 #
 # HOW THIS WORKS
 #   Hand-edited. gen_units.py (at the repo root) regenerates the C unit tables
@@ -3460,6 +3460,27 @@
     .offset  = 0.0;
     .prefix  = default;
     .aliases = ["water_horsepower", "hp_W"];
+  },
+  # The mean GREGORIAN month: a twelfth of the Gregorian year, 31556952/12 s
+  # exactly. Native `mo` is a twelfth of the JULIAN year (2629800 s), 54 s
+  # longer -- 21 ppm apart, dimensionally identical, and invisible to anything
+  # downstream, which is the shape this format refuses to guess at.
+  #
+  # It completes the month family beside mo, mo_syn, mo_trop and mo_sid, and it
+  # is the last unit two publishers named that nothing here could carry: UCUM
+  # defines it as `mo_g` (a_g/12) and QUDT as `MO_MeanGREGORIAN` with
+  # ucumCode "mo_g". Both were refused for want of a native target, and doc/11
+  # §6.4 named it as one of the two classes still waiting.
+  {
+    .id      = <uint:32> 100261;
+    .name    = "month_gregorian";
+    .symbol  = "mo_greg";
+    .factor  = 2629746.0;
+    .dims    = { .time = 1; };
+    .affine  = false;
+    .offset  = 0.0;
+    .prefix  = default;
+    .aliases = ["gregorian_month", "mo_greg"];
   }
 ];
 

@@ -260,6 +260,7 @@
 	bu_circular_mil = 100258,
 	bu_unit_pole    = 100259,
 	bu_horsepower_water = 100260,
+	bu_month_gregorian = 100261,
 
 /* The native block's bounds, and the dense table slot of a unit in it.
  *
@@ -270,8 +271,8 @@
  * arithmetic on the enumerator so it can be a designated-initialiser index in
  * the generated table rows: the row and the enum cannot drift apart. */
 #define BVN_UNIT_NATIVE_FIRST     100000
-#define BVN_UNIT_NATIVE_LAST      100260
-#define BVN_UNIT_NATIVE_COUNT     261
+#define BVN_UNIT_NATIVE_LAST      100261
+#define BVN_UNIT_NATIVE_COUNT     262
 #define BVN_UNIT_SLOT_NATIVE_BASE 1
 #define BVN_SLOT_NATIVE(b) \
 	(BVN_UNIT_SLOT_NATIVE_BASE + ((int)(b) - BVN_UNIT_NATIVE_FIRST))

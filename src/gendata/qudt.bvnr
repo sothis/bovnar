@@ -1904,6 +1904,35 @@
   { .code = "MilliOHM-PER-K";                .bovnar = "m~Ω/K";               .reverse = false; },
   { .code = "MilliOHM-PER-M";                .bovnar = "m~Ω/m";               .reverse = false; },
   { .code = "MilliOSM-PER-KiloGM";           .bovnar = "m~mol/k~g";           .reverse = false; },
+
+  # QUDT states no conversionMultiplier for these, which is why they were
+  # refused -- the table maps a flat code by matching its multiplier against a
+  # native unit of the same dimension, and there was no number to match. Their
+  # own qudt:ucumCode settles each one unambiguously, against a unit bovnar
+  # already carries, so the evidence was there and in the vocabulary's own
+  # words. (check_profile_factors.py already reads that cross-reference to
+  # CHECK the table; these are the rows where it is the only thing to read.)
+  #
+  # Three of these are the ONLY row naming their unit, so they carry no
+  # .reverse = false: without a writable row the profile could read the unit and
+  # never write it, which gen_profiles.py refuses outright. The other four have
+  # a writable sibling already (MO for the synodal month, BBL_US for the barrel)
+  # or are compounds a flat vocabulary cannot write in any case.
+  #
+  # Deliberately not extended past what the code itself names: qudt:IU and its
+  # per-litre forms stay refused, because an arbitrary unit belongs to the
+  # vocabulary that gives it an identity (§7.1) and om:InternationalUnit is
+  # refused on exactly that ground; the CCY_X* precious metals stay refused
+  # because their ucumCode is an ANNOTATED troy ounce and annotations are inert,
+  # so mapping them would make silver and gold the same unit; and the dB
+  # products stay refused beside DECIBEL_M, which is already refused for
+  # carrying a reference level.
+  { .code = "MO_MeanGREGORIAN";              .bovnar = "mo_greg";             },
+  { .code = "MO_MeanJulian";                 .bovnar = "mo";                  },
+  { .code = "MO_Synodic";                    .bovnar = "mo_syn";              .reverse = false; },
+  { .code = "BBL";                           .bovnar = "bbl";                 .reverse = false; },
+  { .code = "B";                             .bovnar = "da~dB";               },
+  { .code = "MicroS2-PER-CentiM2";           .bovnar = "µ~S^2/c~m^2";         .reverse = false; },
   { .code = "MilliPA";                       .bovnar = "m~Pa";                },
   { .code = "MilliPA-PER-M";                 .bovnar = "m~Pa/m";              .reverse = false; },
   { .code = "MilliPA-SEC";                   .bovnar = "m~Pa·s";              .reverse = false; },
@@ -2510,6 +2539,14 @@
   { .code = "DECIBEL_M";  .why = "dBm — dB carries no reference level"; },
   { .code = "DECIBEL_W";  .why = "dBW — dB carries no reference level"; },
   { .code = "DECIBEL_V";  .why = "dBV — dB carries no reference level"; },
+  # The bel per metre. Its bare bel maps (QUDT's own ucumCode "B", and UCUM
+  # reads B as da~dB), but this one does not: QUDT files it under
+  # LinearLogarithmicRatio, whose coherent unit is m^-1, and bovnar gives the
+  # decibel a quantity kind of its own so da~dB/m is not convertible with that.
+  # Its decibel sibling DeciB-PER-M is refused for the same reason, and a
+  # family that maps one spelling and refuses the other would be worse than a
+  # family that refuses both.
+  { .code = "B-PER-M";    .why = "QUDT files it under LinearLogarithmicRatio (m^-1); the decibel is its own quantity kind here"; },
 
   # ── Closing the table against QUDT unit local names ─────────────────────
   #
@@ -2537,11 +2574,8 @@
   { .code = "AC-FT_US";                    .why = "QUDT's multiplier (1233.484266) is neither the international acre-foot (1233.48183755) nor the survey one (1233.48923847)"; },
   { .code = "AT-PER-IN";                   .why = "no native unit of this dimension is a decade away from QUDT's multiplier (39.3700787)"; },
   { .code = "A_Stat-PER-CentiM2";          .why = "no native unit of this dimension is a decade away from QUDT's multiplier (3.335641e-06)"; },
-  { .code = "B";                           .why = "QUDT states no conversionMultiplier for this unit"; },
-  { .code = "B-PER-M";                     .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "BAN";                         .why = "no native unit of this dimension is a decade away from QUDT's multiplier (2.30258509)"; },
   { .code = "BAUD";                        .why = "a dimensionless QUDT unit — every native ratio has the same dimension vector, so nothing here can tell which one it is; QUDT states no ucumCode or udunitsCode to settle it"; },
-  { .code = "BBL";                         .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "BBL_UK_PET";                  .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.1591132)"; },
   { .code = "BBL_UK_PET-PER-DAY";          .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1.841587e-06)"; },
   { .code = "BBL_UK_PET-PER-HR";           .why = "no native unit of this dimension is a decade away from QUDT's multiplier (4.41981e-05)"; },
@@ -2913,9 +2947,6 @@
   { .code = "MOL_LB-PER-SEC";              .why = "no native unit of this dimension is a decade away from QUDT's multiplier (453.59237)"; },
   { .code = "MOMME_Pearl";                 .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "MOMME_Textile";               .why = "QUDT states no conversionMultiplier for this unit"; },
-  { .code = "MO_MeanGREGORIAN";            .why = "QUDT states no conversionMultiplier for this unit"; },
-  { .code = "MO_MeanJulian";               .why = "QUDT states no conversionMultiplier for this unit"; },
-  { .code = "MO_Synodic";                  .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "M_H2O";                       .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "MegaBAUD";                    .why = "a dimensionless QUDT unit — every native ratio has the same dimension vector, so nothing here can tell which one it is; QUDT states no ucumCode or udunitsCode to settle it"; },
   { .code = "MegaCCY_USD";                 .why = "a dimensionless QUDT unit — every native ratio has the same dimension vector, so nothing here can tell which one it is; QUDT states no ucumCode or udunitsCode to settle it"; },
@@ -2933,7 +2964,6 @@
   { .code = "MicroGM-PER-GM-HR";           .why = "no native unit of this dimension is a decade away from QUDT's multiplier (2.777777778e-10)"; },
   { .code = "MicroGM-PER-IN2";             .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1.55e-06)"; },
   { .code = "MicroM-PER-MilliL";           .why = "no native unit of this dimension, and the coherent SI product cannot carry the decade (1)"; },
-  { .code = "MicroS2-PER-CentiM2";         .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "MicroSV-PER-HR";              .why = "no native unit of this dimension is a decade away from QUDT's multiplier (2.77778e-10)"; },
   { .code = "MicroTORR";                   .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.000133322)"; },
   { .code = "MicroV-A_Reactive";           .why = "QUDT states no conversionMultiplier for this unit"; },

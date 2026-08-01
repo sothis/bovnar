@@ -2,7 +2,7 @@
 
 > **Spec version:** 1.1
 > **Status:** Reference — the symbol tables of the unit and currency registry
-> **Scope:** 261 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.
+> **Scope:** 262 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.
 
 ---
 
@@ -699,6 +699,7 @@ or CF document that says `year` be read at all.
 | `yr_com` | `common_year` | common year | `bu_year_common` | 31 536 000 s (exact, = 365 d) |
 | `mo_syn` | `synodal_month` | synodal month | `bu_month_synodal` | 2 551 442.976 s (the synodal, lunar month) |
 | `mo_trop` | `tropical_month` | tropical month | `bu_month_tropical` | 2 360 584.6848 s |
+| `mo_greg` | `gregorian_month` | mean Gregorian month | `bu_month_gregorian` | 2 629 746 s |
 | `mo_sid` | `sidereal_month` | sidereal month | `bu_month_sidereal` | 2 360 591.5104 s |
 | `d_sid` | `sidereal_day` | sidereal day | `bu_day_sidereal` | 86 164.0905 s |
 | `h_sid` | `sidereal_hour` | sidereal hour | `bu_hour_sidereal` | `d_sid`/24 = 3590.1704375 s |
@@ -1048,7 +1049,7 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 
 ---
 
-*The id space is blocked: the leading two digits of an id name its vocabulary. Native units 100000–100260 (261) · UCUM opaque units 200000–200040 (41) · UN/ECE opaque units 300000–300024 (25) · currencies 900000–900215 (166 fiat, 50 crypto). Blocks 40, 50, 60, 70 and 80 are reserved for QUDT, QUDT quantity kinds, UDUNITS, OM 2 and the CF standard names, which contribute no opaque units today.*
+*The id space is blocked: the leading two digits of an id name its vocabulary. Native units 100000–100261 (262) · UCUM opaque units 200000–200040 (41) · UN/ECE opaque units 300000–300024 (25) · currencies 900000–900215 (166 fiat, 50 crypto). Blocks 40, 50, 60, 70 and 80 are reserved for QUDT, QUDT quantity kinds, UDUNITS, OM 2 and the CF standard names, which contribute no opaque units today.*
 *The space is SPARSE — do not index an array by an id. `BVN_UNIT_SLOT_COUNT` = 247 is the row count of the library's dense tables, indexed by `bvni_unit_slot()`, and is not a bound on the enum.*
 
 ---

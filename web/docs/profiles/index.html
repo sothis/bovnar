@@ -63,21 +63,21 @@ admitted after that pass, which is why they sit after it rather than beside thei
 <td><code>ucum:</code></td>
 <td>UCUM — Unified Code for Units of Measure</td>
 <td>expression</td>
-<td>205 mapped + 41 arbitrary, <strong>all 312 UCUM defines</strong></td>
+<td>206 mapped + 41 arbitrary, <strong>all 312 UCUM defines</strong></td>
 <td><a href="#2-syntax">2</a>–<a href="#10-cost-risk-and-what-is-left-out">10</a></td>
 </tr>
 <tr>
 <td><code>unece:</code></td>
 <td>UN/ECE Recommendation 20 and 21</td>
 <td>flat</td>
-<td>1283 + 25 opaque</td>
+<td>1298 + 25 opaque</td>
 <td><a href="#11-the-unece-profile">11</a></td>
 </tr>
 <tr>
 <td><code>qudt:</code></td>
 <td>QUDT unit local names</td>
 <td>flat</td>
-<td>2222, <strong>all 2808 QUDT defines</strong></td>
+<td>2228, <strong>all 2808 QUDT defines</strong></td>
 <td><a href="#12-the-qudt-profiles">12</a></td>
 </tr>
 <tr>
@@ -91,7 +91,7 @@ admitted after that pass, which is why they sit after it rather than beside thei
 <td><code>udunits:</code></td>
 <td>UDUNITS-2, the CF/netCDF units syntax</td>
 <td>expression</td>
-<td>502, <strong>all 584 UDUNITS defines</strong></td>
+<td>503, <strong>all 584 UDUNITS defines</strong></td>
 <td><a href="#13-the-udunits-profile">13</a></td>
 </tr>
 <tr>
@@ -303,7 +303,7 @@ only <code>ucum</code> does, so <code>udunits:mL{x}</code> is <code>error_unit_i
 (§3.4).</p>
 <p>Adding a vocabulary is therefore a data file and a registry row, not a second parser.</p>
 <h3 id="12-why-a-notation-rather-than-more-native-units">1.2 Why a notation rather than more native units</h3>
-<p>Bovnar's native registry is 261 physical units and 216 currencies, hand-maintained in
+<p>Bovnar's native registry is 262 physical units and 216 currencies, hand-maintained in
 <code>src/gendata/</code>. UCUM's atom table is larger — a complete clinical, apothecary, troy, avoirdupois
 and CGS inventory — and its expression language is unbounded, so the set of valid UCUM codes cannot
 be enumerated as a table of units at all.</p>
@@ -1111,16 +1111,16 @@ alone would leave whichever code happened to be shortest and make every other de
 <p>The asymmetry is worth stating plainly: these profiles are good <em>readers</em> and partial <em>writers</em>. A
 round trip that starts in a vocabulary returns to it; one that starts in Bovnar's native registry
 may have nowhere to go.</p>
-<p>Sweeping the whole native registry — all 261 physical units, each at the twelve prefixes
-<code>si_none da h k M G T d c m µ n</code> — <strong>688</strong> combinations survive a native → UCUM → native round trip
-unchanged, <strong>2067</strong> have no UCUM code, 377 are prefix/unit pairs <code>bvn_prefix_unit_valid</code> rejects
+<p>Sweeping the whole native registry — all 262 physical units, each at the twelve prefixes
+<code>si_none da h k M G T d c m µ n</code> — <strong>689</strong> combinations survive a native → UCUM → native round trip
+unchanged, <strong>2078</strong> have no UCUM code, 377 are prefix/unit pairs <code>bvn_prefix_unit_valid</code> rejects
 before the question arises, and <strong>none round-trips to a different unit</strong>. The last of those is the
 invariant; the two counts move whenever the registry gains a unit, so <code>test_sweep_round_trip</code> in
 <code>tests/bovnar_ucum_test.c</code> pins all three rather than leaving them as prose.</p>
 <hr />
 <h2 id="6-the-transliteration-table">6. The transliteration table</h2>
 <h3 id="61-verified-mappings">6.1 Verified mappings</h3>
-<p>The shipped table is <code>src/gendata/ucum.bvnr</code>: 205 mapped <strong>atoms</strong>, 41 arbitrary units, 66 known
+<p>The shipped table is <code>src/gendata/ucum.bvnr</code>: 206 mapped <strong>atoms</strong>, 41 arbitrary units, 65 known
 but refused, and UCUM's 20 prefix spellings. What follows is the whole mapped list, grouped as the
 data file groups it — and it is the whole of it, checked row by row against the reference
 implementation by <code>check_doc_profile_atoms.py</code>, which also fails if a mapped code is missing here. Note that these are <em>atoms</em>, which is how the table is organised and not how a
@@ -1439,6 +1439,11 @@ reading back <code>bvn_unit_to_string</code> and the coherent-SI factor. The UCU
 <td><code>mo_s</code></td>
 <td><code>mo_syn</code></td>
 <td><code>2551442.976</code></td>
+</tr>
+<tr>
+<td><code>mo_g</code></td>
+<td><code>mo_greg</code></td>
+<td><code>2629746.0</code></td>
 </tr>
 </tbody>
 </table>
@@ -2599,11 +2604,6 @@ expected the unit slot to carry the analyte.</p>
 <td><code>error_unit_profile_unsupported</code> (§3.5)</td>
 </tr>
 <tr>
-<td>Year and month variants</td>
-<td><code>mo_g</code> (mean gregorian month)</td>
-<td><code>error_unit_profile_unsupported</code> — <code>a_t</code>, <code>a_g</code> and <code>mo_s</code> now map to <code>yr_trop</code>, <code>yr_greg</code> and <code>mo_syn</code></td>
-</tr>
-<tr>
 <td>Constants as units</td>
 <td><code>[c]</code>, <code>[k]</code>, <code>[h]</code>, <code>[m_e]</code>, <code>[G]</code></td>
 <td><code>error_unit_profile_unsupported</code> — <code>[e]</code> is the exception and maps to <code>e</code>, the elementary charge being a unit of charge rather than a dimensionless constant</td>
@@ -2641,8 +2641,10 @@ names the failure rather than accepting the string and leaving the consumer to d
 problem. Which of these should become real native units is a registry question this document does
 not answer — and the answer has been <em>yes</em> twice already, which is why the tropical year and the
 survey series are named in the paragraph above as codes that now map rather than here as codes that
-do not. The <strong>mean Gregorian month</strong> is the one still waiting; osmolality turned out not to need a unit at
-all, only consistency with the equivalent (§6.3).</p>
+do not. Neither of the two this paragraph named last is still waiting: osmolality turned out not to need a
+unit at all, only consistency with the equivalent (§6.3), and the mean Gregorian month is now
+native as <code>mo_greg</code>. What remains here is genuinely open — a reference level for the decibel, an
+hour angle, a solar mass.</p>
 <p>The last row is the distinction the whole error split exists for. An atom in the <code>.unsupported</code> list
 is refused as <em>known and uncarryable</em>; an atom in none of the three atom lists is refused as <em>not a
 code</em>.
@@ -2889,15 +2891,15 @@ that went in spelled <code>qudt:M-PER-SEC</code> comes out spelled <code>qudt:M-
 <tbody>
 <tr>
 <td><code>ucum.bvnr</code></td>
-<td>20 prefixes, 205 mapped, 41 opaque, 66 unsupported</td>
+<td>20 prefixes, 206 mapped, 41 opaque, 65 unsupported</td>
 </tr>
 <tr>
 <td><code>unece.bvnr</code></td>
-<td>1283 mapped, 25 opaque, 171 unsupported</td>
+<td>1298 mapped, 25 opaque, 156 unsupported</td>
 </tr>
 <tr>
 <td><code>qudt.bvnr</code></td>
-<td>2222 mapped, 586 unsupported</td>
+<td>2228 mapped, 580 unsupported</td>
 </tr>
 <tr>
 <td><code>qudt-qk.bvnr</code></td>
@@ -2905,7 +2907,7 @@ that went in spelled <code>qudt:M-PER-SEC</code> comes out spelled <code>qudt:M-
 </tr>
 <tr>
 <td><code>udunits.bvnr</code></td>
-<td>41 prefixes, 502 mapped, 82 unsupported</td>
+<td>41 prefixes, 503 mapped, 81 unsupported</td>
 </tr>
 <tr>
 <td><code>om.bvnr</code></td>
@@ -2960,7 +2962,7 @@ native target is worth, and compares. <code>unece</code> is reached at one remov
 <p>The generator also emits the <strong>reverse</strong> tables §5.3 uses, choosing the canonical code for each slot
 by the grammar's rule (shortest for an expression profile, first-declared for a flat one), honouring
 <code>.reverse = false</code>, and recording that code's own decade. Deriving them rather than searching the
-forward tables at run time is what makes <code>bvn_unit_to_profile</code> deterministic; the 688 round trips
+forward tables at run time is what makes <code>bvn_unit_to_profile</code> deterministic; the 689 round trips
 quoted in §5.3 are the check that forward and reverse agree.</p>
 <h3 id="93-tests">9.3 Tests</h3>
 <p>One test file per vocabulary, each pinning the section that specifies it, plus the suite that holds
@@ -3621,7 +3623,7 @@ Verbatim source preservation is next.</p>
 <blockquote>
 <p><code>unece:</code> — UN/ECE Recommendation 20, <em>Codes for Units of Measure Used in International Trade</em>, and
 Recommendation 21, <em>Codes for Passengers, Types of Cargo, Packages and Packaging Materials</em>.
-Data file <code>src/gendata/unece.bvnr</code> (1283 mapped, 25 opaque, 171 unsupported — every Rec 20 code
+Data file <code>src/gendata/unece.bvnr</code> (1298 mapped, 25 opaque, 156 unsupported — every Rec 20 code
 QUDT's cross-reference reaches, which is not the same as every Rec 20 code; §11.1);
 pinned by <code>tests/bovnar_unece_test.c</code> (134 assertions).</p>
 </blockquote>
@@ -3636,7 +3638,7 @@ effort.</strong> The other four publish a machine-readable list of everything th
 the publisher states is in one of the three lists" is a condition that can be met and checked. Rec
 20 states its factors in <em>prose</em>. There is no artefact to enumerate, and this profile has always
 been reached at one remove, through the <code>qudt:uneceCommonCode</code> cross-reference (§9.5). So the table
-is now closed against <strong>what that cross-reference reaches</strong> — 1283 mapped and 171 refused, up from
+is now closed against <strong>what that cross-reference reaches</strong> — 1298 mapped and 156 refused, up from
 252 and 7 — and a Rec 20 code that no QUDT unit claims is still outside it, because nothing in this
 repository can say what it is worth. Where the cross-reference contradicts <em>itself</em>, the code is
 refused saying so: 81 codes have more than one QUDT claimant, and <code>J62</code> is claimed by both a
@@ -3975,7 +3977,7 @@ that are equal in SI and different in meaning, and <code>C94</code>/<code>M46</c
 <hr />
 <h2 id="12-the-qudt-profiles">12. The QUDT profiles</h2>
 <blockquote>
-<p><code>qudt:</code> — QUDT unit local names (2222 mapped, 586 unsupported — every one of the 2808 local
+<p><code>qudt:</code> — QUDT unit local names (2228 mapped, 580 unsupported — every one of the 2808 local
 names QUDT defines).
 <code>qudt-qk:</code> — QUDT quantity kinds (903 mapped, 262 unsupported — every one of the 1165 kinds).
 Data files <code>src/gendata/qudt.bvnr</code> and <code>src/gendata/qudt-qk.bvnr</code>;
@@ -4242,7 +4244,7 @@ same equivalence class.</p>
 <blockquote>
 <p><code>udunits:</code> — UDUNITS-2, Unidata's unit library, whose string grammar is the de-facto units syntax
 of netCDF and the CF conventions.
-Data file <code>src/gendata/udunits.bvnr</code> (41 prefixes, 502 mapped, 82 unsupported — every one of
+Data file <code>src/gendata/udunits.bvnr</code> (41 prefixes, 503 mapped, 81 unsupported — every one of
 the 584 spellings the UDUNITS-2 database defines);
 pinned by <code>tests/bovnar_udunits_test.c</code> (153 assertions).</p>
 </blockquote>

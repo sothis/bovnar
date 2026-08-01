@@ -130,6 +130,50 @@ static void chk_error(const char* src, error_code_t want)
 
 /* ── the three outcomes ─────────────────────────────────────────────────── */
 
+/*
+ * Sixteen codes were refused as "no native unit is a decade away from what
+ * QUDT's cross-reference makes this worth" -- true when written, and false the
+ * moment the registry gained the unit. Each now matches its QUDT claimant
+ * EXACTLY rather than within a decade, which is the standard this vocabulary is
+ * held to: it is reached through a secondary source, so an exact factor is the
+ * evidence and a near miss is not.
+ */
+static void test_codes_unblocked_by_the_new_units(void)
+{
+	printf("  unece: refusals the registry outgrew...\n");
+	chk_str("unece:208", "miUS²");        /* QUDT MI_US2,   [mi_us]2 */
+	chk_str("unece:BUI", "bsh_uk");       /* QUDT BU_UK,    [bu_br]  */
+	chk_str("unece:D42", "yr_trop");      /* QUDT YR_TROPICAL, a_t   */
+	chk_str("unece:E86", "Ti~b/m³");
+	chk_str("unece:E87", "Ti~b/m²");
+	chk_str("unece:F80", "hp_W");
+	chk_str("unece:J83", "clo");
+	chk_str("unece:K42", "hp_B");
+	chk_str("unece:L95", "yr_com");
+	chk_str("unece:L96", "yr_sid");
+	chk_str("unece:M47", "cml");
+	chk_str("unece:M85", "AT");
+	chk_str("unece:N94", "statC");
+	chk_str("unece:P29", "footlambert");
+	chk_str("unece:P53", "unit_pole");
+
+	/*
+	 * Three neighbours in the same sweep stay refused, and the reason is the
+	 * cross-reference rather than the registry. M48's only claimant, QUDT's
+	 * MI2, is labelled "Square Mile" with ucumCode [mi_i]2 -- the
+	 * INTERNATIONAL mile -- while stating the SURVEY multiplier; MIK has no
+	 * QUDT claimant at all, so there is no evidence either way; and P30's
+	 * claimant LA is labelled "Lambert" while stating 0.3183098862, which is
+	 * the APOSTILB. The lambert is 1e4/pi, four decades from that.
+	 *
+	 * 208 is the one square mile in the set whose claimant is coherent, which
+	 * is why it maps and its two look-alikes do not.
+	 */
+	chk_error("unece:M48", error_unit_profile_unsupported);
+	chk_error("unece:MIK", error_unit_profile_unsupported);
+	chk_error("unece:P30", error_unit_profile_unsupported);
+}
+
 static void test_outcomes(void)
 {
 	printf("  the three outcomes...\n");
@@ -543,6 +587,7 @@ int main(void)
 	printf("UNECE unit profile\n");
 
 	test_outcomes();
+	test_codes_unblocked_by_the_new_units();
 	test_flatness();
 	test_equivalence();
 	test_opaque_counts();

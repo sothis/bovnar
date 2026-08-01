@@ -401,7 +401,22 @@ The regression test was checked by removing the fix and watching it fail.
 doc/05 §12.4 no longer contradicts itself, and now says which side closes the
 gap.
 
-The document now calls the screen a **superset** whose gap is "one shape wide",
+**Correction, found by probing rather than reading: the gap is two shapes, not
+one.** The other is **capacity** — `Q~m¹⁰⁰ → q~m¹⁰⁰` is 10⁶⁰⁰⁰, a perfectly
+well-defined conversion between compatible units that no representation can
+carry, so the screen answers `true` and the conversion declines. That is
+deliberate and doc/05 §12.4 describes it two paragraphs above the sentence that
+called the gap one shape wide: answering `true` there is precisely how a caller
+separates "too large to compute" from "these units disagree".
+
+The sweep below did not catch it because its domain — the catalogue and its
+quotients and squares — cannot reach the capacity bound, so it passed while the
+claim it was written to defend was too strong. Both the sentence and the test
+now carry the second shape, with a companion case pinning it directly and
+asserting that neither side of it is affine, so it is genuinely a second shape
+rather than the first wearing a large prefix.
+
+The document calls the screen a **superset** whose gap is "two shapes wide",
 and `python/tests/test_convertible_implies_convertible.py` is the assertion
 behind that word: it sweeps 120 000 pairs drawn from the catalogue and its
 quotients and squares, and requires every pair that passes `units_convertible`

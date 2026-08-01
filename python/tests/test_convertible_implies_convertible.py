@@ -10,11 +10,18 @@ right, and screening on the first cost three silent policy failures (a target
 that claimed `°C/h -> K/h` and then delivered the °C/h value, and two rule modes
 that reported OK on a document satisfying neither).
 
-The document now says the screen is a SUPERSET, and that the gap is one shape:
-an affine scale outside "alone, at exponent 1". This is the assertion behind
-that word "one". If a second shape ever opens, a policy can start claiming
-values it cannot deliver again, and the sentence in doc/05 quietly becomes
-false.
+The document says the screen is a SUPERSET whose gap is exactly TWO shapes: an
+affine scale outside "alone, at exponent 1", and capacity — a factor needing
+more than BVN_INT_MAX_BITS, which is why `Q~m^100 -> q~m^100` screens true and
+then declines. That second one is deliberate and documented: separating "too
+large to compute" from "these units disagree" is the question the screen exists
+to answer.
+
+The sweep below runs over the catalogue and its quotients and squares, a domain
+that cannot reach the capacity bound, so within it the affine shape is the only
+one permitted. `test_capacity_is_the_other_shape_in_the_gap` pins the second
+directly. If a THIRD shape ever opens, a policy can start claiming values it
+cannot deliver again, and the sentence in doc/05 quietly becomes false.
 """
 import itertools
 import os
@@ -83,6 +90,28 @@ def test_convertible_that_cannot_convert_is_always_the_affine_shape():
     assert not unexplained, (
         "units_convertible passed a pair the conversion refused, and it is not "
         "the documented affine-in-a-compound shape: %r" % unexplained[:10])
+
+
+@pytest.mark.needs_lib
+def test_capacity_is_the_other_shape_in_the_gap():
+    """The second shape, and the reason the screen answers true for it.
+
+    `Q~m^100 -> q~m^100` is 10^6000: a perfectly well-defined conversion
+    between compatible units that no representation can carry. The screen says
+    true so that a caller can tell "too large to compute" apart from "these
+    units disagree" -- which is what doc/05 12.4 says it is for.
+    """
+    a, b = bovnar.parse_unit("Q~m^100"), bovnar.parse_unit("q~m^100")
+    assert bovnar.units_convertible(a, b) is True
+    with pytest.raises(Exception):
+        bovnar.convert_value(1.0, a, b)
+    # Neither side is affine, so this is genuinely a second shape and not the
+    # first one wearing a large prefix.
+    assert not _affine_misplaced("Q~m^100")
+    assert not _affine_misplaced("q~m^100")
+    # The same units at an exponent the factor CAN carry convert normally.
+    small_a, small_b = bovnar.parse_unit("Q~m"), bovnar.parse_unit("q~m")
+    assert bovnar.convert_value(1.0, small_a, small_b) == pytest.approx(1e60)
 
 
 @pytest.mark.needs_lib

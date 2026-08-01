@@ -16579,7 +16579,7 @@ expected the unit slot to carry the analyte.
 
 | Class | Examples | Outcome |
 |---|---|---|
-| Arbitrary units (32) | `[IU]`, `[iU]`, `[arb'U]`, `[PFU]`, `[CFU]` | **Profile-only** (§3.6) — parsed, comparable, never convertible |
+| Arbitrary units (41) | `[IU]`, `[iU]`, `[arb'U]`, `[PFU]`, `[CFU]` | **Profile-only** (§3.6) — parsed, comparable, never convertible |
 | Special units with a reference | `B[SPL]`, `B[V]`, `B[W]`, `B[kW]`, `B[mV]`, `B[10.nV]` | `error_unit_profile_unsupported` (§3.7) |
 | Other special units | `[p'diop]`, `%[slope]`, `[hp'_X]`, `[m/s2/Hz^(1/2)]` | `error_unit_profile_unsupported` |
 | Scale outside a prefix decade | `10*4`, `10*5`, `10*7`, `10*8` | `error_unit_profile_unsupported` (§3.5) |
@@ -16600,8 +16600,10 @@ their siblings, so those codes map (§6.3).
 The middle rows are the honest cost of the design. A clinical corpus will hit
 `error_unit_profile_unsupported` on real codes, and the profile does not pretend otherwise: it
 names the failure rather than accepting the string and leaving the consumer to discover the
-problem. Which of these should become real native units — the tropical year, osmolality, the survey
-series — is a registry question this document does not answer.
+problem. Which of these should become real native units is a registry question this document does
+not answer — and the answer has been *yes* twice already, which is why the tropical year and the
+survey series are named in the paragraph above as codes that now map rather than here as codes that
+do not. **Osmolality** and the **mean Gregorian month** are the ones still waiting.
 
 The last row is the distinction the whole error split exists for. An atom in the `.unsupported` list
 is refused as *known and uncarryable*; an atom in none of the three atom lists is refused as *not a

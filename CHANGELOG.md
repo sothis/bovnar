@@ -112,6 +112,16 @@ distinction), and the blockquote under each of §11, §12, §13, §16 and §17.
 pass cost and that is a historical fact; its column is relabelled "After that
 pass" and points at §9.1 for current figures.
 
+### Fixed — §6.4 asked whether two units should exist, having just said they do
+
+doc/11 §6.4's class table headed its first row "Arbitrary units (32)"; there are
+41. And it closed by asking which of the refused classes "should become real
+native units — the tropical year, osmolality, the survey series", two paragraphs
+after stating that the registry gained `ftUS`, `chUS`, `acUS` and their siblings
+so those codes now map, and one row after recording that `a_t` maps to
+`yr_trop`. The paragraph now names what is actually still waiting: osmolality
+and the mean Gregorian month.
+
 ### Fixed — doc/11 §17.4 miscounted what CF leaves out, and listed a category that no longer exists
 
 Two rows wrong and one missing, against the upstream table and `cf.bvnr`:

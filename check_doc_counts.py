@@ -132,6 +132,10 @@ CLAIMS = [
     (_phrase(r"\b(\d+)", r"(?:named|physical|base)(?:%s(?:named|physical|base))*"
              % _G, r"units\b"),                                 "units"),
     (_phrase(r"registry(?:'s)?", r"(\d+)", r"units\b"),         "units"),
+    # doc/11 §6.4's class table heads its first row "Arbitrary units (41)" --
+    # UCUM's opaque list, which grew with the rest and said 32 for as long as
+    # every other profile count in that document was wrong.
+    (r"Arbitrary units \((\d+)\)",                              "ucum_opaque"),
     # The exponent bound, wherever a sentence states it as the CURRENT range.
     # Anchored on phrasings that assert rather than recall: "±9 the format can
     # spell" is a claim, "used to stop at ±9" is history and must stay.
@@ -193,6 +197,14 @@ SKIP_DIRS = {".git", "build", "dist", "web", "__pycache__", ".pytest_cache",
 SKIP_FILES = {"CHANGELOG.md", "check_doc_counts.py"}
 SKIP_PREFIXES = ("RELEASE_NOTES_",)
 SUFFIXES = (".md", ".py", ".txt", ".bvnr", ".h", ".c", ".ebnf", ".cff", ".xml")
+
+
+def _add_profile_keys(repo, want):
+    """UCUM's opaque count, for the CLAIMS pattern above."""
+    counts = profile_counts(repo)
+    if "ucum" in counts:
+        want["ucum_opaque"] = counts["ucum"]["opaque"]
+    return want
 
 
 def files(repo):
@@ -329,7 +341,7 @@ def inventory(repo, want):
 
 def main(argv):
     repo = os.path.abspath(argv[1]) if len(argv) > 1 else REPO
-    want = counts(repo)
+    want = _add_profile_keys(repo, counts(repo))
     bad, checked = [], 0
     inv_bad, inv_checked = inventory(repo, want)
     bad += inv_bad

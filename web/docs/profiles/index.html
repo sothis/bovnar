@@ -2563,7 +2563,7 @@ expected the unit slot to carry the analyte.</p>
 </thead>
 <tbody>
 <tr>
-<td>Arbitrary units (32)</td>
+<td>Arbitrary units (41)</td>
 <td><code>[IU]</code>, <code>[iU]</code>, <code>[arb'U]</code>, <code>[PFU]</code>, <code>[CFU]</code></td>
 <td><strong>Profile-only</strong> (§3.6) — parsed, comparable, never convertible</td>
 </tr>
@@ -2627,8 +2627,10 @@ their siblings, so those codes map (§6.3).</p>
 <p>The middle rows are the honest cost of the design. A clinical corpus will hit
 <code>error_unit_profile_unsupported</code> on real codes, and the profile does not pretend otherwise: it
 names the failure rather than accepting the string and leaving the consumer to discover the
-problem. Which of these should become real native units — the tropical year, osmolality, the survey
-series — is a registry question this document does not answer.</p>
+problem. Which of these should become real native units is a registry question this document does
+not answer — and the answer has been <em>yes</em> twice already, which is why the tropical year and the
+survey series are named in the paragraph above as codes that now map rather than here as codes that
+do not. <strong>Osmolality</strong> and the <strong>mean Gregorian month</strong> are the ones still waiting.</p>
 <p>The last row is the distinction the whole error split exists for. An atom in the <code>.unsupported</code> list
 is refused as <em>known and uncarryable</em>; an atom in none of the three atom lists is refused as <em>not a
 code</em>.

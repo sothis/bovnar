@@ -269,6 +269,32 @@ def native_registry():
     return units, pfx, allpfx, iec
 
 
+def target_components(target):
+    """-> [(prefix, atom)] for a .bovnar target expression, prefix None when
+    the component carries no '~'.
+
+    The expression is split into components the way the native parser does:
+    cut at the operators, exponent suffixes dropped ("^-1", "^2", or a unicode
+    superscript), and a '~' prefix separated from its atom. This is THE split
+    check_targets_parse validates against the registry; anything else that
+    needs to know which units a target touches (the derivation-roster test in
+    python/tests) imports it so the two never disagree about what a component
+    is."""
+    out = []
+    for comp in re.split(r"[*/·()]", target):
+        comp = comp.strip()
+        if not comp:
+            continue
+        comp = re.sub(r"\^[-+]?\d$", "", comp)
+        comp = re.sub(r"[¹²³⁴-⁹⁺⁻]+$", "", comp)
+        if "~" in comp:
+            head, _, tail = comp.partition("~")
+            out.append((head, tail))
+        else:
+            out.append((None, comp))
+    return out
+
+
 def check_targets_parse(p, aliases, pfx):
     """Every .bovnar target must be a unit string the native grammar accepts.
 
@@ -284,21 +310,10 @@ def check_targets_parse(p, aliases, pfx):
         if not target:
             bad.append("  %-14s empty target" % m["code"])
             continue
-        # Split the expression into components the way the native parser does,
-        # then check each component's head against the registry.
-        for comp in re.split(r"[*/·()]", target):
-            comp = comp.strip()
-            if not comp:
-                continue
-            # strip an exponent suffix: "^-1", "^2", or a unicode superscript
-            comp = re.sub(r"\^[-+]?\d$", "", comp)
-            comp = re.sub(r"[¹²³⁴-⁹⁺⁻]+$", "", comp)
-            if "~" in comp:
-                head, _, tail = comp.partition("~")
-                if head not in pfx:
-                    bad.append("  %-14s %r: %r is not a prefix"
-                               % (m["code"], target, head))
-                comp = tail
+        for head, comp in target_components(target):
+            if head is not None and head not in pfx:
+                bad.append("  %-14s %r: %r is not a prefix"
+                           % (m["code"], target, head))
             if comp and comp not in aliases:
                 bad.append("  %-14s %r: %r is not a unit in this registry"
                            % (m["code"], target, comp))

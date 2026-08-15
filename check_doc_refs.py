@@ -114,8 +114,15 @@ CUES = [
     (r"\bspecifications?\b", SPEC),
     (r"\bspec\b", SPEC),
 ]
-# A markdown link into the doc set, "…](08_bovnar_readwrite_api.md#…)".
-LINK = re.compile(r"\]\((?:doc/)?((?:\d+_[\w]+|datetime_[\w]+)\.md)")
+# A markdown link into the doc set, "…](08_bovnar_readwrite_api.md#…)". Any
+# .md name matches and every caller then gates on BY_NUMBER membership, so a
+# link out of the doc set (README.md, CONTRIBUTING.md) still resolves nothing.
+# This used to enumerate the numbered documents plus "datetime_*", which meant
+# the design notes were reachable only if their filename happened to start with
+# "datetime": a "[v2 §7](bovnar_v2_proposals.md)" named its target and was read
+# as a citation into the CITING document, passing whenever the citing document
+# happened to have a §7 of its own and failing as a phantom when it did not.
+LINK = re.compile(r"\]\((?:doc/)?([\w.-]+\.md)")
 
 # A "§" belonging to somebody else's document. Nothing in doc/ is numbered like
 # these, so without the skip they would all read as dead citations into the spec.

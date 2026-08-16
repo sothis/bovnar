@@ -100,7 +100,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - [FAQ](https://www.bovnar.io/doc/02_bovnar_faq.md) — Common questions on types, units, limits, encoding, and the API.
 - [Specification](https://www.bovnar.io/doc/03_bovnar_spec.md) — The complete format specification (spec 1.1): grammar, types, units, limits.
 - [Unit & currency cheatsheet](https://www.bovnar.io/doc/04_bovnar_unit_cheatsheet.md) — Every unit symbol, prefix, and currency code in one reference table.
-- [Unit system](https://www.bovnar.io/doc/05_bovnar_unit_system.md) — The 262 physical units, SI/IEC prefixes, and 216 currencies, with dimensions and factors.
+- [Unit system](https://www.bovnar.io/doc/05_bovnar_unit_system.md) — The 264 physical units, SI/IEC prefixes, and 216 currencies, with dimensions and factors.
 - [Unit policy](https://www.bovnar.io/doc/06_bovnar_unit_policy.md) — What a policy validates and converts, the order it resolves in, and the errors it raises.
 - [Unit ambiguities](https://www.bovnar.io/doc/07_bovnar_unit_ambiguities.md) — Which reading wins when a token could mean two things, and how to write the other.
 - [Read & Write C API](https://www.bovnar.io/doc/08_bovnar_readwrite_api.md) — The C reader/writer/DOM API reference (bovnar.h, bovnar_dom.h).
@@ -1807,7 +1807,7 @@ a mismatch is `error_unit_mismatch`.
 
 **How many base units does Bovnar support?**
 
-262 named base units across the following categories:
+264 named base units across the following categories:
 
 - **7 SI base units** — second, meter, gram, ampere, kelvin, mole, candela.
 - **21 named SI-derived units** — hertz through katal (Hz, N, Pa, J, W, V, Ω, F, C, S, Wb, T, H, lm, lx, Bq, Gy, Sv, kat, rad, sr).
@@ -1844,7 +1844,7 @@ a mismatch is `error_unit_mismatch`.
 - **1 conductivity scale** — **CF** (hydroponic conductivity factor, 1 CF = 0.1 mS/cm exactly), which *does* convert, being a rescaled conductivity.
 - **6 units the unit profiles needed** — **metre of water column** (`mH2O`, the conventional 9 806.65 Pa; `c~mH2O` is the centimetre a ventilator is set in), **IT calorie** (`cal_IT`, 4.1868 J — native `cal` is the thermochemical 4.184 J), **thermochemical BTU** (`Btu_th` — native `Btu` is the international-table one), **troy pound** (`lb_t`, twelve troy ounces; also the apothecary pound), **apothecary dram** (`dr_ap`, three scruples — native `dr` is the avoirdupois dram, 2.2× smaller), and the **long hundredweight** (`cwt_l`, 112 lb; the short one is exactly `h~lb` and needs no unit of its own). Each was the sole reason a run of UCUM, UDUNITS-2, QUDT and UN/ECE codes had to be refused.
 - **12 calendar and sidereal time units** — the **tropical** (`yr_trop`), **Gregorian** (`yr_greg`), **sidereal** (`yr_sid`) and **common** (`yr_com`) years; the **synodal** (`mo_syn`), **tropical** (`mo_trop`), **sidereal** (`mo_sid`) and mean **Gregorian** (`mo_greg`, a twelfth of `yr_greg`) months; and the sidereal **day**, **hour**, **minute** and **second** (`d_sid`, `h_sid`, `min_sid`, `s_sid`). `yr` is still the Julian year and `mo` still a twelfth of it — naming the others is what lets a UDUNITS or CF document that says `year` be read at all.
-- **7 CGS electrostatic units** — **statvolt** (`statV`), **statampere** (`statA`), **statcoulomb** (`statC`, the franklin), **statfarad** (`statF`), **statohm** (`statΩ`), **stathenry** (`statH`) and **statsiemens** (`statS`). All are built on `c`, which the 2019 SI fixed, so all are exact rationals.
+- **9 CGS electrostatic units** — **statvolt** (`statV`), **statampere** (`statA`), **statcoulomb** (`statC`, the franklin), **statfarad** (`statF`), **statohm** (`statΩ`), **stathenry** (`statH`), **statsiemens** (`statS`), **statweber** (`statWb`) and **stattesla** (`statT`). All are built on `c`, which the 2019 SI fixed, so all are exact rationals.
 - **3 luminance units** — **lambert** (`Lmb`), **apostilb** (`apostilb`, the blondel) and **foot-lambert** (`footlambert`), each 1/π-based and so marked inexact.
 - **3 water-vapour permeances** — `perm_0C`, `perm_23C` and the metric `perm_m`.
 - **6 heat conventions** — the **mean** (`cal_m`), **15 °C** (`cal_15`) and **20 °C** (`cal_20`) calories, and the **59 °F** (`Btu_59`), **60 °F** (`Btu_60`) and **mean** (`Btu_m`) BTUs, beside the thermochemical and IT ones already here.
@@ -4175,7 +4175,7 @@ ev_data
 
 ### 11.1 Base Units
 
-The unit system supports **262 named base units** across SI, IEC-binary, Imperial/US customary, CGS electromagnetic, radiation, electrical-power, and other categories. The table below covers the SI base units, all 22 named SI-derived units (degree Celsius among them — it is listed under *Non-SI units accepted for use with SI* below, where it is conventionally grouped), and the other non-SI units accepted for use with SI. For the complete reference — including Imperial/US customary, CGS, radiation, electrical-power, rotational, textile, surveying, volume, and other unit families — see **[`doc/05_bovnar_unit_system.md`](05_bovnar_unit_system.md)**.
+The unit system supports **264 named base units** across SI, IEC-binary, Imperial/US customary, CGS electromagnetic, radiation, electrical-power, and other categories. The table below covers the SI base units, all 22 named SI-derived units (degree Celsius among them — it is listed under *Non-SI units accepted for use with SI* below, where it is conventionally grouped), and the other non-SI units accepted for use with SI. For the complete reference — including Imperial/US customary, CGS, radiation, electrical-power, rotational, textile, surveying, volume, and other unit families — see **[`doc/05_bovnar_unit_system.md`](05_bovnar_unit_system.md)**.
 
 **SI base units and digital units**
 
@@ -5937,7 +5937,7 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
 
 > **Spec version:** 1.1
 > **Status:** Reference — the symbol tables of the unit and currency registry
-> **Scope:** 262 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.
+> **Scope:** 264 physical units, 166 fiat currencies, 50 cryptocurrencies, and every SI/IEC prefix.
 
 ---
 
@@ -6652,6 +6652,8 @@ or CF document that says `year` be read at all.
 | `statΩ` | `statohm` | statohm | `bu_statohm` | 22468879468420441/25000 Ω ≈ 898 755 178 737 Ω (exact) |
 | `statH` | `stathenry` | stathenry | `bu_stathenry` | 22468879468420441/25000 H (exact) |
 | `statS` | `statsiemens`, `statmho` | statsiemens | `bu_statsiemens` | 25000/22468879468420441 S (exact) |
+| `statWb` | `statweber` | statweber | `bu_statweber` | 149896229/500000 Wb = 299.792458 Wb (exact, = statV·s) |
+| `statT` | `stattesla` | stattesla | `bu_stattesla` | 149896229/50 T = 2 997 924.58 T (exact, = statV·s/cm²) |
 
 **Luminance**
 
@@ -6984,8 +6986,8 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 
 ---
 
-*The id space is blocked: the leading two digits of an id name its vocabulary. Native units 100000–100261 (262) · UCUM opaque units 200000–200040 (41) · UN/ECE opaque units 300000–300024 (25) · currencies 900000–900215 (166 fiat, 50 crypto). Blocks 40, 50, 60, 70 and 80 are reserved for QUDT, QUDT quantity kinds, UDUNITS, OM 2 and the CF standard names, which contribute no opaque units today.*
-*The space is SPARSE — do not index an array by an id. `BVN_UNIT_SLOT_COUNT` = 247 is the row count of the library's dense tables, indexed by `bvni_unit_slot()`, and is not a bound on the enum.*
+*The id space is blocked: the leading two digits of an id name its vocabulary. Native units 100000–100263 (264) · UCUM opaque units 200000–200040 (41) · UN/ECE opaque units 300000–300024 (25) · currencies 900000–900215 (166 fiat, 50 crypto). Blocks 40, 50, 60, 70 and 80 are reserved for QUDT, QUDT quantity kinds, UDUNITS, OM 2 and the CF standard names, which contribute no opaque units today.*
+*The space is SPARSE — do not index an array by an id. `BVN_UNIT_SLOT_COUNT` = 331 is the row count of the library's dense tables, indexed by `bvni_unit_slot()`, and is not a bound on the enum.*
 
 ---
 
@@ -7104,7 +7106,7 @@ The Bovnar quantity annotation system is an **optional, per-value annotation** t
 
 Two distinct namespaces share the annotation slot:
 
-- **Physical units** — 262 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
+- **Physical units** — 264 named base units covering SI, Imperial, CGS, radiation, surveying, culinary, Old German, and digital storage quantities.
 - **Currency codes** — 216 monetary denominations: 166 ISO 4217 alphabetic codes (including precious-metal X-codes; 4 are historical — HRK retired 2023-01-01, SLL replaced by SLE 2022, ZWL superseded by ZWG 2024, BGN retired 2026-01-01 — and `ANG` coexists with its successor `XCG`, which inherited its numeric code 532; see §9.2) and 50 cryptocurrency tickers.
 
 Both namespaces are syntactically unified: the same grammar, the same `~` prefix separator, the same compound-unit operators (`·`, `*`, `/`), and the same `value_unit_t` data model apply to both. They are separated purely by a token-classification rule described in §9.1 and §10.
@@ -7206,7 +7208,7 @@ When both are present, equality is checked after parsing via `bvn_unit_equal`, a
 
 ## 3. Physical Base Units
 
-Bovnar supports 262 physical base units. Currency codes are a separate namespace and are covered in §9.
+Bovnar supports 264 physical base units. Currency codes are a separate namespace and are covered in §9.
 
 > **Reading this section:** The *Symbol* column gives the canonical serialized form. *Long forms* are accepted on input but never produced on output. *Enum value* is the `value_base_unit_t` constant used in the C API.
 
@@ -8047,6 +8049,8 @@ UDUNITS or CF document that says `year` be read at all. It was refused outright 
 | `statΩ` | `statohm` | statohm | `bu_statohm` | 22468879468420441/25000 Ω ≈ 898 755 178 737 Ω (exact) |
 | `statH` | `stathenry` | stathenry | `bu_stathenry` | 22468879468420441/25000 H (exact) |
 | `statS` | `statsiemens`, `statmho` | statsiemens | `bu_statsiemens` | 25000/22468879468420441 S (exact) |
+| `statWb` | `statweber` | statweber | `bu_statweber` | 149896229/500000 Wb = 299.792458 Wb (exact, = statV·s) |
+| `statT` | `stattesla` | stattesla | `bu_stattesla` | 149896229/50 T = 2 997 924.58 T (exact, = statV·s/cm²) |
 
 **Luminance**
 
@@ -8890,7 +8894,7 @@ A base unit's id is **blocked**, not a running counter: the leading two decimal 
 | 80 | 800000–809999 | CF standard names | `src/gendata/cf.bvnr` |
 | 90 | 900000–909999 | currencies | `src/gendata/currencies.bvnr` |
 
-`bu_none` is 0 and belongs to no block; every tag between the native units and the currencies is now taken, so a further vocabulary needs one outside 10–90. Blocks 40–80 currently contribute no ids at all: those vocabularies map every code onto a native unit, and the block tag reserves their room rather than filling it. Within block 10 the native units run contiguously from `bu_bit` = 100000 to `bu_month_gregorian` = 100261, in the order of `units.bvnr`; `BVN_UNIT_NATIVE_FIRST`, `BVN_UNIT_NATIVE_LAST` and `BVN_UNIT_NATIVE_COUNT` are generated beside the enum, so read the bounds from those rather than from this sentence. Currencies run contiguously from 900000 and — unlike every other block — have **no named `bu_*` enumerators** (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a `$` sigil, resolved by `bvn_parse_currency_str` and carried as the numeric `base` value. `bvn_unit_is_currency(base)` is a bounds check over block 90.
+`bu_none` is 0 and belongs to no block; every tag between the native units and the currencies is now taken, so a further vocabulary needs one outside 10–90. Blocks 40–80 currently contribute no ids at all: those vocabularies map every code onto a native unit, and the block tag reserves their room rather than filling it. Within block 10 the native units run contiguously from `bu_bit` = 100000 to `bu_stattesla` = 100263, in the order of `units.bvnr`; `BVN_UNIT_NATIVE_FIRST`, `BVN_UNIT_NATIVE_LAST` and `BVN_UNIT_NATIVE_COUNT` are generated beside the enum, so read the bounds from those rather than from this sentence. Currencies run contiguously from 900000 and — unlike every other block — have **no named `bu_*` enumerators** (see §9.2/§9.3): a currency is written by its ISO 4217 code behind a `$` sigil, resolved by `bvn_parse_currency_str` and carried as the numeric `base` value. `bvn_unit_is_currency(base)` is a bounds check over block 90.
 
 Only a vocabulary that contributes units of its *own* takes a block. A unit profile is a spelling for the unit slot, so most of its codes translate to native units and carry native ids; the ones that get a block id of their own are the **opaque** units — codes with no native equivalent and no dimension, such as UCUM's assay-defined `[IU]` or UN/ECE's package types — which need an identity precisely because nothing else can stand in for them.
 
@@ -9065,7 +9069,7 @@ typedef enum value_base_unit_e {
 /* Not a member of the enum, and NOT a bound on it: the number of rows in the
  * dense tables the library indexes by bvni_unit_slot(). The id space is
  * sparse, so it has no "one past the end". */
-/* #define BVN_UNIT_SLOT_COUNT 259 */
+/* #define BVN_UNIT_SLOT_COUNT 331 */
 ```
 
 #### `unit_exponent_t`
@@ -14816,6 +14820,7 @@ two digits name the vocabulary it comes from.
 | 100247–100249 | Water-vapour permeance (`PERM_0C`, `PERM_23C`, `PERM_METRIC`) |
 | 100250–100255 | Heat conventions (`CALORIE_MEAN`, `CALORIE_15C`, `CALORIE_20C`, `BTU_59F`, `BTU_60F`, `BTU_MEAN`) |
 | 100256–100261 | `ELEMENTARY_CHARGE`, `SPERE`, `CIRCULAR_MIL`, `UNIT_POLE`, `HORSEPOWER_WATER`, `MONTH_GREGORIAN` |
+| 100262–100263 | CGS electrostatic magnetics (`STATWEBER`, `STATTESLA`) |
 | 900000–900165 | ISO 4217 fiat currencies (`AED` … `ZWL`), block 90 — see `CURRENCY_FIRST` |
 | 900166–900215 | Cryptocurrencies (`BTC` … `RUNE`), the rest of block 90 — see `CURRENCY_LAST` |
 
@@ -15127,6 +15132,13 @@ grows to that channel's largest message and is retained for reuse until
 `bvnr_demux_destroy`, so steady-state memory is the sum of per-channel high-water
 marks (bounded by 4096 channels). Channels are not reclaimed individually.
 
+That 4096 is a **hard limit**, not only a memory estimate. A chunk naming a
+4097th distinct channel cannot be attributed, so the read aborts and
+`bvnr_demux_error` latches `error_octet_stream_out_of_sync` — the demux has lost
+track of the stream, even though the wire framing was well formed. Because
+channels are never reclaimed, the count is of *distinct channel ids seen over the
+whole stream*, not of channels live at any one moment.
+
 ```c
 bvnr_demux_t* dm = bvnr_demux_create(on_message, ctx, 0 /* default cap */);
 bvnr_read_flags_t fl = { .on_verified = bvnr_demux_on_event, .userdata = dm };
@@ -15435,7 +15447,7 @@ Adding a vocabulary is therefore a data file and a registry row, not a second pa
 
 ### 1.2 Why a notation rather than more native units
 
-Bovnar's native registry is 262 physical units and 216 currencies, hand-maintained in
+Bovnar's native registry is 264 physical units and 216 currencies, hand-maintained in
 `src/gendata/`. UCUM's atom table is larger — a complete clinical, apothecary, troy, avoirdupois
 and CGS inventory — and its expression language is unbounded, so the set of valid UCUM codes cannot
 be enumerated as a table of units at all.
@@ -16155,9 +16167,9 @@ The asymmetry is worth stating plainly: these profiles are good *readers* and pa
 round trip that starts in a vocabulary returns to it; one that starts in Bovnar's native registry
 may have nowhere to go.
 
-Sweeping the whole native registry — all 262 physical units, each at the twelve prefixes
+Sweeping the whole native registry — all 264 physical units, each at the twelve prefixes
 `si_none da h k M G T d c m µ n` — **689** combinations survive a native → UCUM → native round trip
-unchanged, **2078** have no UCUM code, 377 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
+unchanged, **2102** have no UCUM code, 377 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
 before the question arises, and **none round-trips to a different unit**. The last of those is the
 invariant; the two counts move whenever the registry gains a unit, so `test_sweep_round_trip` in
 `tests/bovnar_ucum_test.c` pins all three rather than leaving them as prose.
@@ -16886,10 +16898,10 @@ One hand-edited data file per namespace in `src/gendata/`, in the same shape as 
 |---|---|
 | `ucum.bvnr` | 20 prefixes, 206 mapped, 41 opaque, 65 unsupported |
 | `unece.bvnr` | 1298 mapped, 25 opaque, 156 unsupported |
-| `qudt.bvnr` | 2233 mapped, 575 unsupported |
+| `qudt.bvnr` | 2238 mapped, 570 unsupported |
 | `qudt-qk.bvnr` | 903 mapped, 262 unsupported |
 | `udunits.bvnr` | 41 prefixes, 499 mapped, 81 unsupported |
-| `om.bvnr` | 1338 mapped, 122 unsupported |
+| `om.bvnr` | 1341 mapped, 119 unsupported |
 | `cf.bvnr` | 4454 mapped, 617 unsupported |
 
 Four list kinds, and a code belongs to exactly one of them: the vocabulary's prefix spellings with
@@ -17579,7 +17591,7 @@ that are equal in SI and different in meaning, and `C94`/`M46` is the pair that 
 
 ## 12. The QUDT profiles
 
-> `qudt:` — QUDT unit local names (2233 mapped, 575 unsupported — every one of the 2808 local
+> `qudt:` — QUDT unit local names (2238 mapped, 570 unsupported — every one of the 2808 local
 > names QUDT defines).
 > `qudt-qk:` — QUDT quantity kinds (903 mapped, 262 unsupported — every one of the 1165 kinds).
 > Data files `src/gendata/qudt.bvnr` and `src/gendata/qudt-qk.bvnr`;
@@ -18083,7 +18095,7 @@ Growing the native registry to reach them is a separate decision, and doc/05 is 
 
 > `om:` — OM 2, the Ontology of units of Measure (Rijgersberg, van Assem, Top; Wageningen), the
 > second unit ontology of the semantic web beside QUDT.
-> Data file `src/gendata/om.bvnr` (1338 mapped, 122 refused — every unit individual OM states);
+> Data file `src/gendata/om.bvnr` (1341 mapped, 119 refused — every unit individual OM states);
 > pinned by `tests/bovnar_om_test.c` (103 assertions); id block 70, contributing no opaque units.
 
 ### 16.1 Why this vocabulary
@@ -18143,7 +18155,7 @@ refused instead.
 
 The same walk is implemented independently in `check_profile_factors.py` (`class Om`), which
 resolves every local name against `om-2.0.rdf` and compares it with what the library says the target
-is worth: **1275 rows compared, no mismatch**. The three shapes of resolver this brings the tool to
+is worth: **1276 rows compared, no mismatch**. The three shapes of resolver this brings the tool to
 — expression, table read, composition — are listed in its header.
 
 ### 16.3 What the derivation refuses
@@ -18924,8 +18936,8 @@ profile-char = (* any unit-char, plus "," at brace depth >= 1 -- a    *)
 (*   part of IEC 80000-13, which stops at yobi (Yi, 2^80).             *)
 (*                                                                     *)
 (* base-unit  = a symbol looked up in the fixed unit table by              *)
-(*   bvn_parse_unit (src/utils/bovnar_utils.c): 262 named units with        *)
-(*   741 accepted spellings (canonical symbols plus long-form and plural    *)
+(*   bvn_parse_unit (src/utils/bovnar_utils.c): 264 named units with        *)
+(*   745 accepted spellings (canonical symbols plus long-form and plural    *)
 (*   aliases), spanning SI, imperial / US customary, CGS, radiation,        *)
 (*   surveying, culinary, Old German and digital-storage quantities.        *)
 (*   Doc 2 (the unit-system spec) is the authoritative registry; the SI     *)

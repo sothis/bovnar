@@ -64,12 +64,14 @@ CSP_META_RE = re.compile(
 # pages -- it carries no src, so script_hashes() picks it up on its own. The
 # loader it creates on the granted path still needs its ORIGIN named in
 # script-src: injecting a <script> from JavaScript does not bypass CSP, and a
-# hash cannot cover a remote file. What gtag.js does afterwards needs two more
+# hash cannot cover a remote file. What gtag.js does afterwards needs three more
 # allowances that are easy to miss until the browser console fills with
-# violations: it sends its beacons with fetch/sendBeacon (connect-src) and falls
-# back to an image pixel where that fails (img-src). default-src 'none' means
-# anything not named here is blocked, so an incomplete list fails closed -- the
-# banner works, the visitor consents, and no data is ever collected.
+# violations: it sends its beacons with fetch/sendBeacon (connect-src), falls
+# back to an image pixel where that fails (img-src), and frames a sync document
+# for the advertising identifier (frame-src). default-src 'none' means anything
+# not named here is blocked, so an incomplete list fails closed -- the banner
+# works, the visitor consents, and no data is ever collected. Not hypothetical:
+# the wildcard trap described further down did exactly that.
 GA_MEASUREMENT_ID = "G-S8GFD3W21V"
 
 # The tag is CONSENT-GATED: nothing from googletagmanager.com is requested, and
@@ -200,9 +202,48 @@ def consent_banner(lang: str = "en") -> str:
         f"<script>{CONSENT_JS}</script>")
 
 GA_SCRIPT_SRC = "https://www.googletagmanager.com"
-GA_IMG_SRC = "https://www.google-analytics.com https://www.googletagmanager.com"
-GA_CONNECT_SRC = ("https://*.google-analytics.com https://*.googletagmanager.com "
-                  "https://*.analytics.google.com")
+
+# A CSP host wildcard has to match at least ONE label, so '*.analytics.google.com'
+# admits region1.analytics.google.com and REFUSES the bare analytics.google.com --
+# which is one of the hosts GA4 posts to. Google's own CSP guide prints only the
+# wildcard form, which is what makes this the trap it is: the policy reads as
+# though the host is covered, the browser disagrees, and the only symptom is a
+# property that stops recording. Any host GA reaches at its apex is therefore
+# named twice below: once wildcarded for the regional shards, once bare.
+_GA_MEASURE_IMG = "https://*.google-analytics.com https://www.googletagmanager.com"
+_GA_MEASURE_CONNECT = ("https://*.google-analytics.com "
+                       "https://analytics.google.com "
+                       "https://*.analytics.google.com "
+                       "https://*.googletagmanager.com")
+
+# Reached only when the property has Google Signals or an Ads link enabled, which
+# this one does -- Google's tag diagnostic reported stats.g.doubleclick.net and
+# www.google.com blocked, and those are requests no amount of measurement config
+# makes. They carry ADVERTISING identifiers, not just measurement ones, so the
+# analytics section of privacy.html and datenschutz.html says so: the policy and
+# the consent notice have to describe the same site. Dropping the three
+# _GA_ADS_* values from the joins below -- and the matching paragraph from both
+# privacy pages -- is what turning advertising features back off looks like.
+#
+# Google documents one more entry here, 'https://*.google.<TLD>', for the
+# country-domain copies of the remarketing pixel. It is not enumerated: CSP
+# permits no wildcard right of the host, so honouring it literally means listing
+# every domain in google.com/supported_domains -- ~190 hosts, about 5 KB, stamped
+# into every page of this site. If the diagnostic ever names a specific country
+# domain as blocked, add that one host here rather than the whole list.
+_GA_ADS_IMG = ("https://*.g.doubleclick.net "
+               "https://www.google.com https://google.com")
+_GA_ADS_CONNECT = ("https://*.g.doubleclick.net "
+                   "https://www.google.com https://google.com "
+                   "https://pagead2.googlesyndication.com")
+# gtag frames a googletagmanager document to sync the advertising identifier.
+# frame-src has no fallback of its own here beyond default-src 'none', so
+# without naming it the sync is refused like anything else unlisted.
+_GA_ADS_FRAME = "https://www.googletagmanager.com"
+
+GA_IMG_SRC = _GA_MEASURE_IMG + " " + _GA_ADS_IMG
+GA_CONNECT_SRC = _GA_MEASURE_CONNECT + " " + _GA_ADS_CONNECT
+GA_FRAME_SRC = _GA_ADS_FRAME
 
 # Directives that never change. default-src 'none' denies anything not named
 # below; the exceptions (base-uri, form-action) do not fall back to it, so they
@@ -228,6 +269,8 @@ STATIC_DIRECTIVES = [
     # 'self' is the doc drawer's XHR to doc/*.md; the rest is where gtag.js
     # sends its measurement beacons.
     "connect-src 'self' " + GA_CONNECT_SRC,
+    # The page frames nothing of its own; this is the tag's identifier sync.
+    "frame-src " + GA_FRAME_SRC,
     "manifest-src 'self'",
     "base-uri 'none'",
     "form-action 'none'",
@@ -247,6 +290,7 @@ STANDALONE_DIRECTIVES = [
     "img-src 'self' data: " + GA_IMG_SRC,
     "font-src 'self'",
     "connect-src " + GA_CONNECT_SRC,
+    "frame-src " + GA_FRAME_SRC,
     "base-uri 'none'",
     "form-action 'none'",
 ]

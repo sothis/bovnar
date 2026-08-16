@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://www.googletagmanager.com 'sha256-dMl9Eea7j2ZL0hUivGU/UZLwPXszeabEo35bPsWuHa8=' 'sha256-LD8n8dA9SkS6MfxHhdVl8pKjTwy+7U/sPjxR8MhkbrM=' 'sha256-Us6Iuoc76xT5BendnzPECQmU1nVkiWE0MaoNaGt+V1U=' 'sha256-Cye+JnTa0PWKn05L8nglrzyFGjcgzPCdeXTD8qlkemM='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.google-analytics.com https://www.googletagmanager.com; font-src 'self'; connect-src https://*.google-analytics.com https://*.googletagmanager.com https://*.analytics.google.com; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://www.googletagmanager.com 'sha256-dMl9Eea7j2ZL0hUivGU/UZLwPXszeabEo35bPsWuHa8=' 'sha256-LD8n8dA9SkS6MfxHhdVl8pKjTwy+7U/sPjxR8MhkbrM=' 'sha256-Us6Iuoc76xT5BendnzPECQmU1nVkiWE0MaoNaGt+V1U=' 'sha256-Cye+JnTa0PWKn05L8nglrzyFGjcgzPCdeXTD8qlkemM='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.google-analytics.com https://www.googletagmanager.com https://*.g.doubleclick.net https://www.google.com https://google.com; font-src 'self'; connect-src https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://*.googletagmanager.com https://*.g.doubleclick.net https://www.google.com https://google.com https://pagead2.googlesyndication.com; frame-src https://www.googletagmanager.com; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -205,6 +205,15 @@ code {
     Google relies on the EU–US Data Privacy Framework and on the European Commission's standard
     contractual clauses for such transfers. Google's own description is at
     <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">policies.google.com/privacy</a>.
+  </p>
+  <p class="muted">
+    Google's advertising features are active on this tag. On the consented path it therefore also
+    contacts <code>stats.g.doubleclick.net</code> and <code>google.com</code>, and the identifiers
+    set there are advertising identifiers rather than measurement ones alone: where you are signed
+    in to a Google account whose settings permit it, Google may associate the visit with that
+    account, recognise the same browser or person across devices, and use the visit for remarketing
+    audiences and for the aggregated age, gender and interest reports. None of this happens before
+    you allow analytics — declining, or withdrawing below, prevents every one of these requests.
   </p>
   <p class="muted">
     The legal basis is your consent under Art. 6(1)(a) GDPR. You may withdraw it at any time with

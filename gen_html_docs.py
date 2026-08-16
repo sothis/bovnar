@@ -425,6 +425,10 @@ def csp_for(scripts):
             # These pages fetch nothing of their own; connect-src exists purely
             # so the analytics beacon is not blocked by default-src 'none'.
             f"connect-src {gen_csp.GA_CONNECT_SRC}; "
+            # Likewise: these pages frame nothing, so frame-src is here only so
+            # the tag's advertising-identifier sync is not caught by
+            # default-src 'none'.
+            f"frame-src {gen_csp.GA_FRAME_SRC}; "
             "base-uri 'none'; form-action 'none'")
 
 THEME_TOGGLE_BTN = (

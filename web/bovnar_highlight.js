@@ -131,6 +131,16 @@ html[data-theme="light"] .bvh-d5{color:#12731c}html[data-theme="light"] .bvh-d6{
   // single cohesive value token (like the C reader's integer carrier).
   const DT = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)?/;
 
+  // A unit PROFILE parameter (doc/11): "namespace:code", e.g. ucum:mm[Hg],
+  // ucum:10*3/uL{WBC}, udunits:kg m-2 s-1. The code is the other vocabulary's
+  // own notation, so none of the native classes apply to it -- its digits are
+  // not a bit-width, its braces not a struct, its space not a separator -- and
+  // it is coloured whole. Inside an annotation a ',' within {...} and a space
+  // followed by more code both belong to it; an inline suffix has neither.
+  const PROF  = /^([a-z][a-z0-9-]*)(:)((?:\{[^}>\n]*\}|[^\s,>{;#"]|[ \t]+(?=[^\s,>;#"]))+)/;
+  const PROFI = /^([a-z][a-z0-9-]*)(:)([^\s;,#"<>]+)/;
+  function prof(m) { return span('unit', m[1]) + span('tsep', m[2]) + span('unit', m[3]); }
+
   // Split a unit so '~', '*' and '/' read as separators (vim BovnarUnitTilde /
   // UnitSep) and the rest as the unit body (BovnarTypeUnit / UnitExp).
   function unit(u) {
@@ -143,13 +153,18 @@ html[data-theme="light"] .bvh-d5{color:#12731c}html[data-theme="light"] .bvh-d6{
   // Tokenise the interior of a <…> type annotation as vim does: olive delimiters,
   // bold type family, pink bit-width, mint base, orange q-param, teal unit.
   function ann(s) {
-    let out = '', i = 0, m;
+    // `pstart`: a parameter may begin here -- right after the family ':' or a
+    // ','. Only there can "name:" be a profile namespace; anywhere else the
+    // same shape is the family and its own colon ("float:64").
+    let out = '', i = 0, m, pstart = false;
     while (i < s.length) {
       const c = s[i], r = s.slice(i);
       if (c === ' ' || c === '\t') { m = /^[ \t]+/.exec(r); out += esc(m[0]); i += m[0].length; continue; }
       if (c === '<' || c === '>') { out += span('adelim', c); i++; continue; }
-      if (c === ':') { out += span('tsep', ':'); i++; continue; }
-      if (c === ',') { out += span('sep', ','); i++; continue; }
+      if (c === ':') { out += span('tsep', ':'); i++; pstart = true; continue; }
+      if (c === ',') { out += span('sep', ','); i++; pstart = true; continue; }
+      if (pstart && (m = PROF.exec(r))) { out += prof(m); i += m[0].length; pstart = false; continue; }
+      pstart = false;
       if ((m = /^(?:float_fix|float_dec|float|uint|sint|utf8|bool|datetime|no_unit)\b/.exec(r))) { out += span(m[0] === 'no_unit' ? 'unit' : 'type', m[0]); i += m[0].length; continue; }
       if ((m = /^q\d+/.exec(r))) { out += span('param', m[0]); i += m[0].length; continue; }
       if ((m = /^_\d+/.exec(r))) { out += span('base', m[0]); i += m[0].length; continue; }
@@ -202,6 +217,9 @@ html[data-theme="light"] .bvh-d5{color:#12731c}html[data-theme="light"] .bvh-d6{
       if (c === '.' && (m = /^\.[A-Za-z_\u00C0-\uFFFF][\w+\-\u0080-\uFFFF]*/.exec(r))) { out += span('sigil', '.') + span('key', m[0].slice(1)); i += m[0].length; afterNum = false; continue; }
       if (!afterNum && (m = DT.exec(r))) { out += span('num', m[0]); i += m[0].length; afterNum = false; continue; }  // ISO-8601 datetime literal (spec 1.1)
       if ((m = NUM.exec(r)) && /\d/.test(m[0])) { let s = m[0]; if (s[0] === '-') { out += span('neg', '-'); s = s.slice(1); } out += span('num', s); i += m[0].length; afterNum = true; continue; }
+      if (afterNum && (m = PROFI.exec(r))) {           // inline unit in a profile notation (ucum:mm[Hg])
+        out += prof(m); i += m[0].length; afterNum = false; continue;
+      }
       if (afterNum && (m = ID.exec(r))) {              // inline unit suffix after a number (broad unit charset)
         out += unit(m[0]); i += m[0].length; afterNum = false; continue;
       }

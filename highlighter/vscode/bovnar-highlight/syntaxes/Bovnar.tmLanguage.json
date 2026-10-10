@@ -190,6 +190,14 @@
       "patterns": [
         { "include": "#comment" },
 
+        { "comment": "A unit PROFILE parameter (doc/11): namespace:code, e.g. ucum:mm[Hg], ucum:10*3/uL{WBC}, udunits:kg m-2 s-1. The code is another vocabulary's notation, so it is scoped whole rather than split by the native rules below (its digits are not a width). It may only begin a parameter, i.e. follow the family ':' or a ',', which is what keeps float:64 from reading as a namespace. A ',' inside {...} and a space followed by more code belong to it.",
+          "match": "(?<=[,:])(\\s*)([a-z][a-z0-9-]*)(:)((?:\\{[^}>]*\\}|[^\\s,>{]|[ \\t]+(?=[^\\s,>]))+)",
+          "captures": {
+            "2": { "name": "support.type.unit.profile-namespace.bovnar" },
+            "3": { "name": "punctuation.separator.colon.bovnar" },
+            "4": { "name": "support.type.unit.bovnar" }
+          } },
+
         { "comment": "Type-family keywords. Longer names (float_fix, float_dec) must appear before float.",
           "match": "\\b(float_fix|float_dec|float|uint|sint|utf8|bool|datetime)\\b",
           "name": "storage.type.family.bovnar" },
@@ -297,7 +305,7 @@
 
     "inline_unit": {
       "comment": "Inline unit suffix: mandatory whitespace separates the scalar from the unit. The lookbehind fires after a digit or a closing string quote. (Special-number keywords nan/inf/ninf take no inline unit — a unit is given via the type annotation.)",
-      "match": "(?<=[\\d\"])(\\s+)([A-Za-z_$%(‰‱µΩΩ°Å][A-Za-z0-9_$()+~\\.\\-/:\\^\\*%‰‱µΩΩ°Å·¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]*)",
+      "match": "(?<=[\\d\"])(\\s+)([A-Za-z_$%(‰‱µΩΩ°Å][A-Za-z0-9_$()+~\\.\\-/:\\^\\*%‰‱µΩΩ°Å·¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻\\[\\]{}']*)",
       "captures": {
         "1": { "name": "punctuation.separator.inline-unit.bovnar" },
         "2": { "name": "support.type.unit.inline.bovnar"          }

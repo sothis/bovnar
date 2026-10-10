@@ -1,0 +1,59 @@
+#!bovnar 1.2
+# unit_profiles.bvnr — units written in another vocabulary's notation
+#
+# UNDER IMPLEMENTATION. The profile notation is not part of a released
+# specification; see doc/11_bovnar_unit_profiles.md. It is gated on the version
+# directive above: under "#!bovnar 1.1", or with no directive, every profile
+# unit below is error_unit_illegal, because in those versions it is not a unit.
+#
+# A unit parameter of the form  namespace:code  is read as a code of that
+# vocabulary and TRANSLATED, at parse time, into the same unit a native
+# spelling produces. Nothing downstream can tell which notation was used: the
+# two values in each pair below compare equal, convert, and normalise alike.
+
+# ── UCUM — clinical and laboratory data ──────────────────────────────────────
+.patient = {
+	.systolic     = <float:64,ucum:mm[Hg]> 120.0;   # the same unit as…
+	.diastolic    = <float:64,mmHg>         80.0;   # …the native spelling
+	.glucose      = <float:64,ucum:mmol/L>   5.4;
+	.temperature  = <float:64,ucum:Cel>     36.8;
+
+	# A UCUM annotation says what was counted. It never changes the unit —
+	# each of these is a count per volume, with or without it — and it is
+	# kept verbatim.
+	.erythrocytes = <float:64,ucum:10*6/uL{RBC}> 4.8;
+	.leukocytes   = <float:64,ucum:10*3/uL{WBC}> 6.2;
+
+	# An ARBITRARY unit has no SI definition at all. It is carried as an
+	# opaque unit: equal to itself, convertible to nothing.
+	.insulin      = <float:64,ucum:[IU]/mL> 100.0;
+};
+
+# ── UN/ECE Recommendation 20 and 21 — trade documents ────────────────────────
+.invoice_line = {
+	.net_weight = <float_dec:64,unece:KGM> 12.500;   # kilogram
+	.length     = <float_dec:64,unece:MTR>  2.40;    # metre
+	.quantity   = <uint:32,unece:XBX> 40;            # boxes: a Rec 21 package code
+};
+
+# ── QUDT — unit local names, and quantity kinds ──────────────────────────────
+.telemetry = {
+	.speed    = <float:64,qudt:M-PER-SEC> 7.9;
+	.pressure = <float:64,qudt:HectoPA>   1013.25;
+	.mass     = <float:64,qudt-qk:Mass>   81.5;      # a kind: its coherent SI unit
+};
+
+# ── UDUNITS-2 — the units syntax of CF/netCDF ────────────────────────────────
+.climate = {
+	# UDUNITS multiplies with a space, and inside a profile parameter the space
+	# is part of the code.
+	.precip_flux = <float:64,udunits:kg m-2 s-1> 3.2e-5;
+	.wind        = <float:64,udunits:m s-1> [4.1, 5.0, 3.7];
+};
+
+# ── OM 2 and the CF standard names ───────────────────────────────────────────
+.other = {
+	.distance = <float:64,om:kilometre> 42.195;
+	# A CF standard name states its own canonical unit; this one is kelvin.
+	.sst      = <float:64,cf:sea_surface_temperature> 290.4;
+};

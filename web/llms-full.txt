@@ -139,6 +139,7 @@ Browse the documentation as HTML at [https://www.bovnar.io/docs/](https://www.bo
     - 6.3 [Compound Units](#63-compound-units)
     - 6.4 [Explicitly Dimensionless: `no_unit`](#64-explicitly-dimensionless-no_unit)
     - 6.5 [Inline Unit Suffix](#65-inline-unit-suffix)
+    - 6.6 [Units From Another Vocabulary (under implementation)](#66-units-from-another-vocabulary-under-implementation)
 7. [Fixed-Point Numbers: `float_fix`](#7-fixed-point-numbers-float_fix)
 8. [Decimal Floating-Point: `float_dec`](#8-decimal-floating-point-float_dec)
 9. [Strings](#9-strings)
@@ -502,6 +503,42 @@ If a type annotation also specifies a unit and you additionally write an inline 
 ```
 
 **The inline unit suffix is completely forbidden inside array elements.** This is a lexer-level restriction, not a semantic one — any letter or underscore following a value token inside `[…]` is an immediate hard error.
+
+### 6.6 Units From Another Vocabulary (under implementation)
+
+> **Under implementation.** This notation is not part of a released specification. A document reaches it only by declaring `#!bovnar 1.2`; under 1.1, or with no directive, every unit below is `error_unit_illegal`.
+
+Data rarely starts out in Bovnar. A lab system hands you UCUM codes, an invoice carries UN/ECE codes, a netCDF file has UDUNITS strings. You do not have to translate them by hand: write `namespace:code` in the unit slot and the parser translates it.
+
+```bovnar
+#!bovnar 1.2
+.systolic = <float:64,ucum:mm[Hg]>           120.0;   # UCUM
+.weight   = <float_dec:64,unece:KGM>          12.5;   # UN/ECE Rec 20: kilogram
+.speed    = <float:64,qudt:M-PER-SEC>          9.81;  # QUDT
+.flux     = <float:64,udunits:kg m-2 s-1>      0.5;   # UDUNITS: a space multiplies
+.glucose  = 5.4 ucum:mmol/L;                          # inline works too
+```
+
+Seven namespaces exist: `ucum`, `unece`, `qudt`, `qudt-qk`, `udunits`, `om` and `cf`. Three things are worth knowing before you use one.
+
+**It is a spelling, not a second kind of unit.** `ucum:mm[Hg]` and `mmHg` are the same unit after parsing — they compare equal, convert to each other with a factor of exactly one, and satisfy the same policies. That is also why the match rule of §6.5 is about the unit and not the text:
+
+```bovnar
+#!bovnar 1.2
+.ok = <float:64,mmHg> 120.0 ucum:mm[Hg];   # valid: one unit, written two ways
+```
+
+**A code either becomes a real unit or it is an error.** There is no "unknown unit, passed through". A code the vocabulary does not define is `error_unit_illegal`; one it defines but Bovnar cannot represent — a decibel referenced to a fixed level, say — is `error_unit_profile_unsupported`; a namespace this build does not have is `error_unit_profile_unknown`.
+
+<!-- bovnar-example: rejected -->
+```bovnar
+#!bovnar 1.2
+.bad = <float:64,ucum:furlongs> 1.0;       # ERROR: not a UCUM code
+```
+
+**Your spelling is kept.** Re-serialising a document writes `ucum:mm[Hg]` back as `ucum:mm[Hg]`, including a UCUM annotation such as `ucum:mL{total}` whose `{total}` is not part of the unit at all. The reader also hands the spelling to your code beside the parsed unit, so you can tell what was written from what it means.
+
+The full rules, the tables and the codes that are refused are in [Unit Profiles](11_bovnar_unit_profiles.md).
 
 ---
 
@@ -17007,17 +17044,17 @@ movement is that, the two error codes and the new entry points.
 notation with no signature change. Four additions mirror the C ones:
 
 ```python
-bovnar.unit_to_profile(ns, vu)   # -> str; ns is "ucum", "unece", "qudt",
-                                 #    "qudt-qk" or "udunits". Raises when the
-                                 #    unit has no code in that vocabulary
+bovnar.unit_to_profile(ns, vu)   # -> str; ns is one of the seven namespaces.
+                                 #    Raises when the unit has no code in that
+                                 #    vocabulary, which for the read-only "cf"
+                                 #    is every unit (§17.3)
 bovnar.unit_to_ucum(vu)          # -> str; the "ucum" case of the above
 bovnar.unit_is_profile_only(vu)  # -> bool
 bovnar.unit_error_code(s)        # -> int (error_code_t), 0 when s parses
 ```
 
-`bovnar.unit_to_profile`'s `ns` may also be `"om"` or `"cf"` — `cf` is read-only (§17.3), so it
-raises for every unit — and a namespace this build was not compiled with (§9.4) raises like one that
-does not exist.
+A namespace this build was not compiled with (§9.4) raises like one that does not exist;
+`bovnar.available_profiles()` lists the ones it has.
 
 **The spelling travels through the typed tier.** `loads(typed=True)` puts it on each `Quantity` as
 `unit_source`, and `dumps()` writes it back, so a typed round trip of a document spelled in a
@@ -17525,8 +17562,14 @@ error — it found the missing ampere on its first run. It cannot catch a *share
 wrong in the same way agree perfectly. That is now the argument for §9.5 rather than a gap beside
 it, since the factor proof is the only check in the tree that looks outside the tree at all.
 
-**The tables rot.** UCUM, Rec 20, QUDT and UDUNITS all revise; the data files do not, and nothing in
-the build notices. `--fetch` re-downloads, but nothing schedules it.
+**The tables rot — and something now notices.** UCUM, Rec 20, QUDT and UDUNITS all revise; the data
+files do not, and the ordinary build cannot tell, because §9.5's check skips without its cache and a
+test must not reach the network. `.github/workflows/vocabulary-drift.yml` runs
+`check_profile_factors.py --fetch --strict` weekly, outside the build that gates a pull request, so
+a publisher's revision becomes a red scheduled run rather than a silent divergence. It watches what
+it can: UDUNITS-2, UCUM and OM are read from their moving branch, QUDT and CF from the release the
+tables were built against, and Rec 20 not at all — it has no machine-readable artefact to fetch
+(§11.1). A failure is a prompt to review a table by hand; nothing is rewritten automatically.
 
 **~~Whitespace inside a type annotation is accepted and not accumulated~~ — closed.** This section
 used to record the one place in the format where a wrong unit was produced silently rather than

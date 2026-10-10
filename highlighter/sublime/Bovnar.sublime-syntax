@@ -171,6 +171,15 @@ contexts:
           scope: punctuation.definition.type.end.bovnar
           pop: true
         - include: comment
+        # A unit PROFILE parameter (doc/11): namespace:code, e.g. ucum:mm[Hg],
+        # ucum:10*3/uL{WBC}, udunits:kg m-2 s-1. Scoped whole -- its digits are
+        # not a width. It may only begin a parameter (after the family ':' or a
+        # ','), which keeps float:64 from reading as a namespace.
+        - match: '(?<=[,:])(\s*)([a-z][a-z0-9-]*)(:)((?:\{[^}>]*\}|[^\s,>{]|[ \t]+(?=[^\s,>]))+)'
+          captures:
+            2: support.type.unit.profile-namespace.bovnar
+            3: punctuation.separator.colon.bovnar
+            4: support.type.unit.bovnar
         - match: '\b(float_fix|float_dec|float|uint|sint|utf8|bool|datetime)\b'
           scope: storage.type.family.bovnar
         - match: '\bno_unit\b'
@@ -258,7 +267,7 @@ contexts:
   # The lookbehind fires after a digit or a closing string quote. (Special-number
   # keywords nan/inf/ninf take no inline unit — a unit is given via the annotation.)
   inline_unit:
-    - match: '(?<=[\d"])(\s+)([A-Za-z_$%(‰‱µΩΩ°Å][A-Za-z0-9_$()+~\.\-/:\^\*%‰‱µΩΩ°Å·¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻]*)'
+    - match: '(?<=[\d"])(\s+)([A-Za-z_$%(‰‱µΩΩ°Å][A-Za-z0-9_$()+~\.\-/:\^\*%‰‱µΩΩ°Å·¹²³⁴⁵⁶⁷⁸⁹ⁿ⁺⁻\[\]{}'']*)'
       captures:
         1: punctuation.separator.inline-unit.bovnar
         2: support.type.unit.inline.bovnar

@@ -20,6 +20,31 @@ rebuild consumers against the new headers. **SOVERSION is bumped 1 → 2**
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
 
+### Added — the profile tables are checked against their publishers on a schedule
+
+`check_profile_factors.py` compares every mapped row with the publisher's own
+definitions, but only when those files are cached; in the ordinary build it
+skips, because a test must not reach the network. So nothing had ever run it
+against what UCUM, UDUNITS-2 or OM serve *today*, and doc/11 §10.2 recorded
+that the tables rot unnoticed. `.github/workflows/vocabulary-drift.yml` now runs
+it weekly with `--fetch --strict`, outside the build that gates a pull request,
+so a publisher's revision is a red scheduled run and not a silent divergence.
+At the time of writing it passes: 10 663 rows compared, 0 mismatches.
+
+### Added — the profile notation in the places a reader meets the format first
+
+It was specified in doc/11 and absent from the tutorial, the examples and every
+syntax highlighter.
+
+- `examples/unit_profiles.bvnr` spells a unit in each of the seven namespaces
+  and runs through the same events / validate / idempotent gates as the other
+  examples (registered only in a build that carries every profile).
+- doc/01 §6.6 introduces it, still marked under implementation; the Python
+  README shows the typed round trip.
+- The web, vim, VS Code and Sublime highlighters colour `namespace:code` as one
+  unit. Before, `ucum:10*3/uL{WBC}` had its `10` and `3` coloured as bit-widths
+  and its braces as a struct. Geany's lexer is keyword-based and is unchanged.
+
 ### Added — a unit keeps the spelling it was written in (`unit_source`)
 
 `ucum:mL{total}` parses to `m~L`, and until now that was the end of `{total}`:

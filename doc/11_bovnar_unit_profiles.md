@@ -1648,17 +1648,17 @@ movement is that, the two error codes and the new entry points.
 notation with no signature change. Four additions mirror the C ones:
 
 ```python
-bovnar.unit_to_profile(ns, vu)   # -> str; ns is "ucum", "unece", "qudt",
-                                 #    "qudt-qk" or "udunits". Raises when the
-                                 #    unit has no code in that vocabulary
+bovnar.unit_to_profile(ns, vu)   # -> str; ns is one of the seven namespaces.
+                                 #    Raises when the unit has no code in that
+                                 #    vocabulary, which for the read-only "cf"
+                                 #    is every unit (§17.3)
 bovnar.unit_to_ucum(vu)          # -> str; the "ucum" case of the above
 bovnar.unit_is_profile_only(vu)  # -> bool
 bovnar.unit_error_code(s)        # -> int (error_code_t), 0 when s parses
 ```
 
-`bovnar.unit_to_profile`'s `ns` may also be `"om"` or `"cf"` — `cf` is read-only (§17.3), so it
-raises for every unit — and a namespace this build was not compiled with (§9.4) raises like one that
-does not exist.
+A namespace this build was not compiled with (§9.4) raises like one that does not exist;
+`bovnar.available_profiles()` lists the ones it has.
 
 **The spelling travels through the typed tier.** `loads(typed=True)` puts it on each `Quantity` as
 `unit_source`, and `dumps()` writes it back, so a typed round trip of a document spelled in a
@@ -2166,8 +2166,14 @@ error — it found the missing ampere on its first run. It cannot catch a *share
 wrong in the same way agree perfectly. That is now the argument for §9.5 rather than a gap beside
 it, since the factor proof is the only check in the tree that looks outside the tree at all.
 
-**The tables rot.** UCUM, Rec 20, QUDT and UDUNITS all revise; the data files do not, and nothing in
-the build notices. `--fetch` re-downloads, but nothing schedules it.
+**The tables rot — and something now notices.** UCUM, Rec 20, QUDT and UDUNITS all revise; the data
+files do not, and the ordinary build cannot tell, because §9.5's check skips without its cache and a
+test must not reach the network. `.github/workflows/vocabulary-drift.yml` runs
+`check_profile_factors.py --fetch --strict` weekly, outside the build that gates a pull request, so
+a publisher's revision becomes a red scheduled run rather than a silent divergence. It watches what
+it can: UDUNITS-2, UCUM and OM are read from their moving branch, QUDT and CF from the release the
+tables were built against, and Rec 20 not at all — it has no machine-readable artefact to fetch
+(§11.1). A failure is a prompt to review a table by hand; nothing is rewritten automatically.
 
 **~~Whitespace inside a type annotation is accepted and not accumulated~~ — closed.** This section
 used to record the one place in the format where a wrong unit was produced silently rather than

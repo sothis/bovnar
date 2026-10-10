@@ -70,6 +70,20 @@ m, mps = bovnar.parse_unit("m"), bovnar.parse_unit("m/s")
 print(bovnar.units_compatible(m, mps))      # False
 ```
 
+A unit may also be written in another vocabulary's notation — UCUM, UN/ECE,
+QUDT, UDUNITS-2, OM 2 or a CF standard name. This is **under implementation**
+(not in a released specification) and needs a `#!bovnar 1.2` directive. It is a
+spelling, not a second kind of unit: the value carries the same unit either way,
+and the spelling it was written in is kept and written back.
+
+```python
+src = b"#!bovnar 1.2\n.systolic = <float:64,ucum:mm[Hg]> 120.0;\n"
+q = bovnar.loads(src, typed=True)["systolic"]
+print(q.unit, "|", q.unit_source)              # mmHg | ucum:mm[Hg]
+print(q.unit == bovnar.Unit.parse("mmHg"))     # True
+print(bovnar.dumps({"systolic": q}) == src)    # True
+```
+
 A streaming SAX-style `Reader`/`Writer` and a random-access `DomDoc` API are also
 available — see the project documentation.
 

@@ -1224,6 +1224,12 @@ if(_bvnr_nexamples LESS 1)
 endif()
 foreach(_bvnr_ex ${_bvnr_examples})
     get_filename_component(_bvnr_stem "${_bvnr_ex}" NAME_WE)
+    # unit_profiles.bvnr spells a unit in every namespace, so it is a valid
+    # document only in a build that carries all of them; with one compiled out
+    # (doc/11 §9.4) that namespace is error_unit_profile_unknown, by design.
+    if(_bvnr_stem STREQUAL "unit_profiles" AND NOT BVNR_ALL_PROFILES)
+        continue()
+    endif()
     _bvnr_cli_example(${_bvnr_stem})
 endforeach()
 message(STATUS "registered ${_bvnr_nexamples} example documents")
@@ -1409,7 +1415,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 176)   # 129 base + unit_source + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier)
+set(BVNR_EXPECTED_TEST_COUNT 179)   # 129 base + unit_source + 3 for examples/unit_profiles.bvnr + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier)
                                     #             + citation
                                     #         + profiles_off_build
                                     # + om_test + cf_test
@@ -1934,8 +1940,9 @@ endif()
 # depend on the network, which is the same rule bvnr_web_links follows. Populate
 # the cache once with
 #     python3 check_profile_factors.py --fetch
-# and every later run checks for real. CI should fetch and then use --strict so
-# that a skip there is a failure rather than a quiet pass.
+# and every later run checks for real. The scheduled workflow
+# .github/workflows/vocabulary-drift.yml does exactly that weekly, with --strict
+# so that a skip there is a failure rather than a quiet pass.
 #
 # Labelled "python" although the name does not start with bvnr_py_: the label
 # records "drives libbvnr from a Python interpreter", and LIBBOVNAR_DIR below is

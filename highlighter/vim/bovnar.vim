@@ -65,17 +65,17 @@ syn match   BovnarArraySep    ','
 syn match   BovnarRowSep      '/'
 syn match   BovnarKeySigil    '\.'
 
-syn match   BovnarNegative '-\(\d\+\.\d*\([eE][+-]\=\d\+\)\=\|\.\d\+\([eE][+-]\=\d\+\)\=\|\d\+[eE][+-]\=\d\+\|\d\+\)' contains=BovnarFloat,BovnarInteger nextgroup=BovnarInlineUnit skipwhite
+syn match   BovnarNegative '-\(\d\+\.\d*\([eE][+-]\=\d\+\)\=\|\.\d\+\([eE][+-]\=\d\+\)\=\|\d\+[eE][+-]\=\d\+\|\d\+\)' contains=BovnarFloat,BovnarInteger nextgroup=BovnarInlineProfile,BovnarInlineUnit skipwhite
 
 syn match   BovnarAssign    '='
 syn match   BovnarSemicolon ';'
 
 syn match   BovnarNull '=\s*;'
 
-syn match   BovnarInteger '\d\+' nextgroup=BovnarInlineUnit skipwhite
-syn match   BovnarFloat   '\d\+\.\d*\([eE][+-]\=\d\+\)\?' nextgroup=BovnarInlineUnit skipwhite
-syn match   BovnarFloat   '\d\+[eE][+-]\=\d\+' nextgroup=BovnarInlineUnit skipwhite
-syn match   BovnarFloat   '\.\d\+\([eE][+-]\=\d\+\)\?' nextgroup=BovnarInlineUnit skipwhite
+syn match   BovnarInteger '\d\+' nextgroup=BovnarInlineProfile,BovnarInlineUnit skipwhite
+syn match   BovnarFloat   '\d\+\.\d*\([eE][+-]\=\d\+\)\?' nextgroup=BovnarInlineProfile,BovnarInlineUnit skipwhite
+syn match   BovnarFloat   '\d\+[eE][+-]\=\d\+' nextgroup=BovnarInlineProfile,BovnarInlineUnit skipwhite
+syn match   BovnarFloat   '\.\d\+\([eE][+-]\=\d\+\)\?' nextgroup=BovnarInlineProfile,BovnarInlineUnit skipwhite
 
 " ISO-8601 datetime literal (spec 1.1): YYYY-MM-DD with an optional T time,
 " fractional seconds, and a Z or ±HH:MM offset. Defined AFTER BovnarInteger on
@@ -88,7 +88,7 @@ syn match   BovnarDateTime '\d\{4}-\d\{2}-\d\{2}\(T\d\{2}:\d\{2}:\d\{2}\(\.\d\+\
 syn region  BovnarString
       \ start=/"/ skip=/\\./ end=/"/
       \ contains=BovnarEscape,BovnarInvalidEsc
-      \ nextgroup=BovnarInlineUnit skipwhite
+      \ nextgroup=BovnarInlineProfile,BovnarInlineUnit skipwhite
 " InvalidEsc is defined BEFORE Escape so that on the \t \n \v \f \r \" \\ valid
 " escapes — which both patterns match with equal length — the later-defined
 " BovnarEscape wins vim's last-defined-wins tie-break. Only genuinely illegal
@@ -117,6 +117,7 @@ syn region  BovnarTypeAnn
       \          BovnarTypeUnit,BovnarTypeUnitSep,
       \          BovnarTypeUnitExp,BovnarTypePrefix,
       \          BovnarUnitPrefix,BovnarUnitSep,
+      \          BovnarProfileUnit,
       \          BovnarString,
       \          BovnarRefPath,BovnarArraySep
       \ keepend
@@ -159,6 +160,21 @@ syn match   BovnarUnitExp   '\^[+-]\=\d\+' contained
 " a bogus unit by the nextgroup.
 syn match BovnarInlineUnit '[^ \t\r;,#0-9+*/^()~\-\]}][^ \t\r;,#\]}]*' contained contains=BovnarUnitPrefix,BovnarTypeUnit,BovnarUnitSep,BovnarUnitExp,BovnarUnitTilde
 hi link BovnarInlineUnit BovnarTypeUnit
+
+" A unit PROFILE (doc/11): "namespace:code", e.g. ucum:mm[Hg], ucum:10*3/uL{WBC},
+" udunits:kg m-2 s-1. The code is the other vocabulary's own notation, so none of
+" the native classes apply -- its digits are not a bit-width, its braces not a
+" struct -- and it is coloured whole. Both are defined AFTER the native unit
+" matches so they win where both start at the same column.
+"
+" In an annotation it may only begin a parameter (after the family ':' or a ','),
+" which is what keeps "float:64" from reading as a namespace; a ',' inside {...}
+" and a space followed by more code both belong to it.
+syn match BovnarProfileUnit '\%([,:]\s*\)\@<=[a-z][a-z0-9-]*:\%({[^}>]*}\|[^,>{[:space:]]\|[ \t]\+\%([^,>[:space:]]\)\@=\)\+' contained
+hi link BovnarProfileUnit BovnarTypeUnit
+" As an inline suffix it has no space and no comma, and may end in ']' or '}'.
+syn match BovnarInlineProfile '[a-z][a-z0-9-]*:[^ \t\r;,#]\+' contained
+hi link BovnarInlineProfile BovnarTypeUnit
 
 syn match   BovnarType     '\v(float_fix|float_dec|float|uint|sint|utf8|bool|datetime)'
 syn match   BovnarNoUnit   'no_unit'

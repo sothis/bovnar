@@ -23,6 +23,7 @@
     - 6.3 [Compound Units](#63-compound-units)
     - 6.4 [Explicitly Dimensionless: `no_unit`](#64-explicitly-dimensionless-no_unit)
     - 6.5 [Inline Unit Suffix](#65-inline-unit-suffix)
+    - 6.6 [Units From Another Vocabulary (under implementation)](#66-units-from-another-vocabulary-under-implementation)
 7. [Fixed-Point Numbers: `float_fix`](#7-fixed-point-numbers-float_fix)
 8. [Decimal Floating-Point: `float_dec`](#8-decimal-floating-point-float_dec)
 9. [Strings](#9-strings)
@@ -386,6 +387,42 @@ If a type annotation also specifies a unit and you additionally write an inline 
 ```
 
 **The inline unit suffix is completely forbidden inside array elements.** This is a lexer-level restriction, not a semantic one — any letter or underscore following a value token inside `[…]` is an immediate hard error.
+
+### 6.6 Units From Another Vocabulary (under implementation)
+
+> **Under implementation.** This notation is not part of a released specification. A document reaches it only by declaring `#!bovnar 1.2`; under 1.1, or with no directive, every unit below is `error_unit_illegal`.
+
+Data rarely starts out in Bovnar. A lab system hands you UCUM codes, an invoice carries UN/ECE codes, a netCDF file has UDUNITS strings. You do not have to translate them by hand: write `namespace:code` in the unit slot and the parser translates it.
+
+```bovnar
+#!bovnar 1.2
+.systolic = <float:64,ucum:mm[Hg]>           120.0;   # UCUM
+.weight   = <float_dec:64,unece:KGM>          12.5;   # UN/ECE Rec 20: kilogram
+.speed    = <float:64,qudt:M-PER-SEC>          9.81;  # QUDT
+.flux     = <float:64,udunits:kg m-2 s-1>      0.5;   # UDUNITS: a space multiplies
+.glucose  = 5.4 ucum:mmol/L;                          # inline works too
+```
+
+Seven namespaces exist: `ucum`, `unece`, `qudt`, `qudt-qk`, `udunits`, `om` and `cf`. Three things are worth knowing before you use one.
+
+**It is a spelling, not a second kind of unit.** `ucum:mm[Hg]` and `mmHg` are the same unit after parsing — they compare equal, convert to each other with a factor of exactly one, and satisfy the same policies. That is also why the match rule of §6.5 is about the unit and not the text:
+
+```bovnar
+#!bovnar 1.2
+.ok = <float:64,mmHg> 120.0 ucum:mm[Hg];   # valid: one unit, written two ways
+```
+
+**A code either becomes a real unit or it is an error.** There is no "unknown unit, passed through". A code the vocabulary does not define is `error_unit_illegal`; one it defines but Bovnar cannot represent — a decibel referenced to a fixed level, say — is `error_unit_profile_unsupported`; a namespace this build does not have is `error_unit_profile_unknown`.
+
+<!-- bovnar-example: rejected -->
+```bovnar
+#!bovnar 1.2
+.bad = <float:64,ucum:furlongs> 1.0;       # ERROR: not a UCUM code
+```
+
+**Your spelling is kept.** Re-serialising a document writes `ucum:mm[Hg]` back as `ucum:mm[Hg]`, including a UCUM annotation such as `ucum:mL{total}` whose `{total}` is not part of the unit at all. The reader also hands the spelling to your code beside the parsed unit, so you can tell what was written from what it means.
+
+The full rules, the tables and the codes that are refused are in [Unit Profiles](11_bovnar_unit_profiles.md).
 
 ---
 

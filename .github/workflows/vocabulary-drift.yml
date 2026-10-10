@@ -1,0 +1,66 @@
+name: Vocabulary drift
+
+on:
+  schedule:
+    # Mondays 05:17 UTC. Off the hour, where scheduled runs are least delayed.
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: vocabulary-drift
+  cancel-in-progress: true
+
+# The unit-profile tables under src/gendata/ are transcriptions of other
+# people's vocabularies -- UCUM, UDUNITS-2, QUDT, OM, the CF standard-name
+# table -- and those publishers revise. check_profile_factors.py compares every
+# mapped row against the publisher's own machine-readable definitions, but only
+# when those files are in its cache: in the ordinary build it SKIPS, green,
+# because a test must not depend on the network. So nothing ever ran it against
+# what the publishers serve today, and doc/11 §10.2 said as much: "the tables
+# rot ... --fetch re-downloads, but nothing schedules it."
+#
+# This schedules it. It is deliberately NOT part of Build & Package: a publisher
+# pushing a revision must not turn an unrelated pull request red. A failure here
+# means one of two things, and the log says which --
+#
+#   * a row in src/gendata/*.bvnr no longer agrees with its publisher, or names
+#     a code the publisher has dropped: the table needs a look;
+#   * a source URL stopped resolving: the SOURCES map in
+#     check_profile_factors.py needs a look.
+#
+# Either way it is a prompt to review, never an automatic edit. UDUNITS-2, UCUM
+# and OM are fetched from a moving branch on purpose (that is the drift being
+# watched for); QUDT and CF are pinned to the version the tables were built
+# against, so those two only fail when the pinned release itself changes or
+# disappears.
+jobs:
+  factors:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
+      - name: Build the shared library
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=OFF .
+          cmake --build build -j"$(nproc)"
+
+      # --strict: with the cache freshly fetched, a skip is a failure. Without
+      # it a download that silently produced nothing would report success.
+      - name: Check every mapped row against its publisher
+        env:
+          LIBBOVNAR_DIR: ${{ github.workspace }}/build
+        run: python3 check_profile_factors.py --fetch --strict
+
+      - name: Keep what was fetched
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: vocabulary-sources
+          path: build/vocab
+          if-no-files-found: ignore
+          retention-days: 30

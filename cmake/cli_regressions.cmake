@@ -257,6 +257,15 @@ _case(canonical_rescale_named 1 ""
       "pretty-print: rescale.bvnr: cannot write the value at line 1, col [0-9]+: value_out_of_range.*--canonical rescales"
       "parse error|scanner_callback_failed|Writer finish failed"
       pretty-print --canonical rescale.bvnr)
+# A prefix power whose scale no double holds is still a legal unit: the value is
+# moved exactly, and what cannot be written is the VALUE, said as such. Both
+# used to be "unit_illegal", about a unit `validate` had just accepted.
+file(WRITE "${_dir}/farscale.bvnr" ".e = <float_dec:128> 5.0 q~m^11;\n")
+_case(canonical_far_scale_written 0 "<float_dec:128> 0\\.0+5 m¹¹;" "" "unit_illegal"
+      pretty-print --canonical farscale.bvnr)
+file(WRITE "${_dir}/farscale_int.bvnr" ".e = 5 y~m^20;\n")
+_case(canonical_far_scale_int 1 "" "value_out_of_range.*--canonical rescales" "unit_illegal"
+      pretty-print --canonical farscale_int.bvnr)
 _case(parse_error_still_a_parse_error 1 "" "Pretty-print parse error: unexpected_input_byte at line 2"
       "Writer finish failed" pretty-print bad.bvnr)
 string(ASCII 8 _bs)

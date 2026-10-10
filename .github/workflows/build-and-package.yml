@@ -128,7 +128,7 @@ jobs:
       # the build count and falls back to 0 when it cannot — a fallback meant for
       # builds from the source tarball, which has no .git. The MINGW64 shell had
       # no git at all, so this job alone stamped every Windows archive
-      # bovnar-windows-<version>-0, in the zip name AND in its internal directory
+      # bovnar-windows-mingw-<version>-0, in the zip name AND in its internal directory
       # prefix, while MSVC and Linux got the real count. It shipped that way in
       # the v1.1.0 assets before anyone noticed.
       - uses: msys2/setup-msys2@v2
@@ -511,9 +511,9 @@ jobs:
       # Shallow is enough: this job only needs RELEASE_NOTES_<tag>.md, not history.
       - uses: actions/checkout@v5
 
-      # No merge-multiple: the two Windows jobs pack archives with the SAME
-      # filename (see the rename below), so flattening them into one directory
-      # would silently drop one. Each artifact lands in staging/<artifact-name>/.
+      # No merge-multiple: each artifact lands in staging/<artifact-name>/, which
+      # is what lets the step below check every archive against the job that
+      # built it.
       - uses: actions/download-artifact@v8
         with:
           pattern: bovnar-*
@@ -523,15 +523,19 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p assets
-          # pack_artifacts.cmake names the Windows zip after the TARGET, not the
-          # toolchain, so MSVC and MinGW both produce bovnar-windows-<ver>-<count>
-          # .zip. Actions artifacts have a directory each and so never collided;
-          # a release's asset namespace is flat and one would have overwritten the
-          # other. Fold the toolchain into the name on the way in.
+          # pack_artifacts.cmake names each Windows zip, and the directory it
+          # unpacks to, after its toolchain. This step used to do the renaming
+          # itself and only got as far as the file: the two assets of one release
+          # unpacked onto each other. Assert the two agree rather than trust it.
           for tc in msvc mingw; do
-            src=$(ls staging/bovnar-windows-"$tc"/bovnar-windows-*.zip)
+            src=$(ls staging/bovnar-windows-"$tc"/bovnar-windows-"$tc"-*.zip)
             base=$(basename "$src" .zip)
-            mv "$src" "assets/${base/bovnar-windows-/bovnar-windows-$tc-}.zip"
+            tops=$(unzip -Z1 "$src" | cut -d/ -f1 | sort -u)
+            if [ "$tops" != "$base" ]; then
+              echo "::error::$base.zip unpacks to '$tops', not to its own name" >&2
+              exit 1
+            fi
+            mv "$src" assets/
           done
           mv staging/bovnar-linux/*.tar.xz \
              staging/bovnar-amalgamate/*.tar.xz \

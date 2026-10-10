@@ -1605,8 +1605,174 @@ static void test_dom_float_magnitude_fast_path(void)
 	bvn_dom_doc_destroy(d);
 	free(big);
 }
+/*
+ * The node layout (library 2.0): one unit block shared by the nodes that carry
+ * it, and the container payloads inside the value union. None of that is
+ * visible through the API, which is the point of these checks -- every accessor
+ * has to answer as it did when each node held its own 516-byte unit.
+ */
+#if defined(__GLIBC__) && defined(__GLIBC_PREREQ)
+#  if __GLIBC_PREREQ(2, 33)
+#    include <malloc.h>
+#    define BVN_TEST_HAVE_MALLINFO2 1
+#  endif
+#endif
+static void test_dom_node_layout_is_invisible(void)
+{
+	printf("  node layout: shared units, payloads in the union...\n");
+	static const char doc[] =
+		"#!bovnar 1.2\n"
+		".same  = <float:64,k~m/s^2> [1.0, 2.0, 3.0];\n"
+		".u0 = <float:64,m> 1.0;\n"
+		".u1 = <float:64,ucum:[ft_i]> 2.0;\n"
+		".u2 = <float:64,ucum:[ft_i]> 3.0;\n"
+		".u3 = <float:64,m> 4.0;\n"
+		".bare  = [1, 2];\n"
+		".t     = 2026-06-15T10:30:00.123456Z;\n"
+		".one   = [1, 2, 3];\n"
+		".mat   = [1, 2, 3] / [4, 5, 6];\n"
+		".tall  = [0]/[1]/[2]/[3]/[4]/[5]/[6]/[7]/[8]/[9];\n"
+		".s     = { .k = <uint:8,m~V> 7; };\n";
+	bvn_dom_doc_t *d = bvn_dom_parse(doc, (uint32_t)(sizeof doc - 1u));
+	ASSERT_NOT_NULL(d, "layout doc parses");
+	if (!d) return;
+	ASSERT_EQ_INT(bvn_dom_doc_get_parse_error(d), error_none, "layout doc is valid");
+	char buf[BVNR_UNIT_STRING_MAX];
+	uint32_t len = 99u;
+
+	/* Three elements, one annotation: the same unit on each and on the array. */
+	bvn_dom_node_t *same = bvn_dom_lookup(d, ".same");
+	ASSERT_TRUE(bvn_dom_get_unit_string(same, buf, sizeof buf) > 0 &&
+	            strcmp(buf, "k~m/s²") == 0, "the array carries the annotation's unit");
+	for (uint32_t i = 0; i < 3u; i++) {
+		bvn_dom_node_t *e = bvn_dom_array_at(same, i);
+		ASSERT_TRUE(bvn_dom_get_unit_string(e, buf, sizeof buf) > 0 &&
+		            strcmp(buf, "k~m/s²") == 0, "each element carries it too");
+		ASSERT_TRUE(bvn_unit_equal(bvn_dom_get_unit(e), bvn_dom_get_unit(same)),
+		            "and it is the same unit");
+		/* `k~m/s^2` is not the canonical spelling, so it is kept. */
+		const char *src = bvn_dom_get_unit_source(e, &len);
+		ASSERT_TRUE(src && len == 7u && strcmp(src, "k~m/s^2") == 0,
+		            "the spelling survives on a shared block");
+	}
+	/* Units that alternate must not bleed into each other. */
+	static const char *const key[4]  = { ".u0", ".u1", ".u2", ".u3" };
+	static const char *const wsrc[4] = { NULL, "ucum:[ft_i]", "ucum:[ft_i]", NULL };
+	char first[BVNR_UNIT_STRING_MAX];
+	for (uint32_t i = 0; i < 4u; i++) {
+		bvn_dom_node_t *e = bvn_dom_lookup(d, key[i]);
+		ASSERT_TRUE(bvn_dom_get_unit_string(e, buf, sizeof buf) > 0, "unit formats");
+		if (wsrc[i])
+			ASSERT_TRUE(strcmp(buf, "m") != 0, "a foot is not a metre");
+		else
+			ASSERT_TRUE(strcmp(buf, "m") == 0, "alternating units stay apart");
+		if (i == 1u) strcpy(first, buf);
+		if (i == 2u) ASSERT_TRUE(strcmp(first, buf) == 0, "two feet agree");
+		const char *src = bvn_dom_get_unit_source(e, &len);
+		if (wsrc[i])
+			ASSERT_TRUE(src && strcmp(src, wsrc[i]) == 0 &&
+			            len == strlen(wsrc[i]), "profile spelling kept");
+		else
+			ASSERT_TRUE(!src && len == 0u, "canonical spelling not kept");
+	}
+	bvn_dom_node_t *bare = bvn_dom_array_at(bvn_dom_lookup(d, ".bare"), 1u);
+	ASSERT_TRUE(bvn_dom_get_unit_string(bare, buf, sizeof buf) > 0 &&
+	            strcmp(buf, "no_unit") == 0, "a bare value has no unit");
+	ASSERT_NULL(bvn_dom_get_unit_source(bare, &len), "and no spelling");
+
+	/* The datetime fraction and the matrix shape share one pointer. */
+	const char *frac = bvn_dom_get_datetime_fraction(bvn_dom_lookup(d, ".t"), &len);
+	ASSERT_TRUE(frac && len == 6u && strcmp(frac, "123456") == 0, "datetime fraction");
+	ASSERT_NULL(bvn_dom_get_datetime_fraction(bvn_dom_lookup(d, ".mat"), &len),
+	            "an array has no datetime fraction");
+	ASSERT_NULL(bvn_dom_get_datetime_fraction(bvn_dom_lookup(d, ".one"), &len),
+	            "nor has a one-row array");
+
+	int64_t v = -1;
+	ASSERT_EQ_UINT(bvn_dom_array_dims(bvn_dom_lookup(d, ".one")), 1u, "one row");
+	ASSERT_EQ_UINT(bvn_dom_array_dims(bvn_dom_lookup(d, ".mat")), 2u, "two rows");
+	ASSERT_EQ_UINT(bvn_dom_array_count(bvn_dom_lookup(d, ".mat")), 6u, "six cells");
+	ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_lookup(d, ".one[2]"), &v) && v == 3, ".one[2]");
+	ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_lookup(d, ".mat[1][0]"), &v) && v == 4, ".mat[1][0]");
+	ASSERT_NULL(bvn_dom_lookup(d, ".mat[0][3]"), "past the row's width");
+	ASSERT_EQ_UINT(bvn_dom_array_dims(bvn_dom_lookup(d, ".tall")), 10u, "ten rows");
+	ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_lookup(d, ".tall[9][0]"), &v) && v == 9, ".tall[9][0]");
+	ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_lookup(d, ".s.k"), &v) && v == 7, ".s.k");
+	ASSERT_EQ_UINT(bvn_dom_struct_count(bvn_dom_lookup(d, ".s")), 1u, "struct count");
+	ASSERT_EQ_UINT(bvn_dom_array_count(bvn_dom_lookup(d, ".s")), 0u,
+	               "a struct is not an array, whatever shares its bytes");
+	ASSERT_EQ_UINT(bvn_dom_struct_count(bvn_dom_lookup(d, ".one")), 0u, "nor the reverse");
+	bvn_dom_doc_destroy(d);
+
+	/* A shape is part of what must match between sibling arrays. */
+	static const char shapes[] = ".a = [[1, 2, 3, 4], [1, 2] / [3, 4]];";
+	d = bvn_dom_parse(shapes, (uint32_t)(sizeof shapes - 1u));
+	ASSERT_TRUE(d && bvn_dom_doc_get_parse_error(d) == error_array_row_size_mismatch,
+	            "four in a row is not two by two");
+	bvn_dom_doc_destroy(d);
+
+	/* Built by hand: no rows recorded, a unit of its own, destroyed in either
+	 * order relative to the tree it is in. */
+	bvn_dom_node_t *arr = bvn_dom_node_alloc(BVN_DOM_ARRAY);
+	ASSERT_NOT_NULL(arr, "hand-built array");
+	ASSERT_EQ_UINT(bvn_dom_array_dims(arr), 0u, "a hand-built array records no rows");
+	ASSERT_TRUE(bvn_dom_array_append(arr, bvn_dom_node_from_i64(5)), "append");
+	ASSERT_EQ_UINT(bvn_dom_array_dims(arr), 0u, "still none");
+	ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_array_at(arr, 0u), &v) && v == 5, "element reads back");
+	ASSERT_EQ_UINT(bvn_dom_get_unit(bvn_dom_array_at(arr, 0u)).num_components, 0u,
+	               "from_i64 has BVN_UNIT_NONE");
+	ASSERT_EQ_UINT(bvn_dom_get_unit(arr).num_components, 1u,
+	               "node_alloc has the one-component no_unit");
+	bvn_int_t *big = bvn_int_alloc();
+	ASSERT_NOT_NULL(big, "bigint");
+	if (big) {
+		bool uok = false;
+		value_unit_t kg = bvn_parse_unit((const uint8_t *)"k~g", &uok);
+		ASSERT_TRUE(uok && bvn_int_from_str(big, "340282366920938463463374607431768211456", 10),
+		            "2^128");
+		value_type_spec_t vt = { .family = vt_uint, .width = 256u, .base = 0u };
+		bvn_dom_node_t *bn = bvn_dom_node_from_bigint(big, vt, kg);
+		ASSERT_NOT_NULL(bn, "bigint node with a unit");
+		ASSERT_TRUE(bvn_dom_get_unit_string(bn, buf, sizeof buf) > 0 &&
+		            strcmp(buf, "k~g") == 0, "it has the unit it was given");
+		ASSERT_TRUE(bvn_dom_array_append(arr, bn), "append it");
+	}
+	bvn_dom_node_destroy(arr);
+
+#ifdef BVN_TEST_HAVE_MALLINFO2
+	/* What the layout is FOR. A megabyte of `1,` used to cost about 340 MB; it
+	 * is about 32 now, and this fails well before it is 340 again. A sanitizer
+	 * build has its own allocator and reports nothing, so it is skipped there. */
+	{
+		const size_t n = 1u << 20;
+		char *b = malloc(n + 16u);
+		ASSERT_NOT_NULL(b, "megabyte buffer");
+		if (b) {
+			size_t o = (size_t)sprintf(b, ".a = <uint:8,m> [");
+			while (o + 3u < n) { b[o++] = '1'; b[o++] = ','; }
+			b[o - 1u] = ']';
+			b[o++]    = ';';
+			struct mallinfo2 before = mallinfo2();
+			bvn_dom_doc_t *big_doc = bvn_dom_parse(b, (uint32_t)o);
+			struct mallinfo2 after = mallinfo2();
+			ASSERT_TRUE(big_doc &&
+			            bvn_dom_doc_get_parse_error(big_doc) == error_none,
+			            "megabyte array parses");
+			if (after.uordblks > before.uordblks) {
+				size_t used = after.uordblks - before.uordblks;
+				ASSERT_TRUE(used < (size_t)64u << 20,
+				            "a 1 MB array of small integers stays under 64 MB");
+			}
+			bvn_dom_doc_destroy(big_doc);
+			free(b);
+		}
+	}
+#endif
+}
+
 int main(void)
 {
+	test_dom_node_layout_is_invisible();
 	test_dom_homogeneity_is_order_independent();
 	test_dom_row_sizes_are_per_array();
 	test_dom_quoted_digits_are_not_special_floats();

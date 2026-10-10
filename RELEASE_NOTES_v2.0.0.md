@@ -75,6 +75,10 @@ amalgamation and the source tarball are attached to the GitHub release, with a
   (`k~m`); a document that is re-serialised keeps the spelling it was written in.
 - **`text_only`** — a reader flag (and `--text-only`) that refuses a document
   containing an octet stream, for channels that are not byte-transparent.
+- **A document tree a tenth the size** — a DOM node is 48 bytes, down from 656:
+  the unit is shared between the values that carry it instead of copied onto
+  each. A megabyte of small integers parses into about 32 MB, not 340. The DOM
+  API is unchanged.
 - **Python** — `Unit` objects that compare by meaning, `UnitPolicy`,
   `available_profiles()`, `unit_to_profile()`, and a typed
   `loads()` → `dumps()` round trip that is byte-identical for a profile-spelled

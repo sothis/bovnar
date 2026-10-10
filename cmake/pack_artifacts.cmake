@@ -7,7 +7,8 @@
 #   amalgamate/{bovnar.h,bovnar.c}              (the regenerated amalgamation)
 #   bovnar-<version>-<count>-amalgamate.tar.xz  (the amalgamation, packed)
 #   bovnar-linux-<version>-<count>.tar.xz       (native Linux artifacts)
-#   bovnar-windows-<version>-<count>.zip        (native or cross MinGW artifacts)
+#   bovnar-windows-msvc-<version>-<count>.zip   (native MSVC artifacts)
+#   bovnar-windows-mingw-<version>-<count>.zip  (native or cross MinGW artifacts)
 #
 # <count> is the total git commit count (a monotonic build number), or 0 outside
 # a checkout. The platform archive matches the current build; on a Linux host
@@ -41,8 +42,15 @@ set(STAGE "${BIN_DIR}/.pkgstage")
 file(REMOVE_RECURSE "${STAGE}")
 file(MAKE_DIRECTORY "${STAGE}")
 
-# Pack a staged top-level directory (relative to STAGE) into BIN_DIR.
-function(_pack topdir outfile fmt)
+# Pack a staged top-level directory (relative to STAGE) into BIN_DIR. The
+# archive is named after the directory it unpacks to and takes no name of its
+# own, so the two cannot come apart.
+function(_pack topdir fmt)
+    if(fmt STREQUAL "zip")
+        set(outfile "${topdir}.zip")
+    else()
+        set(outfile "${topdir}.tar.xz")
+    endif()
     file(REMOVE "${BIN_DIR}/${outfile}")
     if(fmt STREQUAL "zip")
         execute_process(
@@ -142,28 +150,32 @@ if(PYTHON)
                 file(COPY "${SRC_DIR}/${_extra}" DESTINATION "${STAGE}/${_atop}")
             endif()
         endforeach()
-        _pack("${_atop}" "bovnar-${TAG}-amalgamate.tar.xz" xz)
+        _pack("${_atop}" xz)
     endif()
 else()
     message(WARNING "pack_artifacts: Python not found; skipping the amalgamation archive")
 endif()
 
 # --- 2) native platform archive ---------------------------------------------
+# The two Windows toolchains are named apart, in the file AND in the directory
+# it unpacks to. They used to share both: only the release job told them apart,
+# by renaming the file, so the msvc and mingw assets of one release unpacked
+# onto each other -- import libraries of one ABI beside the DLL of the other.
 if(NATIVE_KIND STREQUAL "linux")
     _stage_bin("bovnar-linux-${TAG}" linux "${BIN_DIR}")
-    _pack("bovnar-linux-${TAG}" "bovnar-linux-${TAG}.tar.xz" xz)
+    _pack("bovnar-linux-${TAG}" xz)
 elseif(NATIVE_KIND STREQUAL "msvc")
-    _stage_bin("bovnar-windows-${TAG}" msvc "${BIN_DIR}")
-    _pack("bovnar-windows-${TAG}" "bovnar-windows-${TAG}.zip" zip)
+    _stage_bin("bovnar-windows-msvc-${TAG}" msvc "${BIN_DIR}")
+    _pack("bovnar-windows-msvc-${TAG}" zip)
 elseif(NATIVE_KIND STREQUAL "mingw")
-    _stage_bin("bovnar-windows-${TAG}" mingw "${BIN_DIR}")
-    _pack("bovnar-windows-${TAG}" "bovnar-windows-${TAG}.zip" zip)
+    _stage_bin("bovnar-windows-mingw-${TAG}" mingw "${BIN_DIR}")
+    _pack("bovnar-windows-mingw-${TAG}" zip)
 endif()
 
 # --- 3) cross MinGW Windows archive (Linux host with build/mingw present) ----
 if(CROSS_DIR AND EXISTS "${CROSS_DIR}/bovnar.exe")
-    _stage_bin("bovnar-windows-${TAG}" mingw "${CROSS_DIR}")
-    _pack("bovnar-windows-${TAG}" "bovnar-windows-${TAG}.zip" zip)
+    _stage_bin("bovnar-windows-mingw-${TAG}" mingw "${CROSS_DIR}")
+    _pack("bovnar-windows-mingw-${TAG}" zip)
 elseif(CROSS_DIR)
     message(STATUS
         "pack_artifacts: ${CROSS_DIR}/bovnar.exe not present; skipping windows.zip "

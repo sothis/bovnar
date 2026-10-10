@@ -45,6 +45,53 @@ rebuild consumers against the new headers. **SOVERSION is bumped 1 → 2**
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
 
+### Changed — a document tree costs a tenth of the memory
+
+- **A DOM node is 48 bytes, down from 656.** Each node held its unit inline —
+  a `value_unit_t` is 516 bytes, 32 components of 16 — so every element of an
+  array carried its own copy of the array's annotation, and so did every bare
+  `1` under no annotation at all. The struct and array bookkeeping sat on every
+  scalar as well, 72 bytes more. A megabyte of `1,` cost about 340 MB to parse;
+  `bvn_dom_parse_fd` reads up to 256 MiB. The unit is now one block shared by
+  the consecutive nodes that carry it (the spelling `bvn_dom_get_unit_source`
+  returns lives in the same block), the container payloads are members of the
+  value union, and a `/`-matrix allocates its shape when its second row opens.
+  The same megabyte now costs about 32 MB.
+- **Nothing in the API or the ABI moves.** `bvn_dom_node_t` is opaque and every
+  accessor answers as it did, including the two it would have been easy to
+  change by accident: an array built by hand still reports 0 from
+  `bvn_dom_array_dims` where a parsed one-row array reports 1, and
+  `bvn_dom_node_alloc` still gives the one-component `no_unit` where
+  `bvn_dom_node_from_i64` gives `BVN_UNIT_NONE`. The node's size is pinned by a
+  compile-time assertion, and a test parses the megabyte and fails past 64 MB.
+
+### Fixed — three things the fourth round listed and left
+
+- **`BVN_UNIT_REDUCE` refused a legal unit whose folded scale no `double`
+  holds.** `y~m²⁰` reduces to `m²⁰` with a scale of 10⁻⁴⁸⁰. `bvn_unit_reduce`
+  reports that through the same `*overflow` as a reduction that had to DROP a
+  component, and `bvn_unit_to_string_ex` refused both — so
+  `pretty-print --canonical` failed on `5.0 q~m^11` with `unit_illegal`, about a
+  unit `validate` had just accepted. The formatter returns a unit and never
+  reads the scale; the writer moves the value in exact rational arithmetic from
+  the unit it had to the unit emitted. Only a dropped component is refused now.
+  `<float_dec:128> 5.0 q~m^11` is written as 5·10⁻³³⁰ `m¹¹`; `5 y~m^20`, an
+  integer with no integer form in `m²⁰`, is still refused, as
+  `value_out_of_range`, which is what is wrong with it. The named-SI collapse
+  still runs in this case, so the reduced form stays a fixed point.
+  `bvn_unit_reduce` itself is unchanged — the scale is what it cannot return —
+  and so is Python's `unit_reduce`, which raises `OverflowError`.
+- **The two Windows archives of a release unpacked onto each other.**
+  `pack_artifacts.cmake` named the zip after the target, so MSVC and MinGW both
+  built `bovnar-windows-<version>-<count>.zip`; the release job renamed the
+  FILES apart and left the directory inside them the same, which puts the
+  import library of one ABI beside the DLL of the other for anyone who unpacks
+  both. The packer now names the archive after its toolchain —
+  `bovnar-windows-msvc-…`, `bovnar-windows-mingw-…` — and derives the file name
+  from the directory it packs, so the two cannot differ. The release job no
+  longer renames anything and checks that each zip unpacks to its own name. The
+  asset names on a release are the ones 1.1.0 had.
+
 ### Fixed — a fourth review round
 
 Six reviews run side by side — reader, writer and units, Python, the CLI with

@@ -357,12 +357,15 @@ def unit_to_str_ex(unit: ValueUnit,
     this function allocates, and the bound sized for the longest unit the
     catalogue can emit).
 
-    Under REDUCE, a reduction that **overflows** — a summed exponent outside the
-    ±100 the format can spell, more surviving bases than a unit may carry, or a
-    folded scale out of float range — is refused rather than written. It drops a
-    component, so what it would produce is a *different* unit: ``m⁵⁰·m⁵⁰``
-    reduces to ``m¹⁰⁰`` and ``m⁵⁰·m⁵¹`` is refused. Without REDUCE such a unit
-    serialises normally.
+    Under REDUCE, a reduction that **drops a component** — a summed exponent
+    outside the ±100 the format can spell, or more surviving bases than a unit
+    may carry — is refused rather than written: what it would produce is a
+    *different* unit. ``m⁵⁰·m⁵⁰`` reduces to ``m¹⁰⁰`` and ``m⁵⁰·m⁵¹`` is
+    refused. Without REDUCE such a unit serialises normally.
+
+    A folded scale out of float range is not that case: ``y~m²⁰`` is written as
+    ``m²⁰``. ``unit_reduce`` still raises OverflowError for it, since the scale
+    is what that function returns.
     """
     unit = _as_vu(unit)
     lib = get_library()

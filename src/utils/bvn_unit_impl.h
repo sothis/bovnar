@@ -225,6 +225,10 @@ bool bvni_kinds_match(value_unit_t a, value_unit_t b);
  * (any exponent but 1, or beside another component). The reader uses it to
  * tell that refusal from a factor too large to represent; see the note there. */
 bool bvni_unit_affine_misplaced(value_unit_t u);
+/* bvn_unit_reduce, reporting a dropped component and an unrepresentable scale
+ * separately; see bovnar_si_units.c. Neither out-flag is optional. */
+value_unit_t bvni_unit_reduce_ex(value_unit_t u, double *scale,
+				 bool *dim_lost, bool *scale_lost);
 static inline int32_t bvni_exp_abs(unit_exponent_t e)
 {
 	int32_t v = bvn_exponent_to_int(e);

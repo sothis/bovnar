@@ -9537,12 +9537,20 @@ Serializes `u` to a canonical UTF-8 string. Returns the number of bytes written 
 > reduces to itself. A lone base at an exponent other than 1 is a different case
 > and still collapses — `s⁻¹` is what `Hz` names, and `m~s⁻¹` comes back `k~Hz`.
 >
-> **An overflowing reduction returns `-1` rather than a unit.** When a summed
-> exponent leaves the range the format can spell, more bases survive than a
-> unit may carry, or the folded scale leaves float range, `bvn_unit_reduce` drops
-> a component — so the result is a *different* unit, not a shorter spelling of the
-> same one. `m¹⁰⁰·m²` is `m¹⁰²`, and such a unit used to serialise as `"no_unit"`. Without
-> `BVN_UNIT_REDUCE` these units write normally. Rewriting an equivalent dose as an absorbed dose in the
+> **A reduction that drops a component returns `-1` rather than a unit.** When a
+> summed exponent leaves the range the format can spell, or more bases survive
+> than a unit may carry, `bvn_unit_reduce` drops a component — so the result is a
+> *different* unit, not a shorter spelling of the same one. `m¹⁰⁰·m²` is `m¹⁰²`,
+> and such a unit used to serialise as `"no_unit"`. Without `BVN_UNIT_REDUCE`
+> these units write normally.
+>
+> A folded scale that no `double` holds is **not** that case. `y~m²⁰` reduces to
+> `m²⁰` with a scale of 10⁻⁴⁸⁰: `bvn_unit_reduce` still raises `*overflow` for it
+> and leaves `*scale` at 1.0, because the scale is what it cannot return, but the
+> unit is intact and this function writes it. The value is moved by the recipe
+> above, which is exact and never passes through a `double`; where the moved
+> value has no form in its own type, the writer reports
+> `error_value_out_of_range`, about the value. Rewriting an equivalent dose as an absorbed dose in the
 > document would be a stronger act than offering the conversion, which §12.4 still
 > does when a caller asks.
 

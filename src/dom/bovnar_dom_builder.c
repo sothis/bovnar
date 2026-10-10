@@ -97,38 +97,65 @@ typedef struct bvn_builder_s {
 	uint32_t        oct_cap;
 	bool            in_octet_stream;
 	error_code_t    last_error;
-	/* The last unit spelling judged by builder_keep_unit_source, and the
+	/* The last unit block made (builder_node_unit), then the last unit
+	 * spelling judged there, and the
 	 * verdict: an array repeats one spelling per element, and formatting the
 	 * unit again for each would cost more than the copy it decides about. */
+	bvn_dom_unit_t *unit_last;
 	bool            usrc_keep;
 	uint32_t        usrc_last_len;
 	char            usrc_last[BVNR_UNIT_SOURCE_MAX + 1u];
 } bvn_builder_t;
 /*
- * Keep the unit's spelling on the node — when it is worth keeping. A spelling
- * equal to the canonical form of the unit is recoverable from the unit, so
- * copying it onto every node of a large array would buy nothing.
+ * Give a node its unit, and the unit's spelling when that is worth keeping. A
+ * spelling equal to the canonical form of the unit is recoverable from the
+ * unit, so it is not kept.
+ *
+ * The block is SHARED with the node before it wherever the two agree, which is
+ * every element of an array under one annotation: the builder holds a reference
+ * to the last block it made and hands it out again. One block back is enough --
+ * a document alternating two units from value to value pays for a block each,
+ * which is still less than every node paid before.
+ *
+ * `d` is the event the spelling comes from, or NULL for a node that has none to
+ * keep: a container, an octet stream, or a value a policy converted, whose unit
+ * is one the document never spelled.
  */
-static bool builder_keep_unit_source(bvn_builder_t *b, bvn_dom_node_t *nd,
-		const bvnr_data_t *d)
+static bool builder_node_unit(bvn_builder_t *b, bvn_dom_node_t *nd,
+		const value_unit_t *vu, const bvnr_data_t *d)
 {
-	uint32_t n = d->unit_source_length;
-	if (n > BVNR_UNIT_SOURCE_MAX)
-		return true;
-	if (n != b->usrc_last_len || memcmp(b->usrc_last, d->unit_source, n) != 0) {
-		char    canon[BVNR_UNIT_STRING_MAX];
-		int32_t cn = bvn_unit_to_string(d->value_unit, canon, sizeof canon);
-		b->usrc_keep = !(cn == (int32_t)n &&
-				 memcmp(canon, d->unit_source, n) == 0);
-		b->usrc_last_len = n;
-		memcpy(b->usrc_last, d->unit_source, n);
+	const char *src = NULL;
+	uint32_t    n   = 0u;
+	if (d && d->unit_source && d->unit_source_length &&
+	    d->unit_source_length <= BVNR_UNIT_SOURCE_MAX) {
+		n = d->unit_source_length;
+		if (n != b->usrc_last_len ||
+		    memcmp(b->usrc_last, d->unit_source, n) != 0) {
+			char    canon[BVNR_UNIT_STRING_MAX];
+			int32_t cn = bvn_unit_to_string(d->value_unit, canon, sizeof canon);
+			b->usrc_keep = !(cn == (int32_t)n &&
+					 memcmp(canon, d->unit_source, n) == 0);
+			b->usrc_last_len = n;
+			memcpy(b->usrc_last, d->unit_source, n);
+		}
+		if (b->usrc_keep)
+			src = (const char *)d->unit_source;
+		else
+			n = 0u;
 	}
-	if (!b->usrc_keep)
-		return true;
-	nd->unit_src = bvn_dom_strdup((const char *)d->unit_source, n);
-	if (!nd->unit_src)
-		return false;
-	nd->unit_src_len = n;
+	bvn_dom_unit_t *u = NULL;
+	if (b->unit_last && bvn_dom_unit_is(b->unit_last, vu, src, n))
+		u = bvn_dom_unit_ref(b->unit_last);
+	if (!u) {
+		u = bvn_dom_unit_get(vu, src, n);
+		if (!u)
+			return false;
+		if (!bvn_dom_unit_static(u)) {  /* worth remembering */
+			bvn_dom_unit_release(b->unit_last);
+			b->unit_last = bvn_dom_unit_ref(u);
+		}
+	}
+	bvn_dom_node_take_unit(nd, u);
 	return true;
 }
 static bool builder_init(bvn_builder_t *b, bvn_dom_doc_t *doc)
@@ -142,6 +169,7 @@ static void builder_cleanup(bvn_builder_t *b)
 	free(b->scopes);
 	free(b->key);
 	free(b->oct_buf);
+	bvn_dom_unit_release(b->unit_last);
 }
 static bvn_scope_t *builder_top(bvn_builder_t *b)
 {
@@ -234,12 +262,11 @@ static bool builder_oct_append(bvn_builder_t *b, const uint8_t *data,
 	b->oct_len = need;
 	return true;
 }
-static bvn_dom_node_t *make_null(value_type_spec_t vt, value_unit_t vu)
+static bvn_dom_node_t *make_null(value_type_spec_t vt)
 {
 	bvn_dom_node_t *n = bvn_dom_node_alloc(BVN_DOM_NULL);
 	if (!n) return NULL;
 	n->value_type = vt;
-	n->value_unit = vu;
 	return n;
 }
 /*
@@ -252,12 +279,11 @@ static bvn_dom_node_t *make_null(value_type_spec_t vt, value_unit_t vu)
  * promoted to uint64 so it isn't misread as negative.
  */
 static bvn_dom_node_t *make_int(const char *str, uint32_t len,
-								value_type_spec_t vt, value_unit_t vu)
+								value_type_spec_t vt)
 {
 	bvn_dom_node_t *n = bvn_dom_node_alloc(BVN_DOM_INT);
 	if (!n) return NULL;
 	n->value_type = vt;
-	n->value_unit = vu;
 	uint32_t effective_width = vt.width ? vt.width : 64u;
 	uint32_t base            = bvn_effective_base(vt);
 	if (effective_width > 64u) {
@@ -459,12 +485,11 @@ static bool builder_decimal_to_double(const char *s, double *out)
 	return bvn_parse_double_in_base(norm, 10u, out);
 }
 static bvn_dom_node_t *make_float(const char *str, uint32_t len,
-								  value_type_spec_t vt, value_unit_t vu)
+								  value_type_spec_t vt)
 {
 	bvn_dom_node_t *n = bvn_dom_node_alloc(BVN_DOM_FLOAT);
 	if (!n) return NULL;
 	n->value_type = vt;
-	n->value_unit = vu;
 	char  stkbuf[256];
 	char *buf;
 	bool  buf_on_heap = false;
@@ -550,13 +575,11 @@ done:
 }
 static bvn_dom_node_t *make_float_from_rational(const bvn_int_t *num,
 						const bvn_int_t *den,
-						value_type_spec_t vt,
-						value_unit_t vu)
+						value_type_spec_t vt)
 {
 	bvn_dom_node_t *n = bvn_dom_node_alloc(BVN_DOM_FLOAT);
 	if (!n) return NULL;
 	n->value_type = vt;
-	n->value_unit = vu;
 	if (!builder_rational_to_double(num, den, &n->val.float_val)) {
 		bvn_dom_node_destroy(n);
 		return NULL;
@@ -592,24 +615,22 @@ static value_type_spec_t builder_widen_converted_int(value_type_spec_t vt,
 	return vt;
 }
 static bvn_dom_node_t *make_string(const char *str, uint32_t len,
-								   value_type_spec_t vt, value_unit_t vu)
+								   value_type_spec_t vt)
 {
 	bvn_dom_node_t *n = bvn_dom_node_alloc(BVN_DOM_STRING);
 	if (!n) return NULL;
 	n->value_type = vt;
-	n->value_unit = vu;
 	n->val.str.data = bvn_dom_strdup(str, len);
 	n->val.str.len  = len;
 	if (!n->val.str.data) { bvn_dom_node_destroy(n); return NULL; }
 	return n;
 }
 static bvn_dom_node_t *make_bool(const char *str, uint32_t len,
-								 value_type_spec_t vt, value_unit_t vu)
+								 value_type_spec_t vt)
 {
 	bvn_dom_node_t *n = bvn_dom_node_alloc(BVN_DOM_BOOL);
 	if (!n) return NULL;
 	n->value_type = vt;
-	n->value_unit = vu;
 	/* The validator collapses on/off to the canonical true/false text
 	 * before emitting token_is_bool, so the only spellings that reach
 	 * the DOM builder are "true" and "false". */
@@ -618,36 +639,33 @@ static bvn_dom_node_t *make_bool(const char *str, uint32_t len,
 	return n;
 }
 static bvn_dom_node_t *make_symbol(const char *str, uint32_t len,
-								   value_type_spec_t vt, value_unit_t vu)
+								   value_type_spec_t vt)
 {
 	bvn_dom_node_t *n = bvn_dom_node_alloc(BVN_DOM_SYMBOL);
 	if (!n) return NULL;
 	n->value_type = vt;
-	n->value_unit = vu;
 	n->val.str.data = bvn_dom_strdup(str, len);
 	n->val.str.len  = len;
 	if (!n->val.str.data) { bvn_dom_node_destroy(n); return NULL; }
 	return n;
 }
 static bvn_dom_node_t *make_reference(const char *str, uint32_t len,
-									  value_type_spec_t vt, value_unit_t vu)
+									  value_type_spec_t vt)
 {
 	bvn_dom_node_t *n = bvn_dom_node_alloc(BVN_DOM_REFERENCE);
 	if (!n) return NULL;
 	n->value_type = vt;
-	n->value_unit = vu;
 	n->val.str.data = bvn_dom_strdup(str, len);
 	n->val.str.len  = len;
 	if (!n->val.str.data) { bvn_dom_node_destroy(n); return NULL; }
 	return n;
 }
 static bvn_dom_node_t *make_octets(const uint8_t *data, uint32_t len,
-								   value_type_spec_t vt, value_unit_t vu)
+								   value_type_spec_t vt)
 {
 	bvn_dom_node_t *n = bvn_dom_node_alloc(BVN_DOM_OCTET_STREAM);
 	if (!n) return NULL;
 	n->value_type = vt;
-	n->value_unit = vu;
 	if (len > 0) {
 		n->val.octets.data = malloc(len);
 		if (!n->val.octets.data) { bvn_dom_node_destroy(n); return NULL; }
@@ -656,21 +674,19 @@ static bvn_dom_node_t *make_octets(const uint8_t *data, uint32_t len,
 	n->val.octets.len = len;
 	return n;
 }
-static bvn_dom_node_t *make_struct(value_type_spec_t vt, value_unit_t vu)
+static bvn_dom_node_t *make_struct(value_type_spec_t vt)
 {
 	bvn_dom_node_t *n = bvn_dom_node_alloc(BVN_DOM_STRUCT);
 	if (!n) return NULL;
 	n->value_type = vt;
-	n->value_unit = vu;
 	return n;
 }
-static bvn_dom_node_t *make_array(value_type_spec_t vt, value_unit_t vu)
+static bvn_dom_node_t *make_array(value_type_spec_t vt)
 {
 	bvn_dom_node_t *n = bvn_dom_node_alloc(BVN_DOM_ARRAY);
 	if (!n) return NULL;
 	n->value_type = vt;
-	n->value_unit = vu;
-	n->arr.num_dims = 1;
+	n->ext.dims = &bvn_dom_dims_1d;
 	return n;
 }
 /*
@@ -766,8 +782,12 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 		break;
 	case ev_struct_start: {
 		builder_do_deferred_pop(b);
-		bvn_dom_node_t *s = make_struct(d->value_type, d->value_unit);
+		bvn_dom_node_t *s = make_struct(d->value_type);
 		if (!s) return false;
+		if (!builder_node_unit(b, s, &d->value_unit, NULL)) {
+			bvn_dom_node_destroy(s);
+			return false;
+		}
 		if (!builder_attach(b, s))
 			return false;
 		if (!builder_push(b, BVN_SCOPE_STRUCT, s)) return false;
@@ -783,12 +803,16 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 			b->array_dim_continue = false;
 			bvn_scope_t *top = builder_top(b);
 			if (top && top->kind == BVN_SCOPE_ARRAY && top->node)
-				top->row_start_count = top->node->arr.count;
+				top->row_start_count = top->node->val.arr.count;
 			break;
 		}
 		builder_do_deferred_pop(b);
-		bvn_dom_node_t *a = make_array(d->value_type, d->value_unit);
+		bvn_dom_node_t *a = make_array(d->value_type);
 		if (!a) return false;
+		if (!builder_node_unit(b, a, &d->value_unit, NULL)) {
+			bvn_dom_node_destroy(a);
+			return false;
+		}
 		if (!builder_attach(b, a))
 			return false;
 		if (!builder_push(b, BVN_SCOPE_ARRAY, a)) return false;
@@ -810,10 +834,16 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 		builder_do_deferred_pop(b);
 		bvn_scope_t *top = builder_top(b);
 		if (top && top->kind == BVN_SCOPE_ARRAY) {
-			uint32_t row_size = top->node->arr.count - top->row_start_count;
-			uint32_t dim = top->node->arr.num_dims - 1u;
-			if (dim < 8)
-				top->node->arr.rows_per_dim[dim] = row_size;
+			/* A one-row array has no shape of its own to record: its only
+			 * row is the array (bvn_dom_arr_row). */
+			bvn_dom_dims_t *dm = top->node->ext.dims;
+			if (dm && dm != &bvn_dom_dims_1d) {
+				uint32_t row_size = top->node->val.arr.count -
+						    top->row_start_count;
+				uint32_t dim = dm->num_dims - 1u;
+				if (dim < 8)
+					dm->rows_per_dim[dim] = row_size;
+			}
 		}
 		b->pending_array_pop = true;
 		break;
@@ -829,8 +859,18 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 			 * it is NOT clamped to the rows_per_dim[8] bound; saturate only to
 			 * avoid a wrap to 0 (which would divide-by-zero in the shape emitter)
 			 * on a pathologically large number of rows. */
-			if (top->node->arr.num_dims < UINT32_MAX)
-				top->node->arr.num_dims++;
+			bvn_dom_dims_t *dm = top->node->ext.dims;
+			if (!dm || dm == &bvn_dom_dims_1d) {
+				/* The second row: this is a matrix after all, and the
+				 * row that just closed was all of the array so far. */
+				dm = calloc(1, sizeof(*dm));
+				if (!dm) return false;
+				dm->num_dims        = 1u;
+				dm->rows_per_dim[0] = top->node->val.arr.count;
+				top->node->ext.dims = dm;
+			}
+			if (dm->num_dims < UINT32_MAX)
+				dm->num_dims++;
 		}
 		break;
 	}
@@ -841,8 +881,12 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 		break;
 	case ev_octet_stream_end: {
 		bvn_dom_node_t *o = make_octets(b->oct_buf, b->oct_len,
-										d->value_type, d->value_unit);
+										d->value_type);
 		if (!o) return false;
+		if (!builder_node_unit(b, o, &d->value_unit, NULL)) {
+			bvn_dom_node_destroy(o);
+			return false;
+		}
 		if (!builder_attach(b, o))
 			return false;
 		b->in_octet_stream = false;
@@ -943,29 +987,28 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 		bvn_dom_node_t *nd = NULL;
 		switch (d->type) {
 		case token_is_null_value:
-			nd = make_null(vt, vu);
+			nd = make_null(vt);
 			break;
 		case token_is_number:
 		case token_is_array_number:
 			if (conv_from_rational)
 				nd = make_float_from_rational(d->conv.num, d->conv.den,
-							      vt, vu);
+							      vt);
 			else if (number_is_float(str, len, vt, false))
-				nd = make_float(str, len, vt, vu);
+				nd = make_float(str, len, vt);
 			else
-				nd = make_int(str, len, vt, vu);
+				nd = make_int(str, len, vt);
 			/* spec 1.1 — keep a datetime literal's verbatim sub-second
 			 * digits so DOM consumers can read them and the value can
 			 * round-trip as an ISO literal. */
 			if (nd && vt.family == vt_datetime &&
 			    d->frac_data && d->frac_length) {
-				nd->dt_frac = bvn_dom_strdup(
+				nd->ext.dt_frac = bvn_dom_strdup(
 					(const char *)d->frac_data, d->frac_length);
-				if (!nd->dt_frac) {
+				if (!nd->ext.dt_frac) {
 					bvn_dom_node_destroy(nd);
 					return false;
 				}
-				nd->dt_frac_len = d->frac_length;
 			}
 			if (!nd && b->last_error == error_none)
 				b->last_error = error_value_out_of_range;
@@ -985,39 +1028,38 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 			if (bvn_type_is_numeric(vt)) {
 				if (conv_from_rational)
 					nd = make_float_from_rational(d->conv.num,
-								      d->conv.den, vt, vu);
+								      d->conv.den, vt);
 				else if (number_is_float(str, len, vt, true))
-					nd = make_float(str, len, vt, vu);
+					nd = make_float(str, len, vt);
 				else
-					nd = make_int(str, len, vt, vu);
+					nd = make_int(str, len, vt);
 				if (!nd && b->last_error == error_none)
 					b->last_error = error_value_out_of_range;
 			} else {
-				nd = make_string(str, len, vt, vu);
+				nd = make_string(str, len, vt);
 			}
 			break;
 		case token_is_bool:
-			nd = make_bool(str, len, vt, vu);
+			nd = make_bool(str, len, vt);
 			break;
 		case token_is_symbol:
-			nd = make_symbol(str, len, vt, vu);
+			nd = make_symbol(str, len, vt);
 			break;
 		case token_is_reference:
-			nd = make_reference(str, len, vt, vu);
+			nd = make_reference(str, len, vt);
 			break;
 		case token_is_octet_stream:
 			break;
 		default:
-			nd = make_null(vt, vu);
+			nd = make_null(vt);
 			break;
 		}
 		if (!nd) return false;
 		/* library 2.0 — the unit's own spelling. Not when a policy converted the
 		 * value: the node then carries conv.unit, which the document never
 		 * spelled. */
-		if (d->unit_source && d->unit_source_length &&
-		    !(d->converted && d->conv.text) &&
-		    !builder_keep_unit_source(b, nd, d)) {
+		if (!builder_node_unit(b, nd, &vu,
+				       (d->converted && d->conv.text) ? NULL : d)) {
 			bvn_dom_node_destroy(nd);
 			return false;
 		}
@@ -1243,12 +1285,12 @@ static error_code_t bvn_dom_shape_merge(
 			 * mean equal shape: a 2x3 block and a 3x2 block (or a flat 4-element
 			 * array and a 2x2 matrix) both hold the same number of cells but are
 			 * different shapes, so the row geometry must match too. */
-			if (a->arr.num_dims != n->arr.num_dims)
+			if (bvn_dom_arr_ndims(a) != bvn_dom_arr_ndims(n))
 				return error_array_row_size_mismatch;
-			uint32_t nd = a->arr.num_dims;
+			uint32_t nd = bvn_dom_arr_ndims(a);
 			if (nd > 8u) nd = 8u;   /* rows_per_dim records only the first 8 rows */
 			for (uint32_t i = 0; i < nd; i++)
-				if (a->arr.rows_per_dim[i] != n->arr.rows_per_dim[i])
+				if (bvn_dom_arr_row(a, i) != bvn_dom_arr_row(n, i))
 					return error_array_row_size_mismatch;
 		}
 		if (tn == BVN_DOM_STRUCT) {

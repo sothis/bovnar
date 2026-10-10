@@ -6073,12 +6073,19 @@ it is simply not the unit this function prints.</p>
 a dimension vector, as do <code>Bq</code>, <code>Bd</code> and <code>Hz</code>, and <code>W</code>, <code>VA</code> and <code>var</code>; each
 reduces to itself. A lone base at an exponent other than 1 is a different case
 and still collapses — <code>s⁻¹</code> is what <code>Hz</code> names, and <code>m~s⁻¹</code> comes back <code>k~Hz</code>.</p>
-<p><strong>An overflowing reduction returns <code>-1</code> rather than a unit.</strong> When a summed
-exponent leaves the range the format can spell, more bases survive than a
-unit may carry, or the folded scale leaves float range, <code>bvn_unit_reduce</code> drops
-a component — so the result is a <em>different</em> unit, not a shorter spelling of the
-same one. <code>m¹⁰⁰·m²</code> is <code>m¹⁰²</code>, and such a unit used to serialise as <code>"no_unit"</code>. Without
-<code>BVN_UNIT_REDUCE</code> these units write normally. Rewriting an equivalent dose as an absorbed dose in the
+<p><strong>A reduction that drops a component returns <code>-1</code> rather than a unit.</strong> When a
+summed exponent leaves the range the format can spell, or more bases survive
+than a unit may carry, <code>bvn_unit_reduce</code> drops a component — so the result is a
+<em>different</em> unit, not a shorter spelling of the same one. <code>m¹⁰⁰·m²</code> is <code>m¹⁰²</code>,
+and such a unit used to serialise as <code>"no_unit"</code>. Without <code>BVN_UNIT_REDUCE</code>
+these units write normally.</p>
+<p>A folded scale that no <code>double</code> holds is <strong>not</strong> that case. <code>y~m²⁰</code> reduces to
+<code>m²⁰</code> with a scale of 10⁻⁴⁸⁰: <code>bvn_unit_reduce</code> still raises <code>*overflow</code> for it
+and leaves <code>*scale</code> at 1.0, because the scale is what it cannot return, but the
+unit is intact and this function writes it. The value is moved by the recipe
+above, which is exact and never passes through a <code>double</code>; where the moved
+value has no form in its own type, the writer reports
+<code>error_value_out_of_range</code>, about the value. Rewriting an equivalent dose as an absorbed dose in the
 document would be a stronger act than offering the conversion, which §12.4 still
 does when a caller asks.</p>
 </blockquote>

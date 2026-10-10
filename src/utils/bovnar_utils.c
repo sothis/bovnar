@@ -1492,15 +1492,21 @@ static int32_t bvni_p10_si_prefix_id(double v)
  * named unit. Only invoked under BVN_UNIT_REDUCE; affine units (those with an
  * offset, like °C) are left alone because they can't be rescaled by a factor.
  */
-static value_unit_t bvni_reduce_to_named_si(value_unit_t u, double scale)
+static value_unit_t bvni_reduce_to_named_si(value_unit_t u, double scale,
+					    bool scale_known)
 {
 	bool aff, ok;
 	double off;
 	double base_si = bvn_unit_to_si_factor(u, &aff, &off, &ok);
 	if (!ok || aff)
 		return u;
-	double net_si = scale * base_si;
-	if (net_si <= 0.0 || !isfinite(net_si))
+	/* A folded scale that no double holds has no prefix either, so it goes
+	 * straight to the second lookup below -- the prefix of the reduced unit's
+	 * own factor -- and stays in the value. It must not skip the collapse
+	 * altogether: q~kg¹¹·m/kg¹⁰·s² reduces to kg·m/s², and the next pass, with
+	 * nothing left to fold, would write N. */
+	double net_si = scale_known ? scale * base_si : 0.0;
+	if (scale_known && (net_si <= 0.0 || !isfinite(net_si)))
 		return u;
 	int32_t dim_r[bvn_si_dim_count];
 	if (!bvn_unit_dimension_vector(u, dim_r))
@@ -1568,7 +1574,7 @@ static value_unit_t bvni_reduce_to_named_si(value_unit_t u, double scale)
 		 * else is off by orders of magnitude. The 1e-6 relative window
 		 * mirrors the old fabs(log10(net_si) - pexp) > 1e-6 gate.
 		 */
-		int32_t pfx_id = bvni_p10_si_prefix_id(net_si);
+		int32_t pfx_id = scale_known ? bvni_p10_si_prefix_id(net_si) : -1;
 		/* No prefix spells the whole factor (N/c~m² is 10^4 Pa; d~J·ppm is
 		 * 10^-7 J). This used to leave the compound as it was -- and the NEXT
 		 * pass, with the folded scale now gone from the unit, collapsed it
@@ -1626,30 +1632,33 @@ int32_t bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t bufsize,
 	}
 	if (flags & BVN_UNIT_REDUCE) {
 		double   scale;
-		bool     overflow;
+		bool     dim_lost, scale_lost;
 		if (!bvn_unit_valid(u))
 			return -1;
-		u = bvn_unit_reduce(u, &scale, &overflow);
+		u = bvni_unit_reduce_ex(u, &scale, &dim_lost, &scale_lost);
 		/*
-		 * An overflowing reduction does not produce a shorter spelling of the
-		 * same unit — it produces a DIFFERENT one. bvn_unit_reduce raises this
-		 * flag when a summed exponent leaves the ±100 the format can spell, when
-		 * more bases survive than a unit may carry, or when the folded scale
-		 * leaves float range; in each case a component is dropped, so m⁵⁰·m⁵¹
-		 * (which is m¹⁰¹) came back with no components at all and formatted as
-		 * "no_unit", and m⁵⁰·m⁵¹·s as "s". Dimensionless, and not compatible with
-		 * what it replaced — the wrong-unit-is-worse-than-a-refused-one failure
-		 * this format exists to prevent, handed to the caller as a success.
+		 * A reduction that DROPS a component does not produce a shorter spelling
+		 * of the same unit — it produces a DIFFERENT one. That happens when a
+		 * summed exponent leaves the ±100 the format can spell, or when more
+		 * bases survive than a unit may carry: m⁵⁰·m⁵¹ (which is m¹⁰¹) came back
+		 * with no components at all and formatted as "no_unit", and m⁵⁰·m⁵¹·s as
+		 * "s". Dimensionless, and not compatible with what it replaced — the
+		 * wrong-unit-is-worse-than-a-refused-one failure this format exists to
+		 * prevent, handed to the caller as a success.
 		 *
 		 * The flag was already computed and was consulted only to skip the
 		 * cosmetic named-SI collapse. Refuse instead: -1 is this function's
 		 * existing answer for a unit it cannot write (see the bu_none guard
 		 * below), it is what bvnr_writer already demanded of this path, and it
 		 * is what the Python binding's unit_reduce() already raises on.
+		 *
+		 * A folded scale too large or too small for a double is NOT that case
+		 * and is not refused: the unit is intact, and this function returns a
+		 * unit, not a scale. See bvni_unit_reduce_ex.
 		 */
-		if (overflow)
+		if (dim_lost)
 			return -1;
-		u = bvni_reduce_to_named_si(u, scale);
+		u = bvni_reduce_to_named_si(u, scale, !scale_lost);
 	} else {
 		if (!bvn_unit_valid(u))
 			return -1;

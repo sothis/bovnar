@@ -378,7 +378,7 @@ Every build also regenerates the single-file amalgamation into `build/amalgamate
 |---|---|
 | `bovnar-<version>-<count>-amalgamate.tar.xz` | the amalgamation (`bovnar.h`, `bovnar.c`), plus `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`, `doc/` and `examples/` |
 | `bovnar-linux-<version>-<count>.tar.xz` | Linux libraries, CLI and headers, plus `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`, `doc/`, `examples/` and the editor `highlighter/` grammars |
-| `bovnar-windows-<version>-<count>.zip` | Windows libraries, CLI and headers (from the MSVC/MinGW build, or the `BVNR_CROSS_MINGW` cross-build on a Linux host), plus `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`, `doc/`, `examples/` and the editor `highlighter/` grammars |
+| `bovnar-windows-msvc-<version>-<count>.zip`, `bovnar-windows-mingw-<version>-<count>.zip` | Windows libraries, CLI and headers, one archive per toolchain (the MinGW one also from the `BVNR_CROSS_MINGW` cross-build on a Linux host); each unpacks to a directory of its own name, plus `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`, `doc/`, `examples/` and the editor `highlighter/` grammars |
 
 Disable with `-DBVNR_PACKAGE=OFF`.
 
@@ -386,10 +386,7 @@ These same archives — built and smoke-tested by CI, plus a `-source.tar.xz`
 snapshot of the tag and a `SHA256SUMS` file — are attached to each
 [GitHub release](https://github.com/sothis/bovnar/releases) from 1.1.0 onward,
 so a build from source is optional. Earlier tags predate the packaging: 1.0.0
-was POSIX-only and had no packer at all, and carries no assets. Only on a
-release are the two Windows archives named
-`bovnar-windows-msvc-…` and `bovnar-windows-mingw-…`: a release's assets share
-one flat namespace and both toolchains pack the identical filename locally.
+was POSIX-only and had no packer at all, and carries no assets.
 
 ### Build options
 

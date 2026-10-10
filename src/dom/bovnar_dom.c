@@ -66,6 +66,101 @@ char *bvn_dom_strdup(const char *s, uint32_t len)
 	r[len] = '\0';
 	return r;
 }
+bvn_dom_unit_t bvn_dom_unit_default = {
+	.refs = 0u,
+	.unit = { .num_components = 1,
+		  .components = {{ .base = bu_none, .exponent = exp_linear,
+				   .prefix.system = prefix_si,
+				   .prefix.id.si = si_none }} }
+};
+bvn_dom_unit_t bvn_dom_unit_none = { .refs = 0u, .unit = { .num_components = 0 } };
+bvn_dom_dims_t bvn_dom_dims_1d   = { .num_dims = 1u };
+/* Same unit, component for component. Deliberately not bvn_unit_equal: two
+ * spellings that mean one unit are still two things bvn_dom_get_unit returns. */
+static bool bvn_dom_unit_same(const value_unit_t *a, const value_unit_t *b)
+{
+	if (a->num_components != b->num_components)
+		return false;
+	uint32_t n = a->num_components < BVNR_MAX_UNIT_COMPONENTS
+		   ? a->num_components : BVNR_MAX_UNIT_COMPONENTS;
+	for (uint32_t i = 0; i < n; i++) {
+		const value_unit_component_t *x = &a->components[i];
+		const value_unit_component_t *y = &b->components[i];
+		if (x->base != y->base || x->exponent != y->exponent ||
+		    x->prefix.system != y->prefix.system ||
+		    (x->prefix.system == prefix_iec
+		         ? x->prefix.id.iec != y->prefix.id.iec
+		         : x->prefix.id.si  != y->prefix.id.si))
+			return false;
+	}
+	return true;
+}
+bool bvn_dom_unit_is(const bvn_dom_unit_t *u, const value_unit_t *vu,
+		     const char *src, uint32_t src_len)
+{
+	if (!src)
+		src_len = 0u;
+	if ((u->src != NULL) != (src != NULL) || u->src_len != src_len)
+		return false;
+	if (src && memcmp(u->src, src, src_len) != 0)
+		return false;
+	return bvn_dom_unit_same(&u->unit, vu);
+}
+bvn_dom_unit_t *bvn_dom_unit_get(const value_unit_t *vu,
+				 const char *src, uint32_t src_len)
+{
+	if (!src) {
+		if (bvn_dom_unit_same(vu, &bvn_dom_unit_default.unit))
+			return &bvn_dom_unit_default;
+		if (vu->num_components == 0u)
+			return &bvn_dom_unit_none;
+	}
+	bvn_dom_unit_t *u = malloc(sizeof(*u));
+	if (!u) return NULL;
+	u->refs    = 1u;
+	u->src     = NULL;
+	u->src_len = 0u;
+	u->unit    = *vu;
+	if (src) {
+		u->src = bvn_dom_strdup(src, src_len);
+		if (!u->src) {
+			free(u);
+			return NULL;
+		}
+		u->src_len = src_len;
+	}
+	return u;
+}
+bvn_dom_unit_t *bvn_dom_unit_ref(bvn_dom_unit_t *u)
+{
+	if (bvn_dom_unit_static(u))
+		return u;
+	if (u->refs == UINT32_MAX)
+		return NULL;                    /* full: the caller makes another */
+	u->refs++;
+	return u;
+}
+void bvn_dom_unit_release(bvn_dom_unit_t *u)
+{
+	if (!u || bvn_dom_unit_static(u))
+		return;
+	if (--u->refs == 0u) {
+		free(u->src);
+		free(u);
+	}
+}
+void bvn_dom_node_take_unit(bvn_dom_node_t *n, bvn_dom_unit_t *u)
+{
+	bvn_dom_unit_release(n->unit);
+	n->unit = u;
+}
+bool bvn_dom_node_set_unit(bvn_dom_node_t *n, const value_unit_t *vu)
+{
+	bvn_dom_unit_t *u = bvn_dom_unit_get(vu, NULL, 0u);
+	if (!u) return false;
+	bvn_dom_node_take_unit(n, u);
+	return true;
+}
 bvn_dom_node_t *bvn_dom_node_alloc(bvn_dom_type_t t)
 {
 	bvn_dom_node_t *n = malloc(sizeof(*n));
@@ -73,7 +168,7 @@ bvn_dom_node_t *bvn_dom_node_alloc(bvn_dom_type_t t)
 	memset(n, 0, sizeof(*n));
 	n->type       = t;
 	n->value_type = BVN_TYPE_PLAIN;
-	n->value_unit = BVN_UNIT_NO_PREFIX(bu_none);
+	n->unit       = &bvn_dom_unit_default;
 	return n;
 }
 static bool bvn_dom_stack_reserve(bvn_dom_node_t ***stack,
@@ -114,14 +209,12 @@ void bvn_dom_node_destroy(bvn_dom_node_t *n)
 	while (sc > 0u) {
 		bvn_dom_node_t *cur = stack[--sc];
 		if (!cur) continue;
-		/* dt_frac sits OUTSIDE the payload union, so every node owns it
-		 * regardless of tag; freeing it inside the BVN_DOM_INT arm tied its
-		 * release to a tag that does not own it. A datetime only ever
-		 * materialises as an INT today, so this was not yet a leak — but a
-		 * field freed on one arm of a switch over an unrelated discriminator
-		 * becomes one the moment that stops holding. */
-		free(cur->dt_frac);   /* spec 1.1 datetime sub-second digits */
-		free(cur->unit_src);  /* library 2.0 the unit's own spelling */
+		/* The unit block is shared; the extra pointer is one allocation
+		 * whichever of its two meanings the tag gives it, apart from the
+		 * static shape every one-row array points at. */
+		bvn_dom_unit_release(cur->unit);
+		if (cur->ext.dims != &bvn_dom_dims_1d)
+			free(cur->ext.dt_frac);
 		switch (cur->type) {
 		case BVN_DOM_INT:
 			if (cur->value_type.width > 64u && cur->val.bigint)
@@ -135,32 +228,36 @@ void bvn_dom_node_destroy(bvn_dom_node_t *n)
 		case BVN_DOM_OCTET_STREAM:
 			free(cur->val.octets.data);
 			break;
+		case BVN_DOM_STRUCT:
+			if (cur->val.members.entries) {
+				uint32_t mc = cur->val.members.count;
+				if (!bvn_dom_stack_reserve(&stack, &cap, sc + mc)) {
+					free(cur);
+					free(stack);
+					return;
+				}
+				for (uint32_t i = 0; i < mc; i++) {
+					free(cur->val.members.entries[i].key);
+					stack[sc++] = cur->val.members.entries[i].value;
+				}
+				free(cur->val.members.entries);
+			}
+			break;
+		case BVN_DOM_ARRAY:
+			if (cur->val.arr.items) {
+				uint32_t ac = cur->val.arr.count;
+				if (!bvn_dom_stack_reserve(&stack, &cap, sc + ac)) {
+					free(cur);
+					free(stack);
+					return;
+				}
+				for (uint32_t i = 0; i < ac; i++)
+					stack[sc++] = cur->val.arr.items[i];
+				free(cur->val.arr.items);
+			}
+			break;
 		default:
 			break;
-		}
-		if (cur->members.entries) {
-			uint32_t mc = cur->members.count;
-			if (!bvn_dom_stack_reserve(&stack, &cap, sc + mc)) {
-				free(cur);
-				free(stack);
-				return;
-			}
-			for (uint32_t i = 0; i < mc; i++) {
-				free(cur->members.entries[i].key);
-				stack[sc++] = cur->members.entries[i].value;
-			}
-			free(cur->members.entries);
-		}
-		if (cur->arr.items) {
-			uint32_t ac = cur->arr.count;
-			if (!bvn_dom_stack_reserve(&stack, &cap, sc + ac)) {
-				free(cur);
-				free(stack);
-				return;
-			}
-			for (uint32_t i = 0; i < ac; i++)
-				stack[sc++] = cur->arr.items[i];
-			free(cur->arr.items);
 		}
 		free(cur);
 	}
@@ -202,7 +299,7 @@ bool bvn_dom_struct_add(bvn_dom_node_t *s,
 {
 	if (!s || s->type != BVN_DOM_STRUCT || !val || val == s ||
 	    (!key && klen) ||
-	    bvn_dom_entries_have_key(s->members.entries, s->members.count,
+	    bvn_dom_entries_have_key(s->val.members.entries, s->val.members.count,
 				     key, klen)) {
 		bvn_dom_node_destroy(val);
 		return false;
@@ -213,11 +310,11 @@ bool bvn_dom_struct_add_nocheck(bvn_dom_node_t *s,
 						const char *key, uint32_t klen,
 						bvn_dom_node_t *val)
 {
-	if (s->members.count == s->members.cap) {
-		if (s->members.cap > UINT32_MAX / 2u) {
+	if (s->val.members.count == s->val.members.cap) {
+		if (s->val.members.cap > UINT32_MAX / 2u) {
 			bvn_dom_node_destroy(val); return false;
 		}
-		uint32_t nc = s->members.cap ? s->members.cap * 2u : 8u;
+		uint32_t nc = s->val.members.cap ? s->val.members.cap * 2u : 8u;
 #if SIZE_MAX <= 0xFFFFFFFFu
 		/* nc fits uint32_t (guard above), but nc * sizeof(entry) is computed in
 		 * size_t and would wrap on a 32-bit size_t; reject as bvn_dom_stack_reserve
@@ -226,17 +323,17 @@ bool bvn_dom_struct_add_nocheck(bvn_dom_node_t *s,
 			bvn_dom_node_destroy(val); return false;
 		}
 #endif
-		bvn_dom_entry_t *ne = realloc(s->members.entries,
+		bvn_dom_entry_t *ne = realloc(s->val.members.entries,
 									  nc * sizeof(*ne));
 		if (!ne) { bvn_dom_node_destroy(val); return false; }
-		s->members.entries = ne;
-		s->members.cap     = nc;
+		s->val.members.entries = ne;
+		s->val.members.cap     = nc;
 	}
 	char *ks = bvn_dom_strdup(key, klen);
 	if (!ks) { bvn_dom_node_destroy(val); return false; }
-	s->members.entries[s->members.count].key   = ks;
-	s->members.entries[s->members.count].value = val;
-	s->members.count++;
+	s->val.members.entries[s->val.members.count].key   = ks;
+	s->val.members.entries[s->val.members.count].value = val;
+	s->val.members.count++;
 	return true;
 }
 bool bvn_dom_doc_add(bvn_dom_doc_t *d,
@@ -286,23 +383,23 @@ bool bvn_dom_array_append(bvn_dom_node_t *a, bvn_dom_node_t *elem)
 }
 bool bvn_dom_array_append_nocheck(bvn_dom_node_t *a, bvn_dom_node_t *elem)
 {
-	if (a->arr.count == a->arr.cap) {
-		if (a->arr.cap > UINT32_MAX / 2u) {
+	if (a->val.arr.count == a->val.arr.cap) {
+		if (a->val.arr.cap > UINT32_MAX / 2u) {
 			bvn_dom_node_destroy(elem); return false;
 		}
-		uint32_t nc = a->arr.cap ? a->arr.cap * 2u : 8u;
+		uint32_t nc = a->val.arr.cap ? a->val.arr.cap * 2u : 8u;
 #if SIZE_MAX <= 0xFFFFFFFFu
 		if ((size_t)nc > SIZE_MAX / sizeof(bvn_dom_node_t *)) {   /* 32-bit wrap guard */
 			bvn_dom_node_destroy(elem); return false;
 		}
 #endif
-		bvn_dom_node_t **ni = realloc(a->arr.items,
+		bvn_dom_node_t **ni = realloc(a->val.arr.items,
 									  nc * sizeof(*ni));
 		if (!ni) { bvn_dom_node_destroy(elem); return false; }
-		a->arr.items = ni;
-		a->arr.cap   = nc;
+		a->val.arr.items = ni;
+		a->val.arr.cap   = nc;
 	}
-	a->arr.items[a->arr.count++] = elem;
+	a->val.arr.items[a->val.arr.count++] = elem;
 	return true;
 }
 bvn_dom_doc_t *bvn_dom_doc_create(void)
@@ -329,9 +426,9 @@ bvn_dom_node_t *bvn_dom_struct_get(const bvn_dom_node_t *node,
 {
 	if (!node || !key) return NULL;
 	if (node->type != BVN_DOM_STRUCT) return NULL;
-	for (uint32_t i = 0; i < node->members.count; i++) {
-		if (strcmp(node->members.entries[i].key, key) == 0)
-			return node->members.entries[i].value;
+	for (uint32_t i = 0; i < node->val.members.count; i++) {
+		if (strcmp(node->val.members.entries[i].key, key) == 0)
+			return node->val.members.entries[i].value;
 	}
 	return NULL;
 }
@@ -353,7 +450,7 @@ static bvn_dom_node_t *bvn_dom_apply_indices(
 	uint32_t k = 0;
 	while (k < nidx) {
 		if (!cur || cur->type != BVN_DOM_ARRAY) return NULL;
-		uint32_t nd = cur->arr.num_dims;
+		uint32_t nd = bvn_dom_arr_ndims(cur);
 		if (nd >= 2u) {
 			if (k + 2u > nidx) return NULL;       /* matrix needs [row][col] */
 			uint32_t r = idx[k], c = idx[k + 1u];
@@ -367,27 +464,27 @@ static bvn_dom_node_t *bvn_dom_apply_indices(
 			 * which case it is rectangular and base = r*cols. */
 			uint64_t base, cols;
 			if (r < 8u) {
-				cols = cur->arr.rows_per_dim[r];
+				cols = bvn_dom_arr_row(cur, r);
 				base = 0;
 				for (uint32_t i = 0; i < r; i++)
-					base += cur->arr.rows_per_dim[i];
+					base += bvn_dom_arr_row(cur, i);
 			} else {
-				uint32_t w0 = cur->arr.rows_per_dim[0];
+				uint32_t w0 = bvn_dom_arr_row(cur, 0);
 				bool uniform = (w0 != 0u);
 				for (uint32_t i = 1; i < 8u; i++)
-					if (cur->arr.rows_per_dim[i] != w0) { uniform = false; break; }
+					if (bvn_dom_arr_row(cur, i) != w0) { uniform = false; break; }
 				if (!uniform) return NULL;
 				cols = w0;
 				base = (uint64_t)r * w0;
 			}
 			if (cols == 0u || (uint64_t)c >= cols) return NULL;
 			uint64_t off = base + c;
-			if (off >= cur->arr.count) return NULL;
-			cur = cur->arr.items[off];
+			if (off >= cur->val.arr.count) return NULL;
+			cur = cur->val.arr.items[off];
 			k += 2u;
 		} else {
-			if (idx[k] >= cur->arr.count) return NULL;
-			cur = cur->arr.items[idx[k]];
+			if (idx[k] >= cur->val.arr.count) return NULL;
+			cur = cur->val.arr.items[idx[k]];
 			k += 1u;
 		}
 	}
@@ -466,8 +563,8 @@ bvn_dom_node_t *bvn_dom_array_at(const bvn_dom_node_t *node,
 								 uint32_t index)
 {
 	if (!node || node->type != BVN_DOM_ARRAY) return NULL;
-	if (index >= node->arr.count) return NULL;
-	return node->arr.items[index];
+	if (index >= node->val.arr.count) return NULL;
+	return node->val.arr.items[index];
 }
 bvn_dom_type_t bvn_dom_node_type(const bvn_dom_node_t *node)
 {
@@ -577,13 +674,13 @@ value_type_spec_t bvn_dom_get_value_type(const bvn_dom_node_t *node)
 }
 value_unit_t bvn_dom_get_unit(const bvn_dom_node_t *node)
 {
-	return node ? node->value_unit : BVN_UNIT_NO_PREFIX(bu_none);
+	return node ? node->unit->unit : BVN_UNIT_NO_PREFIX(bu_none);
 }
 int32_t bvn_dom_get_unit_string(const bvn_dom_node_t *node,
 								char *buf, size_t bufsize)
 {
 	if (!node) return -1;
-	return bvn_unit_to_string(node->value_unit, buf, bufsize);
+	return bvn_unit_to_string(node->unit->unit, buf, bufsize);
 }
 /*
  * Convert a numeric node to its value expressed in SI base units, applying the
@@ -611,7 +708,7 @@ double bvn_dom_get_value_in_base_units(const bvn_dom_node_t *node)
 	bool is_affine      = false;
 	double affine_offset = 0.0;
 	bool si_ok           = true;
-	double factor = bvn_unit_to_si_factor(node->value_unit,
+	double factor = bvn_unit_to_si_factor(node->unit->unit,
 										   &is_affine,
 										   &affine_offset,
 										   &si_ok);
@@ -624,22 +721,22 @@ double bvn_dom_get_value_in_base_units(const bvn_dom_node_t *node)
 uint32_t bvn_dom_struct_count(const bvn_dom_node_t *node)
 {
 	return (node && node->type == BVN_DOM_STRUCT)
-		   ? node->members.count : 0;
+		   ? node->val.members.count : 0;
 }
 uint32_t bvn_dom_array_count(const bvn_dom_node_t *node)
 {
 	return (node && node->type == BVN_DOM_ARRAY)
-		   ? node->arr.count : 0;
+		   ? node->val.arr.count : 0;
 }
 uint32_t bvn_dom_array_dims(const bvn_dom_node_t *node)
 {
 	return (node && node->type == BVN_DOM_ARRAY)
-		   ? node->arr.num_dims : 0;
+		   ? bvn_dom_arr_ndims(node) : 0;
 }
 const bvn_dom_entry_t *bvn_dom_struct_entries(const bvn_dom_node_t *node)
 {
 	return (node && node->type == BVN_DOM_STRUCT)
-		   ? node->members.entries : NULL;
+		   ? node->val.members.entries : NULL;
 }
 const bvn_dom_entry_t *bvn_dom_doc_entries(const bvn_dom_doc_t *doc)
 {
@@ -704,19 +801,19 @@ const char *bvn_dom_get_datetime_fraction(const bvn_dom_node_t *node,
 {
 	if (len_out) *len_out = 0;
 	if (!node || node->type != BVN_DOM_INT ||
-	    node->value_type.family != vt_datetime || !node->dt_frac)
+	    node->value_type.family != vt_datetime || !node->ext.dt_frac)
 		return NULL;
-	if (len_out) *len_out = node->dt_frac_len;
-	return node->dt_frac;
+	if (len_out) *len_out = (uint32_t)strlen(node->ext.dt_frac);
+	return node->ext.dt_frac;
 }
 const char *bvn_dom_get_unit_source(const bvn_dom_node_t *node,
 		uint32_t *len_out)
 {
 	if (len_out) *len_out = 0;
-	if (!node || !node->unit_src)
+	if (!node || !node->unit->src)
 		return NULL;
-	if (len_out) *len_out = node->unit_src_len;
-	return node->unit_src;
+	if (len_out) *len_out = node->unit->src_len;
+	return node->unit->src;
 }
 /*
  * The two raw integer extractors behind every bvn_dom_get_iN / get_uN
@@ -817,7 +914,7 @@ static bvn_dom_node_t *make_narrow_int(int64_t            raw,
 	n->value_type = (value_type_spec_t){ .family = fam,
 										 .width  = width,
 										 .base   = 0u };
-	n->value_unit = BVN_UNIT_NONE;
+	n->unit = &bvn_dom_unit_none;
 	n->val.int_val    = raw;
 	return n;
 }
@@ -847,7 +944,10 @@ bvn_dom_node_t *bvn_dom_node_from_bigint(bvn_int_t     *bigint,
 	bvn_dom_node_t *n = bvn_dom_node_alloc(BVN_DOM_INT);
 	if (!n) return NULL;
 	n->value_type = vt;
-	n->value_unit = vu;
+	if (!bvn_dom_node_set_unit(n, &vu)) {
+		free(n);
+		return NULL;
+	}
 	n->val.bigint     = bigint;
 	return n;
 }

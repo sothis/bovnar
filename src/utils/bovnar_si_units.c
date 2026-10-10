@@ -1431,13 +1431,41 @@ value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overflow)
 	/* `overflow` was already optional and `scale` was not, in one function.
 	 * Both are optional now — see the note on out-parameters in
 	 * bovnar_si_units.h. */
+	bool dim_lost = false, scale_lost = false;
+	value_unit_t r = bvni_unit_reduce_ex(u, scale, &dim_lost, &scale_lost);
+	if (overflow)
+		*overflow = dim_lost || scale_lost;
+	return r;
+}
+/*
+ * bvn_unit_reduce with its one flag told apart. The public function raises
+ * `overflow` for two failures that have nothing in common:
+ *
+ *   dim_lost    a component was DROPPED -- a summed exponent past ±100, more
+ *               bases than a unit can carry. The unit returned is a different
+ *               unit, and nothing can be written for it.
+ *   scale_lost  the unit returned is exactly right and only the folded scale
+ *               does not fit a double: y~m²⁰ is m²⁰ with a scale of 10⁻⁴⁸⁰.
+ *
+ * The formatter needs the unit and never looks at the scale -- the writer moves
+ * the value in exact rational arithmetic, from the unit it had to the unit that
+ * was emitted -- so refusing on the second was refusing a legal unit for the
+ * sake of a number nobody was going to read. `5.0 q~m¹¹` could not be written
+ * under BVN_UNIT_REDUCE at all, and said "unit_illegal" about a unit the reader
+ * had just accepted.
+ */
+value_unit_t bvni_unit_reduce_ex(value_unit_t u, double *scale,
+				 bool *dim_lost, bool *scale_lost)
+{
 	double scale_scratch = 1.0;
+	bool   overflow_store = false;
+	bool  *overflow = &overflow_store;
 	if (!scale)
 		scale = &scale_scratch;
 	bvn_verify_conv_table();
 	*scale = 1.0;
-	if (overflow)
-		*overflow = false;
+	*dim_lost   = false;
+	*scale_lost = false;
 	/* The scale is a product of prefix decades and, for a dropped component, of
 	 * SI factors -- and it is accumulated in the scaled representation for the
 	 * reason bvn_unit_to_si_factor is: `q~ha⁹·y~rd¹⁰·R~F⁷` folds 10⁻²⁷⁰ against
@@ -1563,9 +1591,9 @@ value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overflow)
 	 * caller ignoring the flag would silently multiply by. */
 	if (!bvni_scaled_to_double(sc, scale)) {
 		*scale = 1.0;
-		if (overflow)
-			*overflow = true;
+		*scale_lost = true;
 	}
+	*dim_lost = overflow_store;
 	return result;
 }
 /*

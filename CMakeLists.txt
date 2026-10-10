@@ -781,7 +781,8 @@ endif()
 # <build>/amalgamate and pack release archives into <build>:
 #   bovnar-<version>-<count>-amalgamate.tar.xz   (the amalgamation)
 #   bovnar-linux-<version>-<count>.tar.xz        (Linux artifacts)
-#   bovnar-windows-<version>-<count>.zip         (native or cross MinGW artifacts)
+#   bovnar-windows-msvc-<version>-<count>.zip    (native MSVC artifacts)
+#   bovnar-windows-mingw-<version>-<count>.zip   (native or cross MinGW artifacts)
 # The platform archives also bundle doc/, examples/ and highlighter/.
 # <count> is the git commit count. The platform archive matches the current
 # build; on a Linux host the Windows .zip is packed from the BVNR_CROSS_MINGW

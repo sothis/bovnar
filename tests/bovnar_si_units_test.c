@@ -642,6 +642,47 @@ static void test_unit_reduce_full_cancel_si(void)
 	ASSERT_TRUE(!overflow, "m·m⁻¹ reduce → no overflow");
 }
 
+/* A folded scale no double holds is not a lost dimension. bvn_unit_reduce has
+ * one flag for both and keeps raising it; the formatter, which returns a unit
+ * and not a scale, must refuse only the one that changed the unit. */
+static void test_reduce_scale_past_double_is_not_a_lost_dimension(void)
+{
+	printf("  unit_reduce: an unrepresentable scale keeps the unit...\n");
+	static const struct { const char *in, *out; } ok[] = {
+		{ "y~m²⁰",  "m²⁰" },    /* 10^-480 */
+		{ "q~m¹¹",  "m¹¹" },    /* 10^-330 */
+		{ "Q~m¹¹",  "m¹¹" },    /* 10^+330 */
+		{ "Yi~B⁴⁰", "B⁴⁰" },    /* 2^3200  */
+		/* ...and the named collapse still runs, or the next pass would find
+		 * it and the reduced form would not be a fixed point. */
+		{ "q~m¹¹·k~g/m¹⁰·s²", "m~N" },
+	};
+	for (size_t i = 0; i < sizeof ok / sizeof ok[0]; i++) {
+		bool pok = false, ovf = false;
+		double scale = 0.0;
+		char buf[BVNR_UNIT_STRING_MAX];
+		value_unit_t u = bvn_parse_unit((const uint8_t *)ok[i].in, &pok);
+		ASSERT_TRUE(pok, ok[i].in);
+		(void)bvn_unit_reduce(u, &scale, &ovf);
+		ASSERT_TRUE(ovf, "public reduce still reports the scale it cannot give");
+		ASSERT_EQ_DBL(scale, 1.0, 0.0, "and leaves *scale at 1.0");
+		int32_t n = bvn_unit_to_string_ex(u, buf, sizeof buf, BVN_UNIT_REDUCE);
+		ASSERT_TRUE(n > 0 && strcmp(buf, ok[i].out) == 0, ok[i].in);
+		/* fixed point */
+		value_unit_t r = bvn_parse_unit((const uint8_t *)buf, &pok);
+		char buf2[BVNR_UNIT_STRING_MAX];
+		n = bvn_unit_to_string_ex(r, buf2, sizeof buf2, BVN_UNIT_REDUCE);
+		ASSERT_TRUE(pok && n > 0 && strcmp(buf, buf2) == 0, "reduced form is a fixed point");
+	}
+	/* A dropped component is still refused. */
+	bool pok = false;
+	char buf[BVNR_UNIT_STRING_MAX];
+	value_unit_t lost = bvn_parse_unit((const uint8_t *)"m⁵⁰·m⁵¹", &pok);
+	ASSERT_TRUE(pok, "m⁵⁰·m⁵¹ parses");
+	ASSERT_TRUE(bvn_unit_to_string_ex(lost, buf, sizeof buf, BVN_UNIT_REDUCE) < 0,
+	            "m¹⁰¹ cannot be spelled and is refused");
+}
+
 static void test_value_conversion_examples(void)
 {
 	printf("  value conversion examples...\n");
@@ -3354,6 +3395,7 @@ int main(void)
 	test_malformed_exponent_never_aborts();
 	test_unwritable_units_are_refused();
 	test_reduce_keeps_a_prefixed_dimensionless_scale();
+	test_reduce_scale_past_double_is_not_a_lost_dimension();
 	test_convert_factor_identity();
 	test_prefixed_currency_converts();
 	test_logarithmic_units_refuse();

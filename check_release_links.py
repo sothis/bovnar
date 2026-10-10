@@ -96,10 +96,9 @@ def version_at(tag):
 def expected_assets(version, count):
     """Filenames the release job attaches, in the order the menu lists them.
 
-    Mirrors cmake/pack_artifacts.cmake (the three archives), the source-tarball
-    job, the msvc/mingw rename in the release job -- a release's asset namespace
-    is flat and both toolchains pack the identical name locally -- and the
-    SHA256SUMS the release job writes beside them.
+    Mirrors cmake/pack_artifacts.cmake (the amalgamation and one archive per
+    platform and toolchain), the source-tarball job, and the SHA256SUMS the
+    release job writes beside them.
     """
     tag = f"{version}-{count}"
     return [

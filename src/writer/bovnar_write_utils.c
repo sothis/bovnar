@@ -72,12 +72,41 @@ static bool emit_key(bvnr_writer_t *w, const char *key)
  * The unit is rendered to text honouring the writer's unit_flags (reduce /
  * ASCII-exponent options).
  */
+/*
+ * The one-shot spelling for the next unit (see bovnar.h). Kept in the writer's
+ * validator, whose unit_src is otherwise unused on this side.
+ */
+bool bvnr_writer_set_unit_source(bvnr_writer_t *w,
+				const char *text, uint32_t length)
+{
+	if (!w) return false;
+	if (!text || !length) {
+		w->val.unit_src_len = 0;
+		return true;
+	}
+	if (length > BVNR_UNIT_SOURCE_MAX) {
+		w->val.unit_src_len = 0;
+		return bvn_writer_set_error(w, error_unit_too_long);
+	}
+	memcpy(w->val.unit_src, text, length);
+	w->val.unit_src_len = (uint8_t)length;
+	return true;
+}
 bool bvnr_write_type_annotation(bvnr_writer_t *w,
 				value_type_spec_t vt,
 				value_unit_t vu)
 {
 	if (vu.num_components == 1u && vu.components[0].base == bu_none)
 		vu = BVN_UNIT_NONE;
+	/* Take the one-shot spelling now and forget it, whatever happens below: a
+	 * spelling that outlived a failed write would land on an unrelated value.
+	 * The copy is what the unit-parameter event points at. */
+	uint8_t  usrc[BVNR_UNIT_SOURCE_MAX + 1u];
+	uint32_t usrc_len = w ? w->val.unit_src_len : 0u;
+	if (usrc_len) {
+		memcpy(usrc, w->val.unit_src, usrc_len);
+		w->val.unit_src_len = 0;
+	}
 	bvnr_data_t d = {
 		.type       = token_is_type,
 		.value_type = vt,
@@ -153,9 +182,20 @@ bool bvnr_write_type_annotation(bvnr_writer_t *w,
 		d.type   = token_is_unit;
 		d.data   = (const void *)ubuf;
 		d.length = (uint32_t)ulen;
+		if (usrc_len) {
+			d.unit_source        = usrc;
+			d.unit_source_length = usrc_len;
+		}
 		if (!bvnr_write_event(w,
 				ev_type_annotation_type_family_parameter, &d))
 			return false;
+		d.unit_source        = NULL;
+		d.unit_source_length = 0;
+	} else if (usrc_len) {
+		/* A spelling for a value that turned out to carry no unit is a caller
+		 * mistake, and dropping it silently would hide which value it was
+		 * meant for. */
+		return bvn_writer_set_error(w, error_unit_mismatch);
 	}
 	d.type   = token_is_type;
 	d.data   = NULL;

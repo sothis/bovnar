@@ -20,6 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+import re as _re
 from decimal import Decimal
 from fractions import Fraction
 
@@ -201,16 +202,44 @@ def _uses_spec_1_1(obj) -> bool:
     return False
 
 
+# A unit profile's namespace: lowercase letters, digits and '-' (not leading),
+# then ':'. The same rule as the C library's bvni_unit_has_profile.
+_PROFILE_NS = _re.compile(r'[a-z0-9][a-z0-9-]*:')
+
+
+def _uses_spec_1_2(obj) -> bool:
+    """True if serialising obj would emit the unit-profile notation, which a
+    reader accepts only under a declared ``#!bovnar 1.2``: a Quantity whose kept
+    spelling is in a profile namespace (``ucum:mL{total}``), or whose unit has
+    no native spelling at all (``ucum:[IU]``).
+
+    The second case predates spellings being kept, and dumps() used to fail on
+    it -- the C writer refused the unit for want of a directive dumps() never
+    wrote."""
+    if isinstance(obj, Quantity):
+        if obj.unit_source and _PROFILE_NS.match(obj.unit_source):
+            return True
+        return bool(_has_real_unit(obj.unit.raw) and obj.unit.is_profile_only)
+    if isinstance(obj, dict):
+        return any(_uses_spec_1_2(v) for v in obj.values())
+    if isinstance(obj, (list, tuple)):
+        return any(_uses_spec_1_2(v) for v in obj)
+    return False
+
+
 def dumps(obj: dict, *, pretty: bool = True) -> bytes:
     if not isinstance(obj, dict):
         raise BovnarArgumentError("dumps() requires a dict at the top level")
-    need_version = _uses_spec_1_1(obj)
+    # The directive names the LOWEST version that admits everything written, so
+    # a document with no 1.2 construct stays readable by a 1.1 consumer.
+    need_version = (1, 2) if _uses_spec_1_2(obj) else \
+                   (1, 1) if _uses_spec_1_1(obj) else None
     cap = 4 * 1024 * 1024
     while True:
         try:
             with Writer.to_mem(cap=cap, pretty=pretty) as w:
                 if need_version:
-                    w.write_version(1, 1)
+                    w.write_version(*need_version)
                 _emit_dict(w, obj)
             return w.get_output()
         except BovnarWriteError as e:
@@ -410,7 +439,8 @@ def write_array(w: Writer,
                 rows,
                 *,
                 vt: ValueTypeSpec | None = None,
-                vu: ValueUnit | None = None) -> None:
+                vu: ValueUnit | None = None,
+                unit_source: str | None = None) -> None:
     """
     High-level typed array writer.
 
@@ -422,6 +452,9 @@ def write_array(w: Writer,
     list/tuple (nested array).
 
     *vt* and *vu*, when provided, emit a type annotation before the opening [.
+    *unit_source* spells *vu* the way the caller wants it written -- say
+    ``"ucum:mL{total}"`` for a *vu* of ``m~L`` -- instead of the canonical form;
+    it must parse to *vu* or the write is refused.
     """
     w.emit(Event.ASSIGNMENT_START, key=key)
 
@@ -436,7 +469,8 @@ def write_array(w: Writer,
             int(ValueTypeFamily.DATETIME):  'datetime',
         }
         name = fam_names.get(int(vt.family), 'uint')
-        w._emit_annotation(name, vt, vu if vu is not None else make_unit_none())
+        w._emit_annotation(name, vt, vu if vu is not None else make_unit_none(),
+                           unit_source if vu is not None else None)
 
     if rows and all(isinstance(r, (list, tuple)) for r in rows):
         row_list = rows
@@ -655,7 +689,9 @@ class _TypedDictParser(_DictParser):
         # not in `raw` (the whole-second carrier); carry them so dumps() can
         # round-trip the fraction losslessly.
         frac = data.frac_str() if data is not None else None
-        return Quantity(text, vt, vu, tok_type, frac=frac)
+        # spec 1.2 — and the unit's own spelling, for the same reason.
+        usrc = data.unit_source_str() if data is not None else None
+        return Quantity(text, vt, vu, tok_type, frac=frac, unit_source=usrc)
 
 
 def _seal_array(arr: _ArrScope):
@@ -841,7 +877,7 @@ def _emit_quantity(w: Writer, key: str, q: 'Quantity') -> None:
     w.emit(Event.ASSIGNMENT_START, key=key)
     fam_name = _FAM_NAMES.get(fam)
     if fam_name is not None and _needs_annotation(q.vtype, q.unit.raw, q.raw):
-        w._emit_annotation(fam_name, q.vtype, q.unit.raw)
+        w._emit_annotation(fam_name, q.vtype, q.unit.raw, q.unit_source)
     raw_bytes = q.raw.encode('utf-8') if q.raw else b''
     d = BvnrData()
     d.type       = q._tok_type
@@ -856,6 +892,13 @@ def _emit_quantity(w: Writer, key: str, q: 'Quantity') -> None:
     if frac_bytes:
         d.frac_data   = _ct.cast(_ct.c_char_p(frac_bytes), _ct.c_void_p)
         d.frac_length = len(frac_bytes)
+    # spec 1.2 — the unit's spelling rides on the value as well: where the
+    # annotation carries no unit parameter (a string's unit is written inline)
+    # this event is the only place the writer can take it from.
+    src_bytes = q.unit_source.encode('utf-8') if q.unit_source else None
+    if src_bytes:
+        d.unit_source        = _ct.cast(_ct.c_char_p(src_bytes), _ct.c_void_p)
+        d.unit_source_length = len(src_bytes)
     _write_event_data(w, d)
 
 
@@ -914,6 +957,29 @@ def _array_quantity_annotation(rows):
     if not needed:
         return None, None
     return vt, unit
+
+
+def _array_unit_source(rows):
+    """The one spelling every Quantity leaf of an array agrees on, else None.
+
+    An array has one annotation, so it can keep one spelling. Leaves that
+    disagree -- or that carry none -- get the canonical form, which is what the
+    array was written with before spellings were kept at all."""
+    src = None
+    stack = [rows]
+    while stack:
+        cur = stack.pop()
+        for e in cur:
+            if isinstance(e, (list, tuple)):
+                stack.append(e)
+            elif isinstance(e, Quantity):
+                if e.unit_source is None:
+                    return None
+                if src is None:
+                    src = e.unit_source
+                elif src != e.unit_source:
+                    return None
+    return src
 
 
 def _array_int_annotation(rows):
@@ -1038,7 +1104,9 @@ def _emit_value(w: Writer, key: str, value) -> None:
             vt, vu = _array_quantity_annotation(value)
         if vt is None:
             vt = _array_int_annotation(value)
-        write_array(w, key, value, vt=vt, vu=vu)
+        write_array(w, key, value, vt=vt, vu=vu,
+                    unit_source=_array_unit_source(value) if vu is not None
+                    else None)
     else:
         raise BovnarArgumentError(
             f"Cannot serialise value of type {type(value).__name__!r} "

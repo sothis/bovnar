@@ -34,6 +34,7 @@ add_executable(bvnr_dom_test             tests/bovnar_dom_test.c)
 add_executable(bvnr_si_test              tests/bovnar_si_units_test.c)
 add_executable(bvnr_unit_ext_test        tests/bovnar_unit_ext_test.c)
 add_executable(bvnr_ucum_test            tests/bovnar_ucum_test.c)
+add_executable(bvnr_unit_source_test     tests/bovnar_unit_source_test.c)
 add_executable(bvnr_unece_test           tests/bovnar_unece_test.c)
 add_executable(bvnr_qudt_test            tests/bovnar_qudt_test.c)
 add_executable(bvnr_udunits_test         tests/bovnar_udunits_test.c)
@@ -107,6 +108,8 @@ target_link_libraries(bvnr_unit_ext_test PRIVATE bvnr_static)
 target_compile_options(bvnr_ucum_test PRIVATE ${BVNR_C_FLAGS})
 target_include_directories(bvnr_ucum_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
 target_link_libraries(bvnr_ucum_test PRIVATE bvnr_static)
+target_compile_options(bvnr_unit_source_test PRIVATE ${BVNR_C_FLAGS})
+target_link_libraries(bvnr_unit_source_test PRIVATE bvnr_static)
 
 target_compile_options(bvnr_unece_test PRIVATE ${BVNR_C_FLAGS})
 target_include_directories(bvnr_unece_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
@@ -214,6 +217,13 @@ add_test(NAME bvnr_unit_ext_test COMMAND bvnr_unit_ext_test)
 set_tests_properties(bvnr_unit_ext_test PROPERTIES
     LABELS "unit;si;units_ext"
     FAIL_REGULAR_EXPRESSION "tests, [1-9][0-9]* failures")
+
+if(BVNR_WITH_UCUM_PROFILE AND BVNR_WITH_UDUNITS_PROFILE)
+add_test(NAME bvnr_unit_source_test COMMAND bvnr_unit_source_test)
+set_tests_properties(bvnr_unit_source_test PROPERTIES
+    LABELS "unit;profile;ucum;writer;dom"
+    FAIL_REGULAR_EXPRESSION "tests, [1-9][0-9]* failures")
+endif()
 
 if(BVNR_WITH_UCUM_PROFILE)
 add_test(NAME bvnr_ucum_test COMMAND bvnr_ucum_test)
@@ -1399,7 +1409,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 175)   # 129 base + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier)
+set(BVNR_EXPECTED_TEST_COUNT 176)   # 129 base + unit_source + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier)
                                     #             + citation
                                     #         + profiles_off_build
                                     # + om_test + cf_test

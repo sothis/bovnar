@@ -329,7 +329,8 @@ class Writer:
     def _emit_annotation(self,
                           family_name: str,
                           vt: ValueTypeSpec,
-                          vu: ValueUnit) -> None:
+                          vu: ValueUnit,
+                          unit_source: str | None = None) -> None:
 
         d_start = BvnrData()
         d_start.type = self._TOKEN_IS_TYPE
@@ -456,6 +457,14 @@ class Writer:
                 d_unit.data = ctypes.cast(
                     ctypes.c_char_p(raw_unit), ctypes.c_void_p)
                 d_unit.length = ulen
+                # spec 1.2 — the producer's own spelling, when one was kept. The
+                # C writer checks it against `vu` and ignores it under a unit
+                # flag; `_keep_src` must outlive the call.
+                if unit_source:
+                    _keep_src = unit_source.encode('utf-8')
+                    d_unit.unit_source = ctypes.cast(
+                        ctypes.c_char_p(_keep_src), ctypes.c_void_p)
+                    d_unit.unit_source_length = len(_keep_src)
                 ok = self._lib.bvnr_write_event(
                     self._ptr, int(Event.TYPE_ANNOTATION_TYPE_FAMILY_PARAM),
                     ctypes.byref(d_unit))

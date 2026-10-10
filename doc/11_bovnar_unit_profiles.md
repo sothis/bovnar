@@ -84,7 +84,7 @@ tables wrong in the same way would agree with each other perfectly.
 7. [Data model](#7-data-model)
     - 7.1 [The opaque units](#71-the-opaque-units)
     - 7.2 [Incommensurability, via the mechanism currencies already use](#72-incommensurability-via-the-mechanism-currencies-already-use)
-    - 7.3 [No new field on the data event](#73-no-new-field-on-the-data-event)
+    - 7.3 [The spelling on the data event](#73-the-spelling-on-the-data-event)
     - 7.4 [New error codes](#74-new-error-codes)
 8. [API](#8-api)
     - 8.1 [C](#81-c)
@@ -829,13 +829,41 @@ $ bovnar pretty-print ann.bvnr
 `pretty-print`'s ordinary behaviour, not the profile's — and the annotation text came through it
 verbatim.
 
-Constructing a document through the writer API is the path that loses it. `bvnr_write_float` and
-its siblings take a `value_unit_t`, and a `value_unit_t` has nowhere to hold an annotation, so a
-producer that builds a document from parsed units writes the canonical form.
+Constructing a document through the writer API **was** the path that lost it, and by default
+still writes the canonical form: `bvnr_write_float_unit` and its siblings take a `value_unit_t`, and
+a `value_unit_t` has nowhere to hold an annotation. What changed is that the spelling now has a way
+across. The reader hands it out on every unit-bearing event as `bvnr_data_t.unit_source` (§7.3),
+and the writer takes it back by either of two routes:
 
-**Making the writer preserve the spelling did not ship.** It needs a field on `bvnr_data_t` to carry
-the source out of the reader and a new parameter on every `bvnr_write_*` entry point to carry it
-back in — a large change to the whole writer surface for a string the unit model ignores. See §10.4.
+```c
+/* the typed helpers: one shot, for the next value */
+bvnr_write_version(w, 1, 2);
+bvnr_writer_set_unit_source(w, "ucum:mL{total}", 14);
+bvnr_write_float_unit(w, "a", 64, 1.5, mL);     /* .a = <float:64,ucum:mL{total}> 1.5e+0; */
+
+/* bvnr_write_event: the same field the reader filled */
+d.unit_source = "ucum:mL{total}";  d.unit_source_length = 14;
+```
+
+**The spelling is checked before it is written**, because the alternative is a document that says
+two things. It must parse to the very unit it is handed over with (`error_unit_mismatch`
+otherwise), it must be something a reader would take back as itself in that unit slot, and — being
+profile notation — it needs the `#!bovnar 1.2` directive already emitted, exactly as an opaque unit
+does (§2.2). doc/08 §3.1 has the full table. With `BVN_UNIT_REDUCE` or `BVN_UNIT_ASCII_EXP` set the
+spelling is ignored: those flags ask for a spelling of their own.
+
+**The two unit slots are not interchangeable**, and this is the one place a consumer meets that.
+`ucum:mL{a,b}` and `udunits:kg m-2 s-1` are each a single annotation parameter (§2.4, §13.2) and
+neither is a legal inline suffix, where a comma or a space ends the unit. A spelling read from an
+annotation is therefore written back into an annotation without question and refused as an inline
+suffix when it could not be read from one. Replaying a document's events never meets this — the
+annotation events travel with the value — and a consumer forwarding only `ev_data` does.
+
+What is still lost, and on purpose: **a spelling is not part of the unit.** `bvn_unit_equal`,
+conversion and the policies never see it, a `value_unit_t` that was stored and re-used carries
+none, and a value a unit policy *converted* has no document spelling for the unit it now carries.
+The DOM keeps the spelling only where it differs from the canonical form (§7.3), and the Python
+bindings keep it on a typed `Quantity` (§8.2).
 
 ### 5.3 Emitting a profile code from a native unit
 
@@ -1495,17 +1523,41 @@ profiles contribute to it. The block is contiguous and sits above every native u
 are static assertions in `bvn_internal_dims.h` rather than comments: a native unit appended past the
 block's first id would otherwise become silently incommensurable with everything.
 
-### 7.3 No new field on the data event
+### 7.3 The spelling on the data event
 
-The design added `unit_source`/`unit_source_length` to `bvnr_data_t`, following the
-`frac_data`/`frac_length` precedent from spec 1.1, so a consumer could see the producer's exact
-spelling. It did not ship, and `bvnr_data_t` carries no such field.
+`bvnr_data_t` carries the unit twice: `value_unit` is what it means, and `unit_source` /
+`unit_source_length` are the bytes the producer wrote — following the `frac_data`/`frac_length`
+precedent from spec 1.1, which solved the same problem for the one other value whose text says more
+than its parsed form.
 
-The reason is the writer, not the reader. Capturing the source text on the way in is easy — the
-lexer already holds it. Getting it back out is not: every `bvnr_write_*` entry point takes a
-`value_unit_t`, and a `value_unit_t` has nowhere to put an annotation, so preserving one end to end
-means a new parameter on the whole writer surface for a string the unit model ignores. That is a
-large change for §5.2's single loss. It is recorded in §10.4 rather than half-built.
+```c
+const void* unit_source;          /* e.g. "ucum:mL{total}"; NULL when there is no unit */
+uint32_t    unit_source_length;   /* at most BVNR_UNIT_SOURCE_MAX (255) */
+```
+
+**On the way in** the reader sets it on `ev_data` and on the type-annotation events whenever
+`value_unit` is a real unit. It is the annotation's unit parameter, or the inline suffix when the
+annotation carried no unit; where a value has both — `<float:64,mmHg> 120 ucum:mm[Hg]` — it is the
+annotation's, which is the one a re-serialisation writes. It follows the unit through arrays: an
+annotation inside an array holds for one element, and the spelling goes back to the array's own
+with the unit. A `want_unit` conversion leaves it alone, so it is always the spelling of
+`value_unit` and never of `conv.unit`.
+
+**On the way out** the writer emits it in place of the canonical form, after the checks §5.2
+describes. This section used to explain why that half was not built: every `bvnr_write_*` entry
+point takes a `value_unit_t`, and carrying a string beside it looked like a new parameter on the
+whole writer surface. It turned out to need one function. The helpers all reach the unit through
+`bvnr_write_type_annotation`, so a spelling set once on the writer
+(`bvnr_writer_set_unit_source`) and consumed by the next annotation covers every one of them, and a
+caller of `bvnr_write_event` already has the field.
+
+**The struct grew**, which is an ABI change — the same one the read-time conversion fields already
+made in this release, under the same SOVERSION bump.
+
+**The DOM** keeps the spelling per node (`bvn_dom_get_unit_source`) only where it differs from
+`bvn_unit_to_string` of the node's unit, so a large array written in canonical units stores nothing
+extra and `km`, `ucum:mm[Hg]` and `ucum:mL{total}` are each kept. A node whose value a unit policy
+converted has none.
 
 ### 7.4 New error codes
 
@@ -1573,11 +1625,22 @@ int32_t bvn_unit_to_ucum(value_unit_t u, char* buf, size_t bufsize);
  * symbols, so a caller needs no second way to ask. */
 uint32_t    bvn_unit_profile_count(void);
 const char* bvn_unit_profile_name(uint32_t index);
+
+/* New. Spell the unit of the NEXT value written through a bvnr_write_*_unit
+ * helper the way the producer wrote it (sections 5.2, 7.3). One shot. */
+bool bvnr_writer_set_unit_source(bvnr_writer_t* w,
+                                 const char* text, uint32_t length);
+
+/* New, in bovnar_dom.h. A node's unit as the document spelled it, where that
+ * differs from the canonical form; NULL otherwise (section 7.3). */
+const char* bvn_dom_get_unit_source(const bvn_dom_node_t* node,
+                                    uint32_t* len_out);
 ```
 
 `bvn_parse_unit` keeps its signature, which is why the policy strings of §4.3 work with no change
-at all: `bvnr_unit_policy_t` parses its targets with it, so the notation arrives for free. No struct
-changed, so the only ABI movement is the two error codes and the five new entry points.
+at all: `bvnr_unit_policy_t` parses its targets with it, so the notation arrives for free. One
+struct changed — `bvnr_data_t` gained `unit_source`/`unit_source_length` (§7.3) — so the ABI
+movement is that, the two error codes and the new entry points.
 
 ### 8.2 Python
 
@@ -1596,6 +1659,22 @@ bovnar.unit_error_code(s)        # -> int (error_code_t), 0 when s parses
 `bovnar.unit_to_profile`'s `ns` may also be `"om"` or `"cf"` — `cf` is read-only (§17.3), so it
 raises for every unit — and a namespace this build was not compiled with (§9.4) raises like one that
 does not exist.
+
+**The spelling travels through the typed tier.** `loads(typed=True)` puts it on each `Quantity` as
+`unit_source`, and `dumps()` writes it back, so a typed round trip of a document spelled in a
+profile is byte-identical — annotations, compact prefixes and space-multiplied UDUNITS codes
+included. `dumps()` prepends `#!bovnar 1.2` when a kept spelling (or a profile-only unit) needs it
+and not otherwise. An array has one annotation and so keeps one spelling: where its leaves disagree,
+or one carries none, the array is written in canonical form.
+
+```python
+q = bovnar.loads(src, typed=True)["volume"]
+q.unit_source                    # "ucum:mL{total}"
+str(q.unit)                      # "m~L"
+Quantity("1.5", vt, "m~L", unit_source="ucum:mL{total}")   # set by hand
+data.unit_source_str()           # the same text, on a Reader callback payload
+node.unit_source                 # and on a DomNode, where it differs from the canonical form
+```
 
 The existing `from_pint_unit` / `to_pint_unit` bridge is untouched.
 
@@ -2050,7 +2129,7 @@ out by name instead.
 | Version gate | Two checks in the validator — the annotation unit parameter and the inline unit suffix (§2.2); one guard in the writer |
 | Compatibility | Two refusals, one each in `bvn_unit_to_si_factor` and `bvn_unit_dimension_vector` (§7.2) |
 | Serialisation | One guard at the head of each of the two formatters (§5.1) |
-| ABI | Two error codes; three new functions. **No struct changed** |
+| ABI | Two error codes; three new functions. **No struct changed** *(in that pass — `bvnr_data_t` has since gained `unit_source`, §7.3)* |
 | Bindings | Four `ctypes` declarations and four wrappers |
 | Tests | 604 assertions across five per-vocabulary files, 3551 in the cross-vocabulary suite, 47 conformance cases; two assertions widened in `bovnar_unit_ext_test.c` (the figures for this pass; §§16–17 added two more files, 137 assertions, 1225 cross-vocabulary assertions and 6 conformance cases) |
 
@@ -2167,13 +2246,13 @@ exact code sees a change.
 
 ### 10.4 Specified here but not built
 
-Three things this document describes are not in the library, and one that was listed here has since
+One thing this document describes is not in the library, and three that were listed here have since
 landed. They are together so the gap is one paragraph to read rather than four sections to
 cross-check.
 
 | Not built | Where it is described | Consequence |
 |---|---|---|
-| Verbatim source preservation (`bvnr_data_t.unit_source`, writer re-emission) | §5.2, §7.3 | An annotation is dropped by a document built through the writer API. A parse-and-re-serialise round trip keeps it |
+| ~~Verbatim source preservation (`bvnr_data_t.unit_source`, writer re-emission)~~ | §5.2, §7.3 | **Built.** The reader delivers the spelling on every unit-bearing event, the writer re-emits it from `bvnr_write_event` and — through the one-shot `bvnr_writer_set_unit_source` — from every typed helper, and the DOM and the Python typed tier keep it |
 | ~~The generator's factor proof against the publishers' own values~~ | §9.2, §9.5 | **Built** as `check_profile_factors.py`, outside the generator. All seven profiles, six against their own publishers and `unece` at one remove through QUDT |
 | ~~`BVNR_WITH_UCUM_PROFILE` and feature reporting~~ | §9.4 | **Built** as seven per-vocabulary switches plus `bvn_unit_profile_count`/`bvn_unit_profile_name`. All seven off takes `libbvnr.so` from 1.96 MB to 524 KB |
 | A machine check of `unece` against Rec 20 **itself** | §9.2, §9.5, §10.2 | Rec 20's factors are prose; the table is checked through QUDT's cross-reference instead, which is another publisher's reading |
@@ -2184,7 +2263,9 @@ extending it to QUDT caught six local names QUDT does not define, a month that w
 a rotational speed 2π out. `unece` is reached through QUDT's cross-reference, which is a weaker
 claim and is reported as one. §14's caveat is therefore reduced rather than lifted: the strongest
 statement available for that table is that it agrees with another publisher's reading of Rec 20.
-Verbatim source preservation is next.
+Verbatim source preservation was next and is now built (§7.3). It cost less than the paragraph
+that deferred it predicted: one field pair on `bvnr_data_t` and one function, not a parameter on
+every writer entry point.
 
 ---
 

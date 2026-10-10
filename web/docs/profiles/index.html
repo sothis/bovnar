@@ -22,7 +22,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <meta property="article:published_time" content="2026-07-27">
-<meta property="article:modified_time" content="2026-08-01">
+<meta property="article:modified_time" content="2026-10-10">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar Unit Profiles">
@@ -32,7 +32,7 @@
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
 <link rel="alternate" type="text/markdown" href="/doc/11_bovnar_unit_profiles.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Unit Profiles", "description": "Writing UCUM, UNECE, QUDT and UDUNITS codes in a Bovnar unit slot: the transliteration tables, the collisions between the namespaces, what has no representation, and the cross-vocabulary conformance suite.", "url": "https://www.bovnar.io/docs/profiles/", "mainEntityOfPage": "https://www.bovnar.io/docs/profiles/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-07-27", "dateModified": "2026-08-01", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Unit Profiles", "item": "https://www.bovnar.io/docs/profiles/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Unit Profiles", "description": "Writing UCUM, UNECE, QUDT and UDUNITS codes in a Bovnar unit slot: the transliteration tables, the collisions between the namespaces, what has no representation, and the cross-vocabulary conformance suite.", "url": "https://www.bovnar.io/docs/profiles/", "mainEntityOfPage": "https://www.bovnar.io/docs/profiles/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-07-27", "dateModified": "2026-10-10", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Unit Profiles", "item": "https://www.bovnar.io/docs/profiles/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
@@ -183,7 +183,7 @@ tables wrong in the same way would agree with each other perfectly.</p>
 <li><a href="#7-data-model">Data model</a><ul>
 <li>7.1 <a href="#71-the-opaque-units">The opaque units</a></li>
 <li>7.2 <a href="#72-incommensurability-via-the-mechanism-currencies-already-use">Incommensurability, via the mechanism currencies already use</a></li>
-<li>7.3 <a href="#73-no-new-field-on-the-data-event">No new field on the data event</a></li>
+<li>7.3 <a href="#73-the-spelling-on-the-data-event">The spelling on the data event</a></li>
 <li>7.4 <a href="#74-new-error-codes">New error codes</a></li>
 </ul>
 </li>
@@ -971,12 +971,37 @@ $ bovnar pretty-print ann.bvnr
 <p><code>.b</code> shows both halves of that at once: the inline unit was promoted to an annotation — which is
 <code>pretty-print</code>'s ordinary behaviour, not the profile's — and the annotation text came through it
 verbatim.</p>
-<p>Constructing a document through the writer API is the path that loses it. <code>bvnr_write_float</code> and
-its siblings take a <code>value_unit_t</code>, and a <code>value_unit_t</code> has nowhere to hold an annotation, so a
-producer that builds a document from parsed units writes the canonical form.</p>
-<p><strong>Making the writer preserve the spelling did not ship.</strong> It needs a field on <code>bvnr_data_t</code> to carry
-the source out of the reader and a new parameter on every <code>bvnr_write_*</code> entry point to carry it
-back in — a large change to the whole writer surface for a string the unit model ignores. See §10.4.</p>
+<p>Constructing a document through the writer API <strong>was</strong> the path that lost it, and by default
+still writes the canonical form: <code>bvnr_write_float_unit</code> and its siblings take a <code>value_unit_t</code>, and
+a <code>value_unit_t</code> has nowhere to hold an annotation. What changed is that the spelling now has a way
+across. The reader hands it out on every unit-bearing event as <code>bvnr_data_t.unit_source</code> (§7.3),
+and the writer takes it back by either of two routes:</p>
+<div class="codehilite"><pre><span></span><code><span class="cm">/* the typed helpers: one shot, for the next value */</span>
+<span class="n">bvnr_write_version</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span>
+<span class="n">bvnr_writer_set_unit_source</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;ucum:mL{total}&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">14</span><span class="p">);</span>
+<span class="n">bvnr_write_float_unit</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;a&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">64</span><span class="p">,</span><span class="w"> </span><span class="mf">1.5</span><span class="p">,</span><span class="w"> </span><span class="n">mL</span><span class="p">);</span><span class="w">     </span><span class="cm">/* .a = &lt;float:64,ucum:mL{total}&gt; 1.5e+0; */</span>
+
+<span class="cm">/* bvnr_write_event: the same field the reader filled */</span>
+<span class="n">d</span><span class="p">.</span><span class="n">unit_source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;ucum:mL{total}&quot;</span><span class="p">;</span><span class="w">  </span><span class="n">d</span><span class="p">.</span><span class="n">unit_source_length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">14</span><span class="p">;</span>
+</code></pre></div>
+
+<p><strong>The spelling is checked before it is written</strong>, because the alternative is a document that says
+two things. It must parse to the very unit it is handed over with (<code>error_unit_mismatch</code>
+otherwise), it must be something a reader would take back as itself in that unit slot, and — being
+profile notation — it needs the <code>#!bovnar 1.2</code> directive already emitted, exactly as an opaque unit
+does (§2.2). doc/08 §3.1 has the full table. With <code>BVN_UNIT_REDUCE</code> or <code>BVN_UNIT_ASCII_EXP</code> set the
+spelling is ignored: those flags ask for a spelling of their own.</p>
+<p><strong>The two unit slots are not interchangeable</strong>, and this is the one place a consumer meets that.
+<code>ucum:mL{a,b}</code> and <code>udunits:kg m-2 s-1</code> are each a single annotation parameter (§2.4, §13.2) and
+neither is a legal inline suffix, where a comma or a space ends the unit. A spelling read from an
+annotation is therefore written back into an annotation without question and refused as an inline
+suffix when it could not be read from one. Replaying a document's events never meets this — the
+annotation events travel with the value — and a consumer forwarding only <code>ev_data</code> does.</p>
+<p>What is still lost, and on purpose: <strong>a spelling is not part of the unit.</strong> <code>bvn_unit_equal</code>,
+conversion and the policies never see it, a <code>value_unit_t</code> that was stored and re-used carries
+none, and a value a unit policy <em>converted</em> has no document spelling for the unit it now carries.
+The DOM keeps the spelling only where it differs from the canonical form (§7.3), and the Python
+bindings keep it on a typed <code>Quantity</code> (§8.2).</p>
 <h3 id="53-emitting-a-profile-code-from-a-native-unit">5.3 Emitting a profile code from a native unit</h3>
 <p><code>bvn_unit_to_profile(ns, value_unit_t, char*, size_t)</code> writes a code in the named vocabulary for a
 unit that has one, for producers whose output field is foreign-typed;
@@ -2750,15 +2775,35 @@ currency nor an assay unit has one.</p>
 profiles contribute to it. The block is contiguous and sits above every native unit, and both facts
 are static assertions in <code>bvn_internal_dims.h</code> rather than comments: a native unit appended past the
 block's first id would otherwise become silently incommensurable with everything.</p>
-<h3 id="73-no-new-field-on-the-data-event">7.3 No new field on the data event</h3>
-<p>The design added <code>unit_source</code>/<code>unit_source_length</code> to <code>bvnr_data_t</code>, following the
-<code>frac_data</code>/<code>frac_length</code> precedent from spec 1.1, so a consumer could see the producer's exact
-spelling. It did not ship, and <code>bvnr_data_t</code> carries no such field.</p>
-<p>The reason is the writer, not the reader. Capturing the source text on the way in is easy — the
-lexer already holds it. Getting it back out is not: every <code>bvnr_write_*</code> entry point takes a
-<code>value_unit_t</code>, and a <code>value_unit_t</code> has nowhere to put an annotation, so preserving one end to end
-means a new parameter on the whole writer surface for a string the unit model ignores. That is a
-large change for §5.2's single loss. It is recorded in §10.4 rather than half-built.</p>
+<h3 id="73-the-spelling-on-the-data-event">7.3 The spelling on the data event</h3>
+<p><code>bvnr_data_t</code> carries the unit twice: <code>value_unit</code> is what it means, and <code>unit_source</code> /
+<code>unit_source_length</code> are the bytes the producer wrote — following the <code>frac_data</code>/<code>frac_length</code>
+precedent from spec 1.1, which solved the same problem for the one other value whose text says more
+than its parsed form.</p>
+<div class="codehilite"><pre><span></span><code><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">unit_source</span><span class="p">;</span><span class="w">          </span><span class="cm">/* e.g. &quot;ucum:mL{total}&quot;; NULL when there is no unit */</span>
+<span class="kt">uint32_t</span><span class="w">    </span><span class="n">unit_source_length</span><span class="p">;</span><span class="w">   </span><span class="cm">/* at most BVNR_UNIT_SOURCE_MAX (255) */</span>
+</code></pre></div>
+
+<p><strong>On the way in</strong> the reader sets it on <code>ev_data</code> and on the type-annotation events whenever
+<code>value_unit</code> is a real unit. It is the annotation's unit parameter, or the inline suffix when the
+annotation carried no unit; where a value has both — <code>&lt;float:64,mmHg&gt; 120 ucum:mm[Hg]</code> — it is the
+annotation's, which is the one a re-serialisation writes. It follows the unit through arrays: an
+annotation inside an array holds for one element, and the spelling goes back to the array's own
+with the unit. A <code>want_unit</code> conversion leaves it alone, so it is always the spelling of
+<code>value_unit</code> and never of <code>conv.unit</code>.</p>
+<p><strong>On the way out</strong> the writer emits it in place of the canonical form, after the checks §5.2
+describes. This section used to explain why that half was not built: every <code>bvnr_write_*</code> entry
+point takes a <code>value_unit_t</code>, and carrying a string beside it looked like a new parameter on the
+whole writer surface. It turned out to need one function. The helpers all reach the unit through
+<code>bvnr_write_type_annotation</code>, so a spelling set once on the writer
+(<code>bvnr_writer_set_unit_source</code>) and consumed by the next annotation covers every one of them, and a
+caller of <code>bvnr_write_event</code> already has the field.</p>
+<p><strong>The struct grew</strong>, which is an ABI change — the same one the read-time conversion fields already
+made in this release, under the same SOVERSION bump.</p>
+<p><strong>The DOM</strong> keeps the spelling per node (<code>bvn_dom_get_unit_source</code>) only where it differs from
+<code>bvn_unit_to_string</code> of the node's unit, so a large array written in canonical units stores nothing
+extra and <code>km</code>, <code>ucum:mm[Hg]</code> and <code>ucum:mL{total}</code> are each kept. A node whose value a unit policy
+converted has none.</p>
 <h3 id="74-new-error-codes">7.4 New error codes</h3>
 <p>Two, appended after <code>error_octet_stream_truncated</code> (48) and moving <code>BVN_ERROR_COUNT</code> with them —
 the fuzz harnesses use that count as their bound for "is this a real error code" and trap above it,
@@ -2833,11 +2878,22 @@ build-time fact rather than a comment.</p>
 <span class="cm"> * symbols, so a caller needs no second way to ask. */</span>
 <span class="kt">uint32_t</span><span class="w">    </span><span class="nf">bvn_unit_profile_count</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
 <span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="nf">bvn_unit_profile_name</span><span class="p">(</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">index</span><span class="p">);</span>
+
+<span class="cm">/* New. Spell the unit of the NEXT value written through a bvnr_write_*_unit</span>
+<span class="cm"> * helper the way the producer wrote it (sections 5.2, 7.3). One shot. */</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_writer_set_unit_source</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="o">*</span><span class="w"> </span><span class="n">w</span><span class="p">,</span>
+<span class="w">                                 </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">text</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">length</span><span class="p">);</span>
+
+<span class="cm">/* New, in bovnar_dom.h. A node&#39;s unit as the document spelled it, where that</span>
+<span class="cm"> * differs from the canonical form; NULL otherwise (section 7.3). */</span>
+<span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="nf">bvn_dom_get_unit_source</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvn_dom_node_t</span><span class="o">*</span><span class="w"> </span><span class="n">node</span><span class="p">,</span>
+<span class="w">                                    </span><span class="kt">uint32_t</span><span class="o">*</span><span class="w"> </span><span class="n">len_out</span><span class="p">);</span>
 </code></pre></div>
 
 <p><code>bvn_parse_unit</code> keeps its signature, which is why the policy strings of §4.3 work with no change
-at all: <code>bvnr_unit_policy_t</code> parses its targets with it, so the notation arrives for free. No struct
-changed, so the only ABI movement is the two error codes and the five new entry points.</p>
+at all: <code>bvnr_unit_policy_t</code> parses its targets with it, so the notation arrives for free. One
+struct changed — <code>bvnr_data_t</code> gained <code>unit_source</code>/<code>unit_source_length</code> (§7.3) — so the ABI
+movement is that, the two error codes and the new entry points.</p>
 <h3 id="82-python">8.2 Python</h3>
 <p><code>parse_unit</code>, <code>unit_to_str</code>, <code>units_compatible</code> and <code>UnitPolicy</code> accept and produce every profile
 notation with no signature change. Four additions mirror the C ones:</p>
@@ -2852,6 +2908,20 @@ notation with no signature change. Four additions mirror the C ones:</p>
 <p><code>bovnar.unit_to_profile</code>'s <code>ns</code> may also be <code>"om"</code> or <code>"cf"</code> — <code>cf</code> is read-only (§17.3), so it
 raises for every unit — and a namespace this build was not compiled with (§9.4) raises like one that
 does not exist.</p>
+<p><strong>The spelling travels through the typed tier.</strong> <code>loads(typed=True)</code> puts it on each <code>Quantity</code> as
+<code>unit_source</code>, and <code>dumps()</code> writes it back, so a typed round trip of a document spelled in a
+profile is byte-identical — annotations, compact prefixes and space-multiplied UDUNITS codes
+included. <code>dumps()</code> prepends <code>#!bovnar 1.2</code> when a kept spelling (or a profile-only unit) needs it
+and not otherwise. An array has one annotation and so keeps one spelling: where its leaves disagree,
+or one carries none, the array is written in canonical form.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">q</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">typed</span><span class="o">=</span><span class="kc">True</span><span class="p">)[</span><span class="s2">&quot;volume&quot;</span><span class="p">]</span>
+<span class="n">q</span><span class="o">.</span><span class="n">unit_source</span>                    <span class="c1"># &quot;ucum:mL{total}&quot;</span>
+<span class="nb">str</span><span class="p">(</span><span class="n">q</span><span class="o">.</span><span class="n">unit</span><span class="p">)</span>                      <span class="c1"># &quot;m~L&quot;</span>
+<span class="n">Quantity</span><span class="p">(</span><span class="s2">&quot;1.5&quot;</span><span class="p">,</span> <span class="n">vt</span><span class="p">,</span> <span class="s2">&quot;m~L&quot;</span><span class="p">,</span> <span class="n">unit_source</span><span class="o">=</span><span class="s2">&quot;ucum:mL</span><span class="si">{total}</span><span class="s2">&quot;</span><span class="p">)</span>   <span class="c1"># set by hand</span>
+<span class="n">data</span><span class="o">.</span><span class="n">unit_source_str</span><span class="p">()</span>           <span class="c1"># the same text, on a Reader callback payload</span>
+<span class="n">node</span><span class="o">.</span><span class="n">unit_source</span>                 <span class="c1"># and on a DomNode, where it differs from the canonical form</span>
+</code></pre></div>
+
 <p>The existing <code>from_pint_unit</code> / <code>to_pint_unit</code> bridge is untouched.</p>
 <h3 id="83-cli">8.3 CLI</h3>
 <p><code>bovnar version</code> prints the compiled-in namespaces on a second line, which is where to look first
@@ -3465,7 +3535,7 @@ out by name instead.</p>
 </tr>
 <tr>
 <td>ABI</td>
-<td>Two error codes; three new functions. <strong>No struct changed</strong></td>
+<td>Two error codes; three new functions. <strong>No struct changed</strong> <em>(in that pass — <code>bvnr_data_t</code> has since gained <code>unit_source</code>, §7.3)</em></td>
 </tr>
 <tr>
 <td>Bindings</td>
@@ -3577,7 +3647,7 @@ exact code sees a change.</p>
   cross-currency conversion is refused rather than guessed (doc/05 §9.6). No vocabulary here yields
   a currency, so the profiles never reach this.</p>
 <h3 id="104-specified-here-but-not-built">10.4 Specified here but not built</h3>
-<p>Three things this document describes are not in the library, and one that was listed here has since
+<p>One thing this document describes is not in the library, and three that were listed here have since
 landed. They are together so the gap is one paragraph to read rather than four sections to
 cross-check.</p>
 <table>
@@ -3590,9 +3660,9 @@ cross-check.</p>
 </thead>
 <tbody>
 <tr>
-<td>Verbatim source preservation (<code>bvnr_data_t.unit_source</code>, writer re-emission)</td>
+<td>~~Verbatim source preservation (<code>bvnr_data_t.unit_source</code>, writer re-emission)~~</td>
 <td>§5.2, §7.3</td>
-<td>An annotation is dropped by a document built through the writer API. A parse-and-re-serialise round trip keeps it</td>
+<td><strong>Built.</strong> The reader delivers the spelling on every unit-bearing event, the writer re-emits it from <code>bvnr_write_event</code> and — through the one-shot <code>bvnr_writer_set_unit_source</code> — from every typed helper, and the DOM and the Python typed tier keep it</td>
 </tr>
 <tr>
 <td>~~The generator's factor proof against the publishers' own values~~</td>
@@ -3617,7 +3687,9 @@ extending it to QUDT caught six local names QUDT does not define, a month that w
 a rotational speed 2π out. <code>unece</code> is reached through QUDT's cross-reference, which is a weaker
 claim and is reported as one. §14's caveat is therefore reduced rather than lifted: the strongest
 statement available for that table is that it agrees with another publisher's reading of Rec 20.
-Verbatim source preservation is next.</p>
+Verbatim source preservation was next and is now built (§7.3). It cost less than the paragraph
+that deferred it predicted: one field pair on <code>bvnr_data_t</code> and one function, not a parameter on
+every writer entry point.</p>
 <hr />
 <h2 id="11-the-unece-profile">11. The UNECE profile</h2>
 <blockquote>

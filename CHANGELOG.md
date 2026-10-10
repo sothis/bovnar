@@ -20,6 +20,70 @@ rebuild consumers against the new headers. **SOVERSION is bumped 1 → 2**
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
 
+### Added — a unit keeps the spelling it was written in (`unit_source`)
+
+`ucum:mL{total}` parses to `m~L`, and until now that was the end of `{total}`:
+the reader delivered only the parsed unit, and anything built through the writer
+API wrote the canonical form. doc/11 §10.4 listed this as specified and not
+built. It is built.
+
+`bvnr_data_t` gains `unit_source` / `unit_source_length` — the unit exactly as
+the producer spelled it, beside `value_unit`, which is what it means. **This
+grows the struct**, under the SOVERSION bump this release already carries.
+
+- **Reader.** Set on `ev_data` and on the type-annotation events whenever the
+  value has a real unit: the annotation's unit parameter, or the inline suffix
+  where the annotation carried none. It follows the unit through arrays (an
+  annotation inside an array holds for one element) and through error recovery,
+  and a `want_unit` conversion leaves it alone.
+- **Writer.** `bvnr_write_event` emits it in place of the canonical form, in
+  either unit slot. The typed helpers take a `value_unit_t` and so cannot carry
+  it; the new `bvnr_writer_set_unit_source(w, text, len)` hands it over for the
+  **next** value and then forgets it, which covers all nine `bvnr_write_*_unit`
+  helpers with one symbol.
+- **Checked, not trusted.** A spelling that parses to a different unit is
+  `error_unit_mismatch`; profile notation without an emitted `#!bovnar 1.2` is
+  `error_unsupported_spec_version`; text that a reader would not take back as
+  itself in that slot is `error_unit_illegal`. That last check is made by
+  reading the text back through the real reader rather than by restating the
+  lexer's byte classes — `m>1;.k=<uint:8,m` is not a unit and, pasted into an
+  annotation, is a second assignment. With `BVN_UNIT_REDUCE` or
+  `BVN_UNIT_ASCII_EXP` set the spelling is ignored: those ask for one of their
+  own.
+- **DOM.** `bvn_dom_get_unit_source()` returns it where it differs from the
+  canonical form and `NULL` otherwise, so an array in canonical units stores
+  nothing extra.
+- **Python.** `BvnrData.unit_source_str()`, `Quantity.unit_source`,
+  `DomNode.unit_source`, and a `unit_source=` argument to `write_array`. A
+  `loads(typed=True)` → `dumps()` round trip of a profile-spelled document is
+  now byte-identical.
+- **wasm.** `events()` reports `unit_source` beside `unit`.
+
+Nothing that worked before writes different bytes: a reader-to-writer replay
+(`bovnar pretty-print`) already carried the annotation's text, and its output is
+unchanged. Pinned by `tests/bovnar_unit_source_test.c` (103 assertions) and
+`python/tests/test_unit_source.py`.
+
+### Fixed — a long unit text under a unit flag overran a stack buffer in the writer
+
+The annotation path copies the unit parameter's text into a scratch buffer
+before re-parsing it, when `BVN_UNIT_REDUCE` or `BVN_UNIT_ASCII_EXP` is set. The
+buffer was `char[512]`; the guard in front of the copy was
+`length < BVNR_UNIT_STRING_MAX`, which is 1088. A `bvnr_write_event` caller
+passing 512 to 1087 bytes of unit text wrote up to 576 bytes past the end of it.
+The buffer is now sized by the guard. Not reachable from a parsed document — the
+reader caps a unit parameter at 255 bytes — only from a caller constructing the
+event by hand.
+
+### Fixed — Python `dumps()` could not write a unit that has no native spelling
+
+`ucum:[IU]` and the UN/ECE package codes can only be written in profile
+notation, which the C writer refuses without a `#!bovnar 1.2` directive.
+`dumps()` only ever knew how to emit `#!bovnar 1.1`, so a typed document holding
+such a unit loaded and then failed to dump with `unsupported_spec_version`. It
+now declares 1.2 when the output needs it — for a profile-only unit or a kept
+profile spelling — and stays at 1.1, or at no directive, otherwise.
+
 ### Fixed — two documents still said `ppt` reads as the picopint
 
 Making the compact token `ppt` a parse error left three descriptions of it

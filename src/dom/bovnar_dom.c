@@ -121,6 +121,7 @@ void bvn_dom_node_destroy(bvn_dom_node_t *n)
 		 * field freed on one arm of a switch over an unrelated discriminator
 		 * becomes one the moment that stops holding. */
 		free(cur->dt_frac);   /* spec 1.1 datetime sub-second digits */
+		free(cur->unit_src);  /* spec 1.2 the unit's own spelling */
 		switch (cur->type) {
 		case BVN_DOM_INT:
 			if (cur->value_type.width > 64u && cur->val.bigint)
@@ -645,6 +646,15 @@ const char *bvn_dom_get_datetime_fraction(const bvn_dom_node_t *node,
 		return NULL;
 	if (len_out) *len_out = node->dt_frac_len;
 	return node->dt_frac;
+}
+const char *bvn_dom_get_unit_source(const bvn_dom_node_t *node,
+		uint32_t *len_out)
+{
+	if (len_out) *len_out = 0;
+	if (!node || !node->unit_src)
+		return NULL;
+	if (len_out) *len_out = node->unit_src_len;
+	return node->unit_src;
 }
 /*
  * The two raw integer extractors behind every bvn_dom_get_iN / get_uN

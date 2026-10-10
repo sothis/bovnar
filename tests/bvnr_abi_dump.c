@@ -77,6 +77,8 @@ int main(void)
 	ABI_FIELD(bvnr_data_t, length);
 	ABI_FIELD(bvnr_data_t, frac_data);
 	ABI_FIELD(bvnr_data_t, frac_length);
+	ABI_FIELD(bvnr_data_t, unit_source);
+	ABI_FIELD(bvnr_data_t, unit_source_length);
 	ABI_FIELD(bvnr_data_t, converted);
 	ABI_FIELD(bvnr_data_t, conv);
 

@@ -188,6 +188,19 @@ class TestBvnrData:
         assert BvnrData.converted.offset > BvnrData.frac_length.offset
         assert BvnrData.conv.offset > BvnrData.converted.offset
 
+    def test_has_spec_1_2_unit_source_fields(self):
+        # spec 1.2 added unit_source/unit_source_length BETWEEN the frac fields
+        # and the conversion carrier, so every later offset moved. Same hazard
+        # as above, same guard; test_abi.py checks the numbers against the C
+        # compiler, this pins the order a reader of the struct relies on.
+        d = BvnrData()
+        assert (d.unit_source == 0 or d.unit_source is None)
+        assert d.unit_source_length == 0
+        assert d.unit_source_str() is None
+        assert BvnrData.unit_source.offset > BvnrData.frac_length.offset
+        assert BvnrData.unit_source_length.offset > BvnrData.unit_source.offset
+        assert BvnrData.converted.offset > BvnrData.unit_source_length.offset
+
 class TestOpaqueTypes:
     def test_source_size(self):
         assert ctypes.sizeof(BvnrSource) == OPAQUE_BYTES

@@ -22,7 +22,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <meta property="article:published_time" content="2026-05-14">
-<meta property="article:modified_time" content="2026-07-31">
+<meta property="article:modified_time" content="2026-10-10">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar C Read &amp; Write API">
@@ -32,7 +32,7 @@
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
 <link rel="alternate" type="text/markdown" href="/doc/08_bovnar_readwrite_api.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar C Read & Write API", "description": "The Bovnar C reader, writer, and DOM API reference (bovnar.h, bovnar_dom.h), including read-time lossless unit and base conversion.", "url": "https://www.bovnar.io/docs/api/", "mainEntityOfPage": "https://www.bovnar.io/docs/api/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-07-31", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar C Read & Write API", "item": "https://www.bovnar.io/docs/api/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar C Read & Write API", "description": "The Bovnar C reader, writer, and DOM API reference (bovnar.h, bovnar_dom.h), including read-time lossless unit and base conversion.", "url": "https://www.bovnar.io/docs/api/", "mainEntityOfPage": "https://www.bovnar.io/docs/api/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-10-10", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar C Read & Write API", "item": "https://www.bovnar.io/docs/api/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
@@ -402,6 +402,27 @@ NUL-terminated</strong> — bound the read by <code>frac_length</code>.</p>
 <span class="p">}</span>
 </code></pre></div>
 
+<p><strong>The unit's own spelling (<code>unit_source</code>, spec 1.2).</strong> <code>d-&gt;value_unit</code> is what a
+unit <em>means</em>; <code>d-&gt;unit_source</code> / <code>d-&gt;unit_source_length</code> are what the document
+<em>wrote</em>. The two differ wherever formatting a <code>value_unit_t</code> is lossy: <code>km</code> and
+<code>k~m</code> are one unit, <code>ucum:mm[Hg]</code> and <code>mmHg</code> are one unit, and <code>ucum:mL{total}</code>
+parses to <code>m~L</code> with nowhere in the struct for <code>{total}</code> to live.</p>
+<p>The reader sets the pair on <code>ev_data</code> and on the type-annotation events whenever
+<code>value_unit</code> is a real unit, and leaves it <code>NULL</code>/<code>0</code> otherwise — no unit,
+<code>no_unit</code>, a datetime's epoch. It is the annotation's unit parameter, or the
+inline suffix when the annotation carried no unit; where a value has both, the
+annotation's. Like <code>d-&gt;data</code> it is reader-owned, valid for the callback only and
+<strong>not NUL-terminated</strong>. A <code>want_unit</code> conversion leaves it alone: it is the
+spelling of <code>value_unit</code>, never of <code>conv.unit</code>.</p>
+<div class="codehilite"><pre><span></span><code><span class="cm">/* on a data event: */</span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">d</span><span class="o">-&gt;</span><span class="n">unit_source</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="cm">/* d-&gt;unit_source[0 .. unit_source_length) is e.g. &quot;ucum:mL{total}&quot;,</span>
+<span class="cm">     * while bvn_unit_to_string(d-&gt;value_unit, ...) gives &quot;m~L&quot; */</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>The writer honours it in the other direction — see
+<a href="#31-bvnr_write_type_annotation">§3.1</a>.</p>
 <hr />
 <h3 id="110-read-time-lossless-unit--base-conversion-want_unit">1.10 Read-time lossless unit / base conversion (<code>want_unit</code>)</h3>
 <div class="codehilite"><pre><span></span><code><span class="cm">/* bvnr_read_flags_t */</span>
@@ -1323,6 +1344,75 @@ survives re-opening the writer on another document, and is cleared with <code>NU
 <span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">bvnr_write_type_annotation</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="n">vt</span><span class="p">,</span><span class="w"> </span><span class="n">vu</span><span class="p">))</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
 </code></pre></div>
 
+<h4 id="writing-a-unit-the-way-it-was-spelled-bvnr_writer_set_unit_source">Writing a unit the way it was spelled (<code>bvnr_writer_set_unit_source</code>)</h4>
+<div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_writer_set_unit_source</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span>
+<span class="w">                                 </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">text</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">length</span><span class="p">);</span>
+</code></pre></div>
+
+<p><code>vu</code> is a <code>value_unit_t</code>, and a <code>value_unit_t</code> has nowhere to hold a spelling,
+so the unit is written in canonical form: a producer holding <code>ucum:mL{total}</code>
+gets <code>m~L</code>. <code>bvnr_writer_set_unit_source</code> hands the spelling over separately.
+The <strong>next</strong> <code>bvnr_write_type_annotation</code> — which every <code>bvnr_write_*_unit</code>
+helper calls — emits <code>text</code> for its unit and then forgets it:</p>
+<div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="n">ok</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="n">value_unit_t</span><span class="w"> </span><span class="n">mL</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_parse_unit</span><span class="p">((</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="s">&quot;m~L&quot;</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ok</span><span class="p">);</span>
+
+<span class="n">bvnr_write_version</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span><span class="w">                       </span><span class="cm">/* profile notation needs it */</span>
+<span class="n">bvnr_writer_set_unit_source</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;ucum:mL{total}&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">14</span><span class="p">);</span>
+<span class="n">bvnr_write_float_unit</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;volume&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">64</span><span class="p">,</span><span class="w"> </span><span class="mf">1.5</span><span class="p">,</span><span class="w"> </span><span class="n">mL</span><span class="p">);</span><span class="w">   </span><span class="cm">/* &lt;float:64,ucum:mL{total}&gt; */</span>
+<span class="n">bvnr_write_float_unit</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;other&quot;</span><span class="p">,</span><span class="w">  </span><span class="mi">64</span><span class="p">,</span><span class="w"> </span><span class="mf">2.5</span><span class="p">,</span><span class="w"> </span><span class="n">mL</span><span class="p">);</span><span class="w">   </span><span class="cm">/* &lt;float:64,m~L&gt; — one shot */</span>
+</code></pre></div>
+
+<p>It is one shot so that it cannot leak onto a later value; it is also dropped
+when that write fails, when the writer is re-opened, and by passing <code>NULL</code> or a
+zero length. The text is copied.</p>
+<p>A caller driving <code>bvnr_write_event</code> directly needs no setter: set
+<code>bvnr_data_t.unit_source</code> on the unit-parameter event (annotation slot) or on
+the data event (inline suffix). Either way the spelling is <strong>checked before a
+byte of it is written</strong>, because a spelling that disagrees with the unit is a
+document that says two things:</p>
+<table>
+<thead>
+<tr>
+<th>The spelling…</th>
+<th>Error</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>parses to a different unit than the one given</td>
+<td><code>error_unit_mismatch</code></td>
+</tr>
+<tr>
+<td>does not parse</td>
+<td>whatever <code>bvn_unit_error_code</code> says: <code>error_unit_illegal</code>, <code>error_unit_profile_unknown</code>, <code>error_unit_profile_unsupported</code></td>
+</tr>
+<tr>
+<td>is longer than <code>BVNR_UNIT_SOURCE_MAX</code> (255) bytes</td>
+<td><code>error_unit_too_long</code></td>
+</tr>
+<tr>
+<td>is profile notation and no <code>#!bovnar 1.2</code> directive was emitted</td>
+<td><code>error_unsupported_spec_version</code></td>
+</tr>
+<tr>
+<td>would not be read back as itself in that unit slot</td>
+<td><code>error_unit_illegal</code></td>
+</tr>
+<tr>
+<td>was set for a value that turned out to carry no unit</td>
+<td><code>error_unit_mismatch</code></td>
+</tr>
+</tbody>
+</table>
+<p>The fifth row is the one a unit parser cannot answer, and it is answered by
+reading the text back through the real reader. The two unit slots end in
+different places: <code>ucum:mL{a,b}</code> and <code>udunits:kg m-2 s-1</code> are each one
+annotation parameter and neither is a legal inline suffix, so the same spelling
+is written in one slot and refused in the other.</p>
+<p><strong>A unit flag wins.</strong> With <code>BVN_UNIT_REDUCE</code> or <code>BVN_UNIT_ASCII_EXP</code> set in
+<code>bvnr_write_flags_t.unit_flags</code> the spelling is ignored, unchecked, and the
+canonical form is written: those flags ask for a particular spelling themselves.</p>
 <hr />
 <h3 id="32-bvn_parse_unit--bvn_parse_unit_n">3.2 <code>bvn_parse_unit</code> / <code>bvn_parse_unit_n</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="n">value_unit_t</span><span class="w"> </span><span class="nf">bvn_parse_unit</span><span class="w">  </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="n">unit</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="o">*</span><span class="n">ok</span><span class="p">);</span>
@@ -1715,6 +1805,17 @@ is still the whole-second epoch count read via <code>bvn_dom_get_i64</code>:</p>
 <div class="codehilite"><pre><span></span><code><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="nf">bvn_dom_get_datetime_fraction</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvn_dom_node_t</span><span class="w"> </span><span class="o">*</span><span class="n">node</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="o">*</span><span class="n">len_out</span><span class="p">);</span>
 </code></pre></div>
 
+<p>A value node also keeps its unit's <strong>spelling</strong> (spec 1.2) where that says
+something <code>bvn_dom_get_unit</code> cannot — <code>ucum:mL{total}</code> is the unit <code>m~L</code>, and
+the annotation survives only here:</p>
+<div class="codehilite"><pre><span></span><code><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="nf">bvn_dom_get_unit_source</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvn_dom_node_t</span><span class="w"> </span><span class="o">*</span><span class="n">node</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="o">*</span><span class="n">len_out</span><span class="p">);</span>
+</code></pre></div>
+
+<p>The string is NUL-terminated and owned by the node. It is <code>NULL</code> for a node with
+no unit, for one the document already wrote in canonical form (so
+<code>bvn_unit_to_string</code> of the node's unit <em>is</em> the spelling, and a large array in
+canonical units stores nothing extra), and for one whose value a unit policy
+converted — the document's spelling describes a unit that node no longer has.</p>
 <h3 id="45-building-a-tree">4.5 Building a tree</h3>
 <p>The DOM is also writable, e.g. to construct a document programmatically and hand
 it to a serialiser. <code>bvn_dom_node_alloc</code> / the <code>bvn_dom_node_from_*</code> constructors

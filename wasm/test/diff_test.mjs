@@ -216,6 +216,22 @@ for (const [label, text] of resyncCases) {
   }
 }
 
+// --- the unit's own spelling (spec 1.2) --------------------------------------
+// events() reports "unit" in canonical form, which is where an annotation and a
+// profile's spelling are lost. "unit_source" carries what the document wrote,
+// and is absent where there is no unit to have spelled.
+{
+  const e = b.events('#!bovnar 1.2\n.a = <float:64,ucum:mL{total}> 1.0;\n.b = 2 km;\n.c = 3;\n');
+  const data = (e.events || []).filter(x => x.ev === 'data');
+  ok(e.ok && data.length === 3, `unit_source: events ok=${e.ok} n=${data.length}`);
+  ok(data[0] && data[0].unit_source === 'ucum:mL{total}' && data[0].unit === 'm~L',
+     `unit_source: annotated ${JSON.stringify(data[0])}`);
+  ok(data[1] && data[1].unit_source === 'km' && data[1].unit === 'k~m',
+     `unit_source: inline ${JSON.stringify(data[1])}`);
+  ok(data[2] && !('unit_source' in data[2]),
+     `unit_source: unitless ${JSON.stringify(data[2])}`);
+}
+
 // --- report ----------------------------------------------------------------
 console.log(`\nhard: ${pass} passed, ${fail} failed   |   soft toJSON diffs: ${soft}`);
 if (fail) { console.log('\nFAILURES:'); for (const f of fails) console.log('  ✗ ' + f); process.exit(1); }

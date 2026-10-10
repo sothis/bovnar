@@ -545,6 +545,14 @@ static bool evt_cb(void *ud, bvnr_event_t e, bvnr_data_t *d)
 		sb_json_str_body(b, (const char *)d->frac_data, d->frac_length);
 		sb_putc(b, '"');
 	}
+	/* spec 1.2 — the unit as the document spelled it, beside the canonical
+	 * "unit" above: "ucum:mL{total}" where "unit" says "m~L". */
+	if (d->unit_source && d->unit_source_length) {
+		sb_puts(b, ",\"unit_source\":\"");
+		sb_json_str_body(b, (const char *)d->unit_source,
+				 d->unit_source_length);
+		sb_putc(b, '"');
+	}
 	/* lossless read-time unit/base conversion (bvnr_read_flags_t.want_unit).
 	 * conv.text is NULL when the exact result has no terminating expansion in
 	 * the output base (want_unit_allow_nonterminating): report the conversion

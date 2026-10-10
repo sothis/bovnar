@@ -125,6 +125,9 @@ extern "C" {
  * unit.
  */
 #define BVNR_UNIT_STRING_MAX			1088u
+/* Longest unit spelling a document can carry in one unit slot, and therefore
+ * the longest bvnr_data_t.unit_source the reader delivers or the writer takes. */
+#define BVNR_UNIT_SOURCE_MAX			255u
 #define BVN_MAX_INT_WIDTH			32768u
 /*
  * Sentinel for bvnr_read_flags_t.max_file_size and bvnr_write_flags_t.max_file_size:
@@ -514,6 +517,37 @@ typedef struct bvnr_data_s {
 	 * pretty-print round-trip via re-emission of the ISO literal. */
 	const void*		frac_data;
 	uint32_t		frac_length;
+	/* spec 1.2 — the unit exactly as the producer SPELLED it, captured verbatim.
+	 * `value_unit` above is what the unit means; this is what was written, and
+	 * the two differ in the one way formatting a value_unit_t is lossy: a unit
+	 * profile's spelling ("ucum:mm[Hg]" for mmHg) and above all a UCUM
+	 * annotation ("ucum:mL{total}" parses to m~L and "{total}" has nowhere to
+	 * live in the struct).
+	 *
+	 * READER: set on ev_data and on the type-annotation events whenever
+	 * value_unit is a real unit, NULL/0 otherwise (no unit, `no_unit`, a
+	 * datetime's epoch). It is the annotation's unit parameter, or the inline
+	 * suffix when the annotation carried no unit; where a value has both, the
+	 * annotation's spelling. Reader-owned, valid for the callback only, NOT
+	 * NUL-terminated. A want_unit conversion leaves it alone: it is the
+	 * spelling of value_unit, never of conv.unit.
+	 *
+	 * WRITER: when non-NULL, bvnr_write_event emits it in place of the
+	 * canonical spelling of value_unit -- in the annotation's unit parameter
+	 * and in an inline suffix alike. It is checked first, because a spelling
+	 * that disagrees with the unit is a document that says two things:
+	 *   error_unit_mismatch            it parses to a different unit
+	 *   error_unit_illegal / error_unit_profile_*   it does not parse
+	 *   error_unit_too_long            over BVNR_UNIT_SOURCE_MAX bytes, which
+	 *                                  no reader could take back
+	 *   error_unsupported_spec_version it is profile notation and no
+	 *                                  "#!bovnar 1.2" directive was emitted
+	 * With bvnr_write_flags_t.unit_flags set it is IGNORED and the canonical
+	 * form is written: BVN_UNIT_REDUCE and BVN_UNIT_ASCII_EXP ask for a
+	 * particular spelling, and that request wins. Leave it NULL (zero-init) to
+	 * get the canonical form, which is what every caller got before. */
+	const void*		unit_source;
+	uint32_t		unit_source_length;
 	/* Read-time unit/base conversion (see bvnr_read_flags_t.want_unit). When the
 	 * reader was asked to convert this numeric value and could do so LOSSLESSLY,
 	 * `converted` is true and `conv` carries the exact result — the value in the
@@ -1375,6 +1409,26 @@ BVN_API bool bvn_parse_double(const char* s, value_type_spec_t vt, double* out);
 BVN_API bool bvn_parse_double_in_base(const char* s, uint32_t base, double* out);
 BVN_API bool bvn_looks_like_double(const char* s);
 BVN_API const uint8_t* bvn_get_escape_repl_table(void);
+/*
+ * Spell the unit of the NEXT value written through the helpers below.
+ *
+ * Every bvnr_write_*_unit helper takes a value_unit_t, and a value_unit_t has
+ * nowhere to hold a spelling, so a producer holding "ucum:mL{total}" could only
+ * write the canonical "m~L". This hands the spelling over separately: the next
+ * bvnr_write_type_annotation -- which every one of those helpers calls --
+ * emits `text` for its unit and then forgets it. One shot, so it cannot leak
+ * onto a later value; it is also dropped when that write fails, when the
+ * writer is re-opened, and by passing NULL or a zero length.
+ *
+ * The text is copied, and it is held to bvnr_data_t.unit_source's contract (see
+ * there): it must parse to the very unit the helper is then given. That check
+ * happens at the write, not here, because only the write knows the unit; this
+ * call fails (false, error_unit_too_long latched) only for a text longer than
+ * BVNR_UNIT_SOURCE_MAX. A caller driving bvnr_write_event directly does not
+ * need this -- set bvnr_data_t.unit_source on the events instead.
+ */
+BVN_API bool bvnr_writer_set_unit_source(bvnr_writer_t* w,
+				const char* text, uint32_t length);
 BVN_API bool bvnr_write_type_annotation(bvnr_writer_t* w,
 				value_type_spec_t vt,
 				value_unit_t vu);

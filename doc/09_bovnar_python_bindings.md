@@ -233,6 +233,7 @@ The `BvnrData` payload passed to a callback exposes:
 | `data.converted_in_base(base)` | `str \| None` | The exact conversion re-rendered in `base` |
 | `data.converted_rational()` | `tuple[int, int] \| None` | The exact conversion as `(numerator, denominator)` |
 | `data.frac_str()` | `str \| None` | Verbatim ISO sub-second digits of a `datetime` literal (spec 1.1), or `None` |
+| `data.unit_source_str()` | `str \| None` | The unit exactly as the document spelled it (spec 1.2), or `None` when the value carries no unit. Read it inside the callback |
 
 It also carries the `converted` (bool) and `value_type` / `value_unit` fields directly.
 
@@ -788,6 +789,7 @@ validates the width for the chosen family.
 | `q.epoch_name` | `str \| None` | For a `datetime`, the epoch name (`"unix"`, `"tai"`, …); `None` otherwise |
 | `q.epoch_mjd` | `int \| None` | For a `datetime`, the epoch's Modified Julian Day; `None` otherwise |
 | `q.datetime_fraction` | `str \| None` | For a `datetime` written as a literal with a fractional second, the verbatim sub-second digits (spec 1.1); `None` otherwise |
+| `q.unit_source` | `str \| None` | The unit exactly as the document spelled it (spec 1.2) — `ucum:mL{total}` where `q.unit` is `m~L`. Set by `loads(typed=True)`, or by the `unit_source=` constructor argument; `dumps()` writes it back, and refuses one that does not parse to `q.unit`. `None` writes the canonical form |
 
 ### 6.3 Lossless numeric access (`float_dec`, `float_fix`, `float:128`/`256`)
 
@@ -1441,6 +1443,7 @@ for as long as any derived `DomNode` is in use.
 | `node.as_bytes()` | `bytes` for `OCTET_STREAM` nodes |
 | `node.as_int_str(base=10)` | Integer value as a string in the given base; result C string is freed before return |
 | `node.datetime_fraction` | `str` of the verbatim ISO sub-second digits for a `datetime` written as a literal with a fraction (spec 1.1), else `None`; the carrier value is unchanged and still read via `to_python()` |
+| `node.unit_source` | `str` of the unit exactly as the document spelled it (spec 1.2), where that differs from the canonical form — `ucum:mL{total}` for a unit of `m~L`; `None` for a node with no unit, one already written canonically, or one a unit policy converted |
 | `node[key]` | Child `DomNode` by string key (STRUCT) or integer index (ARRAY) |
 | `key in node` | Membership test for STRUCT nodes |
 | `len(node)` | Element count for STRUCT or ARRAY nodes |

@@ -106,6 +106,8 @@ typedef struct bvnr_serializer_s {
  * bvnr_unit_policy_t. */
 #define BVN_UNIT_IS_UNITLESS(u) \
 	((u).num_components == 0u || BVN_UNIT_IS_NO_UNIT(u))
+/* The opposite: a value that does carry a unit, and so has a spelling. */
+#define BVN_UNIT_IS_REAL(u) (!BVN_UNIT_IS_UNITLESS(u))
 /* Parsed form of bvnr_unit_policy_t. Held as one struct so bvn_val_init can
  * carry it across the memset that re-arms the validator for a new document: a
  * policy belongs to the consumer, not to the document it was set for. */
@@ -215,6 +217,14 @@ typedef struct bvnr_validator_s {
 	uint8_t			acc_exp_state;
 	uint8_t			unit_data_len;
 	bool			has_annotation_unit;
+	/* The spelling parsed_unit was read from (bvnr_data_t.unit_source). The
+	 * invariant is one-directional: WHENEVER parsed_unit is a real unit, this
+	 * is its source text. It is not cleared when parsed_unit goes back to "no
+	 * unit" -- nothing reads it then -- so it must be set at every site that
+	 * gives parsed_unit a real unit and saved/restored wherever parsed_unit
+	 * is (the array frames), under the same condition. */
+	uint8_t			unit_src_len;
+	uint8_t			unit_src[BVNR_UNIT_SOURCE_MAX + 1u];
 	void*			userdata;
 	error_code_t		last_error;
 	uint64_t		error_line;
@@ -256,7 +266,19 @@ struct bvnr_reader_s {
 };
 struct bvnr_writer_s {
 	bvnr_serializer_t	ser;
+	/* val.unit_src doubles as the one-shot spelling handed over by
+	 * bvnr_writer_set_unit_source: the writer has no parsed_unit history of its
+	 * own to keep there. */
 	bvnr_validator_t	val;
+	/* bvnr_data_t.unit_source is checked by reading it back (see
+	 * bvn_writer_check_unit_source). The reader that does it is created on
+	 * first use and kept; the last spelling that passed is remembered so a
+	 * document repeating one unit pays for one check, not one per value. */
+	bvnr_reader_t*		usrc_probe;
+	bool			usrc_ok_inline;
+	uint8_t			usrc_ok_len;
+	uint8_t			usrc_ok[BVNR_UNIT_SOURCE_MAX + 1u];
+	value_unit_t		usrc_ok_unit;
 };
 /* Does `u` satisfy the policy's require_unit / require_dimension_of? Shared by
  * the reader and the writer so the two cannot drift into meaning different

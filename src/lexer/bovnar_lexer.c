@@ -76,6 +76,22 @@ static uint8_t bvn_run_lut_fraction[256];
 static uint8_t bvn_run_lut_exp[256];
 static uint8_t bvn_run_lut_symbol[256];
 static uint8_t bvn_run_lut_inline_unit[256];
+/*
+ * A unit's spelling travels with the unit. Every site below that copies
+ * parsed_unit into or out of an array frame copies its source text the same
+ * way and under the same condition, which is the whole of what keeps
+ * bvnr_data_t.unit_source describing value_unit and not some earlier one.
+ */
+static inline void bvn_usrc_save(bvn_array_frame_t* f, const bvnr_validator_t* v)
+{
+	f->saved_usrc_len = v->unit_src_len;
+	memcpy(f->saved_usrc, v->unit_src, v->unit_src_len);
+}
+static inline void bvn_usrc_restore(bvnr_validator_t* v, const bvn_array_frame_t* f)
+{
+	v->unit_src_len = f->saved_usrc_len;
+	memcpy(v->unit_src, f->saved_usrc, f->saved_usrc_len);
+}
 static uint8_t bvn_run_lut_reference[256];
 static uint8_t bvn_run_lut_type[256];
 static uint8_t bvn_run_lut_ws[256];
@@ -115,7 +131,12 @@ static void bvn_build_run_lut(uint8_t lut[256], state_t st, uint8_t self_action)
  * pre-main hook fired; it must not be the sole initialiser under threads.
  */
 #if defined(__GNUC__) || defined(__clang__)
-#  define BVN_LEX_CONSTRUCTOR __attribute__((constructor))
+/* noinline is a compiler workaround, not a tuning choice. GCC 15.2's LTO
+ * inliner dies copying this constructor's body into bvn_lex_init ("internal
+ * compiler error: in copy_bb, at tree-inline.cc:2402") in an executable where
+ * the writer reaches the reader. The call it leaves behind costs one
+ * predictable branch per reader open. */
+#  define BVN_LEX_CONSTRUCTOR __attribute__((constructor, noinline))
 #else
 #  define BVN_LEX_CONSTRUCTOR
 #endif
@@ -225,6 +246,7 @@ static bool bvn_enter_resync(bvnr_reader_t* p)
 			bvn_array_frame_t *f = &l->arr_frames[l->array_nesting_level];
 			p->val.value_type         = f->saved_vtype;
 			p->val.parsed_unit        = f->saved_vunit;
+			bvn_usrc_restore(&p->val, f);
 			p->val.parsed_unit_serial = f->saved_unit_serial;
 		}
 	}
@@ -953,6 +975,7 @@ bool bvn_action_array_intro(bvnr_reader_t* p)
 	f->saved_row   = p->lex.array_row_size;
 	f->saved_vtype = p->val.value_type;
 	f->saved_vunit = p->val.parsed_unit;
+	bvn_usrc_save(f, &p->val);
 	f->saved_unit_serial = p->val.parsed_unit_serial;
 	p->lex.curr_row_size  = 0;
 	/* UINT64_MAX = "row width not yet established" (an empty row has width 0,
@@ -1014,6 +1037,7 @@ bool bvn_action_array_outro(bvnr_reader_t* p)
 	p->val.value_type     = f->saved_vtype;
 	if (p->val.parsed_unit_serial != f->saved_unit_serial) {
 		p->val.parsed_unit         = f->saved_vunit;
+		bvn_usrc_restore(&p->val, f);
 		p->val.parsed_unit_serial  = f->saved_unit_serial;
 	}
 	p->lex.next_state = array_outro;
@@ -1055,6 +1079,7 @@ bool bvn_action_array_outro_empty(bvnr_reader_t* p)
 	p->val.value_type     = f->saved_vtype;
 	if (p->val.parsed_unit_serial != f->saved_unit_serial) {
 		p->val.parsed_unit         = f->saved_vunit;
+		bvn_usrc_restore(&p->val, f);
 		p->val.parsed_unit_serial  = f->saved_unit_serial;
 	}
 	p->lex.next_state = array_outro;
@@ -1085,6 +1110,7 @@ bool bvn_action_new_array_value(bvnr_reader_t* p)
 	p->val.value_type  = par->saved_vtype;
 	if (p->val.parsed_unit_serial != par->saved_unit_serial) {
 		p->val.parsed_unit         = par->saved_vunit;
+		bvn_usrc_restore(&p->val, par);
 		p->val.parsed_unit_serial  = par->saved_unit_serial;
 	}
 	++p->lex.curr_row_size;
@@ -1519,6 +1545,7 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 			l->array_row_size    = f->saved_row;
 			p->val.value_type    = f->saved_vtype;
 			p->val.parsed_unit   = f->saved_vunit;
+			bvn_usrc_restore(&p->val, f);
 			p->val.parsed_unit_serial = f->saved_unit_serial;
 			l->in_array_element  = (l->array_nesting_level > 0);
 			l->next_state        = resync;
@@ -1540,6 +1567,7 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 					bvn_array_frame_t *f = &l->arr_frames[l->array_nesting_level];
 					p->val.value_type  = f->saved_vtype;
 					p->val.parsed_unit = f->saved_vunit;
+					bvn_usrc_restore(&p->val, f);
 					p->val.parsed_unit_serial = f->saved_unit_serial;
 				}
 			}
@@ -1686,6 +1714,7 @@ bool bvn_action_resync_semicolon(bvnr_reader_t* p)
 			bvn_array_frame_t *f = &l->arr_frames[l->array_nesting_level];
 			p->val.value_type         = f->saved_vtype;
 			p->val.parsed_unit        = f->saved_vunit;
+			bvn_usrc_restore(&p->val, f);
 			p->val.parsed_unit_serial = f->saved_unit_serial;
 		}
 	}

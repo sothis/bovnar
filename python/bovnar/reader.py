@@ -257,9 +257,10 @@ class Reader:
         # callback must therefore hand Python a snapshot, never the view.
         #
         # The by-value fields below become genuinely Python-owned. The pointer
-        # fields (`data`, `frac_data`) are deliberately carried over as raw
-        # addresses and stay valid only for the duration of the callback — read
-        # them with raw_bytes()/frac_str() before returning.
+        # fields (`data`, `frac_data`, `unit_source`) are deliberately carried
+        # over as raw addresses and stay valid only for the duration of the
+        # callback — read them with raw_bytes()/frac_str()/unit_source_str()
+        # before returning.
         unit_size = ctypes.sizeof(ValueUnit)
         snap = BvnrData()
         snap.type              = src.type
@@ -274,6 +275,9 @@ class Reader:
         # spec 1.1 — an ISO datetime literal's sub-second digits.
         snap.frac_data   = src.frac_data
         snap.frac_length = src.frac_length
+        # spec 1.2 — the unit's own spelling; reader-owned like the two above.
+        snap.unit_source        = src.unit_source
+        snap.unit_source_length = src.unit_source_length
         # Lossless read-time conversion result (see want_unit). The exact `text`
         # lives in reader-owned memory valid only during this call, so copy it
         # into the snapshot's own carrier now.

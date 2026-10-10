@@ -68,6 +68,11 @@ import { loadBovnar } from 'bovnar-wasm/single';
 | `events(in)`   | `{ ok, error, error_name, events: [...] }` — the reference event stream    |
 | `version()`    | library version string, e.g. `"1.1.0"`                                     |
 
+An event that carries a unit reports it twice: `unit` is the canonical form
+(`m~L`), and `unit_source` is the unit exactly as the document spelled it
+(`ucum:mL{total}`) — the only place a UCUM annotation or a profile's own
+spelling survives. `unit_source` is absent where the value has no unit.
+
 ### `toJSON` projection notes
 
 `toJSON` projects the validated DOM onto plain JSON *values*; it intentionally

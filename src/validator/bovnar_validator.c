@@ -633,12 +633,31 @@ static inline void bvn_normalize_data_ptr(bvnr_data_t* d)
 	if (d && d->data == NULL)
 		d->data = bvn_empty_sentinel;
 }
+/* Remember the text parsed_unit is about to be (or was just) read from. */
+static inline void bvn_val_set_unit_src(bvnr_validator_t* v,
+					const uint8_t* s, uint32_t n)
+{
+	if (n > BVNR_UNIT_SOURCE_MAX) n = BVNR_UNIT_SOURCE_MAX;
+	v->unit_src_len = (uint8_t)n;
+	memcpy(v->unit_src, s, n);
+}
+/* bvnr_data_t.unit_source: the spelling of the unit this event carries. Only a
+ * real unit has one, and d->value_unit is always parsed_unit when it is real,
+ * so the validator's copy is the right text by its own invariant. */
+static inline void bvn_attach_unit_src(const bvnr_validator_t* v, bvnr_data_t* d)
+{
+	if (BVN_UNIT_IS_REAL(d->value_unit) && v->unit_src_len) {
+		d->unit_source        = v->unit_src;
+		d->unit_source_length = v->unit_src_len;
+	}
+}
 static inline bool bvn_emit_unverified(bvnr_reader_t* r,
 									   bvnr_event_t ev, bvnr_data_t* d)
 {
 	bvnr_validator_t* v = &r->val;
 	if (!v->on_unverified) return true;
 	bvn_normalize_data_ptr(d);
+	bvn_attach_unit_src(v, d);
 	if (!v->on_unverified(v->userdata, ev, d)) {
 		v->last_error = error_scanner_callback_failed;
 		return false;
@@ -651,6 +670,7 @@ static inline bool bvn_emit_verified(bvnr_reader_t* r,
 	bvnr_validator_t* v = &r->val;
 	if (!v->on_verified) return true;
 	bvn_normalize_data_ptr(d);
+	bvn_attach_unit_src(v, d);
 	if (!v->on_verified(v->userdata, ev, d)) {
 		v->last_error = error_scanner_callback_failed;
 		return false;
@@ -1413,6 +1433,8 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 	bool have_inline_unit =
 		emit_unit && inline_unit_str != NULL && inline_unit_len > 0;
 	v->parsed_unit   = have_inline_unit ? inline_unit_val : default_unit;
+	if (have_inline_unit)
+		bvn_val_set_unit_src(v, inline_unit_str, inline_unit_len);
 	v->unit_data_len = have_inline_unit ? (uint8_t)inline_unit_len
 	                 : (emit_unit ? 7u : 0u);
 	bvnr_data_t d = {0};
@@ -1844,8 +1866,10 @@ static bool bvn_val_receive_type(bvnr_reader_t* r,
 	 * BVN_UNIT_IS_NO_UNIT matches the single-component bu_none shape. Test
 	 * both so a unitless annotation never spuriously advances the serial.
 	 */
-	if (parsed_unit.num_components != 0u && !BVN_UNIT_IS_NO_UNIT(parsed_unit))
+	if (parsed_unit.num_components != 0u && !BVN_UNIT_IS_NO_UNIT(parsed_unit)) {
 		v->parsed_unit_serial++;
+		bvn_val_set_unit_src(v, unit_buf, ulen);
+	}
 	v->unit_data_len = ulen;
 	if (ulen > 0)
 		v->has_annotation_unit = true;
@@ -2139,6 +2163,12 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 			v->last_error = error_unit_mismatch;
 			return false;
 		}
+		/* Where the annotation named the unit too, its spelling stands: that
+		 * is the one a re-serialisation writes, the inline suffix being
+		 * dropped as redundant once the annotation carries the unit. */
+		if (!v->has_annotation_unit)
+			bvn_val_set_unit_src(v, raw->inline_unit_data,
+					     raw->inline_unit_len);
 		v->parsed_unit = iu_unit;
 		if (!BVN_UNIT_IS_NO_UNIT(iu_unit))
 			v->parsed_unit_serial++;
@@ -2158,6 +2188,10 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 	 * is a datetime literal that had a `.frac` part). */
 	d.frac_data   = dt_frac;
 	d.frac_length = dt_frac_len;
+	/* spec 1.2 — and the unit's own spelling. Attached here rather than left to
+	 * the emit below so the assertion pass and the want_unit hook see the same
+	 * event the callbacks will. */
+	bvn_attach_unit_src(v, &d);
 	/* The policy's validation half, on the native unit — before any conversion
 	 * can rewrite the unit the document actually wrote. */
 	if (!bvn_apply_unit_assertions(r, tt, &d))

@@ -89,7 +89,40 @@ typedef struct bvn_builder_s {
 	bool            in_octet_stream;
 	uint32_t        row_start_count;
 	error_code_t    last_error;
+	/* The last unit spelling judged by builder_keep_unit_source, and the
+	 * verdict: an array repeats one spelling per element, and formatting the
+	 * unit again for each would cost more than the copy it decides about. */
+	bool            usrc_keep;
+	uint32_t        usrc_last_len;
+	char            usrc_last[BVNR_UNIT_SOURCE_MAX + 1u];
 } bvn_builder_t;
+/*
+ * Keep the unit's spelling on the node — when it is worth keeping. A spelling
+ * equal to the canonical form of the unit is recoverable from the unit, so
+ * copying it onto every node of a large array would buy nothing.
+ */
+static bool builder_keep_unit_source(bvn_builder_t *b, bvn_dom_node_t *nd,
+		const bvnr_data_t *d)
+{
+	uint32_t n = d->unit_source_length;
+	if (n > BVNR_UNIT_SOURCE_MAX)
+		return true;
+	if (n != b->usrc_last_len || memcmp(b->usrc_last, d->unit_source, n) != 0) {
+		char    canon[BVNR_UNIT_STRING_MAX];
+		int32_t cn = bvn_unit_to_string(d->value_unit, canon, sizeof canon);
+		b->usrc_keep = !(cn == (int32_t)n &&
+				 memcmp(canon, d->unit_source, n) == 0);
+		b->usrc_last_len = n;
+		memcpy(b->usrc_last, d->unit_source, n);
+	}
+	if (!b->usrc_keep)
+		return true;
+	nd->unit_src = bvn_dom_strdup((const char *)d->unit_source, n);
+	if (!nd->unit_src)
+		return false;
+	nd->unit_src_len = n;
+	return true;
+}
 static bool builder_init(bvn_builder_t *b, bvn_dom_doc_t *doc)
 {
 	memset(b, 0, sizeof(*b));
@@ -712,6 +745,15 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 			break;
 		}
 		if (!nd) return false;
+		/* spec 1.2 — the unit's own spelling. Not when a policy converted the
+		 * value: the node then carries conv.unit, which the document never
+		 * spelled. */
+		if (d->unit_source && d->unit_source_length &&
+		    !(d->converted && d->conv.text) &&
+		    !builder_keep_unit_source(b, nd, d)) {
+			bvn_dom_node_destroy(nd);
+			return false;
+		}
 		if (!builder_attach(b, nd))
 			return false;
 		break;

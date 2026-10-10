@@ -83,6 +83,7 @@ void bvnr_writer_destroy(bvnr_writer_t* w)
 {
 	if (!w) return;
 	free(w->ser.ser_value_text);
+	bvnr_reader_destroy(w->usrc_probe);
 	free(w);
 }
 /*
@@ -622,6 +623,137 @@ static bool bvn_w_key_position(const bvnr_serializer_t* s)
 		return true;
 	return !bvn_ser_is_direct_array_element(s, s->array_depth - 1u);
 }
+/* Has this document declared spec 1.2, the version the profile notation is
+ * gated on? The directive cannot be added once a value is out. */
+static bool bvn_w_declares_1_2(const bvnr_serializer_t* s)
+{
+	return s->version_emitted &&
+	       (s->version_major > 1u ||
+	        (s->version_major == 1u && s->version_minor >= 2u));
+}
+/*
+ * What the probe reader saw: how many assignments and values the probe
+ * document turned out to hold, and the unit and spelling of the last value.
+ */
+typedef struct bvn_usrc_probe_s {
+	uint32_t	assignments;
+	uint32_t	values;
+	value_unit_t	unit;
+	uint32_t	src_len;
+	uint8_t		src[BVNR_UNIT_SOURCE_MAX + 1u];
+} bvn_usrc_probe_t;
+static bool bvn_usrc_probe_event(void* ud, bvnr_event_t ev, bvnr_data_t* d)
+{
+	bvn_usrc_probe_t* pr = ud;
+	if (ev == ev_assignment_start) {
+		pr->assignments++;
+	} else if (ev == ev_data) {
+		pr->values++;
+		pr->unit    = d->value_unit;
+		pr->src_len = 0;
+		if (d->unit_source && d->unit_source_length <= BVNR_UNIT_SOURCE_MAX) {
+			pr->src_len = d->unit_source_length;
+			memcpy(pr->src, d->unit_source, d->unit_source_length);
+		}
+	}
+	return true;
+}
+/*
+ * Would a reader, handed `text` in this unit slot, read back exactly `text` as
+ * exactly `unit`? Answered by doing it: a one-value probe document is built
+ * around the text and parsed by the real reader.
+ *
+ * Asking bvn_parse_unit is not enough, and that is why this exists. A unit
+ * slot is delimited by the LEXER, and the two slots disagree about where one
+ * ends -- "ucum:mL{a,b}" and "udunits:kg m-2 s-1" are one parameter inside an
+ * annotation and not a legal inline suffix at all, while "m> 1;.k=<uint:8,m"
+ * parses as nothing and yet, pasted into an annotation, is a second assignment.
+ * Restating the lexer's byte classes here would be a second copy of rules that
+ * have already moved twice; running the lexer cannot drift from it. Every way
+ * the text could escape its slot shows up as one of the conditions below.
+ */
+static bool bvn_writer_probe_unit_source(bvnr_writer_t* w,
+	const uint8_t* text, uint32_t len, value_unit_t unit, bool inline_slot)
+{
+	static const char head_ann[] = "#!bovnar 1.2\n.k=<float:64,";
+	static const char tail_ann[] = ">1;";
+	static const char head_inl[] = "#!bovnar 1.2\n.k=1 ";
+	static const char tail_inl[] = ";";
+	const char* head = inline_slot ? head_inl : head_ann;
+	const char* tail = inline_slot ? tail_inl : tail_ann;
+	char   doc[sizeof head_ann + BVNR_UNIT_SOURCE_MAX + sizeof tail_ann];
+	size_t hl = strlen(head), tl = strlen(tail);
+	memcpy(doc, head, hl);
+	memcpy(doc + hl, text, len);
+	memcpy(doc + hl + len, tail, tl);
+	if (!w->usrc_probe) {
+		w->usrc_probe = bvnr_reader_create();
+		if (!w->usrc_probe) return false;
+	}
+	bvn_usrc_probe_t  pr    = {0};
+	bvnr_read_flags_t flags = {0};
+	flags.max_array_nesting = 1;
+	flags.userdata    = &pr;
+	flags.on_verified = bvn_usrc_probe_event;
+	if (!bvnr_open_read_mem(w->usrc_probe, doc, hl + len + tl, NULL, 0, &flags))
+		return false;
+	if (!bvnr_read(w->usrc_probe))
+		return false;
+	return pr.assignments == 1u && pr.values == 1u &&
+	       pr.src_len == len && memcmp(pr.src, text, len) == 0 &&
+	       bvn_unit_equal(pr.unit, unit);
+}
+/*
+ * bvnr_data_t.unit_source, on the way out. A spelling is only ever a second way
+ * of saying value_unit, so it is held to that before a byte of it is written:
+ * see the field's own comment in bovnar.h for the contract this enforces.
+ *
+ * `inline_slot` says which of the two unit slots the text is headed for.
+ */
+static bool bvn_writer_check_unit_source(bvnr_writer_t* w,
+	const bvnr_data_t* d, bool inline_slot)
+{
+	if (!d->unit_source || !d->unit_source_length)   return true;
+	/* A reduce/ASCII request asks for a spelling of its own and wins; the
+	 * serialiser will not look at this one, so neither does the check. */
+	if (w->ser.unit_flags != BVN_UNIT_FLAGS_NONE)    return true;
+	/* Nothing to spell: the serialiser writes no unit for these either. */
+	if (inline_slot && !BVN_UNIT_IS_REAL(d->value_unit)) return true;
+	uint32_t len = d->unit_source_length;
+	if (len > BVNR_UNIT_SOURCE_MAX)
+		return bvn_writer_set_error(w, error_unit_too_long);
+	if (w->usrc_ok_len == len && w->usrc_ok_inline == inline_slot &&
+	    memcmp(w->usrc_ok, d->unit_source, len) == 0 &&
+	    bvn_unit_equal(w->usrc_ok_unit, d->value_unit) &&
+	    (!bvni_unit_has_profile((const char*)d->unit_source, len) ||
+	     bvn_w_declares_1_2(&w->ser)))
+		return true;
+	uint8_t text[BVNR_UNIT_SOURCE_MAX + 1u];
+	memcpy(text, d->unit_source, len);
+	text[len] = 0;
+	/* An embedded NUL would end the text early for every check below. */
+	if (memchr(text, 0, len))
+		return bvn_writer_set_error(w, error_unit_illegal);
+	error_code_t ec = bvn_unit_error_code(text, len);
+	if (ec != error_none)
+		return bvn_writer_set_error(w, ec);
+	bool         ok = false;
+	value_unit_t pu = bvn_parse_unit(text, &ok);
+	if (!ok)
+		return bvn_writer_set_error(w, error_unit_illegal);
+	if (!bvn_unit_equal(pu, d->value_unit))
+		return bvn_writer_set_error(w, error_unit_mismatch);
+	if (bvni_unit_has_profile((const char*)text, len) &&
+	    !bvn_w_declares_1_2(&w->ser))
+		return bvn_writer_set_error(w, error_unsupported_spec_version);
+	if (!bvn_writer_probe_unit_source(w, text, len, d->value_unit, inline_slot))
+		return bvn_writer_set_error(w, error_unit_illegal);
+	w->usrc_ok_inline = inline_slot;
+	w->usrc_ok_len    = (uint8_t)len;
+	memcpy(w->usrc_ok, text, len);
+	w->usrc_ok_unit   = d->value_unit;
+	return true;
+}
 static bool bvn_writer_validate_event(bvnr_writer_t* w,
 	bvnr_event_t ev, bvnr_data_t* data)
 {
@@ -756,14 +888,16 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		 * force the notation.
 		 */
 		if (bvni_unit_has_opaque(data->value_unit) &&
-			!(w->ser.version_emitted &&
-			  (w->ser.version_major > 1u ||
-			   (w->ser.version_major == 1u && w->ser.version_minor >= 2u))))
+			!bvn_w_declares_1_2(&w->ser))
 			return bvn_writer_set_error(w, error_unsupported_spec_version);
 		return bvn_validate_type_spec_for_writer(w,
 			data->value_type);
-	case ev_type_annotation_type_family:
 	case ev_type_annotation_type_family_parameter:
+		if (data->type == token_is_unit &&
+		    !bvn_writer_check_unit_source(w, data, false))
+			return false;
+		/* fallthrough */
+	case ev_type_annotation_type_family:
 		w->val.value_type  = data->value_type;
 		w->val.parsed_unit = data->value_unit;
 		break;
@@ -779,6 +913,11 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		token_type_t tt = data->type;
 		value_type_spec_t vt = data->value_type;
 		if (!bvn_check_type_value_compat(w, tt, vt))
+			return false;
+		/* The spelling matters only where the serialiser will use it: as the
+		 * inline suffix of a value whose annotation did not carry the unit. */
+		if (!w->ser.emitted_unit &&
+		    !bvn_writer_check_unit_source(w, data, true))
 			return false;
 		/*
 		 * The producer's half of the unit policy (bvnr_writer_set_unit_policy).
@@ -1094,6 +1233,12 @@ static bool bvn_ser_append_inline_unit(bvnr_serializer_t *s,
 	if (s->emitted_unit)                              return true;
 	if (d->value_unit.num_components == 0u)           return true;
 	if (BVN_UNIT_IS_NO_UNIT(d->value_unit))           return true;
+	/* The producer's own spelling, checked against value_unit already. */
+	if (s->unit_flags == BVN_UNIT_FLAGS_NONE &&
+	    d->unit_source && d->unit_source_length) {
+		if (!bvn_ser_push_byte(s, ' ')) return false;
+		return bvn_ser_push(s, d->unit_source, d->unit_source_length);
+	}
 	char ubuf[BVNR_UNIT_STRING_MAX];
 	/* Honour the writer's unit_flags (reduce / ASCII-exponent) so a value-side
 	 * inline unit canonicalises identically to one given in the annotation,
@@ -1427,7 +1572,29 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 		} else if (d->type == token_is_unit) {
 			if (!bvn_ser_push_byte(s, use_colon ? ':' : ','))
 				return false;
-			if (d->data && d->length) {
+			/* The unit's text: what the event carries in `data`, or -- for a
+			 * caller that set only bvnr_data_t.unit_source -- that. Under a
+			 * unit flag the spelling is ignored by contract and unchecked, so
+			 * there the text is taken from value_unit instead. */
+			const void *utext = d->data;
+			uint32_t    utlen = d->length;
+			char        cbuf[BVNR_UNIT_STRING_MAX];
+			if (!(utext && utlen) && d->unit_source && d->unit_source_length) {
+				if (s->unit_flags == BVN_UNIT_FLAGS_NONE) {
+					utext = d->unit_source;
+					utlen = d->unit_source_length;
+				} else {
+					int32_t cn = bvn_unit_to_string_ex(
+						d->value_unit, cbuf, sizeof cbuf, s->unit_flags);
+					if (cn < 0) {
+						s->ser_error = error_unit_illegal;
+						return false;
+					}
+					utext = cbuf;
+					utlen = (uint32_t)cn;
+				}
+			}
+			if (utext && utlen) {
 				/* Apply unit_flags here too. On the reader-driven path
 				 * (pretty-print, canonicalise) this token carries the unit
 				 * TEXT the reader saw, and pushing it verbatim left the
@@ -1439,15 +1606,27 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 				 * go through bvn_unit_to_string_ex. Text that will not
 				 * parse back (a unit this build does not know) is passed
 				 * through unchanged rather than dropped. */
-				const uint8_t *ut = (const uint8_t *)d->data;
+				const uint8_t *ut = (const uint8_t *)utext;
 				char           ubuf[BVNR_UNIT_STRING_MAX];
-				const char    *emit = (const char *)d->data;
-				uint32_t       elen = d->length;
+				const char    *emit = (const char *)utext;
+				uint32_t       elen = utlen;
+				/* spec 1.2 — the producer's own spelling, where one was
+				 * handed over (bvnr_data_t.unit_source) and no unit flag
+				 * asks for a different one. It has been checked against
+				 * value_unit by the time it gets here. */
+				if (s->unit_flags == BVN_UNIT_FLAGS_NONE &&
+				    d->unit_source && d->unit_source_length) {
+					emit = (const char *)d->unit_source;
+					elen = d->unit_source_length;
+				}
 				if (s->unit_flags != BVN_UNIT_FLAGS_NONE &&
-				    d->length < sizeof ubuf) {
-					char tmp[512];
-					memcpy(tmp, ut, d->length);
-					tmp[d->length] = '\0';
+				    utlen < sizeof ubuf) {
+					/* Sized by the guard above. This was char[512] under
+					 * a guard of 1088, so a unit text of 512..1087 bytes
+					 * ran off the end of it. */
+					char tmp[BVNR_UNIT_STRING_MAX];
+					memcpy(tmp, ut, utlen);
+					tmp[utlen] = '\0';
 					bool pok = false;
 					value_unit_t pu =
 						bvn_parse_unit((const uint8_t *)tmp, &pok);
@@ -1746,8 +1925,10 @@ static void bvn_writer_init(bvnr_writer_t* w, bvnr_write_flags_t* opts)
 	 * emits rather than what one document contains, and a caller who set it
 	 * before opening would have no way to notice it had been dropped. */
 	bvn_unit_policy_state_t saved_policy = w->val.policy;
+	bvnr_reader_t* saved_probe = w->usrc_probe;
 	memset(w, 0, sizeof(*w));
 	w->val.policy = saved_policy;
+	w->usrc_probe = saved_probe;
 	w->ser.pretty = false;
 	w->ser.indent = 0;
 	w->ser.need_semi = false;

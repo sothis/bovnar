@@ -120,14 +120,15 @@ class Quantity:
     enable exact round-trips: numeric precision, integer base, and physical
     units are all preserved across a load/dump cycle.
     """
-    __slots__ = ('raw', 'vtype', 'unit', '_tok_type', '_frac')
+    __slots__ = ('raw', 'vtype', 'unit', '_tok_type', '_frac', '_unit_source')
 
     def __init__(self,
                  raw:      str | None,
                  vtype:    ValueTypeSpec,
                  unit:     'Unit | ValueUnit | str | None' = None,
                  tok_type: int = 2,
-                 frac:     str | None = None) -> None:
+                 frac:     str | None = None,
+                 unit_source: str | None = None) -> None:
         # VALIDATED SINCE 1.2. It used to accept anything and store it, so
         # Quantity("1", "not-a-valuetypespec") constructed happily and every
         # consumer of .vtype had to defend itself against a value that could
@@ -160,6 +161,24 @@ class Quantity:
         # with no fraction. Carried through dumps() so a fractional datetime
         # round-trips losslessly via the C writer's ISO-literal reconstruction.
         self._frac     = frac
+        # spec 1.2 — the unit as the document SPELLED it, where that says more
+        # than `unit` can: "ucum:mL{total}" is the unit m~L, and the annotation
+        # survives only here. dumps() writes this spelling back; the C writer
+        # refuses one that does not parse to `unit`, so a stale or mistyped
+        # value fails at the write rather than producing a document that says
+        # two things. None writes the canonical form.
+        if unit_source is not None and not isinstance(unit_source, str):
+            raise BovnarArgumentError(
+                "Quantity unit_source must be the unit's verbatim spelling as a "
+                "str, or None; got %s" % type(unit_source).__name__)
+        self._unit_source = unit_source or None
+
+    @property
+    def unit_source(self) -> str | None:
+        """The unit exactly as the document spelled it, or None. ``unit`` is
+        what it means; this keeps what formatting it would lose -- a profile's
+        spelling and, above all, a UCUM annotation."""
+        return self._unit_source
 
     @property
     def datetime_fraction(self) -> str | None:

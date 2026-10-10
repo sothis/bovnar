@@ -203,6 +203,21 @@ class DomNode:
         return s
 
     @property
+    def unit_source(self) -> "str | None":
+        """
+        The node's unit exactly as the document spelled it (spec 1.2), where
+        that says something ``unit`` cannot -- ``ucum:mL{total}`` is the unit
+        ``m~L``, and the annotation survives only here. ``None`` for a node with
+        no unit, for one already written in canonical form (``unit_str`` is then
+        the spelling), and for one whose value a unit policy converted.
+        """
+        lib = get_library()
+        ptr = lib.bvn_dom_get_unit_source(self._ptr, None)
+        if not ptr:
+            return None
+        return ptr.decode('utf-8', errors='replace')
+
+    @property
     def datetime_fraction(self) -> "str | None":
         """
         The verbatim ISO sub-second digits (without the leading '.') of a

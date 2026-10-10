@@ -2151,10 +2151,18 @@ typedef struct bvnr_data_s {
     uint32_t           length;
     const void*        frac_data;    /* spec 1.1 — ISO datetime sub-second digits, else NULL */
     uint32_t           frac_length;  /* spec 1.1 — length of frac_data, else 0 */
+    const void*        unit_source;        /* spec 1.2 — value_unit as the document spelled it */
+    uint32_t           unit_source_length; /* spec 1.2 — its length, 0 with NULL */
     bool               converted;    /* a read-time conversion restated this value */
     bvnr_converted_t   conv;         /* its result: the unit delivered, and the digits */
 } bvnr_data_t;
 ```
+
+`unit_source` is the unit's own **spelling**, where `value_unit` is its meaning.
+The two differ wherever formatting a `value_unit_t` is lossy — `km` and `k~m` are
+one unit, and so are `ucum:mL{total}` and `m~L` — and the writer re-emits the
+spelling when it is handed back. See
+[Unit Profiles §5.2](11_bovnar_unit_profiles.md#52-what-canonical-output-loses-and-on-which-path).
 
 `converted` and `conv` are the unit-facing half of the struct: when a `want_unit`
 hook or a [unit policy](06_bovnar_unit_policy.md) restated a value, `conv`

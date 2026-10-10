@@ -475,6 +475,8 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     # the value has none); the node owns the storage, so the result is read-only.
     lib.bvn_dom_get_datetime_fraction.restype  = c_char_p
     lib.bvn_dom_get_datetime_fraction.argtypes = [c_void_p, P(c_uint32)]
+    lib.bvn_dom_get_unit_source.restype  = c_char_p
+    lib.bvn_dom_get_unit_source.argtypes = [c_void_p, P(c_uint32)]
 
     lib.bvn_dom_get_unit.restype  = ValueUnit
     lib.bvn_dom_get_unit.argtypes = [c_void_p]

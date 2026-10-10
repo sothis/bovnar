@@ -301,6 +301,8 @@ class BvnrData(ctypes.Structure):
         ('length',      ctypes.c_uint32),
         ('frac_data',   ctypes.c_void_p),    # spec 1.1 — ISO datetime sub-second digits, else NULL
         ('frac_length', ctypes.c_uint32),    # spec 1.1 — length of frac_data, else 0
+        ('unit_source', ctypes.c_void_p),    # spec 1.2 — the unit as the producer spelled it, else NULL
+        ('unit_source_length', ctypes.c_uint32),  # spec 1.2 — length of unit_source, else 0
         ('converted',   ctypes.c_bool),      # lossless read-time conversion applied?
         ('conv',        BvnrConverted),      # exact converted value when converted
     ]
@@ -311,6 +313,19 @@ class BvnrData(ctypes.Structure):
             return None
         return (ctypes.c_char * self.frac_length).from_address(
             self.frac_data).raw.decode('ascii')
+
+    def unit_source_str(self) -> "str | None":
+        """The unit exactly as the document spelled it (spec 1.2), or None when
+        the value carries no unit.
+
+        ``value_unit`` is what the unit means; this is what was written. They
+        differ where formatting a unit is lossy: ``ucum:mL{total}`` parses to
+        ``m~L`` and only this keeps the annotation. Like ``raw_bytes()``, read it
+        inside the callback -- the bytes belong to the reader."""
+        if not self.unit_source or self.unit_source_length == 0:
+            return None
+        return (ctypes.c_char * self.unit_source_length).from_address(
+            self.unit_source).raw.decode('utf-8', errors='replace')
 
     def converted_str(self) -> "str | None":
         """The exact converted value in the requested base (lossless read-time

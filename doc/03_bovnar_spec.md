@@ -2355,6 +2355,8 @@ typedef struct bvnr_data_s {
     uint32_t          length;
     const void*       frac_data;    /* spec 1.1 — ISO datetime sub-second digits, else NULL */
     uint32_t          frac_length;  /* spec 1.1 — length of frac_data, else 0 */
+    const void*       unit_source;        /* spec 1.2 — the unit as the document spelled it, else NULL */
+    uint32_t          unit_source_length; /* spec 1.2 — length of unit_source, else 0 */
     bool              converted;    /* a want_unit read-time conversion was applied (§ read-time conversion) */
     bvnr_converted_t  conv;         /* the exact converted value (unit + text + rational); zeroed when converted is false */
 } bvnr_data_t;

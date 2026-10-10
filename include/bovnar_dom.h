@@ -159,6 +159,16 @@ BVN_API void  bvn_dom_free_string(char *s);
  * as an integer carrier, or a literal with no fraction; *len_out (when non-NULL)
  * receives the digit count (0 when NULL is returned). The node's integer value
  * is still the whole-second epoch count read via bvn_dom_get_i64(). */
+/* spec 1.2 — the unit of a value node exactly as the document spelled it
+ * (NUL-terminated, owned by the node — do NOT free), where that spelling says
+ * something bvn_dom_get_unit() cannot: "ucum:mL{total}" is the unit m~L, and
+ * the annotation survives only here. Returns NULL — and the canonical
+ * bvn_unit_to_string() of the node's unit IS the spelling — for a node with no
+ * unit, for one written in canonical form already, and for one whose value a
+ * unit policy converted (the document's spelling describes a unit the node no
+ * longer has). *len_out (when non-NULL) receives the length, 0 with NULL. */
+BVN_API const char *bvn_dom_get_unit_source(const bvn_dom_node_t *node,
+		uint32_t *len_out);
 BVN_API const char *bvn_dom_get_datetime_fraction(const bvn_dom_node_t *node,
 		uint32_t *len_out);
 /* Fetch an integer node as a fixed-width type. Return false (leaving *out

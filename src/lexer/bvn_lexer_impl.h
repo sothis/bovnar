@@ -285,6 +285,9 @@ typedef struct bvn_array_frame_s {
 	value_type_spec_t	saved_vtype;
 	value_unit_t		saved_vunit;
 	uint32_t		saved_unit_serial;
+	/* saved_vunit's spelling -- travels with it, see bvnr_validator_t.unit_src. */
+	uint8_t			saved_usrc_len;
+	uint8_t			saved_usrc[BVNR_UNIT_SOURCE_MAX + 1u];
 	uint64_t		dim_row_size;
 	bool			in_dim_seq;
 	/* struct_nesting_level when this '[' was opened. A ';' ending a value only

@@ -319,8 +319,8 @@ def unit_to_profile(namespace: str, unit: ValueUnit) -> str:
     turbidity kinds and every currency. An opaque unit belonging to a DIFFERENT
     profile has none either: ``[IU]`` is UCUM's and has no UNECE spelling. And a
     FLAT vocabulary (``unece``, ``qudt``, ``qudt-qk``, ``om``, ``cf``) can spell only a single
-    unprefixed component, because a flat code is one whole token with no
-    operator to build it out of -- so ``k~m/h`` has no UNECE form even though
+    component (no product, quotient or exponent), because a flat code is one
+    whole token with no operator to build it out of -- so ``k~m/h`` has no UNECE form even though
     ``KMH`` parses to exactly it. All three raise rather than returning an
     invented code.
     """
@@ -959,6 +959,19 @@ def _array_quantity_annotation(rows):
     return vt, unit
 
 
+def _array_has_unit(rows) -> bool:
+    """True if any Quantity leaf of a (nested) array carries a real unit."""
+    stack = [rows]
+    while stack:
+        cur = stack.pop()
+        for e in cur:
+            if isinstance(e, (list, tuple)):
+                stack.append(e)
+            elif isinstance(e, Quantity) and _has_real_unit(e.unit.raw):
+                return True
+    return False
+
+
 def _array_unit_source(rows):
     """The one spelling every Quantity leaf of an array agrees on, else None.
 
@@ -1102,6 +1115,19 @@ def _emit_value(w: Writer, key: str, value) -> None:
         vu = None
         if vt is None:
             vt, vu = _array_quantity_annotation(value)
+        if vu is None and _array_has_unit(value):
+            # An array has ONE annotation, and its elements are written bare.
+            # Leaves that agree on type and unit get that annotation (above);
+            # leaves that do not -- two units, or a Quantity beside a plain
+            # number -- used to be written with no unit at all: [1 s, 3 m] came
+            # out as [1, 3], two measurements turned into two bare numbers. The
+            # format refuses that array too (a bare array is homogeneous in its
+            # unit), so there is nothing valid to write; say so.
+            raise BovnarArgumentError(
+                f"Cannot serialise {key!r}: its elements carry units but do not "
+                "agree on one type and unit, and a Bovnar array has a single "
+                "annotation for all of them. Give them a common unit, or use a "
+                "struct with one field per value.")
         if vt is None:
             vt = _array_int_annotation(value)
         write_array(w, key, value, vt=vt, vu=vu,

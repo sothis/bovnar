@@ -38,7 +38,8 @@ pip install --upgrade bovnar     # pure-ctypes bindings + bundled shared library
 ```
 
 Prebuilt archives for Linux and Windows (MinGW64 and MSVC), the single-file
-amalgamation and the WebAssembly bundle are attached to the GitHub release.
+amalgamation and the source tarball are attached to the GitHub release, with a
+`SHA256SUMS` file.
 
 ## What's new
 
@@ -64,7 +65,8 @@ amalgamation and the WebAssembly bundle are attached to the GitHub release.
   and the writer enforces the validation half on what it emits. On the CLI:
   `--unit`, `--field`, `--si`, `--require-unit`, `--require-dimension`,
   `--require-field`.
-- **A temperature difference is a unit** — `ΔK`, `Δ°C` and four siblings, in
+- **A temperature difference is a unit** — `ΔK` (also spelled `Δ°C`) and five
+  siblings, in
   their own quantity kind, so a difference no longer converts as a scale reading.
 - **A larger native registry** — 264 physical units, up from 163, with their
   conversion factors checked against their own definitions.
@@ -76,9 +78,9 @@ amalgamation and the WebAssembly bundle are attached to the GitHub release.
   `available_profiles()`, `unit_to_profile()`, and a typed
   `loads()` → `dumps()` round trip that is byte-identical for a profile-spelled
   document.
-- **Tooling** — every mapped profile row is checked against its publisher's own
-  machine-readable definitions (UN/ECE through QUDT's cross-reference), on a
-  weekly schedule; the
+- **Tooling** — the mapped profile rows are checked against their publishers'
+  own machine-readable definitions on a weekly schedule (UN/ECE only as far as
+  QUDT's cross-reference reaches, since Rec 20 publishes none); the
   conformance suite is at **470 cases**; the web, vim, VS Code and Sublime
   highlighters know the profile notation.
 
@@ -92,6 +94,15 @@ amalgamation and the WebAssembly bundle are attached to the GitHub release.
 - **Python.** `Quantity.unit` is a `Unit` object (use `str(q.unit)`, or
   `q.unit.raw` for the struct), the value accessors are uniformly properties
   (`q.decimal`, not `q.decimal()`), and `Quantity()` validates its arguments.
+- **Removed names.** The currency id sub-ranges are gone, because currencies
+  are catalogue rows now and their order carries no meaning: in C,
+  `BVN_CURRENCY_FIAT_FIRST`/`_LAST`, `BVN_CURRENCY_CRYPTO_FIRST`/`_LAST`, the
+  `BVN_CURRENCY_EXT_*` segment and `BVN_VALUE_BASE_UNIT_COUNT_CURRENCY`, and
+  the enumerators `bu_zwg` and
+  `bu_xcg`; in Python, `CURRENCY_FIAT_*`, `CURRENCY_CRYPTO_*`, `CURRENCY_EXT_*`
+  and `BaseUnit._SENTINEL`. Use `BVN_CURRENCY_FIRST`/`_LAST`/`_COUNT`,
+  `bvn_unit_is_currency`, `bvn_unit_is_fiat`/`bvn_unit_is_crypto` and
+  `bvn_unit_valid`. No exported function was removed and no prototype changed.
 
 ## New error codes (appended, non-breaking)
 
@@ -112,7 +123,9 @@ Existing codes are unchanged.
   it always was.
 - **A bare array is homogeneous in its unit**, not merely in its dimension: an
   array whose elements are annotated with different units of one dimension —
-  metres beside feet — is refused by the document tier. A consumer that read
+  metres beside feet — is refused by the document tier (`bovnar validate`,
+  `bvn_dom_parse`, Python `dom_parse`; the streaming reader and `loads()` still
+  deliver such an array element by element). A consumer that read
   such an array as one block, which the specification said it could, was
   computing wrong numbers.
 - **1.2 constructs are opt-in** — they require the `#!bovnar 1.2` directive.
@@ -126,10 +139,10 @@ CF standard-name table carries no licence statement**; permission and a
 declaration have been requested for those two and neither has arrived. UN/ECE
 Recommendation 20 exists to be implemented and is universally implemented, but
 the UN's website terms do not say so; written confirmation has been asked for
-there too. Both
+there too. The UCUM and CF
 tables ship enabled, and `-DBVNR_WITH_UCUM_PROFILE=OFF` /
 `-DBVNR_WITH_CF_PROFILE=OFF` remove them from a build entirely. The record is in
-[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and doc/11 §18.
+[`THIRD_PARTY_NOTICES.md`](https://github.com/sothis/bovnar/blob/v2.0.0/THIRD_PARTY_NOTICES.md) and doc/11 §18.
 
 ## Documentation
 
@@ -137,11 +150,11 @@ Full docs — tutorial, specification, unit/currency reference, unit profiles, C
 and Python API, formal EBNF grammar, FAQ, conformance protocol, and cheat sheet —
 are available at **https://www.bovnar.io** (each also downloadable as **PDF**),
 and in the [`doc/`](https://github.com/sothis/bovnar/tree/main/doc) directory.
-See [`CHANGELOG.md`](CHANGELOG.md) for the complete change list.
+See [`CHANGELOG.md`](https://github.com/sothis/bovnar/blob/v2.0.0/CHANGELOG.md) for the complete change list.
 
 ## License
 
 MIT for the source, CC BY 4.0 for the documentation, CC0 1.0 for the examples.
 The identifier strings in the unit-profile tables belong to their publishers and
 are not covered by the MIT grant; see
-[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+[`THIRD_PARTY_NOTICES.md`](https://github.com/sothis/bovnar/blob/v2.0.0/THIRD_PARTY_NOTICES.md).

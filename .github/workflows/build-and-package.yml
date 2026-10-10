@@ -442,7 +442,7 @@ jobs:
     # whose test job failed still published its wheels -- while `release`,
     # which does wait for the tests, attached nothing: a version on PyPI with
     # no GitHub release behind it and a red suite.
-    needs: [build_wheels, build_sdist, tests]
+    needs: [build_wheels, build_sdist, tests, release]
     runs-on: ubuntu-latest
     # Only publish on a version tag (e.g. v1.1.0).
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
@@ -526,16 +526,39 @@ jobs:
         run: |
           set -euo pipefail
           tag="$GITHUB_REF_NAME"
-          # The release usually already exists (tags are cut from the GitHub UI),
-          # in which case we only add assets to it. Create it otherwise so pushing
-          # a tag alone is enough, preferring the repo's hand-written notes.
-          if ! gh release view "$tag" >/dev/null 2>&1; then
-            if [ -f "RELEASE_NOTES_${tag}.md" ]; then
-              gh release create "$tag" --title "$tag" --notes-file "RELEASE_NOTES_${tag}.md"
-            else
-              gh release create "$tag" --title "$tag" --generate-notes
-            fi
+          # Pushing the tag alone is the supported way to cut a release: this
+          # step creates it, preferring the repo's hand-written notes. Do NOT
+          # create the release in the GitHub UI first -- see below for why a
+          # release published before its assets are attached cannot be repaired.
+          notes=(--generate-notes)
+          if [ -f "RELEASE_NOTES_${tag}.md" ]; then
+            notes=(--notes-file "RELEASE_NOTES_${tag}.md")
           fi
-          # --clobber so re-running the workflow on a tag replaces the assets
-          # rather than failing on the existing names.
-          gh release upload "$tag" assets/* --clobber
+          # The repository has release immutability switched on: a PUBLISHED
+          # release accepts no further assets. So nothing is published until
+          # every asset is attached -- create a draft, upload, then publish.
+          # releases/tags/<tag> answers only for a published release.
+          # (v1.0.0 is what the other order leaves behind: published, immutable,
+          # no assets, and a tag name that can never be reused.)
+          if state=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" --jq '"\(.immutable) \(.assets | length)"' 2>/dev/null); then
+            immutable="${state%% *}"
+            nassets="${state##* }"
+            if [ "$immutable" = "true" ] && [ "$nassets" = "0" ]; then
+              # Published by hand before this job ran. Nothing can be attached
+              # any more, and saying "fine" here would let PyPI publish a
+              # version whose GitHub release is empty.
+              echo "::error::release ${tag} is published, immutable and has no assets -- it cannot be completed. Delete it and cut the next version."
+              exit 1
+            elif [ "$immutable" = "true" ]; then
+              # A re-run after a completed release: nothing can or should change.
+              echo "::notice::release ${tag} is already published and immutable -- leaving its assets as they are"
+            else
+              gh release upload "$tag" assets/* --clobber
+            fi
+          else
+            if ! gh release view "$tag" >/dev/null 2>&1; then
+              gh release create "$tag" --draft --verify-tag --title "$tag" "${notes[@]}"
+            fi
+            gh release upload "$tag" assets/* --clobber
+            gh release edit "$tag" --draft=false
+          fi

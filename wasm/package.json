@@ -16,7 +16,9 @@
     "bovnar.mjs",
     "bovnar.single.mjs",
     "bovnar.wasm",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "sideEffects": false,
   "keywords": [

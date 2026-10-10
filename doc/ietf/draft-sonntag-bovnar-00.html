@@ -3290,7 +3290,7 @@ therefore only ever accepted where the separated form would have been
 <p id="section-8.3-5">The longest-suffix rule resolves most apparent collisions without a
 special case, because a token that is itself a registered unit is read as
 that unit: <code>pH</code>, <code>mph</code>, and <code>kph</code> are registry entries and are never read
-as pico-henry, milli-phot, or kilo-phot. Exactly two compact spellings
+as pico-henry, milli-phot, or kilo-phot. Exactly three compact spellings
 are refused by name, because for them the longest-suffix rule would
 silently pick one of two defensible readings:<a href="#section-8.3-5" class="pilcrow">¶</a></p>
 <span id="name-compact-spellings-refused-b"></span><table class="center" id="table-9">
@@ -3319,9 +3319,16 @@ silently pick one of two defensible readings:<a href="#section-8.3-5" class="pil
               <td class="text-left" rowspan="1" colspan="1">kilotonne or knot - write <code>k~t</code> or <code>kn</code>
 </td>
             </tr>
+            <tr>
+              <td class="text-left" rowspan="1" colspan="1">
+                <code>ppt</code>
+</td>
+              <td class="text-left" rowspan="1" colspan="1">parts per trillion or per thousand in use, the picopint by the rule - write <code>pptr</code>, <code>‰</code> or <code>p~pt</code>
+</td>
+            </tr>
           </tbody>
         </table>
-<p id="section-8.3-7">Both are <code>error_unit_illegal</code>. The separated spellings remain valid, so
+<p id="section-8.3-7">All three are <code>error_unit_illegal</code>. The separated spellings remain valid, so
 the refusal costs nothing but a character.<a href="#section-8.3-7" class="pilcrow">¶</a></p>
 <p id="section-8.3-8">Which spelling a producer emits depends on what it is doing, and the two
 cases differ:<a href="#section-8.3-8" class="pilcrow">¶</a></p>
@@ -5239,7 +5246,7 @@ unit-component = [ prefix [ "~" ] ] base-unit [ unit-exp ]
 ;
 ; base-unit is matched as the LONGEST alias suffix, so a token
 ; that is itself a registered unit outranks any prefixed reading
-; of it. Section 8.3 lists the two spellings refused by name.
+; of it. Section 8.3 lists the three spellings refused by name.
 
 base-unit      = 1*base-unit-char
 base-unit-char = ALPHA / DIGIT / "_" / "%"
@@ -5759,10 +5766,11 @@ becomes a 64-bit width, <code>&lt;float:64,k g&gt;</code> becomes the kilogram, 
 space-multiplied UDUNITS spelling <code>m s-1</code> becomes <code>ms-1</code>, a reciprocal
 millisecond. Reporting code 52 at the first octet after the whitespace is
 therefore a requirement of this document and not a lexical nicety.<a href="#appendix-B-9" class="pilcrow">¶</a></p>
-<p id="appendix-B-10">The unit-profile facility of <a href="#error-codes" class="auto internal xref">Appendix B</a>, which this document does not
+<p id="appendix-B-10">The unit-profile facility (<a href="#unit-profiles" class="auto internal xref">Section 8.6</a>), which this document does not
 specify, admits whitespace inside a parameter that carries a profile
 namespace, where it is part of the foreign code rather than a separator. A
-parameter carrying a namespace prefix is therefore never code 52: in a
+parameter carrying a namespace prefix is therefore never code 52 on account
+of a space or a tab (a line break inside it still is): in a
 document declaring 1.2 or newer it is the foreign code, or
 <code>error_unit_profile_unknown</code> (49) for a namespace the consumer does not
 implement; in a document declaring less it is <code>error_unit_illegal</code>,

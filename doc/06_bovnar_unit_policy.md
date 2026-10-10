@@ -377,9 +377,10 @@ values ([4.2](#42-a-bare-number-matches-only-no_unit--and-no_unit-matches-only-a
 
 ### 5.1 Validation only
 
-The same policy object drives `bvnr_writer_set_unit_policy`, but only `require_unit` and
-`require_dimension_of` are accepted. A policy carrying `targets`, `normalise`, `base` or
-`on_inexact` is rejected outright rather than half-honoured.
+The same policy object drives `bvnr_writer_set_unit_policy`, but only its validating half is
+accepted: `require_unit`, `require_dimension_of`, and per-field rules in `bvnr_rule_require` mode.
+A policy carrying `targets`, `normalise`, `base`, `on_inexact` or a `bvnr_rule_convert` rule is
+rejected outright rather than half-honoured.
 
 `bvnr_write_event` fails with `error_unit_mismatch`, and the writer latches it like any other
 write error — query it with `bvnr_writer_get_error`.

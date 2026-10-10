@@ -1230,7 +1230,7 @@ Prefixes MUST NOT stack: `kkg` and `k~kg` are both `error_unit_illegal`.
 The longest-suffix rule resolves most apparent collisions without a
 special case, because a token that is itself a registered unit is read as
 that unit: `pH`, `mph`, and `kph` are registry entries and are never read
-as pico-henry, milli-phot, or kilo-phot. Exactly two compact spellings
+as pico-henry, milli-phot, or kilo-phot. Exactly three compact spellings
 are refused by name, because for them the longest-suffix rule would
 silently pick one of two defensible readings:
 
@@ -1238,9 +1238,10 @@ silently pick one of two defensible readings:
 |---|---|
 | `usb` | the bus, not microstilb - write `u~sb` or `µ~sb` |
 | `kt` | kilotonne or knot - write `k~t` or `kn` |
+| `ppt` | parts per trillion or per thousand in use, the picopint by the rule - write `pptr`, `‰` or `p~pt` |
 {: title="Compact spellings refused by name"}
 
-Both are `error_unit_illegal`. The separated spellings remain valid, so
+All three are `error_unit_illegal`. The separated spellings remain valid, so
 the refusal costs nothing but a character.
 
 Which spelling a producer emits depends on what it is doing, and the two
@@ -2527,7 +2528,7 @@ unit-component = [ prefix [ "~" ] ] base-unit [ unit-exp ]
 ;
 ; base-unit is matched as the LONGEST alias suffix, so a token
 ; that is itself a registered unit outranks any prefixed reading
-; of it. Section 8.3 lists the two spellings refused by name.
+; of it. Section 8.3 lists the three spellings refused by name.
 
 base-unit      = 1*base-unit-char
 base-unit-char = ALPHA / DIGIT / "_" / "%"
@@ -2704,10 +2705,11 @@ space-multiplied UDUNITS spelling `m s-1` becomes `ms-1`, a reciprocal
 millisecond. Reporting code 52 at the first octet after the whitespace is
 therefore a requirement of this document and not a lexical nicety.
 
-The unit-profile facility of {{error-codes}}, which this document does not
+The unit-profile facility ({{unit-profiles}}), which this document does not
 specify, admits whitespace inside a parameter that carries a profile
 namespace, where it is part of the foreign code rather than a separator. A
-parameter carrying a namespace prefix is therefore never code 52: in a
+parameter carrying a namespace prefix is therefore never code 52 on account
+of a space or a tab (a line break inside it still is): in a
 document declaring 1.2 or newer it is the foreign code, or
 `error_unit_profile_unknown` (49) for a namespace the consumer does not
 implement; in a document declaring less it is `error_unit_illegal`,

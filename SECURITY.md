@@ -30,14 +30,17 @@ with the reporter credited in `CHANGELOG.md` unless they ask otherwise.
 | Version | Supported |
 |---|---|
 | 2.0.x | Yes |
-| 1.1.x | No — upgrade to 2.0.x, which reads every 1.0 and 1.1 document; the C ABI and the Python API changed, so this one is a rebuild and not a drop-in |
+| 1.1.x | No — upgrade to 2.0.x, which reads 1.0 and 1.1 documents (see below for the two it now refuses); the C ABI and the Python API changed, so this one is a rebuild and not a drop-in |
 | 1.0.x | No |
 
 The **format** and the reference implementation are versioned separately, both
 semantically, and a fix lands on the newest release of the implementation only.
 Within a major version of the format it is additive: a document valid under spec
 1.0 stays valid, and decodes to the same values, under every 1.x spec, so a
-newer reader never needs a document migrated. The implementation's own major
+newer reader does not need a document migrated — with two exceptions, both
+recorded in the specification (§17) as corrections made in 1.2: whitespace
+inside a type-annotation parameter, and a bare array mixing units of one
+dimension, are now refused. The implementation's own major
 moves when a program built against it has to change, which is what 2.0.0 was;
 `CHANGELOG.md` says which spec each release implements.
 

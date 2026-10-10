@@ -493,9 +493,9 @@ unit-char    = (* any byte accepted by copy_type_byte that is not     *)
 (* from being a namespace; it exists for &quot;qudt-qk&quot;, where the          *)
 (* vocabulary itself is split into a unit namespace and a              *)
 (* quantity-kind one.                                                  *)
-profile-unit = profile-name , &quot;:&quot; , profile-code ;
+profile-unit = profile-name , ws , &quot;:&quot; , ws , profile-code ;
 profile-name = name-head , {name-tail} ;   (* &quot;ucum&quot;, &quot;qudt-qk&quot;       *)
-name-head    = lower-alpha | digit ;
+name-head    = lower-alpha ;   (* a digit-led parameter is a width *)
 name-tail    = lower-alpha | digit | &quot;-&quot; ;
 lower-alpha  = &quot;a&quot;|&quot;b&quot;|&quot;c&quot;|&quot;d&quot;|&quot;e&quot;|&quot;f&quot;|&quot;g&quot;|&quot;h&quot;|&quot;i&quot;|&quot;j&quot;|&quot;k&quot;|&quot;l&quot;|&quot;m&quot;
              | &quot;n&quot;|&quot;o&quot;|&quot;p&quot;|&quot;q&quot;|&quot;r&quot;|&quot;s&quot;|&quot;t&quot;|&quot;u&quot;|&quot;v&quot;|&quot;w&quot;|&quot;x&quot;|&quot;y&quot;|&quot;z&quot; ;
@@ -553,14 +553,15 @@ profile-char = (* any unit-char, plus &quot;,&quot; at brace depth &gt;= 1 -- a 
 (* A bare base-unit with no prefix requires no separator.             *)
 (* A prefix may be written with the &quot;~&quot; separator (&quot;k~g&quot;) or          *)
 (* compactly, without it (&quot;kg&quot;, &quot;MiB&quot;).  Both spell the same unit;    *)
-(* the writer always emits the separated form.  base-unit is matched  *)
+(* the separated form is the canonical one, though a re-serialised    *)
+(* document keeps the spelling it carried.  base-unit is matched      *)
 (* as the LONGEST alias suffix, so a bare unit outranks any prefixed  *)
 (* reading of the same token (&quot;min&quot; is the minute, not milli-inch)    *)
 (* and no compact spelling can change how an existing document        *)
 (* decodes.  A prefix cannot be stacked (&quot;kkg&quot;, &quot;k~kg&quot; are both       *)
 (* error_unit_illegal), prefix-unit validity is unchanged, and the    *)
 (* few compact spellings listed in .compact_exceptions               *)
-(* (src/gendata/units.bvnr: &quot;usb&quot;, &quot;kt&quot;) stay errors because they    *)
+(* (src/gendata/units.bvnr: &quot;usb&quot;, &quot;kt&quot;, &quot;ppt&quot;) stay errors -- they  *)
 (* name something else, or two things at once.                       *)
 (* A prefixed CURRENCY behaves the same way (&quot;k~$EUR&quot; = &quot;k$EUR&quot;);    *)
 (* the &#39;$&#39; sigil separates prefix from code and stays MANDATORY, so  *)
@@ -871,7 +872,9 @@ ref-body-char = sym-body-char ;
 (*      streaming reader — `loads`/the SAX callbacks accept these and  *)
 (*      deliver every element; only a DOM parse rejects them.  Array   *)
 (*      elements must be HOMOGENEOUS (spec 1.0): the same kind         *)
-(*      throughout, `,`-separated sibling sub-arrays must be           *)
+(*      throughout -- and, for numbers in a bare array, the same UNIT, *)
+(*      not merely the same dimension (corrected in spec 1.2) --       *)
+(*      `,`-separated sibling sub-arrays must be                       *)
 (*      rectangular (match in length), and sibling structs must share  *)
 (*      the same shape.  A ragged sibling set is                       *)
 (*      error_array_row_size_mismatch (code 2); a mix of element kinds *)
@@ -1047,7 +1050,9 @@ byte         = (* any single byte 0x00–0xFF *) ;
        (e.g. [1,2,3]/[4,5], or [[1,2]/[3,4,5]]).
 
      Sibling homogeneity (DOM BUILDER ONLY — bvn_dom_parse; the streaming
-     reader accepts these). Array elements must be the same kind throughout,
+     reader accepts these). Array elements must be the same kind throughout
+     and, for numbers in a bare array, carry the same unit ([1 m, 2 ft]-shaped
+     data, annotated element by element, is error_array_element_type_mismatch),
      `,`-separated sibling sub-arrays must be rectangular (match in length,
      so a bare array/matrix is rectangular), and sibling structs must share
      the same shape. A ragged sibling set is error_array_row_size_mismatch
@@ -1155,10 +1160,10 @@ byte         = (* any single byte 0x00–0xFF *) ;
      error_unexpected_input_byte.
 
      The validator&#39;s bvn_val_receive calls bvn_parse_unit on the
-     inline buffer and compares the result to v-&gt;parsed_unit using
-     memcmp on the full value_unit_t structure (valid because both
-     structs are zero-initialised before parsing and all padding is
-     zeroed).  When has_annotation_unit is true and the comparison
+     inline buffer and compares the result to v-&gt;parsed_unit with
+     bvn_unit_equal -- the multiset of components, so the comparison
+     is order-insensitive and &quot;m*s&quot; agrees with &quot;s*m&quot;.  When
+     has_annotation_unit is true and the comparison
      fails, the validator returns error_unit_mismatch.
      When no annotation unit was present, the inline unit is silently
      adopted as the effective unit.

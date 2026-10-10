@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){try{var s=localStorage.getItem('bovnar-theme');var d=s==='dark'||(s!=='light'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(!d)document.documentElement.setAttribute('data-theme','light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();</script>
 <title>Bovnar Unit Profiles</title>
-<meta name="description" content="Writing UCUM, UNECE, QUDT and UDUNITS codes in a Bovnar unit slot: the transliteration tables, the collisions between the namespaces, what has no representation, and the cross-vocabulary conformance suite.">
+<meta name="description" content="Writing UCUM, UN/ECE, QUDT, UDUNITS, OM 2 and CF codes in a Bovnar unit slot: the transliteration tables, the collisions between the namespaces, what has no representation, and the cross-vocabulary conformance suite.">
 <meta name="theme-color" content="#1e1e1e">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://www.bovnar.io/docs/profiles/">
@@ -15,7 +15,7 @@
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Bovnar">
 <meta property="og:title" content="Bovnar Unit Profiles">
-<meta property="og:description" content="Writing UCUM, UNECE, QUDT and UDUNITS codes in a Bovnar unit slot: the transliteration tables, the collisions between the namespaces, what has no representation, and the cross-vocabulary conformance suite.">
+<meta property="og:description" content="Writing UCUM, UN/ECE, QUDT, UDUNITS, OM 2 and CF codes in a Bovnar unit slot: the transliteration tables, the collisions between the namespaces, what has no representation, and the cross-vocabulary conformance suite.">
 <meta property="og:url" content="https://www.bovnar.io/docs/profiles/">
 <meta property="og:image" content="https://www.bovnar.io/bovnar-og.png">
 <meta property="og:image:width" content="1200">
@@ -26,13 +26,13 @@
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar Unit Profiles">
-<meta name="twitter:description" content="Writing UCUM, UNECE, QUDT and UDUNITS codes in a Bovnar unit slot: the transliteration tables, the collisions between the namespaces, what has no representation, and the cross-vocabulary conformance suite.">
+<meta name="twitter:description" content="Writing UCUM, UN/ECE, QUDT, UDUNITS, OM 2 and CF codes in a Bovnar unit slot: the transliteration tables, the collisions between the namespaces, what has no representation, and the cross-vocabulary conformance suite.">
 <meta name="twitter:image" content="https://www.bovnar.io/bovnar-og.png">
 <meta name="twitter:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
 <link rel="alternate" type="text/markdown" href="/doc/11_bovnar_unit_profiles.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Unit Profiles", "description": "Writing UCUM, UNECE, QUDT and UDUNITS codes in a Bovnar unit slot: the transliteration tables, the collisions between the namespaces, what has no representation, and the cross-vocabulary conformance suite.", "url": "https://www.bovnar.io/docs/profiles/", "mainEntityOfPage": "https://www.bovnar.io/docs/profiles/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-07-27", "dateModified": "2026-10-10", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Unit Profiles", "item": "https://www.bovnar.io/docs/profiles/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Unit Profiles", "description": "Writing UCUM, UN/ECE, QUDT, UDUNITS, OM 2 and CF codes in a Bovnar unit slot: the transliteration tables, the collisions between the namespaces, what has no representation, and the cross-vocabulary conformance suite.", "url": "https://www.bovnar.io/docs/profiles/", "mainEntityOfPage": "https://www.bovnar.io/docs/profiles/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-07-27", "dateModified": "2026-10-10", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Unit Profiles", "item": "https://www.bovnar.io/docs/profiles/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
@@ -1062,7 +1062,7 @@ alone would leave whichever code happened to be shortest and make every other de
 <li><em>No table is complete.</em> A native unit outside a transliteration table has nowhere to go — the Old
   German units, the water-hardness degrees, the turbidity kinds, <code>PSU</code>, <code>CF</code>, <code>kph</code>, <code>rpm</code>,
   and every currency. Membership here is per-unit and not per-family: <code>mph</code> has both a UN/ECE
-  and a QUDT code while <code>kph</code> has neither, and <code>NTU</code> is writable where <code>PSU</code> is not.</li>
+  and a QUDT code while <code>kph</code> has neither.</li>
 <li><em>A flat profile can only write a single component.</em> A flat code names a whole unit, so there is no
   way to compose one out of parts: <code>unece:MSK</code> reads back as <code>m/s²</code>, but a native <code>m/s²</code> has no
   UNECE spelling this function can construct. The expression profiles have no such limit.</li>
@@ -2894,8 +2894,9 @@ build-time fact rather than a comment.</p>
 
 <p><code>bvn_parse_unit</code> keeps its signature, which is why the policy strings of §4.3 work with no change
 at all: <code>bvnr_unit_policy_t</code> parses its targets with it, so the notation arrives for free. One
-struct changed — <code>bvnr_data_t</code> gained <code>unit_source</code>/<code>unit_source_length</code> (§7.3) — so the ABI
-movement is that, the two error codes and the new entry points.</p>
+struct changed for this feature — <code>bvnr_data_t</code> gained <code>unit_source</code>/<code>unit_source_length</code> (§7.3) —
+so its ABI movement is that, the two error codes and the new entry points. (The release moved more
+than the profiles did; the changelog has the whole list.)</p>
 <h3 id="82-python">8.2 Python</h3>
 <p><code>parse_unit</code>, <code>unit_to_str</code>, <code>units_compatible</code> and <code>UnitPolicy</code> accept and produce every profile
 notation with no signature change. Four additions mirror the C ones:</p>
@@ -3553,7 +3554,9 @@ out by name instead.</p>
 <p>The unit parser is the bulk of it. Everything else is small, and — this is what §1.1 buys — the
 DOM, the writer, the streaming reader, the policy engine and the CLI needed no work at all, because
 a translated unit is an ordinary unit. The two formatter guards, the two compatibility refusals and
-the writer's one spec-version check are the entire footprint outside the new file.</p>
+the writer's one spec-version check are the entire footprint outside the new file. (That was true
+of translation, which is what this table costs out. Keeping a unit's <em>spelling</em> came later and did
+touch the reader, the writer and the DOM — §7.3.)</p>
 <h3 id="102-what-can-go-wrong">10.2 What can go wrong</h3>
 <p><strong>The tables rest on their authors less than they did, and not nowhere.</strong> §9.5's factor proof now
 does confirm that UCUM's <code>[Btu_IT]</code> is 1055.05585262 J against <code>ucum-essence.xml</code>, and it has found
@@ -4345,7 +4348,7 @@ else — ordinary left-to-right arithmetic. <code>kg/m*s</code> is <code>(kg/m)*
 back as <code>k~g·s/m</code> — for exactly this reason: getting it backwards turns a viscosity into its
 reciprocal and still formats cleanly.</p>
 <p>UDUNITS accepts symbols and spelled-out names for units <em>and</em> prefixes, which is why the table
-carries 251 codes and 41 prefix spellings for a vocabulary no larger than UCUM's: <code>m</code>, <code>meter</code> and
+carries 499 codes and 41 prefix spellings for a vocabulary no larger than UCUM's: <code>m</code>, <code>meter</code> and
 <code>metre</code> are three rows, and <code>kilo</code> is a prefix beside <code>k</code>. <code>udunits:km</code>, <code>udunits:kilometer</code> and
 <code>udunits:kilometre</code> are one unit.</p>
 <div class="codehilite"><pre><span></span><code>udunits:m*s-1       →  m/s
@@ -4888,7 +4891,7 @@ before length does</strong>, which is a rule this vocabulary needed and the othe
 </tr>
 </tbody>
 </table>
-<p>735 native units have an OM spelling as a result. A compound unit still has none: a flat vocabulary
+<p>791 native units — counted as (unit, decade) pairs, which is how a flat vocabulary names them — have an OM spelling as a result. A compound unit still has none: a flat vocabulary
 spells one whole code, so <code>bvn_unit_to_profile("om", m/s²)</code> returns -1 for the reason §5.1 gives.</p>
 <hr />
 <h2 id="17-the-cf-standard-name-profile">17. The CF standard-name profile</h2>

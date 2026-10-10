@@ -364,6 +364,26 @@ static void test_writer_refusals(void)
 	            "it is reported as set for a value with no unit");
 	bvnr_writer_destroy(w);
 
+	/* ...nor is it dropped in silence when that value was the last one. */
+	w = open_writer(true, 0);
+	if (!w) { failures++; return; }
+	bvnr_writer_set_unit_source(w, "km", 2);
+	ASSERT_TRUE(bvnr_write_string(w, "s", "x"), "a string takes no unit");
+	ASSERT_FALSE(bvnr_write_finish(w), "finishing with the spelling unused");
+	ASSERT_TRUE(bvnr_writer_get_error(w) == error_unit_mismatch, "is the same mistake");
+	bvnr_writer_destroy(w);
+
+	/* The FIRST error is the one a caller finds. A bad key used to be
+	 * overwritten by the one-shot's own complaint on the write after it. */
+	w = open_writer(true, 0);
+	if (!w) { failures++; return; }
+	bvnr_writer_set_unit_source(w, "km", 2);
+	ASSERT_FALSE(bvnr_write_float_unit(w, "bad key", 64, 1.5, U("k~m")), "bad key");
+	ASSERT_FALSE(bvnr_write_float_unit(w, "a", 64, 1.5, U("k~m")), "sticky");
+	ASSERT_TRUE(bvnr_writer_get_error(w) != error_unit_mismatch,
+	            "the first error stands");
+	bvnr_writer_destroy(w);
+
 	/* A spelling for a value that carries no unit names the wrong value. */
 	w = open_writer(true, 0);
 	if (!w) { failures++; return; }
@@ -491,6 +511,170 @@ static void test_writer_data_text(void)
 	            "data and unit_source disagreeing");
 }
 
+/* A 32-component unit whose compact spelling (km^-9*ms^-9*...) is some 210
+ * bytes and whose canonical form (k~m⁻⁹·m~s⁻⁹·...) is some 370. */
+static value_unit_t long_unit(char* spelling, size_t cap)
+{
+	static const char* const b[] = {
+		"km","ms","kg","mA","mK","mmol","mcd","kN","kPa","kJ","kW","kV","kHz",
+		"mL","mbar","keV","mlm","mlx","mrad","kWb","mT","mH","mF","mC","mS",
+		"kBq","mGy","mSv","mkat","mW","mm","cm","dm","kL","MeV","kcal","MPa",
+	};
+	value_unit_t u = {0};
+	int n = 0;
+	spelling[0] = 0;
+	for (size_t i = 0; i < sizeof b / sizeof b[0] && n < 32; i++) {
+		char t[900];
+		snprintf(t, sizeof t, "%s%s%s^-9", spelling, n ? "*" : "", b[i]);
+		bool ok = false;
+		value_unit_t v = bvn_parse_unit((const uint8_t*)t, &ok);
+		if (ok && v.num_components == (uint32_t)n + 1u && strlen(t) < cap) {
+			strcpy(spelling, t);
+			u = v;
+			n++;
+		}
+	}
+	return u;
+}
+
+static void test_writer_long_units(void)
+{
+	printf("  ...a long unit is judged by what is WRITTEN, not by its other spelling...\n");
+	char src[900], canon[BVNR_UNIT_STRING_MAX];
+	value_unit_t u = long_unit(src, sizeof src);
+	int32_t cn = bvn_unit_to_string(u, canon, sizeof canon);
+	ASSERT_TRUE(u.num_components == 32u && strlen(src) < 240u && cn > 255,
+	            "the test unit: 32 components, short spelling, long canonical form");
+
+	/* The helper passes the canonical text in `data` beside the spelling. It
+	 * is not written, so its length is not the document's concern. */
+	bvnr_writer_t* w = open_writer(false, 0);
+	if (!w) { failures++; return; }
+	ASSERT_TRUE(bvnr_writer_set_unit_source(w, src, (uint32_t)strlen(src)) &&
+	            bvnr_write_float_unit(w, "a", 64, 1.5, u) && bvnr_write_finish(w),
+	            "a spelling that fits is written though the canonical form would not");
+	bvnr_writer_destroy(w);
+	seen_t s;
+	bvnr_read_flags_t f;
+	memset(&f, 0, sizeof f);
+	char copy[sizeof wbuf];
+	memcpy(copy, wbuf, sizeof copy);
+	ASSERT_TRUE(read_doc(copy, &s, &f) && s.n == 1 && strcmp(s.src[0], src) == 0,
+	            "and reads back as written");
+
+	/* Without the spelling the canonical form is what would go out, and it
+	 * does not fit: refused, in the annotation and as an inline suffix. */
+	w = open_writer(false, 0);
+	if (!w) { failures++; return; }
+	ASSERT_FALSE(bvnr_write_float_unit(w, "a", 64, 1.5, u), "canonical form too long");
+	ASSERT_TRUE(bvnr_writer_get_error(w) == error_unit_too_long ||
+	            bvnr_writer_get_error(w) == error_type_too_long, "refused for its length");
+	bvnr_writer_destroy(w);
+	w = open_writer(false, 0);
+	if (!w) { failures++; return; }
+	bvnr_data_t d;
+	memset(&d, 0, sizeof d);
+	d.type = token_is_identifier; d.data = "a"; d.length = 1;
+	bool ok = bvnr_write_event(w, ev_assignment_start, &d);
+	memset(&d, 0, sizeof d);
+	d.type = token_is_number;
+	d.value_unit = u;
+	d.data = "1"; d.length = 1;
+	ASSERT_TRUE(ok && !bvnr_write_event(w, ev_data, &d) &&
+	            bvnr_writer_get_error(w) == error_unit_too_long,
+	            "an inline suffix over the reader's cap is refused, not written");
+	bvnr_writer_destroy(w);
+
+	/* The probe must not be stricter than the document: <uint:...> leaves
+	 * 250 bytes for the unit, and the probe used to allow 246. */
+	char doc[400], unit[300];
+	memcpy(unit, "ucum:mL{", 8);
+	memset(unit + 8, 'x', 240);
+	strcpy(unit + 248, "}");
+	snprintf(doc, sizeof doc, "#!bovnar 1.2\n.a=<uint:%s>1;", unit);
+	w = open_writer(true, 0);
+	bvnr_reader_t* r = bvnr_reader_create();
+	if (!w || !r) { failures++; return; }
+	memset(&f, 0, sizeof f);
+	f.userdata = w;
+	f.on_verified = replay_cb;
+	ASSERT_TRUE(bvnr_open_read_mem(r, doc, strlen(doc), NULL, 0, &f) &&
+	            bvnr_read(r) && bvnr_write_finish(w),
+	            "an annotation that fills the reader's buffer replays");
+	ASSERT_TRUE(strcmp(wbuf, doc) == 0, "byte for byte");
+	bvnr_reader_destroy(r);
+	bvnr_writer_destroy(w);
+}
+
+static void test_writer_value_agrees(void)
+{
+	printf("  ...and a value agrees with the annotation it is written under...\n");
+	/* The serialiser writes the annotation's unit and never looks at the
+	 * value's: five metres under <float:64,k~g> went out as five kilograms. */
+	bvnr_writer_t* w = open_writer(false, 0);
+	if (!w) { failures++; return; }
+	bvnr_data_t d;
+	memset(&d, 0, sizeof d);
+	d.type = token_is_identifier; d.data = "a"; d.length = 1;
+	bool ok = bvnr_write_event(w, ev_assignment_start, &d);
+	ok = ok && bvnr_write_type_annotation(w, BVN_TYPE_FLOAT(64), U("k~g"));
+	memset(&d, 0, sizeof d);
+	d.type = token_is_number;
+	d.value_type = BVN_TYPE_FLOAT(64);
+	d.value_unit = U("m");
+	d.data = "5"; d.length = 1;
+	ASSERT_TRUE(ok && !bvnr_write_event(w, ev_data, &d) &&
+	            bvnr_writer_get_error(w) == error_unit_mismatch,
+	            "a value in metres under an annotation in kilograms");
+	bvnr_writer_destroy(w);
+
+	/* The annotation's unit may be given on its START event alone; the
+	 * parameter events need nothing but their type. */
+	w = open_writer(false, 0);
+	if (!w) { failures++; return; }
+	memset(&d, 0, sizeof d);
+	d.type = token_is_identifier; d.data = "a"; d.length = 1;
+	ok = bvnr_write_event(w, ev_assignment_start, &d);
+	memset(&d, 0, sizeof d);
+	d.type = token_is_type;
+	d.value_type = BVN_TYPE_FLOAT(64);
+	d.value_unit = U("m");
+	ok = ok && bvnr_write_event(w, ev_type_annotation_start, &d);
+	d.value_unit = (value_unit_t){0};
+	ok = ok && bvnr_write_event(w, ev_type_annotation_type_family, &d);
+	d.type = token_is_unit; d.data = "m"; d.length = 1;
+	ok = ok && bvnr_write_event(w, ev_type_annotation_type_family_parameter, &d);
+	memset(&d, 0, sizeof d);
+	d.type = token_is_type;
+	ok = ok && bvnr_write_event(w, ev_type_annotation_end, &d);
+	memset(&d, 0, sizeof d);
+	d.type = token_is_number;
+	d.value_type = BVN_TYPE_FLOAT(64);
+	d.value_unit = U("m");
+	d.data = "5"; d.length = 1;
+	ok = ok && bvnr_write_event(w, ev_data, &d) && bvnr_write_finish(w);
+	ASSERT_TRUE(ok && strstr(wbuf, ".a=<float:m>5;") != NULL, wbuf);
+	bvnr_writer_destroy(w);
+
+	/* A datetime's parameter is its epoch, and only its epoch's own name. */
+	w = open_writer(true, 0);
+	if (!w) { failures++; return; }
+	memset(&d, 0, sizeof d);
+	d.type = token_is_identifier; d.data = "t"; d.length = 1;
+	ok = bvnr_write_event(w, ev_assignment_start, &d);
+	memset(&d, 0, sizeof d);
+	d.type = token_is_type;
+	d.value_type.family = vt_datetime;
+	d.value_type.width  = 64;
+	d.value_type.base   = (uint32_t)bvnr_datetime_epoch_index("tai");
+	ok = ok && bvnr_write_event(w, ev_type_annotation_start, &d);
+	ok = ok && bvnr_write_event(w, ev_type_annotation_type_family, &d);
+	d.type = token_is_unit; d.data = "tai>1;.k=<uint:8"; d.length = 16;
+	ASSERT_TRUE(ok && !bvnr_write_event(w, ev_type_annotation_type_family_parameter, &d),
+	            "an epoch parameter that is not the epoch's name is refused");
+	bvnr_writer_destroy(w);
+}
+
 static void test_writer_annotation_cap(void)
 {
 	printf("  ...and a spelling may not push an annotation past the reader's cap...\n");
@@ -533,6 +717,16 @@ static void test_writer_arrays(void)
 	 * A valid document replayed into one its own reader refused. */
 	static const char* const docs[] = {
 		".a=<float:64,s>[<float:64,m>[<uint:8>null,2],3];",
+		/* A "/"-continued row is governed by the same annotation as the row
+		 * before it. The first fix for the case above restored the state at
+		 * each row's END and then let the enclosing array overwrite it, so
+		 * the second row of an annotated block nested in a plain array lost
+		 * its annotation's unit and gained inline ones. */
+		".a=[<sint:16,s>[46,96]/[2707,44]];",
+		".a=[[<uint:8,s>[1]/[2]]];",
+		/* A profile spelling can mean "no unit": a bare UCUM annotation, the
+		 * UCUM unity. The writer's check knew only the literal no_unit. */
+		"#!bovnar 1.2\n.a=<float:64,ucum:{cells}>5;.b=<uint:64,_10,ucum:1>5;",
 		".a=<float:64,s>[<uint:8>1,3]/[4,<float:64>5];",
 		"#!bovnar 1.2\n.a=<float:64,udunits:kg m-2 s-1>"
 			"[<float:64,ucum:mL{a,b}>[<uint:8>null,\"7\"],3];",
@@ -685,6 +879,11 @@ static void test_dom(void)
 	const char* sc = bvn_dom_get_unit_source(bvn_dom_lookup(dd, ".c"), NULL);
 	ASSERT_TRUE((sa == NULL) == (sb == NULL) && (sb == NULL) == (sc == NULL),
 	            "three values written alike are kept alike");
+	char ua[64], ub[64];
+	ASSERT_TRUE(bvn_dom_get_unit_string(bvn_dom_lookup(dd, ".a"), ua, sizeof ua) > 0 &&
+	            bvn_dom_get_unit_string(bvn_dom_lookup(dd, ".b"), ub, sizeof ub) > 0 &&
+	            strcmp(ua, ub) == 0,
+	            "and the unit is the annotation's parse, whatever the suffix's order");
 	bvn_dom_doc_destroy(dd);
 
 	/* A converting policy stores conv.unit, which the document never spelled. */
@@ -720,6 +919,8 @@ int main(void)
 	test_writer_events();
 	test_writer_data_text();
 	test_writer_annotation_cap();
+	test_writer_long_units();
+	test_writer_value_agrees();
 	test_replay();
 	test_writer_arrays();
 	test_long_unit_text_under_flags();

@@ -1094,7 +1094,7 @@ UDUNITS or CF document that says `year` be read at all. It was refused outright 
 
 ## 4. Prefixes
 
-A prefix is attached to a base unit symbol either with the `~` separator — `prefix~baseunit`, the canonical form — or **compactly**, without it: `kg` is `k~g`, `MiB` is `Mi~B`. Both spellings parse to the same `value_unit_t`. `bvn_unit_to_string` — and a writer handed only a `value_unit_t` — always emits the separated form; a document that is *re-serialised* keeps the spelling it was written in, and `bovnar pretty-print --canonical` restores the separated one. See §4.3 for what the compact form does and does not accept.
+A prefix is attached to a base unit symbol either with the `~` separator — `prefix~baseunit`, the canonical form — or **compactly**, without it: `kg` is `k~g`, `MiB` is `Mi~B`. Both spellings parse to the same `value_unit_t`. `bvn_unit_to_string` — and a writer handed only a `value_unit_t` — always emits the separated form; a document that is *re-serialised* keeps the spelling it was written in. `bovnar pretty-print --canonical` does not keep the spelling either way: it reduces every unit and rescales the value (`1 km` becomes `1000.0 m`), so its output carries no prefix at all. See §4.3 for what the compact form does and does not accept.
 
 ### 4.1 SI Prefixes
 
@@ -2811,7 +2811,7 @@ All four errors are raised during the `on_unverified` → validator phase. In `c
 - [Specification §11 — Units System](03_bovnar_spec.md#11-units-system) — how a unit is attached to a value
 - [Unit & Currency Cheat Sheet](04_bovnar_unit_cheatsheet.md) — every symbol in this registry, in table form
 - [Unit Ambiguities](07_bovnar_unit_ambiguities.md) — every token that could plausibly mean two things
-- [Unit Profiles](11_bovnar_unit_profiles.md) — writing UCUM, UNECE, QUDT and UDUNITS codes in a unit slot, and where the vocabularies disagree
+- [Unit Profiles](11_bovnar_unit_profiles.md) — writing UCUM, UN/ECE, QUDT, UDUNITS, OM 2 and CF codes in a unit slot, and where the vocabularies disagree
 - [Read & Write API](08_bovnar_readwrite_api.md) — `bvn_parse_unit`, `bvn_unit_to_string`, and read-time conversion
 - [Python Bindings](09_bovnar_python_bindings.md) — the same unit model from Python, with the NumPy and pint bridges
 

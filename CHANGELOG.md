@@ -41,6 +41,81 @@ rebuild consumers against the new headers. **SOVERSION is bumped 1 → 2**
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
 
+### Fixed — what a second review round turned up, three of them in the first round's fixes
+
+The fixes below this entry were themselves reviewed, and differentially fuzzed:
+1.2 million generated documents replayed reader → writer → reader in five flag
+modes, comparing every value's text, type, unit and spelling. Three of the
+first round's fixes had made things worse for documents the release before
+them handled.
+
+**Regressions introduced by the first round, caught before any release**
+
+- **An annotated multi-row array nested in a plain one no longer replayed.**
+  `[<sint:16,s> [46, 96] / [2707, 44]]`: the per-row state was restored at each
+  row's end and then overwritten by the enclosing array's, so the second row
+  lost its annotation's unit — refused by the writer, and written with inline
+  units by the canonical observer. It is restored at the `/` as well.
+- **A profile spelling that means "no unit" was refused.** `ucum:{cells}`,
+  `ucum:1` and every other annotation-only or unity code parse to no unit, and
+  the new check accepted only the literal `no_unit` there.
+- **A unit with a long canonical form could not be written under its own,
+  shorter spelling.** The canonical text travels beside the spelling without
+  being written, and was being held to the slot's length limit anyway.
+
+**Cases the first round missed**
+
+- **A value could contradict its annotation.** The serialiser writes the
+  annotation's unit and never looks at the value's, so `<float:64,k~g>`
+  followed by a value in metres was written as kilograms. `error_unit_mismatch`
+  now. A unit given only on the annotation's start event is accepted for the
+  parameter events that follow.
+- **An over-long inline unit was still written** when it came from the unit and
+  not from a spelling: `pretty-print --canonical` exited 0 with a document its
+  own `validate` refused.
+- **The read-back probe was stricter than the document**: it left 246 bytes for
+  a unit where `<uint:…>` leaves 250.
+- **The one-shot spelling** is counted per assignment in the writer core, so it
+  holds for assignments written as raw events too; an unused one is reported by
+  `bvnr_write_finish`; and it no longer overwrites an earlier error.
+- **The annotation serial is 64-bit.** A frame restores its unit when the serial
+  has moved, and a 32-bit one is back where it started after 2³² annotations.
+- **Python `dumps()` wrote a list of quantities with different units as bare
+  numbers** — `[1 s, 3 m]` became `[1, 3]`. An array has one annotation, and the
+  format refuses that array anyway; `dumps()` now raises.
+
+One limitation is recorded and not fixed: a bare value with an inline unit of
+some 243 bytes or more can be read and not replayed, because the reader delivers
+it inside a synthesised annotation where it no longer fits. Falling back to the
+inline slot was tried and withdrawn — nothing at that point knows whether the
+value can carry one, and the fuzzer found the wrong guesses.
+
+**The release machinery**
+
+- **The release job would have published an empty release that could never be
+  completed.** The repository has release immutability switched on, and the job
+  created the release — publishing it — before uploading the archives. An
+  immutable release accepts no assets, and its tag name cannot be reused; v1.0.0
+  is what that leaves behind. The job now creates a draft, uploads, and
+  publishes last, and fails loudly on a release someone published by hand.
+- **PyPI now waits for the GitHub release**, not only for the tests: the
+  irreversible step runs last.
+- **Out-of-tree builds failed four tests** that silently depended on a build
+  directory named `build` inside the source tree.
+- The WebAssembly bundle embedded the absolute path of whoever built it, and
+  shipped without the licence and third-party notices.
+- `check_release_links.py` judged a source tarball unpacked inside an unrelated
+  repository against that repository's tags.
+
+**The documents** — another twenty false statements, a third of them in text
+the first round had rewritten. `--canonical` does not "restore the separated
+prefix form": it reduces the unit and rescales the value. Whitespace beside a
+namespace colon is dropped like whitespace beside any other separator, which
+§5.3 did not say. Three compact spellings are refused by name, not two. The
+writer does accept per-field rules in require mode. The site still said 180
+units, 411 and 419 conformance cases, and four vocabularies. SECURITY.md and
+the FAQ still promised that no 1.x document can stop parsing.
+
 ### Fixed — what a release review of the writer, the reader and the build turned up
 
 Found by reviewing the tree as a release candidate, each confirmed by running it.
@@ -2928,7 +3003,8 @@ existing hazards rather than new ones:
 - **`bvn_unit_is_fiat` / `bvn_unit_is_crypto` read the catalogue row**, not a
   sub-range of the ids. The order of `currencies.bvnr` therefore carries no
   meaning and a new currency of either kind appends without renumbering
-  anything. `BVN_CURRENCY_FIAT_FIRST` / `_LAST` / `CRYPTO_FIRST` / `_LAST` are
+  anything. `BVN_CURRENCY_FIAT_FIRST` / `_LAST` / `CRYPTO_FIRST` / `_LAST` and
+  `BVN_VALUE_BASE_UNIT_COUNT_CURRENCY` are
   replaced by `BVN_CURRENCY_FIRST` / `_LAST` / `_COUNT`, which are now
   **generated** from the catalogue (`include/bovnar_currency.gen.h`) rather than
   hand-written beside it — a bound can no longer claim more rows than exist.
@@ -2982,8 +3058,8 @@ Also fixed:
 
 ### Changed — BREAKING (Python bindings)
 
-The Python package is **2.0.0** and two of its API shapes changed. Both were
-defects the review named, and neither could be fixed additively.
+The Python package is **2.0.0** and three of its API shapes changed. All were
+defects the review named, and none could be fixed additively.
 
 - **`Quantity.unit` is now a `Unit` object, not a raw `ValueUnit`.** The struct
   it used to return had its operations scattered across module-level functions

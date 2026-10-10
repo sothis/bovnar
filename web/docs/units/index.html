@@ -3292,7 +3292,7 @@ UDUNITS or CF document that says <code>year</code> be read at all. It was refuse
 </table>
 <hr />
 <h2 id="4-prefixes">4. Prefixes</h2>
-<p>A prefix is attached to a base unit symbol either with the <code>~</code> separator — <code>prefix~baseunit</code>, the canonical form — or <strong>compactly</strong>, without it: <code>kg</code> is <code>k~g</code>, <code>MiB</code> is <code>Mi~B</code>. Both spellings parse to the same <code>value_unit_t</code>. <code>bvn_unit_to_string</code> — and a writer handed only a <code>value_unit_t</code> — always emits the separated form; a document that is <em>re-serialised</em> keeps the spelling it was written in, and <code>bovnar pretty-print --canonical</code> restores the separated one. See §4.3 for what the compact form does and does not accept.</p>
+<p>A prefix is attached to a base unit symbol either with the <code>~</code> separator — <code>prefix~baseunit</code>, the canonical form — or <strong>compactly</strong>, without it: <code>kg</code> is <code>k~g</code>, <code>MiB</code> is <code>Mi~B</code>. Both spellings parse to the same <code>value_unit_t</code>. <code>bvn_unit_to_string</code> — and a writer handed only a <code>value_unit_t</code> — always emits the separated form; a document that is <em>re-serialised</em> keeps the spelling it was written in. <code>bovnar pretty-print --canonical</code> does not keep the spelling either way: it reduces every unit and rescales the value (<code>1 km</code> becomes <code>1000.0 m</code>), so its output carries no prefix at all. See §4.3 for what the compact form does and does not accept.</p>
 <h3 id="41-si-prefixes">4.1 SI Prefixes</h3>
 <p>All 24 current SI prefixes are supported, from quecto (10⁻³⁰) to quetta (10³⁰).</p>
 <table>
@@ -6528,7 +6528,7 @@ ev_data   data=&quot;1500&quot;
 <li><a href="https://www.bovnar.io/docs/spec/#11-units-system">Specification §11 — Units System</a> — how a unit is attached to a value</li>
 <li><a href="https://www.bovnar.io/docs/cheatsheet/">Unit &amp; Currency Cheat Sheet</a> — every symbol in this registry, in table form</li>
 <li><a href="https://www.bovnar.io/docs/ambiguities/">Unit Ambiguities</a> — every token that could plausibly mean two things</li>
-<li><a href="https://www.bovnar.io/docs/profiles/">Unit Profiles</a> — writing UCUM, UNECE, QUDT and UDUNITS codes in a unit slot, and where the vocabularies disagree</li>
+<li><a href="https://www.bovnar.io/docs/profiles/">Unit Profiles</a> — writing UCUM, UN/ECE, QUDT, UDUNITS, OM 2 and CF codes in a unit slot, and where the vocabularies disagree</li>
 <li><a href="https://www.bovnar.io/docs/api/">Read &amp; Write API</a> — <code>bvn_parse_unit</code>, <code>bvn_unit_to_string</code>, and read-time conversion</li>
 <li><a href="https://www.bovnar.io/docs/python/">Python Bindings</a> — the same unit model from Python, with the NumPy and pint bridges</li>
 </ul>

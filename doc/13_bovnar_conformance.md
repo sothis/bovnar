@@ -212,6 +212,7 @@ Options:
 | `comments` | Comment parsing |
 | `whitespace` | Whitespace tolerance |
 | `homogeneity` | DOM-tier: array homogeneity, struct shape, key uniqueness (self-test only) |
+| `unit_profile` | The seven profile notations (spec 1.2): the three outcomes and their error codes, the version gate, annotations, cross-vocabulary agreement |
 
 ---
 

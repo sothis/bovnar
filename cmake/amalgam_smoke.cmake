@@ -9,7 +9,7 @@
 #
 # Required -D args: SRC_DIR, PYTHON, CC, BIN_DIR
 
-if(NOT SRC_DIR OR NOT PYTHON OR NOT CC OR NOT BIN_DIR)
+if(NOT SRC_DIR OR NOT PYTHON OR NOT CC OR NOT BIN_DIR OR NOT GENERATED)
     message(FATAL_ERROR "amalgam_smoke.cmake: SRC_DIR/PYTHON/CC/BIN_DIR required")
 endif()
 
@@ -18,7 +18,8 @@ file(MAKE_DIRECTORY "${gen}")
 
 # 1. Generate into the build tree.
 execute_process(
-    COMMAND "${PYTHON}" "${SRC_DIR}/amalgamate.py" "${gen}"
+    COMMAND "${CMAKE_COMMAND}" -E env "BVNR_GENERATED_DIR=${GENERATED}"
+            "${PYTHON}" "${SRC_DIR}/amalgamate.py" "${gen}"
     WORKING_DIRECTORY "${SRC_DIR}"
     RESULT_VARIABLE rc)
 if(NOT rc EQUAL 0)

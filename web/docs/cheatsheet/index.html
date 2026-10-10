@@ -327,7 +327,7 @@
 </tbody>
 </table>
 <p>Examples: bare <code>m</code> = metre; <code>m~s</code> and <code>ms</code> = millisecond. Bare <code>d</code> = day; <code>d~s</code> and <code>ds</code> = decisecond. Bare <code>min</code> = minute, so milli-inch needs the separator: <code>m~in</code>.</p>
-<p>A compact spelling is refused when the token means something else in the wild: <code>usb</code> and <code>kt</code> are <code>error_unit_illegal</code> (write <code>u~sb</code>; for <code>kt</code>, <code>k~t</code> for the kilotonne or <code>kn</code> for the knot). <code>pH</code>, <code>mph</code> and <code>kph</code> are units in their own right (§3.26–3.27 of the unit-system reference), so they parse as acidity and the two speeds — <code>p~H</code>, <code>m~ph</code> and <code>k~ph</code> are still the picohenry and the milli-/kilophot.</p>
+<p>A compact spelling is refused when the token means something else in the wild: <code>usb</code>, <code>kt</code> and <code>ppt</code> are <code>error_unit_illegal</code> (write <code>u~sb</code>; for <code>kt</code>, <code>k~t</code> for the kilotonne or <code>kn</code> for the knot; for <code>ppt</code>, <code>pptr</code>, <code>‰</code> or <code>p~pt</code>). <code>pH</code>, <code>mph</code> and <code>kph</code> are units in their own right (§3.26–3.27 of the unit-system reference), so they parse as acidity and the two speeds — <code>p~H</code>, <code>m~ph</code> and <code>k~ph</code> are still the picohenry and the milli-/kilophot.</p>
 <p>Currencies take the compact prefix too (<code>k$EUR</code> = <code>k~$EUR</code>, §5.4), but their <code>$</code> sigil is never optional.</p>
 <hr />
 <h2 id="2-iec-binary-prefixes">2. IEC Binary Prefixes</h2>
@@ -4477,7 +4477,7 @@ abbreviations that are deliberately not units — is in <a href="https://www.bov
 <li><a href="https://www.bovnar.io/docs/ambiguities/">Unit Ambiguities</a> — which reading wins when a token could mean two things</li>
 <li><a href="https://www.bovnar.io/docs/spec/#11-units-system">Specification §11 — Units System</a> — how a unit attaches to a value</li>
 <li><a href="https://www.bovnar.io/docs/faq/#4-units">FAQ §4 — Units</a> — the questions these tables raise most often</li>
-<li><a href="https://www.bovnar.io/docs/profiles/">Unit Profiles</a> — writing these same units as UCUM, UNECE, QUDT or UDUNITS codes, and the profile-only units that exist in no native spelling</li>
+<li><a href="https://www.bovnar.io/docs/profiles/">Unit Profiles</a> — writing these same units as UCUM, UN/ECE, QUDT, UDUNITS, OM 2 or CF codes, and the profile-only units that exist in no native spelling</li>
 </ul>
 <hr />
 <p><em>The id space is blocked: the leading two digits of an id name its vocabulary. Native units 100000–100263 (264) · UCUM opaque units 200000–200040 (41) · UN/ECE opaque units 300000–300024 (25) · currencies 900000–900215 (166 fiat, 50 crypto). Blocks 40, 50, 60, 70 and 80 are reserved for QUDT, QUDT quantity kinds, UDUNITS, OM 2 and the CF standard names, which contribute no opaque units today.</em>

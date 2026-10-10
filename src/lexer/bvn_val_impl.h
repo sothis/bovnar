@@ -219,7 +219,10 @@ typedef struct bvnr_validator_s {
 	value_type_spec_t	value_type;
 	value_unit_t		parsed_unit;
 	value_type_spec_t	inferred_default_vtype;
-	uint32_t		parsed_unit_serial;
+	/* 64 bits: it moves once per annotation, and a frame restores its unit
+	 * when the serial has MOVED -- a 32-bit one comes back to where it was
+	 * after 2^32 annotations inside one array element. */
+	uint64_t		parsed_unit_serial;
 	uint64_t		acc_value;
 	bool			acc_overflow;
 	bool			acc_has_dot;
@@ -289,6 +292,14 @@ struct bvnr_writer_s {
 	 * being consumed: the second one means the value it was set for took
 	 * no unit. */
 	uint8_t			usrc_keys;
+	/* The unit the annotation in flight (or just closed) names, taken from
+	 * its start event or, failing that, its unit parameter -- and whether
+	 * that annotation is still waiting for the value it governs. This is
+	 * what a value is held against: the serialiser writes the annotation's
+	 * unit and never looks at the value's, so `<float:64,k~g>` followed by a
+	 * value saying metres used to be written as kilograms. */
+	value_unit_t		ann_unit;
+	bool			ann_pending;
 	bool			usrc_ok_inline;
 	uint8_t			usrc_ok_len;
 	uint8_t			usrc_ok[BVNR_UNIT_SOURCE_MAX + 1u];

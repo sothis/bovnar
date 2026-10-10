@@ -381,8 +381,9 @@ situations. A native unit outside that vocabulary's transliteration table has no
 form in it — the Old German units, the water-hardness degrees, the turbidity
 kinds and every currency. An opaque unit belonging to a *different* profile has
 none either: `[IU]` is UCUM's, so `unit_to_profile("unece", …)` refuses it. And a
-**flat** vocabulary (`unece`, `qudt`, `qudt-qk`) can spell only a single
-unprefixed component, because a flat code is one whole token with no operator to
+**flat** vocabulary (`unece`, `qudt`, `qudt-qk`, `om`) can spell only a single
+component — no product, quotient or exponent, though a prefixed one is fine
+(`k~g` is `unece:KGM`) — because a flat code is one whole token with no operator to
 build it out of — so `k~m/h` has no UNECE form even though `unece:KMH` parses to
 exactly it.
 

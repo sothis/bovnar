@@ -139,8 +139,8 @@ window.bvnrTcfg = function (key, english) {
      rest of the page, instead of discovering it ~250ms in when bovnar_parser_wasm.js
      runs its dynamic import(). The ?v is the build-stamped content hash — it must
      match the dynamic import so the module is reused, not re-fetched. -->
-<link rel="modulepreload" href="bovnar_wasm_core.js?v=333dcc85639f">
-<link rel="modulepreload" href="bovnar_wasm.js?v=8cd60cea51ad">
+<link rel="modulepreload" href="bovnar_wasm_core.js?v=78eb3abded04">
+<link rel="modulepreload" href="bovnar_wasm.js?v=3a881a0c69ec">
 <!-- Canvas textures for the orbit demo, which sits below a full-height hero.
      They are never <img> elements (the globe samples them offscreen), so they
      cannot affect first paint -- at fetchpriority="high" their 122 KB competed
@@ -4207,7 +4207,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
         <div class="doc-card-num">04</div>
         <div>
           <div class="doc-card-title">Units &amp; Currencies Cheat Sheet</div>
-          <div class="doc-card-desc">All 180 physical units, 166 fiat currencies, and 50 cryptocurrencies. SI/IEC prefixes, compound expressions, and symbol disambiguation.</div>
+          <div class="doc-card-desc">All 264 physical units, 166 fiat currencies, and 50 cryptocurrencies. SI/IEC prefixes, compound expressions, and symbol disambiguation.</div>
           <div class="doc-card-tag">Quick reference</div>
         </div>
       </a>
@@ -4263,7 +4263,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
         <div class="doc-card-num">11</div>
         <div>
           <div class="doc-card-title">Unit Profiles</div>
-          <div class="doc-card-desc">Writing UCUM, UNECE, QUDT and UDUNITS codes in a unit slot. The transliteration tables, the collisions between the namespaces, an explicit list of what has no representation, and the cross-vocabulary suite that holds the five to each other.</div>
+          <div class="doc-card-desc">Writing UCUM, UN/ECE, QUDT, UDUNITS, OM 2 and CF codes in a unit slot. The transliteration tables, the collisions between the namespaces, an explicit list of what has no representation, and the cross-vocabulary suite that holds the seven to each other.</div>
           <div class="doc-card-tag">Interoperability</div>
         </div>
       </a>
@@ -4279,7 +4279,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
         <div class="doc-card-num">13</div>
         <div>
           <div class="doc-card-title">Conformance Test Tool</div>
-          <div class="doc-card-desc">419 test cases, IUT protocol for independent implementation verification, TAP output, and CTest integration.</div>
+          <div class="doc-card-desc">470 test cases, IUT protocol for independent implementation verification, TAP output, and CTest integration.</div>
           <div class="doc-card-tag">Verification</div>
         </div>
       </a>
@@ -4421,7 +4421,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
   </button>
 </div>
 
-<script src="bovnar_parser_wasm.js?v=da2462513c22"></script>
+<script src="bovnar_parser_wasm.js?v=2aae702bfaa7"></script>
 <script src="bovnar_highlight.js?v=f31f84f2becd"></script>
 <script>
 /* ══ PLAYGROUND ══════════════════════════════════════════════════════════ */

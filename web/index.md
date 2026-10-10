@@ -102,6 +102,6 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - [Streaming & framing](https://www.bovnar.io/doc/10_bovnar_streaming.md) — Octet streams, frames, multiplexing/demultiplexing, and embedded documents.
 - [Unit profiles](https://www.bovnar.io/doc/11_bovnar_unit_profiles.md) — The ucum:, unece:, qudt:, qudt-qk:, udunits:, om: and cf: notations, their transliteration tables, what they refuse, and how they are checked against each other.
 - [EBNF grammar](https://www.bovnar.io/doc/12_bovnar.ebnf) — The formal grammar, annotated against the reference lexer/validator.
-- [Conformance](https://www.bovnar.io/doc/13_bovnar_conformance.md) — The 411-case conformance suite and the IUT protocol for third-party implementations.
+- [Conformance](https://www.bovnar.io/doc/13_bovnar_conformance.md) — The 470-case conformance suite and the IUT protocol for third-party implementations.
 
 Browse the documentation as HTML at [https://www.bovnar.io/docs/](https://www.bovnar.io/docs/). A single-file copy of the whole set is at [https://www.bovnar.io/llms-full.txt](https://www.bovnar.io/llms-full.txt).

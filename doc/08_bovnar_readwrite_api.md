@@ -1367,9 +1367,10 @@ will carry in the output — whether it was given inline on the value or as a
 parameter of its type annotation, and a single annotation covers every element
 of the array under it.
 
-**Validation only.** Only `require_unit` and `require_dimension_of` are
-accepted; a policy carrying `targets`, `normalise`, `base` or `on_inexact` is
-rejected (`false`) rather than half-honoured. The writer already has a
+**Validation only.** `require_unit`, `require_dimension_of` and per-field rules
+in `bvnr_rule_require` mode are accepted; a policy carrying `targets`,
+`normalise`, `base`, `on_inexact` or a `bvnr_rule_convert` rule is rejected
+(`false`) rather than half-honoured. The writer already has a
 value-rewriting mode — `BVN_UNIT_REDUCE` in `bvnr_write_flags_t.unit_flags`,
 which folds prefixes out and rescales the value exactly — and a second one
 arriving through a different door, with different rules about exactness, is how
@@ -1440,7 +1441,7 @@ It is one shot, and for the **next value only**. If that value takes no unit —
 string, a bool, a struct, a bare number — the spelling does not travel on to
 whichever later value happens to carry one: the write fails with
 `error_unit_mismatch` (for a helper that writes no annotation at all, at the
-key that follows it). It is also dropped when a write fails, when the writer is
+key that follows it, or at `bvnr_write_finish` if there is none). It is also dropped when a write fails, when the writer is
 re-opened, and by passing `NULL` or a zero length. The text is copied.
 
 A caller driving `bvnr_write_event` directly needs no setter: set
@@ -1464,6 +1465,21 @@ reader fills on that event and what every caller before 2.0 passed, and the
 writer emits it when there is no `unit_source` — so it has to name
 `value_unit` too, and where both fields are set they must agree. (A datetime's
 parameter is its epoch, and there the one text accepted is the epoch's name.)
+"`value_unit`" here is the parameter event's own, or — for a caller that sets
+the unit only on `ev_type_annotation_start` and nothing but `type` on the
+parameter events — the one given there.
+
+**A value agrees with its annotation.** The serialiser writes the unit the
+annotation names and never the value's, so a data event that follows an
+annotation naming a unit must carry that unit or none. `<float:64,k~g>`
+followed by a value whose `value_unit` is metres is `error_unit_mismatch`; it
+used to be written, as kilograms.
+
+**One document can be read and not written back:** a bare value with an inline
+unit of some 243 bytes or more. The reader delivers an inline unit inside a
+synthesised annotation (`<float:64,_10,…>`), which is a dozen bytes longer than
+the slot the unit came from; where that no longer fits in the annotation's 255,
+the replay is refused with `error_unit_too_long`.
 
 The fifth row is the one a unit parser cannot answer, and it is answered by
 reading the text back through the real reader. The two unit slots end in
@@ -2073,7 +2089,7 @@ The only behavioral difference occurs when **both** are present and **disagree**
 
 <!-- bovnar-example: rejected -->
 ```bovnar
-.bad = <float:64,m> 1.0 s;    /* annotation says m, inline says s → error */
+.bad = <float:64,m> 1.0 s;    # annotation says m, inline says s → error_unit_mismatch
 ```
 
 Inline unit suffixes are **illegal inside array elements**. The lexer rejects them with `error_unexpected_input_byte`.

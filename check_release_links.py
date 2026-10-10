@@ -147,7 +147,11 @@ def main():
     # Ask git rather than looking for a .git DIRECTORY: in a `git worktree` it is
     # a file, and the isdir() spelling would have skipped this check entirely
     # from any worktree -- exactly the silent self-disabling it exists to prevent.
-    if git("rev-parse", "--is-inside-work-tree") != "true":
+    # And ask for the toplevel, not merely "am I inside a work tree": a source
+    # tarball unpacked somewhere under an UNRELATED repository is inside that
+    # repository's work tree, and was then judged against its tags.
+    top = git("rev-parse", "--show-toplevel")
+    if top is None or os.path.realpath(top) != os.path.realpath(ROOT):
         # The source tarball is `git archive` output: tracked files, no history.
         # Nothing to compare against, and nothing wrong either.
         print("check_release_links.py: not a git checkout (source tarball?) -- "

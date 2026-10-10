@@ -166,7 +166,7 @@ DOCS = [
      "documents for transport over sockets and files."),
     ("11_bovnar_unit_profiles.md", "profiles", "bovnar-unit-profiles",
      "Bovnar Unit Profiles",
-     "Writing UCUM, UNECE, QUDT and UDUNITS codes in a Bovnar unit slot: the "
+     "Writing UCUM, UN/ECE, QUDT, UDUNITS, OM 2 and CF codes in a Bovnar unit slot: the "
      "transliteration tables, the collisions between the namespaces, what has "
      "no representation, and the cross-vocabulary conformance suite."),
     ("12_bovnar.ebnf", "grammar", "bovnar-grammar",
@@ -175,7 +175,7 @@ DOCS = [
      "lexer and validator."),
     ("13_bovnar_conformance.md", "conformance", "bovnar-conformance",
      "Bovnar Conformance Testing",
-     "The Bovnar 411-case conformance test suite and the IUT protocol for validating "
+     "The Bovnar 470-case conformance test suite and the IUT protocol for validating "
      "third-party implementations."),
 ]
 

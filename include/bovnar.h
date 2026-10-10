@@ -557,7 +557,15 @@ typedef struct bvnr_data_s {
 	 *                                  "#!bovnar 1.2" directive was emitted
 	 * The unit parameter's `data` text -- what the reader fills there and every
 	 * caller before 2.0 used -- is held to the same contract; where both are
-	 * set they must agree.
+	 * set they must agree. "The unit" is the event's own value_unit, or, where
+	 * a parameter event carries none, the one given on the annotation's start
+	 * event. And a VALUE written directly under an annotation that names a
+	 * unit must carry that unit or none: the serialiser writes the
+	 * annotation's, so a value saying otherwise is error_unit_mismatch.
+	 *
+	 * One document can be read and not written back: a bare value with an
+	 * inline unit of some 243 bytes or more. The reader hands it over inside
+	 * a synthesised annotation, where it no longer fits.
 	 * With bvnr_write_flags_t.unit_flags set it is IGNORED and the canonical
 	 * form is written: BVN_UNIT_REDUCE and BVN_UNIT_ASCII_EXP ask for a
 	 * particular spelling, and that request wins. Leave it NULL (zero-init) to
@@ -619,8 +627,8 @@ typedef struct bvnr_read_flags_s {
 	bool		continue_on_error;
 	bvnr_on_error_fn	on_error;
 	/* When true, a leading "#!bovnar <major>.<minor>" directive declaring a
-	 * spec version newer than this build supports (BVNR_SPEC_VERSION_*) is a
-	 * hard error_unsupported_spec_version. When false (the zero-init default)
+	 * spec version this build does not support -- a newer minor, or any other
+	 * major (BVNR_SPEC_VERSION_*) -- is a hard error_unsupported_spec_version. When false (the zero-init default)
 	 * the declared version is recorded — query it with
 	 * bvnr_reader_get_declared_version() — but not enforced. Production
 	 * consumers that must not silently misread a future document should set it. */
@@ -1201,8 +1209,9 @@ BVN_API bool bvnr_reader_set_unit_policy(
  * reaching a file in the first place, which is what "hand the file to anyone and
  * they have everything required to interpret it" actually depends on.
  *
- * VALIDATION ONLY. Only `require_unit` and `require_dimension_of` are accepted;
- * a policy carrying `targets`, `normalise`, `base` or `on_inexact` is rejected
+ * VALIDATION ONLY. `require_unit`, `require_dimension_of` and per-field rules
+ * in bvnr_rule_require mode are accepted; a policy carrying `targets`,
+ * `normalise`, `base`, `on_inexact` or a bvnr_rule_convert rule is rejected
  * (false) rather than half-honoured. The writer already has a value-rewriting
  * mode — BVN_UNIT_REDUCE in bvnr_write_flags_t.unit_flags, which folds prefixes
  * out and rescales the value exactly — and a second one arriving through a
@@ -1435,8 +1444,9 @@ BVN_API const uint8_t* bvn_get_escape_repl_table(void);
  * value only: if that value takes no unit (a string, a bool, a struct, a bare
  * number) the write that follows it fails with error_unit_mismatch, rather than
  * the spelling travelling on to whichever later value happens to carry a unit.
- * It is also dropped when a write fails, when the writer is re-opened, and by
- * passing NULL or a zero length.
+ * (If it was the last value, bvnr_write_finish reports it.) It is also dropped
+ * when a write fails, when the writer is re-opened, and by passing NULL or a
+ * zero length.
  *
  * The text is copied, and it is held to bvnr_data_t.unit_source's contract (see
  * there): it must parse to the very unit the helper is then given. That check
@@ -1467,8 +1477,10 @@ BVN_API bool bvnr_write_float(bvnr_writer_t* w, const char* key,
  * it is the default unix). A #!bovnar 1.1 directive must ALREADY have been emitted
  * (set bvnr_write_flags_t.emit_version, or call bvnr_write_version right after
  * open); a datetime written without it FAILS with error_unsupported_spec_version
- * and emits nothing, since the directive cannot be added retroactively. That
- * directive is also what lets the document be re-read. */
+ * before its annotation or value is written, since the directive cannot be
+ * added retroactively. (The key is already in the sink by then, and the writer
+ * is in its error state: the document is not usable.) That directive is also
+ * what lets the document be re-read. */
 BVN_API bool bvnr_write_datetime(bvnr_writer_t* w, const char* key,
 			  uint32_t width, const char* epoch, int64_t value);
 BVN_API bool bvnr_write_float_fix(bvnr_writer_t* w, const char* key,

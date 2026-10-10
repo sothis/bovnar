@@ -680,7 +680,7 @@ static bool bvn_usrc_probe_event(void* ud, bvnr_event_t ev, bvnr_data_t* d)
 static bool bvn_writer_probe_unit_source(bvnr_writer_t* w,
 	const uint8_t* text, uint32_t len, value_unit_t unit, bool inline_slot)
 {
-	static const char head_ann[] = "#!bovnar 1.2\n.k=<float:64,";
+	static const char head_ann[] = "#!bovnar 1.2\n.k=<uint:";
 	static const char tail_ann[] = ">1;";
 	static const char head_inl[] = "#!bovnar 1.2\n.k=1 ";
 	static const char tail_inl[] = ";";
@@ -704,6 +704,9 @@ static bool bvn_writer_probe_unit_source(bvnr_writer_t* w,
 		return false;
 	if (!bvnr_read(w->usrc_probe))
 		return false;
+	if (BVN_UNIT_IS_UNITLESS(unit))
+		return pr.assignments == 1u && pr.values == 1u &&
+		       pr.src_len == 0u && BVN_UNIT_IS_UNITLESS(pr.unit);
 	return pr.assignments == 1u && pr.values == 1u &&
 	       pr.src_len == len && memcmp(pr.src, text, len) == 0 &&
 	       bvn_unit_equal(pr.unit, unit);
@@ -721,7 +724,16 @@ static bool bvn_writer_check_unit_text(bvnr_writer_t* w,
 	if (len > BVNR_UNIT_SOURCE_MAX)
 		return bvn_writer_set_error(w, error_unit_too_long);
 	/* An annotation is capped as a whole, so there the spelling shares the
-	 * reader's buffer with the family and every parameter before it. */
+	 * reader's buffer with the family and every parameter before it.
+	 *
+	 * One document can be read and not written back for this reason: a bare
+	 * value with an inline unit of some 243 bytes or more. The reader folds
+	 * the unit into a synthesised `<float:64,_10,...>`, which is a dozen
+	 * bytes longer than the slot it came from. Leaving such a unit to the
+	 * value's inline slot instead was tried and withdrawn: at this point
+	 * nothing knows whether the value CAN carry one (an array cannot, nor
+	 * can nan/inf), and the wrong guess is an unreadable document. Refusing
+	 * is the honest answer for a unit that long. */
 	if (!inline_slot &&
 	    bvn_ser_position(&w->ser) - w->ser.ann_start + 1u + len
 	        > BVN_TYPE_BUF_CAP - 1u)
@@ -751,7 +763,14 @@ static bool bvn_writer_check_unit_text(bvnr_writer_t* w,
 		 * by kind and by text, and there is nothing for the probe to do. */
 		if (!BVN_UNIT_IS_UNITLESS(unit))
 			return bvn_writer_set_error(w, error_unit_mismatch);
-		if (inline_slot || len != 7u || memcmp(text, "no_unit", 7u) != 0)
+		if (!inline_slot && len == 7u && memcmp(text, "no_unit", 7u) == 0)
+			return true;
+		if (inline_slot)
+			return bvn_writer_set_error(w, error_unit_illegal);
+		if (bvni_unit_has_profile((const char*)text, len) &&
+		    !bvn_w_declares_1_2(&w->ser))
+			return bvn_writer_set_error(w, error_unsupported_spec_version);
+		if (!bvn_writer_probe_unit_source(w, text, len, unit, false))
 			return bvn_writer_set_error(w, error_unit_illegal);
 		return true;
 	}
@@ -780,6 +799,10 @@ static bool bvn_writer_check_unit_param(bvnr_writer_t* w, const bvnr_data_t* d)
 	const void* text = d->data;
 	uint32_t    len  = text ? d->length : 0u;
 	bool        flags = w->ser.unit_flags != BVN_UNIT_FLAGS_NONE;
+	/* The unit this text has to name: the event's own, or the one the
+	 * annotation's start event gave when this event carries none. */
+	value_unit_t unit = BVN_UNIT_IS_REAL(d->value_unit) ? d->value_unit
+	                                                    : w->ann_unit;
 	/* A datetime's parameter is its epoch, not a unit: the one text allowed is
 	 * the epoch's own name. */
 	if (d->value_type.family == vt_datetime) {
@@ -792,13 +815,32 @@ static bool bvn_writer_check_unit_param(bvnr_writer_t* w, const bvnr_data_t* d)
 	 * no flag it is what gets written, in preference to `data`. */
 	if (!flags && d->unit_source && d->unit_source_length) {
 		if (!bvn_writer_check_unit_text(w, d->unit_source,
-				d->unit_source_length, d->value_unit, false))
+				d->unit_source_length, unit, false))
 			return false;
 		/* `data` is then not written -- but if present it must not say
-		 * something else, or the event describes two units. */
+		 * something else, or the event describes two units. Only its
+		 * MEANING is held to that: it never reaches the document, so the
+		 * slot's length and lexical limits are not its concern. */
 		if (!len || (len == d->unit_source_length &&
 		             memcmp(text, d->unit_source, len) == 0))
 			return true;
+		{
+			char tmp[BVNR_UNIT_STRING_MAX];
+			if (len >= sizeof tmp)
+				return bvn_writer_set_error(w, error_unit_too_long);
+			memcpy(tmp, text, len);
+			tmp[len] = 0;
+			if (memchr(tmp, 0, len))
+				return bvn_writer_set_error(w, error_unit_illegal);
+			bool ok2 = false;
+			value_unit_t pu2 = bvn_parse_unit((const uint8_t*)tmp, &ok2);
+			if (!ok2)
+				return bvn_writer_set_error(w, error_unit_illegal);
+			if (BVN_UNIT_IS_UNITLESS(pu2) != BVN_UNIT_IS_UNITLESS(unit) ||
+			    (BVN_UNIT_IS_REAL(pu2) && !bvn_unit_equal(pu2, unit)))
+				return bvn_writer_set_error(w, error_unit_mismatch);
+			return true;
+		}
 	}
 	if (!len)
 		return true;
@@ -824,12 +866,12 @@ static bool bvn_writer_check_unit_param(bvnr_writer_t* w, const bvnr_data_t* d)
 			return bvn_writer_set_error(w,
 				ec != error_none ? ec : error_unit_illegal);
 		}
-		if (BVN_UNIT_IS_UNITLESS(pu) || BVN_UNIT_IS_UNITLESS(d->value_unit))
+		if (BVN_UNIT_IS_UNITLESS(pu) || BVN_UNIT_IS_UNITLESS(unit))
 			return BVN_UNIT_IS_UNITLESS(pu) &&
-			       BVN_UNIT_IS_UNITLESS(d->value_unit)
+			       BVN_UNIT_IS_UNITLESS(unit)
 				? true : bvn_writer_set_error(w, error_unit_mismatch);
 		int32_t an = bvn_unit_to_string_ex(pu, a, sizeof a, w->ser.unit_flags);
-		int32_t bn = bvn_unit_to_string_ex(d->value_unit, b, sizeof b,
+		int32_t bn = bvn_unit_to_string_ex(unit, b, sizeof b,
 						   w->ser.unit_flags);
 		if (an < 0 || bn < 0)
 			return bvn_writer_set_error(w, error_unit_illegal);
@@ -837,7 +879,7 @@ static bool bvn_writer_check_unit_param(bvnr_writer_t* w, const bvnr_data_t* d)
 			return bvn_writer_set_error(w, error_unit_mismatch);
 		return true;
 	}
-	return bvn_writer_check_unit_text(w, text, len, d->value_unit, false);
+	return bvn_writer_check_unit_text(w, text, len, unit, false);
 }
 /* An inline suffix: only unit_source can spell it, and only without a flag. */
 static bool bvn_writer_check_inline_unit(bvnr_writer_t* w, const bvnr_data_t* d)
@@ -953,8 +995,21 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		return true;
 	case ev_assignment_start:
 		w->ser.stream_begun = true;
+		w->ann_pending = false;
 		if (!bvn_validate_id_for_writer(w, data->data, data->length))
 			return false;
+		/* A spelling set by bvnr_writer_set_unit_source is for the NEXT value.
+		 * A second assignment starting with it still unused means that value
+		 * took no unit (a string, a bool, a struct) -- the same caller mistake
+		 * as setting one for a unitless number, and reported the same way,
+		 * rather than left to land on whichever later value carries a unit.
+		 * Counted here and not in the helpers, so it holds however the
+		 * assignments in between were written. */
+		if (w->val.unit_src_len && ++w->usrc_keys > 1u) {
+			w->val.unit_src_len = 0;
+			w->usrc_keys        = 0;
+			return bvn_writer_set_error(w, error_unit_mismatch);
+		}
 		/* The key of the value about to be written — all a per-field rule needs
 		 * from the event stream on this side, exactly as on the reader's. */
 		if (w->val.policy.num_rules)
@@ -967,6 +1022,8 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		w->ser.w_in_annotation  = true;
 		w->val.value_type  = data->value_type;
 		w->val.parsed_unit = data->value_unit;
+		w->ann_unit        = data->value_unit;
+		w->ann_pending     = false;
 		/*
 		 * A unit with no native spelling — one carrying a UCUM arbitrary atom —
 		 * can only be written in the spec-1.2 profile notation, which the reader
@@ -987,9 +1044,17 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		return bvn_validate_type_spec_for_writer(w,
 			data->value_type);
 	case ev_type_annotation_type_family_parameter:
-		if (data->type == token_is_unit &&
-		    !bvn_writer_check_unit_param(w, data))
-			return false;
+		if (data->type == token_is_unit) {
+			/* The annotation's unit may be stated on its start event, on
+			 * this one, or both. A caller who sets it only at the start --
+			 * the parameter events need nothing but their `type` -- is
+			 * checked against that. */
+			if (BVN_UNIT_IS_REAL(data->value_unit) &&
+			    BVN_UNIT_IS_UNITLESS(w->ann_unit))
+				w->ann_unit = data->value_unit;
+			if (!bvn_writer_check_unit_param(w, data))
+				return false;
+		}
 		/* fallthrough */
 	case ev_type_annotation_type_family:
 		w->val.value_type  = data->value_type;
@@ -997,6 +1062,7 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		break;
 	case ev_type_annotation_end:
 		w->ser.w_in_annotation = false;
+		w->ann_pending         = true;
 		break;
 	case ev_data: {
 		w->ser.stream_begun = true;
@@ -1008,12 +1074,23 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		value_type_spec_t vt = data->value_type;
 		if (!bvn_check_type_value_compat(w, tt, vt))
 			return false;
+		bool carries = tt == token_is_number || tt == token_is_array_number ||
+		               tt == token_is_string || tt == token_is_array_string;
+		bool own_ann = w->ann_pending;
+		w->ann_pending = false;
+		/* A value directly under an annotation that names a unit is written
+		 * with THAT unit -- the serialiser never looks at the value's. So the
+		 * two must agree, or five metres go out as five kilograms. */
+		if (carries && own_ann && BVN_UNIT_IS_REAL(w->ann_unit)) {
+			if (BVN_UNIT_IS_REAL(data->value_unit) &&
+			    !bvn_unit_equal(data->value_unit, w->ann_unit))
+				return bvn_writer_set_error(w, error_unit_mismatch);
+		}
 		/* A unit the annotation did not carry is written as an inline suffix.
 		 * That exists for a scalar only: inside "[...]" the reader takes no
 		 * inline unit at all, so one there is a document nobody can read. */
 		if (!w->ser.emitted_unit && BVN_UNIT_IS_REAL(data->value_unit) &&
-		    (tt == token_is_number || tt == token_is_array_number ||
-		     tt == token_is_string || tt == token_is_array_string)) {
+		    carries) {
 			if (w->ser.array_depth > 0u &&
 			    bvn_ser_is_direct_array_element(&w->ser,
 					w->ser.array_depth - 1u))
@@ -1154,6 +1231,7 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		w->ser.w_awaiting_value = false;   /* the stream WAS the value */
 		break;
 	case ev_struct_start:
+		w->ann_pending = false;
 		w->ser.stream_begun = true;
 		if (w->ser.struct_depth >= (uint32_t)w->ser.max_struct_nesting)
 			return bvn_writer_set_error(w, error_struct_nesting_too_high);
@@ -1162,6 +1240,7 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		w->ser.w_awaiting_value = false;   /* the struct IS the value */
 		break;
 	case ev_array_row_start:
+		w->ann_pending = false;
 		w->ser.stream_begun = true;
 		if (w->ser.array_depth >= w->ser.max_array_nesting)
 			return bvn_writer_set_error(w, error_array_nesting_too_high);
@@ -1338,6 +1417,14 @@ static bool bvn_ser_append_inline_unit(bvnr_serializer_t *s,
 	if (s->emitted_unit)                              return true;
 	if (d->value_unit.num_components == 0u)           return true;
 	if (BVN_UNIT_IS_NO_UNIT(d->value_unit))           return true;
+	/* The format has no inline unit inside "[...]". The validating writer
+	 * refuses one before it gets here; the canon observer drives this
+	 * function with no validation at all, so the rule is held here too. */
+	if (s->array_depth > 0u &&
+	    bvn_ser_is_direct_array_element(s, s->array_depth - 1u)) {
+		s->ser_error = error_unit_illegal;
+		return false;
+	}
 	/* The producer's own spelling, checked against value_unit already. */
 	if (s->unit_flags == BVN_UNIT_FLAGS_NONE &&
 	    d->unit_source && d->unit_source_length) {
@@ -1352,6 +1439,10 @@ static bool bvn_ser_append_inline_unit(bvnr_serializer_t *s,
 	 * its meaning) on round-trip. */
 	int32_t un = bvn_unit_to_string_ex(d->value_unit, ubuf, sizeof ubuf,
 					   s->unit_flags);
+	if (un > (int32_t)BVNR_UNIT_SOURCE_MAX) {
+		s->ser_error = error_unit_too_long;
+		return false;
+	}
 	if (un <= 0) {
 		/* Say WHICH failure. Without this the refusal this comment describes
 		 * was reported as whatever ser_error happened to hold. */
@@ -1676,8 +1767,6 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 				return false;
 			s->emitted_type_param = true;
 		} else if (d->type == token_is_unit) {
-			if (!bvn_ser_push_byte(s, use_colon ? ':' : ','))
-				return false;
 			/* The unit's text: what the event carries in `data`, or -- for a
 			 * caller that set only bvnr_data_t.unit_source -- that. Under a
 			 * unit flag the spelling is ignored by contract and unchecked, so
@@ -1752,8 +1841,12 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 						elen = (uint32_t)un;
 					}
 				}
+				if (!bvn_ser_push_byte(s, use_colon ? ':' : ','))
+					return false;
 				if (!bvn_ser_push(s, emit, elen))
 					return false;
+			} else if (!bvn_ser_push_byte(s, use_colon ? ':' : ',')) {
+				return false;
 			}
 			s->emitted_type_param = true;
 			s->emitted_unit = true;
@@ -1843,6 +1936,8 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 				s->arr_need_comma[idx] = false;
 			}
 		}
+		if (s->array_depth < s->max_array_nesting)
+			s->emitted_unit = s->arr_emitted_unit[s->array_depth];
 		break;
 	case ev_octet_stream_start:
 		if (!s->had_type_annotation) {
@@ -2199,6 +2294,12 @@ bool bvnr_write_finish(bvnr_writer_t* w)
 	if (!w) return false;
 	if (w->val.last_error != error_none)
 		return false;
+	/* A spelling handed over and never used: the value it was meant for took
+	 * no unit, and it was the last one. */
+	if (w->val.unit_src_len) {
+		w->val.unit_src_len = 0;
+		return bvn_writer_set_error(w, error_unit_mismatch);
+	}
 	/* An assignment still waiting for its value, or an unclosed annotation, is
 	 * just as incomplete as an unclosed struct — it leaves ".k=" or ".k=<" in the
 	 * document with no terminating ';'. A caller who wants a null value sends

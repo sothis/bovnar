@@ -453,8 +453,9 @@ situations. A native unit outside that vocabulary's transliteration table has no
 form in it — the Old German units, the water-hardness degrees, the turbidity
 kinds and every currency. An opaque unit belonging to a <em>different</em> profile has
 none either: <code>[IU]</code> is UCUM's, so <code>unit_to_profile("unece", …)</code> refuses it. And a
-<strong>flat</strong> vocabulary (<code>unece</code>, <code>qudt</code>, <code>qudt-qk</code>) can spell only a single
-unprefixed component, because a flat code is one whole token with no operator to
+<strong>flat</strong> vocabulary (<code>unece</code>, <code>qudt</code>, <code>qudt-qk</code>, <code>om</code>) can spell only a single
+component — no product, quotient or exponent, though a prefixed one is fine
+(<code>k~g</code> is <code>unece:KGM</code>) — because a flat code is one whole token with no operator to
 build it out of — so <code>k~m/h</code> has no UNECE form even though <code>unece:KMH</code> parses to
 exactly it.</p>
 <p>In a <strong>document</strong> the notation additionally requires a <code>#!bovnar 1.2</code> directive;

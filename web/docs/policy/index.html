@@ -371,9 +371,10 @@ values (<a href="#42-a-bare-number-matches-only-no_unit--and-no_unit-matches-onl
 <hr />
 <h2 id="5-writer-side-policy">5. Writer-side policy</h2>
 <h3 id="51-validation-only">5.1 Validation only</h3>
-<p>The same policy object drives <code>bvnr_writer_set_unit_policy</code>, but only <code>require_unit</code> and
-<code>require_dimension_of</code> are accepted. A policy carrying <code>targets</code>, <code>normalise</code>, <code>base</code> or
-<code>on_inexact</code> is rejected outright rather than half-honoured.</p>
+<p>The same policy object drives <code>bvnr_writer_set_unit_policy</code>, but only its validating half is
+accepted: <code>require_unit</code>, <code>require_dimension_of</code>, and per-field rules in <code>bvnr_rule_require</code> mode.
+A policy carrying <code>targets</code>, <code>normalise</code>, <code>base</code>, <code>on_inexact</code> or a <code>bvnr_rule_convert</code> rule is
+rejected outright rather than half-honoured.</p>
 <p><code>bvnr_write_event</code> fails with <code>error_unit_mismatch</code>, and the writer latches it like any other
 write error — query it with <code>bvnr_writer_get_error</code>.</p>
 <p>The unit checked is the one the value will carry in the output, whether it was given inline or as

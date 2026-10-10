@@ -105,7 +105,7 @@ Written as `prefix~base`, or compactly without the separator: `k~m` and `km` are
 
 Examples: bare `m` = metre; `m~s` and `ms` = millisecond. Bare `d` = day; `d~s` and `ds` = decisecond. Bare `min` = minute, so milli-inch needs the separator: `m~in`.
 
-A compact spelling is refused when the token means something else in the wild: `usb` and `kt` are `error_unit_illegal` (write `u~sb`; for `kt`, `k~t` for the kilotonne or `kn` for the knot). `pH`, `mph` and `kph` are units in their own right (§3.26–3.27 of the unit-system reference), so they parse as acidity and the two speeds — `p~H`, `m~ph` and `k~ph` are still the picohenry and the milli-/kilophot.
+A compact spelling is refused when the token means something else in the wild: `usb`, `kt` and `ppt` are `error_unit_illegal` (write `u~sb`; for `kt`, `k~t` for the kilotonne or `kn` for the knot; for `ppt`, `pptr`, `‰` or `p~pt`). `pH`, `mph` and `kph` are units in their own right (§3.26–3.27 of the unit-system reference), so they parse as acidity and the two speeds — `p~H`, `m~ph` and `k~ph` are still the picohenry and the milli-/kilophot.
 
 Currencies take the compact prefix too (`k$EUR` = `k~$EUR`, §5.4), but their `$` sigil is never optional.
 
@@ -1047,7 +1047,7 @@ No bare token is simultaneously a valid physical unit and a currency: currencies
 - [Unit Ambiguities](07_bovnar_unit_ambiguities.md) — which reading wins when a token could mean two things
 - [Specification §11 — Units System](03_bovnar_spec.md#11-units-system) — how a unit attaches to a value
 - [FAQ §4 — Units](02_bovnar_faq.md#4-units) — the questions these tables raise most often
-- [Unit Profiles](11_bovnar_unit_profiles.md) — writing these same units as UCUM, UNECE, QUDT or UDUNITS codes, and the profile-only units that exist in no native spelling
+- [Unit Profiles](11_bovnar_unit_profiles.md) — writing these same units as UCUM, UN/ECE, QUDT, UDUNITS, OM 2 or CF codes, and the profile-only units that exist in no native spelling
 
 ---
 

@@ -130,3 +130,21 @@ def test_array_to_bvnr_writes_a_profile_only_unit():
     assert [q.unit.is_profile_only for q in back] == [True, True]
     # A native unit still gets no directive at all.
     assert not bovnar.array_to_bvnr("a", np.array([1.0]), unit="m").startswith(b"#!")
+
+
+def test_dumps_refuses_an_array_whose_units_it_cannot_write():
+    # An array has one annotation and its elements are written bare. Leaves
+    # that disagree on the unit used to be written with NO unit -- [1 s, 3 m]
+    # came out as [1, 3]. The format refuses that array as well, so there is
+    # nothing valid to write; dumps() says so instead of dropping the units.
+    d = bovnar.loads(b'.a = [<float:64,s> 1, <float:64,m> 3];', typed=True)
+    with pytest.raises(BovnarArgumentError):
+        bovnar.dumps(d)
+    # A Quantity beside a plain number is the same loss by another route.
+    d = bovnar.loads(b'.a = <float:64,s> [1, 3];', typed=True)
+    d['a'][1] = 3.0
+    with pytest.raises(BovnarArgumentError):
+        bovnar.dumps(d)
+    # Units that agree are written under the one annotation, as before.
+    d = bovnar.loads(b'.a = <float:64,s> [1, 3];', typed=True)
+    assert bovnar.dumps(d) == b'.a = <float:64,s> [1, 3];\n'

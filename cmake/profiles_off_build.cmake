@@ -27,7 +27,7 @@
 #
 # Required -D args: SRC_DIR, PYTHON, CC, BIN_DIR
 
-if(NOT SRC_DIR OR NOT PYTHON OR NOT CC OR NOT BIN_DIR)
+if(NOT SRC_DIR OR NOT PYTHON OR NOT CC OR NOT BIN_DIR OR NOT GENERATED)
     message(FATAL_ERROR "profiles_off_build.cmake: SRC_DIR/PYTHON/CC/BIN_DIR required")
 endif()
 
@@ -35,7 +35,8 @@ set(gen "${BIN_DIR}/gen")
 file(MAKE_DIRECTORY "${gen}")
 
 execute_process(
-    COMMAND "${PYTHON}" "${SRC_DIR}/amalgamate.py" "${gen}"
+    COMMAND "${CMAKE_COMMAND}" -E env "BVNR_GENERATED_DIR=${GENERATED}"
+            "${PYTHON}" "${SRC_DIR}/amalgamate.py" "${gen}"
     WORKING_DIRECTORY "${SRC_DIR}"
     RESULT_VARIABLE rc OUTPUT_VARIABLE out ERROR_VARIABLE err)
 if(NOT rc EQUAL 0)

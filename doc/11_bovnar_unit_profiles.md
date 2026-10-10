@@ -917,7 +917,7 @@ It remains **partial by construction**, and in three different ways:
 - *No table is complete.* A native unit outside a transliteration table has nowhere to go — the Old
   German units, the water-hardness degrees, the turbidity kinds, `PSU`, `CF`, `kph`, `rpm`,
   and every currency. Membership here is per-unit and not per-family: `mph` has both a UN/ECE
-  and a QUDT code while `kph` has neither, and `NTU` is writable where `PSU` is not.
+  and a QUDT code while `kph` has neither.
 - *A flat profile can only write a single component.* A flat code names a whole unit, so there is no
   way to compose one out of parts: `unece:MSK` reads back as `m/s²`, but a native `m/s²` has no
   UNECE spelling this function can construct. The expression profiles have no such limit.
@@ -1641,8 +1641,9 @@ const char* bvn_dom_get_unit_source(const bvn_dom_node_t* node,
 
 `bvn_parse_unit` keeps its signature, which is why the policy strings of §4.3 work with no change
 at all: `bvnr_unit_policy_t` parses its targets with it, so the notation arrives for free. One
-struct changed — `bvnr_data_t` gained `unit_source`/`unit_source_length` (§7.3) — so the ABI
-movement is that, the two error codes and the new entry points.
+struct changed for this feature — `bvnr_data_t` gained `unit_source`/`unit_source_length` (§7.3) —
+so its ABI movement is that, the two error codes and the new entry points. (The release moved more
+than the profiles did; the changelog has the whole list.)
 
 ### 8.2 Python
 
@@ -2139,7 +2140,9 @@ out by name instead.
 The unit parser is the bulk of it. Everything else is small, and — this is what §1.1 buys — the
 DOM, the writer, the streaming reader, the policy engine and the CLI needed no work at all, because
 a translated unit is an ordinary unit. The two formatter guards, the two compatibility refusals and
-the writer's one spec-version check are the entire footprint outside the new file.
+the writer's one spec-version check are the entire footprint outside the new file. (That was true
+of translation, which is what this table costs out. Keeping a unit's *spelling* came later and did
+touch the reader, the writer and the DOM — §7.3.)
 
 ### 10.2 What can go wrong
 
@@ -2598,7 +2601,7 @@ back as `k~g·s/m` — for exactly this reason: getting it backwards turns a vis
 reciprocal and still formats cleanly.
 
 UDUNITS accepts symbols and spelled-out names for units *and* prefixes, which is why the table
-carries 251 codes and 41 prefix spellings for a vocabulary no larger than UCUM's: `m`, `meter` and
+carries 499 codes and 41 prefix spellings for a vocabulary no larger than UCUM's: `m`, `meter` and
 `metre` are three rows, and `kilo` is a prefix beside `k`. `udunits:km`, `udunits:kilometer` and
 `udunits:kilometre` are one unit.
 
@@ -3028,7 +3031,7 @@ before length does**, which is a rule this vocabulary needed and the others did 
 | `m` | `metre`, `cubicMetrePerSquareMetre` | `metre` | a composed name is worth a metre and is not a spelling of one |
 | `mmHg` | `millimetreOfMercury` | `millimetreOfMercury` | the only candidate, and 2.9 ppm from OM's rounded column — waived by name in `check_profile_factors.py`, exactly as UCUM's `m[Hg]` and QUDT's `TORR` are |
 
-735 native units have an OM spelling as a result. A compound unit still has none: a flat vocabulary
+791 native units — counted as (unit, decade) pairs, which is how a flat vocabulary names them — have an OM spelling as a result. A compound unit still has none: a flat vocabulary
 spells one whole code, so `bvn_unit_to_profile("om", m/s²)` returns -1 for the reason §5.1 gives.
 
 ---

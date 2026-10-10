@@ -729,6 +729,7 @@ if(_bvnr_have_pytest AND BVNR_ALL_PROFILES)
         set_tests_properties(${_name} PROPERTIES
             TIMEOUT ${_timeout}
             LABELS  "python;python_pure;${_labels}"
+            ENVIRONMENT "${_bvnr_lib_env}"
         )
     endmacro()
 
@@ -970,6 +971,7 @@ if(_bvnr_have_pytest AND BVNR_ALL_PROFILES)
     set_tests_properties(bvnr_py_pure_all PROPERTIES
         TIMEOUT 300
         LABELS  "python;python_pure"
+        ENVIRONMENT "${_bvnr_lib_env}"
     )
 
 elseif(NOT Python3_FOUND)
@@ -2046,6 +2048,7 @@ if(Python3_Interpreter_FOUND AND NOT WIN32 AND NOT BVNR_SANITIZE
                 -DPYTHON=${Python3_EXECUTABLE}
                 -DCC=${CMAKE_C_COMPILER}
                 -DBIN_DIR=${CMAKE_CURRENT_BINARY_DIR}/amalgam_smoke
+                -DGENERATED=${BVNR_GENERATED_DIR}
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/amalgam_smoke.cmake)
     set_tests_properties(bvnr_amalgam_smoke PROPERTIES
         LABELS "packaging;codegen;amalgam" TIMEOUT 300)
@@ -2078,6 +2081,7 @@ if(Python3_Interpreter_FOUND AND NOT WIN32 AND NOT BVNR_SANITIZE
                 -DPYTHON=${Python3_EXECUTABLE}
                 -DCC=${CMAKE_C_COMPILER}
                 -DBIN_DIR=${CMAKE_CURRENT_BINARY_DIR}/profiles_off
+                -DGENERATED=${BVNR_GENERATED_DIR}
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/profiles_off_build.cmake)
     set_tests_properties(bvnr_profile_configs PROPERTIES
         LABELS "packaging;codegen;amalgam;profile" TIMEOUT 300)

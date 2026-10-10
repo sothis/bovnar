@@ -41,6 +41,10 @@ COMMON=(
 	# (CMakeLists.txt). Without this, -O3 produces an infinite loop in the DOM
 	# builder on type-annotated values.
 	-fno-strict-aliasing
+	# The library has one live assert(), and __FILE__ put the absolute path of
+	# whoever built the bundle into the shipped .wasm -- which also made the
+	# committed artifact differ byte-for-byte when rebuilt anywhere else.
+	"-ffile-prefix-map=$ROOT=."
 	-I "$AMALG" -I "$ROOT/wasm"
 	-std=c11
 	"$AMALG/bovnar.c" "$ROOT/wasm/bvnr_wasm.c"
@@ -71,6 +75,12 @@ echo ">> assembling package (wrapper + metadata)"
 cp "$ROOT/wasm/index.mjs"    "$OUT/index.mjs"
 cp "$ROOT/wasm/package.json" "$OUT/package.json"
 cp "$ROOT/wasm/README.md"    "$OUT/README.md"
+# The .wasm embeds the unit-profile tables, and with them identifier strings
+# that belong to their publishers. The notices have to travel with a binary
+# (cmake/pack_artifacts.cmake says the same of the archives), so they travel
+# with this one too.
+cp "$ROOT/LICENSE"                  "$OUT/LICENSE"
+cp "$ROOT/THIRD_PARTY_NOTICES.md"   "$OUT/THIRD_PARTY_NOTICES.md"
 # Single-file wrapper: same wrapper, importing the inlined glue.
 sed "s#'./bovnar.mjs'#'./bovnar.single.mjs'#" \
 	"$ROOT/wasm/index.mjs" > "$OUT/index.single.mjs"

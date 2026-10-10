@@ -91,7 +91,7 @@ class TestUnitObject:
 
 class TestAccessorsAreProperties:
     """value, decimal, fraction, fixed_point, stored_value, ieee_bits and
-    unit_str are all properties in 1.2. They were split between properties and
+    unit_str are all properties in 2.0. They were split between properties and
     methods with no stateable rule."""
 
     def test_numeric_accessors(self):

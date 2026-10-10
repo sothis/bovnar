@@ -43,7 +43,7 @@ bvnr.toJSON('.speed = 9.81 m/s;\n.name = "probe";');
 bvnr.events('.x = <uint:16> 7;');
 // { ok: true, events: [ { seq: 0, ev: 'stream_start', ... }, ... ] }
 
-bvnr.version();  // "1.1.0"
+bvnr.version();  // "2.0.0"
 ```
 
 `input` is a string (UTF-8 encoded for you) or a `Uint8Array` (pass bytes
@@ -66,7 +66,7 @@ import { loadBovnar } from 'bovnar-wasm/single';
 | `validate(in)` | `{ ok, error, error_name, line, column, byte, offset, recovery_count, declared_version }` |
 | `toJSON(in)`   | `{ ok, error, error_name, value }` — DOM projected to plain JSON           |
 | `events(in)`   | `{ ok, error, error_name, events: [...] }` — the reference event stream    |
-| `version()`    | library version string, e.g. `"1.1.0"`                                     |
+| `version()`    | library version string, e.g. `"2.0.0"`                                     |
 
 An event that carries a unit reports it twice: `unit` is the canonical form
 (`m~L`), and `unit_source` is the unit exactly as the document spelled it

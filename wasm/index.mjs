@@ -18,7 +18,7 @@
 //   bvnr.toJSON('.v = 9.81 m/s;');                // -> { ok, value, ... }
 //   bvnr.events('.v = 9.81 m/s;');                // -> { ok, events:[...] }
 //   bvnr.eventsConvert('.v = 9.81 k~m/s;', 'm/s'); // -> events with `converted`
-//   bvnr.version();                                // -> "1.1.0"
+//   bvnr.version();                                // -> "2.0.0"
 //
 // `input` may be a string (UTF-8 encoded for you) or a Uint8Array (passed
 // through verbatim — required if the document embeds octet streams with NULs).
@@ -162,7 +162,7 @@ export async function loadBovnar(opts) {
      *  shim to reconstruct the tree + event-stream shapes. */
     doc: (input) => callJson('bvnr_wasm_doc', input),
 
-    /** Library version string, e.g. "1.1.0". */
+    /** Library version string, e.g. "2.0.0". */
     version: () => Module.ccall('bvnr_wasm_version', 'string', [], []),
 
     /** The raw emscripten Module, for advanced use. */

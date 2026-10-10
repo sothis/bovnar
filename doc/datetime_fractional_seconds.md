@@ -1,6 +1,6 @@
 # Bovnar — Datetime Fractional Seconds (Design Note)
 
-> **Spec version:** 1.1
+> **Spec version:** 1.2
 > **Status:** Informative — a maintainer's design note, not published behaviour
 > **Scope:** How an ISO-8601 fractional second is preserved beside a whole-second carrier.
 
@@ -175,4 +175,4 @@ fraction for programmatic access); it has no re-serialiser of its own.
 
 ---
 
-*End of Bovnar — Datetime Fractional Seconds (Design Note) (Bovnar spec 1.1).*
+*End of Bovnar — Datetime Fractional Seconds (Design Note) (Bovnar spec 1.2).*

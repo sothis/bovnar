@@ -40,7 +40,7 @@
 <h1>Bovnar — Unit &amp; Currency Reference</h1>
 <p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/05_bovnar_unit_system.md">Markdown</a> and <a href="/doc/pdf/bovnar-unit-system.pdf">PDF</a>.</p>
 <blockquote>
-<p><strong>Spec version:</strong> 1.1
+<p><strong>Spec version:</strong> 1.2
 <strong>Status:</strong> Normative — the unit and currency registry the parser validates against
 <strong>Scope:</strong> Physical units, currency codes, prefix rules, disambiguation, C/Python APIs, and validation.</p>
 </blockquote>
@@ -142,7 +142,7 @@
 <li>12.3 <a href="#123-prefix-factor-and-exponent-queries">Prefix Factor and Exponent Queries</a></li>
 <li>12.4 <a href="#124-si-conversion-api">SI Conversion API</a></li>
 <li>12.5 <a href="#125-currency-api">Currency API</a></li>
-<li>12.6 <a href="#126-unit-profile-api-under-implementation">Unit Profile API (under implementation)</a></li>
+<li>12.6 <a href="#126-unit-profile-api-spec-12">Unit Profile API (spec 1.2)</a></li>
 <li>12.7 <a href="#127-python-api">Python API</a></li>
 </ul>
 </li>
@@ -200,10 +200,8 @@ the parameter to a <strong>unit profile</strong>, which translates it into the s
 <code>&lt;float_dec:64,mmHg&gt;</code> are the same unit to every part of the library. Seven
 namespaces are defined — <code>ucum</code>, <code>unece</code>, <code>qudt</code>, <code>qudt-qk</code>, <code>udunits</code>, <code>om</code>
 and <code>cf</code>; everything in this reference applies to the
-result unchanged. <strong>The notation is under implementation</strong> — it is not part of a
-published specification, and a document must opt in with a <code>#!bovnar 1.2</code>
-directive that this build does not itself advertise. A native unit is
-unaffected in every version. See
+result unchanged. <strong>The notation is spec 1.2</strong>, so a document must opt in with
+a <code>#!bovnar 1.2</code> directive. A native unit is unaffected in every version. See
 <a href="https://www.bovnar.io/docs/profiles/">Unit Profiles</a>.</p>
 </blockquote>
 <h3 id="21-parameter-ordering-flexibility">2.1 Parameter Ordering Flexibility</h3>
@@ -6233,7 +6231,7 @@ does when a caller asks.</p>
 <span class="n">assert</span><span class="p">(</span><span class="w"> </span><span class="n">bvn_unit_is_currency</span><span class="p">(</span><span class="n">currency</span><span class="p">.</span><span class="n">components</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">base</span><span class="p">));</span><span class="w"> </span><span class="cm">/* true */</span>
 </code></pre></div>
 
-<h3 id="126-unit-profile-api-under-implementation">12.6 Unit Profile API (under implementation)</h3>
+<h3 id="126-unit-profile-api-spec-12">12.6 Unit Profile API (spec 1.2)</h3>
 <p>Four functions serve the profile notations. <code>bvn_parse_unit</code> itself is unchanged and takes every notation; these cover what a caller needs <em>around</em> it.</p>
 <div class="codehilite"><pre><span></span><code><span class="n">error_code_t</span><span class="w"> </span><span class="nf">bvn_unit_error_code</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="n">unit</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">len</span><span class="p">);</span>
 <span class="kt">bool</span><span class="w">         </span><span class="nf">bvn_unit_is_profile_only</span><span class="p">(</span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">u</span><span class="p">);</span>
@@ -6252,7 +6250,7 @@ does when a caller asks.</p>
 <span class="n">bvn_unit_to_ucum</span><span class="w">  </span><span class="p">(</span><span class="n">u</span><span class="p">,</span><span class="w"> </span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="n">buf</span><span class="p">);</span><span class="w">                                 </span><span class="cm">/* &quot;mm[Hg]&quot;  */</span>
 </code></pre></div>
 
-<p>Note that <strong>in a document</strong> the notation is gated on an explicit <code>#!bovnar 1.2</code> directive (§11.9 of the specification) — a version this build does not itself advertise, because the notation is under implementation. These API entry points have no document and therefore no version, so they accept the notation unconditionally.</p>
+<p>Note that <strong>in a document</strong> the notation is gated on an explicit <code>#!bovnar 1.2</code> directive (§11.9 of the specification). These API entry points have no document and therefore no version, so they accept the notation unconditionally.</p>
 <h3 id="127-python-api">12.7 Python API</h3>
 <div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar.enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseUnit</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">bovnar.currency</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
@@ -6535,7 +6533,7 @@ ev_data   data=&quot;1500&quot;
 <li><a href="https://www.bovnar.io/docs/python/">Python Bindings</a> — the same unit model from Python, with the NumPy and pint bridges</li>
 </ul>
 <hr />
-<p><em>End of Bovnar — Unit &amp; Currency Reference (Bovnar spec 1.1).</em></p>
+<p><em>End of Bovnar — Unit &amp; Currency Reference (Bovnar spec 1.2).</em></p>
 </main>
 <footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · <a href="/privacy.html">Privacy</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>

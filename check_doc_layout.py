@@ -23,7 +23,7 @@ shape is pinned in one place instead of being restated in eleven:
   * a TOC that lists every "##" and "###" heading, in document order, with the
     anchor each heading actually gets — this is the part that rots fastest,
     because adding a section is one edit and remembering the TOC is another;
-  * a "## See also" section and the closing "*End of … (Bovnar spec 1.1).*"
+  * a "## See also" section and the closing "*End of … (Bovnar spec 1.2).*"
     line.
 
 The anchor slugs are computed with gen_html_docs.gh_slug — the same function
@@ -53,7 +53,7 @@ FENCE = re.compile(r"^(```|~~~)")
 # give it markdown and gen_csp.
 RETIRED_MARKER = "bovnar:retired-path"
 NO_NUMBER = ("Table of Contents", "See also")
-FOOTER = re.compile(r"^\*End of .+ \(Bovnar spec 1\.1\)\.\*$")
+FOOTER = re.compile(r"^\*End of .+ \(Bovnar spec 1\.2\)\.\*$")
 META_KEYS = ["**Spec version:**", "**Status:**", "**Scope:**"]
 
 
@@ -275,7 +275,7 @@ def check(path, verbose=False):
         problems.append("no '## See also' section")
     tail = [l for l in lines if l.strip()]
     title = lines[0][2:].strip() if lines and lines[0].startswith("# ") else ""
-    want = f"*End of {title} (Bovnar spec 1.1).*"
+    want = f"*End of {title} (Bovnar spec 1.2).*"
     if not tail:
         problems.append("empty document")
     elif not FOOTER.match(tail[-1].strip()):

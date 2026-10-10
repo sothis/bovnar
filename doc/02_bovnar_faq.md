@@ -1,6 +1,6 @@
 # Bovnar — Frequently Asked Questions
 
-> **Spec version:** 1.1
+> **Spec version:** 1.2
 > **Status:** Non-normative — answers indexed to the specification
 > **Scope:** Common questions on syntax, types, units, numbers, limits, and the C and Python APIs.
 
@@ -575,10 +575,9 @@ documentation-grade data, prefer the explicit form.
 
 **Can I write units as UCUM, UNECE, QUDT or UDUNITS codes?**
 
-Yes — five foreign vocabularies are accepted in the unit slot. The notation
-exists in the implementation but is **under implementation**: no published
-specification defines it, and the version it will ship under is not settled. It
-is reachable today by opting in explicitly:
+Yes — seven foreign vocabularies are accepted in the unit slot. The notation is
+**spec 1.2**, and like every construct added after 1.0 a document opts in to it
+with the version directive:
 
 ```bovnar
 #!bovnar 1.2
@@ -1529,4 +1528,4 @@ standard publication by three to five years.
 
 ---
 
-*End of Bovnar — Frequently Asked Questions (Bovnar spec 1.1).*
+*End of Bovnar — Frequently Asked Questions (Bovnar spec 1.2).*

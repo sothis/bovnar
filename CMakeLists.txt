@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(bovnar VERSION 1.2.0 LANGUAGES C)
+project(bovnar VERSION 2.0.0 LANGUAGES C)
 
 # Windows builds are 64-bit only (MinGW64 and MSVC x64). CMAKE_SIZEOF_VOID_P is
 # populated by the compiler probe that project() just ran.
@@ -532,10 +532,12 @@ endif()
 # loads libbvnr.so by exact name via ctypes, and wheel archives do not preserve
 # the symlink chain a versioned soname creates.
 #
-# VERSION tracks the ABI, NOT ${PROJECT_VERSION}. The project version is the
-# FORMAT version (see the CHANGELOG: "semantic versioning of the format"), which
-# is deliberately still 1.1.0 here -- the wire format did not change, only the
-# ABI did. Deriving the real filename from it produced libbvnr.so.1.1.0 for BOTH
+# VERSION tracks the ABI, NOT ${PROJECT_VERSION}. They coincide today -- the
+# library is 2.0.0 and the ABI major is 2 -- but they count different things:
+# the project version also moves for a Python-API break or a feature release,
+# and an ABI break need not wait for either. When this was written the project
+# version was still 1.1.0 with the ABI already broken, and deriving the real
+# filename from it produced libbvnr.so.1.1.0 for BOTH
 # SOVERSION 1 and SOVERSION 2, so the two mutually incompatible libraries had the
 # same on-disk name and would overwrite each other; a binary linked against
 # libbvnr.so.1 would then be handed a file that is actually ABI 2 -- exactly the

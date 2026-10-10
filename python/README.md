@@ -71,8 +71,8 @@ print(bovnar.units_compatible(m, mps))      # False
 ```
 
 A unit may also be written in another vocabulary's notation — UCUM, UN/ECE,
-QUDT, UDUNITS-2, OM 2 or a CF standard name. This is **under implementation**
-(not in a released specification) and needs a `#!bovnar 1.2` directive. It is a
+QUDT, UDUNITS-2, OM 2 or a CF standard name. This is **spec 1.2** and needs a
+`#!bovnar 1.2` directive in the document. It is a
 spelling, not a second kind of unit: the value carries the same unit either way,
 and the spelling it was written in is kept and written back.
 

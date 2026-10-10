@@ -1,6 +1,6 @@
 # Bovnar — Unit Policy Reference
 
-> **Spec version:** 1.1
+> **Spec version:** 1.2
 > **Status:** Reference — the unit policy carried by `bvnr_unit_policy_t`, on the reader and on the writer.
 > **Scope:** What a policy declares, the order its parts are consulted in, what it validates, what it converts, and the errors it raises. Behaviour only; the C declarations live in the read/write API reference.
 
@@ -544,4 +544,4 @@ bvnr_writer_set_unit_policy(w, &p);
 
 ---
 
-*End of Bovnar — Unit Policy Reference (Bovnar spec 1.1).*
+*End of Bovnar — Unit Policy Reference (Bovnar spec 1.2).*

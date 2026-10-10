@@ -129,7 +129,7 @@ class Quantity:
                  tok_type: int = 2,
                  frac:     str | None = None,
                  unit_source: str | None = None) -> None:
-        # VALIDATED SINCE 1.2. It used to accept anything and store it, so
+        # VALIDATED SINCE 2.0. It used to accept anything and store it, so
         # Quantity("1", "not-a-valuetypespec") constructed happily and every
         # consumer of .vtype had to defend itself against a value that could
         # never be right -- one of them by catching AttributeError on .family.

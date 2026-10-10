@@ -85,7 +85,7 @@ informative:
   RFC9839:
   BOVNAR-SPEC:
     date: 2026
-    title: "Bovnar - Specification, version 1.1"
+    title: "Bovnar - Specification, version 1.2"
     author:
       - name: Janos Sonntag
     target: https://www.bovnar.io/doc/03_bovnar_spec.md
@@ -211,9 +211,9 @@ Bovnar occupies a deliberate position between three neighbours:
 * Against **UCUM** {{UCUM}} and **CF** {{CF}}, which standardize unit
   *notation* for use inside some other format, it specifies the container
   as well, so that the unit is enforced by the parser rather than by a
-  downstream convention. A facility for writing a unit in UCUM and other
-  foreign notations exists in the reference implementation but is not part
-  of the format this document specifies; see {{unit-profiles}}.
+  downstream convention. Format version 1.2 adds a facility for writing a
+  unit in UCUM and other foreign notations; it is specified by
+  {{BOVNAR-SPEC}} and not by this document; see {{unit-profiles}}.
 
 * Against **schema languages**, it is schema-free. The description
   travels with each value rather than in a separate artifact that can be
@@ -256,17 +256,17 @@ document.
 The normative project specification for the format is {{BOVNAR-SPEC}},
 with the unit registry in {{BOVNAR-UNITS}} and a grammar in ISO/IEC 14977
 {{ISO14977}} EBNF in {{BOVNAR-EBNF}}. This document is a restatement of
-format version 1.1 of that specification in IETF conventions, with the
+format version 1.2 of that specification in IETF conventions, with the
 grammar translated into ABNF and with the media type, security, and
 interoperability analysis that publication as an RFC requires.
 
 Where this document and {{BOVNAR-SPEC}} disagree on a point of format
-version 1.1, that is a defect in one of them and should be reported. This
+version 1.2 that both specify, that is a defect in one of them and should be reported. This
 document deliberately omits material from {{BOVNAR-SPEC}} that describes
 the reference implementation rather than the format: event callbacks,
 C types, internal representations, and API entry points. It also excludes
-{{BOVNAR-SPEC}} Section 11.9 (unit profiles), which is not part of any
-released format version; see {{unit-profiles}}.
+{{BOVNAR-SPEC}} Section 11.9 (unit profiles), the one version 1.2 facility
+this document names without specifying; see {{unit-profiles}}.
 
 # Conventions and Definitions
 
@@ -1369,19 +1369,41 @@ An unrecognized unit in either position is `error_unit_illegal`.
 
 ## Unit Profiles {#unit-profiles}
 
-A facility for expressing a unit in a foreign notation - written
-`namespace:code` - exists in the reference implementation but is **not
-part of any released format version**, is reachable only by declaring a
-version the implementation does not advertise, and its eventual version
-number is unsettled. Seven namespaces are defined there so far: `ucum`
-{{UCUM}}, `unece` {{UNECE20}}, `qudt` and `qudt-qk` {{QUDT}},
-`udunits` {{UDUNITS}}, `om` {{OM2}} and `cf` {{CF}}.
+Format version 1.2 adds a facility for expressing a unit in a foreign
+notation, written `namespace:code`:
 
-It is mentioned here only so that implementers encountering it in
-{{BOVNAR-SPEC}} know its status. It is not specified by this document,
-and a consumer conforming to this document MUST treat `namespace:code` in
-unit position as `error_unit_illegal`, which is what a version 1.0 or 1.1
-consumer does.
+~~~
+#!bovnar 1.2
+.systolic = <float:64,ucum:mm[Hg]> 120.0;
+~~~
+
+Seven namespaces are defined: `ucum` {{UCUM}}, `unece` {{UNECE20}},
+`qudt` and `qudt-qk` {{QUDT}}, `udunits` {{UDUNITS}}, `om` {{OM2}} and
+`cf` {{CF}}. A code is translated, when the document is parsed, into the
+unit a native spelling of the same quantity produces, so the facility
+adds spellings and no values: every rule of this document applies to the
+result unchanged.
+
+**The facility is specified by {{BOVNAR-SPEC}} Section 11.9 and its
+companion on unit profiles, not by this document.** Its translation
+tables restate other publishers' vocabularies and are revised as those
+vocabularies are, which is not a cadence this document can follow. What
+this document fixes is the boundary, so that a consumer implementing it
+alone behaves predictably:
+
+* In a document that declares less than 1.2, or declares nothing,
+  `namespace:code` in unit position is `error_unit_illegal`. In those
+  versions it is not a unit.
+* In a document that declares 1.2 or newer, a consumer that does not
+  implement a namespace MUST reject it as `error_unit_profile_unknown`
+  (49), and MUST NOT pass the code through uninterpreted. A consumer that
+  implements none of them rejects every such unit that way.
+* A consumer that does implement a namespace either translates the code
+  into a unit of {{units}} or rejects it: `error_unit_illegal` for a code
+  the vocabulary does not define, `error_unit_profile_unsupported` (50)
+  for one it defines and this unit system cannot represent. There is no
+  third outcome in which a value carries a unit the consumer cannot
+  reason about.
 
 # Composite Values {#composites}
 
@@ -2566,10 +2588,9 @@ C:
   under a policy it was configured with. Not a defect in the document.
 
 U:
-: **Unallocated here.** The value is taken by the unit-profile facility,
-  which is not part of any released format version and is not specified by
-  this document ({{unit-profiles}}). The values are listed so that a future
-  code is not assigned on top of them.
+: **Unit profile.** Raised by the unit-profile facility of format version
+  1.2, whose boundary this document fixes and whose content it does not
+  specify ({{unit-profiles}}).
 
 | Value | Name | Class |
 |---|---|---|

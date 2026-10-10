@@ -496,4 +496,4 @@ gap, because the gap is at least visible.
 
 ---
 
-*End of Bovnar — Measurement Uncertainty (Design Note) (Bovnar spec 1.1).*
+*End of Bovnar — Measurement Uncertainty (Design Note) (Bovnar spec 1.2).*

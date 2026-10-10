@@ -388,4 +388,4 @@ existed and could not have been right without them.
 
 ---
 
-*End of Bovnar — Temperature Difference (Design Note) (Bovnar spec 1.1).*
+*End of Bovnar — Temperature Difference (Design Note) (Bovnar spec 1.2).*

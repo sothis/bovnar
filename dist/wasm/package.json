@@ -1,6 +1,6 @@
 {
   "name": "bovnar-wasm",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "description": "The Bovnar C reference parser, compiled to WebAssembly: validate, parse-to-JSON, and stream events for .bvnr documents in browsers, Node, Deno, and edge runtimes.",
   "type": "module",
   "main": "./index.mjs",

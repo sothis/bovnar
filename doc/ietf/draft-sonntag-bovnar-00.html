@@ -1231,11 +1231,11 @@ li > p:last-of-type:only-child {
 <thead><tr>
 <td class="left">Internet-Draft</td>
 <td class="center">The Bovnar Format</td>
-<td class="right">July 2026</td>
+<td class="right">October 2026</td>
 </tr></thead>
 <tfoot><tr>
 <td class="left">Sonntag</td>
-<td class="center">Expires 29 January 2027</td>
+<td class="center">Expires 13 April 2027</td>
 <td class="right">[Page]</td>
 </tr></tfoot>
 </table>
@@ -1248,12 +1248,12 @@ li > p:last-of-type:only-child {
 <dd class="internet-draft">draft-sonntag-bovnar-00</dd>
 <dt class="label-published">Published:</dt>
 <dd class="published">
-<time datetime="2026-07-28" class="published">28 July 2026</time>
+<time datetime="2026-10-10" class="published">10 October 2026</time>
     </dd>
 <dt class="label-intended-status">Intended Status:</dt>
 <dd class="intended-status">Informational</dd>
 <dt class="label-expires">Expires:</dt>
-<dd class="expires"><time datetime="2027-01-29">29 January 2027</time></dd>
+<dd class="expires"><time datetime="2027-04-13">13 April 2027</time></dd>
 <dt class="label-authors">Author:</dt>
 <dd class="authors">
 <div class="author">
@@ -1308,7 +1308,7 @@ error model, and the media type registration for the format.<a href="#section-ab
         time. It is inappropriate to use Internet-Drafts as reference
         material or to cite them other than as "work in progress."<a href="#section-boilerplate.1-3" class="pilcrow">¶</a></p>
 <p id="section-boilerplate.1-4">
-        This Internet-Draft will expire on 29 January 2027.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
+        This Internet-Draft will expire on 13 April 2027.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="copyright">
@@ -1732,9 +1732,9 @@ implementations must carry.<a href="#section-1.2-2.1.1" class="pilcrow">¶</a></
             <p id="section-1.2-2.2.1">Against <strong>UCUM</strong> <span>[<a href="#UCUM" class="cite xref">UCUM</a>]</span> and <strong>CF</strong> <span>[<a href="#CF" class="cite xref">CF</a>]</span>, which standardize unit
 <em>notation</em> for use inside some other format, it specifies the container
 as well, so that the unit is enforced by the parser rather than by a
-downstream convention. A facility for writing a unit in UCUM and other
-foreign notations exists in the reference implementation but is not part
-of the format this document specifies; see <a href="#unit-profiles" class="auto internal xref">Section 8.6</a>.<a href="#section-1.2-2.2.1" class="pilcrow">¶</a></p>
+downstream convention. Format version 1.2 adds a facility for writing a
+unit in UCUM and other foreign notations; it is specified by
+<span>[<a href="#BOVNAR-SPEC" class="cite xref">BOVNAR-SPEC</a>]</span> and not by this document; see <a href="#unit-profiles" class="auto internal xref">Section 8.6</a>.<a href="#section-1.2-2.2.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-1.2-2.3">
             <p id="section-1.2-2.3.1">Against <strong>schema languages</strong>, it is schema-free. The description
@@ -1805,16 +1805,16 @@ document.<a href="#section-1.3-3" class="pilcrow">¶</a></p>
 <p id="section-1.4-1">The normative project specification for the format is <span>[<a href="#BOVNAR-SPEC" class="cite xref">BOVNAR-SPEC</a>]</span>,
 with the unit registry in <span>[<a href="#BOVNAR-UNITS" class="cite xref">BOVNAR-UNITS</a>]</span> and a grammar in ISO/IEC 14977
 <span>[<a href="#ISO14977" class="cite xref">ISO14977</a>]</span> EBNF in <span>[<a href="#BOVNAR-EBNF" class="cite xref">BOVNAR-EBNF</a>]</span>. This document is a restatement of
-format version 1.1 of that specification in IETF conventions, with the
+format version 1.2 of that specification in IETF conventions, with the
 grammar translated into ABNF and with the media type, security, and
 interoperability analysis that publication as an RFC requires.<a href="#section-1.4-1" class="pilcrow">¶</a></p>
 <p id="section-1.4-2">Where this document and <span>[<a href="#BOVNAR-SPEC" class="cite xref">BOVNAR-SPEC</a>]</span> disagree on a point of format
-version 1.1, that is a defect in one of them and should be reported. This
+version 1.2 that both specify, that is a defect in one of them and should be reported. This
 document deliberately omits material from <span>[<a href="#BOVNAR-SPEC" class="cite xref">BOVNAR-SPEC</a>]</span> that describes
 the reference implementation rather than the format: event callbacks,
 C types, internal representations, and API entry points. It also excludes
-<span>[<a href="#BOVNAR-SPEC" class="cite xref">BOVNAR-SPEC</a>]</span> Section 11.9 (unit profiles), which is not part of any
-released format version; see <a href="#unit-profiles" class="auto internal xref">Section 8.6</a>.<a href="#section-1.4-2" class="pilcrow">¶</a></p>
+<span>[<a href="#BOVNAR-SPEC" class="cite xref">BOVNAR-SPEC</a>]</span> Section 11.9 (unit profiles), the one version 1.2 facility
+this document names without specifying; see <a href="#unit-profiles" class="auto internal xref">Section 8.6</a>.<a href="#section-1.4-2" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
@@ -3147,9 +3147,9 @@ against the registry, and the registry is too large to reproduce here and
 grows in minor revisions (<a href="#version-stability" class="auto internal xref">Section 11.4</a>). An implementer needs
 <span>[<a href="#BOVNAR-UNITS" class="cite xref">BOVNAR-UNITS</a>]</span> to build a conforming parser; everything else required
 is in this document.<a href="#section-8.1-2" class="pilcrow">¶</a></p>
-<p id="section-8.1-3">The registry covers 180 named units across SI <span>[<a href="#SI" class="cite xref">SI</a>]</span>, IEC binary
+<p id="section-8.1-3">The registry covers 264 named units across SI <span>[<a href="#SI" class="cite xref">SI</a>]</span>, IEC binary
 <span>[<a href="#IEC80000-13" class="cite xref">IEC80000-13</a>]</span>, imperial and US customary, CGS, radiation, electrical
-power, rotational, surveying, textile, and other families, accepting 529
+power, rotational, surveying, textile, and other families, accepting 745
 spellings in total once long-form and plural aliases are counted; plus
 216 currency codes (<a href="#currency" class="auto internal xref">Section 8.4</a>).<a href="#section-8.1-3" class="pilcrow">¶</a></p>
 <p id="section-8.1-4">Three properties govern how a unit behaves:<a href="#section-8.1-4" class="pilcrow">¶</a></p>
@@ -3208,7 +3208,10 @@ multiplication and are semantically identical; <code>·</code> is visually prefe
 <code>/</code> denotes division.<a href="#section-8.2-4" class="pilcrow">¶</a></p>
 <p id="section-8.2-5"><strong>Division latches.</strong> The first <code>/</code> moves every subsequent factor at that
 level into the denominator; further <code>/</code> separators never toggle back.
-<code>m/s/s</code> therefore has the dimensions of <code>m·s⁻²</code>, not of <code>m</code>. It is not the SAME unit as <code>m·s⁻²</code>: repeated bases are not merged, so <code>m/s/s</code> carries <code>s⁻¹</code> twice where <code>m·s⁻²</code> carries <code>s⁻²</code> once, and the two compare unequal while converting with factor 1.<a href="#section-8.2-5" class="pilcrow">¶</a></p>
+<code>m/s/s</code> therefore has the dimensions of <code>m·s⁻²</code>, not of <code>m</code>. It is not the
+SAME unit as <code>m·s⁻²</code>: repeated bases are not merged, so <code>m/s/s</code> carries
+<code>s⁻¹</code> twice where <code>m·s⁻²</code> carries <code>s⁻²</code> once, and the two compare unequal
+while converting with factor 1.<a href="#section-8.2-5" class="pilcrow">¶</a></p>
 <p id="section-8.2-6"><strong>Grouping.</strong> A parenthesised sub-expression is evaluated independently
 and, like any factor, obeys the latching denominator: a <code>/</code> before a
 group negates the group's net exponents as a whole. So <code>k~g/(m·s²)</code> is
@@ -3234,26 +3237,33 @@ caret form:<a href="#section-8.2-7" class="pilcrow">¶</a></p>
             <tr>
               <td class="text-left" rowspan="1" colspan="1">Superscript</td>
               <td class="text-left" rowspan="1" colspan="1">
-                <code>m²</code>, <code>m⁻³</code>
+                <code>m²</code>, <code>m⁻³</code>, <code>m¹⁰⁰</code>
 </td>
               <td class="text-left" rowspan="1" colspan="1">U+2070, U+00B9, U+00B2, U+00B3, U+2074-U+2079; sign U+207A (no-op) or U+207B (negate); one to three digits</td>
             </tr>
             <tr>
               <td class="text-left" rowspan="1" colspan="1">Caret</td>
               <td class="text-left" rowspan="1" colspan="1">
-                <code>m^2</code>, <code>m^-3</code>, <code>m^+2</code>
+                <code>m^2</code>, <code>m^-3</code>, <code>m^100</code>
 </td>
-              <td class="text-left" rowspan="1" colspan="1"><code>^[+-]?[0-9]{1,3}</code></td>
+              <td class="text-left" rowspan="1" colspan="1">
+                <code>^[+-]?[0-9]{1,3}</code>
+</td>
             </tr>
           </tbody>
         </table>
-<p id="section-8.2-9">A compound unit <span class="bcp14">MUST NOT</span> exceed <strong>32 components</strong>; more is
+<p id="section-8.2-9">An exponent is an integer in <code>[-100, 100]</code> (<code>BVN_EXPONENT_MIN</code>,
+<code>BVN_EXPONENT_MAX</code>), with zero reserved: <code>m^0</code> and <code>m⁰</code> are not units.
+At most three digits are scanned, so <code>m^1000</code> is an unrecognised token
+rather than an over-large exponent, while <code>m^200</code> scans and is refused
+on the range check. Both are <code>error_unit_illegal</code>.<a href="#section-8.2-9" class="pilcrow">¶</a></p>
+<p id="section-8.2-10">A compound unit <span class="bcp14">MUST NOT</span> exceed <strong>32 components</strong>; more is
 <code>error_unit_illegal</code>. An empty component between separators (<code>m//s</code>,
 <code>m*·s</code>), an empty group, and unbalanced parentheses are likewise
-<code>error_unit_illegal</code>.<a href="#section-8.2-9" class="pilcrow">¶</a></p>
-<p id="section-8.2-10"><code>no_unit</code> in unit position means explicitly dimensionless. Omitting the
+<code>error_unit_illegal</code>.<a href="#section-8.2-10" class="pilcrow">¶</a></p>
+<p id="section-8.2-11"><code>no_unit</code> in unit position means explicitly dimensionless. Omitting the
 unit parameter from an annotation is equivalent, and an unannotated value
-is dimensionless by synthesis; all three are compatible.<a href="#section-8.2-10" class="pilcrow">¶</a></p>
+is dimensionless by synthesis; all three are compatible.<a href="#section-8.2-11" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="prefixes">
@@ -3476,18 +3486,47 @@ commutes: <code>N·m</code> and <code>m·N</code> are the same unit and do not m
         <h3 id="name-unit-profiles">
 <a href="#section-8.6" class="section-number selfRef">8.6. </a><a href="#name-unit-profiles" class="section-name selfRef">Unit Profiles</a>
         </h3>
-<p id="section-8.6-1">A facility for expressing a unit in a foreign notation - written
-<code>namespace:code</code> - exists in
-the reference implementation but is <strong>not part of any released format
-version</strong>, is reachable only by declaring a version the implementation
-does not advertise, and its eventual version number is unsettled. Five
-namespaces are defined there so far: <code>ucum</code> <span>[<a href="#UCUM" class="cite xref">UCUM</a>]</span>, <code>unece</code> <span>[<a href="#UNECE20" class="cite xref">UNECE20</a>]</span>,
-<code>qudt</code> and <code>qudt-qk</code> <span>[<a href="#QUDT" class="cite xref">QUDT</a>]</span>, and <code>udunits</code> <span>[<a href="#UDUNITS" class="cite xref">UDUNITS</a>]</span>.<a href="#section-8.6-1" class="pilcrow">¶</a></p>
-<p id="section-8.6-2">It is mentioned here only so that implementers encountering it in
-<span>[<a href="#BOVNAR-SPEC" class="cite xref">BOVNAR-SPEC</a>]</span> know its status. It is not specified by this document,
-and a consumer conforming to this document <span class="bcp14">MUST</span> treat <code>namespace:code</code> in
-unit position as <code>error_unit_illegal</code>, which is what a version 1.0 or 1.1
-consumer does.<a href="#section-8.6-2" class="pilcrow">¶</a></p>
+<p id="section-8.6-1">Format version 1.2 adds a facility for expressing a unit in a foreign
+notation, written <code>namespace:code</code>:<a href="#section-8.6-1" class="pilcrow">¶</a></p>
+<div class="alignLeft art-text artwork" id="section-8.6-2">
+<pre>
+#!bovnar 1.2
+.systolic = &lt;float:64,ucum:mm[Hg]&gt; 120.0;
+</pre><a href="#section-8.6-2" class="pilcrow">¶</a>
+</div>
+<p id="section-8.6-3">Seven namespaces are defined: <code>ucum</code> <span>[<a href="#UCUM" class="cite xref">UCUM</a>]</span>, <code>unece</code> <span>[<a href="#UNECE20" class="cite xref">UNECE20</a>]</span>,
+<code>qudt</code> and <code>qudt-qk</code> <span>[<a href="#QUDT" class="cite xref">QUDT</a>]</span>, <code>udunits</code> <span>[<a href="#UDUNITS" class="cite xref">UDUNITS</a>]</span>, <code>om</code> <span>[<a href="#OM2" class="cite xref">OM2</a>]</span> and
+<code>cf</code> <span>[<a href="#CF" class="cite xref">CF</a>]</span>. A code is translated, when the document is parsed, into the
+unit a native spelling of the same quantity produces, so the facility
+adds spellings and no values: every rule of this document applies to the
+result unchanged.<a href="#section-8.6-3" class="pilcrow">¶</a></p>
+<p id="section-8.6-4"><strong>The facility is specified by <span>[<a href="#BOVNAR-SPEC" class="cite xref">BOVNAR-SPEC</a>]</span> Section 11.9 and its
+companion on unit profiles, not by this document.</strong> Its translation
+tables restate other publishers' vocabularies and are revised as those
+vocabularies are, which is not a cadence this document can follow. What
+this document fixes is the boundary, so that a consumer implementing it
+alone behaves predictably:<a href="#section-8.6-4" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-8.6-5.1">
+            <p id="section-8.6-5.1.1">In a document that declares less than 1.2, or declares nothing,
+<code>namespace:code</code> in unit position is <code>error_unit_illegal</code>. In those
+versions it is not a unit.<a href="#section-8.6-5.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-8.6-5.2">
+            <p id="section-8.6-5.2.1">In a document that declares 1.2 or newer, a consumer that does not
+implement a namespace <span class="bcp14">MUST</span> reject it as <code>error_unit_profile_unknown</code>
+(49), and <span class="bcp14">MUST NOT</span> pass the code through uninterpreted. A consumer that
+implements none of them rejects every such unit that way.<a href="#section-8.6-5.2.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-8.6-5.3">
+            <p id="section-8.6-5.3.1">A consumer that does implement a namespace either translates the code
+into a unit of <a href="#units" class="auto internal xref">Section 8</a> or rejects it: <code>error_unit_illegal</code> for a code
+the vocabulary does not define, <code>error_unit_profile_unsupported</code> (50)
+for one it defines and this unit system cannot represent. There is no
+third outcome in which a value carries a unit the consumer cannot
+reason about.<a href="#section-8.6-5.3.1" class="pilcrow">¶</a></p>
+</li>
+        </ul>
 </section>
 </div>
 </section>
@@ -4940,7 +4979,7 @@ may reveal more about a system than the value does.<a href="#section-15.12-2" cl
 <dd class="break"></dd>
 <dt id="BOVNAR-SPEC">[BOVNAR-SPEC]</dt>
         <dd>
-<span class="refAuthor">Sonntag, J.</span>, <span class="refTitle">"Bovnar - Specification, version 1.1"</span>, <time datetime="2026" class="refDate">2026</time>, <span>&lt;<a href="https://www.bovnar.io/doc/03_bovnar_spec.md">https://www.bovnar.io/doc/03_bovnar_spec.md</a>&gt;</span>. </dd>
+<span class="refAuthor">Sonntag, J.</span>, <span class="refTitle">"Bovnar - Specification, version 1.2"</span>, <time datetime="2026" class="refDate">2026</time>, <span>&lt;<a href="https://www.bovnar.io/doc/03_bovnar_spec.md">https://www.bovnar.io/doc/03_bovnar_spec.md</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="CF">[CF]</dt>
         <dd>
@@ -4953,6 +4992,10 @@ may reveal more about a system than the value does.<a href="#section-15.12-2" cl
 <dt id="MCO">[MCO]</dt>
         <dd>
 <span class="refAuthor">NASA</span>, <span class="refTitle">"Mars Climate Orbiter Mishap Investigation Board Phase I Report"</span>, <time datetime="1999-11-10" class="refDate">10 November 1999</time>. </dd>
+<dd class="break"></dd>
+<dt id="OM2">[OM2]</dt>
+        <dd>
+<span class="refAuthor">Wageningen University and Research</span>, <span class="refTitle">"Ontology of units of Measure (OM) 2"</span>, <span>n.d.</span>, <span>&lt;<a href="https://github.com/HajoRijgersberg/OM">https://github.com/HajoRijgersberg/OM</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="QUDT">[QUDT]</dt>
         <dd>
@@ -5158,7 +5201,7 @@ that satisfies the production and is absent from the registry is
 <code>error_unit_illegal</code>, which is the ordinary case of the ABNF being
 necessary and not sufficient (<a href="#grammar-notation" class="auto internal xref">Section 2.3</a>). The prefix sets, by
 contrast, are closed and are enumerated here in full.<a href="#appendix-A-4" class="pilcrow">¶</a></p>
-<div class="lang-abnf sourcecode" id="appendix-A-5">
+<div class="breakable lang-abnf sourcecode" id="appendix-A-5">
 <pre>
 ; resolved-unit is the entry point of the UNIT sub-grammar: the text a
 ; unit-param or an inline-unit carries must parse as one of these. It is
@@ -5276,10 +5319,9 @@ under a policy it was configured with. Not a defect in the document.<a href="#ap
         <dd class="break"></dd>
 <dt id="appendix-B-3.13">U:</dt>
         <dd style="margin-left: 1.5em" id="appendix-B-3.14">
-          <p id="appendix-B-3.14.1"><strong>Unallocated here.</strong> The value is taken by the unit-profile facility,
-which is not part of any released format version and is not specified by
-this document (<a href="#unit-profiles" class="auto internal xref">Section 8.6</a>). The values are listed so that a future
-code is not assigned on top of them.<a href="#appendix-B-3.14.1" class="pilcrow">¶</a></p>
+          <p id="appendix-B-3.14.1"><strong>Unit profile.</strong> Raised by the unit-profile facility of format version
+1.2, whose boundary this document fixes and whose content it does not
+specify (<a href="#unit-profiles" class="auto internal xref">Section 8.6</a>).<a href="#appendix-B-3.14.1" class="pilcrow">¶</a></p>
 </dd>
       <dd class="break"></dd>
 </dl>
@@ -5688,21 +5730,22 @@ it is how a consumer whose pipeline normalizes line endings declines the
 document at the door instead of discovering the damage downstream.<a href="#appendix-B-8" class="pilcrow">¶</a></p>
 <p id="appendix-B-9"><code>error_type_param_whitespace</code> (52) is raised for whitespace inside a
 type-annotation parameter. The grammar of <a href="#collected-abnf" class="auto internal xref">Appendix A</a> places every
-<code>ws</code> in <code>type-ann</code> beside a separator — after <code>family</code>, either side of
-the <code>:</code> that introduces <code>param-list</code> or of a <code>,</code> between parameters,
-and before the closing <code>&gt;</code> — and derives none inside a <code>param</code>. A
-consumer that skips whitespace uniformly within an annotation instead of at
-those positions silently concatenates a split parameter, which yields a
+<code>ws</code> in <code>type-ann</code> beside a separator - after <code>family</code>, either side of the
+<code>:</code> that introduces <code>param-list</code> or of a <code>,</code> between parameters, and
+before the closing <code>&gt;</code> - and derives none inside a <code>param</code>. A consumer
+that skips whitespace uniformly within an annotation instead of at those
+positions silently concatenates a split parameter, which yields a
 different type or a different unit rather than an error: <code>&lt;uint:6 4&gt;</code>
 becomes a 64-bit width, <code>&lt;float:64,k g&gt;</code> becomes the kilogram, and the
 space-multiplied UDUNITS spelling <code>m s-1</code> becomes <code>ms-1</code>, a reciprocal
 millisecond. Reporting code 52 at the first octet after the whitespace is
 therefore a requirement of this document and not a lexical nicety.<a href="#appendix-B-9" class="pilcrow">¶</a></p>
-<p id="appendix-B-10">The unit-profile facility of this appendix, which this document does not
-specify, admits whitespace inside a parameter that carries a profile namespace,
-where it is part of the foreign code rather than a separator. A consumer that
-implements no profile never reaches that case: with no namespace to recognise,
-every parameter is a native one and code 52 applies throughout.<a href="#appendix-B-10" class="pilcrow">¶</a></p>
+<p id="appendix-B-10">The unit-profile facility of <a href="#error-codes" class="auto internal xref">Appendix B</a>, which this document does not
+specify, admits whitespace inside a parameter that carries a profile
+namespace, where it is part of the foreign code rather than a separator. A
+consumer that implements no profile never reaches that case: with no
+namespace to recognise, every parameter is a native one and code 52 applies
+throughout.<a href="#appendix-B-10" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="examples">

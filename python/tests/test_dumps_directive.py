@@ -32,7 +32,7 @@ from bovnar.exceptions import BovnarArgumentError
 
 
 def test_quantity_rejects_non_spec_vtype():
-    """The Quantity constructor VALIDATES vtype (since 1.2).
+    """The Quantity constructor VALIDATES vtype (since 2.0).
 
     It used to accept anything and store it, so Quantity("1", "not-a-vtype")
     constructed happily and every consumer of .vtype had to defend itself

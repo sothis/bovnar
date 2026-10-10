@@ -1,6 +1,6 @@
 # Bovnar — Tutorial
 
-> **Spec version:** 1.1
+> **Spec version:** 1.2
 > **Status:** Non-normative — a guided, example-driven introduction
 > **Scope:** Writing and reading Bovnar documents by hand: types, units, arrays, structs, references, and the event model.
 
@@ -23,7 +23,7 @@
     - 6.3 [Compound Units](#63-compound-units)
     - 6.4 [Explicitly Dimensionless: `no_unit`](#64-explicitly-dimensionless-no_unit)
     - 6.5 [Inline Unit Suffix](#65-inline-unit-suffix)
-    - 6.6 [Units From Another Vocabulary (under implementation)](#66-units-from-another-vocabulary-under-implementation)
+    - 6.6 [Units From Another Vocabulary (spec 1.2)](#66-units-from-another-vocabulary-spec-12)
 7. [Fixed-Point Numbers: `float_fix`](#7-fixed-point-numbers-float_fix)
 8. [Decimal Floating-Point: `float_dec`](#8-decimal-floating-point-float_dec)
 9. [Strings](#9-strings)
@@ -388,9 +388,9 @@ If a type annotation also specifies a unit and you additionally write an inline 
 
 **The inline unit suffix is completely forbidden inside array elements.** This is a lexer-level restriction, not a semantic one — any letter or underscore following a value token inside `[…]` is an immediate hard error.
 
-### 6.6 Units From Another Vocabulary (under implementation)
+### 6.6 Units From Another Vocabulary (spec 1.2)
 
-> **Under implementation.** This notation is not part of a released specification. A document reaches it only by declaring `#!bovnar 1.2`; under 1.1, or with no directive, every unit below is `error_unit_illegal`.
+> **Spec 1.2.** A document reaches this notation only by declaring `#!bovnar 1.2`; under 1.1, or with no directive, every unit below is `error_unit_illegal`.
 
 Data rarely starts out in Bovnar. A lab system hands you UCUM codes, an invoice carries UN/ECE codes, a netCDF file has UDUNITS strings. You do not have to translate them by hand: write `namespace:code` in the unit slot and the parser translates it.
 
@@ -1085,4 +1085,4 @@ nan  inf  ninf
 
 ---
 
-*End of Bovnar — Tutorial (Bovnar spec 1.1).*
+*End of Bovnar — Tutorial (Bovnar spec 1.2).*

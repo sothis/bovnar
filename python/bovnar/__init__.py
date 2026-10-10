@@ -114,7 +114,7 @@ __all__ = [
     'MAX_FILESIZE_BYTES',
 ]
 
-__version__ = '1.2.0'
+__version__ = '2.0.0'
 
 
 def version() -> str:

@@ -1,13 +1,31 @@
 # Changelog
 
 All notable changes to Bovnar are recorded here. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning is **semantic
-versioning of the format (spec)**; the reference implementation
-(`BVNR_VERSION_STRING`, `bovnar.__version__`, the CMake project version) tracks
-it in lockstep. The highest spec a build understands is reported by
-`bvnr_spec_version()` / `BVNR_SPEC_VERSION_MAJOR`·`MINOR`.
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The headings are
+versions of the **reference implementation** (`BVNR_VERSION_STRING`,
+`bovnar.__version__`, the CMake project version), under semantic versioning: its
+major moves when a program built against it has to change. The **format** is
+versioned separately, also semantically, and each release says which spec it
+implements; the highest spec a build understands is reported by
+`bvnr_spec_version()` / `BVNR_SPEC_VERSION_MAJOR`·`MINOR`. Through 1.1.0 the two
+numbers were the same. They part at 2.0.0, which breaks the ABI and the Python
+API and implements spec 1.2.
 
-## [Unreleased]
+## [2.0.0] - 2026-10-10
+
+**Library 2.0.0, implementing spec 1.2.** The major is for the library: the ABI
+breaks (SOVERSION 2) and so does the Python API. **The format does not break** —
+it is spec 1.2, additive over 1.1, and a document is versioned by its `#!bovnar`
+directive, which stays in the 1.x line.
+
+Spec 1.2 adds the unit-profile notation — a unit written in UCUM, UN/ECE,
+QUDT, UDUNITS-2, OM 2 or as a CF standard name — which a document opts in to
+with `#!bovnar 1.2`, exactly as 1.1's constructs need `#!bovnar 1.1`. Everything
+else in this release is the reference implementation: a read-time unit policy
+and lossless conversion, a much larger native unit registry, and the corrections
+a long review of the unit subsystem turned up. See
+[`RELEASE_NOTES_v2.0.0.md`](RELEASE_NOTES_v2.0.0.md) for the summary; what
+follows is the record.
 
 The on-the-wire format grows only additively *except in one place*: the unit
 parser accepts one new input spelling (the compact prefix form, below), the
@@ -39,7 +57,7 @@ syntax highlighter.
 - `examples/unit_profiles.bvnr` spells a unit in each of the seven namespaces
   and runs through the same events / validate / idempotent gates as the other
   examples (registered only in a build that carries every profile).
-- doc/01 §6.6 introduces it, still marked under implementation; the Python
+- doc/01 §6.6 introduces it; the Python
   README shows the typed round trip.
 - The web, vim, VS Code and Sublime highlighters colour `namespace:code` as one
   unit. Before, `ucum:10*3/uL{WBC}` had its `10` and `3` coloured as bit-widths
@@ -2877,7 +2895,7 @@ Also fixed:
 
 ### Changed — BREAKING (Python bindings)
 
-The Python package is **1.2.0** and two of its API shapes changed. Both were
+The Python package is **2.0.0** and two of its API shapes changed. Both were
 defects the review named, and neither could be fixed additively.
 
 - **`Quantity.unit` is now a `Unit` object, not a raw `ValueUnit`.** The struct
@@ -2930,13 +2948,12 @@ defects the review named, and neither could be fixed additively.
   On the CLI for `validate` and `events`; `query` refuses the option rather than
   ignoring it, since that path goes through the DOM, which takes no read flags.
 
-- **A unit notation under implementation** (`ucum:`, `unece:`, `qudt:`,
-  `qudt-qk:`, `udunits:` — below). It is **not** a new
-  specification version: `BVNR_SPEC_VERSION_MINOR` is unchanged and
-  `bovnar version` still reports spec 1.1. A document reaches the notation only
-  by opting in to a version this build does not advertise, which keeps it out of
-  every document that does not ask for it and leaves the number it will finally
-  ship under open.
+- **A unit notation, and with it spec 1.2** (`ucum:`, `unece:`, `qudt:`,
+  `qudt-qk:`, `udunits:` — below; `om:` and `cf:` further up). While it was
+  being built the notation was reachable only by declaring a version the build
+  did not advertise, which kept it out of every document that did not ask for
+  it. This release advertises that version: `BVNR_SPEC_VERSION_MINOR` is 2 and
+  `bovnar version` reports spec 1.2.
 
 - **The UCUM unit profile** — `ucum:<code>` in a unit slot, translated at parse
   time into the same `value_unit_t` a native spelling produces, so nothing
@@ -4357,7 +4374,7 @@ arrays (including the homogeneity rules), structs, octet streams, references,
 and the error-code values. See [`RELEASE_NOTES_v1.0.0.md`](RELEASE_NOTES_v1.0.0.md)
 for the full notes.
 
-[Unreleased]: https://github.com/sothis/bovnar/compare/v1.1.0...HEAD
+[2.0.0]: https://github.com/sothis/bovnar/releases/tag/v2.0.0
 [1.1.0]: https://github.com/sothis/bovnar/releases/tag/v1.1.0
 [1.0.1]: https://github.com/sothis/bovnar/releases/tag/v1.0.1
 [1.0.0]: https://github.com/sothis/bovnar/releases/tag/v1.0.0

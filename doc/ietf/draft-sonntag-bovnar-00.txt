@@ -3,9 +3,9 @@
 
 
 Independent Submission                                        J. Sonntag
-Internet-Draft                                              28 July 2026
+Internet-Draft                                           10 October 2026
 Intended status: Informational                                          
-Expires: 29 January 2027
+Expires: 13 April 2027
 
 
             The Bovnar (BVNR) Unit-Safe Serialization Format
@@ -53,9 +53,9 @@ Status of This Memo
 
 
 
-Sonntag                  Expires 29 January 2027                [Page 1]
+Sonntag                   Expires 13 April 2027                 [Page 1]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    Internet-Drafts are draft documents valid for a maximum of six months
@@ -63,7 +63,7 @@ Internet-Draft              The Bovnar Format                  July 2026
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 29 January 2027.
+   This Internet-Draft will expire on 13 April 2027.
 
 Copyright Notice
 
@@ -109,9 +109,9 @@ Table of Contents
 
 
 
-Sonntag                  Expires 29 January 2027                [Page 2]
+Sonntag                   Expires 13 April 2027                 [Page 2]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
      7.2.  Type Families . . . . . . . . . . . . . . . . . . . . . .  20
@@ -131,67 +131,67 @@ Internet-Draft              The Bovnar Format                  July 2026
      8.4.  Currency  . . . . . . . . . . . . . . . . . . . . . . . .  29
      8.5.  Inline Unit Suffix  . . . . . . . . . . . . . . . . . . .  30
        8.5.1.  Interaction With the Annotation . . . . . . . . . . .  31
-     8.6.  Unit Profiles . . . . . . . . . . . . . . . . . . . . . .  31
+     8.6.  Unit Profiles . . . . . . . . . . . . . . . . . . . . . .  32
    9.  Composite Values  . . . . . . . . . . . . . . . . . . . . . .  32
      9.1.  Arrays  . . . . . . . . . . . . . . . . . . . . . . . . .  32
-       9.1.1.  Element Homogeneity . . . . . . . . . . . . . . . . .  32
-     9.2.  Structs . . . . . . . . . . . . . . . . . . . . . . . . .  33
+       9.1.1.  Element Homogeneity . . . . . . . . . . . . . . . . .  33
+     9.2.  Structs . . . . . . . . . . . . . . . . . . . . . . . . .  34
      9.3.  Octet Streams . . . . . . . . . . . . . . . . . . . . . .  34
-   10. Validation, Limits, and Errors  . . . . . . . . . . . . . . .  34
-     10.1.  Limits . . . . . . . . . . . . . . . . . . . . . . . . .  34
-     10.2.  Error Model  . . . . . . . . . . . . . . . . . . . . . .  36
-     10.3.  Error Recovery . . . . . . . . . . . . . . . . . . . . .  37
-       10.3.1.  What the Two Counters Mean . . . . . . . . . . . . .  38
-   11. Conformance . . . . . . . . . . . . . . . . . . . . . . . . .  38
-     11.1.  Producers  . . . . . . . . . . . . . . . . . . . . . . .  38
-     11.2.  Tiers  . . . . . . . . . . . . . . . . . . . . . . . . .  39
-     11.3.  Test Corpus  . . . . . . . . . . . . . . . . . . . . . .  41
-     11.4.  Version Stability  . . . . . . . . . . . . . . . . . . .  41
-   12. Interoperability Considerations . . . . . . . . . . . . . . .  42
-     12.1.  Transport  . . . . . . . . . . . . . . . . . . . . . . .  42
-     12.2.  Comparison and Signing . . . . . . . . . . . . . . . . .  42
-     12.3.  Mapping To and From JSON . . . . . . . . . . . . . . . .  43
-     12.4.  File Naming and Detection  . . . . . . . . . . . . . . .  44
-   13. Media Type Registration . . . . . . . . . . . . . . . . . . .  44
-   14. IANA Considerations . . . . . . . . . . . . . . . . . . . . .  45
-     14.1.  Corrections to the Existing Registration . . . . . . . .  46
-     14.2.  Open Registration Questions  . . . . . . . . . . . . . .  47
-   15. Security Considerations . . . . . . . . . . . . . . . . . . .  48
-     15.1.  Resource Exhaustion  . . . . . . . . . . . . . . . . . .  48
-     15.2.  Parser Differentials Between Tiers . . . . . . . . . . .  49
-     15.3.  Recovery Mode Silently Discards Data . . . . . . . . . .  49
-     15.4.  Version Leniency . . . . . . . . . . . . . . . . . . . .  50
-     15.5.  Transport Corruption of Octet Streams  . . . . . . . . .  50
+   10. Validation, Limits, and Errors  . . . . . . . . . . . . . . .  35
+     10.1.  Limits . . . . . . . . . . . . . . . . . . . . . . . . .  35
+     10.2.  Error Model  . . . . . . . . . . . . . . . . . . . . . .  37
+     10.3.  Error Recovery . . . . . . . . . . . . . . . . . . . . .  38
+       10.3.1.  What the Two Counters Mean . . . . . . . . . . . . .  39
+   11. Conformance . . . . . . . . . . . . . . . . . . . . . . . . .  39
+     11.1.  Producers  . . . . . . . . . . . . . . . . . . . . . . .  39
+     11.2.  Tiers  . . . . . . . . . . . . . . . . . . . . . . . . .  40
+     11.3.  Test Corpus  . . . . . . . . . . . . . . . . . . . . . .  42
+     11.4.  Version Stability  . . . . . . . . . . . . . . . . . . .  42
+   12. Interoperability Considerations . . . . . . . . . . . . . . .  43
+     12.1.  Transport  . . . . . . . . . . . . . . . . . . . . . . .  43
+     12.2.  Comparison and Signing . . . . . . . . . . . . . . . . .  43
+     12.3.  Mapping To and From JSON . . . . . . . . . . . . . . . .  44
+     12.4.  File Naming and Detection  . . . . . . . . . . . . . . .  45
+   13. Media Type Registration . . . . . . . . . . . . . . . . . . .  45
+   14. IANA Considerations . . . . . . . . . . . . . . . . . . . . .  46
+     14.1.  Corrections to the Existing Registration . . . . . . . .  47
+     14.2.  Open Registration Questions  . . . . . . . . . . . . . .  48
+   15. Security Considerations . . . . . . . . . . . . . . . . . . .  49
+     15.1.  Resource Exhaustion  . . . . . . . . . . . . . . . . . .  49
+     15.2.  Parser Differentials Between Tiers . . . . . . . . . . .  50
+     15.3.  Recovery Mode Silently Discards Data . . . . . . . . . .  50
+     15.4.  Version Leniency . . . . . . . . . . . . . . . . . . . .  51
+     15.5.  Transport Corruption of Octet Streams  . . . . . . . . .  51
 
 
 
-Sonntag                  Expires 29 January 2027                [Page 3]
+Sonntag                   Expires 13 April 2027                 [Page 3]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
-     15.6.  Reference Resolution . . . . . . . . . . . . . . . . . .  51
-     15.7.  Numeric Interpretation . . . . . . . . . . . . . . . . .  51
-     15.8.  Units Are Validated, Not Verified  . . . . . . . . . . .  52
-     15.9.  Leap-Second Table Drift  . . . . . . . . . . . . . . . .  52
-     15.10. Confusable and Non-Normalized Keys . . . . . . . . . . .  53
-     15.11. No Confidentiality, Integrity, or Authenticity . . . . .  53
-     15.12. Information Disclosure . . . . . . . . . . . . . . . . .  53
-   16. References  . . . . . . . . . . . . . . . . . . . . . . . . .  53
-     16.1.  Normative References . . . . . . . . . . . . . . . . . .  54
-     16.2.  Informative References . . . . . . . . . . . . . . . . .  55
-   Appendix A.  Collected ABNF . . . . . . . . . . . . . . . . . . .  56
-   Appendix B.  Error Codes  . . . . . . . . . . . . . . . . . . . .  61
-   Appendix C.  Examples . . . . . . . . . . . . . . . . . . . . . .  64
-     C.1.  Configuration . . . . . . . . . . . . . . . . . . . . . .  64
-     C.2.  Instrument Record . . . . . . . . . . . . . . . . . . . .  64
-     C.3.  Unit Safety . . . . . . . . . . . . . . . . . . . . . . .  65
-     C.4.  Compound Units  . . . . . . . . . . . . . . . . . . . . .  65
-     C.5.  Arrays  . . . . . . . . . . . . . . . . . . . . . . . . .  65
-     C.6.  References  . . . . . . . . . . . . . . . . . . . . . . .  66
-   Appendix D.  Design Rationale . . . . . . . . . . . . . . . . . .  66
-   Acknowledgments . . . . . . . . . . . . . . . . . . . . . . . . .  68
-   Author's Address  . . . . . . . . . . . . . . . . . . . . . . . .  68
+     15.6.  Reference Resolution . . . . . . . . . . . . . . . . . .  52
+     15.7.  Numeric Interpretation . . . . . . . . . . . . . . . . .  52
+     15.8.  Units Are Validated, Not Verified  . . . . . . . . . . .  53
+     15.9.  Leap-Second Table Drift  . . . . . . . . . . . . . . . .  53
+     15.10. Confusable and Non-Normalized Keys . . . . . . . . . . .  54
+     15.11. No Confidentiality, Integrity, or Authenticity . . . . .  54
+     15.12. Information Disclosure . . . . . . . . . . . . . . . . .  54
+   16. References  . . . . . . . . . . . . . . . . . . . . . . . . .  54
+     16.1.  Normative References . . . . . . . . . . . . . . . . . .  55
+     16.2.  Informative References . . . . . . . . . . . . . . . . .  56
+   Appendix A.  Collected ABNF . . . . . . . . . . . . . . . . . . .  57
+   Appendix B.  Error Codes  . . . . . . . . . . . . . . . . . . . .  62
+   Appendix C.  Examples . . . . . . . . . . . . . . . . . . . . . .  66
+     C.1.  Configuration . . . . . . . . . . . . . . . . . . . . . .  66
+     C.2.  Instrument Record . . . . . . . . . . . . . . . . . . . .  66
+     C.3.  Unit Safety . . . . . . . . . . . . . . . . . . . . . . .  67
+     C.4.  Compound Units  . . . . . . . . . . . . . . . . . . . . .  67
+     C.5.  Arrays  . . . . . . . . . . . . . . . . . . . . . . . . .  67
+     C.6.  References  . . . . . . . . . . . . . . . . . . . . . . .  67
+   Appendix D.  Design Rationale . . . . . . . . . . . . . . . . . .  67
+   Acknowledgments . . . . . . . . . . . . . . . . . . . . . . . . .  69
+   Author's Address  . . . . . . . . . . . . . . . . . . . . . . . .  69
 
 1.  Introduction
 
@@ -221,9 +221,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027                [Page 4]
+Sonntag                   Expires 13 April 2027                 [Page 4]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    #!bovnar 1.1
@@ -255,10 +255,10 @@ Internet-Draft              The Bovnar Format                  July 2026
    *  Against *UCUM* [UCUM] and *CF* [CF], which standardize unit
       _notation_ for use inside some other format, it specifies the
       container as well, so that the unit is enforced by the parser
-      rather than by a downstream convention.  A facility for writing a
-      unit in UCUM and other foreign notations exists in the reference
-      implementation but is not part of the format this document
-      specifies; see Section 8.6.
+      rather than by a downstream convention.  Format version 1.2 adds a
+      facility for writing a unit in UCUM and other foreign notations;
+      it is specified by [BOVNAR-SPEC] and not by this document; see
+      Section 8.6.
 
    *  Against *schema languages*, it is schema-free.  The description
       travels with each value rather than in a separate artifact that
@@ -277,9 +277,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027                [Page 5]
+Sonntag                   Expires 13 April 2027                 [Page 5]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    *  the character encoding and byte classes of a Bovnar document
@@ -317,25 +317,25 @@ Internet-Draft              The Bovnar Format                  July 2026
    The normative project specification for the format is [BOVNAR-SPEC],
    with the unit registry in [BOVNAR-UNITS] and a grammar in ISO/IEC
    14977 [ISO14977] EBNF in [BOVNAR-EBNF].  This document is a
-   restatement of format version 1.1 of that specification in IETF
+   restatement of format version 1.2 of that specification in IETF
    conventions, with the grammar translated into ABNF and with the media
    type, security, and interoperability analysis that publication as an
    RFC requires.
 
    Where this document and [BOVNAR-SPEC] disagree on a point of format
-   version 1.1, that is a defect in one of them and should be reported.
-   This document deliberately omits material from [BOVNAR-SPEC] that
-   describes the reference implementation rather than the format: event
-   callbacks, C types, internal representations, and API entry points.
-   It also excludes [BOVNAR-SPEC] Section 11.9 (unit profiles), which is
-   not part of any released format version; see Section 8.6.
+   version 1.2 that both specify, that is a defect in one of them and
+   should be reported.  This document deliberately omits material from
+   [BOVNAR-SPEC] that describes the reference implementation rather than
+   the format: event callbacks, C types, internal representations, and
+   API entry points.  It also excludes [BOVNAR-SPEC] Section 11.9 (unit
+   profiles), the one version 1.2 facility this document names without
+   specifying; see Section 8.6.
 
 
 
-
-Sonntag                  Expires 29 January 2027                [Page 6]
+Sonntag                   Expires 13 April 2027                 [Page 6]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
 2.  Conventions and Definitions
@@ -389,9 +389,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027                [Page 7]
+Sonntag                   Expires 13 April 2027                 [Page 7]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
       of the whole document.  See Section 11.
@@ -445,9 +445,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027                [Page 8]
+Sonntag                   Expires 13 April 2027                 [Page 8]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    *  *Datetime literal field ranges and epoch compatibility*
@@ -501,9 +501,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027                [Page 9]
+Sonntag                   Expires 13 April 2027                 [Page 9]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    stream       = [ BOM ] *blank [ version-decl ] ws *( assignment ws )
@@ -557,9 +557,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 10]
+Sonntag                   Expires 13 April 2027                [Page 10]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    This document does not require any Unicode normalization form.  Two
@@ -613,9 +613,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 11]
+Sonntag                   Expires 13 April 2027                [Page 11]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    +==================+========================+======================+
@@ -669,9 +669,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 12]
+Sonntag                   Expires 13 April 2027                [Page 12]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    version-decl = "#" %s"!bovnar" 1*hspace version-int "." version-int
@@ -725,9 +725,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 13]
+Sonntag                   Expires 13 April 2027                [Page 13]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
 6.  Lexical Structure
@@ -781,9 +781,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 14]
+Sonntag                   Expires 13 April 2027                [Page 14]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    The escapes \t, \n, \v, \f, \r, \", and \\ denote HTAB, LF, VT, FF,
@@ -837,9 +837,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 15]
+Sonntag                   Expires 13 April 2027                [Page 15]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    Eight exact spellings are reserved and are not symbols:
@@ -893,9 +893,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 16]
+Sonntag                   Expires 13 April 2027                [Page 16]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    *  Cycles are not detected. .a = &.b; .b = &.a; is a valid document.
@@ -949,9 +949,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 17]
+Sonntag                   Expires 13 April 2027                [Page 17]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    .hexfloat = <float:64,_16> "1.8p+2";   # 1.8(16) x 2^2 = 6.0
@@ -1005,9 +1005,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 18]
+Sonntag                   Expires 13 April 2027                [Page 18]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    A :60 at an instant that the implementation's leap-second table does
@@ -1061,9 +1061,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 19]
+Sonntag                   Expires 13 April 2027                [Page 19]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    An annotation MUST appear in one of four positions, always before the
@@ -1117,9 +1117,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 20]
+Sonntag                   Expires 13 April 2027                [Page 20]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
 7.2.1.  Value Compatibility
@@ -1173,9 +1173,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 21]
+Sonntag                   Expires 13 April 2027                [Page 21]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
 7.3.  Parameters
@@ -1229,9 +1229,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 22]
+Sonntag                   Expires 13 April 2027                [Page 22]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    *  uint and sint accept bases 2 through 62.
@@ -1285,9 +1285,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 23]
+Sonntag                   Expires 13 April 2027                [Page 23]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
                       +=======+====================+
@@ -1341,9 +1341,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 24]
+Sonntag                   Expires 13 April 2027                [Page 24]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
 7.4.  Default Type Synthesis
@@ -1397,9 +1397,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 25]
+Sonntag                   Expires 13 April 2027                [Page 25]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    That reference is *normative*, and it is the one point at which this
@@ -1453,9 +1453,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 26]
+Sonntag                   Expires 13 April 2027                [Page 26]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    This is the _semantic_ grammar of a resolved unit, applied to the
@@ -1474,10 +1474,10 @@ Internet-Draft              The Bovnar Format                  July 2026
 
    *Division latches.* The first / moves every subsequent factor at that
    level into the denominator; further / separators never toggle back.
-   m/s/s therefore has the dimensions of m·s⁻², not of m.  It is not
-   the SAME unit as m·s⁻²: repeated bases are not merged, so m/s/s
-   carries s⁻¹ twice where m·s⁻² carries s⁻² once, and the two compare
-   unequal while converting with factor 1.
+   m/s/s therefore has the dimensions of m·s⁻², not of m.  It is not the
+   SAME unit as m·s⁻²: repeated bases are not merged, so m/s/s carries
+   s⁻¹ twice where m·s⁻² carries s⁻² once, and the two compare unequal
+   while converting with factor 1.
 
    *Grouping.* A parenthesised sub-expression is evaluated independently
    and, like any factor, obeys the latching denominator: a / before a
@@ -1490,18 +1490,29 @@ Internet-Draft              The Bovnar Format                  July 2026
    *Exponents* are written either as Unicode superscripts or in ASCII
    caret form:
 
-    +=============+==========+========================================+
-    | Form        | Example  | Notes                                  |
-    +=============+==========+========================================+
-    | Superscript | m², m⁻³, | U+2070, U+00B9, U+00B2, U+00B3,        |
-    |             | m¹⁰⁰     | U+2074-U+2079; sign U+207A (no-op) or  |
-    |             |          | U+207B (negate); one to three digits   |
-    +-------------+----------+----------------------------------------+
-    | Caret       | m^2, m^- | ^[+-]?[0-9]{1,3}                       |
-    |             | 3, m^100 |                                        |
-    +-------------+----------+----------------------------------------+
+    +=============+==========+=======================================+
+    | Form        | Example  | Notes                                 |
+    +=============+==========+=======================================+
+    | Superscript | m², m⁻³, | U+2070, U+00B9, U+00B2, U+00B3,       |
+    |             | m¹⁰⁰     | U+2074-U+2079; sign U+207A (no-op) or |
+    |             |          | U+207B (negate); one to three digits  |
+    +-------------+----------+---------------------------------------+
+    | Caret       | m^2, m^- | ^[+-]?[0-9]{1,3}                      |
+    |             | 3, m^100 |                                       |
+    +-------------+----------+---------------------------------------+
 
-                        Table 8: Unit exponent forms
+                       Table 8: Unit exponent forms
+
+
+
+
+
+
+
+Sonntag                   Expires 13 April 2027                [Page 27]
+
+Internet-Draft              The Bovnar Format               October 2026
+
 
    An exponent is an integer in [-100, 100] (BVN_EXPONENT_MIN,
    BVN_EXPONENT_MAX), with zero reserved: m^0 and m⁰ are not units.  At
@@ -1513,16 +1524,6 @@ Internet-Draft              The Bovnar Format                  July 2026
    error_unit_illegal.  An empty component between separators (m//s,
    m*·s), an empty group, and unbalanced parentheses are likewise
    error_unit_illegal.
-
-
-
-
-
-
-Sonntag                  Expires 29 January 2027               [Page 27]
-
-Internet-Draft              The Bovnar Format                  July 2026
-
 
    no_unit in unit position means explicitly dimensionless.  Omitting
    the unit parameter from an annotation is equivalent, and an
@@ -1556,6 +1557,19 @@ Internet-Draft              The Bovnar Format                  July 2026
    compact spellings are refused by name, because for them the longest-
    suffix rule would silently pick one of two defensible readings:
 
+
+
+
+
+
+
+
+
+Sonntag                   Expires 13 April 2027                [Page 28]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
         +==========+==============================================+
         | Spelling | Refused because                              |
         +==========+==============================================+
@@ -1571,14 +1585,6 @@ Internet-Draft              The Bovnar Format                  July 2026
 
    Which spelling a producer emits depends on what it is doing, and the
    two cases differ:
-
-
-
-
-Sonntag                  Expires 29 January 2027               [Page 28]
-
-Internet-Draft              The Bovnar Format                  July 2026
-
 
    *  A producer *serializing a unit it holds as a value* - one it
       constructed, computed, or decoded, rather than copied from an
@@ -1612,6 +1618,14 @@ Internet-Draft              The Bovnar Format                  July 2026
    without $ is looked up in the physical-unit table and nowhere else.
    A bare USD or CUP is therefore never a currency.
 
+
+
+
+Sonntag                   Expires 13 April 2027                [Page 29]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
    The consequence is that the two namespaces are *disjoint by
    construction*: no currency code can collide with a physical unit
    symbol, present or future.
@@ -1625,16 +1639,6 @@ Internet-Draft              The Bovnar Format                  July 2026
    denomination.  Under the rule above neither is a question: BTU and
    cup are units because they lack the sigil, $CUP is a currency because
    it has one, and bare CUP is error_unit_illegal because it is neither.
-
-
-
-
-
-
-Sonntag                  Expires 29 January 2027               [Page 29]
-
-Internet-Draft              The Bovnar Format                  July 2026
-
 
    .price = 19.99 $USD;                 # inline currency
    .scaled = <float_dec:64,k~$EUR> 250.0;  # thousands of EUR
@@ -1671,6 +1675,13 @@ Internet-Draft              The Bovnar Format                  July 2026
                 / "/" / ":" / "^" / "*" / "~" / "(" / ")" / "'"
                 / "[" / "]" / "{" / "}" / unit-lead / utf8-cont
 
+
+
+Sonntag                   Expires 13 April 2027                [Page 30]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
    The separating blank is mandatory: 9.81 m/s is valid and 9.81m is an
    error.
 
@@ -1679,18 +1690,6 @@ Internet-Draft              The Bovnar Format                  July 2026
    .mass     = 70.0 k~g;
    .storage  = 4 Gi~B;
    .ratio    = 3.14 no_unit;
-
-
-
-
-
-
-
-
-Sonntag                  Expires 29 January 2027               [Page 30]
-
-Internet-Draft              The Bovnar Format                  July 2026
-
 
    *An inline suffix is forbidden inside an array.* Any character that
    could begin one - a letter, _, $, %, (, or a UTF-8 lead octet -
@@ -1728,31 +1727,55 @@ Internet-Draft              The Bovnar Format                  July 2026
 
    An unrecognized unit in either position is error_unit_illegal.
 
+
+
+
+
+
+
+Sonntag                   Expires 13 April 2027                [Page 31]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
 8.6.  Unit Profiles
 
-   A facility for expressing a unit in a foreign notation - written
-   namespace:code - exists in the reference implementation but is *not
-   part of any released format version*, is reachable only by declaring
-   a version the implementation does not advertise, and its eventual
-   version number is unsettled.  Seven namespaces are defined there so
-   far: ucum [UCUM], unece [UNECE20], qudt and qudt-qk [QUDT], udunits
-   [UDUNITS], om [OM2] and cf [CF].
+   Format version 1.2 adds a facility for expressing a unit in a foreign
+   notation, written namespace:code:
 
+   #!bovnar 1.2
+   .systolic = <float:64,ucum:mm[Hg]> 120.0;
 
+   Seven namespaces are defined: ucum [UCUM], unece [UNECE20], qudt and
+   qudt-qk [QUDT], udunits [UDUNITS], om [OM2] and cf [CF].  A code is
+   translated, when the document is parsed, into the unit a native
+   spelling of the same quantity produces, so the facility adds
+   spellings and no values: every rule of this document applies to the
+   result unchanged.
 
+   *The facility is specified by [BOVNAR-SPEC] Section 11.9 and its
+   companion on unit profiles, not by this document.* Its translation
+   tables restate other publishers' vocabularies and are revised as
+   those vocabularies are, which is not a cadence this document can
+   follow.  What this document fixes is the boundary, so that a consumer
+   implementing it alone behaves predictably:
 
+   *  In a document that declares less than 1.2, or declares nothing,
+      namespace:code in unit position is error_unit_illegal.  In those
+      versions it is not a unit.
 
+   *  In a document that declares 1.2 or newer, a consumer that does not
+      implement a namespace MUST reject it as error_unit_profile_unknown
+      (49), and MUST NOT pass the code through uninterpreted.  A
+      consumer that implements none of them rejects every such unit that
+      way.
 
-Sonntag                  Expires 29 January 2027               [Page 31]
-
-Internet-Draft              The Bovnar Format                  July 2026
-
-
-   It is mentioned here only so that implementers encountering it in
-   [BOVNAR-SPEC] know its status.  It is not specified by this document,
-   and a consumer conforming to this document MUST treat namespace:code
-   in unit position as error_unit_illegal, which is what a version 1.0
-   or 1.1 consumer does.
+   *  A consumer that does implement a namespace either translates the
+      code into a unit of Section 8 or rejects it: error_unit_illegal
+      for a code the vocabulary does not define,
+      error_unit_profile_unsupported (50) for one it defines and this
+      unit system cannot represent.  There is no third outcome in which
+      a value carries a unit the consumer cannot reason about.
 
 9.  Composite Values
 
@@ -1762,6 +1785,14 @@ Internet-Draft              The Bovnar Format                  July 2026
    array-row    = "[" ws [ row-content ] ws "]"
    row-content  = array-elem *( ws "," ws array-elem )
    array-elem   = [ type-ann ws ] [ raw-value ]
+
+
+
+
+Sonntag                   Expires 13 April 2027                [Page 32]
+
+Internet-Draft              The Bovnar Format               October 2026
+
 
    An array is one or more bracketed *rows* separated by /. Elements
    within a row are separated by ,.
@@ -1797,13 +1828,6 @@ Internet-Draft              The Bovnar Format                  July 2026
       plain numeric encodings.  Its *epoch is a dimension*, exactly as a
       currency is: a bare array MUST NOT mix epochs.
 
-
-
-Sonntag                  Expires 29 January 2027               [Page 32]
-
-Internet-Draft              The Bovnar Format                  July 2026
-
-
    *  *Rectangularity.* Sibling sub-arrays MUST have equal length and
       recursively matching element shape. [[1,2],[3,4]] is valid;
       [[1,2],[3,4,5]] is error_array_row_size_mismatch.
@@ -1816,6 +1840,15 @@ Internet-Draft              The Bovnar Format                  July 2026
       different unit in each record, and a list field a different length
       - so a multi-currency ledger and per-record argument lists are
       both valid.
+
+
+
+
+
+Sonntag                   Expires 13 April 2027                [Page 33]
+
+Internet-Draft              The Bovnar Format               October 2026
+
 
    *  *Null is a hole.* A null element matches any shape and neither
       establishes nor breaks homogeneity, so [1, , 3] is valid.
@@ -1851,15 +1884,6 @@ Internet-Draft              The Bovnar Format                  July 2026
    given, and a consumer MUST make it available, because Section 9.1.1
    makes key order significant for sibling records.
 
-
-
-
-
-Sonntag                  Expires 29 January 2027               [Page 33]
-
-Internet-Draft              The Bovnar Format                  July 2026
-
-
 9.3.  Octet Streams
 
    A NUL octet where a value is expected switches to binary chunk mode.
@@ -1872,6 +1896,15 @@ Internet-Draft              The Bovnar Format                  July 2026
 
    Any tag octet other than 00 or 01 is error_octet_stream_out_of_sync.
    A chunk that ends prematurely is error_read_complete_chunk_failed.
+
+
+
+
+
+Sonntag                   Expires 13 April 2027                [Page 34]
+
+Internet-Draft              The Bovnar Format               October 2026
+
 
    Note the encoding of the length: a length field of 0x0000 denotes
    *65536 octets, not zero*. This makes the full 16-bit range usable at
@@ -1911,9 +1944,22 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 34]
+
+
+
+
+
+
+
+
+
+
+
+
+
+Sonntag                   Expires 13 April 2027                [Page 35]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
     +==================+=============+===============================+
@@ -1967,9 +2013,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 35]
+Sonntag                   Expires 13 April 2027                [Page 36]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
       +===================+=========+===============================+
@@ -2023,9 +2069,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 36]
+Sonntag                   Expires 13 April 2027                [Page 37]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    The error codes named throughout this document each have a stable
@@ -2079,9 +2125,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 37]
+Sonntag                   Expires 13 April 2027                [Page 38]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    The converse case is worth stating because it is easy to misread: if
@@ -2135,9 +2181,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 38]
+Sonntag                   Expires 13 April 2027                [Page 39]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    *  *emit a version declaration when the document uses any construct
@@ -2191,9 +2237,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 39]
+Sonntag                   Expires 13 April 2027                [Page 40]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    A *materializing consumer* constructs a tree of the whole document.
@@ -2247,9 +2293,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 40]
+Sonntag                   Expires 13 April 2027                [Page 41]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
      +==========================+===================================+
@@ -2303,9 +2349,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 41]
+Sonntag                   Expires 13 April 2027                [Page 42]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    What requires a major revision: anything that could render a valid
@@ -2359,9 +2405,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 42]
+Sonntag                   Expires 13 April 2027                [Page 43]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    *  µ~m and u~m are the same unit.
@@ -2415,9 +2461,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 43]
+Sonntag                   Expires 13 April 2027                [Page 44]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
 12.4.  File Naming and Detection
@@ -2471,9 +2517,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 44]
+Sonntag                   Expires 13 April 2027                [Page 45]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
       Two points bear on interchange specifically: implementations may
@@ -2527,9 +2573,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 45]
+Sonntag                   Expires 13 April 2027                [Page 46]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
 14.1.  Corrections to the Existing Registration
@@ -2583,9 +2629,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 46]
+Sonntag                   Expires 13 April 2027                [Page 47]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
        differential risk between conformance tiers (Section 15.2),
@@ -2639,9 +2685,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 47]
+Sonntag                   Expires 13 April 2027                [Page 48]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    3.  *Structured syntax suffix.* If formats come to be layered on
@@ -2695,9 +2741,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 48]
+Sonntag                   Expires 13 April 2027                [Page 49]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    *  *String concatenation* accumulates toward max_string_length across
@@ -2751,9 +2797,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 49]
+Sonntag                   Expires 13 April 2027                [Page 50]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    Checking the skipped-octet total instead is not sufficient, and the
@@ -2807,9 +2853,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 50]
+Sonntag                   Expires 13 April 2027                [Page 51]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
 15.6.  Reference Resolution
@@ -2863,9 +2909,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 51]
+Sonntag                   Expires 13 April 2027                [Page 52]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
 15.8.  Units Are Validated, Not Verified
@@ -2919,9 +2965,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 52]
+Sonntag                   Expires 13 April 2027                [Page 53]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
 15.10.  Confusable and Non-Normalized Keys
@@ -2975,9 +3021,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 53]
+Sonntag                   Expires 13 April 2027                [Page 54]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
 16.1.  Normative References
@@ -3031,9 +3077,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-Sonntag                  Expires 29 January 2027               [Page 54]
+Sonntag                   Expires 13 April 2027                [Page 55]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC
@@ -3058,7 +3104,7 @@ Internet-Draft              The Bovnar Format                  July 2026
               EBNF)", 2026, <https://www.bovnar.io/doc/12_bovnar.ebnf>.
 
    [BOVNAR-SPEC]
-              Sonntag, J., "Bovnar - Specification, version 1.1", 2026,
+              Sonntag, J., "Bovnar - Specification, version 1.2", 2026,
               <https://www.bovnar.io/doc/03_bovnar_spec.md>.
 
    [CF]       CF Conventions Committee, "NetCDF Climate and Forecast
@@ -3072,8 +3118,8 @@ Internet-Draft              The Bovnar Format                  July 2026
    [MCO]      NASA, "Mars Climate Orbiter Mishap Investigation Board
               Phase I Report", 10 November 1999.
 
-   [OM2]      Wageningen University and Research, "Ontology of units
-              of Measure (OM) 2", n.d.,
+   [OM2]      Wageningen University and Research, "Ontology of units of
+              Measure (OM) 2", n.d.,
               <https://github.com/HajoRijgersberg/OM>.
 
    [QUDT]     QUDT.org, "QUDT - Quantities, Units, Dimensions and Data
@@ -3084,17 +3130,17 @@ Internet-Draft              The Bovnar Format                  July 2026
               RFC 3986, DOI 10.17487/RFC3986, January 2005,
               <https://www.rfc-editor.org/rfc/rfc3986>.
 
+
+
+
+Sonntag                   Expires 13 April 2027                [Page 56]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
    [RFC5198]  Klensin, J. and M. Padlipsky, "Unicode Format for Network
               Interchange", RFC 5198, DOI 10.17487/RFC5198, March 2008,
               <https://www.rfc-editor.org/rfc/rfc5198>.
-
-
-
-
-Sonntag                  Expires 29 January 2027               [Page 55]
-
-Internet-Draft              The Bovnar Format                  July 2026
-
 
    [RFC8259]  Bray, T., Ed., "The JavaScript Object Notation (JSON) Data
               Interchange Format", STD 90, RFC 8259,
@@ -3141,17 +3187,16 @@ Appendix A.  Collected ABNF
 
    ; ---- version declaration ---------------------------------------
 
+
+
+Sonntag                   Expires 13 April 2027                [Page 57]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
    version-decl = "#" %s"!bovnar" 1*hspace version-int "." version-int
                   *hspace [ CR / LF ]
    hspace       = HTAB / SP
-
-
-
-Sonntag                  Expires 29 January 2027               [Page 56]
-
-Internet-Draft              The Bovnar Format                  July 2026
-
-
    version-int  = "0" / ( %x31-39 *DIGIT )
 
    ; ---- whitespace and comments -----------------------------------
@@ -3197,17 +3242,17 @@ Internet-Draft              The Bovnar Format                  July 2026
                 / number
                 / string
                 / symbol
+
+
+
+Sonntag                   Expires 13 April 2027                [Page 58]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
                 / reference
                 / array
                 / struct
-
-
-
-Sonntag                  Expires 29 January 2027               [Page 57]
-
-Internet-Draft              The Bovnar Format                  July 2026
-
-
                 / octet-stream
 
    scalar-with-unit = ( number / string ) ws-req inline-unit
@@ -3253,17 +3298,17 @@ Internet-Draft              The Bovnar Format                  July 2026
    base-param   = "_" 1*DIGIT
    q-param      = %s"q" 1*DIGIT
    epoch-param  = %s"unix" / %s"tai" / %s"gps" / %s"mjd" / %s"ntp"
+
+
+
+Sonntag                   Expires 13 April 2027                [Page 59]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
                 / %s"galileo" / %s"glonass" / %s"y2000" / %s"beidou"
 
    ; unit-param and epoch-param overlap syntactically; they are
-
-
-
-Sonntag                  Expires 29 January 2027               [Page 58]
-
-Internet-Draft              The Bovnar Format                  July 2026
-
-
    ; disambiguated by the type family (see Section 7.3).
    unit-param   = 1*unit-char
    unit-char    = ALPHA / DIGIT / "_" / "$" / "%" / "+" / "-" / "."
@@ -3312,12 +3357,9 @@ Internet-Draft              The Bovnar Format                  July 2026
 
 
 
-
-
-
-Sonntag                  Expires 29 January 2027               [Page 59]
+Sonntag                   Expires 13 April 2027                [Page 60]
 
-Internet-Draft              The Bovnar Format                  July 2026
+Internet-Draft              The Bovnar Format               October 2026
 
 
    ; resolved-unit is the entry point of the UNIT sub-grammar: the text a
@@ -3343,7 +3385,7 @@ Internet-Draft              The Bovnar Format                  July 2026
    base-unit      = 1*base-unit-char
    base-unit-char = ALPHA / DIGIT / "_" / "%"
                   / %xC2.B0                    ; U+00B0 DEGREE SIGN
-               / %xCE.94                    ; U+0394 GREEK CAPITAL DELTA
+                  / %xCE.94                    ; U+0394 GREEK CAPITAL DELTA
                   / %xC3.85 / %xCC.8A          ; U+00C5, U+030A (angstrom)
                   / %xCE.A9 / %xE2.84.A6       ; U+03A9, U+2126 (ohm)
                   / %xE2.84.A7                 ; U+2127 MHO
@@ -3368,24 +3410,25 @@ Internet-Draft              The Bovnar Format                  July 2026
    ; a currency is error_unit_illegal (Section 8.4).
 
    unit-exp      = caret-exp / sup-exp
+
+
+
+Sonntag                   Expires 13 April 2027                [Page 61]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
    caret-exp     = "^" [ "+" / "-" ] 1*3DIGIT
    sup-exp       = [ sup-sign ] 1*3sup-digit
    sup-sign      = %xE2.81.BA / %xE2.81.BB     ; U+207A, U+207B
    sup-digit     = %xE2.81.B0                  ; U+2070 SUPERSCRIPT ZERO
-              / %xC2.B9 / %xC2.B2 / %xC2.B3 ; U+00B9, U+00B2, U+00B3
+                 / %xC2.B9 / %xC2.B2 / %xC2.B3 ; U+00B9, U+00B2, U+00B3
                  / %xE2.81.B4 / %xE2.81.B5 / %xE2.81.B6
                  / %xE2.81.B7 / %xE2.81.B8 / %xE2.81.B9  ; U+2074-U+2079
 
    ; The grammar bounds the SHAPE; the VALUE is bounded by Section 8.2.
    ; An exponent is an integer in [-100, 100] with zero reserved, so of
    ; the three-digit forms only 100 and -100 are units.
-
-
-
-Sonntag                  Expires 29 January 2027               [Page 60]
-
-Internet-Draft              The Bovnar Format                  July 2026
-
 
 Appendix B.  Error Codes
 
@@ -3423,10 +3466,17 @@ Appendix B.  Error Codes
       declined it under a policy it was configured with.  Not a defect
       in the document.
 
-   U:  *Unallocated here.* The value is taken by the unit-profile
-      facility, which is not part of any released format version and is
-      not specified by this document (Section 8.6).  The values are
-      listed so that a future code is not assigned on top of them.
+
+
+
+Sonntag                   Expires 13 April 2027                [Page 62]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
+   U:  *Unit profile.* Raised by the unit-profile facility of format
+      version 1.2, whose boundary this document fixes and whose content
+      it does not specify (Section 8.6).
 
        +=======+==========================================+=======+
        | Value | Name                                     | Class |
@@ -3435,14 +3485,6 @@ Appendix B.  Error Codes
        +-------+------------------------------------------+-------+
        | 1     | error_unknown_token_type                 | D     |
        +-------+------------------------------------------+-------+
-
-
-
-Sonntag                  Expires 29 January 2027               [Page 61]
-
-Internet-Draft              The Bovnar Format                  July 2026
-
-
        | 2     | error_array_row_size_mismatch            | D     |
        +-------+------------------------------------------+-------+
        | 3     | error_identifier_too_long                | D     |
@@ -3480,6 +3522,14 @@ Internet-Draft              The Bovnar Format                  July 2026
        | 19    | error_invalid_utf8_byte                  | D     |
        +-------+------------------------------------------+-------+
        | 20    | error_invalid_byte_order_mark            | D     |
+
+
+
+Sonntag                   Expires 13 April 2027                [Page 63]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
        +-------+------------------------------------------+-------+
        | 21    | error_type_too_long                      | D     |
        +-------+------------------------------------------+-------+
@@ -3491,14 +3541,6 @@ Internet-Draft              The Bovnar Format                  July 2026
        +-------+------------------------------------------+-------+
        | 25    | error_illegal_value_type                 | D     |
        +-------+------------------------------------------+-------+
-
-
-
-Sonntag                  Expires 29 January 2027               [Page 62]
-
-Internet-Draft              The Bovnar Format                  July 2026
-
-
        | 26    | error_scanner_callback_failed            | I     |
        +-------+------------------------------------------+-------+
        | 27    | error_file_too_long                      | D     |
@@ -3536,6 +3578,14 @@ Internet-Draft              The Bovnar Format                  July 2026
        | 43    | error_unsupported_spec_version           | D     |
        +-------+------------------------------------------+-------+
        | 44    | error_invalid_codepoint                  | D     |
+
+
+
+Sonntag                   Expires 13 April 2027                [Page 64]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
        +-------+------------------------------------------+-------+
        | 45    | error_invalid_datetime_literal           | D     |
        +-------+------------------------------------------+-------+
@@ -3547,14 +3597,6 @@ Internet-Draft              The Bovnar Format                  July 2026
        +-------+------------------------------------------+-------+
        | 49    | error_unit_profile_unknown               | U     |
        +-------+------------------------------------------+-------+
-
-
-
-Sonntag                  Expires 29 January 2027               [Page 63]
-
-Internet-Draft              The Bovnar Format                  July 2026
-
-
        | 50    | error_unit_profile_unsupported           | U     |
        +-------+------------------------------------------+-------+
        | 51    | error_octet_stream_forbidden             | C     |
@@ -3588,10 +3630,18 @@ Internet-Draft              The Bovnar Format                  July 2026
 
    error_type_param_whitespace (52) is raised for whitespace inside a
    type-annotation parameter.  The grammar of Appendix A places every ws
-   in type-ann beside a separator - after family, either side of the ":"
-   that introduces param-list or of a "," between parameters, and before
-   the closing ">" - and derives none inside a param.  A consumer that
+   in type-ann beside a separator - after family, either side of the :
+   that introduces param-list or of a , between parameters, and before
+   the closing > - and derives none inside a param.  A consumer that
    skips whitespace uniformly within an annotation instead of at those
+
+
+
+Sonntag                   Expires 13 April 2027                [Page 65]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
    positions silently concatenates a split parameter, which yields a
    different type or a different unit rather than an error: <uint:6 4>
    becomes a 64-bit width, <float:64,k g> becomes the kilogram, and the
@@ -3620,20 +3670,6 @@ C.1.  Configuration
 
 C.2.  Instrument Record
 
-
-
-
-
-
-
-
-
-
-Sonntag                  Expires 29 January 2027               [Page 64]
-
-Internet-Draft              The Bovnar Format                  July 2026
-
-
    #!bovnar 1.1
 
    .station = {
@@ -3653,6 +3689,14 @@ Internet-Draft              The Bovnar Format                  July 2026
        .humidity    = 47.5 %;
        .payload_len = <uint:32,Ki~B>       12;
    };
+
+
+
+
+Sonntag                   Expires 13 April 2027                [Page 66]
+
+Internet-Draft              The Bovnar Format               October 2026
+
 
 C.3.  Unit Safety
 
@@ -3676,19 +3720,6 @@ C.4.  Compound Units
    and k~g/m·s² resolve identically, and k~g·m·s⁻² is k~g·m/s².
 
 C.5.  Arrays
-
-
-
-
-
-
-
-
-
-Sonntag                  Expires 29 January 2027               [Page 65]
-
-Internet-Draft              The Bovnar Format                  July 2026
-
 
    .matrix    = [1, 2, 3]/[4, 5, 6];        # one 2x3 block
    .nested    = [[1, 2], [3, 4]];           # rectangular
@@ -3715,6 +3746,14 @@ Appendix D.  Design Rationale
    This appendix records why several of the format's more surprising
    decisions are as they are.  It is informative.
 
+
+
+
+Sonntag                   Expires 13 April 2027                [Page 67]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
    *Why the unit is inside the value rather than beside it.* A unit
    carried in a sibling field, an attribute, or a naming convention can
    be dropped by any transformation that does not know it is significant
@@ -3738,14 +3777,6 @@ Appendix D.  Design Rationale
    *Why the $ sigil is mandatory.* Currency codes and unit symbols
    occupy the same lexical space, and the registry already holds the
    near-misses: BTU is a real unit alias that a currency registry could
-
-
-
-Sonntag                  Expires 29 January 2027               [Page 66]
-
-Internet-Draft              The Bovnar Format                  July 2026
-
-
    plausibly want as a ticker, and cup versus $CUP would otherwise be
    separated by letter case alone (Section 8.4).  Any scheme that
    adjudicates such collisions one at a time must be revisited every
@@ -3771,6 +3802,14 @@ Internet-Draft              The Bovnar Format                  July 2026
    Delimiting requires escaping, escaping expands the payload by an
    amount that depends on its content, and a delimited region cannot be
    skipped without being scanned.  Length prefixing gives constant-
+
+
+
+Sonntag                   Expires 13 April 2027                [Page 68]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
    factor transparency and skippability.  The price is fragility under
    transports that rewrite octets, which Section 15.5 treats as the
    design tradeoff it is.
@@ -3789,18 +3828,6 @@ Internet-Draft              The Bovnar Format                  July 2026
    lexically a comment means an older consumer skips it and reads the
    rest, which is correct precisely when the document uses no newer
    construct.
-
-
-
-
-
-
-
-
-Sonntag                  Expires 29 January 2027               [Page 67]
-
-Internet-Draft              The Bovnar Format                  July 2026
-
 
 Acknowledgments
 
@@ -3834,23 +3861,4 @@ Author's Address
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Sonntag                  Expires 29 January 2027               [Page 68]
+Sonntag                   Expires 13 April 2027                [Page 69]

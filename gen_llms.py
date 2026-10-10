@@ -33,7 +33,7 @@ DOCS = [
     ("02_bovnar_faq.md",          "FAQ",
      "Common questions on types, units, limits, encoding, and the API."),
     ("03_bovnar_spec.md",         "Specification",
-     "The complete format specification (spec 1.1): grammar, types, units, limits."),
+     "The complete format specification (spec 1.2): grammar, types, units, limits."),
     ("04_bovnar_unit_cheatsheet.md","Unit & currency cheatsheet",
      "Every unit symbol, prefix, and currency code in one reference table."),
     ("05_bovnar_unit_system.md",  "Unit system",

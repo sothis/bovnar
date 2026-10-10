@@ -40,7 +40,7 @@
 <h1>Bovnar — Specification</h1>
 <p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/03_bovnar_spec.md">Markdown</a> and <a href="/doc/pdf/bovnar-specification.pdf">PDF</a>.</p>
 <blockquote>
-<p><strong>Spec version:</strong> 1.1
+<p><strong>Spec version:</strong> 1.2
 <strong>Status:</strong> Normative — released (1.x line; additive over the frozen 1.0 baseline)
 <strong>Scope:</strong> Grammar, lexical structure, type system, units, limits, and error semantics.</p>
 </blockquote>
@@ -130,7 +130,7 @@
 <li>11.6 <a href="#116-examples">Examples</a></li>
 <li>11.7 <a href="#117-compound-unit-constraints">Compound Unit Constraints</a></li>
 <li>11.8 <a href="#118-the-no_unit-keyword">The <code>no_unit</code> Keyword</a></li>
-<li>11.9 <a href="#119-unit-profiles-under-implementation">Unit Profiles (under implementation)</a></li>
+<li>11.9 <a href="#119-unit-profiles-spec-12">Unit Profiles (spec 1.2)</a></li>
 </ul>
 </li>
 <li><a href="#12-validation--constraints">Validation &amp; Constraints</a><ul>
@@ -2398,10 +2398,7 @@ for anything genuinely out of range.</p>
 <div class="codehilite"><pre><code class="language-bovnar">.dimensionless = &lt;uint:32,no_unit&gt; 42;</code></pre></div>
 <p>Within an explicit annotation, <strong>omitting</strong> the unit parameter yields the same internal representation as an explicit <code>no_unit</code>: <code>BVN_UNIT_NONE</code> with <code>num_components == 0</code>. (<code>bvn_parse_type_annotation</code> initialises the unit to <code>BVN_UNIT_NONE</code> and only overwrites it when a dimensioned unit parameter is actually present.)</p>
 <p>A <strong>fully untyped</strong> value (no annotation at all) instead defaults to dimensionless via default-type synthesis, producing <code>BVN_UNIT_NO_PREFIX(bu_none)</code> with <code>num_components == 1</code> and <code>base == bu_none</code>. All three forms are semantically equivalent — they compare as compatible via <code>bvn_units_compatible</code> and both encodings serialize to <code>"no_unit"</code> via <code>bvn_unit_to_string</code> — but the untyped-default form (<code>num_components == 1</code>) is a structurally distinct internal state from the annotated forms (<code>num_components == 0</code>).</p>
-<h3 id="119-unit-profiles-under-implementation">11.9 Unit Profiles (under implementation)</h3>
-<blockquote>
-<p><strong>Under implementation.</strong> Nothing in this section is part of a released specification. It describes work in the reference implementation, reachable only by opting in to a version the build does not advertise, and the version it will ship under is not settled.</p>
-</blockquote>
+<h3 id="119-unit-profiles-spec-12">11.9 Unit Profiles (spec 1.2)</h3>
 <p>A unit parameter that begins with a namespace and a colon — <code>name:code</code> — is a <strong>unit profile</strong>: a foreign notation for the same unit slot. The profile translates the code into exactly the value described in §11.1–§11.8, so the result is a unit like any other and every rule in this section applies to it unchanged. A namespace is lowercase letters, digits and <code>-</code>; the hyphen may not lead.</p>
 <p>Seven namespaces are defined:</p>
 <table>
@@ -2490,7 +2487,7 @@ for anything genuinely out of range.</p>
 </tbody>
 </table>
 <p><strong>Character set.</strong> A profile unit may use <code>'</code>, <code>[</code>, <code>]</code>, <code>{</code> and <code>}</code> in addition to the native unit characters (§11.4). A <code>,</code> inside <code>{…}</code> belongs to the unit rather than ending the type parameter. <code>;</code>, <code>#</code>, <code>&lt;</code>, <code>&gt;</code> and <code>"</code> remain excluded, so an unterminated bracket or annotation cannot consume the remainder of the document.</p>
-<p>The complete notation, the transliteration table, and the codes that have no representation are specified in <a href="https://www.bovnar.io/docs/profiles/">UCUM Unit Profile</a>.</p>
+<p>The complete notation, the transliteration table, and the codes that have no representation are specified in <a href="https://www.bovnar.io/docs/profiles/">Unit Profiles</a>.</p>
 <hr />
 <h2 id="12-validation--constraints">12. Validation &amp; Constraints</h2>
 <h3 id="121-utf-8-validation">12.1 UTF-8 Validation</h3>
@@ -3655,11 +3652,11 @@ All functions return <code>false</code> on serialisation error.</p>
 <span class="w">    </span><span class="n">error_unit_inexact</span><span class="w">                       </span><span class="o">=</span><span class="w"> </span><span class="mi">47</span><span class="p">,</span>
 <span class="w">    </span><span class="cm">/* a multiplexed message was still short when its octet stream ended. */</span>
 <span class="w">    </span><span class="n">error_octet_stream_truncated</span><span class="w">             </span><span class="o">=</span><span class="w"> </span><span class="mi">48</span><span class="p">,</span>
-<span class="w">    </span><span class="cm">/* under implementation (§11.9) — the namespace before the &#39;:&#39; is not a unit</span>
+<span class="w">    </span><span class="cm">/* spec 1.2 (§11.9) — the namespace before the &#39;:&#39; is not a unit</span>
 <span class="cm">     * profile this build supports. Distinct from error_unit_illegal so a</span>
 <span class="cm">     * producer can tell &quot;no such profile compiled in&quot; from &quot;malformed unit&quot;. */</span>
 <span class="w">    </span><span class="n">error_unit_profile_unknown</span><span class="w">               </span><span class="o">=</span><span class="w"> </span><span class="mi">49</span><span class="p">,</span>
-<span class="w">    </span><span class="cm">/* under implementation (§11.9) — valid in its vocabulary, but with no</span>
+<span class="w">    </span><span class="cm">/* spec 1.2 (§11.9) — valid in its vocabulary, but with no</span>
 <span class="cm">     * representation in this unit system: a reference level, a scale factor</span>
 <span class="cm">     * outside the SI prefix decades, an expression wider than</span>
 <span class="cm">     * BVNR_MAX_UNIT_COMPONENTS, or a construct the unit slot cannot reach at</span>
@@ -3687,14 +3684,17 @@ All functions return <code>false</code> on serialisation error.</p>
 <p>Bovnar follows semantic versioning of the <strong>format</strong>, independent of any
 implementation's version.</p>
 <p><strong>Implementation version.</strong> The reference implementation exposes its own
-version, which tracks the format version but may advance independently for
-implementation-only fixes. The C header defines <code>BVNR_VERSION_MAJOR</code>,
-<code>BVNR_VERSION_MINOR</code>, <code>BVNR_VERSION_PATCH</code>, the comparable integer
-<code>BVNR_VERSION</code> (<code>major*10000 + minor*100 + patch</code>, so <code>#if BVNR_VERSION &gt;= 10100</code>
-tests "≥ 1.1.0"), and <code>BVNR_VERSION_STRING</code> (<code>"1.1.0"</code>). The Python package
-mirrors this as <code>bovnar.__version__</code>. Separately, <code>BVNR_SPEC_VERSION_MAJOR</code> /
-<code>BVNR_SPEC_VERSION_MINOR</code> name the highest <strong>spec</strong> version the build
-understands (<code>1.1</code>); <code>bvnr_version()</code>, <code>bvnr_version_string()</code> and
+version, and it is a different number from the format's. Through 1.1.0 the two
+moved together; they parted at library <strong>2.0.0</strong>, which broke the ABI and the
+Python API while the format it reads grew only additively, to spec <strong>1.2</strong>. The
+library's major counts breaks in what a <em>program</em> is built against; the format's
+major counts breaks in what a <em>document</em> means, and has not moved. The C header
+defines <code>BVNR_VERSION_MAJOR</code>, <code>BVNR_VERSION_MINOR</code>, <code>BVNR_VERSION_PATCH</code>, the
+comparable integer <code>BVNR_VERSION</code> (<code>major*10000 + minor*100 + patch</code>, so
+<code>#if BVNR_VERSION &gt;= 20000</code> tests "≥ 2.0.0"), and <code>BVNR_VERSION_STRING</code>
+(<code>"2.0.0"</code>). The Python package mirrors this as <code>bovnar.__version__</code>.
+Separately, <code>BVNR_SPEC_VERSION_MAJOR</code> / <code>BVNR_SPEC_VERSION_MINOR</code> name the
+highest <strong>spec</strong> version the build understands (<code>1.2</code>); <code>bvnr_version()</code>, <code>bvnr_version_string()</code> and
 <code>bvnr_spec_version()</code> expose both at runtime.</p>
 <p><strong>Declaring a document's version.</strong> Since 1.1 a document may state which spec
 version it targets with a leading <code>#!bovnar &lt;major&gt;.&lt;minor&gt;</code> directive (§3.4).
@@ -4129,7 +4129,7 @@ float_dec:
 <li><a href="https://www.bovnar.io/docs/conformance/">Conformance Test Tool</a> — how an implementation proves it follows this specification</li>
 </ul>
 <hr />
-<p><em>End of Bovnar — Specification (Bovnar spec 1.1).</em></p>
+<p><em>End of Bovnar — Specification (Bovnar spec 1.2).</em></p>
 </main>
 <footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · <a href="/privacy.html">Privacy</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>

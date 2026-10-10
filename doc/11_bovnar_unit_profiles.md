@@ -1,7 +1,7 @@
 # Bovnar — Unit Profiles
 
-> **Spec version:** 1.1 — **the notation described here is UNDER IMPLEMENTATION.** It is not part of any published specification, and the version it will ship under is not settled (§2.2)
-> **Status:** Under implementation — the code is in `src/utils/bovnar_profiles.c` and pinned by `tests/bovnar_ucum_test.c`, `tests/bovnar_unece_test.c`, `tests/bovnar_qudt_test.c`, `tests/bovnar_udunits_test.c`, `tests/bovnar_om_test.c`, `tests/bovnar_cf_test.c` and `tests/bovnar_crossvocab_test.c`, but nothing here is released: no published specification defines the notation, and `bovnar version` reports spec 1.1. Section 10.4 lists the parts of this document that were not built at all.
+> **Spec version:** 1.2
+> **Status:** Normative — the profile notation and the transliteration tables the parser translates through. The code is in `src/utils/bovnar_profiles.c` and pinned by `tests/bovnar_ucum_test.c`, `tests/bovnar_unece_test.c`, `tests/bovnar_qudt_test.c`, `tests/bovnar_udunits_test.c`, `tests/bovnar_om_test.c`, `tests/bovnar_cf_test.c`, `tests/bovnar_crossvocab_test.c` and `tests/bovnar_unit_source_test.c`. Section 10.4 lists the one part of this document that was not built, and §18.3 the licensing questions that are still open.
 > **Scope:** How a foreign vocabulary's code may be written in the unit slot beside Bovnar's native notation, what it translates to, what it refuses, and what the format still guarantees once seven of them are admitted.
 
 **Seven namespaces are defined.** Sections 1–10 specify the profile MECHANISM and, as its worked
@@ -283,11 +283,8 @@ table is consulted.
 ### 2.2 Where a profile unit may appear, and in which documents
 
 **The notation is gated on the declared spec version.** A profile unit needs a `#!bovnar` directive
-declaring a version above 1.1 — spelled `#!bovnar 1.2` today — exactly as the datetime family and
-the `\x`/`\u` escapes need a declared 1.1. That version is **not one this build advertises**: the
-notation is under implementation, `bovnar version` reports spec 1.1, and the number it finally ships under is
-not settled. Without
-one it is `error_unit_illegal` — in a 1.1 document `ucum:mm[Hg]` is simply not a unit, the same way
+declaring 1.2 or later — `#!bovnar 1.2` — exactly as the datetime family and the `\x`/`\u`
+escapes need a declared 1.1. Without one it is `error_unit_illegal` — in a 1.1 document `ucum:mm[Hg]` is simply not a unit, the same way
 `<datetime:64>` is simply not a value type in a 1.0 document. A document with **no** directive
 declares nothing and therefore gets neither surface.
 
@@ -1684,7 +1681,7 @@ The existing `from_pint_unit` / `to_pint_unit` bridge is untouched.
 when a code that should parse does not:
 
 ```
-bovnar 1.2.0-dev (spec 1.1)
+bovnar 2.0.0 (spec 1.2)
 unit profiles: ucum unece qudt qudt-qk udunits om cf
 ```
 
@@ -3234,4 +3231,4 @@ table nobody can trace.
 
 ---
 
-*End of Bovnar — Unit Profiles (Bovnar spec 1.1).*
+*End of Bovnar — Unit Profiles (Bovnar spec 1.2).*

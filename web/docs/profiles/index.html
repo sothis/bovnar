@@ -40,8 +40,8 @@
 <h1>Bovnar — Unit Profiles</h1>
 <p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/11_bovnar_unit_profiles.md">Markdown</a> and <a href="/doc/pdf/bovnar-unit-profiles.pdf">PDF</a>.</p>
 <blockquote>
-<p><strong>Spec version:</strong> 1.1 — <strong>the notation described here is UNDER IMPLEMENTATION.</strong> It is not part of any published specification, and the version it will ship under is not settled (§2.2)
-<strong>Status:</strong> Under implementation — the code is in <code>src/utils/bovnar_profiles.c</code> and pinned by <code>tests/bovnar_ucum_test.c</code>, <code>tests/bovnar_unece_test.c</code>, <code>tests/bovnar_qudt_test.c</code>, <code>tests/bovnar_udunits_test.c</code>, <code>tests/bovnar_om_test.c</code>, <code>tests/bovnar_cf_test.c</code> and <code>tests/bovnar_crossvocab_test.c</code>, but nothing here is released: no published specification defines the notation, and <code>bovnar version</code> reports spec 1.1. Section 10.4 lists the parts of this document that were not built at all.
+<p><strong>Spec version:</strong> 1.2
+<strong>Status:</strong> Normative — the profile notation and the transliteration tables the parser translates through. The code is in <code>src/utils/bovnar_profiles.c</code> and pinned by <code>tests/bovnar_ucum_test.c</code>, <code>tests/bovnar_unece_test.c</code>, <code>tests/bovnar_qudt_test.c</code>, <code>tests/bovnar_udunits_test.c</code>, <code>tests/bovnar_om_test.c</code>, <code>tests/bovnar_cf_test.c</code>, <code>tests/bovnar_crossvocab_test.c</code> and <code>tests/bovnar_unit_source_test.c</code>. Section 10.4 lists the one part of this document that was not built, and §18.3 the licensing questions that are still open.
 <strong>Scope:</strong> How a foreign vocabulary's code may be written in the unit slot beside Bovnar's native notation, what it translates to, what it refuses, and what the format still guarantees once seven of them are admitted.</p>
 </blockquote>
 <p><strong>Seven namespaces are defined.</strong> Sections 1–10 specify the profile MECHANISM and, as its worked
@@ -374,11 +374,8 @@ all — UCUM writes the millimetre of mercury <code>mm[Hg]</code>. Inside a name
 table is consulted.</p>
 <h3 id="22-where-a-profile-unit-may-appear-and-in-which-documents">2.2 Where a profile unit may appear, and in which documents</h3>
 <p><strong>The notation is gated on the declared spec version.</strong> A profile unit needs a <code>#!bovnar</code> directive
-declaring a version above 1.1 — spelled <code>#!bovnar 1.2</code> today — exactly as the datetime family and
-the <code>\x</code>/<code>\u</code> escapes need a declared 1.1. That version is <strong>not one this build advertises</strong>: the
-notation is under implementation, <code>bovnar version</code> reports spec 1.1, and the number it finally ships under is
-not settled. Without
-one it is <code>error_unit_illegal</code> — in a 1.1 document <code>ucum:mm[Hg]</code> is simply not a unit, the same way
+declaring 1.2 or later — <code>#!bovnar 1.2</code> — exactly as the datetime family and the <code>\x</code>/<code>\u</code>
+escapes need a declared 1.1. Without one it is <code>error_unit_illegal</code> — in a 1.1 document <code>ucum:mm[Hg]</code> is simply not a unit, the same way
 <code>&lt;datetime:64&gt;</code> is simply not a value type in a 1.0 document. A document with <strong>no</strong> directive
 declares nothing and therefore gets neither surface.</p>
 <div class="codehilite"><pre><code class="language-bovnar">#!bovnar 1.2
@@ -2926,7 +2923,7 @@ or one carries none, the array is written in canonical form.</p>
 <h3 id="83-cli">8.3 CLI</h3>
 <p><code>bovnar version</code> prints the compiled-in namespaces on a second line, which is where to look first
 when a code that should parse does not:</p>
-<div class="codehilite"><pre><span></span><code>bovnar 1.2.0-dev (spec 1.1)
+<div class="codehilite"><pre><span></span><code>bovnar 2.0.0 (spec 1.2)
 unit profiles: ucum unece qudt qudt-qk udunits om cf
 </code></pre></div>
 
@@ -5142,7 +5139,7 @@ table nobody can trace.</p>
 <li><a href="https://www.bovnar.io/docs/grammar/">EBNF</a> — <code>unit-param</code>, <code>profile-unit</code> and the byte classes of §2.3</li>
 </ul>
 <hr />
-<p><em>End of Bovnar — Unit Profiles (Bovnar spec 1.1).</em></p>
+<p><em>End of Bovnar — Unit Profiles (Bovnar spec 1.2).</em></p>
 </main>
 <footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · <a href="/privacy.html">Privacy</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>

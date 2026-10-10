@@ -1,6 +1,6 @@
 # Bovnar — Specification
 
-> **Spec version:** 1.1
+> **Spec version:** 1.2
 > **Status:** Normative — released (1.x line; additive over the frozen 1.0 baseline)
 > **Scope:** Grammar, lexical structure, type system, units, limits, and error semantics.
 
@@ -71,7 +71,7 @@
     - 11.6 [Examples](#116-examples)
     - 11.7 [Compound Unit Constraints](#117-compound-unit-constraints)
     - 11.8 [The `no_unit` Keyword](#118-the-no_unit-keyword)
-    - 11.9 [Unit Profiles (under implementation)](#119-unit-profiles-under-implementation)
+    - 11.9 [Unit Profiles (spec 1.2)](#119-unit-profiles-spec-12)
 12. [Validation & Constraints](#12-validation--constraints)
     - 12.1 [UTF-8 Validation](#121-utf-8-validation)
     - 12.2 [Size Limits](#122-size-limits)
@@ -1714,9 +1714,7 @@ Within an explicit annotation, **omitting** the unit parameter yields the same i
 
 A **fully untyped** value (no annotation at all) instead defaults to dimensionless via default-type synthesis, producing `BVN_UNIT_NO_PREFIX(bu_none)` with `num_components == 1` and `base == bu_none`. All three forms are semantically equivalent — they compare as compatible via `bvn_units_compatible` and both encodings serialize to `"no_unit"` via `bvn_unit_to_string` — but the untyped-default form (`num_components == 1`) is a structurally distinct internal state from the annotated forms (`num_components == 0`).
 
-### 11.9 Unit Profiles (under implementation)
-
-> **Under implementation.** Nothing in this section is part of a released specification. It describes work in the reference implementation, reachable only by opting in to a version the build does not advertise, and the version it will ship under is not settled.
+### 11.9 Unit Profiles (spec 1.2)
 
 A unit parameter that begins with a namespace and a colon — `name:code` — is a **unit profile**: a foreign notation for the same unit slot. The profile translates the code into exactly the value described in §11.1–§11.8, so the result is a unit like any other and every rule in this section applies to it unchanged. A namespace is lowercase letters, digits and `-`; the hyphen may not lead.
 
@@ -1757,7 +1755,7 @@ A code that is one whole token is **never decomposed**: `unece:KGM` is the kilog
 
 **Character set.** A profile unit may use `'`, `[`, `]`, `{` and `}` in addition to the native unit characters (§11.4). A `,` inside `{…}` belongs to the unit rather than ending the type parameter. `;`, `#`, `<`, `>` and `"` remain excluded, so an unterminated bracket or annotation cannot consume the remainder of the document.
 
-The complete notation, the transliteration table, and the codes that have no representation are specified in [UCUM Unit Profile](11_bovnar_unit_profiles.md).
+The complete notation, the transliteration table, and the codes that have no representation are specified in [Unit Profiles](11_bovnar_unit_profiles.md).
 
 ---
 
@@ -2716,11 +2714,11 @@ typedef enum error_code_e {
     error_unit_inexact                       = 47,
     /* a multiplexed message was still short when its octet stream ended. */
     error_octet_stream_truncated             = 48,
-    /* under implementation (§11.9) — the namespace before the ':' is not a unit
+    /* spec 1.2 (§11.9) — the namespace before the ':' is not a unit
      * profile this build supports. Distinct from error_unit_illegal so a
      * producer can tell "no such profile compiled in" from "malformed unit". */
     error_unit_profile_unknown               = 49,
-    /* under implementation (§11.9) — valid in its vocabulary, but with no
+    /* spec 1.2 (§11.9) — valid in its vocabulary, but with no
      * representation in this unit system: a reference level, a scale factor
      * outside the SI prefix decades, an expression wider than
      * BVNR_MAX_UNIT_COMPONENTS, or a construct the unit slot cannot reach at
@@ -2751,14 +2749,17 @@ Bovnar follows semantic versioning of the **format**, independent of any
 implementation's version.
 
 **Implementation version.** The reference implementation exposes its own
-version, which tracks the format version but may advance independently for
-implementation-only fixes. The C header defines `BVNR_VERSION_MAJOR`,
-`BVNR_VERSION_MINOR`, `BVNR_VERSION_PATCH`, the comparable integer
-`BVNR_VERSION` (`major*10000 + minor*100 + patch`, so `#if BVNR_VERSION >= 10100`
-tests "≥ 1.1.0"), and `BVNR_VERSION_STRING` (`"1.1.0"`). The Python package
-mirrors this as `bovnar.__version__`. Separately, `BVNR_SPEC_VERSION_MAJOR` /
-`BVNR_SPEC_VERSION_MINOR` name the highest **spec** version the build
-understands (`1.1`); `bvnr_version()`, `bvnr_version_string()` and
+version, and it is a different number from the format's. Through 1.1.0 the two
+moved together; they parted at library **2.0.0**, which broke the ABI and the
+Python API while the format it reads grew only additively, to spec **1.2**. The
+library's major counts breaks in what a *program* is built against; the format's
+major counts breaks in what a *document* means, and has not moved. The C header
+defines `BVNR_VERSION_MAJOR`, `BVNR_VERSION_MINOR`, `BVNR_VERSION_PATCH`, the
+comparable integer `BVNR_VERSION` (`major*10000 + minor*100 + patch`, so
+`#if BVNR_VERSION >= 20000` tests "≥ 2.0.0"), and `BVNR_VERSION_STRING`
+(`"2.0.0"`). The Python package mirrors this as `bovnar.__version__`.
+Separately, `BVNR_SPEC_VERSION_MAJOR` / `BVNR_SPEC_VERSION_MINOR` name the
+highest **spec** version the build understands (`1.2`); `bvnr_version()`, `bvnr_version_string()` and
 `bvnr_spec_version()` expose both at runtime.
 
 **Declaring a document's version.** Since 1.1 a document may state which spec
@@ -3226,4 +3227,4 @@ The `bvn_float_t` intermediate representation is MPFR-layout-compatible (see
 
 ---
 
-*End of Bovnar — Specification (Bovnar spec 1.1).*
+*End of Bovnar — Specification (Bovnar spec 1.2).*

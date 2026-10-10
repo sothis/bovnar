@@ -42,18 +42,24 @@
 extern "C" {
 #endif
 /*
- * Library/format version. The reference implementation versions in lockstep
- * with the Python package (pyproject.toml, bovnar.__version__). BVNR_VERSION is
- * an int that increases monotonically and is safe for #if comparison, e.g.
- * #if BVNR_VERSION >= 10100.
+ * LIBRARY version. The reference implementation versions in lockstep with the
+ * Python package (pyproject.toml, bovnar.__version__). BVNR_VERSION is an int
+ * that increases monotonically and is safe for #if comparison, e.g.
+ * #if BVNR_VERSION >= 20000.
+ *
+ * NOT the format version -- that is BVNR_SPEC_VERSION_* below, and since 2.0.0
+ * the two are different numbers on purpose. The library's major counts breaks
+ * in what a PROGRAM is built against: 2.0.0 broke the ABI and the Python API
+ * while the format it reads grew only additively, to spec 1.2. A document is
+ * versioned by its "#!bovnar" directive and never by this.
  */
-#define BVNR_VERSION_MAJOR		1
-#define BVNR_VERSION_MINOR		2
+#define BVNR_VERSION_MAJOR		2
+#define BVNR_VERSION_MINOR		0
 #define BVNR_VERSION_PATCH		0
 #define BVNR_VERSION			((BVNR_VERSION_MAJOR) * 10000 + \
 					 (BVNR_VERSION_MINOR) * 100 + \
 					 (BVNR_VERSION_PATCH))
-#define BVNR_VERSION_STRING		"1.2.0"
+#define BVNR_VERSION_STRING		"2.0.0"
 /*
  * Pre-release marker for a build made from a tree that is AHEAD of the released
  * version above. "-dev" while CHANGELOG.md still has an [Unreleased] section;
@@ -71,7 +77,7 @@ extern "C" {
  * smoke test that asserts bovnar.version() == '1.1.0'. The suffix is applied
  * where the mistake actually happens: the `bovnar version` banner a human reads.
  */
-#define BVNR_VERSION_SUFFIX		"-dev"
+#define BVNR_VERSION_SUFFIX		""
 #define BVNR_VERSION_STRING_FULL	BVNR_VERSION_STRING BVNR_VERSION_SUFFIX
 /*
  * Highest bovnar *spec* version this build understands. A document may declare
@@ -84,7 +90,7 @@ extern "C" {
  * level above.
  */
 #define BVNR_SPEC_VERSION_MAJOR		1
-#define BVNR_SPEC_VERSION_MINOR		1
+#define BVNR_SPEC_VERSION_MINOR		2
 /*
  * Components in one compound unit. value_unit_t embeds the array inline and is
  * passed BY VALUE across this API, so this number is the struct's size: at 32 a
@@ -288,9 +294,7 @@ typedef enum error_code_e {
 	 * delivered, never pre-allocated) but the loss is reportable instead of
 	 * indistinguishable from an empty stream. */
 	error_octet_stream_truncated        = 48,
-	/* The unit profiles. UNRELEASED: the notation is not part of any published
-	 * specification, and the version it will ship under is not settled. The
-	 * split matters to a producer: one of these says "you wrote it wrong", the
+	/* The unit profiles (spec 1.2). The split matters to a producer: one of these says "you wrote it wrong", the
 	 * other says "you wrote it right and this build cannot carry it", and the
 	 * fixes are different. A malformed code, and a code over something the
 	 * vocabulary does not define, stay error_unit_illegal. */
@@ -1288,8 +1292,7 @@ BVN_API int32_t      bvn_unit_to_string_ex(value_unit_t u, char* buf, size_t buf
  * still a unit, and refusing to compare or convert it would be wrong.
  */
 BVN_API bool         bvn_unit_valid(value_unit_t u);
-/* The unit profiles (doc/11_bovnar_unit_profiles.md). UNRELEASED --
- * see that document's status line.
+/* The unit profiles (spec 1.2, doc/11_bovnar_unit_profiles.md).
  *
  * bvn_unit_error_code says WHY a unit string bvn_parse_unit rejected is not a
  * unit: error_unit_illegal for malformed input, error_unit_profile_unknown for

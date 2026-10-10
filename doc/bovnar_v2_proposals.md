@@ -428,4 +428,4 @@ door that closes for good.
 
 ---
 
-*End of Bovnar — Version 2 Grammar Proposals (Design Note) (Bovnar spec 1.1).*
+*End of Bovnar — Version 2 Grammar Proposals (Design Note) (Bovnar spec 1.2).*

@@ -1,6 +1,6 @@
 # Bovnar — Unit & Currency Reference
 
-> **Spec version:** 1.1
+> **Spec version:** 1.2
 > **Status:** Normative — the unit and currency registry the parser validates against
 > **Scope:** Physical units, currency codes, prefix rules, disambiguation, C/Python APIs, and validation.
 
@@ -85,7 +85,7 @@
     - 12.3 [Prefix Factor and Exponent Queries](#123-prefix-factor-and-exponent-queries)
     - 12.4 [SI Conversion API](#124-si-conversion-api)
     - 12.5 [Currency API](#125-currency-api)
-    - 12.6 [Unit Profile API (under implementation)](#126-unit-profile-api-under-implementation)
+    - 12.6 [Unit Profile API (spec 1.2)](#126-unit-profile-api-spec-12)
     - 12.7 [Python API](#127-python-api)
 13. [Integration with the Parser Event Stream](#13-integration-with-the-parser-event-stream)
     - 13.1 [Full event sequence — physical unit](#131-full-event-sequence--physical-unit)
@@ -145,10 +145,8 @@ type-param      = width-param   (* plain decimal integer, e.g. 32    *)
 > `<float_dec:64,mmHg>` are the same unit to every part of the library. Seven
 > namespaces are defined — `ucum`, `unece`, `qudt`, `qudt-qk`, `udunits`, `om`
 > and `cf`; everything in this reference applies to the
-> result unchanged. **The notation is under implementation** — it is not part of a
-> published specification, and a document must opt in with a `#!bovnar 1.2`
-> directive that this build does not itself advertise. A native unit is
-> unaffected in every version. See
+> result unchanged. **The notation is spec 1.2**, so a document must opt in with
+> a `#!bovnar 1.2` directive. A native unit is unaffected in every version. See
 > [Unit Profiles](11_bovnar_unit_profiles.md).
 
 ### 2.1 Parameter Ordering Flexibility
@@ -2491,7 +2489,7 @@ assert(!bvn_unit_is_currency(volume.components[0].base));   /* true */
 assert( bvn_unit_is_currency(currency.components[0].base)); /* true */
 ```
 
-### 12.6 Unit Profile API (under implementation)
+### 12.6 Unit Profile API (spec 1.2)
 
 Four functions serve the profile notations. `bvn_parse_unit` itself is unchanged and takes every notation; these cover what a caller needs *around* it.
 
@@ -2517,7 +2515,7 @@ bvn_unit_to_string(u, buf, sizeof buf);                                 /* "mmHg
 bvn_unit_to_ucum  (u, buf, sizeof buf);                                 /* "mm[Hg]"  */
 ```
 
-Note that **in a document** the notation is gated on an explicit `#!bovnar 1.2` directive (§11.9 of the specification) — a version this build does not itself advertise, because the notation is under implementation. These API entry points have no document and therefore no version, so they accept the notation unconditionally.
+Note that **in a document** the notation is gated on an explicit `#!bovnar 1.2` directive (§11.9 of the specification). These API entry points have no document and therefore no version, so they accept the notation unconditionally.
 
 ### 12.7 Python API
 
@@ -2819,4 +2817,4 @@ All four errors are raised during the `on_unverified` → validator phase. In `c
 
 ---
 
-*End of Bovnar — Unit & Currency Reference (Bovnar spec 1.1).*
+*End of Bovnar — Unit & Currency Reference (Bovnar spec 1.2).*

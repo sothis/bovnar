@@ -17,7 +17,7 @@
 - [Format at a Glance](#format-at-a-glance)
 - [Where Bovnar Fits](#where-bovnar-fits)
 - [Bovnar vs UCUM and CF](#bovnar-vs-ucum-and-cf)
-- [Carrying other vocabularies](#carrying-other-vocabularies-unit-profiles-under-implementation)
+- [Carrying other vocabularies](#carrying-other-vocabularies-unit-profiles-spec-12)
 - [Repository Layout](#repository-layout)
 - [Building](#building)
 - [Command-Line Tool](#command-line-tool)
@@ -200,7 +200,7 @@ In earth-system science, CF wins and will keep winning. The entire tool ecosyste
 
 Bovnar's ground is where CF does not reach: heterogeneous documents rather than arrays, text and binary payloads in one file, configuration mixed with measurements, log streams, industrial telemetry, financial data with units. That is the space between JSON (no type, no unit) and netCDF (arrays, external schema, binary container).
 
-### Carrying other vocabularies: unit profiles (under implementation)
+### Carrying other vocabularies: unit profiles (spec 1.2)
 
 Because these code systems sit at a different layer, they can be **components rather than alternatives**. Seven foreign notations are accepted in the unit slot, alongside the native one:
 
@@ -226,7 +226,7 @@ Because these code systems sit at a different layer, they can be **components ra
 | `om:` | OM 2 — Ontology of units of Measure | agrifood, food science, LCA, FAIR/ELN data, Wikidata alignment |
 | `cf:` | CF standard names (read-only) | netCDF/CF metadata, where a variable carries a standard name and no units string |
 
-This notation is **under implementation** and is not in a released version: the current specification is 1.1. A document reaches it only by opting in to a version the build does not advertise, which is why the `#!bovnar 1.2` directive is required.
+The notation is **spec 1.2** and, like every construct added after 1.0, is opt-in per document: it needs the `#!bovnar 1.2` directive, and without one `ucum:mm[Hg]` is simply not a unit. Native units are unaffected in every version.
 
 A profile code is translated at parse time into exactly the same unit a native spelling produces, so nothing downstream can tell which notation was used. That holds *across* vocabularies too — `ucum:kg`, `unece:KGM`, `qudt:KiloGM`, `udunits:kg`, `om:kilogram` and `qudt-qk:Mass` are one and the same `value_unit_t`, and a cross-vocabulary suite of 4776 assertions over 64 concepts checks every spelling against every other one pairwise.
 

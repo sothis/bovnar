@@ -1,6 +1,6 @@
 # Bovnar — Unit Ambiguities
 
-> **Spec version:** 1.1
+> **Spec version:** 1.2
 > **Status:** Reference — companion to the unit registry and the cheat sheet
 > **Scope:** Every token that could plausibly mean two things — what Bovnar reads it as, and how to write the other meaning.
 
@@ -612,8 +612,8 @@ usually where the money is.
 
 ## 17. The same spelling in another namespace
 
-> **Under implementation.** The `namespace:code` notation is not part of a released specification
-> and needs a `#!bovnar 1.2` directive; see [Unit Profiles](11_bovnar_unit_profiles.md).
+> **Spec 1.2.** The `namespace:code` notation needs a `#!bovnar 1.2` directive; see
+> [Unit Profiles](11_bovnar_unit_profiles.md).
 
 Everything above is about one token read two ways *inside Bovnar's own registry*. A unit profile
 adds a second axis: the same letters mean different things in different vocabularies, and the
@@ -665,4 +665,4 @@ please report it.*
 
 ---
 
-*End of Bovnar — Unit Ambiguities (Bovnar spec 1.1).*
+*End of Bovnar — Unit Ambiguities (Bovnar spec 1.2).*

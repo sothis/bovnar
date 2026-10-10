@@ -1,6 +1,6 @@
 # Bovnar — Python Bindings
 
-> **Spec version:** 1.1
+> **Spec version:** 1.2
 > **Status:** Reference — the Python package as implemented
 > **Scope:** Installation, the high-level and streaming APIs, the DOM, `Quantity`, and the NumPy and pint bridges.
 
@@ -25,7 +25,7 @@ import time via the standard `ctypes.CDLL` machinery.
     - 4.5 [Low-level writer](#45-low-level-writer)
     - 4.6 [Streaming / framing (`bovnar.stream`)](#46-streaming--framing-bovnarstream)
 5. [Unit helpers](#5-unit-helpers)
-    - 5.1 [The unit-profile notations (under implementation)](#51-the-unit-profile-notations-under-implementation)
+    - 5.1 [The unit-profile notations (spec 1.2)](#51-the-unit-profile-notations-spec-12)
     - 5.2 [Extended unit functions](#52-extended-unit-functions)
     - 5.3 [`UnitFlags`](#53-unitflags)
     - 5.4 [`ValueUnitPrefix`](#54-valueunitprefix)
@@ -330,9 +330,9 @@ f = bovnar.unit_factor("in")   # → 1.0  (NOT 0.0254 — the inch has no prefix
 f = bovnar.unit_factor("h")    # → 1.0  (NOT 3600.0)
 ```
 
-### 5.1 The unit-profile notations (under implementation)
+### 5.1 The unit-profile notations (spec 1.2)
 
-**These notations are under implementation**: they are not part of a published specification and the version they will ship under is not settled. `parse_unit` takes a profile notation as readily as the native one, and returns
+**These notations are spec 1.2**: in a document they need a `#!bovnar 1.2` directive, while the API entry points below have no document and take them unconditionally. `parse_unit` takes a profile notation as readily as the native one, and returns
 the same `ValueUnit` either way — so everything else in this chapter works on the
 result unchanged. **Seven** namespaces are accepted — `ucum:`, `unece:`, `qudt:`,
 `qudt-qk:`, `udunits:`, `om:` and `cf:` — but each is a *compile-time* switch, so
@@ -1778,4 +1778,4 @@ unversioned document is treated as 1.0) are exposed as:
 
 ---
 
-*End of Bovnar — Python Bindings (Bovnar spec 1.1).*
+*End of Bovnar — Python Bindings (Bovnar spec 1.2).*

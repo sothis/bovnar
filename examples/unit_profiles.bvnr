@@ -1,10 +1,10 @@
 #!bovnar 1.2
 # unit_profiles.bvnr — units written in another vocabulary's notation
 #
-# UNDER IMPLEMENTATION. The profile notation is not part of a released
-# specification; see doc/11_bovnar_unit_profiles.md. It is gated on the version
-# directive above: under "#!bovnar 1.1", or with no directive, every profile
-# unit below is error_unit_illegal, because in those versions it is not a unit.
+# The profile notation is spec 1.2 (doc/11_bovnar_unit_profiles.md) and is gated
+# on the version directive above: under "#!bovnar 1.1", or with no directive,
+# every profile unit below is error_unit_illegal, because in those versions it
+# is not a unit.
 #
 # A unit parameter of the form  namespace:code  is read as a code of that
 # vocabulary and TRANSLATED, at parse time, into the same unit a native

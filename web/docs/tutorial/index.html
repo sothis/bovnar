@@ -40,7 +40,7 @@
 <h1>Bovnar — Tutorial</h1>
 <p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/01_bovnar_tutorial.md">Markdown</a> and <a href="/doc/pdf/bovnar-tutorial.pdf">PDF</a>.</p>
 <blockquote>
-<p><strong>Spec version:</strong> 1.1
+<p><strong>Spec version:</strong> 1.2
 <strong>Status:</strong> Non-normative — a guided, example-driven introduction
 <strong>Scope:</strong> Writing and reading Bovnar documents by hand: types, units, arrays, structs, references, and the event model.</p>
 </blockquote>
@@ -64,7 +64,7 @@
 <li>6.3 <a href="#63-compound-units">Compound Units</a></li>
 <li>6.4 <a href="#64-explicitly-dimensionless-no_unit">Explicitly Dimensionless: <code>no_unit</code></a></li>
 <li>6.5 <a href="#65-inline-unit-suffix">Inline Unit Suffix</a></li>
-<li>6.6 <a href="#66-units-from-another-vocabulary-under-implementation">Units From Another Vocabulary (under implementation)</a></li>
+<li>6.6 <a href="#66-units-from-another-vocabulary-spec-12">Units From Another Vocabulary (spec 1.2)</a></li>
 </ul>
 </li>
 <li><a href="#7-fixed-point-numbers-float_fix">Fixed-Point Numbers: <code>float_fix</code></a></li>
@@ -393,9 +393,9 @@
 <div class="codehilite"><pre><code class="language-bovnar">.ok  = &lt;float:64,m/s&gt; 9.81 m/s;   # redundant but valid: both say m/s
 .bad = &lt;float:64,m&gt;   9.81 s;     # ERROR: annotation says m, inline says s</code></pre></div>
 <p><strong>The inline unit suffix is completely forbidden inside array elements.</strong> This is a lexer-level restriction, not a semantic one — any letter or underscore following a value token inside <code>[…]</code> is an immediate hard error.</p>
-<h3 id="66-units-from-another-vocabulary-under-implementation">6.6 Units From Another Vocabulary (under implementation)</h3>
+<h3 id="66-units-from-another-vocabulary-spec-12">6.6 Units From Another Vocabulary (spec 1.2)</h3>
 <blockquote>
-<p><strong>Under implementation.</strong> This notation is not part of a released specification. A document reaches it only by declaring <code>#!bovnar 1.2</code>; under 1.1, or with no directive, every unit below is <code>error_unit_illegal</code>.</p>
+<p><strong>Spec 1.2.</strong> A document reaches this notation only by declaring <code>#!bovnar 1.2</code>; under 1.1, or with no directive, every unit below is <code>error_unit_illegal</code>.</p>
 </blockquote>
 <p>Data rarely starts out in Bovnar. A lab system hands you UCUM codes, an invoice carries UN/ECE codes, a netCDF file has UDUNITS strings. You do not have to translate them by hand: write <code>namespace:code</code> in the unit slot and the parser translates it.</p>
 <div class="codehilite"><pre><code class="language-bovnar">#!bovnar 1.2
@@ -936,7 +936,7 @@ nan  inf  ninf
 <li><a href="https://www.bovnar.io/docs/faq/">FAQ</a> — the questions this tutorial raises next</li>
 </ul>
 <hr />
-<p><em>End of Bovnar — Tutorial (Bovnar spec 1.1).</em></p>
+<p><em>End of Bovnar — Tutorial (Bovnar spec 1.2).</em></p>
 </main>
 <footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · <a href="/privacy.html">Privacy</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>

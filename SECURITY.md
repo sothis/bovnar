@@ -29,14 +29,17 @@ with the reporter credited in `CHANGELOG.md` unless they ask otherwise.
 
 | Version | Supported |
 |---|---|
-| 1.1.x | Yes |
-| 1.0.x | No — upgrade to 1.1.x, which parses every 1.0 document unchanged |
+| 2.0.x | Yes |
+| 1.1.x | No — upgrade to 2.0.x, which reads every 1.0 and 1.1 document; the C ABI and the Python API changed, so this one is a rebuild and not a drop-in |
+| 1.0.x | No |
 
-Bovnar versions the **format** semantically and the reference implementation
-tracks it in lockstep, so a fix lands on the newest release only. Within a major
-version the format is additive: a document valid under spec 1.0 stays valid, and
-decodes to the same values, under every 1.x release, so upgrading is not a
-migration.
+The **format** and the reference implementation are versioned separately, both
+semantically, and a fix lands on the newest release of the implementation only.
+Within a major version of the format it is additive: a document valid under spec
+1.0 stays valid, and decodes to the same values, under every 1.x spec, so a
+newer reader never needs a document migrated. The implementation's own major
+moves when a program built against it has to change, which is what 2.0.0 was;
+`CHANGELOG.md` says which spec each release implements.
 
 ## In Scope
 

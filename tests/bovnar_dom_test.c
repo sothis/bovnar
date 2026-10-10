@@ -1062,8 +1062,44 @@ static void test_dom_bigint_node_carries_its_unit(void)
 	}
 }
 
+/*
+ * In Base64 '+' is a digit, and in Ascii85 so are '+' and '-'. The narrow
+ * unsigned parser refused any text that BEGAN with one of them, as a sign --
+ * right for bases up to 36 and wrong here -- so `<uint:64,_85> "-."`, the number
+ * 1033, was delivered by the streaming reader and refused as out of range by
+ * everything built on the DOM: `bovnar validate`, `bovnar query`, dom_parse.
+ * Conformance case TYP-039 declares the document valid; it passed only because
+ * that suite reads at the streaming tier.
+ */
+static void test_dom_leading_sign_digit_in_base_64_and_85(void)
+{
+	static const struct { const char *doc; uint64_t want; } cases[] = {
+		{ ".x = <uint:64,_85> \"-.\";",  1033u },
+		{ ".x = <uint:64,_64> \"+a\";",  3994u },
+		{ ".x = <uint:16,_85> \".-\";",  1117u },   /* never affected */
+	};
+	for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+		bvn_dom_doc_t *doc = bvn_dom_parse(cases[i].doc,
+						   (uint32_t)strlen(cases[i].doc));
+		ASSERT_NOT_NULL(doc, cases[i].doc);
+		if (!doc) continue;
+		ASSERT_EQ_INT((int)bvn_dom_doc_get_parse_error(doc), (int)error_none,
+			      cases[i].doc);
+		uint64_t v = 0;
+		ASSERT_TRUE(bvn_dom_get_u64(bvn_dom_lookup(doc, ".x"), &v) &&
+			    v == cases[i].want, cases[i].doc);
+		bvn_dom_doc_destroy(doc);
+	}
+	/* Where '-' can only be a sign, an unsigned value still has none. */
+	static const char neg[] = ".x = <uint:64,_16> \"-a\";";
+	bvn_dom_doc_t *doc = bvn_dom_parse(neg, (uint32_t)(sizeof neg - 1));
+	ASSERT_TRUE(doc && bvn_dom_doc_get_parse_error(doc) != error_none,
+		    "a signed text for an unsigned base-16 value is still refused");
+	bvn_dom_doc_destroy(doc);
+}
 int main(void)
 {
+	test_dom_leading_sign_digit_in_base_64_and_85();
 	test_dom_accessors_fail_rather_than_lie();
 	test_dom_string_carried_numbers_are_numbers();
 	test_dom_dimension_match_is_order_insensitive();

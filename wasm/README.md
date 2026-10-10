@@ -61,12 +61,19 @@ import { loadBovnar } from 'bovnar-wasm/single';
 
 ## API surfaces
 
-| Function       | Returns                                                                    |
-| -------------- | -------------------------------------------------------------------------- |
-| `validate(in)` | `{ ok, error, error_name, line, column, byte, offset, recovery_count, declared_version }` |
-| `toJSON(in)`   | `{ ok, error, error_name, value }` — DOM projected to plain JSON           |
-| `events(in)`   | `{ ok, error, error_name, events: [...] }` — the reference event stream    |
-| `version()`    | library version string, e.g. `"2.0.0"`                                     |
+`loadBovnar()` resolves to an object with these members:
+
+| Member | Returns |
+| ------ | ------- |
+| `validate(in)` | `{ ok, error, error_name, line, column, byte, offset, recovery_count, declared_version }` — stops at the first error |
+| `errors(in)` | `{ ok, errors: [{ error, error_name, line, column, byte, offset }], declared_version }` — reads on past each error and reports them all |
+| `toJSON(in)` | `{ ok, error, error_name, value }` — the DOM projected to plain JSON |
+| `events(in)` | `{ ok, error, error_name, events: [...] }` — the reference event stream |
+| `parse(in)` | `{ ok, error, error_name, events: [...], errors: [...], declared_version }` — `events` and `errors` in one pass |
+| `eventsConvert(in, unit = '', base = 0, allowNonterminating = false)` | as `events`; each numeric `data` event that can be delivered in `unit` also carries `converted`, `converted_base` and `converted_unit` |
+| `doc(in)` | `{ ok, tree: [{ key, value }, ...] }` — the document as a tree of keyed nodes |
+| `version()` | library version string, e.g. `"2.0.0"` |
+| `Module` | the raw Emscripten module |
 
 An event that carries a unit reports it twice: `unit` is the canonical form
 (`m~L`), and `unit_source` is the unit exactly as the document spelled it

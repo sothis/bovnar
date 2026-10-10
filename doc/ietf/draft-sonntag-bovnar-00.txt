@@ -159,7 +159,7 @@ Internet-Draft              The Bovnar Format               October 2026
    15. Security Considerations . . . . . . . . . . . . . . . . . . .  49
      15.1.  Resource Exhaustion  . . . . . . . . . . . . . . . . . .  49
      15.2.  Parser Differentials Between Tiers . . . . . . . . . . .  50
-     15.3.  Recovery Mode Silently Discards Data . . . . . . . . . .  50
+     15.3.  Recovery Mode Silently Discards Data . . . . . . . . . .  51
      15.4.  Version Leniency . . . . . . . . . . . . . . . . . . . .  51
      15.5.  Transport Corruption of Octet Streams  . . . . . . . . .  51
 
@@ -2021,7 +2021,7 @@ Internet-Draft              The Bovnar Format               October 2026
       +===================+=========+===============================+
       | Quantity          | Maximum | Error                         |
       +===================+=========+===============================+
-      | Components in one | 8       | error_unit_illegal            |
+      | Components in one | 32      | error_unit_illegal            |
       | compound unit     |         |                               |
       +-------------------+---------+-------------------------------+
       | Parenthesis       | 16      | error_unit_illegal            |
@@ -2362,13 +2362,24 @@ Internet-Draft              The Bovnar Format               October 2026
    accepted, and they are recorded here because they bend the first
    paragraph of this section.  Whitespace inside a type-annotation
    parameter is now code 52 (Appendix B); the grammar never derived it,
-   but the reference consumer deleted it, so that <float:64,k g> was
-   read as the kilogram.  And array homogeneity is by unit where it was
-   by dimension (Section 9.1.1), because the rule as written let a
-   consumer that treated the elements of [1 m, 2 ft]-shaped data
-   identically - as the same section told it it could - compute wrong
-   values.  Neither changes what any accepted document means; both apply
-   to every document whatever version it declares.
+   but the reference consumer deleted it, so that <float:64,m in> was
+   read as the minute.  And array homogeneity is by unit where it was by
+   dimension (Section 9.1.1), because the rule as written let a consumer
+   that treated the elements of [1 m, 2 ft]-shaped data identically - as
+   the same section told it it could - compute wrong values.  Neither
+   changes what any accepted document means; both apply to every
+   document whatever version it declares.
+
+   The 1.2 reference consumer also fixed defects that had let through,
+   or misread, input this format already excluded: a byte-order mark not
+   at offset 0, a malformed version declaration ended by end-of-input,
+   an array left open at its ;, and a fractional datetime literal whose
+   UTC year leaves 0000-9999 are now errors; an element annotation
+   without a unit no longer strips the unit from the array elements
+   after it; and a tai literal spelling a known leap second
+   (2016-12-31T23:59:60Z) decodes one second lower than it did, having
+   previously collapsed onto the second after it.  That last is the one
+   case in which an accepted document decodes to a different value.
 
 12.  Interoperability Considerations
 
@@ -2390,6 +2401,15 @@ Internet-Draft              The Bovnar Format               October 2026
       over HTTP [RFC9110], avoid any intermediary performing text
       transformation; and
 
+
+
+
+
+Sonntag                   Expires 13 April 2027                [Page 43]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
    *  where a channel must remain text, have the _producer_ refuse to
       emit an octet stream, rather than assume none will occur.
       Implementations SHOULD offer a *text-only mode* that turns this
@@ -2402,14 +2422,6 @@ Internet-Draft              The Bovnar Format               October 2026
    A document with no octet stream is well-formed UTF-8 text throughout
    and is safe on a text channel, subject to the usual caveat about
    line-ending normalization changing octets inside string literals.
-
-
-
-Sonntag                   Expires 13 April 2027                [Page 43]
-
-Internet-Draft              The Bovnar Format               October 2026
-
-
    Producers targeting a text channel SHOULD write line endings
    consistently and SHOULD consider the Net-Unicode profile of
    [RFC5198].
@@ -2445,6 +2457,15 @@ Internet-Draft              The Bovnar Format               October 2026
    A Bovnar document maps to JSON [RFC8259] lossily in one direction and
    partially in the other.
 
+
+
+
+
+Sonntag                   Expires 13 April 2027                [Page 44]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
    Bovnar to JSON loses the type annotation, the unit, the distinction
    between uint, sint, float, float_fix, and float_dec, the distinction
    between a symbol and a string, the reference kind, and any octet
@@ -2458,13 +2479,6 @@ Internet-Draft              The Bovnar Format               October 2026
 
    *  a ragged or mixed-type array, which has no representation
       (Section 9.1.1);
-
-
-
-Sonntag                   Expires 13 April 2027                [Page 44]
-
-Internet-Draft              The Bovnar Format               October 2026
-
 
    *  an object with duplicate keys (Section 3);
 
@@ -2500,6 +2514,14 @@ Internet-Draft              The Bovnar Format               October 2026
 
    Subtype name:  vnd.bovnar
 
+
+
+
+Sonntag                   Expires 13 April 2027                [Page 45]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
    Required parameters:  N/A
 
    Optional parameters:  charset - per [RFC6657].  The encoding of a
@@ -2510,18 +2532,6 @@ Internet-Draft              The Bovnar Format               October 2026
       rather than attempt transcoding.
 
    Encoding considerations:  *binary*. Although the text layer of a
-
-
-
-
-
-
-
-Sonntag                   Expires 13 April 2027                [Page 45]
-
-Internet-Draft              The Bovnar Format               October 2026
-
-
       Bovnar document is UTF-8, a document may contain octet-stream
       regions (Section 9.3) holding arbitrary octets, including NUL and
       unpaired CR.  Such a document is not safe on a channel that
@@ -2560,16 +2570,6 @@ Internet-Draft              The Bovnar Format               October 2026
 
    Intended usage:  COMMON
 
-   Restrictions on usage:  None
-
-   Author:  Janos Sonntag
-
-   Change controller:  Janos Sonntag
-
-
-
-
-
 
 
 
@@ -2577,6 +2577,12 @@ Sonntag                   Expires 13 April 2027                [Page 46]
 
 Internet-Draft              The Bovnar Format               October 2026
 
+
+   Restrictions on usage:  None
+
+   Author:  Janos Sonntag
+
+   Change controller:  Janos Sonntag
 
 14.  IANA Considerations
 
@@ -2620,12 +2626,6 @@ Internet-Draft              The Bovnar Format               October 2026
        files in the reference implementation's repository -
        github.com/sothis/bovnar/blob/main/doc/<name> - naming the
        specification, the unit system, the grammar, the FAQ and the
-       conformance suite.  Those paths are an artifact of one
-       repository's layout at one moment: the documentation set has
-       since been renumbered, and every one of the five citations named
-       a file that no longer exists under that name.  Pointer files were
-       restored at the cited paths to keep the published registration
-       resolving, but a registry entry should not depend on a repository
 
 
 
@@ -2634,6 +2634,12 @@ Sonntag                   Expires 13 April 2027                [Page 47]
 Internet-Draft              The Bovnar Format               October 2026
 
 
+       conformance suite.  Those paths are an artifact of one
+       repository's layout at one moment: the documentation set has
+       since been renumbered, and every one of the five citations named
+       a file that no longer exists under that name.  Pointer files were
+       restored at the cited paths to keep the published registration
+       resolving, but a registry entry should not depend on a repository
        preserving a filename indefinitely.  The template in Section 13
        therefore cites this document first, with [BOVNAR-SPEC] as the
        versioned companion, under www.bovnar.io URLs that are redirected
@@ -2675,13 +2681,7 @@ Internet-Draft              The Bovnar Format               October 2026
    The following are open and are called out for review rather than
    resolved:
 
-   1.  *Tree.* The format is registered in the vendor tree as text/
-       vnd.bovnar.  Publication of an open specification would
-       ordinarily justify a standards-tree registration, text/bovnar,
-       with the vendor name retained as a deprecated alias.  This
-       document does not request that, because it is an Informational
-       individual submission; the question should be settled if the
-       format is taken up on the standards track.
+
 
 
 
@@ -2689,6 +2689,14 @@ Sonntag                   Expires 13 April 2027                [Page 48]
 
 Internet-Draft              The Bovnar Format               October 2026
 
+
+   1.  *Tree.* The format is registered in the vendor tree as text/
+       vnd.bovnar.  Publication of an open specification would
+       ordinarily justify a standards-tree registration, text/bovnar,
+       with the vendor name retained as a deprecated alias.  This
+       document does not request that, because it is an Informational
+       individual submission; the question should be settled if the
+       format is taken up on the standards track.
 
    2.  *Top-level type.* text is a poor fit for a format that may embed
        arbitrary octets.  The alternatives are to keep text with the
@@ -2729,14 +2737,6 @@ Internet-Draft              The Bovnar Format               October 2026
       library inherits that library's performance characteristics on
       adversarial input.
 
-   *  *Non-decimal bases multiply digit counts.* A non-decimal value is
-      written as a quoted string (Section 6.6), so a 32768-bit integer
-      in base 2 is a 32768-character string literal - comfortably inside
-      the default max_string_length of 65535.  Base conversion cost is
-      superlinear in most implementations.
-
-
-
 
 
 
@@ -2745,6 +2745,12 @@ Sonntag                   Expires 13 April 2027                [Page 49]
 
 Internet-Draft              The Bovnar Format               October 2026
 
+
+   *  *Non-decimal bases multiply digit counts.* A non-decimal value is
+      written as a quoted string (Section 6.6), so a 32768-bit integer
+      in base 2 is a 32768-character string literal - comfortably inside
+      the default max_string_length of 65535.  Base conversion cost is
+      superlinear in most implementations.
 
    *  *Nesting defaults to 64 with a hard cap of 255.* A recursive-
       descent consumer MUST bound its own stack independently rather
@@ -2787,12 +2793,6 @@ Internet-Draft              The Bovnar Format               October 2026
    implementation that validates at one tier and acts at another is
    misconfigured regardless of the correctness of either.
 
-15.3.  Recovery Mode Silently Discards Data
-
-   When recovery mode is enabled, a consumer continues past errors and
-   delivers a _subset_ of the document without any indication in the
-   data itself that a subset is what it is.
-
 
 
 
@@ -2801,6 +2801,12 @@ Sonntag                   Expires 13 April 2027                [Page 50]
 
 Internet-Draft              The Bovnar Format               October 2026
 
+
+15.3.  Recovery Mode Silently Discards Data
+
+   When recovery mode is enabled, a consumer continues past errors and
+   delivers a _subset_ of the document without any indication in the
+   data itself that a subset is what it is.
 
    An application that enables recovery and ignores the skipped-octet
    total may therefore act on a document from which arbitrary
@@ -2844,12 +2850,6 @@ Internet-Draft              The Bovnar Format               October 2026
    that rewrites a CR inside a payload shifts every subsequent length
    field, and the reader then interprets payload octets as tag and
    length fields.
-
-
-
-
-
-
 
 
 
@@ -3600,7 +3600,7 @@ Internet-Draft              The Bovnar Format               October 2026
        +-------+------------------------------------------+-------+
        | 42    | error_invalid_spec_version               | D     |
        +-------+------------------------------------------+-------+
-       | 43    | error_unsupported_spec_version           | D     |
+       | 43    | error_unsupported_spec_version           | C     |
        +-------+------------------------------------------+-------+
        | 44    | error_invalid_codepoint                  | D     |
        +-------+------------------------------------------+-------+
@@ -3647,15 +3647,20 @@ Internet-Draft              The Bovnar Format               October 2026
    end of input while recovering from an earlier error yields the
    original code first and this one second (Section 10.3).
 
-   error_octet_stream_forbidden (51) is, with error_unit_profile_unknown
-   (49) on a consumer lacking a namespace (Section 8.6), one of the two
-   codes here that a valid document can provoke.  It is what a consumer
-   opened in the text-only mode of Section 12.1 reports on meeting an
-   octet stream: the document is well-formed and the octet stream is a
-   first-class part of the format, but this consumer has asserted that
-   its channel carries text.  Reporting it is how a consumer whose
-   pipeline normalizes line endings declines the document at the door
-   instead of discovering the damage downstream.
+   error_octet_stream_forbidden (51) is not the only code here that a
+   valid document can provoke, but it is the only one defined for
+   nothing else.  The others are error_unsupported_spec_version (43),
+   raised only in the strict mode of Section 5;
+   error_unit_profile_unknown (49) on a consumer lacking a namespace
+   (Section 8.6); and the codes of the configurable limits
+   (Section 10.1) on a consumer configured more tightly than the
+   producer assumed.  Code 51 is what a consumer opened in the text-only
+   mode of Section 12.1 reports on meeting an octet stream: the document
+   is well-formed and the octet stream is a first-class part of the
+   format, but this consumer has asserted that its channel carries text.
+   Reporting it is how a consumer whose pipeline normalizes line endings
+   declines the document at the door instead of discovering the damage
+   downstream.
 
    error_type_param_whitespace (52) is raised for whitespace inside a
    type-annotation parameter.  The grammar of Appendix A places every ws
@@ -3684,11 +3689,6 @@ Internet-Draft              The Bovnar Format               October 2026
 Appendix C.  Examples
 
 C.1.  Configuration
-
-
-
-
-
 
 
 

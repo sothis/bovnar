@@ -1774,11 +1774,15 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 			const void *utext = d->data;
 			uint32_t    utlen = d->length;
 			char        cbuf[BVNR_UNIT_STRING_MAX];
-			if (!(utext && utlen) && d->unit_source && d->unit_source_length) {
-				if (s->unit_flags == BVN_UNIT_FLAGS_NONE) {
+			if (!(utext && utlen)) {
+				if (s->unit_flags == BVN_UNIT_FLAGS_NONE &&
+				    d->unit_source && d->unit_source_length) {
 					utext = d->unit_source;
 					utlen = d->unit_source_length;
-				} else {
+				} else if (BVN_UNIT_IS_REAL(d->value_unit)) {
+					/* No text at all, only the unit: write its canonical
+					 * form. This used to emit the separator and nothing
+					 * after it -- "<float:64,>" -- and report success. */
 					int32_t cn = bvn_unit_to_string_ex(
 						d->value_unit, cbuf, sizeof cbuf, s->unit_flags);
 					if (cn < 0) {
@@ -1845,8 +1849,10 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 					return false;
 				if (!bvn_ser_push(s, emit, elen))
 					return false;
-			} else if (!bvn_ser_push_byte(s, use_colon ? ':' : ',')) {
-				return false;
+			} else {
+				/* Neither a text nor a unit: there is no parameter to
+				 * write, and a bare separator is not an annotation. */
+				break;
 			}
 			s->emitted_type_param = true;
 			s->emitted_unit = true;

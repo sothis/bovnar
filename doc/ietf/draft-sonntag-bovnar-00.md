@@ -1568,7 +1568,7 @@ everywhere.
 
 | Quantity | Maximum | Error |
 |---|---|---|
-| Components in one compound unit | 8 | `error_unit_illegal` |
+| Components in one compound unit | 32 | `error_unit_illegal` |
 | Parenthesis nesting in a unit | 16 | `error_unit_illegal` |
 | `uint` / `sint` / `float` width | 32768 bits | `error_illegal_value_type` |
 | Type-annotation body | 255 octets | `error_type_too_long` |
@@ -1802,13 +1802,24 @@ Version 1.2 made two corrections that refuse documents a 1.1 consumer
 accepted, and they are recorded here because they bend the first
 paragraph of this section. Whitespace inside a type-annotation parameter
 is now code 52 ({{error-codes}}); the grammar never derived it, but the
-reference consumer deleted it, so that `<float:64,k g>` was read as the
-kilogram. And array homogeneity is by unit where it was by dimension
+reference consumer deleted it, so that `<float:64,m in>` was read as the
+minute. And array homogeneity is by unit where it was by dimension
 ({{array-homogeneity}}), because the rule as written let a consumer that
 treated the elements of `[1 m, 2 ft]`-shaped data identically - as the
 same section told it it could - compute wrong values. Neither changes
 what any accepted document means; both apply to every document whatever
 version it declares.
+
+The 1.2 reference consumer also fixed defects that had let through, or
+misread, input this format already excluded: a byte-order mark not at
+offset 0, a malformed version declaration ended by end-of-input, an array
+left open at its `;`, and a fractional `datetime` literal whose UTC year
+leaves 0000-9999 are now errors; an element annotation without a unit no
+longer strips the unit from the array elements after it; and a `tai`
+literal spelling a known leap second (`2016-12-31T23:59:60Z`) decodes one
+second lower than it did, having previously collapsed onto the second
+after it. That last is the one case in which an accepted document decodes
+to a different value.
 
 # Interoperability Considerations {#interop}
 
@@ -2658,7 +2669,7 @@ U:
 | 40 | `error_struct_shape_mismatch` | M |
 | 41 | `error_duplicate_struct_key` | M |
 | 42 | `error_invalid_spec_version` | D |
-| 43 | `error_unsupported_spec_version` | D |
+| 43 | `error_unsupported_spec_version` | C |
 | 44 | `error_invalid_codepoint` | D |
 | 45 | `error_invalid_datetime_literal` | D |
 | 46 | `error_datetime_literal_unsupported_epoch` | D |
@@ -2683,9 +2694,13 @@ report *in addition to* another, rather than instead of it: reaching end
 of input while recovering from an earlier error yields the original code
 first and this one second ({{error-recovery}}).
 
-`error_octet_stream_forbidden` (51) is, with `error_unit_profile_unknown`
-(49) on a consumer lacking a namespace ({{unit-profiles}}), one of the
-two codes here that a valid document can provoke. It is what a consumer opened in the text-only mode
+`error_octet_stream_forbidden` (51) is not the only code here that a
+valid document can provoke, but it is the only one defined for nothing
+else. The others are `error_unsupported_spec_version` (43), raised only
+in the strict mode of {{version}}; `error_unit_profile_unknown` (49) on a
+consumer lacking a namespace ({{unit-profiles}}); and the codes of the
+configurable limits ({{limits}}) on a consumer configured more tightly
+than the producer assumed. Code 51 is what a consumer opened in the text-only mode
 of {{interop-transport}} reports on meeting an octet stream: the document
 is well-formed and the octet stream is a first-class part of the format,
 but this consumer has asserted that its channel carries text. Reporting

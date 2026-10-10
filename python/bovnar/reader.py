@@ -492,9 +492,10 @@ class Reader:
                   max_file_size: int = MAX_FILESIZE_BYTES,
                   continue_on_error: bool = False,
                   strict_version: bool = False,
+                  text_only: bool = False,
                   want_unit: Callable | None = None,
                   want_unit_allow_nonterminating: bool = False,
-                 max_conversion_length: int = 0) -> None:
+                  max_conversion_length: int = 0) -> None:
         # Forwards every read_fd option; dropping any of them here would make a
         # conversion or strict-version read impossible from a path.
         import os
@@ -507,6 +508,7 @@ class Reader:
                 max_file_size=max_file_size,
                 continue_on_error=continue_on_error,
                 strict_version=strict_version,
+                text_only=text_only,
                 want_unit=want_unit,
                 want_unit_allow_nonterminating=want_unit_allow_nonterminating,
                 max_conversion_length=max_conversion_length,

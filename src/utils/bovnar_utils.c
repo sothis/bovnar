@@ -2479,10 +2479,22 @@ bool bvn_parse_int64(const char* s, value_type_spec_t vt, int64_t* out)
 bool bvn_parse_uint64(const char* s, value_type_spec_t vt, uint64_t* out)
 {
 	if (!s || !out) return false;
-	/* No sign at all: an unsigned carrier has none, and strtoull silently wraps
-	 * a leading '-' into a huge positive value rather than failing. */
-	if (!bvn_parse_prefix_ok(s, false)) return false;
 	uint32_t base = bvn_effective_base(vt);
+	/* No sign at all: an unsigned carrier has none, and strtoull silently wraps
+	 * a leading '-' into a huge positive value rather than failing.
+	 *
+	 * That is a rule about bases up to 36, where '-' and '+' can only be a
+	 * sign. In Base64 '+' is the digit 62, and in Ascii85 '+' and '-' are the
+	 * digits 10 and 12 -- so `<uint:64,_85> "-."` is the number 1033, which the
+	 * streaming reader delivered and this refused, and with it every document
+	 * tier built on this function (bovnar validate, the DOM, query). There the
+	 * digit loop below is the whole test: a byte that is not a digit of the
+	 * base fails it. */
+	if (base <= 36u) {
+		if (!bvn_parse_prefix_ok(s, false)) return false;
+	} else if (!*s) {
+		return false;
+	}
 	if (base >= 2u && base <= 36u) {
 		char* end;
 		errno = 0;

@@ -34,7 +34,7 @@ DOC_DIR = os.path.join(ROOT, "doc")
 OUT_DIR = os.path.join(ROOT, "build", "doc", "pdf")
 ZIP_NAME = "bovnar-docs-pdf.zip"
 
-VERSION = "1.1"
+VERSION = "1.2"   # the SPEC version
 
 # source filename -> (output slug, short label used in the footer/header)
 DOCS = [
@@ -76,7 +76,7 @@ CSS = r"""
         color: #0a6cb0;
     }
     @bottom-left {
-        content: "Bovnar v__VERSION__  ·  __LABEL__";
+        content: "Bovnar spec __VERSION__  ·  __LABEL__";
         font-size: 7.5pt;
         color: #8a929c;
     }
@@ -202,7 +202,7 @@ def render_markdown(text):
 
 def build_html(title, subtitle, body_html, label):
     css = CSS.replace("__VERSION__", VERSION).replace("__LABEL__", label)
-    cover = (f'<div class="cover"><p class="mark">BOVNAR · v{VERSION}</p>'
+    cover = (f'<div class="cover"><p class="mark">BOVNAR · spec {VERSION}</p>'
              f'<h1>{title}</h1>'
              f'<p class="subtitle">{subtitle}</p></div>')
     # weasyprint maps these to the PDF's document-information dictionary:
@@ -272,7 +272,7 @@ def main():
             # version/blockquote lines are kept as-is.
             text = re.sub(r"^#\s+.*$", "", text, count=1, flags=re.M)
             body = render_markdown(text)
-        subtitle = f"Bovnar (BVNR) v{VERSION} documentation · {label} · {today}"
+        subtitle = f"Bovnar (BVNR) spec {VERSION} documentation · {label} · {today}"
         html = build_html(title, subtitle, body, label)
         out = os.path.join(OUT_DIR, slug + ".pdf")
         HTML(string=html, base_url=DOC_DIR).write_pdf(out)

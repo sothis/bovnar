@@ -300,8 +300,9 @@ everywhere else comments remain semantically inert.
 **Recognition rules.**
 
 - It is recognised only as the **very first comment**, after an optional BOM and
-  leading whitespace. A `#!bovnar …` appearing on any later line is an ordinary
-  comment and is ignored.
+  leading whitespace (blank lines included). A `#!bovnar …` appearing after
+  any other comment, or after any content, is an ordinary comment and is
+  ignored.
 - `#!bovnar` not followed by a space or a tab (e.g. `#!bovnarish`, or the bare
   word at the end of a line) is an ordinary comment, not a directive.
 - A directive prefix followed by a malformed version (missing component,
@@ -877,13 +878,16 @@ first byte after the whitespace:
 ```
 
 This is a rule about a *wrong value*, not about tidiness. Whitespace inside a
-parameter used to be deleted, so `<float:64,k g>` was accepted as `k~g` and
-`<uint:6 4>` as a 64-bit width — a wrong unit and a wrong type, each produced
-silently. The trap has a specific victim: UDUNITS and CF multiply with a space,
-so `<float:64,udunits:m s-1>` was accepted as `ms-1`, **reciprocal
-milliseconds**, for a value the author wrote as a speed. Through 1.1 the only
-safe spelling was `udunits:m*s-1`; the exception below is what now makes the
-space-multiplied form mean what it says.
+parameter used to be deleted, so `<float:64,m in>` was accepted as `min` — the
+minute — and `<uint:6 4>` as a 64-bit width: a wrong unit and a wrong type, each
+produced silently. Two things new in 1.2 would have made the trap much larger
+had the deletion stayed. With the compact prefix form, `<float:64,k g>` would
+have become `k~g`; and UDUNITS and CF multiply with a space, so
+`<float:64,udunits:m s-1>` would have been read as `ms-1`, **reciprocal
+milliseconds**, for a value the author wrote as a speed. (Neither of those two
+was ever accepted by a released reader: 1.1 has no compact form and no
+profiles.) The exception below is what makes the space-multiplied form mean what
+it says.
 
 A comma nested inside a UCUM annotation is part of the code rather than a
 separator, so it does not end the parameter: `ucum:mL{cells,tot}` is one
@@ -920,6 +924,11 @@ Three details of that exception:
   `error_type_param_whitespace`.
 - **Trailing whitespace is trimmed**, since it sits beside the separator that
   ends the parameter: `<float:64,udunits:m >` is `udunits:m`.
+- **A comment cannot follow a namespaced code.** Whitespace after it is
+  trimmed, but the code runs to the `,` or `>` that ends the parameter, and `#`
+  is not a code byte: `<float:64,ucum:kg # note⏎>` is
+  `error_unexpected_input_byte`, where `<float:64,kg # note⏎>` is fine. Put the
+  comment before the parameter, or beside its namespace colon.
 - **A line break is still an error**, even in a namespaced parameter. No
   vocabulary spells a unit across a line, and admitting one would let a
   malformed code consume a document's layout.
@@ -1621,7 +1630,7 @@ The `/` separator divides the preceding components by the following ones. The fi
 - A bare base unit with no prefix requires no separator.
 - When a prefix is present on a **physical** unit, the `~` separator is optional: `k~g` and `kg` are the same unit, as are `Mi~B` and `MiB`. The base unit is matched as the longest alias suffix, so a bare unit always outranks a prefixed reading of the same token (`min` is the minute, not milli-inch) — a compact spelling is therefore only ever accepted where the separated form would have been `error_unit_illegal`, and no existing document decodes differently because of it. Prefixes still cannot be stacked (`kkg`, `k~kg` → `error_unit_illegal`), prefix–unit validity is unchanged, and three compact spellings are refused by name because the token is a well-known annotation for something else: `usb` (the bus, not microstilb — write `u~sb`), `kt` (a standard abbreviation for *two* units this format models, the kilotonne and the knot — write `k~t` or `kn`) and `ppt` (parts per trillion or per thousand in the wild, a picopint by the compact rule — write `pptr`, `‰` or `p~pt`). `pH`, `mph` and `kph` needed an exception until the quantities they name became units in their own right; a bare alias outranks any prefixed reading, so they now resolve without one. See §4.3 of the unit-system reference.
 - The same holds for a **currency**: `k~$EUR` and `k$EUR` are the same unit. The `$` sigil already separates the prefix from the code, so the compact form is unambiguous by construction — but the sigil itself stays mandatory, and `kUSD` is `error_unit_illegal` just as bare `USD` is.
-- The canonical output form always carries the separator: `bvn_unit_to_string` and the `bvnr_write_*` helpers emit `k~g`. A *re-serialisation* is a different matter — it writes back the spelling the document carried (`unit_source`, §16.1), so `km` stays `km` through `bovnar pretty-print`. `bovnar pretty-print --canonical` does not keep the spelling either way: it reduces every unit and rescales the value (`1 km` becomes `1000.0 m`), so its output carries no prefix at all.
+- The canonical output form always carries the separator: `bvn_unit_to_string` and the `bvnr_write_*` helpers emit `k~g`. A *re-serialisation* is a different matter — it writes back the spelling the document carried (`unit_source`, §16.1), so `km` stays `km` through `bovnar pretty-print`. `bovnar pretty-print --canonical` does not keep the spelling either way: it writes every unit in reduced form and rescales the value to match (`1.0 km` becomes `1000.0 m`, `2.5 kg` becomes `2500.0 g`). A prefix on a base unit, a currency or a non-SI unit is folded into the value; a unit that is, or reduces to, a single named derived SI unit keeps its prefix, in the separated form (`kPa` → `k~Pa`, `k~N·m` → `k~J`), so `2.5 k~N` and `2500 N` are not unified. An integer that would stop being an integer, or stop fitting its width, fails with `error_value_out_of_range`; nothing is rounded.
 
 ```bovnar
 # Simple (single-component) units — same as before
@@ -2798,10 +2807,11 @@ revisions:
   matched as the longest alias suffix so no existing spelling changes meaning,
   and the **canonical output form is unaffected** — `bvn_unit_to_string` and a
   writer handed no spelling keep emitting the separated `k~g`, and
-  `bovnar pretty-print --canonical` folds prefixes out altogether, so a
-  document can always be made readable to a reader that predates the
-  spelling. (A plain re-serialisation keeps the spelling the document was
-  written in.);
+  `bovnar pretty-print --canonical` writes no compact spelling — a prefix is
+  either folded into the value or written with its `~` — so a document can be
+  made readable to a reader that predates the spelling, except where an
+  integer value cannot take the rescale. (A plain re-serialisation keeps the
+  spelling the document was written in.);
 - **new constructs gated on the version that introduced them** — available only
   to a document whose `#!bovnar` directive declares that version or a newer
   one, and an error in any other, so no existing document can acquire one by
@@ -2836,16 +2846,46 @@ rather than as changes of the format, on these grounds:
 - *Whitespace inside a type-annotation parameter* is
   `error_type_param_whitespace` (§5.3). The grammar never derived it — every
   `ws` in an annotation sits beside a separator — but the reference reader
-  deleted it, so `<float:64,k g>` was read as `k~g`. A document relying on that
-  carried a unit its author did not write.
+  deleted it, so `<float:64,m in>` was read as `min` and `<uint:6 4>` as 64
+  bits. A document relying on that carried a unit or a type its author did not
+  write.
 - *A bare array is homogeneous in its unit, not merely its dimension* (§7.4).
   The rule as written through 1.1 let `[1 m, 2 ft]`-shaped arrays through
   while the same section promised that a consumer may treat the elements
   identically; a consumer who believed it computed wrong numbers. The promise
   was kept and the rule corrected to make it true.
 
-Neither changes what any accepted document *means*. A producer affected by
-either was already emitting data that could not be read correctly.
+Neither of the two changes what any accepted document *means*. A producer
+affected by either was already emitting data that could not be read correctly.
+
+**Reader defects fixed in the same release.** Beside those two, the 1.2
+reference reader stopped letting through — or misreading — input the
+specification already excluded. They are listed because a document that
+depended on one behaves differently, and because the first of them is the one
+case in which an accepted document now decodes to a different value:
+
+- *A `tai` datetime literal spelling a known leap second*
+  (`2016-12-31T23:59:60Z`) has its own value, one less than before
+  (1861920036, was 1861920037); through 1.1 it collapsed onto the second after
+  it. Civil epochs are unchanged.
+- *In an array under a unit annotation, an element annotated without a unit*
+  (`<float:64,s>[<float:64> 1, 3]`) no longer strips the unit from the elements
+  after it. The `3` is in seconds again — and the document tier then refuses the
+  array as mixed.
+- *A byte-order mark anywhere but offset 0* is
+  `error_invalid_byte_order_mark` (§3.2 always said so; one after leading
+  whitespace was accepted).
+- *A version directive ended by end-of-input* is parsed like one ended by a
+  newline, so a malformed one is `error_invalid_spec_version`.
+- *An array left open at the `;`* (`.a = [1;`) is
+  `error_got_incomplete_bvnr_stream`; it was accepted, and absorbed the next
+  assignment.
+- *A datetime literal with a fraction whose UTC year falls outside 0000–9999*
+  (reachable only through a timezone offset) is
+  `error_invalid_datetime_literal`.
+- *Eight conversion factors were corrected* (`elle`, `klafter`, `rute`,
+  `morgen`, `inHg`, `Da`, `slug`, `ft_lb`): a document's digits are unchanged,
+  what they convert to is not.
 
 **What requires a 2.0.** Any change that could render a valid 1.x document invalid,
 change how it decodes, renumber an error code, or change what an existing

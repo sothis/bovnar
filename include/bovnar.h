@@ -246,7 +246,8 @@ typedef enum error_code_e {
 	error_recovered                     = 37,  /* reserved; never set by the library */
 	error_unit_mismatch                 = 38,
 	/* Array element homogeneity (spec 1.0): every non-null element of an array
-	 * must share the same kind and physical dimension; sibling sub-arrays must
+	 * must share the same kind and, for numbers, the same UNIT (spec 1.2: not
+	 * merely the same physical dimension); sibling sub-arrays must
 	 * match in length and element shape (recursively); sibling structs must
 	 * share the same keys with recursively-matching fields. */
 	error_array_element_type_mismatch   = 39,

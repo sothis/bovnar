@@ -458,6 +458,8 @@ name-head    = lower-alpha ;   (* a digit-led parameter is a width *)
 name-tail    = lower-alpha | digit | "-" ;
 lower-alpha  = "a"|"b"|"c"|"d"|"e"|"f"|"g"|"h"|"i"|"j"|"k"|"l"|"m"
              | "n"|"o"|"p"|"q"|"r"|"s"|"t"|"u"|"v"|"w"|"x"|"y"|"z" ;
+(* NOTE: after a profile-code the ws before "," or ">" may not contain *)
+(* a comment -- the reader refuses "#" there.                          *)
 profile-code = profile-char , {profile-char} ;
 profile-char = (* any unit-char, plus "," at brace depth >= 1 -- a    *)
                (* UCUM annotation may contain a comma ("{cells,tot}") *)

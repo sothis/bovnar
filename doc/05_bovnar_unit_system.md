@@ -1094,7 +1094,7 @@ UDUNITS or CF document that says `year` be read at all. It was refused outright 
 
 ## 4. Prefixes
 
-A prefix is attached to a base unit symbol either with the `~` separator — `prefix~baseunit`, the canonical form — or **compactly**, without it: `kg` is `k~g`, `MiB` is `Mi~B`. Both spellings parse to the same `value_unit_t`. `bvn_unit_to_string` — and a writer handed only a `value_unit_t` — always emits the separated form; a document that is *re-serialised* keeps the spelling it was written in. `bovnar pretty-print --canonical` does not keep the spelling either way: it reduces every unit and rescales the value (`1 km` becomes `1000.0 m`), so its output carries no prefix at all. See §4.3 for what the compact form does and does not accept.
+A prefix is attached to a base unit symbol either with the `~` separator — `prefix~baseunit`, the canonical form — or **compactly**, without it: `kg` is `k~g`, `MiB` is `Mi~B`. Both spellings parse to the same `value_unit_t`. `bvn_unit_to_string` — and a writer handed only a `value_unit_t` — always emits the separated form; a document that is *re-serialised* keeps the spelling it was written in. `bovnar pretty-print --canonical` does not keep the spelling either way: it writes every unit in reduced form and rescales the value to match (`1.0 km` becomes `1000.0 m`, `2.5 kg` becomes `2500.0 g`). A prefix on a base unit, a currency or a non-SI unit is folded into the value; a unit that is, or reduces to, a single named derived SI unit keeps its prefix, in the separated form (`kPa` → `k~Pa`, `k~N·m` → `k~J`), so `2.5 k~N` and `2500 N` are not unified. An integer that would stop being an integer, or stop fitting its width, fails with `error_value_out_of_range`; nothing is rounded. See §4.3 for what the compact form does and does not accept.
 
 ### 4.1 SI Prefixes
 
@@ -1744,7 +1744,7 @@ What that path accepts is **the same currency expression, differing at most in p
 | `$USD` | `$USD` | 1 (identity) |
 | `k~$USD` | `$USD` | 1000 — a prefix delta is an exact power of ten (or two, for IEC), so it stays lossless |
 | `$USD·oz_t⁻¹` | `oz_t⁻¹·$USD` | 1 — the match is a multiset, because unit multiplication commutes |
-| `$USD` | `$EUR` | refused — `bu_usd ≠ bu_eur`, and the library holds no exchange rate |
+| `$USD` | `$EUR` | refused — two different currency ids, and the library holds no exchange rate |
 | `$USD/oz_t` | `$USD/g` | **refused**, though only the denominator changes and no rate is involved. A compound carrying a currency is matched as a whole; the physical part is not converted independently. Convert the physical quantity separately if you need this |
 | `$USD` | `m`, `no_unit`, `%` | refused |
 
@@ -2052,7 +2052,7 @@ typedef enum value_base_unit_e {
 
     /* … the six units the profiles needed, the US survey lengths, the
      * typographic lengths, the US dry volumes and the trade measures, and
-     * the rest of block 10 up to bu_horsepower_water = 100260. The whole run is
+     * the rest of block 10 up to bu_stattesla = 100263. The whole run is
      * generated into include/bovnar_units.gen.h from
      * src/gendata/units.bvnr, in that file's order — read it there rather
      * than from this abridged listing. */
@@ -2214,7 +2214,8 @@ Usage:
 value_unit_t kg  = BVN_UNIT_SI(bu_gram, si_kilo);
 value_unit_t gib = BVN_UNIT_IEC(bu_byte, iec_gibi);
 value_unit_t m2  = BVN_UNIT_SI_EXP(bu_meter, si_none, exp_square);
-value_unit_t usd = BVN_UNIT_NO_PREFIX(bu_usd);    /* single currency unit */
+value_unit_t usd = BVN_UNIT_NO_PREFIX(            /* a currency: ids come from */
+    bvn_parse_currency_str((const uint8_t *)"USD", 3));  /* the catalogue, not an enumerator */
 value_unit_t none = BVN_UNIT_NONE;
 ```
 
@@ -2246,9 +2247,9 @@ value_unit_t u = bvn_parse_unit((const uint8_t *)"k~g·m/s²", &ok);
    [1]: bu_meter,  exp_linear,     si_none
    [2]: bu_second, exp_neg_square, si_none */
 
-value_unit_t c = bvn_parse_unit((const uint8_t *)"USD/oz_t", &ok);
+value_unit_t c = bvn_parse_unit((const uint8_t *)"$USD/oz_t", &ok);
 /* c.num_components == 2:
-   [0]: bu_usd,       exp_linear,     si_none  (currency)
+   [0]: the id of USD, exp_linear,  si_none  (currency)
    [1]: bu_troy_ounce, exp_neg_linear, si_none */
 ```
 
@@ -2470,11 +2471,14 @@ Examples:
 
 ```c
 bool ok;
-uint8_t n = bvn_currency_minor_unit(bu_kwd, &ok);  /* n=3, ok=true  */
-uint8_t m = bvn_currency_minor_unit(bu_jpy, &ok);  /* m=0, ok=true  */
+int kwd = bvn_parse_currency_str((const uint8_t *)"KWD", 3);
+int jpy = bvn_parse_currency_str((const uint8_t *)"JPY", 3);
+int usd = bvn_parse_currency_str((const uint8_t *)"USD", 3);
+uint8_t n = bvn_currency_minor_unit(kwd, &ok);     /* n=3, ok=true  */
+uint8_t m = bvn_currency_minor_unit(jpy, &ok);     /* m=0, ok=true  */
 uint8_t x = bvn_currency_minor_unit(bu_meter, &ok);/* x=0, ok=false */
 
-const bvn_currency_info_t *ci = bvn_currency_info(bu_usd);
+const bvn_currency_info_t *ci = bvn_currency_info(usd);
 /* ci->code="USD", ci->numeric_code=840, ci->minor_unit=2,
    ci->is_crypto=false, ci->name="US Dollar" */
 

@@ -1,8 +1,10 @@
 # Bovnar 2.0.0 — units from other vocabularies, and a reader that converts
 
 **The 2 is the library's, not the format's.** Bovnar 2.0.0 implements **spec
-1.2**, which is additive over 1.1: no accepted document changes meaning and the
-version directive stays in the 1.x line. The major moved because programs built against
+1.2**, which is additive over 1.1, and the version directive stays in the 1.x
+line. (One accepted spelling decodes differently — a `tai` leap-second literal —
+and a handful of malformed inputs are no longer let through; see
+*Compatibility*.) The major moved because programs built against
 1.1 have to change — the C ABI breaks and so does the Python API. From this
 release on, the library version and the spec version are separate numbers.
 
@@ -22,9 +24,8 @@ translated, at parse time, into the same unit a native spelling produces.
 
 Like every construct added after 1.0 it is **opt-in per document**: it needs the
 `#!bovnar 1.2` directive, and without one `ucum:mm[Hg]` is simply not a unit.
-Native units are unaffected in every version, and every document a 1.1 reader
-accepted and this one still accepts means exactly what it did. Two corrections
-refuse documents that 1.1 let through; both are under *Compatibility* below.
+Native units are unaffected in every version. What a 1.1 reader accepted and
+this one treats differently is listed, in full, under *Compatibility* below.
 
 For C consumers: rebuild against the new headers. `libbvnr.so` moves to
 SOVERSION 2, so a binary built against 1.1 fails to load rather than misreading
@@ -103,6 +104,12 @@ amalgamation and the source tarball are attached to the GitHub release, with a
   and `BaseUnit._SENTINEL`. Use `BVN_CURRENCY_FIRST`/`_LAST`/`_COUNT`,
   `bvn_unit_is_currency`, `bvn_unit_is_fiat`/`bvn_unit_is_crypto` and
   `bvn_unit_valid`. No exported function was removed and no prototype changed.
+- **Writer events are checked.** `bvnr_write_event` now refuses a unit
+  parameter whose text does not name the annotation's unit, a value whose unit
+  contradicts the annotation it is written under, and an inline unit on an
+  array element (`error_unit_mismatch` / `error_unit_illegal`). The helpers
+  never produced such events; a caller that built them by hand was writing a
+  document that said two things.
 
 ## New error codes (appended, non-breaking)
 
@@ -113,22 +120,42 @@ Existing codes are unchanged.
 
 ## Compatibility
 
-- **Two corrections refuse documents that 1.1 accepted.** Neither changes what
-  any accepted document means, and both apply whatever version a document
-  declares.
-- **Whitespace inside a type-annotation parameter is now an error**
-  (`error_type_param_whitespace`). `<float:64,k g>` used to be read as `k~g`
-  with the space silently deleted; such a document carried a unit its author did
-  not write. Whitespace beside a separator — `<float : 64 , m>` — is as legal as
-  it always was.
-- **A bare array is homogeneous in its unit**, not merely in its dimension: an
-  array whose elements are annotated with different units of one dimension —
-  metres beside feet — is refused by the document tier (`bovnar validate`,
-  `bvn_dom_parse`, Python `dom_parse`; the streaming reader and `loads()` still
-  deliver such an array element by element). A consumer that read
-  such an array as one block, which the specification said it could, was
-  computing wrong numbers.
+Checked by running a build of 1.1.0 beside this one over the 1.1.0 examples,
+documentation and conformance inputs, 170 000 unit spellings and 80 000 mutated
+documents. No unit spelling that 1.1.0 accepted is refused or means something
+else. What does differ:
+
+- **Two corrections refuse documents that 1.1 accepted**, and apply whatever
+  version a document declares:
+  - **Whitespace inside a type-annotation parameter is an error**
+    (`error_type_param_whitespace`). `<float:64,m in>` used to be read as `min`
+    — the minute — and `<uint:6 4>` as a 64-bit width, with the space silently
+    deleted; such a document carried a unit or a type its author did not write.
+    Whitespace beside a separator — `<float : 64 , m>` — is as legal as it
+    always was.
+  - **A bare array is homogeneous in its unit**, not merely in its dimension:
+    an array whose elements are annotated with different units of one dimension
+    — metres beside feet — is refused by the document tier (`bovnar validate`,
+    `bvn_dom_parse`, Python `dom_parse`; the streaming reader and `loads()`
+    still deliver such an array element by element). A consumer that read such
+    an array as one block, which the specification said it could, was computing
+    wrong numbers.
+- **One accepted document decodes to a different value.** A `tai` datetime
+  literal spelling a known leap second — `2016-12-31T23:59:60Z` — now has its
+  own value, one second lower than before; 1.1 collapsed it onto the second
+  after it.
+- **Reader fixes that refuse, or re-read, input 1.1 let through:** a byte-order
+  mark that is not at offset 0; a malformed `#!bovnar` directive with no
+  trailing newline; an array left open at its `;` (`.a = [1;`), which used to
+  absorb the next assignment; a fractional datetime literal whose UTC year
+  leaves 0000–9999. And in `<float:64,s>[<float:64> 1, 3]` the `3` keeps the
+  array's unit, where 1.1 delivered it with none.
+- **Eight unit factors were corrected** — `elle` by 3.3×10⁻⁴,
+  `klafter`/`rute`/`morgen` by about 10⁻⁶, and `inHg`, `Da`, `slug`, `ft_lb`
+  below 2×10⁻⁹. A document's digits are unchanged; what they convert to is not.
 - **1.2 constructs are opt-in** — they require the `#!bovnar 1.2` directive.
+
+The specification's §17 records all of these.
 
 ## Open questions this release does not close
 

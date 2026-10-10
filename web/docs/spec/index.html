@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){try{var s=localStorage.getItem('bovnar-theme');var d=s==='dark'||(s!=='light'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(!d)document.documentElement.setAttribute('data-theme','light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();</script>
 <title>Bovnar Specification (v1.2)</title>
-<meta name="description" content="The complete Bovnar (BVNR) format specification, version 1.1: grammar, type system, physical units, numeric bases, limits, and error semantics.">
+<meta name="description" content="The complete Bovnar (BVNR) format specification, version 1.2: grammar, type system, physical units, numeric bases, limits, and error semantics.">
 <meta name="theme-color" content="#1e1e1e">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://www.bovnar.io/docs/spec/">
@@ -15,7 +15,7 @@
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Bovnar">
 <meta property="og:title" content="Bovnar Specification (v1.2)">
-<meta property="og:description" content="The complete Bovnar (BVNR) format specification, version 1.1: grammar, type system, physical units, numeric bases, limits, and error semantics.">
+<meta property="og:description" content="The complete Bovnar (BVNR) format specification, version 1.2: grammar, type system, physical units, numeric bases, limits, and error semantics.">
 <meta property="og:url" content="https://www.bovnar.io/docs/spec/">
 <meta property="og:image" content="https://www.bovnar.io/bovnar-og.png">
 <meta property="og:image:width" content="1200">
@@ -26,19 +26,19 @@
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar Specification (v1.2)">
-<meta name="twitter:description" content="The complete Bovnar (BVNR) format specification, version 1.1: grammar, type system, physical units, numeric bases, limits, and error semantics.">
+<meta name="twitter:description" content="The complete Bovnar (BVNR) format specification, version 1.2: grammar, type system, physical units, numeric bases, limits, and error semantics.">
 <meta name="twitter:image" content="https://www.bovnar.io/bovnar-og.png">
 <meta name="twitter:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
 <link rel="alternate" type="text/markdown" href="/doc/03_bovnar_spec.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Specification (v1.2)", "description": "The complete Bovnar (BVNR) format specification, version 1.1: grammar, type system, physical units, numeric bases, limits, and error semantics.", "url": "https://www.bovnar.io/docs/spec/", "mainEntityOfPage": "https://www.bovnar.io/docs/spec/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-10-10", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Specification (v1.2)", "item": "https://www.bovnar.io/docs/spec/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Specification (v1.2)", "description": "The complete Bovnar (BVNR) format specification, version 1.2: grammar, type system, physical units, numeric bases, limits, and error semantics.", "url": "https://www.bovnar.io/docs/spec/", "mainEntityOfPage": "https://www.bovnar.io/docs/spec/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-10-10", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Specification (v1.2)", "item": "https://www.bovnar.io/docs/spec/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
 <main>
 <h1>Bovnar — Specification</h1>
-<p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/03_bovnar_spec.md">Markdown</a> and <a href="/doc/pdf/bovnar-specification.pdf">PDF</a>.</p>
+<p class="doc-meta">Bovnar (BVNR) spec 1.2 documentation · Also available as <a href="/doc/03_bovnar_spec.md">Markdown</a> and <a href="/doc/pdf/bovnar-specification.pdf">PDF</a>.</p>
 <blockquote>
 <p><strong>Spec version:</strong> 1.2
 <strong>Status:</strong> Normative — released (1.x line; additive over the frozen 1.0 baseline)
@@ -464,8 +464,9 @@ everywhere else comments remain semantically inert.</p>
 <p><strong>Recognition rules.</strong></p>
 <ul>
 <li>It is recognised only as the <strong>very first comment</strong>, after an optional BOM and
-  leading whitespace. A <code>#!bovnar …</code> appearing on any later line is an ordinary
-  comment and is ignored.</li>
+  leading whitespace (blank lines included). A <code>#!bovnar …</code> appearing after
+  any other comment, or after any content, is an ordinary comment and is
+  ignored.</li>
 <li><code>#!bovnar</code> not followed by a space or a tab (e.g. <code>#!bovnarish</code>, or the bare
   word at the end of a line) is an ordinary comment, not a directive.</li>
 <li>A directive prefix followed by a malformed version (missing component,
@@ -1124,13 +1125,16 @@ first byte after the whitespace:</p>
 .f = &lt;uint:6 4&gt; 1;              # error_type_param_whitespace
 .g = &lt;float:64,m / s&gt; 1.0;      # error_type_param_whitespace</code></pre></div>
 <p>This is a rule about a <em>wrong value</em>, not about tidiness. Whitespace inside a
-parameter used to be deleted, so <code>&lt;float:64,k g&gt;</code> was accepted as <code>k~g</code> and
-<code>&lt;uint:6 4&gt;</code> as a 64-bit width — a wrong unit and a wrong type, each produced
-silently. The trap has a specific victim: UDUNITS and CF multiply with a space,
-so <code>&lt;float:64,udunits:m s-1&gt;</code> was accepted as <code>ms-1</code>, <strong>reciprocal
-milliseconds</strong>, for a value the author wrote as a speed. Through 1.1 the only
-safe spelling was <code>udunits:m*s-1</code>; the exception below is what now makes the
-space-multiplied form mean what it says.</p>
+parameter used to be deleted, so <code>&lt;float:64,m in&gt;</code> was accepted as <code>min</code> — the
+minute — and <code>&lt;uint:6 4&gt;</code> as a 64-bit width: a wrong unit and a wrong type, each
+produced silently. Two things new in 1.2 would have made the trap much larger
+had the deletion stayed. With the compact prefix form, <code>&lt;float:64,k g&gt;</code> would
+have become <code>k~g</code>; and UDUNITS and CF multiply with a space, so
+<code>&lt;float:64,udunits:m s-1&gt;</code> would have been read as <code>ms-1</code>, <strong>reciprocal
+milliseconds</strong>, for a value the author wrote as a speed. (Neither of those two
+was ever accepted by a released reader: 1.1 has no compact form and no
+profiles.) The exception below is what makes the space-multiplied form mean what
+it says.</p>
 <p>A comma nested inside a UCUM annotation is part of the code rather than a
 separator, so it does not end the parameter: <code>ucum:mL{cells,tot}</code> is one
 parameter, not two.</p>
@@ -1161,6 +1165,11 @@ flux in netCDF and CF metadata.</p>
   <code>error_type_param_whitespace</code>.</li>
 <li><strong>Trailing whitespace is trimmed</strong>, since it sits beside the separator that
   ends the parameter: <code>&lt;float:64,udunits:m &gt;</code> is <code>udunits:m</code>.</li>
+<li><strong>A comment cannot follow a namespaced code.</strong> Whitespace after it is
+  trimmed, but the code runs to the <code>,</code> or <code>&gt;</code> that ends the parameter, and <code>#</code>
+  is not a code byte: <code>&lt;float:64,ucum:kg # note⏎&gt;</code> is
+  <code>error_unexpected_input_byte</code>, where <code>&lt;float:64,kg # note⏎&gt;</code> is fine. Put the
+  comment before the parameter, or beside its namespace colon.</li>
 <li><strong>A line break is still an error</strong>, even in a namespaced parameter. No
   vocabulary spells a unit across a line, and admitting one would let a
   malformed code consume a document's layout.</li>
@@ -2247,7 +2256,7 @@ unit-component = [ prefix [ &quot;~&quot; ] ] base-unit [ unit-exponent ]
 <li>A bare base unit with no prefix requires no separator.</li>
 <li>When a prefix is present on a <strong>physical</strong> unit, the <code>~</code> separator is optional: <code>k~g</code> and <code>kg</code> are the same unit, as are <code>Mi~B</code> and <code>MiB</code>. The base unit is matched as the longest alias suffix, so a bare unit always outranks a prefixed reading of the same token (<code>min</code> is the minute, not milli-inch) — a compact spelling is therefore only ever accepted where the separated form would have been <code>error_unit_illegal</code>, and no existing document decodes differently because of it. Prefixes still cannot be stacked (<code>kkg</code>, <code>k~kg</code> → <code>error_unit_illegal</code>), prefix–unit validity is unchanged, and three compact spellings are refused by name because the token is a well-known annotation for something else: <code>usb</code> (the bus, not microstilb — write <code>u~sb</code>), <code>kt</code> (a standard abbreviation for <em>two</em> units this format models, the kilotonne and the knot — write <code>k~t</code> or <code>kn</code>) and <code>ppt</code> (parts per trillion or per thousand in the wild, a picopint by the compact rule — write <code>pptr</code>, <code>‰</code> or <code>p~pt</code>). <code>pH</code>, <code>mph</code> and <code>kph</code> needed an exception until the quantities they name became units in their own right; a bare alias outranks any prefixed reading, so they now resolve without one. See §4.3 of the unit-system reference.</li>
 <li>The same holds for a <strong>currency</strong>: <code>k~$EUR</code> and <code>k$EUR</code> are the same unit. The <code>$</code> sigil already separates the prefix from the code, so the compact form is unambiguous by construction — but the sigil itself stays mandatory, and <code>kUSD</code> is <code>error_unit_illegal</code> just as bare <code>USD</code> is.</li>
-<li>The canonical output form always carries the separator: <code>bvn_unit_to_string</code> and the <code>bvnr_write_*</code> helpers emit <code>k~g</code>. A <em>re-serialisation</em> is a different matter — it writes back the spelling the document carried (<code>unit_source</code>, §16.1), so <code>km</code> stays <code>km</code> through <code>bovnar pretty-print</code>. <code>bovnar pretty-print --canonical</code> does not keep the spelling either way: it reduces every unit and rescales the value (<code>1 km</code> becomes <code>1000.0 m</code>), so its output carries no prefix at all.</li>
+<li>The canonical output form always carries the separator: <code>bvn_unit_to_string</code> and the <code>bvnr_write_*</code> helpers emit <code>k~g</code>. A <em>re-serialisation</em> is a different matter — it writes back the spelling the document carried (<code>unit_source</code>, §16.1), so <code>km</code> stays <code>km</code> through <code>bovnar pretty-print</code>. <code>bovnar pretty-print --canonical</code> does not keep the spelling either way: it writes every unit in reduced form and rescales the value to match (<code>1.0 km</code> becomes <code>1000.0 m</code>, <code>2.5 kg</code> becomes <code>2500.0 g</code>). A prefix on a base unit, a currency or a non-SI unit is folded into the value; a unit that is, or reduces to, a single named derived SI unit keeps its prefix, in the separated form (<code>kPa</code> → <code>k~Pa</code>, <code>k~N·m</code> → <code>k~J</code>), so <code>2.5 k~N</code> and <code>2500 N</code> are not unified. An integer that would stop being an integer, or stop fitting its width, fails with <code>error_value_out_of_range</code>; nothing is rounded.</li>
 </ul>
 <div class="codehilite"><pre><code class="language-bovnar"># Simple (single-component) units — same as before
 .time = &lt;float:64,s&gt; 2.5;               # seconds
@@ -3733,10 +3742,11 @@ revisions:</p>
   matched as the longest alias suffix so no existing spelling changes meaning,
   and the <strong>canonical output form is unaffected</strong> — <code>bvn_unit_to_string</code> and a
   writer handed no spelling keep emitting the separated <code>k~g</code>, and
-  <code>bovnar pretty-print --canonical</code> folds prefixes out altogether, so a
-  document can always be made readable to a reader that predates the
-  spelling. (A plain re-serialisation keeps the spelling the document was
-  written in.);</li>
+  <code>bovnar pretty-print --canonical</code> writes no compact spelling — a prefix is
+  either folded into the value or written with its <code>~</code> — so a document can be
+  made readable to a reader that predates the spelling, except where an
+  integer value cannot take the rescale. (A plain re-serialisation keeps the
+  spelling the document was written in.);</li>
 <li><strong>new constructs gated on the version that introduced them</strong> — available only
   to a document whose <code>#!bovnar</code> directive declares that version or a newer
   one, and an error in any other, so no existing document can acquire one by
@@ -3770,16 +3780,46 @@ rather than as changes of the format, on these grounds:</p>
 <li><em>Whitespace inside a type-annotation parameter</em> is
   <code>error_type_param_whitespace</code> (§5.3). The grammar never derived it — every
   <code>ws</code> in an annotation sits beside a separator — but the reference reader
-  deleted it, so <code>&lt;float:64,k g&gt;</code> was read as <code>k~g</code>. A document relying on that
-  carried a unit its author did not write.</li>
+  deleted it, so <code>&lt;float:64,m in&gt;</code> was read as <code>min</code> and <code>&lt;uint:6 4&gt;</code> as 64
+  bits. A document relying on that carried a unit or a type its author did not
+  write.</li>
 <li><em>A bare array is homogeneous in its unit, not merely its dimension</em> (§7.4).
   The rule as written through 1.1 let <code>[1 m, 2 ft]</code>-shaped arrays through
   while the same section promised that a consumer may treat the elements
   identically; a consumer who believed it computed wrong numbers. The promise
   was kept and the rule corrected to make it true.</li>
 </ul>
-<p>Neither changes what any accepted document <em>means</em>. A producer affected by
-either was already emitting data that could not be read correctly.</p>
+<p>Neither of the two changes what any accepted document <em>means</em>. A producer
+affected by either was already emitting data that could not be read correctly.</p>
+<p><strong>Reader defects fixed in the same release.</strong> Beside those two, the 1.2
+reference reader stopped letting through — or misreading — input the
+specification already excluded. They are listed because a document that
+depended on one behaves differently, and because the first of them is the one
+case in which an accepted document now decodes to a different value:</p>
+<ul>
+<li><em>A <code>tai</code> datetime literal spelling a known leap second</em>
+  (<code>2016-12-31T23:59:60Z</code>) has its own value, one less than before
+  (1861920036, was 1861920037); through 1.1 it collapsed onto the second after
+  it. Civil epochs are unchanged.</li>
+<li><em>In an array under a unit annotation, an element annotated without a unit</em>
+  (<code>&lt;float:64,s&gt;[&lt;float:64&gt; 1, 3]</code>) no longer strips the unit from the elements
+  after it. The <code>3</code> is in seconds again — and the document tier then refuses the
+  array as mixed.</li>
+<li><em>A byte-order mark anywhere but offset 0</em> is
+  <code>error_invalid_byte_order_mark</code> (§3.2 always said so; one after leading
+  whitespace was accepted).</li>
+<li><em>A version directive ended by end-of-input</em> is parsed like one ended by a
+  newline, so a malformed one is <code>error_invalid_spec_version</code>.</li>
+<li><em>An array left open at the <code>;</code></em> (<code>.a = [1;</code>) is
+  <code>error_got_incomplete_bvnr_stream</code>; it was accepted, and absorbed the next
+  assignment.</li>
+<li><em>A datetime literal with a fraction whose UTC year falls outside 0000–9999</em>
+  (reachable only through a timezone offset) is
+  <code>error_invalid_datetime_literal</code>.</li>
+<li><em>Eight conversion factors were corrected</em> (<code>elle</code>, <code>klafter</code>, <code>rute</code>,
+  <code>morgen</code>, <code>inHg</code>, <code>Da</code>, <code>slug</code>, <code>ft_lb</code>): a document's digits are unchanged,
+  what they convert to is not.</li>
+</ul>
 <p><strong>What requires a 2.0.</strong> Any change that could render a valid 1.x document invalid,
 change how it decodes, renumber an error code, or change what an existing
 document's bytes mean is a breaking change and is reserved for a major (2.0)
@@ -4173,7 +4213,7 @@ float_dec:
 <hr />
 <p><em>End of Bovnar — Specification (Bovnar spec 1.2).</em></p>
 </main>
-<footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · <a href="/privacy.html">Privacy</a> · MIT-licensed</footer>
+<footer>Bovnar (BVNR) spec 1.2 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · <a href="/privacy.html">Privacy</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>
 <script src="/bovnar_highlight.js?v=f31f84f2becd"></script>
 <script>(function(){if(!window.BovnarHighlight)return;var b=document.querySelectorAll('pre code.language-bovnar');for(var i=0;i<b.length;i++)b[i].innerHTML=BovnarHighlight.highlight(b[i].textContent);})();</script>

@@ -35,11 +35,57 @@ which used to be deleted and is now an error, **or is a bare array mixing units
 of one dimension**, which the document tier now refuses. Both are recorded below
 and in doc/03 §17 as corrections; the first kind of document carried a unit its
 author did not write, and the second was being read wrongly by any consumer that
-took §7.4 at its word. **The ABI breaks**:
+took §7.4 at its word. A build of 1.1.0 run beside this one turned up a further
+short list of reader fixes that also change what happens to a document 1.1
+accepted — one leap-second literal that decodes one second lower, and several
+malformed inputs no longer let through; doc/03 §17 and the release notes'
+*Compatibility* section list them all. **The ABI breaks**:
 `bvnr_data_t` and `bvnr_read_flags_t.want_unit` changed shape (see below) —
 rebuild consumers against the new headers. **SOVERSION is bumped 1 → 2**
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
+
+### Fixed — what running 1.1.0 beside this release turned up
+
+The release documents said this release changes what happens to a document
+1.1.0 accepted in two places. Nobody had checked. A build of 1.1.0 was run
+beside this tree over the 1.1.0 examples, documentation and conformance inputs,
+170 000 unit spellings and 80 000 mutated documents.
+
+- **A regression in the document tier, in code.** In Base64 `+` is a digit, and
+  in Ascii85 so are `+` and `-`; the narrow unsigned parser refused any text
+  beginning with one as a sign. `<uint:64,_85> "-."` is the number 1033: the
+  streaming reader delivered it, and `bovnar validate`, `bovnar query` and the
+  DOM refused it as out of range. 1.1.0 accepted it. Conformance case TYP-039
+  declares it valid and passed only because that suite reads at the streaming
+  tier.
+- **The list of compatibility changes was short by six.** Beside the two
+  corrections: a `tai` leap-second literal decodes one second lower (the one
+  case of an accepted document changing value); an element annotation without
+  a unit no longer strips the unit from the elements after it; a BOM not at
+  offset 0, a malformed directive ended by end-of-input, an array left open at
+  its `;`, and an out-of-range fractional datetime literal are refused; eight
+  unit factors were corrected. Every one was already recorded further down this
+  file as a fix. None was in the specification's §17, the release notes or
+  SECURITY.md, which all said no accepted document changes meaning. They are
+  now.
+- **The example every document used for the whitespace correction was never
+  true of a release.** "`<float:64,k g>` used to be read as `k~g`" describes
+  this tree while the compact form was being built; 1.1.0 has no compact form
+  and refused it. What 1.1.0 did accept was `<float:64,m in>`, as the minute.
+- **`--canonical` described wrongly, a second time.** It does not leave "no
+  prefix at all": a prefix on a named derived SI unit stays (`kPa` → `k~Pa`),
+  so `2.5 k~N` and `2500 N` are not unified, and an integer that cannot take the
+  rescale is refused. The CLI's own help said semantically equal documents
+  produce equal bytes.
+- **A unit-parameter event with a unit and no text wrote `<float:64,>`** and
+  reported success. It writes the canonical form.
+- A comment cannot follow a namespaced code (`<float:64,ucum:kg # c>`), which
+  §5.3 and the grammar both allowed. The IETF draft's limits table still said 8
+  components; it classed error 43 as always-rejected though only strict mode
+  raises it. doc/05's currency snippets used `bu_usd`, an enumerator that does
+  not exist. The published doc pages and PDFs were stamped "v1.1". The site's
+  Python sample called a property. Python `read_file` lacked `text_only`.
 
 ### Fixed — what a second review round turned up, three of them in the first round's fixes
 
@@ -266,7 +312,7 @@ shape does change**: a unit written only as an inline suffix beside an
 annotation that names no unit — `<float:64> 1.0 km` — used to come back in
 canonical form (`1.0 k~m`) and now keeps its spelling (`1.0 km`), like every
 other unit in the document. `--canonical` is unaffected. Pinned by
-`tests/bovnar_unit_source_test.c` (186 assertions) and
+`tests/bovnar_unit_source_test.c` (214 assertions) and
 `python/tests/test_unit_source.py`.
 
 ### Fixed — a long unit text under a unit flag overran a stack buffer in the writer
@@ -2627,7 +2673,10 @@ operator — is [doc/temperature_difference.md](doc/temperature_difference.md).
 ### Fixed — a space inside a type annotation produced a different unit, silently
 
 `<float:64,k g>` was accepted as `k~g`. `<uint:6 4>` was accepted as a 64-bit
-width. `<float:64,udunits:m s-1>` — the space-multiplied spelling UDUNITS and CF
+width. (The first of these, and the UDUNITS case below, describe this tree
+while the compact form and the profiles were being built; 1.1.0 has neither and
+refused both. What 1.1.0 did accept was `<uint:6 4>` and `<float:64,m in>`, the
+latter as `min`.) `<float:64,udunits:m s-1>` — the space-multiplied spelling UDUNITS and CF
 use, and the commonest one in netCDF metadata — was accepted as `udunits:ms-1`,
 **reciprocal milliseconds**, for a value its author wrote as a speed. This was
 the one place in the format where a wrong unit was produced silently rather than

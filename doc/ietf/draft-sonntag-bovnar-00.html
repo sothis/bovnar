@@ -3809,7 +3809,7 @@ everywhere.<a href="#section-10.1-4" class="pilcrow">¶</a></p>
           <tbody>
             <tr>
               <td class="text-left" rowspan="1" colspan="1">Components in one compound unit</td>
-              <td class="text-left" rowspan="1" colspan="1">8</td>
+              <td class="text-left" rowspan="1" colspan="1">32</td>
               <td class="text-left" rowspan="1" colspan="1">
                 <code>error_unit_illegal</code>
 </td>
@@ -4200,13 +4200,23 @@ change what an existing document's octets mean.<a href="#section-11.4-4" class="
 accepted, and they are recorded here because they bend the first
 paragraph of this section. Whitespace inside a type-annotation parameter
 is now code 52 (<a href="#error-codes" class="auto internal xref">Appendix B</a>); the grammar never derived it, but the
-reference consumer deleted it, so that <code>&lt;float:64,k g&gt;</code> was read as the
-kilogram. And array homogeneity is by unit where it was by dimension
+reference consumer deleted it, so that <code>&lt;float:64,m in&gt;</code> was read as the
+minute. And array homogeneity is by unit where it was by dimension
 (<a href="#array-homogeneity" class="auto internal xref">Section 9.1.1</a>), because the rule as written let a consumer that
 treated the elements of <code>[1 m, 2 ft]</code>-shaped data identically - as the
 same section told it it could - compute wrong values. Neither changes
 what any accepted document means; both apply to every document whatever
 version it declares.<a href="#section-11.4-5" class="pilcrow">¶</a></p>
+<p id="section-11.4-6">The 1.2 reference consumer also fixed defects that had let through, or
+misread, input this format already excluded: a byte-order mark not at
+offset 0, a malformed version declaration ended by end-of-input, an array
+left open at its <code>;</code>, and a fractional <code>datetime</code> literal whose UTC year
+leaves 0000-9999 are now errors; an element annotation without a unit no
+longer strips the unit from the array elements after it; and a <code>tai</code>
+literal spelling a known leap second (<code>2016-12-31T23:59:60Z</code>) decodes one
+second lower than it did, having previously collapsed onto the second
+after it. That last is the one case in which an accepted document decodes
+to a different value.<a href="#section-11.4-6" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
@@ -5669,7 +5679,7 @@ specify (<a href="#unit-profiles" class="auto internal xref">Section 8.6</a>).<a
             <td class="text-left" rowspan="1" colspan="1">
               <code>error_unsupported_spec_version</code>
 </td>
-            <td class="text-left" rowspan="1" colspan="1">D</td>
+            <td class="text-left" rowspan="1" colspan="1">C</td>
           </tr>
           <tr>
             <td class="text-left" rowspan="1" colspan="1">44</td>
@@ -5746,9 +5756,13 @@ not required to raise code 33.<a href="#appendix-B-6" class="pilcrow">¶</a></p>
 report <em>in addition to</em> another, rather than instead of it: reaching end
 of input while recovering from an earlier error yields the original code
 first and this one second (<a href="#error-recovery" class="auto internal xref">Section 10.3</a>).<a href="#appendix-B-7" class="pilcrow">¶</a></p>
-<p id="appendix-B-8"><code>error_octet_stream_forbidden</code> (51) is, with <code>error_unit_profile_unknown</code>
-(49) on a consumer lacking a namespace (<a href="#unit-profiles" class="auto internal xref">Section 8.6</a>), one of the
-two codes here that a valid document can provoke. It is what a consumer opened in the text-only mode
+<p id="appendix-B-8"><code>error_octet_stream_forbidden</code> (51) is not the only code here that a
+valid document can provoke, but it is the only one defined for nothing
+else. The others are <code>error_unsupported_spec_version</code> (43), raised only
+in the strict mode of <a href="#version" class="auto internal xref">Section 5</a>; <code>error_unit_profile_unknown</code> (49) on a
+consumer lacking a namespace (<a href="#unit-profiles" class="auto internal xref">Section 8.6</a>); and the codes of the
+configurable limits (<a href="#limits" class="auto internal xref">Section 10.1</a>) on a consumer configured more tightly
+than the producer assumed. Code 51 is what a consumer opened in the text-only mode
 of <a href="#interop-transport" class="auto internal xref">Section 12.1</a> reports on meeting an octet stream: the document
 is well-formed and the octet stream is a first-class part of the format,
 but this consumer has asserted that its channel carries text. Reporting

@@ -1323,9 +1323,12 @@ static int cmd_query(const char *path, const char *filename,
  * `canonical` turns on BVN_UNIT_REDUCE for the whole document: every compound
  * unit folds to its reduced form (m·m -> m2, and every prefix out), and the
  * writer rescales each value to match, exactly. That is the difference between
- * a pretty-printer and a canonicaliser -- two documents that MEAN the same
- * thing come out as the same bytes, which is what a signature, a content hash
- * or a semantic diff needs and what re-spelling alone does not give.
+ * a pretty-printer and a canonicaliser -- two spellings of one unit come out
+ * as the same bytes, which is what a signature, a content hash or a semantic
+ * diff needs and what re-spelling alone does not give. It stops short of
+ * unifying every pair of equal quantities: the formatter keeps the prefix of a
+ * named derived SI unit (bovnar.h, BVN_UNIT_REDUCE), so 2.5 k~N and 2500 N stay
+ * two documents.
  *
  * Everything this needs was already plumbed: bvnr_write_flags_t.unit_flags
  * reaches the serializer, and the serializer applies it on both the annotation
@@ -3515,7 +3518,7 @@ static void usage(const char *prog)
 		"                  it wants back: --field .a.b=m --require-unit ...\n"
 		"  pretty-print  Pretty-print a .bvnr file (--canonical: also reduce\n"
 		"                every unit to canonical form, rescaling values to match,\n"
-		"                so semantically equal documents produce equal bytes)\n"
+		"                so two spellings of one unit produce equal bytes)\n"
 		"  convert <file>  Convert json<->bvnr (direction from .json/.bvnr ext)\n"
 		"                  Override with --from <fmt> --to <fmt> if needed\n"
 		"                  Supported: json -> bvnr,  bvnr -> json\n"

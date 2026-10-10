@@ -248,18 +248,18 @@ The colon is already an accepted byte inside a type-annotation body (state table
 `copy_type_byte`, `[0x3a]`), and no native unit alias or currency code contains one, so the
 discriminator is unambiguous against the entire existing registry with no lookahead.
 
-It is also already an *error* today, which is what makes the extension safe. A `:` in a unit slot
-was `error_unit_illegal` before the profiles existed and still is whenever the profile machinery
-declines it — for a document that has not opted in (§2.2), for a namespace this build does define
-but a code it does not know, or for a namespace with no rows at all:
+It was also already an *error* before the profiles existed, which is what made the extension safe.
+A `:` in a unit slot was `error_unit_illegal` then, and still is wherever the profile machinery
+declines it as not a unit — in a document that has not opted in (§2.2), and in one that has, for a
+code the named namespace does not define:
 
 ```
 $ bovnar validate t.bvnr        # #!bovnar 1.1 / .a = <float:64,ucum:mmHg> 1.0;
 Validation failed: unit_illegal at line 2, col 25
 ```
 
-No document that parses today contains a `ucum:` unit, so no document can change meaning when one
-starts to parse. Contrast the alternative of a quoted form (`ucum:"mm[Hg]"`), which would put a
+No document that parsed before spec 1.2 contained a `ucum:` unit, so no document changed meaning
+when one started to parse. Contrast the alternative of a quoted form (`ucum:"mm[Hg]"`), which would put a
 string-escape sub-language inside a type body for no gain.
 
 The three refusals are distinguishable once a document *has* opted in, which is the whole point of
@@ -2186,7 +2186,9 @@ used to record the one place in the format where a wrong unit was produced silen
 refused: a space **between** parameters and a space **inside** a unit were indistinguishable by the
 time the parameter was scanned, so `<float:64,k g>` was accepted as `k~g` and
 `<float:64,udunits:m s-1>` became `udunits:ms-1` — reciprocal milliseconds — for a value written as
-a speed.
+a speed. (In this tree, while the notation was being built: no released reader has the compact form
+or a profile, so neither was ever accepted in a release. What 1.1 did accept this way was
+`<float:64,m in>`, as the minute.)
 
 The fix is the one this section called for. Whitespace stays ignorable beside a separator (the
 family `:`, a `,` between parameters, the closing `>`), and inside a *native* parameter it is

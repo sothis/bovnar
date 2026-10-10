@@ -104,7 +104,7 @@ itself, the `\u`/`\x` escapes, the `datetime` family and reference array
 indexing) plus the unit-profile notation. `bvnr_spec_version()` reports it.
 
 Spec 1.0 remains the frozen, stable baseline: a document that declares no
-`#!bovnar` directive is treated as 1.0, and a 1.0 document parses unchanged (the specification's §17 records the two narrow corrections made in 1.2).
+`#!bovnar` directive is treated as 1.0, and a 1.0 document parses unchanged (the specification's §17 lists the narrow exceptions made in 1.2).
 `bvnr_version_string()` reports the **library** version, which is a different
 number from the spec version and has been since library 2.0.0: that release
 broke the C ABI and the Python API, which is what a library major is for, while

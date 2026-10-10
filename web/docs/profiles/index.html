@@ -38,7 +38,7 @@
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
 <main>
 <h1>Bovnar — Unit Profiles</h1>
-<p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/11_bovnar_unit_profiles.md">Markdown</a> and <a href="/doc/pdf/bovnar-unit-profiles.pdf">PDF</a>.</p>
+<p class="doc-meta">Bovnar (BVNR) spec 1.2 documentation · Also available as <a href="/doc/11_bovnar_unit_profiles.md">Markdown</a> and <a href="/doc/pdf/bovnar-unit-profiles.pdf">PDF</a>.</p>
 <blockquote>
 <p><strong>Spec version:</strong> 1.2
 <strong>Status:</strong> Normative — the profile notation and the transliteration tables the parser translates through. The code is in <code>src/utils/bovnar_profiles.c</code> and pinned by <code>tests/bovnar_ucum_test.c</code>, <code>tests/bovnar_unece_test.c</code>, <code>tests/bovnar_qudt_test.c</code>, <code>tests/bovnar_udunits_test.c</code>, <code>tests/bovnar_om_test.c</code>, <code>tests/bovnar_cf_test.c</code>, <code>tests/bovnar_crossvocab_test.c</code> and <code>tests/bovnar_unit_source_test.c</code>. Section 10.4 lists the one part of this document that was not built, and §18.3 the licensing questions that are still open.
@@ -346,16 +346,16 @@ Validation failed: unit_illegal at line 2, col 24
 <p>The colon is already an accepted byte inside a type-annotation body (state table
 <code>copy_type_byte</code>, <code>[0x3a]</code>), and no native unit alias or currency code contains one, so the
 discriminator is unambiguous against the entire existing registry with no lookahead.</p>
-<p>It is also already an <em>error</em> today, which is what makes the extension safe. A <code>:</code> in a unit slot
-was <code>error_unit_illegal</code> before the profiles existed and still is whenever the profile machinery
-declines it — for a document that has not opted in (§2.2), for a namespace this build does define
-but a code it does not know, or for a namespace with no rows at all:</p>
+<p>It was also already an <em>error</em> before the profiles existed, which is what made the extension safe.
+A <code>:</code> in a unit slot was <code>error_unit_illegal</code> then, and still is wherever the profile machinery
+declines it as not a unit — in a document that has not opted in (§2.2), and in one that has, for a
+code the named namespace does not define:</p>
 <div class="codehilite"><pre><span></span><code>$ bovnar validate t.bvnr        # #!bovnar 1.1 / .a = &lt;float:64,ucum:mmHg&gt; 1.0;
 Validation failed: unit_illegal at line 2, col 25
 </code></pre></div>
 
-<p>No document that parses today contains a <code>ucum:</code> unit, so no document can change meaning when one
-starts to parse. Contrast the alternative of a quoted form (<code>ucum:"mm[Hg]"</code>), which would put a
+<p>No document that parsed before spec 1.2 contained a <code>ucum:</code> unit, so no document changed meaning
+when one started to parse. Contrast the alternative of a quoted form (<code>ucum:"mm[Hg]"</code>), which would put a
 string-escape sub-language inside a type body for no gain.</p>
 <p>The three refusals are distinguishable once a document <em>has</em> opted in, which is the whole point of
 the split in §3.1:</p>
@@ -3595,7 +3595,9 @@ used to record the one place in the format where a wrong unit was produced silen
 refused: a space <strong>between</strong> parameters and a space <strong>inside</strong> a unit were indistinguishable by the
 time the parameter was scanned, so <code>&lt;float:64,k g&gt;</code> was accepted as <code>k~g</code> and
 <code>&lt;float:64,udunits:m s-1&gt;</code> became <code>udunits:ms-1</code> — reciprocal milliseconds — for a value written as
-a speed.</p>
+a speed. (In this tree, while the notation was being built: no released reader has the compact form
+or a profile, so neither was ever accepted in a release. What 1.1 did accept this way was
+<code>&lt;float:64,m in&gt;</code>, as the minute.)</p>
 <p>The fix is the one this section called for. Whitespace stays ignorable beside a separator (the
 family <code>:</code>, a <code>,</code> between parameters, the closing <code>&gt;</code>), and inside a <em>native</em> parameter it is
 <code>error_type_param_whitespace</code>. That half was not a change to the grammar: doc/12 always put every
@@ -5153,7 +5155,7 @@ table nobody can trace.</p>
 <hr />
 <p><em>End of Bovnar — Unit Profiles (Bovnar spec 1.2).</em></p>
 </main>
-<footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · <a href="/privacy.html">Privacy</a> · MIT-licensed</footer>
+<footer>Bovnar (BVNR) spec 1.2 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · <a href="/privacy.html">Privacy</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>
 <script src="/bovnar_highlight.js?v=f31f84f2becd"></script>
 <script>(function(){if(!window.BovnarHighlight)return;var b=document.querySelectorAll('pre code.language-bovnar');for(var i=0;i<b.length;i++)b[i].innerHTML=BovnarHighlight.highlight(b[i].textContent);})();</script>

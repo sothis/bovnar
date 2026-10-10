@@ -120,7 +120,7 @@ def css_stamp(relpath):
     """
     with open(os.path.join(ROOT, "web", relpath), "rb") as fh:
         return "?v=" + hashlib.sha256(fh.read()).hexdigest()[:12]
-VERSION = "1.1"
+VERSION = "1.2"   # the SPEC version: the docs describe the format
 
 # source, clean URL slug, PDF slug, title, meta description.
 DOCS = [
@@ -134,7 +134,7 @@ DOCS = [
      "the C and Python APIs."),
     ("03_bovnar_spec.md", "spec", "bovnar-specification",
      "Bovnar Specification (v1.2)",
-     "The complete Bovnar (BVNR) format specification, version 1.1: grammar, type "
+     "The complete Bovnar (BVNR) format specification, version 1.2: grammar, type "
      "system, physical units, numeric bases, limits, and error semantics."),
     ("04_bovnar_unit_cheatsheet.md", "cheatsheet", "bovnar-cheatsheet",
      "Bovnar Unit & Currency Cheat Sheet",
@@ -142,7 +142,7 @@ DOCS = [
      "and cryptocurrency code."),
     ("05_bovnar_unit_system.md", "units", "bovnar-unit-system",
      "Bovnar Unit & Currency System",
-     "Every Bovnar physical unit, SI and IEC prefix, and currency — 180 units and "
+     "Every Bovnar physical unit, SI and IEC prefix, and currency — 264 units and "
      "216 currencies with dimensions and exact conversion factors."),
     ("06_bovnar_unit_policy.md", "policy", "bovnar-unit-policy",
      "Bovnar Unit Policy Reference",
@@ -488,7 +488,7 @@ BACK_TOP_BTN = (
 # lands here with no route to the provider identification that § 5 DDG requires
 # to be reachable from any page of the offering.
 FOOTER = (
-    '<footer>Bovnar (BVNR) v' + VERSION +
+    '<footer>Bovnar (BVNR) spec ' + VERSION +
     ' · <a href="/">Home</a> · <a href="/docs/">All docs</a> · '
     '<a href="https://github.com/sothis/bovnar">Source</a> · '
     '<a href="/impressum.html">Impressum</a> · '
@@ -728,7 +728,7 @@ def build_doc_page(src, slug, pdf, title, desc):
     raw_type = "text/plain" if is_ebnf else "text/markdown"
     extra_head = (f'<link rel="alternate" type="{raw_type}" href="/doc/{src}">\n'
                   + doc_schema(title, desc, canonical, published, modified, faqs))
-    meta = (f'<p class="doc-meta">Bovnar (BVNR) v{VERSION} documentation · '
+    meta = (f'<p class="doc-meta">Bovnar (BVNR) spec {VERSION} documentation · '
             f'Also available as <a href="/doc/{src}">{raw_label}</a> and '
             f'<a href="/doc/pdf/{pdf}.pdf">PDF</a>.</p>')
     body = f"<h1>{html.escape(h1)}</h1>\n{meta}\n{rendered}"

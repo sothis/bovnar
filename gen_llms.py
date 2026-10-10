@@ -205,7 +205,7 @@ def build_index_md_de(sections):
             ("python", "Python-Bindings", "Das reine ctypes-Python-Paket."),
             ("grammar", "EBNF-Grammatik", "Die formale Grammatik, kommentiert gegen die Referenzimplementierung."),
             ("faq", "FAQ", "Häufige Fragen zu Typen, Einheiten, Limits und der API."),
-            ("conformance", "Konformität", "Die 411-Fall-Konformitätssuite und das IUT-Protokoll."),
+            ("conformance", "Konformität", "Die 470-Fall-Konformitätssuite und das IUT-Protokoll."),
             ("cheatsheet", "Einheiten- & Währungs-Spickzettel", "Alle Einheitensymbole, Präfixe und Währungscodes."),
             ("streaming", "Streaming & Framing", "Oktett-Streams, Frames, Multiplexing und eingebettete Dokumente."),
         ])

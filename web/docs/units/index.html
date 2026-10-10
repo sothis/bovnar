@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){try{var s=localStorage.getItem('bovnar-theme');var d=s==='dark'||(s!=='light'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(!d)document.documentElement.setAttribute('data-theme','light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();</script>
 <title>Bovnar Unit &amp; Currency System</title>
-<meta name="description" content="Every Bovnar physical unit, SI and IEC prefix, and currency — 180 units and 216 currencies with dimensions and exact conversion factors.">
+<meta name="description" content="Every Bovnar physical unit, SI and IEC prefix, and currency — 264 units and 216 currencies with dimensions and exact conversion factors.">
 <meta name="theme-color" content="#1e1e1e">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://www.bovnar.io/docs/units/">
@@ -15,7 +15,7 @@
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Bovnar">
 <meta property="og:title" content="Bovnar Unit &amp; Currency System">
-<meta property="og:description" content="Every Bovnar physical unit, SI and IEC prefix, and currency — 180 units and 216 currencies with dimensions and exact conversion factors.">
+<meta property="og:description" content="Every Bovnar physical unit, SI and IEC prefix, and currency — 264 units and 216 currencies with dimensions and exact conversion factors.">
 <meta property="og:url" content="https://www.bovnar.io/docs/units/">
 <meta property="og:image" content="https://www.bovnar.io/bovnar-og.png">
 <meta property="og:image:width" content="1200">
@@ -26,19 +26,19 @@
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar Unit &amp; Currency System">
-<meta name="twitter:description" content="Every Bovnar physical unit, SI and IEC prefix, and currency — 180 units and 216 currencies with dimensions and exact conversion factors.">
+<meta name="twitter:description" content="Every Bovnar physical unit, SI and IEC prefix, and currency — 264 units and 216 currencies with dimensions and exact conversion factors.">
 <meta name="twitter:image" content="https://www.bovnar.io/bovnar-og.png">
 <meta name="twitter:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
 <link rel="alternate" type="text/markdown" href="/doc/05_bovnar_unit_system.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Unit & Currency System", "description": "Every Bovnar physical unit, SI and IEC prefix, and currency — 180 units and 216 currencies with dimensions and exact conversion factors.", "url": "https://www.bovnar.io/docs/units/", "mainEntityOfPage": "https://www.bovnar.io/docs/units/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-10-10", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Unit & Currency System", "item": "https://www.bovnar.io/docs/units/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Unit & Currency System", "description": "Every Bovnar physical unit, SI and IEC prefix, and currency — 264 units and 216 currencies with dimensions and exact conversion factors.", "url": "https://www.bovnar.io/docs/units/", "mainEntityOfPage": "https://www.bovnar.io/docs/units/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-10-10", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Unit & Currency System", "item": "https://www.bovnar.io/docs/units/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
 <main>
 <h1>Bovnar — Unit &amp; Currency Reference</h1>
-<p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/05_bovnar_unit_system.md">Markdown</a> and <a href="/doc/pdf/bovnar-unit-system.pdf">PDF</a>.</p>
+<p class="doc-meta">Bovnar (BVNR) spec 1.2 documentation · Also available as <a href="/doc/05_bovnar_unit_system.md">Markdown</a> and <a href="/doc/pdf/bovnar-unit-system.pdf">PDF</a>.</p>
 <blockquote>
 <p><strong>Spec version:</strong> 1.2
 <strong>Status:</strong> Normative — the unit and currency registry the parser validates against
@@ -3292,7 +3292,7 @@ UDUNITS or CF document that says <code>year</code> be read at all. It was refuse
 </table>
 <hr />
 <h2 id="4-prefixes">4. Prefixes</h2>
-<p>A prefix is attached to a base unit symbol either with the <code>~</code> separator — <code>prefix~baseunit</code>, the canonical form — or <strong>compactly</strong>, without it: <code>kg</code> is <code>k~g</code>, <code>MiB</code> is <code>Mi~B</code>. Both spellings parse to the same <code>value_unit_t</code>. <code>bvn_unit_to_string</code> — and a writer handed only a <code>value_unit_t</code> — always emits the separated form; a document that is <em>re-serialised</em> keeps the spelling it was written in. <code>bovnar pretty-print --canonical</code> does not keep the spelling either way: it reduces every unit and rescales the value (<code>1 km</code> becomes <code>1000.0 m</code>), so its output carries no prefix at all. See §4.3 for what the compact form does and does not accept.</p>
+<p>A prefix is attached to a base unit symbol either with the <code>~</code> separator — <code>prefix~baseunit</code>, the canonical form — or <strong>compactly</strong>, without it: <code>kg</code> is <code>k~g</code>, <code>MiB</code> is <code>Mi~B</code>. Both spellings parse to the same <code>value_unit_t</code>. <code>bvn_unit_to_string</code> — and a writer handed only a <code>value_unit_t</code> — always emits the separated form; a document that is <em>re-serialised</em> keeps the spelling it was written in. <code>bovnar pretty-print --canonical</code> does not keep the spelling either way: it writes every unit in reduced form and rescales the value to match (<code>1.0 km</code> becomes <code>1000.0 m</code>, <code>2.5 kg</code> becomes <code>2500.0 g</code>). A prefix on a base unit, a currency or a non-SI unit is folded into the value; a unit that is, or reduces to, a single named derived SI unit keeps its prefix, in the separated form (<code>kPa</code> → <code>k~Pa</code>, <code>k~N·m</code> → <code>k~J</code>), so <code>2.5 k~N</code> and <code>2500 N</code> are not unified. An integer that would stop being an integer, or stop fitting its width, fails with <code>error_value_out_of_range</code>; nothing is rounded. See §4.3 for what the compact form does and does not accept.</p>
 <h3 id="41-si-prefixes">4.1 SI Prefixes</h3>
 <p>All 24 current SI prefixes are supported, from quecto (10⁻³⁰) to quetta (10³⁰).</p>
 <table>
@@ -5367,7 +5367,7 @@ tabulates all three caps beside the profile grammar.</p>
 <tr>
 <td><code>$USD</code></td>
 <td><code>$EUR</code></td>
-<td>refused — <code>bu_usd ≠ bu_eur</code>, and the library holds no exchange rate</td>
+<td>refused — two different currency ids, and the library holds no exchange rate</td>
 </tr>
 <tr>
 <td><code>$USD/oz_t</code></td>
@@ -5838,7 +5838,7 @@ tabulates all three caps beside the profile grammar.</p>
 
 <span class="w">    </span><span class="cm">/* … the six units the profiles needed, the US survey lengths, the</span>
 <span class="cm">     * typographic lengths, the US dry volumes and the trade measures, and</span>
-<span class="cm">     * the rest of block 10 up to bu_horsepower_water = 100260. The whole run is</span>
+<span class="cm">     * the rest of block 10 up to bu_stattesla = 100263. The whole run is</span>
 <span class="cm">     * generated into include/bovnar_units.gen.h from</span>
 <span class="cm">     * src/gendata/units.bvnr, in that file&#39;s order — read it there rather</span>
 <span class="cm">     * than from this abridged listing. */</span>
@@ -5980,7 +5980,8 @@ requested a conversion must read <code>converted</code> to know whether it happe
 <div class="codehilite"><pre><span></span><code><span class="n">value_unit_t</span><span class="w"> </span><span class="n">kg</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="n">BVN_UNIT_SI</span><span class="p">(</span><span class="n">bu_gram</span><span class="p">,</span><span class="w"> </span><span class="n">si_kilo</span><span class="p">);</span>
 <span class="n">value_unit_t</span><span class="w"> </span><span class="n">gib</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BVN_UNIT_IEC</span><span class="p">(</span><span class="n">bu_byte</span><span class="p">,</span><span class="w"> </span><span class="n">iec_gibi</span><span class="p">);</span>
 <span class="n">value_unit_t</span><span class="w"> </span><span class="n">m2</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="n">BVN_UNIT_SI_EXP</span><span class="p">(</span><span class="n">bu_meter</span><span class="p">,</span><span class="w"> </span><span class="n">si_none</span><span class="p">,</span><span class="w"> </span><span class="n">exp_square</span><span class="p">);</span>
-<span class="n">value_unit_t</span><span class="w"> </span><span class="n">usd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BVN_UNIT_NO_PREFIX</span><span class="p">(</span><span class="n">bu_usd</span><span class="p">);</span><span class="w">    </span><span class="cm">/* single currency unit */</span>
+<span class="n">value_unit_t</span><span class="w"> </span><span class="n">usd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BVN_UNIT_NO_PREFIX</span><span class="p">(</span><span class="w">            </span><span class="cm">/* a currency: ids come from */</span>
+<span class="w">    </span><span class="n">bvn_parse_currency_str</span><span class="p">((</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="s">&quot;USD&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">));</span><span class="w">  </span><span class="cm">/* the catalogue, not an enumerator */</span>
 <span class="n">value_unit_t</span><span class="w"> </span><span class="n">none</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BVN_UNIT_NONE</span><span class="p">;</span>
 </code></pre></div>
 
@@ -6006,9 +6007,9 @@ requested a conversion must read <code>converted</code> to know whether it happe
 <span class="cm">   [1]: bu_meter,  exp_linear,     si_none</span>
 <span class="cm">   [2]: bu_second, exp_neg_square, si_none */</span>
 
-<span class="n">value_unit_t</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_parse_unit</span><span class="p">((</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="s">&quot;USD/oz_t&quot;</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ok</span><span class="p">);</span>
+<span class="n">value_unit_t</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_parse_unit</span><span class="p">((</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="s">&quot;$USD/oz_t&quot;</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ok</span><span class="p">);</span>
 <span class="cm">/* c.num_components == 2:</span>
-<span class="cm">   [0]: bu_usd,       exp_linear,     si_none  (currency)</span>
+<span class="cm">   [0]: the id of USD, exp_linear,  si_none  (currency)</span>
 <span class="cm">   [1]: bu_troy_ounce, exp_neg_linear, si_none */</span>
 </code></pre></div>
 
@@ -6212,11 +6213,14 @@ does when a caller asks.</p>
 
 <p>Examples:</p>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="n">ok</span><span class="p">;</span>
-<span class="kt">uint8_t</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_currency_minor_unit</span><span class="p">(</span><span class="n">bu_kwd</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ok</span><span class="p">);</span><span class="w">  </span><span class="cm">/* n=3, ok=true  */</span>
-<span class="kt">uint8_t</span><span class="w"> </span><span class="n">m</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_currency_minor_unit</span><span class="p">(</span><span class="n">bu_jpy</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ok</span><span class="p">);</span><span class="w">  </span><span class="cm">/* m=0, ok=true  */</span>
+<span class="kt">int</span><span class="w"> </span><span class="n">kwd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_parse_currency_str</span><span class="p">((</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="s">&quot;KWD&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span>
+<span class="kt">int</span><span class="w"> </span><span class="n">jpy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_parse_currency_str</span><span class="p">((</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="s">&quot;JPY&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span>
+<span class="kt">int</span><span class="w"> </span><span class="n">usd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_parse_currency_str</span><span class="p">((</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="s">&quot;USD&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span>
+<span class="kt">uint8_t</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_currency_minor_unit</span><span class="p">(</span><span class="n">kwd</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ok</span><span class="p">);</span><span class="w">     </span><span class="cm">/* n=3, ok=true  */</span>
+<span class="kt">uint8_t</span><span class="w"> </span><span class="n">m</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_currency_minor_unit</span><span class="p">(</span><span class="n">jpy</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ok</span><span class="p">);</span><span class="w">     </span><span class="cm">/* m=0, ok=true  */</span>
 <span class="kt">uint8_t</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_currency_minor_unit</span><span class="p">(</span><span class="n">bu_meter</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ok</span><span class="p">);</span><span class="cm">/* x=0, ok=false */</span>
 
-<span class="k">const</span><span class="w"> </span><span class="n">bvn_currency_info_t</span><span class="w"> </span><span class="o">*</span><span class="n">ci</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_currency_info</span><span class="p">(</span><span class="n">bu_usd</span><span class="p">);</span>
+<span class="k">const</span><span class="w"> </span><span class="n">bvn_currency_info_t</span><span class="w"> </span><span class="o">*</span><span class="n">ci</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_currency_info</span><span class="p">(</span><span class="n">usd</span><span class="p">);</span>
 <span class="cm">/* ci-&gt;code=&quot;USD&quot;, ci-&gt;numeric_code=840, ci-&gt;minor_unit=2,</span>
 <span class="cm">   ci-&gt;is_crypto=false, ci-&gt;name=&quot;US Dollar&quot; */</span>
 
@@ -6535,7 +6539,7 @@ ev_data   data=&quot;1500&quot;
 <hr />
 <p><em>End of Bovnar — Unit &amp; Currency Reference (Bovnar spec 1.2).</em></p>
 </main>
-<footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · <a href="/privacy.html">Privacy</a> · MIT-licensed</footer>
+<footer>Bovnar (BVNR) spec 1.2 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · <a href="/privacy.html">Privacy</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>
 <script src="/bovnar_highlight.js?v=f31f84f2becd"></script>
 <script>(function(){if(!window.BovnarHighlight)return;var b=document.querySelectorAll('pre code.language-bovnar');for(var i=0;i<b.length;i++)b[i].innerHTML=BovnarHighlight.highlight(b[i].textContent);})();</script>

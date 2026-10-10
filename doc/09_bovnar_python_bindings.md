@@ -779,7 +779,7 @@ validates the width for the chosen family.
 |---|---|---|
 | `q.raw` | `str \| None` | Original text token as it appeared in the BVNR stream |
 | `q.vtype` | `ValueTypeSpec` | Type family, bit width, and numeral base |
-| `q.unit` | `ValueUnit` | Physical unit (`BVN_UNIT_NONE` when dimensionless) |
+| `q.unit` | `Unit` | Physical unit; `str(q.unit)` is its canonical text, `q.unit.raw` the `ValueUnit` struct (`BVN_UNIT_NONE` when dimensionless) |
 | `q.value` | property | Decode `raw` to the closest native Python scalar (`int`, `float`, `str`, `bool`) — **lossy** for `float_dec` / `float_fix` / `float:128`+ (goes through a C `double`) |
 | `q.unit_str` | `str` | Canonical unit string (e.g. `'m/s²'`), or `''` when dimensionless |
 | `q.decimal` | `Decimal` | **Exact** value as `decimal.Decimal` from the verbatim literal — lossless at any width; raises for non-numeric families |
@@ -812,9 +812,9 @@ f.fixed_point  # (837, 8)
 ```
 
 These materialise over the **full** representable range, including exponents the
-C parser cannot otherwise reach (beyond ~1e9865). `decimal()` / `fraction()`
+C parser cannot otherwise reach (beyond ~1e9865). `decimal` / `fraction`
 work at every binary width bovnar allows (16, or a multiple of 32 up to 32768);
-the bit-exact `stored_value()` / `ieee_bits()` apply to the IEEE encodings
+the bit-exact `stored_value` / `ieee_bits` apply to the IEEE encodings
 (`float:16/32/64/128/256`), which are also exposed directly as `bovnar.BvnFloat`.
 
 ### 6.4 `dumps()` integration

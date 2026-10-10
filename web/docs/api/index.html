@@ -38,7 +38,7 @@
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
 <main>
 <h1>Bovnar — Read &amp; Write API</h1>
-<p class="doc-meta">Bovnar (BVNR) v1.1 documentation · Also available as <a href="/doc/08_bovnar_readwrite_api.md">Markdown</a> and <a href="/doc/pdf/bovnar-readwrite-api.pdf">PDF</a>.</p>
+<p class="doc-meta">Bovnar (BVNR) spec 1.2 documentation · Also available as <a href="/doc/08_bovnar_readwrite_api.md">Markdown</a> and <a href="/doc/pdf/bovnar-readwrite-api.pdf">PDF</a>.</p>
 <blockquote>
 <p><strong>Spec version:</strong> 1.2
 <strong>Status:</strong> Reference — the C reader, writer, and DOM as implemented
@@ -980,6 +980,11 @@ have no effect. The writer never internally limits array items, text bytes, or f
 <td><code>BVN_UNIT_ASCII_EXP</code></td>
 <td><code>1 &lt;&lt; 1</code></td>
 <td>Use <code>^N</code> ASCII caret notation instead of Unicode superscripts</td>
+</tr>
+<tr>
+<td><code>BVN_NUM_CANONICAL</code></td>
+<td><code>1 &lt;&lt; 2</code></td>
+<td>Render a <em>rescaled</em> float in float shape (<code>5000.0</code>, not <code>5000</code>), so a value that took the rescale lands on the same spelling as one that did not. What <code>bovnar pretty-print --canonical</code> sets beside <code>BVN_UNIT_REDUCE</code></td>
 </tr>
 </tbody>
 </table>
@@ -2120,7 +2125,7 @@ bovnar<span class="w"> </span>query<span class="w"> </span>--require-unit<span c
 <hr />
 <p><em>End of Bovnar — Read &amp; Write API (Bovnar spec 1.2).</em></p>
 </main>
-<footer>Bovnar (BVNR) v1.1 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · <a href="/privacy.html">Privacy</a> · MIT-licensed</footer>
+<footer>Bovnar (BVNR) spec 1.2 · <a href="/">Home</a> · <a href="/docs/">All docs</a> · <a href="https://github.com/sothis/bovnar">Source</a> · <a href="/impressum.html">Impressum</a> · <a href="/privacy.html">Privacy</a> · MIT-licensed</footer>
 <button type="button" class="to-top" id="to-top" aria-label="Back to top" title="Back to top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M5 13l7-7 7 7"/></svg></button>
 <script src="/bovnar_highlight.js?v=f31f84f2becd"></script>
 <script>(function(){if(!window.BovnarHighlight)return;var b=document.querySelectorAll('pre code.language-bovnar');for(var i=0;i<b.length;i++)b[i].innerHTML=BovnarHighlight.highlight(b[i].textContent);})();</script>

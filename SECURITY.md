@@ -37,10 +37,11 @@ The **format** and the reference implementation are versioned separately, both
 semantically, and a fix lands on the newest release of the implementation only.
 Within a major version of the format it is additive: a document valid under spec
 1.0 stays valid, and decodes to the same values, under every 1.x spec, so a
-newer reader does not need a document migrated — with two exceptions, both
-recorded in the specification (§17) as corrections made in 1.2: whitespace
-inside a type-annotation parameter, and a bare array mixing units of one
-dimension, are now refused. The implementation's own major
+newer reader does not need a document migrated — with the exceptions the
+specification's §17 lists for 1.2: two corrections (whitespace inside a
+type-annotation parameter, and a bare array mixing units of one dimension, are
+now refused) and a short list of reader defects that let malformed input
+through. The implementation's own major
 moves when a program built against it has to change, which is what 2.0.0 was;
 `CHANGELOG.md` says which spec each release implements.
 

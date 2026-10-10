@@ -656,6 +656,28 @@ static void test_writer_value_agrees(void)
 	ASSERT_TRUE(ok && strstr(wbuf, ".a=<float:m>5;") != NULL, wbuf);
 	bvnr_writer_destroy(w);
 
+	/* A unit parameter event that carries the unit and no text at all is
+	 * written in canonical form. It used to write "<float:64,>". */
+	w = open_writer(false, 0);
+	if (!w) { failures++; return; }
+	memset(&d, 0, sizeof d);
+	d.type = token_is_identifier; d.data = "a"; d.length = 1;
+	ok = bvnr_write_event(w, ev_assignment_start, &d);
+	memset(&d, 0, sizeof d);
+	d.type = token_is_type;
+	d.value_type = BVN_TYPE_FLOAT(64);
+	d.value_unit = U("k~m");
+	ok = ok && bvnr_write_event(w, ev_type_annotation_start, &d);
+	ok = ok && bvnr_write_event(w, ev_type_annotation_type_family, &d);
+	d.type = token_is_unit;
+	ok = ok && bvnr_write_event(w, ev_type_annotation_type_family_parameter, &d);
+	d.type = token_is_type;
+	ok = ok && bvnr_write_event(w, ev_type_annotation_end, &d);
+	d.type = token_is_number; d.data = "5"; d.length = 1;
+	ok = ok && bvnr_write_event(w, ev_data, &d) && bvnr_write_finish(w);
+	ASSERT_TRUE(ok && strstr(wbuf, ".a=<float:k~m>5;") != NULL, wbuf);
+	bvnr_writer_destroy(w);
+
 	/* A datetime's parameter is its epoch, and only its epoch's own name. */
 	w = open_writer(true, 0);
 	if (!w) { failures++; return; }

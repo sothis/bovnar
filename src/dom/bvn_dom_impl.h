@@ -47,7 +47,7 @@ struct bvn_dom_node_s {
 	 * this is informational and used to round-trip the literal. */
 	char    *dt_frac;
 	uint32_t dt_frac_len;
-	/* spec 1.2 — the unit as the document spelled it (NUL-terminated), kept
+	/* library 2.0 — the unit as the document spelled it (NUL-terminated), kept
 	 * ONLY where that differs from bvn_unit_to_string(value_unit): a profile
 	 * spelling, a UCUM annotation, a compact prefix. NULL otherwise, so a
 	 * million-element array written in canonical units pays nothing. */

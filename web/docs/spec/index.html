@@ -5,7 +5,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://www.googletagmanager.com 'sha256-KXgaOoQf3ANIagLxGqNELtm67cSSRRLOWWkVK8RaZ1Y=' 'sha256-Qtn1FTroF99QGUeTl/5Cp/aoo4fLz6dXDH6fKkCR22k=' 'sha256-nCVfGd1NS24z5cdTpUxPHzqexdO2qVBS/lMf5GbAYwo=' 'sha256-Cye+JnTa0PWKn05L8nglrzyFGjcgzPCdeXTD8qlkemM=' 'sha256-EmLJ0P7dzb3MwCMZi2ljunfiNyL/IH80ELI8wUpvOvU='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.google-analytics.com https://www.googletagmanager.com https://*.g.doubleclick.net https://www.google.com https://google.com; font-src 'self'; connect-src https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://*.googletagmanager.com https://*.g.doubleclick.net https://www.google.com https://google.com https://pagead2.googlesyndication.com; frame-src https://www.googletagmanager.com; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>(function(){try{var s=localStorage.getItem('bovnar-theme');var d=s==='dark'||(s!=='light'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(!d)document.documentElement.setAttribute('data-theme','light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();</script>
-<title>Bovnar Specification (v1.1)</title>
+<title>Bovnar Specification (v1.2)</title>
 <meta name="description" content="The complete Bovnar (BVNR) format specification, version 1.1: grammar, type system, physical units, numeric bases, limits, and error semantics.">
 <meta name="theme-color" content="#1e1e1e">
 <meta name="robots" content="index, follow">
@@ -14,7 +14,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Bovnar">
-<meta property="og:title" content="Bovnar Specification (v1.1)">
+<meta property="og:title" content="Bovnar Specification (v1.2)">
 <meta property="og:description" content="The complete Bovnar (BVNR) format specification, version 1.1: grammar, type system, physical units, numeric bases, limits, and error semantics.">
 <meta property="og:url" content="https://www.bovnar.io/docs/spec/">
 <meta property="og:image" content="https://www.bovnar.io/bovnar-og.png">
@@ -25,14 +25,14 @@
 <meta property="article:modified_time" content="2026-10-10">
 
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Bovnar Specification (v1.1)">
+<meta name="twitter:title" content="Bovnar Specification (v1.2)">
 <meta name="twitter:description" content="The complete Bovnar (BVNR) format specification, version 1.1: grammar, type system, physical units, numeric bases, limits, and error semantics.">
 <meta name="twitter:image" content="https://www.bovnar.io/bovnar-og.png">
 <meta name="twitter:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
 <link rel="alternate" type="text/markdown" href="/doc/03_bovnar_spec.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Specification (v1.1)", "description": "The complete Bovnar (BVNR) format specification, version 1.1: grammar, type system, physical units, numeric bases, limits, and error semantics.", "url": "https://www.bovnar.io/docs/spec/", "mainEntityOfPage": "https://www.bovnar.io/docs/spec/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-10-10", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Specification (v1.1)", "item": "https://www.bovnar.io/docs/spec/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Specification (v1.2)", "description": "The complete Bovnar (BVNR) format specification, version 1.1: grammar, type system, physical units, numeric bases, limits, and error semantics.", "url": "https://www.bovnar.io/docs/spec/", "mainEntityOfPage": "https://www.bovnar.io/docs/spec/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-10-10", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Specification (v1.2)", "item": "https://www.bovnar.io/docs/spec/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
@@ -446,10 +446,11 @@ very first line:</p>
 <p><strong>An unversioned document is spec 1.0.</strong> A document with no directive is treated
 as targeting spec <strong>1.0</strong> — the frozen baseline grammar. The directive only ever
 <em>opts in</em> to a newer version; its absence is never ambiguous. Consequently, any
-syntax introduced after 1.0 (a future minor revision) is available only to a
-document that declares the matching version: a 1.1-only construct in an
-unversioned (i.e. 1.0) document is invalid, exactly as it would be to a 1.0
-reader. <code>bvnr_reader_get_declared_version</code> returns <code>false</code> for such a document
+syntax introduced after 1.0 is available only to a document that declares the
+version that introduced it, or a newer one. A 1.1 construct in an unversioned
+(i.e. 1.0) document is invalid, exactly as it would be to a 1.0 reader, and so
+is a 1.2 construct in a document declaring 1.1.
+<code>bvnr_reader_get_declared_version</code> returns <code>false</code> for an unversioned document
 (there is nothing declared), and a consumer that wants a concrete number should
 default to 1.0.</p>
 <p><strong>Form.</strong> <code>#</code> <code>!bovnar</code> followed by one or more spaces/tabs, a <code>&lt;major&gt;.&lt;minor&gt;</code>
@@ -487,8 +488,12 @@ opened with <code>strict_version</code> instead rejects any unsupported version
 </thead>
 <tbody>
 <tr>
-<td><code>#!bovnar 1.1</code></td>
+<td><code>#!bovnar 1.2</code></td>
 <td>current — accepted</td>
+</tr>
+<tr>
+<td><code>#!bovnar 1.1</code></td>
+<td>older minor — accepted</td>
 </tr>
 <tr>
 <td><code>#!bovnar 1.0</code></td>
@@ -1455,7 +1460,7 @@ rows, but <code>[]/[1]</code> is <code>error_array_row_size_mismatch</code>.</p>
 <p>Since spec 1.0 the elements of an array must be <strong>homogeneous</strong>. The rule is <em>"shape uniform, fields free"</em>, checked over the materialised value (above the lexer; it complements the streaming reader's per-value type and unit checks):</p>
 <ul>
 <li><strong>Kind.</strong> Every non-null element shares the same kind — number, string, symbol, bool, reference, octet stream, array, or struct. <code>[1, "two"]</code> and <code>[1, {.x=1;}]</code> are <code>error_array_element_type_mismatch</code>.</li>
-<li><strong>Unit</strong> (bare scalar arrays and matrices). Numeric elements must carry the <strong>same unit</strong>, not merely the same dimension; the numeric encodings (<code>uint</code>, <code>sint</code>, <code>float</code>, <code>float_fix</code>, <code>float_dec</code>) may mix freely. <code>[&lt;float:64,m&gt; 1.0, &lt;float:64,k~g&gt; 2.0]</code> (length vs mass) is rejected, and so are <code>[&lt;float:64,m&gt; 1.0, &lt;float:64,ft&gt; 2.0]</code> (a scale apart), <code>[&lt;float_dec:64,$USD&gt; 1.0, &lt;float_dec:64,k~$USD&gt; 2.0]</code> (a prefix apart) and <code>[&lt;float:64,°C&gt; 1.0, &lt;float:64,K&gt; 2.0]</code> (an affine <strong>offset</strong> apart). <code>[1, 2.5, 3]</code> (all dimensionless) is fine, and so is <code>[&lt;float:64,m*s&gt; 1.0, &lt;float:64,s*m&gt; 2.0]</code> — the comparison is order-insensitive, because unit multiplication commutes — as is an explicit <code>no_unit</code> beside an omitted unit, which are two spellings of the same thing. Each currency is its own unit, so a bare array may not mix <code>$USD</code> and <code>$EUR</code> values.</li>
+<li><strong>Unit</strong> (bare scalar arrays and matrices). Numeric elements must carry the <strong>same unit</strong>, not merely the same dimension (through spec 1.1 this rule read <em>the same dimension</em>; §17 records the correction); the numeric encodings (<code>uint</code>, <code>sint</code>, <code>float</code>, <code>float_fix</code>, <code>float_dec</code>) may mix freely. <code>[&lt;float:64,m&gt; 1.0, &lt;float:64,k~g&gt; 2.0]</code> (length vs mass) is rejected, and so are <code>[&lt;float:64,m&gt; 1.0, &lt;float:64,ft&gt; 2.0]</code> (a scale apart), <code>[&lt;float_dec:64,$USD&gt; 1.0, &lt;float_dec:64,k~$USD&gt; 2.0]</code> (a prefix apart) and <code>[&lt;float:64,°C&gt; 1.0, &lt;float:64,K&gt; 2.0]</code> (an affine <strong>offset</strong> apart). <code>[1, 2.5, 3]</code> (all dimensionless) is fine, and so is <code>[&lt;float:64,m*s&gt; 1.0, &lt;float:64,s*m&gt; 2.0]</code> — the comparison is order-insensitive, because unit multiplication commutes — as is an explicit <code>no_unit</code> beside an omitted unit, which are two spellings of the same thing. Each currency is its own unit, so a bare array may not mix <code>$USD</code> and <code>$EUR</code> values.</li>
 </ul>
 <p>The rule is the unit and not the dimension because of the sentence that closes this section: <em>a consumer may treat the elements identically</em>. Under dimensional homogeneity that sentence was false — a reader that took it at its word and applied one unit to <code>[1.0 m, 2.0 ft]</code> was wrong by 0.3048, and on <code>[1.0 °C, 2.0 K]</code> wrong by an added 273.15. An offset between two neighbouring cells is not a mistake anything downstream can notice, so it is refused at the parse, where every other wrong unit in this format is refused.
 - <strong><code>datetime</code> (spec 1.1).</strong> A <code>datetime</code> is its own kind: it does <strong>not</strong> mix with the plain numeric encodings above (<code>[&lt;datetime:64,unix&gt; 1, &lt;sint:64&gt; 2]</code> is <code>error_array_element_type_mismatch</code>). And, exactly as for currencies, its <strong>epoch is a dimension</strong> — a bare array may not mix epochs (<code>[&lt;datetime:64,unix&gt; 1, &lt;datetime:64,tai&gt; 2]</code> is rejected); a homogeneous same-epoch datetime array is fine. (These are materialised-document/DOM-tier rules, like the rest of §7.4.)
@@ -2237,7 +2242,7 @@ unit-component = [ prefix [ &quot;~&quot; ] ] base-unit [ unit-exponent ]
 <li>A bare base unit with no prefix requires no separator.</li>
 <li>When a prefix is present on a <strong>physical</strong> unit, the <code>~</code> separator is optional: <code>k~g</code> and <code>kg</code> are the same unit, as are <code>Mi~B</code> and <code>MiB</code>. The base unit is matched as the longest alias suffix, so a bare unit always outranks a prefixed reading of the same token (<code>min</code> is the minute, not milli-inch) — a compact spelling is therefore only ever accepted where the separated form would have been <code>error_unit_illegal</code>, and no existing document decodes differently because of it. Prefixes still cannot be stacked (<code>kkg</code>, <code>k~kg</code> → <code>error_unit_illegal</code>), prefix–unit validity is unchanged, and three compact spellings are refused by name because the token is a well-known annotation for something else: <code>usb</code> (the bus, not microstilb — write <code>u~sb</code>), <code>kt</code> (a standard abbreviation for <em>two</em> units this format models, the kilotonne and the knot — write <code>k~t</code> or <code>kn</code>) and <code>ppt</code> (parts per trillion or per thousand in the wild, a picopint by the compact rule — write <code>pptr</code>, <code>‰</code> or <code>p~pt</code>). <code>pH</code>, <code>mph</code> and <code>kph</code> needed an exception until the quantities they name became units in their own right; a bare alias outranks any prefixed reading, so they now resolve without one. See §4.3 of the unit-system reference.</li>
 <li>The same holds for a <strong>currency</strong>: <code>k~$EUR</code> and <code>k$EUR</code> are the same unit. The <code>$</code> sigil already separates the prefix from the code, so the compact form is unambiguous by construction — but the sigil itself stays mandatory, and <code>kUSD</code> is <code>error_unit_illegal</code> just as bare <code>USD</code> is.</li>
-<li>The canonical output form always carries the separator: <code>bvn_unit_to_string</code> and the <code>bvnr_write_*</code> helpers emit <code>k~g</code> whichever spelling was read.</li>
+<li>The canonical output form always carries the separator: <code>bvn_unit_to_string</code> and the <code>bvnr_write_*</code> helpers emit <code>k~g</code>. A <em>re-serialisation</em> is a different matter — it writes back the spelling the document carried (<code>unit_source</code>, §16.1), so <code>km</code> stays <code>km</code> through <code>bovnar pretty-print</code>; <code>--canonical</code> restores the separated form.</li>
 </ul>
 <div class="codehilite"><pre><code class="language-bovnar"># Simple (single-component) units — same as before
 .time = &lt;float:64,s&gt; 2.5;               # seconds
@@ -2442,7 +2447,7 @@ for anything genuinely out of range.</p>
 </tr>
 <tr>
 <td><code>cf</code></td>
-<td>CF standard names — translated to the <strong><code>canonical_units</code></strong> CF states for the name; <strong>read-only</strong>, a unit is never written back as one</td>
+<td>CF standard names — translated to the <strong><code>canonical_units</code></strong> CF states for the name; <strong>read-only</strong>: no unit is ever translated <em>into</em> a <code>cf:</code> code, though a spelling a document already carried is kept when it is re-serialised</td>
 <td>one whole code, never decomposed</td>
 </tr>
 </tbody>
@@ -2486,7 +2491,7 @@ for anything genuinely out of range.</p>
 </tr>
 </tbody>
 </table>
-<p><strong>Character set.</strong> A profile unit may use <code>'</code>, <code>[</code>, <code>]</code>, <code>{</code> and <code>}</code> in addition to the native unit characters (§11.4). A <code>,</code> inside <code>{…}</code> belongs to the unit rather than ending the type parameter. <code>;</code>, <code>#</code>, <code>&lt;</code>, <code>&gt;</code> and <code>"</code> remain excluded, so an unterminated bracket or annotation cannot consume the remainder of the document.</p>
+<p><strong>Character set.</strong> A profile unit may use <code>'</code>, <code>[</code>, <code>]</code>, <code>{</code> and <code>}</code> in addition to the native unit characters (§11.4). A <code>,</code> inside <code>{…}</code> belongs to the unit rather than ending the type parameter, and inside a type annotation SP and HT within the code belong to it too (§5.3) — UDUNITS multiplies with a space. An inline suffix admits neither. <code>;</code>, <code>#</code>, <code>&lt;</code>, <code>&gt;</code> and <code>"</code> remain excluded, so an unterminated bracket or annotation cannot consume the remainder of the document.</p>
 <p>The complete notation, the transliteration table, and the codes that have no representation are specified in <a href="https://www.bovnar.io/docs/profiles/">Unit Profiles</a>.</p>
 <hr />
 <h2 id="12-validation--constraints">12. Validation &amp; Constraints</h2>
@@ -3311,8 +3316,8 @@ alone would: <code>;</code> remains a boundary in every case it was one before.<
 <span class="w">    </span><span class="kt">uint32_t</span><span class="w">          </span><span class="n">length</span><span class="p">;</span>
 <span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w">       </span><span class="n">frac_data</span><span class="p">;</span><span class="w">    </span><span class="cm">/* spec 1.1 — ISO datetime sub-second digits, else NULL */</span>
 <span class="w">    </span><span class="kt">uint32_t</span><span class="w">          </span><span class="n">frac_length</span><span class="p">;</span><span class="w">  </span><span class="cm">/* spec 1.1 — length of frac_data, else 0 */</span>
-<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w">       </span><span class="n">unit_source</span><span class="p">;</span><span class="w">        </span><span class="cm">/* spec 1.2 — the unit as the document spelled it, else NULL */</span>
-<span class="w">    </span><span class="kt">uint32_t</span><span class="w">          </span><span class="n">unit_source_length</span><span class="p">;</span><span class="w"> </span><span class="cm">/* spec 1.2 — length of unit_source, else 0 */</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w">       </span><span class="n">unit_source</span><span class="p">;</span><span class="w">        </span><span class="cm">/* library 2.0 — the unit as the document spelled it, else NULL */</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w">          </span><span class="n">unit_source_length</span><span class="p">;</span><span class="w"> </span><span class="cm">/* library 2.0 — length of unit_source, else 0 */</span>
 <span class="w">    </span><span class="kt">bool</span><span class="w">              </span><span class="n">converted</span><span class="p">;</span><span class="w">    </span><span class="cm">/* a want_unit read-time conversion was applied (§ read-time conversion) */</span>
 <span class="w">    </span><span class="n">bvnr_converted_t</span><span class="w">  </span><span class="n">conv</span><span class="p">;</span><span class="w">         </span><span class="cm">/* the exact converted value (unit + text + rational); zeroed when converted is false */</span>
 <span class="p">}</span><span class="w"> </span><span class="n">bvnr_data_t</span><span class="p">;</span>
@@ -3720,16 +3725,26 @@ revisions:</p>
   additive direction as a new unit: a spelling is only ever accepted where the
   parser previously raised <code>error_unit_illegal</code>, the base symbol is still
   matched as the longest alias suffix so no existing spelling changes meaning,
-  and the <strong>canonical output form is unaffected</strong> — the writer keeps emitting
-  the separated <code>k~g</code>, so a document that round-trips stays readable to a
-  reader that predates the spelling;</li>
+  and the <strong>canonical output form is unaffected</strong> — <code>bvn_unit_to_string</code> and a
+  writer handed no spelling keep emitting the separated <code>k~g</code>, and
+  <code>bovnar pretty-print --canonical</code> restores it, so a document can always be
+  made readable to a reader that predates the spelling. (A plain
+  re-serialisation keeps the spelling the document was written in.);</li>
+<li><strong>new constructs gated on the version that introduced them</strong> — available only
+  to a document whose <code>#!bovnar</code> directive declares that version or a newer
+  one, and an error in any other, so no existing document can acquire one by
+  accident. This is how both minor revisions so far were delivered: 1.1 added
+  the <code>datetime</code> family, the <code>\x</code>/<code>\u{}</code> escapes and reference array indexing;
+  1.2 added the unit-profile notation (§11.9);</li>
 <li><strong>new error codes</strong> appended after the current maximum (existing numeric values
   never change). The five the <em>grammar</em> of 1.1 required are
   <code>error_invalid_spec_version</code> (42), <code>error_unsupported_spec_version</code> (43),
   <code>error_invalid_codepoint</code> (44), <code>error_invalid_datetime_literal</code> (45), and
   <code>error_datetime_literal_unsupported_epoch</code> (46) — those carry a <code>spec 1.1</code>
-  note in §16.10. Codes have been appended since for facilities beside the
-  wire format and for reader policy. <strong>§16.10 is the list</strong>, and the current
+  note in §16.10. Codes appended since: 47 and 48 for facilities beside the
+  wire format, 49 and 50 for the spec 1.2 unit profiles, 51 for a reader
+  policy, and 52 for a lexical rule the grammar always implied (see the
+  corrections below). <strong>§16.10 is the list</strong>, and the current
   maximum is wherever it ends — never a number quoted somewhere else, this
   paragraph included;</li>
 <li>the <strong>optional version directive</strong> (§3.4), added in 1.1: it is an ordinary
@@ -3740,9 +3755,28 @@ revisions:</p>
 <p>A reader from an older 1.x point release may not recognise a unit or currency
 added in a newer one; that is the expected direction of forward compatibility and
 is not a break of the 1.0 promise.</p>
+<p><strong>Two corrections made in 1.2, stated because they bend the sentence above.</strong>
+Both refuse documents that a 1.1 reader accepted, and both apply to every
+document, whatever it declares. They are recorded as corrections of defects
+rather than as changes of the format, on these grounds:</p>
+<ul>
+<li><em>Whitespace inside a type-annotation parameter</em> is
+  <code>error_type_param_whitespace</code> (§5.3). The grammar never derived it — every
+  <code>ws</code> in an annotation sits beside a separator — but the reference reader
+  deleted it, so <code>&lt;float:64,k g&gt;</code> was read as <code>k~g</code>. A document relying on that
+  carried a unit its author did not write.</li>
+<li><em>A bare array is homogeneous in its unit, not merely its dimension</em> (§7.4).
+  The rule as written through 1.1 let <code>[1 m, 2 ft]</code>-shaped arrays through
+  while the same section promised that a consumer may treat the elements
+  identically; a consumer who believed it computed wrong numbers. The promise
+  was kept and the rule corrected to make it true.</li>
+</ul>
+<p>Neither changes what any accepted document <em>means</em>. A producer affected by
+either was already emitting data that could not be read correctly.</p>
 <p><strong>What requires a 2.0.</strong> Any change that could render a valid 1.x document invalid,
-change how it decodes, renumber an error code, or alter the grammar is a breaking
-change and is reserved for a major (2.0) revision. The changes that motivated
+change how it decodes, renumber an error code, or change what an existing
+document's bytes mean is a breaking change and is reserved for a major (2.0)
+revision of the <em>format</em> — which is not the library's version (above). The changes that motivated
 the 1.0 freeze — the <strong>mandatory <code>$</code> currency sigil</strong> (§10.4 of the unit-system
 reference), <strong>array element homogeneity</strong> (§7.4), and <strong><code>float_fix</code> value-range
 validation</strong> (§6.2, rejecting a value the declared Q-format cannot represent) —

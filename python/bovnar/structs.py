@@ -301,8 +301,8 @@ class BvnrData(ctypes.Structure):
         ('length',      ctypes.c_uint32),
         ('frac_data',   ctypes.c_void_p),    # spec 1.1 — ISO datetime sub-second digits, else NULL
         ('frac_length', ctypes.c_uint32),    # spec 1.1 — length of frac_data, else 0
-        ('unit_source', ctypes.c_void_p),    # spec 1.2 — the unit as the producer spelled it, else NULL
-        ('unit_source_length', ctypes.c_uint32),  # spec 1.2 — length of unit_source, else 0
+        ('unit_source', ctypes.c_void_p),    # library 2.0 — the unit as the producer spelled it, else NULL
+        ('unit_source_length', ctypes.c_uint32),  # library 2.0 — length of unit_source, else 0
         ('converted',   ctypes.c_bool),      # lossless read-time conversion applied?
         ('conv',        BvnrConverted),      # exact converted value when converted
     ]
@@ -315,7 +315,7 @@ class BvnrData(ctypes.Structure):
             self.frac_data).raw.decode('ascii')
 
     def unit_source_str(self) -> "str | None":
-        """The unit exactly as the document spelled it (spec 1.2), or None when
+        """The unit exactly as the document spelled it (library 2.0), or None when
         the value carries no unit.
 
         ``value_unit`` is what the unit means; this is what was written. They

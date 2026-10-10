@@ -205,7 +205,7 @@ class DomNode:
     @property
     def unit_source(self) -> "str | None":
         """
-        The node's unit exactly as the document spelled it (spec 1.2), where
+        The node's unit exactly as the document spelled it (library 2.0), where
         that says something ``unit`` cannot -- ``ucum:mL{total}`` is the unit
         ``m~L``, and the annotation survives only here. ``None`` for a node with
         no unit, for one already written in canonical form (``unit_str`` is then

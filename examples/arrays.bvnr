@@ -108,7 +108,7 @@
 
 # ── 12. Homogeneity: mixed-type data is a struct, not an array ────────────────
 # Since spec 1.0, array elements are homogeneous: every non-null element shares
-# the same kind and (for bare scalar arrays) the same physical dimension. Values
+# the same kind and (for bare scalar arrays) the same unit. Values
 # of completely different kinds belong in a struct with named fields:
 
 .record = {

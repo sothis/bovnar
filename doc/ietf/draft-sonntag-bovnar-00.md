@@ -360,7 +360,8 @@ grammar and are stated in prose only:
   so it accepts every construct in every document. The constructs
   introduced after 1.0 - the `datetime` family, the `\x` and `\u{}`
   escapes, and reference array indexing - are valid only in a document
-  that declares 1.1 or newer ({{version}}). This is the single largest
+  that declares 1.1 or newer, and a `namespace:code` unit only in one
+  that declares 1.2 or newer ({{version}}). This is the single largest
   class of rule the grammar cannot carry.
 
 * **String escape semantics** ({{strings}}): that `\u{}` names a Unicode
@@ -547,7 +548,9 @@ introduced after 1.0 is therefore available only to a document that
 declares a version at least as new: in an undeclared document, the 1.1
 constructs (the `datetime` family, the `\x` and `\u{}` string escapes,
 and reference array indexing) are invalid exactly as they would be to a
-1.0 consumer.
+1.0 consumer, and the one 1.2 construct (a `namespace:code` unit,
+{{unit-profiles}}) is invalid in any document that declares less than
+1.2.
 
 Recognition is strict:
 
@@ -1441,10 +1444,14 @@ fields free*:
 * **Kind.** Every non-null element shares one kind. `[1, "two"]` and
   `[1, {.x=1;}]` are `error_array_element_type_mismatch`.
 
-* **Dimension.** Numeric elements MUST share one physical dimension,
-  though the numeric encodings may mix freely. `[1, 2.5, 3]` is valid;
-  `[<float:64,m> 1.0, <float:64,k~g> 2.0]` is not. Each currency is its
-  own dimension, so a bare array MUST NOT mix `$USD` and `$EUR`.
+* **Unit.** Numeric elements MUST carry the same unit, not merely the
+  same physical dimension, though the numeric encodings may mix freely.
+  `[1, 2.5, 3]` is valid; `[<float:64,m> 1.0, <float:64,k~g> 2.0]` is
+  not, and neither is `[<float:64,m> 1.0, <float:64,k~m> 2.0]`, whose
+  elements differ only in scale. The comparison is of the unit and not
+  of its spelling. Each currency is its own unit, so a bare array MUST
+  NOT mix `$USD` and `$EUR`. (Through version 1.1 this rule read "the
+  same dimension"; see {{version-stability}}.)
 
 * **Datetime.** A `datetime` is its own kind and does not mix with the
   plain numeric encodings. Its **epoch is a dimension**, exactly as a
@@ -1682,8 +1689,9 @@ A producer MUST:
 * emit well-formed UTF-8 in the text layer ({{encoding}});
 * **emit a version declaration when the document uses any construct
   introduced after version 1.0** ({{version}}) - the `datetime` family,
-  the `\x` and `\u{}` string escapes, and reference array indexing. A
-  document using one without declaring 1.1 is invalid, and the failure is
+  the `\x` and `\u{}` string escapes, and reference array indexing,
+  which need 1.1, and a `namespace:code` unit, which needs 1.2. A
+  document using one without declaring its version is invalid, and the failure is
   easy to miss because every *other* value in it is usually fine;
 * emit the canonical separated prefix form `k~g` when serializing a unit
   it holds as a value; a producer reproducing an existing document MAY
@@ -1721,7 +1729,7 @@ MUST additionally enforce:
 
 | Rule | Error |
 |---|---|
-| Array element kind and dimension ({{array-homogeneity}}) | `error_array_element_type_mismatch` |
+| Array element kind and unit ({{array-homogeneity}}) | `error_array_element_type_mismatch` |
 | Ragged sibling sub-arrays ({{array-homogeneity}}) | `error_array_row_size_mismatch` |
 | Sibling struct shape ({{array-homogeneity}}) | `error_struct_shape_mismatch` |
 | Duplicate key in one scope ({{model}}) | `error_duplicate_struct_key` |
@@ -1786,8 +1794,20 @@ limits and options whose defaults preserve behaviour; and constructs
 gated behind a version declaration ({{version}}).
 
 What requires a major revision: anything that could render a valid
-document invalid, change how it decodes, renumber an error code, or alter
-the grammar.
+document invalid, change how it decodes, renumber an error code, or
+change what an existing document's octets mean.
+
+Version 1.2 made two corrections that refuse documents a 1.1 consumer
+accepted, and they are recorded here because they bend the first
+paragraph of this section. Whitespace inside a type-annotation parameter
+is now code 52 ({{error-codes}}); the grammar never derived it, but the
+reference consumer deleted it, so that `<float:64,k g>` was read as the
+kilogram. And array homogeneity is by unit where it was by dimension
+({{array-homogeneity}}), because the rule as written let a consumer that
+treated the elements of `[1 m, 2 ft]`-shaped data identically - as the
+same section told it it could - compute wrong values. Neither changes
+what any accepted document means; both apply to every document whatever
+version it declares.
 
 # Interoperability Considerations {#interop}
 
@@ -2556,7 +2576,7 @@ Every violation this document specifies is reported with one of the codes
 below. The numeric values are stable: an existing value never changes,
 and a new code is appended above the current maximum ({{version-stability}}).
 
-The class column distinguishes six kinds of code, only two of which say
+The class column distinguishes seven kinds of code, only two of which say
 the document is invalid:
 
 D:
@@ -2662,8 +2682,9 @@ report *in addition to* another, rather than instead of it: reaching end
 of input while recovering from an earlier error yields the original code
 first and this one second ({{error-recovery}}).
 
-`error_octet_stream_forbidden` (51) is the only code here that a valid
-document can provoke. It is what a consumer opened in the text-only mode
+`error_octet_stream_forbidden` (51) is, with `error_unit_profile_unknown`
+(49) on a consumer lacking a namespace ({{unit-profiles}}), one of the
+two codes here that a valid document can provoke. It is what a consumer opened in the text-only mode
 of {{interop-transport}} reports on meeting an octet stream: the document
 is well-formed and the octet stream is a first-class part of the format,
 but this consumer has asserted that its channel carries text. Reporting
@@ -2686,9 +2707,11 @@ therefore a requirement of this document and not a lexical nicety.
 The unit-profile facility of {{error-codes}}, which this document does not
 specify, admits whitespace inside a parameter that carries a profile
 namespace, where it is part of the foreign code rather than a separator. A
-consumer that implements no profile never reaches that case: with no
-namespace to recognise, every parameter is a native one and code 52 applies
-throughout.
+parameter carrying a namespace prefix is therefore never code 52: in a
+document declaring 1.2 or newer it is the foreign code, or
+`error_unit_profile_unknown` (49) for a namespace the consumer does not
+implement; in a document declaring less it is `error_unit_illegal`,
+whatever whitespace it contains.
 
 
 # Examples {#examples}

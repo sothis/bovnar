@@ -689,7 +689,7 @@ class _TypedDictParser(_DictParser):
         # not in `raw` (the whole-second carrier); carry them so dumps() can
         # round-trip the fraction losslessly.
         frac = data.frac_str() if data is not None else None
-        # spec 1.2 — and the unit's own spelling, for the same reason.
+        # library 2.0 — and the unit's own spelling, for the same reason.
         usrc = data.unit_source_str() if data is not None else None
         return Quantity(text, vt, vu, tok_type, frac=frac, unit_source=usrc)
 
@@ -892,7 +892,7 @@ def _emit_quantity(w: Writer, key: str, q: 'Quantity') -> None:
     if frac_bytes:
         d.frac_data   = _ct.cast(_ct.c_char_p(frac_bytes), _ct.c_void_p)
         d.frac_length = len(frac_bytes)
-    # spec 1.2 — the unit's spelling rides on the value as well: where the
+    # library 2.0 — the unit's spelling rides on the value as well: where the
     # annotation carries no unit parameter (a string's unit is written inline)
     # this event is the only place the writer can take it from.
     src_bytes = q.unit_source.encode('utf-8') if q.unit_source else None

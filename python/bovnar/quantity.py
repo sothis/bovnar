@@ -161,7 +161,7 @@ class Quantity:
         # with no fraction. Carried through dumps() so a fractional datetime
         # round-trips losslessly via the C writer's ISO-literal reconstruction.
         self._frac     = frac
-        # spec 1.2 — the unit as the document SPELLED it, where that says more
+        # library 2.0 — the unit as the document SPELLED it, where that says more
         # than `unit` can: "ucum:mL{total}" is the unit m~L, and the annotation
         # survives only here. dumps() writes this spelling back; the C writer
         # refuses one that does not parse to `unit`, so a stale or mistyped

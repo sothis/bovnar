@@ -331,6 +331,17 @@ set(BVNR_SOURCES
 )
 
 add_library(bvnr_objects OBJECT ${BVNR_SOURCES})
+# FAT LTO objects. The static archive is SHIPPED (the release tarball,
+# `cmake --install`), and with plain LTO every member of libbvnr.a is GIMPLE
+# bytecode and nothing else: it links only with the same GCC major and only with
+# LTO on, so clang -- or a GCC one version away -- gets "undefined reference" for
+# every symbol of an archive that plainly contains them. Fat objects carry the
+# machine code as well. It is a target option, and has to be: CMake's own IPO
+# flags for GCC end in -fno-fat-lto-objects, which a flag in CMAKE_C_FLAGS
+# cannot override because it comes first.
+if(BVNR_LTO AND CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(bvnr_objects PRIVATE -ffat-lto-objects)
+endif()
 target_compile_options(bvnr_objects PRIVATE ${BVNR_C_FLAGS})
 # The per-profile switches. Passed as 0/1 rather than as define/undef, because
 # bvn_profile_impl.h defaults them to 1 with #ifndef and tests them with #if --
@@ -687,6 +698,16 @@ endif()
 # System integration for the Bovnar media type (text/vnd.bovnar) and the .bvnr
 # extension. Skipped for the Python wheel build (SKBUILD). After `make install`
 # run `update-mime-database <datadir>/mime` to refresh the desktop database.
+# The licence, and the notices for the third-party identifiers the unit-profile
+# tables carry (UCUM, QUDT, OM 2, UDUNITS-2, CF, UN/ECE). The release archives
+# and the wheel already ship both; an install tree did not, which is the tree a
+# distribution package is cut from -- and UDUNITS-2's licence requires its
+# notice to accompany a binary.
+if(NOT SKBUILD)
+    install(FILES LICENSE THIRD_PARTY_NOTICES.md
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/bovnar)
+endif()
+
 if(NOT SKBUILD)
     option(BVNR_INSTALL_MIME
         "Install the freedesktop shared-mime-info entry + file(1) magic for *.bvnr"

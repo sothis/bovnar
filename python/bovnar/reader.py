@@ -275,7 +275,7 @@ class Reader:
         # spec 1.1 — an ISO datetime literal's sub-second digits.
         snap.frac_data   = src.frac_data
         snap.frac_length = src.frac_length
-        # spec 1.2 — the unit's own spelling; reader-owned like the two above.
+        # library 2.0 — the unit's own spelling; reader-owned like the two above.
         snap.unit_source        = src.unit_source
         snap.unit_source_length = src.unit_source_length
         # Lossless read-time conversion result (see want_unit). The exact `text`

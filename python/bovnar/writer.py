@@ -457,7 +457,7 @@ class Writer:
                 d_unit.data = ctypes.cast(
                     ctypes.c_char_p(raw_unit), ctypes.c_void_p)
                 d_unit.length = ulen
-                # spec 1.2 — the producer's own spelling, when one was kept. The
+                # library 2.0 — the producer's own spelling, when one was kept. The
                 # C writer checks it against `vu` and ignores it under a unit
                 # flag; `_keep_src` must outlive the call.
                 if unit_source:

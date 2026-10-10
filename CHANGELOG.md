@@ -27,16 +27,99 @@ a long review of the unit subsystem turned up. See
 [`RELEASE_NOTES_v2.0.0.md`](RELEASE_NOTES_v2.0.0.md) for the summary; what
 follows is the record.
 
-The on-the-wire format grows only additively *except in one place*: the unit
+The on-the-wire format grows only additively *except in two places*: the unit
 parser accepts one new input spelling (the compact prefix form, below), the
 canonical output form is unchanged, and every existing document parses to exactly
 the same values — **unless it has whitespace inside a type-annotation parameter**,
-which used to be deleted and is now an error. See the first entry below; those
-documents carried a unit their author did not write. **The ABI breaks**:
+which used to be deleted and is now an error, **or is a bare array mixing units
+of one dimension**, which the document tier now refuses. Both are recorded below
+and in doc/03 §17 as corrections; the first kind of document carried a unit its
+author did not write, and the second was being read wrongly by any consumer that
+took §7.4 at its word. **The ABI breaks**:
 `bvnr_data_t` and `bvnr_read_flags_t.want_unit` changed shape (see below) —
 rebuild consumers against the new headers. **SOVERSION is bumped 1 → 2**
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
+
+### Fixed — what a release review of the writer, the reader and the build turned up
+
+Found by reviewing the tree as a release candidate, each confirmed by running it.
+
+**The writer**
+
+- **A unit parameter's text went out unchecked.** The spelling check covered
+  `unit_source` and not the event's older `data` field, which the serialiser
+  writes when there is no `unit_source`. A hand-built event with
+  `data = "kg>1;.k=<uint:8,m"` and a `value_unit` of metres was accepted and
+  produced a different unit and a second assignment. Both fields are now held
+  to the same rule; where both are set they must agree. Under a unit flag the
+  text is compared in the form the flag produces.
+- **A spelling could push an annotation past the reader's 255-byte cap.** The
+  check asked whether the spelling was readable on its own, and the cap is on
+  the annotation as a whole — so `<float_fix:128,q64,…>` with a 240-byte
+  spelling was written and could not be read back. Refused now, as
+  `error_unit_too_long`, and the serialiser enforces the cap itself.
+- **A valid document replayed into one the reader refused.** Whether an
+  annotation had already written the unit was tracked once per value, not per
+  array, so an element annotation without a unit (`<uint:8>` inside a
+  `<float:64,s>` array) switched it off for every later element — each of which
+  then gained an inline unit, and the reader takes none inside `[…]`. It is
+  tracked per array row. This predates the spelling work.
+- **An inline unit on an array element is refused** (`error_unit_illegal`) when
+  a caller builds one by hand; it used to be written.
+- **The one-shot spelling could land on the wrong value.** It was consumed by
+  the next *annotation*, so after a string or a bool it travelled on to
+  whichever later value had a unit. It is for the next value: if that value
+  takes no unit, the write that follows fails with `error_unit_mismatch`.
+
+**The reader**
+
+- **A value could lose its unit in silence.** In `<float:64,s>[<float:64> 1, 3]`
+  the element annotation carries no unit, and the array's `s` was not restored
+  after it: the `3` was delivered with no unit at all. The frame only restored
+  when a *dimensioned* annotation had intervened. It restores after any.
+- **`value_unit` and `unit_source` could come from two parses of one unit.**
+  `<float:64,s·m> 1 m·s` took the struct from the suffix and the text from the
+  annotation; the two are equal, but not identical, and the DOM's decision to
+  keep a spelling then depended on the order of the document.
+
+**Python**
+
+- **`array_to_bvnr` could not write a unit with no native spelling**, for the
+  reason `dumps()` could not: it knew to declare 1.1 for a datetime array and
+  nothing about 1.2.
+
+**The build and the release machinery**
+
+- **CI was red on a change nobody made.** `pytest` pulls in the newest Pygments,
+  2.21 stopped escaping quotes in its HTML, and `bvnr_html_docs` compared eleven
+  committed pages against a regeneration that differed in every code block.
+  Pygments is pinned to the version the pages are generated with.
+- **The release gate would have failed the release.** `check_release_links.py`
+  requires the Downloads menu to follow the tag, and ran on the tagged commit
+  itself — where the archives it wants linked are what that CI run is about to
+  build. `release` waits for the tests, so the GitHub release would have had no
+  archives; `publish` did not, so PyPI would have published anyway. The tagged
+  commit is now exempt, and `publish` waits for the tests too.
+- **The shipped static library only linked with the compiler that built it.**
+  With plain LTO every member of `libbvnr.a` is compiler bytecode. The objects
+  are now fat: the same archive links with or without LTO.
+- **`cmake --install` installed no licence and no third-party notices**, though
+  the archives and the wheel carry both.
+- **Seven gates failed in a build with a profile compiled out** for no reason
+  but the configuration — they ask the built library whether what the documents
+  say about every vocabulary is true. They are disabled there, visibly.
+- `CITATION.cff` still described 1.1.0; the VS Code extension still called
+  itself 1.1.0 after its grammar changed; the site said "spec v1.1".
+
+**The documents** — some thirty statements that were false: leftovers of
+"under implementation" in the FAQ, the README, doc/09 and the EBNF header; "the
+writer always emits `k~g`" in six places, which a re-serialisation has not done
+for an annotation since before this release; doc/11's assertion counts and
+namespace lists stuck at five; the component limit quoted as 8 where it is 32; a
+Python README example that raised `TypeError` under the 2.0 API; and the IETF
+draft still requiring arrays to agree in *dimension*. doc/03 §17 now states the
+two corrections of this release instead of promising they could not happen.
 
 ### Added — the profile tables are checked against their publishers on a schedule
 
@@ -102,9 +185,13 @@ grows the struct**, under the SOVERSION bump this release already carries.
   now byte-identical.
 - **wasm.** `events()` reports `unit_source` beside `unit`.
 
-Nothing that worked before writes different bytes: a reader-to-writer replay
-(`bovnar pretty-print`) already carried the annotation's text, and its output is
-unchanged. Pinned by `tests/bovnar_unit_source_test.c` (103 assertions) and
+A reader-to-writer replay (`bovnar pretty-print`) already carried an
+*annotation's* text, and for annotated values its output is unchanged. **One
+shape does change**: a unit written only as an inline suffix beside an
+annotation that names no unit — `<float:64> 1.0 km` — used to come back in
+canonical form (`1.0 k~m`) and now keeps its spelling (`1.0 km`), like every
+other unit in the document. `--canonical` is unaffected. Pinned by
+`tests/bovnar_unit_source_test.c` (186 assertions) and
 `python/tests/test_unit_source.py`.
 
 ### Fixed — a long unit text under a unit flag overran a stack buffer in the writer

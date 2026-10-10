@@ -28,13 +28,13 @@ Participants are expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 Bovnar is a library and a specification. The specification is versioned
 (`doc/03_bovnar_spec.md`), has a formal grammar (`doc/12_bovnar.ebnf`), a
-registered IANA media type (`text/vnd.bovnar`), and a 387-case conformance suite
+registered IANA media type (`text/vnd.bovnar`), and a 470-case conformance suite
 that third-party parsers can be measured against.
 
 A document that parses under a given spec version must keep parsing, and must
 keep meaning the same thing. Changing the library is an ordinary code change.
 Changing what the grammar accepts, or what a value means, is a specification
-change and is gated behind a spec version directive (`#!bovnar 1.1`). The two
+change and is gated behind a spec version directive (`#!bovnar 1.2`, say). The two
 are reviewed differently — see [Proposing a Change](#proposing-a-change) — so
 please do not combine them in one pull request.
 
@@ -154,7 +154,7 @@ Label filters narrow a run while iterating:
 
 ```bash
 ctest -L unit                  # C unit tests
-ctest -L conformance           # the 387-case suite
+ctest -L conformance           # the 470-case suite
 ctest -L cli                   # command-line behaviour
 ctest -L python                # bindings (needs libbvnr.so; CTest injects the path)
 ctest -L fuzz_deep             # the long fuzz tier
@@ -216,7 +216,7 @@ source and re-run the generator instead.
 |---|---|---|
 | `include/bovnar_units.gen.h` | `src/gendata/units.bvnr` | `gen_units.py` |
 | `include/bovnar_si_prefix.gen.h`, `include/bovnar_iec_prefix.gen.h` | `src/gendata/prefixes.bvnr` | `gen_prefixes.py` |
-| `include/bovnar_profiles.gen.h` | `src/gendata/ucum.bvnr`, `unece.bvnr`, `qudt.bvnr`, `qudt-qk.bvnr`, `udunits.bvnr` | `gen_profiles.py` |
+| `include/bovnar_profiles.gen.h` | `src/gendata/ucum.bvnr`, `unece.bvnr`, `qudt.bvnr`, `qudt-qk.bvnr`, `udunits.bvnr`, `om.bvnr`, `cf.bvnr` | `gen_profiles.py` |
 | `build/generated/bovnar_currency_table.gen.inc` | `src/gendata/currencies.bvnr` | `gen_currencies.py` |
 | `python/bovnar/_pint_units.py` | the unit registry | `gen_units.py` |
 | `web/docs/*.html` | `doc/*.md` | `gen_html_docs.py` |

@@ -121,7 +121,7 @@ void bvn_dom_node_destroy(bvn_dom_node_t *n)
 		 * field freed on one arm of a switch over an unrelated discriminator
 		 * becomes one the moment that stops holding. */
 		free(cur->dt_frac);   /* spec 1.1 datetime sub-second digits */
-		free(cur->unit_src);  /* spec 1.2 the unit's own spelling */
+		free(cur->unit_src);  /* library 2.0 the unit's own spelling */
 		switch (cur->type) {
 		case BVN_DOM_INT:
 			if (cur->value_type.width > 64u && cur->val.bigint)

@@ -545,7 +545,7 @@ static bool evt_cb(void *ud, bvnr_event_t e, bvnr_data_t *d)
 		sb_json_str_body(b, (const char *)d->frac_data, d->frac_length);
 		sb_putc(b, '"');
 	}
-	/* spec 1.2 — the unit as the document spelled it, beside the canonical
+	/* library 2.0 — the unit as the document spelled it, beside the canonical
 	 * "unit" above: "ucum:mL{total}" where "unit" says "m~L". */
 	if (d->unit_source && d->unit_source_length) {
 		sb_puts(b, ",\"unit_source\":\"");

@@ -60,7 +60,7 @@ each value as a `Quantity`:
 ```python
 data = bovnar.loads(b".velocity = <float:64,m/s> 9.81;\n", typed=True)
 q = data["velocity"]
-print(q.raw, bovnar.unit_to_str(q.unit))   # 9.81 m/s
+print(q.raw, q.unit)                       # 9.81 m/s
 ```
 
 Units and conversions are backed by the C library:

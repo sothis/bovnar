@@ -2,7 +2,7 @@
 
 **Unit-safe serialization for scientific and industrial systems — with a C99 reference implementation.**
 
-[![Spec version](https://img.shields.io/badge/spec-1.1-blue)](doc/03_bovnar_spec.md)
+[![Spec version](https://img.shields.io/badge/spec-1.2-blue)](doc/03_bovnar_spec.md)
 [![License: MIT + third-party notices](https://img.shields.io/badge/license-MIT%20%2B%20notices-green)](LICENSE)
 [![C standard](https://img.shields.io/badge/C-C99-orange)](CMakeLists.txt)
 [![Website](https://img.shields.io/badge/web-bovnar.io-blue)](https://www.bovnar.io)
@@ -91,7 +91,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
 - **Browser playground** — the real C reference parser, compiled to WebAssembly (`bovnar_parser_wasm.js` over `bovnar_wasm_core.js`), runs the reference verified event stream (with full type/unit/value validation) in the browser and powers an interactive web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
-- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 425-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
+- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 470-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
 
 ---
 
@@ -228,7 +228,7 @@ Because these code systems sit at a different layer, they can be **components ra
 
 The notation is **spec 1.2** and, like every construct added after 1.0, is opt-in per document: it needs the `#!bovnar 1.2` directive, and without one `ucum:mm[Hg]` is simply not a unit. Native units are unaffected in every version.
 
-A profile code is translated at parse time into exactly the same unit a native spelling produces, so nothing downstream can tell which notation was used. That holds *across* vocabularies too — `ucum:kg`, `unece:KGM`, `qudt:KiloGM`, `udunits:kg`, `om:kilogram` and `qudt-qk:Mass` are one and the same `value_unit_t`, and a cross-vocabulary suite of 4776 assertions over 64 concepts checks every spelling against every other one pairwise.
+A profile code is translated at parse time into exactly the same unit a native spelling produces, so nothing downstream can tell which notation was used. That holds *across* vocabularies too — `ucum:kg`, `unece:KGM`, `qudt:KiloGM`, `udunits:kg`, `om:kilogram` and `qudt-qk:Mass` are one and the same `value_unit_t`, and a cross-vocabulary suite of 4789 assertions over 64 concepts checks every spelling against every other one pairwise.
 
 The enforcement point does not move. A profile code either becomes a real unit or becomes an error — there is no passthrough that would let an unchecked string reach a value:
 
@@ -323,7 +323,7 @@ bovnar/
 ├── doc/
 │   ├── 01_bovnar_tutorial.md
 │   ├── 02_bovnar_faq.md               # Frequently asked questions
-│   ├── 03_bovnar_spec.md              # Format specification (v1.1)
+│   ├── 03_bovnar_spec.md              # Format specification (v1.2)
 │   ├── 04_bovnar_unit_cheatsheet.md   # Units & currencies quick reference
 │   ├── 05_bovnar_unit_system.md
 │   ├── 06_bovnar_unit_policy.md       # Unit policy: validation & conversion
@@ -331,7 +331,7 @@ bovnar/
 │   ├── 08_bovnar_readwrite_api.md
 │   ├── 09_bovnar_python_bindings.md
 │   ├── 10_bovnar_streaming.md         # Streaming, framing & multiplexing
-│   ├── 11_bovnar_unit_profiles.md     # UCUM/UNECE/QUDT/UDUNITS codes in a unit slot
+│   ├── 11_bovnar_unit_profiles.md     # UCUM/UNECE/QUDT/UDUNITS/OM/CF codes in a unit slot
 │   ├── 12_bovnar.ebnf                 # Formal EBNF grammar
 │   └── 13_bovnar_conformance.md       # Conformance test tool and IUT protocol
 ├── CMakeLists.txt
@@ -549,6 +549,9 @@ every registered test, and then sweeps the fuzz harnesses:
 | `bvnr_unece_test` | The `unece:` notation: Rec 20 units, Rec 21 packages as incommensurable counts |
 | `bvnr_qudt_test` | The `qudt:` and `qudt-qk:` notations: local names, and quantity kinds as coherent SI units |
 | `bvnr_udunits_test` | The `udunits:` notation: operators, and the two refusals that carry weight |
+| `bvnr_om_test` | The `om:` notation: OM 2 unit individuals, and which name a unit is written back as |
+| `bvnr_cf_test` | The `cf:` notation: CF standard names read as their canonical unit; never written |
+| `bvnr_unit_source_test` | A unit's spelling as written: delivered by the reader, re-emitted and checked by the writer, kept by the DOM |
 | `bvnr_crossvocab_test` | Cross-vocabulary conformance: do the six unit vocabularies agree with each other? |
 | `bvnr_currency_test` | Fiat and crypto currency lookup, minor units, prefix rules |
 | `bvnr_utils_test` | Utility functions |
@@ -557,7 +560,7 @@ every registered test, and then sweeps the fuzz harnesses:
 | `bvnr_float_fix_dec_test` | Fixed and decimal float modes |
 | `bvnr_datetime_test` | Datetime parsing, epochs, ISO-8601 literals, and Gregorian conversions |
 | `bvnr_high_severity_test` | Robustness under malformed input |
-| `bvnr_conformance` | 425-case conformance suite — self-test plus `--iut` adapter mode |
+| `bvnr_conformance` | 470-case conformance suite — self-test plus `--iut` adapter mode |
 | `bvnr_fuzz_test --harness reader\|dom\|utils` | Randomised fuzzing of reader, DOM, and utils |
 | `bvnr_fuzz_writer_test` | Randomised fuzzing of the serialiser |
 
@@ -791,7 +794,7 @@ cd web && ./httpd.sh          # python3 -m http.server
 |---|---|
 | [Tutorial](doc/01_bovnar_tutorial.md) | Practical, hands-on introduction to the format. |
 | [FAQ](doc/02_bovnar_faq.md) | Frequently asked questions covering the format, type system, units, C API, Python bindings, and limits. |
-| [Specification (v1.1)](doc/03_bovnar_spec.md) | Full lexical and syntactic grammar, type system, arrays, structs, octet streams, validation rules, and formal EBNF. |
+| [Specification (v1.2)](doc/03_bovnar_spec.md) | Full lexical and syntactic grammar, type system, arrays, structs, octet streams, validation rules, and formal EBNF. |
 | [Units & Currencies Cheat Sheet](doc/04_bovnar_unit_cheatsheet.md) | Quick reference for every physical unit, 166 fiat currencies, and 50 cryptocurrencies, with prefix tables and symbol-disambiguation rules. |
 | [Unit & Currency Reference](doc/05_bovnar_unit_system.md) | SI and IEC prefixes, base units, compound units, exponents, C API, and validation rules. |
 | [Unit Policy](doc/06_bovnar_unit_policy.md) | What a unit policy declares, the order its parts resolve in, what it validates and converts, and the errors it raises — on the reader and the writer. |
@@ -799,11 +802,11 @@ cd web && ./httpd.sh          # python3 -m http.server
 | [Read & Write API](doc/08_bovnar_readwrite_api.md) | Complete C API for streaming readers and writers with annotated examples. |
 | [Python Bindings](doc/09_bovnar_python_bindings.md) | Pure-ctypes Python interface: high-level `loads`/`dumps`, streaming `Reader`/`Writer`, unit helpers. |
 | [Streaming, Framing & Multiplexing](doc/10_bovnar_streaming.md) | Endless streams, multi-document framing, octet multiplexing, and document-in-document — applications layered on the event API. |
-| [Unit Profiles](doc/11_bovnar_unit_profiles.md) | Writing UCUM, UNECE, QUDT and UDUNITS codes in a Bovnar unit slot: the transliteration tables, the collisions between the namespaces, what has no representation, and the cross-vocabulary conformance suite. |
+| [Unit Profiles](doc/11_bovnar_unit_profiles.md) | Writing UCUM, UN/ECE, QUDT, UDUNITS, OM 2 and CF codes in a Bovnar unit slot: the transliteration tables, the collisions between the namespaces, what has no representation, and the cross-vocabulary conformance suite. |
 | [Formal EBNF](doc/12_bovnar.ebnf) | Machine-readable grammar. |
-| [Conformance Test Tool](doc/13_bovnar_conformance.md) | Conformance suite (425 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
+| [Conformance Test Tool](doc/13_bovnar_conformance.md) | Conformance suite (470 cases), IUT protocol for verifying third-party implementations, TAP output, and CTest integration. |
 
-See [`CHANGELOG.md`](CHANGELOG.md) for what changed between versions (including the additive spec 1.1).
+See [`CHANGELOG.md`](CHANGELOG.md) for what changed between versions (including the additive specs 1.1 and 1.2, and which spec each library release implements).
 
 ---
 

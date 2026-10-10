@@ -1,8 +1,8 @@
 # Bovnar 2.0.0 — units from other vocabularies, and a reader that converts
 
 **The 2 is the library's, not the format's.** Bovnar 2.0.0 implements **spec
-1.2**, which is additive over 1.1: no document changes meaning and the version
-directive stays in the 1.x line. The major moved because programs built against
+1.2**, which is additive over 1.1: no accepted document changes meaning and the
+version directive stays in the 1.x line. The major moved because programs built against
 1.1 have to change — the C ABI breaks and so does the Python API. From this
 release on, the library version and the spec version are separate numbers.
 
@@ -22,9 +22,9 @@ translated, at parse time, into the same unit a native spelling produces.
 
 Like every construct added after 1.0 it is **opt-in per document**: it needs the
 `#!bovnar 1.2` directive, and without one `ucum:mm[Hg]` is simply not a unit.
-Native units are unaffected in every version, and every 1.0 and 1.1 document
-parses to exactly the same values — with one deliberate exception, under
-*Compatibility* below.
+Native units are unaffected in every version, and every document a 1.1 reader
+accepted and this one still accepts means exactly what it did. Two corrections
+refuse documents that 1.1 let through; both are under *Compatibility* below.
 
 For C consumers: rebuild against the new headers. `libbvnr.so` moves to
 SOVERSION 2, so a binary built against 1.1 fails to load rather than misreading
@@ -68,7 +68,8 @@ amalgamation and the WebAssembly bundle are attached to the GitHub release.
   their own quantity kind, so a difference no longer converts as a scale reading.
 - **A larger native registry** — 264 physical units, up from 163, with their
   conversion factors checked against their own definitions.
-- **Compact prefix form** — `km` beside `k~m`. The canonical output is unchanged.
+- **Compact prefix form** — `km` beside `k~m`. The canonical form is unchanged
+  (`k~m`); a document that is re-serialised keeps the spelling it was written in.
 - **`text_only`** — a reader flag (and `--text-only`) that refuses a document
   containing an octet stream, for channels that are not byte-transparent.
 - **Python** — `Unit` objects that compare by meaning, `UnitPolicy`,
@@ -101,15 +102,19 @@ Existing codes are unchanged.
 
 ## Compatibility
 
-- **1.0 and 1.1 documents parse to the same values**, with one exception:
-  **whitespace inside a type-annotation parameter is now an error**
+- **Two corrections refuse documents that 1.1 accepted.** Neither changes what
+  any accepted document means, and both apply whatever version a document
+  declares.
+- **Whitespace inside a type-annotation parameter is now an error**
   (`error_type_param_whitespace`). `<float:64,k g>` used to be read as `k~g`
   with the space silently deleted; such a document carried a unit its author did
   not write. Whitespace beside a separator — `<float : 64 , m>` — is as legal as
   it always was.
 - **A bare array is homogeneous in its unit**, not merely in its dimension: an
   array whose elements are annotated with different units of one dimension —
-  metres beside feet — is refused by the document tier.
+  metres beside feet — is refused by the document tier. A consumer that read
+  such an array as one block, which the specification said it could, was
+  computing wrong numbers.
 - **1.2 constructs are opt-in** — they require the `#!bovnar 1.2` directive.
 
 ## Open questions this release does not close
@@ -118,7 +123,10 @@ The profile tables restate other publishers' vocabularies. QUDT and OM (CC BY
 4.0) and UDUNITS-2 (BSD 3-clause) are attributed as their licences require.
 **UCUM's licence conditions its grant on not creating derivative tables, and the
 CF standard-name table carries no licence statement**; permission and a
-declaration have been requested for those two and neither has arrived. Both
+declaration have been requested for those two and neither has arrived. UN/ECE
+Recommendation 20 exists to be implemented and is universally implemented, but
+the UN's website terms do not say so; written confirmation has been asked for
+there too. Both
 tables ship enabled, and `-DBVNR_WITH_UCUM_PROFILE=OFF` /
 `-DBVNR_WITH_CF_PROFILE=OFF` remove them from a build entirely. The record is in
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and doc/11 §18.

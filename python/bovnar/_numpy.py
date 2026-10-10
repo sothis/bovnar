@@ -659,13 +659,25 @@ def array_to_bvnr(key: str, arr, *, unit=None, pretty: bool = True,
     from .exceptions import BovnarWriteError
     from .enums import ErrorCode
     np = _np()
-    needs_v11 = np.asarray(arr).dtype.kind == 'M'   # datetime64 -> spec 1.1
+    # The directive names the LOWEST version that admits what is written, and it
+    # must lead the document. datetime64 is spec 1.1. A unit with no native
+    # spelling (ucum:[IU], a UN/ECE package code) can only be written in the
+    # profile notation, which is spec 1.2 -- without the directive the C writer
+    # refuses it, and this function used to fail on such a unit for that reason.
+    version = None
+    if np.asarray(arr).dtype.kind == 'M':
+        version = (1, 1)
+    if unit is not None:
+        from . import unit_is_profile_only
+        vu = _resolve_unit_arg(unit)
+        if vu is not None and vu.num_components and unit_is_profile_only(vu):
+            version = (1, 2)
     cap = 4 * 1024 * 1024
     while True:
         try:
             with Writer.to_mem(cap=cap, pretty=pretty) as w:
-                if needs_v11:
-                    w.write_version(1, 1)           # directive must lead the doc
+                if version:
+                    w.write_version(*version)       # directive must lead the doc
                 from_numpy(w, key, arr, unit=unit, float_format=float_format)
             return w.get_output()
         except BovnarWriteError as e:

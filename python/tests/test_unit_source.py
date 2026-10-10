@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-"""The unit's own spelling (spec 1.2, bvnr_data_t.unit_source) through the
+"""The unit's own spelling (library 2.0, bvnr_data_t.unit_source) through the
 Python bindings: the reader hands it over, a typed load keeps it on the
 Quantity, dumps() writes it back, and the DOM exposes it.
 
@@ -116,3 +116,17 @@ def test_dom_exposes_it_where_the_unit_cannot_give_it_back():
     assert dom.lookup('.a').unit_source == 'ucum:mL{total}'
     assert dom.lookup('.c')[0].unit_source is None       # canonical already
     assert dom.lookup('.n').unit_source is None
+
+
+def test_array_to_bvnr_writes_a_profile_only_unit():
+    # The numpy convenience writer had the same gap as dumps(): it knew to
+    # declare 1.1 for a datetime64 array and nothing about 1.2, so a unit that
+    # can only be spelled in profile notation was refused by the C writer.
+    np = pytest.importorskip("numpy")
+    out = bovnar.array_to_bvnr("a", np.array([1.0, 2.0]), unit="ucum:[IU]",
+                               pretty=False)
+    assert out.startswith(b"#!bovnar 1.2\n")
+    back = bovnar.loads(out, typed=True)["a"]
+    assert [q.unit.is_profile_only for q in back] == [True, True]
+    # A native unit still gets no directive at all.
+    assert not bovnar.array_to_bvnr("a", np.array([1.0]), unit="m").startswith(b"#!")

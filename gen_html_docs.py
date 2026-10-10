@@ -133,7 +133,7 @@ DOCS = [
      "Frequently asked questions about Bovnar types, units, limits, encoding, and "
      "the C and Python APIs."),
     ("03_bovnar_spec.md", "spec", "bovnar-specification",
-     "Bovnar Specification (v1.1)",
+     "Bovnar Specification (v1.2)",
      "The complete Bovnar (BVNR) format specification, version 1.1: grammar, type "
      "system, physical units, numeric bases, limits, and error semantics."),
     ("04_bovnar_unit_cheatsheet.md", "cheatsheet", "bovnar-cheatsheet",

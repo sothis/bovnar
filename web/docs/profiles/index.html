@@ -77,7 +77,7 @@ admitted after that pass, which is why they sit after it rather than beside thei
 <td><code>qudt:</code></td>
 <td>QUDT unit local names</td>
 <td>flat</td>
-<td>2233, <strong>all 2808 QUDT defines</strong></td>
+<td>2238, <strong>all 2808 QUDT defines</strong></td>
 <td><a href="#12-the-qudt-profiles">12</a></td>
 </tr>
 <tr>
@@ -98,7 +98,7 @@ admitted after that pass, which is why they sit after it rather than beside thei
 <td><code>om:</code></td>
 <td>OM 2 — Ontology of units of Measure</td>
 <td>flat</td>
-<td>1338 + 122 refused, <strong>every unit individual OM states</strong></td>
+<td>1341 + 119 refused, <strong>every unit individual OM states</strong></td>
 <td><a href="#16-the-om-2-profile">16</a></td>
 </tr>
 <tr>
@@ -123,7 +123,7 @@ they wrote it in. <code>unece</code> cannot be closed the same way and §11.1 sa
 pass changed and what it cost.</p>
 <p>Every acceptance, refusal and conversion factor quoted below was produced by running the
 reference implementation built from this tree, and the behavioural claims are pinned by the test
-files named above (741 assertions across the seven profiles, plus 4776 in the cross-vocabulary
+files named above (1277 assertions across the seven profiles, plus 4789 in the cross-vocabulary
 suite). The VOCABULARY side — whether each foreign code is <em>worth</em> what the table says — is checked
 too, but not by the same means and not to the same strength: <code>check_profile_factors.py</code> (§9.5)
 resolves every mapped code against its publisher's own machine-readable definitions, and <code>unece</code>
@@ -199,7 +199,7 @@ tables wrong in the same way would agree with each other perfectly.</p>
 <li>9.3 <a href="#93-tests">Tests</a></li>
 <li>9.4 <a href="#94-one-build-switch-per-vocabulary">One build switch per vocabulary</a></li>
 <li>9.5 <a href="#95-the-factor-proof">The factor proof</a></li>
-<li>9.6 <a href="#96-synchronisation-between-the-five-tables">Synchronisation between the five tables</a></li>
+<li>9.6 <a href="#96-synchronisation-between-the-tables">Synchronisation between the tables</a></li>
 </ul>
 </li>
 <li><a href="#10-cost-risk-and-what-is-left-out">Cost, risk, and what is left out</a><ul>
@@ -290,7 +290,7 @@ them is exactly two things:</p>
 <ul>
 <li><strong>The grammar.</strong> An <em>expression</em> profile (<code>ucum</code>, <code>udunits</code>) writes a code as an expression over
   prefixed atoms, with operators, exponents and grouping. A <em>flat</em> profile (<code>unece</code>, <code>qudt</code>,
-  <code>qudt-qk</code>) has no operators and no prefixes at all: the whole code is one token, matched entire.
+  <code>qudt-qk</code>, <code>om</code>, <code>cf</code>) has no operators and no prefixes at all: the whole code is one token, matched entire.
   That is not a simplification but a correctness requirement — UNECE's <code>KGM</code> is the kilogram, and a
   parser that decomposed it would find a <code>k</code> prefix on a <code>GM</code> that UNECE never defined, just as it
   would read <code>MTS</code> as a mega-<code>TS</code> and QUDT's <code>MI</code> (the mile) as a milli-anything.</li>
@@ -362,8 +362,8 @@ the split in §3.1:</p>
 <div class="codehilite"><pre><span></span><code>$ bovnar validate t.bvnr        # #!bovnar 1.2 / .a = &lt;float:64,zz:m&gt; 1.0;
 Validation failed: unit_profile_unknown at line 2, col 20
 
-$ bovnar validate t.bvnr        # #!bovnar 1.2 / .a = &lt;float:64,ucum:osm&gt; 1.0;
-Validation failed: unit_profile_unsupported at line 2, col 24
+$ bovnar validate t.bvnr        # #!bovnar 1.2 / .a = &lt;float:64,ucum:B[SPL]&gt; 1.0;
+Validation failed: unit_profile_unsupported at line 2, col 27
 
 $ bovnar validate t.bvnr        # #!bovnar 1.2 / .a = &lt;float:64,ucum:mmHg&gt; 1.0;
 Validation failed: unit_illegal at line 2, col 25
@@ -390,8 +390,10 @@ as it always did.</p>
 <p>The writer enforces the other half. A unit with no native spelling — one carrying an opaque base
 unit (§7.1) — can only be emitted in this notation, so writing one without having emitted the opt-in
 directive is <code>error_unsupported_spec_version</code> rather than a document the library cannot read back. A
-<em>translated</em> unit needs no such guard: <code>ucum:mm[Hg]</code> is written as the native <code>mmHg</code>, which every
-version accepts.</p>
+<em>translated</em> unit needs no such guard when it is written from the unit alone: <code>ucum:mm[Hg]</code> parses
+to <code>mmHg</code>, and <code>mmHg</code> is what <code>bvn_unit_to_string</code> gives back, which every version accepts. The
+guard returns with the <em>spelling</em>: a writer handed <code>ucum:mm[Hg]</code> as the text to write (§5.2) is
+writing profile notation, and needs the directive for it exactly as an opaque unit does.</p>
 <p>Otherwise: everywhere a native unit may appear — as the unit parameter of a type annotation, and as
 an inline unit suffix. Parameter ordering stays free (doc/05 §2.1) and the annotation/inline agreement rule
 (doc/05 §2.2) is unchanged — the comparison is on the parsed <code>value_unit_t</code>, so the two spellings
@@ -457,14 +459,17 @@ Validation failed: unexpected_input_byte at line 2, col 18
 <p><code>type_body_outro</code> is extended alongside <code>copy_type_byte</code> because the two already carry an identical
 unit-byte class; letting them diverge here would be the odd choice, and anything nonsensical that
 reaches the type-spec parser through it is still <code>error_illegal_value_type</code>.</p>
-<p>This is the only lexer change the profile requires, and it is the one place where the profile is
+<p>This is the only change to the unit <em>byte class</em> the profile requires — whitespace inside a
+namespaced annotation parameter is the other lexer change, and has its own section (§13.2) — and it
+is the one place where the profile is
 <em>not</em> invisible to a native-only document: after it, <code>&lt;float:64,m[s]&gt;</code> reaches <code>bvn_parse_unit</code>
 and fails there (<code>error_unit_illegal</code>) instead of failing in the lexer
 (<code>error_unexpected_input_byte</code>). One error code moves for a family of inputs that were errors
 before and are errors after. §9.3 pins that in the conformance corpus rather than leaving it to be
 discovered.</p>
-<p>Nothing else about the byte class changes. <code>&lt;</code>, <code>&gt;</code>, <code>"</code>, <code>;</code>, <code>#</code> and whitespace stay out, so a
-brace cannot swallow the rest of the document. Two consequences, and they land on different sides of
+<p>Nothing else about the byte class changes. <code>&lt;</code>, <code>&gt;</code>, <code>"</code>, <code>;</code> and <code>#</code> stay out, so a brace cannot
+swallow the rest of the document; whitespace stays out of an inline suffix, and inside an annotation
+is admitted only within a parameter that carries a namespace (§13.2). Two consequences, and they land on different sides of
 the lexer boundary:</p>
 <div class="codehilite"><pre><span></span><code>$ bovnar validate t.bvnr        # .a = &lt;float:64,ucum:mL{a;b}&gt; 1.0;
 Validation failed: unexpected_input_byte at line 2, col 25
@@ -547,8 +552,8 @@ where the byte classes of §2.3 are also recorded:</p>
 <strong>semantic</strong>, as the native unit sub-grammar is (doc/05 §5.2): the lexer captures
 bytes, and <code>bvn_parse_unit</code> — which dispatches on the namespace — decides whether
 they are a valid code in that vocabulary. The normative grammar for what is
-inside is each vocabulary's own, and restating five of them here would create
-five second authorities to keep in step with the first.</p>
+inside is each vocabulary's own, and restating them here would create a second
+authority for each, to keep in step with the first.</p>
 <hr />
 <h2 id="3-translation">3. Translation</h2>
 <h3 id="31-three-outcomes-and-no-fourth">3.1 Three outcomes, and no fourth</h3>
@@ -691,7 +696,7 @@ where Bovnar can type it and the reader can find it by key path.</p>
 <p>The annotation text is preserved for round-trip (§5.2), and is preserved <em>verbatim</em>, including case
 and spacing. It never affects equality, compatibility, conversion or normalisation.</p>
 <p><strong>Annotations are UCUM's, and only UCUM's.</strong> The registry row carries a flag, and it is false for
-the other four namespaces, so <code>udunits:mL{x}</code> is <code>error_unit_illegal</code> rather than a millilitre with
+the other six namespaces, so <code>udunits:mL{x}</code> is <code>error_unit_illegal</code> rather than a millilitre with
 a comment. Admitting the syntax everywhere would let a UDUNITS code that is simply wrong look like a
 valid annotated one.</p>
 <p>This is the valve. UCUM's own justification for annotations is that a code system which refuses the
@@ -1003,7 +1008,7 @@ bindings keep it on a typed <code>Quantity</code> (§8.2).</p>
 <p><code>bvn_unit_to_profile(ns, value_unit_t, char*, size_t)</code> writes a code in the named vocabulary for a
 unit that has one, for producers whose output field is foreign-typed;
 <code>bvn_unit_to_ucum(value_unit_t, char*, size_t)</code> is the <code>"ucum"</code> case, kept for callers that predate
-the other four. Both return a negative length when they fail.</p>
+the other namespaces. Both return a negative length when they fail.</p>
 <p>The mapping is driven by a <strong>generated reverse table</strong>, one per namespace, not by searching the
 forward one. Three things depend on that.</p>
 <p>First, the choice is deterministic and canonical. Searching the forward table picked
@@ -1025,7 +1030,7 @@ grammar because the competing rows differ with it:</p>
 <td><strong>shortest wins</strong>, ties alphabetically: the vocabulary's own abbreviation is the short one</td>
 </tr>
 <tr>
-<td>flat (<code>unece</code>, <code>qudt</code>, <code>qudt-qk</code>)</td>
+<td>flat (<code>unece</code>, <code>qudt</code>, <code>qudt-qk</code>, <code>om</code>)</td>
 <td><em>different codes for one unit</em> — <code>JOU</code> and <code>J55</code>, <code>PAL</code> and <code>C55</code>, <code>TON_SHORT</code> and <code>TON</code></td>
 <td><strong>first declared wins</strong>: the data file lists the canonical code first and its aliases after</td>
 </tr>
@@ -2829,8 +2834,8 @@ so a stale count turns a legitimate new error into a fuzz crash.</p>
 <p>Malformed input, and a code over something the vocabulary does not define, stay <code>error_unit_illegal</code>
 (32). The split is what a producer needs: "you wrote it wrong" and "you wrote it right and we cannot
 carry it" call for different fixes.</p>
-<p><code>error_octet_stream_forbidden</code> (51) was appended after these two in the same release cycle, so the
-enum currently ends at 51 and <code>BVN_ERROR_COUNT</code> is 52. The static assertion in
+<p><code>error_octet_stream_forbidden</code> (51) and <code>error_type_param_whitespace</code> (52) were appended after
+these two in the same release cycle, so the enum ends at 52 and <code>BVN_ERROR_COUNT</code> is 53. The static assertion in
 <code>bvn_internal_dims.h</code> names the last enumerator explicitly, which is what makes that ordering a
 build-time fact rather than a comment.</p>
 <hr />
@@ -3007,7 +3012,7 @@ disagreeing with the parser it feeds.</p>
   two vocabularies;</li>
 <li>an opaque name collides across profiles;</li>
 <li>a <code>.bovnar</code> target names a prefix or a unit this build's registry does not have;</li>
-<li>the longest profile code this table could emit would overflow <code>BVNR_UNIT_STRING_MAX</code> (1024), which
+<li>the longest profile code this table could emit would overflow <code>BVNR_UNIT_STRING_MAX</code> (1088), which
   is what sizes the stack buffers in the writer and the CLI;</li>
 <li>every row naming one unit carries <code>.reverse = false</code>, which would make that unit readable and
   unwritable.</li>
@@ -3018,9 +3023,10 @@ these tables can produce.</p>
 <p><strong>What it does not check is the vocabulary side</strong>, and that half now lives in a separate tool rather
 than in the generator. <code>gen_profiles.py</code> still carries no foreign value: a data file states the
 target and not what the publisher says the code is worth. Where a value was uncertain, or certainly
-<em>close but not equal</em> to a native unit, the code went into <code>.unsupported</code> instead — which is why
-<code>osm</code>, <code>[Btu]</code>, <code>cal_IT</code> and <code>[dr_ap]</code> are refused rather than mapped onto the nearly-right native
-unit.</p>
+<em>close but not equal</em> to a native unit, the code went into <code>.unsupported</code> instead of being mapped
+onto the nearly-right one. That is where <code>[Btu]</code>, <code>cal_IT</code> and <code>[dr_ap]</code> sat until the registry
+gained units of exactly their value; all three map today, and the rule that kept them out is the
+rule that still holds for whatever has no exact target.</p>
 <p><code>check_profile_factors.py</code> (CTest target <code>bvnr_profile_factors</code>) closes it for all seven profiles,
 though not for all of them equally. It reads UCUM's <code>ucum-essence.xml</code>, the UDUNITS-2 XML database
 and QUDT's Turtle vocabularies, resolves every code to a factor and a dimension vector, asks the
@@ -3047,43 +3053,43 @@ them to each other:</p>
 <tr>
 <td><code>tests/bovnar_ucum_test.c</code></td>
 <td><code>bvnr_ucum_test</code></td>
-<td>130</td>
+<td>171</td>
 <td>§2–§10</td>
 </tr>
 <tr>
 <td><code>tests/bovnar_unece_test.c</code></td>
 <td><code>bvnr_unece_test</code></td>
-<td>134</td>
+<td>557</td>
 <td>§11</td>
 </tr>
 <tr>
 <td><code>tests/bovnar_qudt_test.c</code></td>
 <td><code>bvnr_qudt_test</code></td>
-<td>187</td>
+<td>201</td>
 <td>§12</td>
 </tr>
 <tr>
 <td><code>tests/bovnar_udunits_test.c</code></td>
 <td><code>bvnr_udunits_test</code></td>
-<td>153</td>
+<td>199</td>
 <td>§13</td>
 </tr>
 <tr>
 <td><code>tests/bovnar_om_test.c</code></td>
 <td><code>bvnr_om_test</code></td>
-<td>92</td>
+<td>103</td>
 <td>§16</td>
 </tr>
 <tr>
 <td><code>tests/bovnar_cf_test.c</code></td>
 <td><code>bvnr_cf_test</code></td>
-<td>45</td>
+<td>46</td>
 <td>§17</td>
 </tr>
 <tr>
 <td><code>tests/bovnar_crossvocab_test.c</code></td>
 <td><code>bvnr_crossvocab_test</code></td>
-<td>4776</td>
+<td>4789</td>
 <td>§14</td>
 </tr>
 </tbody>
@@ -3196,8 +3202,8 @@ dimension vector, asks the reference library what the native target is worth, an
 native side goes through <code>bvn_parse_unit</code> and <code>bvn_unit_to_si_factor</code> via the ctypes bindings, never
 through a Python reimplementation of the unit grammar — that is exactly how a table starts
 disagreeing with the parser it feeds (§9.1).</p>
-<p>As of this tree it compares <strong>10652 rows across the seven vocabularies</strong> and reports <strong>0 mismatches</strong>,
-10 dead rows and <strong>0 coverage suggestions</strong> — the tables are closed against their publishers, so
+<p>As of this tree it compares <strong>10663 rows across the seven vocabularies</strong> and reports <strong>0 mismatches</strong>,
+0 dead rows and <strong>0 coverage suggestions</strong> — the tables are closed against their publishers, so
 there is nothing left for the coverage half to propose.</p>
 <p><strong>Three outcomes, and only one fails the build.</strong></p>
 <table>
@@ -3375,12 +3381,12 @@ says otherwise is a factor trap rather than a coverage gap.</p>
 <code>conversionMultiplier</code>) have no factor to check — they are exactly the ones carried as opaque or
 refused. The standing risk of §10.2 is <strong>reduced everywhere and retired nowhere</strong>: four tables now
 rest on their publishers, and the fifth rests on another publisher's reading of its publisher.</p>
-<h3 id="96-synchronisation-between-the-five-tables">9.6 Synchronisation between the five tables</h3>
+<h3 id="96-synchronisation-between-the-tables">9.6 Synchronisation between the tables</h3>
 <p>Checking each table against its own publisher leaves a second question open: whether the five agree
 with <strong>each other</strong> about what bovnar's registry contains. §14's concept table asks that of the
 concepts it lists; this asks it of every native unit, and it is the same tool — the coverage half of
 <code>check_profile_factors.py</code>, read across all five outputs at once rather than one profile at a time.</p>
-<p>For each of the 180 native units, the question is which profiles map it against which vocabularies
+<p>For each native unit, the question is which profiles map it against which vocabularies
 <em>define</em> something equal to it. A unit that three tables carry and a fourth omits — while that
 fourth vocabulary has a perfectly good code for it — is a synchronisation gap, and on the first
 sweep there were 65 of them. They were overwhelmingly one-sided:</p>
@@ -3421,8 +3427,8 @@ label before it was accepted.</p>
 <p><strong>A second pass closed the compound half of the same gap.</strong> The first pass could only see codes
 worth a bare native symbol (§9.5), which is why it reported nine for <code>unece</code> and none at all of the
 kind a flat vocabulary is most likely to be missing. Once the index carried the tables' own targets,
-another 71 rows landed — <code>unece</code> from 201 to 252 and <code>qudt</code> from 244 to 263, which are the counts
-shipping today — and they divide into two groups that are worth naming, because both are gaps a
+another 71 rows landed — <code>unece</code> from 201 to 252 and <code>qudt</code> from 244 to 263, the counts of that pass
+(§9.1 has today's) — and they divide into two groups that are worth naming, because both are gaps a
 flat grammar creates and an expression grammar cannot have:</p>
 <table>
 <thead>
@@ -3516,7 +3522,7 @@ out by name instead.</p>
 </tr>
 <tr>
 <td>Registry</td>
-<td>Five data files in <code>src/gendata/</code> (§9.1); <code>gen_profiles.py</code> emitting the per-profile and shared tables; one <code>value_base_unit_t</code> BLOCK per profile (UCUM 200000–200040, UN/ECE 300000–300024)</td>
+<td>Five data files in <code>src/gendata/</code> in that pass, seven today (§9.1); <code>gen_profiles.py</code> emitting the per-profile and shared tables; one <code>value_base_unit_t</code> BLOCK per profile (UCUM 200000–200040, UN/ECE 300000–300024)</td>
 </tr>
 <tr>
 <td>Version gate</td>
@@ -3603,8 +3609,8 @@ still the reciprocal millisecond it has always been. A UCUM annotation keeps its
 grammar as <code>error_unit_illegal</code>, which is the right layer: "no such code", not "no whitespace here".
 §13.2, which used to explain why the space-separated form could not be supported, now explains how it
 is.</p>
-<p><strong>The refusal set is where adopters leave.</strong> §6.4 refuses osmolality, the non-Julian years, the
-referenced bels and four decades of scale. A clinical corpus will meet several of those early, and
+<p><strong>The refusal set is where adopters leave.</strong> §6.4 refuses the referenced bels, the other
+function-defined special units, four decades of scale and the British series. A clinical corpus will meet several of those early, and
 each is a reason to conclude the profile does not really support UCUM. The counter-argument — that
 naming a refusal beats accepting a string you cannot reason about — is correct and will not always
 be persuasive. §15 makes this worse before it makes it better: the refusal set is now much larger,
@@ -4937,7 +4943,10 @@ all, rather than singling one row out to be wrong; the C side reaches -1 through
 row names this base" path, with no special case in the writer. A <code>.reverse</code> flag in such a data file
 is a build error, because it would be describing a choice nothing makes.</p>
 <p>The refusal is this namespace's own. The same kelvin still writes as <code>qudt:K</code> and <code>om:kelvin</code>, and a
-<code>cf:</code> unit is not "profile only" (§5.1): it translates to an ordinary native unit and writes as one.</p>
+<code>cf:</code> unit is not "profile only" (§5.1): it translates to an ordinary native unit, and written from
+that unit alone it comes back as one. A document that <em>spelled</em> it <code>cf:air_temperature</code> keeps that
+spelling when it is re-serialised (§5.2) — which is the text being preserved, not a unit being
+translated into a standard name.</p>
 <h3 id="174-what-is-absent-and-what-it-costs">17.4 What is absent, and what it costs</h3>
 <table>
 <thead>
@@ -5134,7 +5143,7 @@ table nobody can trace.</p>
 <li><a href="https://www.bovnar.io/docs/ambiguities/#17-the-same-spelling-in-another-namespace">Unit Ambiguities §17</a> — the reader-facing index of the cross-namespace collisions §6.2 records</li>
 <li><a href="https://www.bovnar.io/docs/policy/">Unit Policy</a> — the reader- and writer-side policies a translated unit passes through unchanged</li>
 <li><a href="https://www.bovnar.io/docs/api/#112-reader-side-unit-policy-bvnr_reader_set_unit_policy">Read/Write API</a> — the reader-side unit policy, and the <code>want_unit</code> hook a profile unit reaches unmodified</li>
-<li><a href="https://www.bovnar.io/docs/conformance/">Conformance Test Tool</a> — where the 53-case <code>unit_profile</code> group lives</li>
+<li><a href="https://www.bovnar.io/docs/conformance/">Conformance Test Tool</a> — where the 59-case <code>unit_profile</code> group lives</li>
 <li><a href="https://www.bovnar.io/docs/cheatsheet/">Unit Cheatsheet</a> — the native spellings the transliteration tables target</li>
 <li><a href="https://www.bovnar.io/docs/grammar/">EBNF</a> — <code>unit-param</code>, <code>profile-unit</code> and the byte classes of §2.3</li>
 </ul>

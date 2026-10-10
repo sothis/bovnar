@@ -217,8 +217,16 @@ jobs:
       # It is a hard requirement of this job, not an optional extra -- the
       # generated web/docs pages are committed, so this is the only gate that
       # catches a doc/*.md edit that never went through the generator.
+      #
+      # pygments is PINNED, and it has to be. pytest pulls in whatever is newest,
+      # codehilite renders the docs' code blocks through it, and 2.21 stopped
+      # escaping quotes in its HTML -- so bvnr_html_docs compared the committed
+      # pages against a regeneration that differed in every code block and
+      # failed on eleven of them, for a change nobody here made. The committed
+      # web/docs pages are generated with this version; bump the pin and
+      # regenerate them in the same commit.
       - name: Install Python test dependencies
-        run: python3 -m pip install --quiet pytest numpy markdown
+        run: python3 -m pip install --quiet pytest numpy markdown 'pygments==2.19.2'
 
       # -DPython3_EXECUTABLE pins the resolution to the interpreter just
       # provisioned instead of leaving FindPython3 to choose among the several on
@@ -430,7 +438,11 @@ jobs:
 
   publish:
     name: Publish to PyPI
-    needs: [build_wheels, build_sdist]
+    # `tests` is here because a PyPI release is immutable. Without it a tag
+    # whose test job failed still published its wheels -- while `release`,
+    # which does wait for the tests, attached nothing: a version on PyPI with
+    # no GitHub release behind it and a red suite.
+    needs: [build_wheels, build_sdist, tests]
     runs-on: ubuntu-latest
     # Only publish on a version tag (e.g. v1.1.0).
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')

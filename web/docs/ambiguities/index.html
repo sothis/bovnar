@@ -96,7 +96,7 @@ against the reference parser; where a token is refused, it really is <code>error
 <tr>
 <td>3</td>
 <td>Whatever precedes the base is the <strong>prefix</strong>, with <code>~</code> optional</td>
-<td><code>k~g</code> and <code>kg</code> are one unit; the writer always emits <code>k~g</code></td>
+<td><code>k~g</code> and <code>kg</code> are one unit; the canonical spelling is <code>k~g</code></td>
 </tr>
 <tr>
 <td>4</td>
@@ -1831,7 +1831,7 @@ sometimes being wrong.</p>
 </table>
 <p>Two rules make this tractable, and both are worth knowing before writing a profile code:</p>
 <ul>
-<li><strong>A flat vocabulary's code is one whole token.</strong> <code>unece:</code>, <code>qudt:</code> and <code>qudt-qk:</code> recognise no
+<li><strong>A flat vocabulary's code is one whole token.</strong> <code>unece:</code>, <code>qudt:</code>, <code>qudt-qk:</code>, <code>om:</code> and <code>cf:</code> recognise no
   operators and strip no prefixes, so a code either matches entire or is refused. <code>unece:KGM/MTR</code>
   and <code>qudt:M/SEC</code> are <code>error_unit_illegal</code>, not compounds.</li>
 <li><strong>A whole atom beats a prefix in an expression vocabulary</strong>, exactly as it does natively.

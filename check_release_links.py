@@ -171,6 +171,24 @@ def main():
     if not version:
         return fail(f"{tag}: could not read project(bovnar VERSION ...) from "
                     "CMakeLists.txt at that tag.")
+
+    # THE TAGGED COMMIT ITSELF IS EXEMPT. The order this gate imposes is "tag
+    # first, let CI build and attach the archives, then update the menu" -- so
+    # on the commit the tag points at, the menu still names the previous
+    # release, and it has to: the files it would link to are what this very CI
+    # run is about to produce. Failing here made the tag's own test job red,
+    # which withheld the archives from the release it was guarding. The check
+    # is back in force on the first commit after the tag.
+    head = git("rev-parse", "HEAD")
+    if head and head == git("rev-parse", f"{tag}^{{commit}}"):
+        if tag != f"v{version}":
+            return fail(
+                f"{tag} records project(bovnar VERSION {version}) in "
+                "CMakeLists.txt; the tag and the project version disagree.")
+        print(f"check_release_links.py: HEAD is {tag} itself -- its archives "
+              "do not exist yet, so the menu is not checked on this commit. "
+              "Update web/index.html once the release job has attached them.")
+        return 0
     if tag != f"v{version}":
         return fail(
             f"{tag} records project(bovnar VERSION {version}) in CMakeLists.txt, "

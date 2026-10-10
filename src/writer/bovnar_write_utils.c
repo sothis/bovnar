@@ -55,6 +55,16 @@ static bool emit_key(bvnr_writer_t *w, const char *key)
 {
 	if (!key)
 		return bvn_writer_set_error(w, error_invalid_argument);
+	/* A spelling set by bvnr_writer_set_unit_source is for the NEXT value. A
+	 * second key starting with it still unused means that value took no unit
+	 * (a string, a bool, a struct) -- the same caller mistake as setting one
+	 * for a unitless number, and reported the same way, rather than left to
+	 * land on whichever later value happens to carry a unit. */
+	if (w && w->val.unit_src_len && ++w->usrc_keys > 1u) {
+		w->val.unit_src_len = 0;
+		w->usrc_keys        = 0;
+		return bvn_writer_set_error(w, error_unit_mismatch);
+	}
 	bvnr_data_t d = {
 		.type   = token_is_identifier,
 		.data   = (const void *)key,
@@ -80,6 +90,7 @@ bool bvnr_writer_set_unit_source(bvnr_writer_t *w,
 				const char *text, uint32_t length)
 {
 	if (!w) return false;
+	w->usrc_keys = 0;
 	if (!text || !length) {
 		w->val.unit_src_len = 0;
 		return true;
@@ -106,6 +117,7 @@ bool bvnr_write_type_annotation(bvnr_writer_t *w,
 	if (usrc_len) {
 		memcpy(usrc, w->val.unit_src, usrc_len);
 		w->val.unit_src_len = 0;
+		w->usrc_keys        = 0;
 	}
 	bvnr_data_t d = {
 		.type       = token_is_type,

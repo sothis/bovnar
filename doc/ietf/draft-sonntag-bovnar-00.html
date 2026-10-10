@@ -1956,7 +1956,8 @@ the same octets; the prose forbids it.<a href="#section-2.3-5.3.1" class="pilcro
 so it accepts every construct in every document. The constructs
 introduced after 1.0 - the <code>datetime</code> family, the <code>\x</code> and <code>\u{}</code>
 escapes, and reference array indexing - are valid only in a document
-that declares 1.1 or newer (<a href="#version" class="auto internal xref">Section 5</a>). This is the single largest
+that declares 1.1 or newer, and a <code>namespace:code</code> unit only in one
+that declares 1.2 or newer (<a href="#version" class="auto internal xref">Section 5</a>). This is the single largest
 class of rule the grammar cannot carry.<a href="#section-2.3-5.4.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-2.3-5.5">
@@ -2208,7 +2209,9 @@ introduced after 1.0 is therefore available only to a document that
 declares a version at least as new: in an undeclared document, the 1.1
 constructs (the <code>datetime</code> family, the <code>\x</code> and <code>\u{}</code> string escapes,
 and reference array indexing) are invalid exactly as they would be to a
-1.0 consumer.<a href="#section-5-4" class="pilcrow">¶</a></p>
+1.0 consumer, and the one 1.2 construct (a <code>namespace:code</code> unit,
+<a href="#unit-profiles" class="auto internal xref">Section 8.6</a>) is invalid in any document that declares less than
+1.2.<a href="#section-5-4" class="pilcrow">¶</a></p>
 <p id="section-5-5">Recognition is strict:<a href="#section-5-5" class="pilcrow">¶</a></p>
 <ul class="normal">
 <li class="normal" id="section-5-6.1">
@@ -3574,10 +3577,13 @@ fields free</em>:<a href="#section-9.1.1-1" class="pilcrow">¶</a></p>
 <code>[1, {.x=1;}]</code> are <code>error_array_element_type_mismatch</code>.<a href="#section-9.1.1-2.1.1" class="pilcrow">¶</a></p>
 </li>
             <li class="normal" id="section-9.1.1-2.2">
-              <p id="section-9.1.1-2.2.1"><strong>Dimension.</strong> Numeric elements <span class="bcp14">MUST</span> share one physical dimension,
-though the numeric encodings may mix freely. <code>[1, 2.5, 3]</code> is valid;
-<code>[&lt;float:64,m&gt; 1.0, &lt;float:64,k~g&gt; 2.0]</code> is not. Each currency is its
-own dimension, so a bare array <span class="bcp14">MUST NOT</span> mix <code>$USD</code> and <code>$EUR</code>.<a href="#section-9.1.1-2.2.1" class="pilcrow">¶</a></p>
+              <p id="section-9.1.1-2.2.1"><strong>Unit.</strong> Numeric elements <span class="bcp14">MUST</span> carry the same unit, not merely the
+same physical dimension, though the numeric encodings may mix freely.
+<code>[1, 2.5, 3]</code> is valid; <code>[&lt;float:64,m&gt; 1.0, &lt;float:64,k~g&gt; 2.0]</code> is
+not, and neither is <code>[&lt;float:64,m&gt; 1.0, &lt;float:64,k~m&gt; 2.0]</code>, whose
+elements differ only in scale. The comparison is of the unit and not
+of its spelling. Each currency is its own unit, so a bare array <span class="bcp14">MUST NOT</span> mix <code>$USD</code> and <code>$EUR</code>. (Through version 1.1 this rule read "the
+same dimension"; see <a href="#version-stability" class="auto internal xref">Section 11.4</a>.)<a href="#section-9.1.1-2.2.1" class="pilcrow">¶</a></p>
 </li>
             <li class="normal" id="section-9.1.1-2.3">
               <p id="section-9.1.1-2.3.1"><strong>Datetime.</strong> A <code>datetime</code> is its own kind and does not mix with the
@@ -3984,8 +3990,9 @@ single place to find them.<a href="#section-11.1-1" class="pilcrow">¶</a></p>
           <li class="normal" id="section-11.1-3.2">
             <p id="section-11.1-3.2.1"><strong>emit a version declaration when the document uses any construct
 introduced after version 1.0</strong> (<a href="#version" class="auto internal xref">Section 5</a>) - the <code>datetime</code> family,
-the <code>\x</code> and <code>\u{}</code> string escapes, and reference array indexing. A
-document using one without declaring 1.1 is invalid, and the failure is
+the <code>\x</code> and <code>\u{}</code> string escapes, and reference array indexing,
+which need 1.1, and a <code>namespace:code</code> unit, which needs 1.2. A
+document using one without declaring its version is invalid, and the failure is
 easy to miss because every <em>other</em> value in it is usually fine;<a href="#section-11.1-3.2.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-11.1-3.3">
@@ -4050,7 +4057,7 @@ memory. The format therefore defines two conformance tiers.<a href="#section-11.
           </thead>
           <tbody>
             <tr>
-              <td class="text-left" rowspan="1" colspan="1">Array element kind and dimension (<a href="#array-homogeneity" class="auto internal xref">Section 9.1.1</a>)</td>
+              <td class="text-left" rowspan="1" colspan="1">Array element kind and unit (<a href="#array-homogeneity" class="auto internal xref">Section 9.1.1</a>)</td>
               <td class="text-left" rowspan="1" colspan="1">
                 <code>error_array_element_type_mismatch</code>
 </td>
@@ -4180,8 +4187,19 @@ unchanged; new error codes appended above the maximum; new optional
 limits and options whose defaults preserve behaviour; and constructs
 gated behind a version declaration (<a href="#version" class="auto internal xref">Section 5</a>).<a href="#section-11.4-3" class="pilcrow">¶</a></p>
 <p id="section-11.4-4">What requires a major revision: anything that could render a valid
-document invalid, change how it decodes, renumber an error code, or alter
-the grammar.<a href="#section-11.4-4" class="pilcrow">¶</a></p>
+document invalid, change how it decodes, renumber an error code, or
+change what an existing document's octets mean.<a href="#section-11.4-4" class="pilcrow">¶</a></p>
+<p id="section-11.4-5">Version 1.2 made two corrections that refuse documents a 1.1 consumer
+accepted, and they are recorded here because they bend the first
+paragraph of this section. Whitespace inside a type-annotation parameter
+is now code 52 (<a href="#error-codes" class="auto internal xref">Appendix B</a>); the grammar never derived it, but the
+reference consumer deleted it, so that <code>&lt;float:64,k g&gt;</code> was read as the
+kilogram. And array homogeneity is by unit where it was by dimension
+(<a href="#array-homogeneity" class="auto internal xref">Section 9.1.1</a>), because the rule as written let a consumer that
+treated the elements of <code>[1 m, 2 ft]</code>-shaped data identically - as the
+same section told it it could - compute wrong values. Neither changes
+what any accepted document means; both apply to every document whatever
+version it declares.<a href="#section-11.4-5" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
@@ -5274,7 +5292,7 @@ sup-digit     = %xE2.81.B0                  ; U+2070 SUPERSCRIPT ZERO
 <p id="appendix-B-1">Every violation this document specifies is reported with one of the codes
 below. The numeric values are stable: an existing value never changes,
 and a new code is appended above the current maximum (<a href="#version-stability" class="auto internal xref">Section 11.4</a>).<a href="#appendix-B-1" class="pilcrow">¶</a></p>
-<p id="appendix-B-2">The class column distinguishes six kinds of code, only two of which say
+<p id="appendix-B-2">The class column distinguishes seven kinds of code, only two of which say
 the document is invalid:<a href="#appendix-B-2" class="pilcrow">¶</a></p>
 <span class="break"></span><dl class="dlParallel" id="appendix-B-3">
         <dt id="appendix-B-3.1">D:</dt>
@@ -5721,8 +5739,9 @@ not required to raise code 33.<a href="#appendix-B-6" class="pilcrow">¶</a></p>
 report <em>in addition to</em> another, rather than instead of it: reaching end
 of input while recovering from an earlier error yields the original code
 first and this one second (<a href="#error-recovery" class="auto internal xref">Section 10.3</a>).<a href="#appendix-B-7" class="pilcrow">¶</a></p>
-<p id="appendix-B-8"><code>error_octet_stream_forbidden</code> (51) is the only code here that a valid
-document can provoke. It is what a consumer opened in the text-only mode
+<p id="appendix-B-8"><code>error_octet_stream_forbidden</code> (51) is, with <code>error_unit_profile_unknown</code>
+(49) on a consumer lacking a namespace (<a href="#unit-profiles" class="auto internal xref">Section 8.6</a>), one of the
+two codes here that a valid document can provoke. It is what a consumer opened in the text-only mode
 of <a href="#interop-transport" class="auto internal xref">Section 12.1</a> reports on meeting an octet stream: the document
 is well-formed and the octet stream is a first-class part of the format,
 but this consumer has asserted that its channel carries text. Reporting
@@ -5743,9 +5762,11 @@ therefore a requirement of this document and not a lexical nicety.<a href="#appe
 <p id="appendix-B-10">The unit-profile facility of <a href="#error-codes" class="auto internal xref">Appendix B</a>, which this document does not
 specify, admits whitespace inside a parameter that carries a profile
 namespace, where it is part of the foreign code rather than a separator. A
-consumer that implements no profile never reaches that case: with no
-namespace to recognise, every parameter is a native one and code 52 applies
-throughout.<a href="#appendix-B-10" class="pilcrow">¶</a></p>
+parameter carrying a namespace prefix is therefore never code 52: in a
+document declaring 1.2 or newer it is the foreign code, or
+<code>error_unit_profile_unknown</code> (49) for a namespace the consumer does not
+implement; in a document declaring less it is <code>error_unit_illegal</code>,
+whatever whitespace it contains.<a href="#appendix-B-10" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="examples">

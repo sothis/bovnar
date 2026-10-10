@@ -279,10 +279,11 @@ very first line:
 **An unversioned document is spec 1.0.** A document with no directive is treated
 as targeting spec **1.0** — the frozen baseline grammar. The directive only ever
 *opts in* to a newer version; its absence is never ambiguous. Consequently, any
-syntax introduced after 1.0 (a future minor revision) is available only to a
-document that declares the matching version: a 1.1-only construct in an
-unversioned (i.e. 1.0) document is invalid, exactly as it would be to a 1.0
-reader. `bvnr_reader_get_declared_version` returns `false` for such a document
+syntax introduced after 1.0 is available only to a document that declares the
+version that introduced it, or a newer one. A 1.1 construct in an unversioned
+(i.e. 1.0) document is invalid, exactly as it would be to a 1.0 reader, and so
+is a 1.2 construct in a document declaring 1.1.
+`bvnr_reader_get_declared_version` returns `false` for an unversioned document
 (there is nothing declared), and a consumer that wants a concrete number should
 default to 1.0.
 
@@ -317,7 +318,8 @@ opened with `strict_version` instead rejects any unsupported version
 
 | Directive line | Outcome |
 |---|---|
-| `#!bovnar 1.1` | current — accepted |
+| `#!bovnar 1.2` | current — accepted |
+| `#!bovnar 1.1` | older minor — accepted |
 | `#!bovnar 1.0` | older minor — accepted |
 | `#!bovnar 1.9` | newer minor — lenient: accepted; strict: error |
 | `#!bovnar 2.0` | newer major — lenient: accepted; strict: error |
@@ -1229,7 +1231,7 @@ Comma-separated elements are distinct *values*, but since spec 1.0 they are no l
 Since spec 1.0 the elements of an array must be **homogeneous**. The rule is *"shape uniform, fields free"*, checked over the materialised value (above the lexer; it complements the streaming reader's per-value type and unit checks):
 
 - **Kind.** Every non-null element shares the same kind — number, string, symbol, bool, reference, octet stream, array, or struct. `[1, "two"]` and `[1, {.x=1;}]` are `error_array_element_type_mismatch`.
-- **Unit** (bare scalar arrays and matrices). Numeric elements must carry the **same unit**, not merely the same dimension; the numeric encodings (`uint`, `sint`, `float`, `float_fix`, `float_dec`) may mix freely. `[<float:64,m> 1.0, <float:64,k~g> 2.0]` (length vs mass) is rejected, and so are `[<float:64,m> 1.0, <float:64,ft> 2.0]` (a scale apart), `[<float_dec:64,$USD> 1.0, <float_dec:64,k~$USD> 2.0]` (a prefix apart) and `[<float:64,°C> 1.0, <float:64,K> 2.0]` (an affine **offset** apart). `[1, 2.5, 3]` (all dimensionless) is fine, and so is `[<float:64,m*s> 1.0, <float:64,s*m> 2.0]` — the comparison is order-insensitive, because unit multiplication commutes — as is an explicit `no_unit` beside an omitted unit, which are two spellings of the same thing. Each currency is its own unit, so a bare array may not mix `$USD` and `$EUR` values.
+- **Unit** (bare scalar arrays and matrices). Numeric elements must carry the **same unit**, not merely the same dimension (through spec 1.1 this rule read *the same dimension*; §17 records the correction); the numeric encodings (`uint`, `sint`, `float`, `float_fix`, `float_dec`) may mix freely. `[<float:64,m> 1.0, <float:64,k~g> 2.0]` (length vs mass) is rejected, and so are `[<float:64,m> 1.0, <float:64,ft> 2.0]` (a scale apart), `[<float_dec:64,$USD> 1.0, <float_dec:64,k~$USD> 2.0]` (a prefix apart) and `[<float:64,°C> 1.0, <float:64,K> 2.0]` (an affine **offset** apart). `[1, 2.5, 3]` (all dimensionless) is fine, and so is `[<float:64,m*s> 1.0, <float:64,s*m> 2.0]` — the comparison is order-insensitive, because unit multiplication commutes — as is an explicit `no_unit` beside an omitted unit, which are two spellings of the same thing. Each currency is its own unit, so a bare array may not mix `$USD` and `$EUR` values.
 
   The rule is the unit and not the dimension because of the sentence that closes this section: *a consumer may treat the elements identically*. Under dimensional homogeneity that sentence was false — a reader that took it at its word and applied one unit to `[1.0 m, 2.0 ft]` was wrong by 0.3048, and on `[1.0 °C, 2.0 K]` wrong by an added 273.15. An offset between two neighbouring cells is not a mistake anything downstream can notice, so it is refused at the parse, where every other wrong unit in this format is refused.
 - **`datetime` (spec 1.1).** A `datetime` is its own kind: it does **not** mix with the plain numeric encodings above (`[<datetime:64,unix> 1, <sint:64> 2]` is `error_array_element_type_mismatch`). And, exactly as for currencies, its **epoch is a dimension** — a bare array may not mix epochs (`[<datetime:64,unix> 1, <datetime:64,tai> 2]` is rejected); a homogeneous same-epoch datetime array is fine. (These are materialised-document/DOM-tier rules, like the rest of §7.4.)
@@ -1614,7 +1616,7 @@ The `/` separator divides the preceding components by the following ones. The fi
 - A bare base unit with no prefix requires no separator.
 - When a prefix is present on a **physical** unit, the `~` separator is optional: `k~g` and `kg` are the same unit, as are `Mi~B` and `MiB`. The base unit is matched as the longest alias suffix, so a bare unit always outranks a prefixed reading of the same token (`min` is the minute, not milli-inch) — a compact spelling is therefore only ever accepted where the separated form would have been `error_unit_illegal`, and no existing document decodes differently because of it. Prefixes still cannot be stacked (`kkg`, `k~kg` → `error_unit_illegal`), prefix–unit validity is unchanged, and three compact spellings are refused by name because the token is a well-known annotation for something else: `usb` (the bus, not microstilb — write `u~sb`), `kt` (a standard abbreviation for *two* units this format models, the kilotonne and the knot — write `k~t` or `kn`) and `ppt` (parts per trillion or per thousand in the wild, a picopint by the compact rule — write `pptr`, `‰` or `p~pt`). `pH`, `mph` and `kph` needed an exception until the quantities they name became units in their own right; a bare alias outranks any prefixed reading, so they now resolve without one. See §4.3 of the unit-system reference.
 - The same holds for a **currency**: `k~$EUR` and `k$EUR` are the same unit. The `$` sigil already separates the prefix from the code, so the compact form is unambiguous by construction — but the sigil itself stays mandatory, and `kUSD` is `error_unit_illegal` just as bare `USD` is.
-- The canonical output form always carries the separator: `bvn_unit_to_string` and the `bvnr_write_*` helpers emit `k~g` whichever spelling was read.
+- The canonical output form always carries the separator: `bvn_unit_to_string` and the `bvnr_write_*` helpers emit `k~g`. A *re-serialisation* is a different matter — it writes back the spelling the document carried (`unit_source`, §16.1), so `km` stays `km` through `bovnar pretty-print`; `--canonical` restores the separated form.
 
 ```bovnar
 # Simple (single-component) units — same as before
@@ -1728,7 +1730,7 @@ Seven namespaces are defined:
 | `qudt-qk` | QUDT quantity kinds — translated to the **coherent SI unit** of the kind | one whole code, never decomposed |
 | `udunits` | UDUNITS-2, the CF/netCDF units syntax | an expression over prefixed atoms |
 | `om` | OM 2 — Ontology of units of Measure | one whole code, never decomposed |
-| `cf` | CF standard names — translated to the **`canonical_units`** CF states for the name; **read-only**, a unit is never written back as one | one whole code, never decomposed |
+| `cf` | CF standard names — translated to the **`canonical_units`** CF states for the name; **read-only**: no unit is ever translated *into* a `cf:` code, though a spelling a document already carried is kept when it is re-serialised | one whole code, never decomposed |
 
 ```bovnar
 #!bovnar 1.2
@@ -1753,7 +1755,7 @@ A code that is one whole token is **never decomposed**: `unece:KGM` is the kilog
 | Valid in the profile, with no representation in this unit system | `error_unit_profile_unsupported` |
 | The namespace is not a profile this implementation supports | `error_unit_profile_unknown` |
 
-**Character set.** A profile unit may use `'`, `[`, `]`, `{` and `}` in addition to the native unit characters (§11.4). A `,` inside `{…}` belongs to the unit rather than ending the type parameter. `;`, `#`, `<`, `>` and `"` remain excluded, so an unterminated bracket or annotation cannot consume the remainder of the document.
+**Character set.** A profile unit may use `'`, `[`, `]`, `{` and `}` in addition to the native unit characters (§11.4). A `,` inside `{…}` belongs to the unit rather than ending the type parameter, and inside a type annotation SP and HT within the code belong to it too (§5.3) — UDUNITS multiplies with a space. An inline suffix admits neither. `;`, `#`, `<`, `>` and `"` remain excluded, so an unterminated bracket or annotation cannot consume the remainder of the document.
 
 The complete notation, the transliteration table, and the codes that have no representation are specified in [Unit Profiles](11_bovnar_unit_profiles.md).
 
@@ -2353,8 +2355,8 @@ typedef struct bvnr_data_s {
     uint32_t          length;
     const void*       frac_data;    /* spec 1.1 — ISO datetime sub-second digits, else NULL */
     uint32_t          frac_length;  /* spec 1.1 — length of frac_data, else 0 */
-    const void*       unit_source;        /* spec 1.2 — the unit as the document spelled it, else NULL */
-    uint32_t          unit_source_length; /* spec 1.2 — length of unit_source, else 0 */
+    const void*       unit_source;        /* library 2.0 — the unit as the document spelled it, else NULL */
+    uint32_t          unit_source_length; /* library 2.0 — length of unit_source, else 0 */
     bool              converted;    /* a want_unit read-time conversion was applied (§ read-time conversion) */
     bvnr_converted_t  conv;         /* the exact converted value (unit + text + rational); zeroed when converted is false */
 } bvnr_data_t;
@@ -2788,16 +2790,26 @@ revisions:
   additive direction as a new unit: a spelling is only ever accepted where the
   parser previously raised `error_unit_illegal`, the base symbol is still
   matched as the longest alias suffix so no existing spelling changes meaning,
-  and the **canonical output form is unaffected** — the writer keeps emitting
-  the separated `k~g`, so a document that round-trips stays readable to a
-  reader that predates the spelling;
+  and the **canonical output form is unaffected** — `bvn_unit_to_string` and a
+  writer handed no spelling keep emitting the separated `k~g`, and
+  `bovnar pretty-print --canonical` restores it, so a document can always be
+  made readable to a reader that predates the spelling. (A plain
+  re-serialisation keeps the spelling the document was written in.);
+- **new constructs gated on the version that introduced them** — available only
+  to a document whose `#!bovnar` directive declares that version or a newer
+  one, and an error in any other, so no existing document can acquire one by
+  accident. This is how both minor revisions so far were delivered: 1.1 added
+  the `datetime` family, the `\x`/`\u{}` escapes and reference array indexing;
+  1.2 added the unit-profile notation (§11.9);
 - **new error codes** appended after the current maximum (existing numeric values
   never change). The five the *grammar* of 1.1 required are
   `error_invalid_spec_version` (42), `error_unsupported_spec_version` (43),
   `error_invalid_codepoint` (44), `error_invalid_datetime_literal` (45), and
   `error_datetime_literal_unsupported_epoch` (46) — those carry a `spec 1.1`
-  note in §16.10. Codes have been appended since for facilities beside the
-  wire format and for reader policy. **§16.10 is the list**, and the current
+  note in §16.10. Codes appended since: 47 and 48 for facilities beside the
+  wire format, 49 and 50 for the spec 1.2 unit profiles, 51 for a reader
+  policy, and 52 for a lexical rule the grammar always implied (see the
+  corrections below). **§16.10 is the list**, and the current
   maximum is wherever it ends — never a number quoted somewhere else, this
   paragraph included;
 - the **optional version directive** (§3.4), added in 1.1: it is an ordinary
@@ -2809,9 +2821,29 @@ A reader from an older 1.x point release may not recognise a unit or currency
 added in a newer one; that is the expected direction of forward compatibility and
 is not a break of the 1.0 promise.
 
+**Two corrections made in 1.2, stated because they bend the sentence above.**
+Both refuse documents that a 1.1 reader accepted, and both apply to every
+document, whatever it declares. They are recorded as corrections of defects
+rather than as changes of the format, on these grounds:
+
+- *Whitespace inside a type-annotation parameter* is
+  `error_type_param_whitespace` (§5.3). The grammar never derived it — every
+  `ws` in an annotation sits beside a separator — but the reference reader
+  deleted it, so `<float:64,k g>` was read as `k~g`. A document relying on that
+  carried a unit its author did not write.
+- *A bare array is homogeneous in its unit, not merely its dimension* (§7.4).
+  The rule as written through 1.1 let `[1 m, 2 ft]`-shaped arrays through
+  while the same section promised that a consumer may treat the elements
+  identically; a consumer who believed it computed wrong numbers. The promise
+  was kept and the rule corrected to make it true.
+
+Neither changes what any accepted document *means*. A producer affected by
+either was already emitting data that could not be read correctly.
+
 **What requires a 2.0.** Any change that could render a valid 1.x document invalid,
-change how it decodes, renumber an error code, or alter the grammar is a breaking
-change and is reserved for a major (2.0) revision. The changes that motivated
+change how it decodes, renumber an error code, or change what an existing
+document's bytes mean is a breaking change and is reserved for a major (2.0)
+revision of the *format* — which is not the library's version (above). The changes that motivated
 the 1.0 freeze — the **mandatory `$` currency sigil** (§10.4 of the unit-system
 reference), **array element homogeneity** (§7.4), and **`float_fix` value-range
 validation** (§6.2, rejecting a value the declared Q-format cannot represent) —

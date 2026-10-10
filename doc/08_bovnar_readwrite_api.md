@@ -389,7 +389,7 @@ if (d->frac_data && d->frac_length) {
 }
 ```
 
-**The unit's own spelling (`unit_source`, spec 1.2).** `d->value_unit` is what a
+**The unit's own spelling (`unit_source`, library 2.0).** `d->value_unit` is what a
 unit *means*; `d->unit_source` / `d->unit_source_length` are what the document
 *wrote*. The two differ wherever formatting a `value_unit_t` is lossy: `km` and
 `k~m` are one unit, `ucum:mm[Hg]` and `mmHg` are one unit, and `ucum:mL{total}`
@@ -1436,9 +1436,12 @@ bvnr_write_float_unit(w, "volume", 64, 1.5, mL);   /* <float:64,ucum:mL{total}> 
 bvnr_write_float_unit(w, "other",  64, 2.5, mL);   /* <float:64,m~L> — one shot */
 ```
 
-It is one shot so that it cannot leak onto a later value; it is also dropped
-when that write fails, when the writer is re-opened, and by passing `NULL` or a
-zero length. The text is copied.
+It is one shot, and for the **next value only**. If that value takes no unit — a
+string, a bool, a struct, a bare number — the spelling does not travel on to
+whichever later value happens to carry one: the write fails with
+`error_unit_mismatch` (for a helper that writes no annotation at all, at the
+key that follows it). It is also dropped when a write fails, when the writer is
+re-opened, and by passing `NULL` or a zero length. The text is copied.
 
 A caller driving `bvnr_write_event` directly needs no setter: set
 `bvnr_data_t.unit_source` on the unit-parameter event (annotation slot) or on
@@ -1450,10 +1453,17 @@ document that says two things:
 |---|---|
 | parses to a different unit than the one given | `error_unit_mismatch` |
 | does not parse | whatever `bvn_unit_error_code` says: `error_unit_illegal`, `error_unit_profile_unknown`, `error_unit_profile_unsupported` |
-| is longer than `BVNR_UNIT_SOURCE_MAX` (255) bytes | `error_unit_too_long` |
+| is longer than `BVNR_UNIT_SOURCE_MAX` (255) bytes, or than what is left of an annotation's 255 after the family and the parameters before it | `error_unit_too_long` |
 | is profile notation and no `#!bovnar 1.2` directive was emitted | `error_unsupported_spec_version` |
 | would not be read back as itself in that unit slot | `error_unit_illegal` |
 | was set for a value that turned out to carry no unit | `error_unit_mismatch` |
+| is headed for an inline suffix on an array element | `error_unit_illegal` — the format has no inline unit inside `[…]` |
+
+The unit parameter's `data` text is held to the same table. It is what the
+reader fills on that event and what every caller before 2.0 passed, and the
+writer emits it when there is no `unit_source` — so it has to name
+`value_unit` too, and where both fields are set they must agree. (A datetime's
+parameter is its epoch, and there the one text accepted is the epoch's name.)
 
 The fifth row is the one a unit parser cannot answer, and it is answered by
 reading the text back through the real reader. The two unit slots end in
@@ -1462,8 +1472,10 @@ annotation parameter and neither is a legal inline suffix, so the same spelling
 is written in one slot and refused in the other.
 
 **A unit flag wins.** With `BVN_UNIT_REDUCE` or `BVN_UNIT_ASCII_EXP` set in
-`bvnr_write_flags_t.unit_flags` the spelling is ignored, unchecked, and the
-canonical form is written: those flags ask for a particular spelling themselves.
+`bvnr_write_flags_t.unit_flags`, `unit_source` is ignored, unchecked, and the
+flagged form is written: those flags ask for a particular spelling themselves.
+The `data` text is still checked there, in the form the flag produces — it may
+be `m` for a `value_unit` of `k~m` under `BVN_UNIT_REDUCE`, and may not be `s`.
 
 ---
 
@@ -1634,7 +1646,7 @@ fprintf(stderr, "error: %s\n", bvn_error_to_string(bvnr_reader_get_error(r)));
 
 | Code | Value | String | Trigger |
 |------|-------|--------|---------|
-| `error_unit_illegal` | 32 | `"unit_illegal"` | Unparseable unit string (unknown base, bad prefix, empty component, >8 components) |
+| `error_unit_illegal` | 32 | `"unit_illegal"` | Unparseable unit string (unknown base, bad prefix, empty component, more than `BVNR_MAX_UNIT_COMPONENTS` = 32 components) |
 | `error_unit_too_long` | 22 | `"unit_too_long"` | An **inline** unit suffix exceeds its 255-byte lexer buffer; a unit in an annotation raises `error_type_too_long` instead |
 | `error_unit_mismatch` | 38 | `"unit_mismatch"` | Inline unit suffix present, type-annotation unit also present, and the two differ; or a `want_unit` target dimensionally incompatible with the value's unit (§1.10) |
 | `error_unit_inexact` | 47 | `"unit_inexact"` | A `want_unit` conversion could not be delivered exactly: irrational factor, or a non-terminating expansion in the output base without `want_unit_allow_nonterminating` (§1.10) |
@@ -1676,7 +1688,7 @@ For the same reason its array-nesting cap is set to the maximum: the reader has 
 enforced its own limit, and a second, stricter cap here would reject a document the
 reader accepted.
 
-**Version directives.** A canonical copy of a spec-1.1 document needs the directive its
+**Version directives.** A canonical copy of a spec-1.1 or 1.2 document needs the directive its
 constructs require in order to re-read. `bvnr_canon_observer_set_version` records one to
 prepend; it is emitted lazily, just before the first event. Call it before any event is
 fed — typically from the reader's callback once `bvnr_reader_get_declared_version`
@@ -1849,7 +1861,7 @@ is still the whole-second epoch count read via `bvn_dom_get_i64`:
 const char *bvn_dom_get_datetime_fraction(const bvn_dom_node_t *node, uint32_t *len_out);
 ```
 
-A value node also keeps its unit's **spelling** (spec 1.2) where that says
+A value node also keeps its unit's **spelling** (library 2.0) where that says
 something `bvn_dom_get_unit` cannot — `ucum:mL{total}` is the unit `m~L`, and
 the annotation survives only here:
 

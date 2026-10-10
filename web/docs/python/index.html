@@ -45,7 +45,7 @@
 <strong>Scope:</strong> Installation, the high-level and streaming APIs, the DOM, <code>Quantity</code>, and the NumPy and pint bridges.</p>
 </blockquote>
 <p>Pure-<code>ctypes</code> Python bindings for the <strong>Bovnar (BVNR)</strong> typed serialisation
-library (spec v1.1).</p>
+library (library 2.0.0, format spec 1.2).</p>
 <p>No compiled extension module is needed — the bindings load <code>libbvnr.so</code> at
 import time via the standard <code>ctypes.CDLL</code> machinery.</p>
 <hr />
@@ -319,7 +319,7 @@ external state via closure instead.</p>
 <tr>
 <td><code>data.unit_source_str()</code></td>
 <td><code>str \| None</code></td>
-<td>The unit exactly as the document spelled it (spec 1.2), or <code>None</code> when the value carries no unit. Read it inside the callback</td>
+<td>The unit exactly as the document spelled it (library 2.0), or <code>None</code> when the value carries no unit. Read it inside the callback</td>
 </tr>
 </tbody>
 </table>
@@ -426,7 +426,7 @@ which of them a given build carries is a question to ask rather than assume; see
 <span class="n">bovnar</span><span class="o">.</span><span class="n">available_profiles</span><span class="p">()</span>
 <span class="c1"># → (&#39;ucum&#39;, &#39;unece&#39;, &#39;qudt&#39;, &#39;qudt-qk&#39;, &#39;udunits&#39;, &#39;om&#39;, &#39;cf&#39;)</span>
 
-<span class="c1"># The same unit, five ways — all one ValueUnit</span>
+<span class="c1"># The same unit in other vocabularies — all one ValueUnit</span>
 <span class="n">kg</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;k~g&quot;</span><span class="p">)</span>
 <span class="n">bovnar</span><span class="o">.</span><span class="n">unit_to_profile</span><span class="p">(</span><span class="s2">&quot;ucum&quot;</span><span class="p">,</span>    <span class="n">kg</span><span class="p">)</span>   <span class="c1"># → &quot;kg&quot;</span>
 <span class="n">bovnar</span><span class="o">.</span><span class="n">unit_to_profile</span><span class="p">(</span><span class="s2">&quot;unece&quot;</span><span class="p">,</span>   <span class="n">kg</span><span class="p">)</span>   <span class="c1"># → &quot;KGM&quot;</span>
@@ -857,7 +857,7 @@ validates the width for the chosen family.</p>
 <tr>
 <td><code>q.unit_source</code></td>
 <td><code>str \| None</code></td>
-<td>The unit exactly as the document spelled it (spec 1.2) — <code>ucum:mL{total}</code> where <code>q.unit</code> is <code>m~L</code>. Set by <code>loads(typed=True)</code>, or by the <code>unit_source=</code> constructor argument; <code>dumps()</code> writes it back, and refuses one that does not parse to <code>q.unit</code>. <code>None</code> writes the canonical form</td>
+<td>The unit exactly as the document spelled it (library 2.0) — <code>ucum:mL{total}</code> where <code>q.unit</code> is <code>m~L</code>. Set by <code>loads(typed=True)</code>, or by the <code>unit_source=</code> constructor argument; <code>dumps()</code> writes it back, and refuses one that does not parse to <code>q.unit</code>. <code>None</code> writes the canonical form</td>
 </tr>
 </tbody>
 </table>
@@ -1239,7 +1239,8 @@ or unknown codes.</p>
 manager or call <code>r.close()</code> explicitly to release the C object.</p>
 <h3 id="112-read_mem">11.2 <code>read_mem</code></h3>
 <p><code>read_mem(data, *, on_verified, on_unverified, max_file_size, continue_on_error,
-strict_version, want_unit, want_unit_allow_nonterminating, max_conversion_length)</code></p>
+strict_version, text_only, want_unit, want_unit_allow_nonterminating,
+max_conversion_length)</code></p>
 <p>Parse BVNR from a <code>bytes</code>, <code>bytearray</code>, or <code>memoryview</code> object.</p>
 <table>
 <thead>
@@ -1286,6 +1287,12 @@ strict_version, want_unit, want_unit_allow_nonterminating, max_conversion_length
 <td><code>bool</code></td>
 <td><code>False</code></td>
 <td>Reject a declared spec version newer than this build (<code>error_unsupported_spec_version</code>)</td>
+</tr>
+<tr>
+<td><code>text_only</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Refuse a document that contains an octet stream (<code>error_octet_stream_forbidden</code>), for a channel that is not byte-transparent</td>
 </tr>
 <tr>
 <td><code>want_unit</code></td>
@@ -1675,7 +1682,7 @@ for as long as any derived <code>DomNode</code> is in use.</p>
 </tr>
 <tr>
 <td><code>node.unit_source</code></td>
-<td><code>str</code> of the unit exactly as the document spelled it (spec 1.2), where that differs from the canonical form — <code>ucum:mL{total}</code> for a unit of <code>m~L</code>; <code>None</code> for a node with no unit, one already written canonically, or one a unit policy converted</td>
+<td><code>str</code> of the unit exactly as the document spelled it (library 2.0), where that differs from the canonical form — <code>ucum:mL{total}</code> for a unit of <code>m~L</code>; <code>None</code> for a node with no unit, one already written canonically, or one a unit policy converted</td>
 </tr>
 <tr>
 <td><code>node[key]</code></td>
@@ -2206,9 +2213,14 @@ at value 900033 takes the suffixed name. This affects the Python member name onl
 </blockquote>
 <hr />
 <h2 id="19-spec-11-additions">19. Spec 1.1 additions</h2>
-<p>These bindings target the <strong>Bovnar spec (v1.1)</strong>; spec 1.0 remains the
-frozen baseline. The 1.1 features (all gated on a <code>#!bovnar 1.1</code> directive — an
-unversioned document is treated as 1.0) are exposed as:</p>
+<p>These bindings target the <strong>Bovnar spec 1.2</strong>; spec 1.0 remains the frozen
+baseline, and the package's own version (2.0.0) is a separate number
+(<code>bovnar.version()</code> against <code>bovnar.spec_version()</code>). Spec 1.2's one addition,
+the unit-profile notation, is covered in <a href="#51-the-unit-profile-notations-spec-12">§5.1</a>:
+it is gated on a <code>#!bovnar 1.2</code> directive, which <code>dumps()</code> prepends when a
+kept spelling or a profile-only unit needs it. The 1.1 features (all gated on a
+<code>#!bovnar 1.1</code> directive — an unversioned document is treated as 1.0) are
+exposed as:</p>
 <ul>
 <li><strong>Version:</strong> <code>bovnar.version()</code> (library version string), <code>bovnar.spec_version()</code>
   → <code>(major, minor)</code> of the highest spec understood, and

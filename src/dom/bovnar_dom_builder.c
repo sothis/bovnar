@@ -745,7 +745,7 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 			break;
 		}
 		if (!nd) return false;
-		/* spec 1.2 — the unit's own spelling. Not when a policy converted the
+		/* library 2.0 — the unit's own spelling. Not when a policy converted the
 		 * value: the node then carries conv.unit, which the document never
 		 * spelled. */
 		if (d->unit_source && d->unit_source_length &&

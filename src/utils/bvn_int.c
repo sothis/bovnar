@@ -855,6 +855,10 @@ bool bvn_int_mul(bvn_int_t *dst, const bvn_int_t *a, const bvn_int_t *b)
 	bvn_int_t *tmp = bvn_int_alloc();
 	if (!tmp) return false;
 	if (!bigint_ensure_cap(tmp, na + nb)) { bvn_int_free(tmp); return false; }
+	/* bigint_ensure_cap guarantees limbs is non-NULL on success, but -fanalyzer
+	 * does not carry that across the call (the same note as in the adder
+	 * above); it reports the loop below once the objects are compiled fat. */
+	if (!tmp->limbs) { bvn_int_free(tmp); return false; }
 	memset(tmp->limbs, 0, (size_t)(na + nb) * sizeof(uint32_t));
 	for (uint32_t i = 0; i < na; i++) {
 		uint64_t ai = a->limbs[i], carry = 0u;

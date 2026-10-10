@@ -189,7 +189,7 @@ class TestBvnrData:
         assert BvnrData.conv.offset > BvnrData.converted.offset
 
     def test_has_spec_1_2_unit_source_fields(self):
-        # spec 1.2 added unit_source/unit_source_length BETWEEN the frac fields
+        # library 2.0 added unit_source/unit_source_length BETWEEN the frac fields
         # and the conversion carrier, so every later offset moved. Same hazard
         # as above, same guard; test_abi.py checks the numbers against the C
         # compiler, this pins the order a reader of the struct relies on.

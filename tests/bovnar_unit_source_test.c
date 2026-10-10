@@ -26,7 +26,7 @@
  */
 
 /*
- * bvnr_data_t.unit_source (spec 1.2): the unit as the producer spelled it.
+ * bvnr_data_t.unit_source (library 2.0): the unit as the producer spelled it.
  * Specified in doc/11_bovnar_unit_profiles.md §5.2 and §7.3.
  *
  * Three things are held here. That the READER hands over the exact bytes and
@@ -175,6 +175,11 @@ static void test_reader_arrays(void)
 	/* Nested: the inner array's annotation ends with the inner array. */
 	static const char* const w3[] = { "m", "s", "s", "m" };
 	expect_sources(".a = <uint:8,m> [1, <uint:8,s> [2, 3], 4];", w3, 4);
+	/* An element annotation WITHOUT a unit holds for one element too: the
+	 * array's unit comes back after it. It used not to -- the 3 below was
+	 * delivered with no unit at all. */
+	static const char* const w5[] = { NULL, "s", "s" };
+	expect_sources(".a = <float:64,s> [<float:64> 1, 3, 4];", w5, 3);
 	/* The value after an array starts clean. */
 	static const char* const w4[] = { "m", NULL, "s" };
 	expect_sources(".a = <uint:8,m> [1]; .b = 2; .c = 3 s;", w4, 3);
@@ -347,6 +352,18 @@ static void test_writer_refusals(void)
 	            "as error_unit_too_long");
 	bvnr_writer_destroy(w);
 
+	/* One shot means the NEXT value. A helper that writes no annotation does
+	 * not quietly pass the spelling on to whichever later value has a unit. */
+	w = open_writer(true, 0);
+	if (!w) { failures++; return; }
+	bvnr_writer_set_unit_source(w, "ucum:mL{total}", 14);
+	ASSERT_TRUE(bvnr_write_string(w, "s", "x"), "a string takes no unit");
+	ASSERT_FALSE(bvnr_write_float_unit(w, "v", 64, 1.5, U("m~L")),
+	             "and the spelling does not travel on to the next value");
+	ASSERT_TRUE(bvnr_writer_get_error(w) == error_unit_mismatch,
+	            "it is reported as set for a value with no unit");
+	bvnr_writer_destroy(w);
+
 	/* A spelling for a value that carries no unit names the wrong value. */
 	w = open_writer(true, 0);
 	if (!w) { failures++; return; }
@@ -371,8 +388,17 @@ static void test_writer_flags(void)
 }
 
 /* Drive bvnr_write_event directly: `.k = <float:64,UNIT> 1;` or `.k = 1 UNIT;` */
+static error_code_t event_write_ex(bool annotated, const char* src,
+                                   const char* unit, const char* data_text);
 static error_code_t event_write(bool annotated, const char* src,
                                 const char* unit, bool with_data_text)
+{
+	return event_write_ex(annotated, src, unit, with_data_text ? unit : NULL);
+}
+/* `src` may be NULL (no unit_source); `data_text` is the unit parameter's
+ * `data`, which is what every caller before 2.0 filled. */
+static error_code_t event_write_ex(bool annotated, const char* src,
+                                   const char* unit, const char* data_text)
 {
 	bvnr_writer_t* w = open_writer(true, 0);
 	if (!w) return error_invalid_argument;
@@ -392,9 +418,11 @@ static error_code_t event_write(bool annotated, const char* src,
 		d.type = token_is_type_width;
 		ok = ok && bvnr_write_event(w, ev_type_annotation_type_family_parameter, &d);
 		d.type = token_is_unit;
-		if (with_data_text) { d.data = unit; d.length = (uint32_t)strlen(unit); }
-		d.unit_source = src;
-		d.unit_source_length = (uint32_t)strlen(src);
+		if (data_text) { d.data = data_text; d.length = (uint32_t)strlen(data_text); }
+		if (src) {
+			d.unit_source = src;
+			d.unit_source_length = (uint32_t)strlen(src);
+		}
 		ok = ok && bvnr_write_event(w, ev_type_annotation_type_family_parameter, &d);
 		memset(&d, 0, sizeof d);
 		d.type = token_is_type;
@@ -405,8 +433,10 @@ static error_code_t event_write(bool annotated, const char* src,
 	d.value_type = annotated ? BVN_TYPE_FLOAT(64) : BVN_TYPE_PLAIN;
 	d.value_unit = vu;
 	d.data = "1"; d.length = 1;
-	d.unit_source = src;
-	d.unit_source_length = (uint32_t)strlen(src);
+	if (src) {
+		d.unit_source = src;
+		d.unit_source_length = (uint32_t)strlen(src);
+	}
 	ok = ok && bvnr_write_event(w, ev_data, &d);
 	ok = ok && bvnr_write_finish(w);
 	error_code_t e = ok ? error_none : bvnr_writer_get_error(w);
@@ -438,6 +468,117 @@ static void test_writer_events(void)
 	            "a space-multiplied code is one annotation parameter");
 	ASSERT_TRUE(event_write(false, "udunits:kg m-2 s-1", "k~g/m²/s", false)
 	            == error_unit_illegal, "and not an inline suffix");
+}
+
+static bool replay_cb(void* ud, bvnr_event_t ev, bvnr_data_t* d);
+
+static void test_writer_data_text(void)
+{
+	printf("  ...and the parameter's older `data` text is held to the same rule...\n");
+	/* The serialiser writes `data` when there is no unit_source, so checking
+	 * only the new field left the old one a way round every refusal above. */
+	ASSERT_TRUE(event_write_ex(true, NULL, "m", "m") == error_none,
+	            "the control: data naming the unit");
+	ASSERT_TRUE(event_write_ex(true, NULL, "k~m", "km") == error_none,
+	            "data may spell the unit another way");
+	ASSERT_TRUE(strstr(wbuf, ".k=<float:64,km>1;") != NULL, wbuf);
+	ASSERT_TRUE(event_write_ex(true, NULL, "m", "kg") == error_unit_mismatch,
+	            "data naming a different unit");
+	ASSERT_TRUE(event_write_ex(true, NULL, "m", "kg>1;.k=<uint:8,m") != error_none,
+	            "data that would write a second assignment");
+	ASSERT_TRUE(strstr(wbuf, ".k=<uint:8") == NULL, wbuf);
+	ASSERT_TRUE(event_write_ex(true, "m", "m", "s") == error_unit_mismatch,
+	            "data and unit_source disagreeing");
+}
+
+static void test_writer_annotation_cap(void)
+{
+	printf("  ...and a spelling may not push an annotation past the reader's cap...\n");
+	/* The reader holds an annotation's body in 255 bytes, family and all. A
+	 * spelling that fits on its own can still be the one that overflows it,
+	 * and how much room is left depends on what came before. */
+	char src[BVNR_UNIT_SOURCE_MAX + 1];
+	for (uint32_t L = 200; L <= BVNR_UNIT_SOURCE_MAX; L++) {
+		memcpy(src, "ucum:m{", 7);
+		memset(src + 7, 'a', L - 8);
+		src[L - 1] = '}';
+		src[L] = 0;
+		bvnr_writer_t* w = open_writer(true, 0);
+		if (!w) { failures++; return; }
+		bool ok = bvnr_writer_set_unit_source(w, src, L) &&
+		          bvnr_write_float_fix_unit(w, "a", 128, 64, 1.5, U("m")) &&
+		          bvnr_write_finish(w);
+		error_code_t e = bvnr_writer_get_error(w);
+		bvnr_writer_destroy(w);
+		seen_t s;
+		bvnr_read_flags_t f;
+		memset(&f, 0, sizeof f);
+		char copy[sizeof wbuf];
+		memcpy(copy, wbuf, sizeof copy);
+		tests++;
+		if (ok ? !read_doc(copy, &s, &f) : e != error_unit_too_long) {
+			fprintf(stderr, "FAIL: spelling of %u bytes: %s\n", L,
+			        ok ? "written, and unreadable" : "refused with the wrong code");
+			failures++;
+		}
+	}
+}
+
+static void test_writer_arrays(void)
+{
+	printf("  ...and no inline unit is ever written inside an array...\n");
+	/* An element's own annotation used to switch the "unit already written"
+	 * state off for every LATER element of the enclosing array, which then
+	 * each gained an inline unit -- and the reader takes none inside [...].
+	 * A valid document replayed into one its own reader refused. */
+	static const char* const docs[] = {
+		".a=<float:64,s>[<float:64,m>[<uint:8>null,2],3];",
+		".a=<float:64,s>[<uint:8>1,3]/[4,<float:64>5];",
+		"#!bovnar 1.2\n.a=<float:64,udunits:kg m-2 s-1>"
+			"[<float:64,ucum:mL{a,b}>[<uint:8>null,\"7\"],3];",
+	};
+	for (size_t i = 0; i < sizeof docs / sizeof docs[0]; i++) {
+		/* The directive is not an event; a replay re-declares it itself. */
+		bvnr_writer_t* w = open_writer(strncmp(docs[i], "#!", 2) == 0, 0);
+		bvnr_reader_t* r = bvnr_reader_create();
+		if (!w || !r) { failures++; return; }
+		bvnr_read_flags_t f;
+		memset(&f, 0, sizeof f);
+		f.userdata = w;
+		f.on_verified = replay_cb;
+		ASSERT_TRUE(bvnr_open_read_mem(r, docs[i], strlen(docs[i]), NULL, 0, &f) &&
+		            bvnr_read(r) && bvnr_write_finish(w), docs[i]);
+		bvnr_reader_destroy(r);
+		bvnr_writer_destroy(w);
+		seen_t s1, s2;
+		char copy[sizeof wbuf];
+		memcpy(copy, wbuf, sizeof copy);
+		memset(&f, 0, sizeof f);
+		bool ok1 = read_doc(docs[i], &s1, &f);
+		memset(&f, 0, sizeof f);
+		bool ok2 = read_doc(copy, &s2, &f);
+		ASSERT_TRUE(ok1 && ok2, copy);
+		ASSERT_TRUE(s1.n == s2.n && memcmp(s1.src, s2.src, sizeof s1.src) == 0 &&
+		            memcmp(s1.has, s2.has, sizeof s1.has) == 0,
+		            "the replay carries the same units on the same values");
+	}
+
+	/* And a caller building the events by hand is told, not obliged. */
+	bvnr_writer_t* w = open_writer(false, 0);
+	if (!w) { failures++; return; }
+	bvnr_data_t d;
+	memset(&d, 0, sizeof d);
+	d.type = token_is_identifier; d.data = "a"; d.length = 1;
+	bool ok = bvnr_write_event(w, ev_assignment_start, &d);
+	memset(&d, 0, sizeof d);
+	ok = ok && bvnr_write_event(w, ev_array_row_start, &d);
+	d.type = token_is_array_number;
+	d.value_unit = U("m");
+	d.data = "1"; d.length = 1;
+	ASSERT_TRUE(ok && !bvnr_write_event(w, ev_data, &d) &&
+	            bvnr_writer_get_error(w) == error_unit_illegal,
+	            "an inline unit on an array element is refused");
+	bvnr_writer_destroy(w);
 }
 
 /* Replay a document reader -> writer; the events now carry unit_source on
@@ -475,8 +616,10 @@ static void test_long_unit_text_under_flags(void)
 {
 	printf("  a long unit text under a unit flag stays inside its buffer...\n");
 	/* The annotation path copied the text into char[512] under a guard of
-	 * BVNR_UNIT_STRING_MAX. Nothing here is a unit; the copy happens before
-	 * anything asks. Run under ASan this is the regression test. */
+	 * BVNR_UNIT_STRING_MAX. Nothing here is a unit, and the writer now refuses
+	 * it before the serialiser sees it -- so what this pins is that 1000
+	 * bytes of it are refused cleanly, with every copy on the way in bounds.
+	 * Run under ASan. */
 	char text[1000];
 	memset(text, 'm', sizeof text);
 	bvnr_writer_t* w = open_writer(false, BVN_UNIT_REDUCE);
@@ -526,6 +669,24 @@ static void test_dom(void)
 	ASSERT_TRUE(bvn_dom_get_unit_source(NULL, &n) == NULL && n == 0, "NULL node");
 	bvn_dom_doc_destroy(dd);
 
+	/* value_unit and unit_source come from ONE parse. `s·m` and `m·s` are
+	 * equal, so a redundant inline suffix in the other order used to replace
+	 * the struct while the annotation kept the text -- and the verdict on
+	 * whether the text was worth keeping then depended on document order. */
+	static const char doc3[] =
+		".a = <float:64,s\xc2\xb7m> 2;\n"
+		".b = <float:64,s\xc2\xb7m> 1 m\xc2\xb7s;\n"
+		".c = <float:64,s\xc2\xb7m> 3;\n";
+	dd = bvn_dom_parse(doc3, (uint32_t)(sizeof doc3 - 1));
+	ASSERT_TRUE(dd && bvn_dom_doc_get_parse_error(dd) == error_none, "dom parse");
+	if (!dd) return;
+	const char* sa = bvn_dom_get_unit_source(bvn_dom_lookup(dd, ".a"), NULL);
+	const char* sb = bvn_dom_get_unit_source(bvn_dom_lookup(dd, ".b"), NULL);
+	const char* sc = bvn_dom_get_unit_source(bvn_dom_lookup(dd, ".c"), NULL);
+	ASSERT_TRUE((sa == NULL) == (sb == NULL) && (sb == NULL) == (sc == NULL),
+	            "three values written alike are kept alike");
+	bvn_dom_doc_destroy(dd);
+
 	/* A converting policy stores conv.unit, which the document never spelled. */
 	bvnr_unit_policy_t pol;
 	memset(&pol, 0, sizeof pol);
@@ -557,7 +718,10 @@ int main(void)
 	test_writer_refusals();
 	test_writer_flags();
 	test_writer_events();
+	test_writer_data_text();
+	test_writer_annotation_cap();
 	test_replay();
+	test_writer_arrays();
 	test_long_unit_text_under_flags();
 	test_dom();
 

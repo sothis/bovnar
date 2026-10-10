@@ -1866,10 +1866,17 @@ static bool bvn_val_receive_type(bvnr_reader_t* r,
 	 * BVN_UNIT_IS_NO_UNIT matches the single-component bu_none shape. Test
 	 * both so a unitless annotation never spuriously advances the serial.
 	 */
-	if (parsed_unit.num_components != 0u && !BVN_UNIT_IS_NO_UNIT(parsed_unit)) {
-		v->parsed_unit_serial++;
+	if (parsed_unit.num_components != 0u && !BVN_UNIT_IS_NO_UNIT(parsed_unit))
 		bvn_val_set_unit_src(v, unit_buf, ulen);
-	}
+	/*
+	 * The serial moves for EVERY annotation, with a unit or without. It used to
+	 * move only for a dimensioned one, on the theory that "no unit" changes
+	 * nothing -- but inside an array it does: `<float:64,s>[<float:64> 1, 3]`
+	 * sets parsed_unit to "none" for the first element, and with the serial
+	 * unmoved the array frame saw no reason to put `s` back. The 3 was then
+	 * delivered with no unit at all, a value losing its unit in silence.
+	 */
+	v->parsed_unit_serial++;
 	v->unit_data_len = ulen;
 	if (ulen > 0)
 		v->has_annotation_unit = true;
@@ -2165,11 +2172,17 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 		}
 		/* Where the annotation named the unit too, its spelling stands: that
 		 * is the one a re-serialisation writes, the inline suffix being
-		 * dropped as redundant once the annotation carries the unit. */
-		if (!v->has_annotation_unit)
+		 * dropped as redundant once the annotation carries the unit.
+		 *
+		 * The UNIT stands with it. The two compared equal just above, but equal
+		 * is order-insensitive (`s·m` is `m·s`), so taking the suffix's struct
+		 * while keeping the annotation's text would hand out a value_unit and
+		 * a unit_source from two different parses of one unit. */
+		if (!v->has_annotation_unit) {
 			bvn_val_set_unit_src(v, raw->inline_unit_data,
 					     raw->inline_unit_len);
-		v->parsed_unit = iu_unit;
+			v->parsed_unit = iu_unit;
+		}
 		if (!BVN_UNIT_IS_NO_UNIT(iu_unit))
 			v->parsed_unit_serial++;
 	}
@@ -2188,7 +2201,7 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 	 * is a datetime literal that had a `.frac` part). */
 	d.frac_data   = dt_frac;
 	d.frac_length = dt_frac_len;
-	/* spec 1.2 — and the unit's own spelling. Attached here rather than left to
+	/* library 2.0 — and the unit's own spelling. Attached here rather than left to
 	 * the emit below so the assertion pass and the want_unit hook see the same
 	 * event the callbacks will. */
 	bvn_attach_unit_src(v, &d);

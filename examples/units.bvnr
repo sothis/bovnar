@@ -394,12 +394,12 @@
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 22. Up to 8 components (BVN_MAX_UNIT_COMPONENTS limit)
+# 22. Many components (the limit is BVNR_MAX_UNIT_COMPONENTS, 32)
 # ══════════════════════════════════════════════════════════════════════════════
-# The maximum is 8 components.  Compound physical units rarely exceed 4–5.
+# A unit may have up to 32 components.  Compound physical units rarely exceed 4–5.
 
 .seven_comp = <float:64,k~g·m·s/A·K·mol·cd>   1.0;  # 7 components — within limit
-.eight_comp = <float:64,m·s·k~g·A·K·mol·cd·b> 1.0;  # 8 components — at the limit
+.eight_comp = <float:64,m·s·k~g·A·K·mol·cd·b> 1.0;  # 8 components — still far inside it
 
 
 

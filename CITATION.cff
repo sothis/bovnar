@@ -19,10 +19,10 @@ authors:
   - family-names: Sonntag
     given-names: Janos
     orcid: "https://orcid.org/0009-0008-1299-6534"
-version: 1.1.0
-# The release date of version 1.1.0 (tag v1.1.0, and the CHANGELOG entry), not
-# the later date on which the Zenodo archive of it was deposited.
-date-released: "2026-06-21"
+version: 2.0.0
+# The release date of version 2.0.0 (tag v2.0.0, and the CHANGELOG entry), not
+# the later date on which the Zenodo archive of it is deposited.
+date-released: "2026-10-10"
 license: MIT
 repository-code: "https://github.com/sothis/bovnar"
 url: "https://www.bovnar.io"
@@ -36,12 +36,9 @@ identifiers:
     description: >-
       Concept DOI, resolving to the latest archived documentation and
       specification
-  - type: doi
-    value: 10.5281/zenodo.21443009
-    description: Archived source of version 1.1.0
-  - type: doi
-    value: 10.5281/zenodo.21443296
-    description: Archived documentation and specification of version 1.1.0
+  # The per-version DOIs of 2.0.0 are minted when its archives are deposited,
+  # after the tag; add them here then. Those of 1.1.0 -- 10.5281/zenodo.21443009
+  # (source) and 10.5281/zenodo.21443296 (documentation) -- are in README.md.
 keywords:
   - serialization
   - units of measure

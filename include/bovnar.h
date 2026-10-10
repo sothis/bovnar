@@ -65,17 +65,19 @@ extern "C" {
  * version above. "-dev" while CHANGELOG.md still has an [Unreleased] section;
  * "" as part of cutting a release, in the same commit that closes that section.
  *
- * It exists because "1.1.0" alone is a claim a build from this tree cannot
- * honestly make: the tree carries an ABI break, new error codes and a unit
- * notation that 1.1.0 does not have, so a `bovnar version` reading "1.1.0" sends
- * a bug report against a release whose behaviour is not what the reporter ran.
+ * It exists because the bare version is a claim a build from an unreleased tree
+ * cannot honestly make: between 1.1.0 and 2.0.0 the tree carried an ABI break,
+ * new error codes and a unit notation that 1.1.0 did not have, so a
+ * `bovnar version` reading "1.1.0" sent a bug report against a release whose
+ * behaviour was not what the reporter ran. Set it back to "-dev" in the first
+ * commit after a release that opens a new [Unreleased] section.
  *
  * DELIBERATELY NOT PART OF BVNR_VERSION_STRING, and not a new API symbol. Those
  * feed places that must stay a bare numeric triple -- the CMake project version
- * (the release workflow greps it with a [0-9]+\.[0-9]+\.[0-9]+ regex), the
- * SOVERSION derived from it, pyproject.toml's PEP 440 version, and the wheel
- * smoke test that asserts bovnar.version() == '1.1.0'. The suffix is applied
- * where the mistake actually happens: the `bovnar version` banner a human reads.
+ * (the release workflow greps it with a [0-9]+\.[0-9]+\.[0-9]+ regex),
+ * pyproject.toml's PEP 440 version, and the wheel smoke test that asserts
+ * bovnar.version() equals it. The suffix is applied where the mistake actually
+ * happens: the `bovnar version` banner a human reads.
  */
 #define BVNR_VERSION_SUFFIX		""
 #define BVNR_VERSION_STRING_FULL	BVNR_VERSION_STRING BVNR_VERSION_SUFFIX
@@ -132,7 +134,10 @@ extern "C" {
  */
 #define BVNR_UNIT_STRING_MAX			1088u
 /* Longest unit spelling a document can carry in one unit slot, and therefore
- * the longest bvnr_data_t.unit_source the reader delivers or the writer takes. */
+ * the longest bvnr_data_t.unit_source the reader delivers or the writer takes.
+ * It is reachable as an inline suffix. A type annotation is capped at 255 bytes
+ * AS A WHOLE, so there a spelling shares the room with the family and every
+ * parameter before it, and the writer refuses one that would not fit. */
 #define BVNR_UNIT_SOURCE_MAX			255u
 #define BVN_MAX_INT_WIDTH			32768u
 /*
@@ -294,8 +299,8 @@ typedef enum error_code_e {
 	 * delivered, never pre-allocated) but the loss is reportable instead of
 	 * indistinguishable from an empty stream. */
 	error_octet_stream_truncated        = 48,
-	/* The unit profiles (spec 1.2). The split matters to a producer: one of these says "you wrote it wrong", the
-	 * other says "you wrote it right and this build cannot carry it", and the
+	/* The unit profiles (spec 1.2). The split matters to a producer: one of
+	 * these says "you wrote it wrong", the other says "you wrote it right and this build cannot carry it", and the
 	 * fixes are different. A malformed code, and a code over something the
 	 * vocabulary does not define, stay error_unit_illegal. */
 	/* The namespace before the ':' is not a profile this build supports. A
@@ -521,7 +526,7 @@ typedef struct bvnr_data_s {
 	 * pretty-print round-trip via re-emission of the ISO literal. */
 	const void*		frac_data;
 	uint32_t		frac_length;
-	/* spec 1.2 — the unit exactly as the producer SPELLED it, captured verbatim.
+	/* library 2.0 — the unit exactly as the producer SPELLED it, captured verbatim.
 	 * `value_unit` above is what the unit means; this is what was written, and
 	 * the two differ in the one way formatting a value_unit_t is lossy: a unit
 	 * profile's spelling ("ucum:mm[Hg]" for mmHg) and above all a UCUM
@@ -542,10 +547,17 @@ typedef struct bvnr_data_s {
 	 * that disagrees with the unit is a document that says two things:
 	 *   error_unit_mismatch            it parses to a different unit
 	 *   error_unit_illegal / error_unit_profile_*   it does not parse
-	 *   error_unit_too_long            over BVNR_UNIT_SOURCE_MAX bytes, which
-	 *                                  no reader could take back
+	 *   error_unit_too_long            over BVNR_UNIT_SOURCE_MAX bytes, or too
+	 *                                  long for what is left of an
+	 *                                  annotation's 255 -- either way more
+	 *                                  than a reader could take back
+	 *   error_unit_illegal             as an inline suffix on an array
+	 *                                  element: the format has none there
 	 *   error_unsupported_spec_version it is profile notation and no
 	 *                                  "#!bovnar 1.2" directive was emitted
+	 * The unit parameter's `data` text -- what the reader fills there and every
+	 * caller before 2.0 used -- is held to the same contract; where both are
+	 * set they must agree.
 	 * With bvnr_write_flags_t.unit_flags set it is IGNORED and the canonical
 	 * form is written: BVN_UNIT_REDUCE and BVN_UNIT_ASCII_EXP ask for a
 	 * particular spelling, and that request wins. Leave it NULL (zero-init) to
@@ -1419,9 +1431,12 @@ BVN_API const uint8_t* bvn_get_escape_repl_table(void);
  * nowhere to hold a spelling, so a producer holding "ucum:mL{total}" could only
  * write the canonical "m~L". This hands the spelling over separately: the next
  * bvnr_write_type_annotation -- which every one of those helpers calls --
- * emits `text` for its unit and then forgets it. One shot, so it cannot leak
- * onto a later value; it is also dropped when that write fails, when the
- * writer is re-opened, and by passing NULL or a zero length.
+ * emits `text` for its unit and then forgets it. One shot, and for the NEXT
+ * value only: if that value takes no unit (a string, a bool, a struct, a bare
+ * number) the write that follows it fails with error_unit_mismatch, rather than
+ * the spelling travelling on to whichever later value happens to carry a unit.
+ * It is also dropped when a write fails, when the writer is re-opened, and by
+ * passing NULL or a zero length.
  *
  * The text is copied, and it is held to bvnr_data_t.unit_source's contract (see
  * there): it must parse to the very unit the helper is then given. That check

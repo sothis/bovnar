@@ -42,7 +42,7 @@ A unit component is resolved in this order. Knowing the order explains every tab
 |------|------|-------------|
 | 1 | A `$` anywhere selects the **currency** table | `$USD`, `k$EUR`, `k~$EUR`. A bare code is never a currency: `USD` is `error_unit_illegal` |
 | 2 | Otherwise the base symbol is the **longest alias suffix** of the token | `min` matches the alias `min` (minute) before it could match `in` (inch) |
-| 3 | Whatever precedes the base is the **prefix**, with `~` optional | `k~g` and `kg` are one unit; the writer always emits `k~g` |
+| 3 | Whatever precedes the base is the **prefix**, with `~` optional | `k~g` and `kg` are one unit; the canonical spelling is `k~g` |
 | 4 | The **prefix policy** of that unit must allow it | `Ki~m` and `Kim` both fail; IEC prefixes are for `b`/`B` only |
 | 5 | A handful of spellings are **refused by name** | `usb`, `kt` — see §4 |
 
@@ -635,7 +635,7 @@ Every row below was produced by the reference implementation.
 
 Two rules make this tractable, and both are worth knowing before writing a profile code:
 
-- **A flat vocabulary's code is one whole token.** `unece:`, `qudt:` and `qudt-qk:` recognise no
+- **A flat vocabulary's code is one whole token.** `unece:`, `qudt:`, `qudt-qk:`, `om:` and `cf:` recognise no
   operators and strip no prefixes, so a code either matches entire or is refused. `unece:KGM/MTR`
   and `qudt:M/SEC` are `error_unit_illegal`, not compounds.
 - **A whole atom beats a prefix in an expression vocabulary**, exactly as it does natively.

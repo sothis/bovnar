@@ -60,6 +60,16 @@ typedef struct bvnr_serializer_s {
 	uint8_t			max_array_nesting;
 	uint8_t			max_struct_nesting;
 	bool			arr_need_comma[UINT8_MAX+1];
+	/* emitted_unit as it stood when each array row opened: whether the
+	 * annotation that governs the ROW carried the unit. An element's own
+	 * annotation overrides it for that element only; every later sibling
+	 * goes back to this. Without it an inner "<uint:8>" left emitted_unit
+	 * false for the rest of the outer array, whose elements then each
+	 * gained an inline unit -- which no reader accepts inside "[...]". */
+	bool			arr_emitted_unit[UINT8_MAX+1];
+	/* Bytes written when the current annotation's "<" went out, so its
+	 * length can be held to the reader's cap (BVN_TYPE_BUF_CAP - 1). */
+	uint64_t		ann_start;
 	bool			in_octet_stream;
 	uint32_t		struct_depth;
 	uint32_t		struct_depth_at_array_start[UINT8_MAX+1];
@@ -275,6 +285,10 @@ struct bvnr_writer_s {
 	 * first use and kept; the last spelling that passed is remembered so a
 	 * document repeating one unit pays for one check, not one per value. */
 	bvnr_reader_t*		usrc_probe;
+	/* Keys started since bvnr_writer_set_unit_source without the spelling
+	 * being consumed: the second one means the value it was set for took
+	 * no unit. */
+	uint8_t			usrc_keys;
 	bool			usrc_ok_inline;
 	uint8_t			usrc_ok_len;
 	uint8_t			usrc_ok[BVNR_UNIT_SOURCE_MAX + 1u];

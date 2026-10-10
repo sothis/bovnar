@@ -402,7 +402,7 @@ NUL-terminated</strong> — bound the read by <code>frac_length</code>.</p>
 <span class="p">}</span>
 </code></pre></div>
 
-<p><strong>The unit's own spelling (<code>unit_source</code>, spec 1.2).</strong> <code>d-&gt;value_unit</code> is what a
+<p><strong>The unit's own spelling (<code>unit_source</code>, library 2.0).</strong> <code>d-&gt;value_unit</code> is what a
 unit <em>means</em>; <code>d-&gt;unit_source</code> / <code>d-&gt;unit_source_length</code> are what the document
 <em>wrote</em>. The two differ wherever formatting a <code>value_unit_t</code> is lossy: <code>km</code> and
 <code>k~m</code> are one unit, <code>ucum:mm[Hg]</code> and <code>mmHg</code> are one unit, and <code>ucum:mL{total}</code>
@@ -1363,9 +1363,12 @@ helper calls — emits <code>text</code> for its unit and then forgets it:</p>
 <span class="n">bvnr_write_float_unit</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;other&quot;</span><span class="p">,</span><span class="w">  </span><span class="mi">64</span><span class="p">,</span><span class="w"> </span><span class="mf">2.5</span><span class="p">,</span><span class="w"> </span><span class="n">mL</span><span class="p">);</span><span class="w">   </span><span class="cm">/* &lt;float:64,m~L&gt; — one shot */</span>
 </code></pre></div>
 
-<p>It is one shot so that it cannot leak onto a later value; it is also dropped
-when that write fails, when the writer is re-opened, and by passing <code>NULL</code> or a
-zero length. The text is copied.</p>
+<p>It is one shot, and for the <strong>next value only</strong>. If that value takes no unit — a
+string, a bool, a struct, a bare number — the spelling does not travel on to
+whichever later value happens to carry one: the write fails with
+<code>error_unit_mismatch</code> (for a helper that writes no annotation at all, at the
+key that follows it). It is also dropped when a write fails, when the writer is
+re-opened, and by passing <code>NULL</code> or a zero length. The text is copied.</p>
 <p>A caller driving <code>bvnr_write_event</code> directly needs no setter: set
 <code>bvnr_data_t.unit_source</code> on the unit-parameter event (annotation slot) or on
 the data event (inline suffix). Either way the spelling is <strong>checked before a
@@ -1388,7 +1391,7 @@ document that says two things:</p>
 <td>whatever <code>bvn_unit_error_code</code> says: <code>error_unit_illegal</code>, <code>error_unit_profile_unknown</code>, <code>error_unit_profile_unsupported</code></td>
 </tr>
 <tr>
-<td>is longer than <code>BVNR_UNIT_SOURCE_MAX</code> (255) bytes</td>
+<td>is longer than <code>BVNR_UNIT_SOURCE_MAX</code> (255) bytes, or than what is left of an annotation's 255 after the family and the parameters before it</td>
 <td><code>error_unit_too_long</code></td>
 </tr>
 <tr>
@@ -1403,16 +1406,27 @@ document that says two things:</p>
 <td>was set for a value that turned out to carry no unit</td>
 <td><code>error_unit_mismatch</code></td>
 </tr>
+<tr>
+<td>is headed for an inline suffix on an array element</td>
+<td><code>error_unit_illegal</code> — the format has no inline unit inside <code>[…]</code></td>
+</tr>
 </tbody>
 </table>
+<p>The unit parameter's <code>data</code> text is held to the same table. It is what the
+reader fills on that event and what every caller before 2.0 passed, and the
+writer emits it when there is no <code>unit_source</code> — so it has to name
+<code>value_unit</code> too, and where both fields are set they must agree. (A datetime's
+parameter is its epoch, and there the one text accepted is the epoch's name.)</p>
 <p>The fifth row is the one a unit parser cannot answer, and it is answered by
 reading the text back through the real reader. The two unit slots end in
 different places: <code>ucum:mL{a,b}</code> and <code>udunits:kg m-2 s-1</code> are each one
 annotation parameter and neither is a legal inline suffix, so the same spelling
 is written in one slot and refused in the other.</p>
 <p><strong>A unit flag wins.</strong> With <code>BVN_UNIT_REDUCE</code> or <code>BVN_UNIT_ASCII_EXP</code> set in
-<code>bvnr_write_flags_t.unit_flags</code> the spelling is ignored, unchecked, and the
-canonical form is written: those flags ask for a particular spelling themselves.</p>
+<code>bvnr_write_flags_t.unit_flags</code>, <code>unit_source</code> is ignored, unchecked, and the
+flagged form is written: those flags ask for a particular spelling themselves.
+The <code>data</code> text is still checked there, in the form the flag produces — it may
+be <code>m</code> for a <code>value_unit</code> of <code>k~m</code> under <code>BVN_UNIT_REDUCE</code>, and may not be <code>s</code>.</p>
 <hr />
 <h3 id="32-bvn_parse_unit--bvn_parse_unit_n">3.2 <code>bvn_parse_unit</code> / <code>bvn_parse_unit_n</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="n">value_unit_t</span><span class="w"> </span><span class="nf">bvn_parse_unit</span><span class="w">  </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="n">unit</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="o">*</span><span class="n">ok</span><span class="p">);</span>
@@ -1588,7 +1602,7 @@ table in which a rounded decimal is passed off as exact.</p>
 <td><code>error_unit_illegal</code></td>
 <td>32</td>
 <td><code>"unit_illegal"</code></td>
-<td>Unparseable unit string (unknown base, bad prefix, empty component, &gt;8 components)</td>
+<td>Unparseable unit string (unknown base, bad prefix, empty component, more than <code>BVNR_MAX_UNIT_COMPONENTS</code> = 32 components)</td>
 </tr>
 <tr>
 <td><code>error_unit_too_long</code></td>
@@ -1661,7 +1675,7 @@ observer reproduces faithfully what it is fed rather than checking it a second t
 For the same reason its array-nesting cap is set to the maximum: the reader has already
 enforced its own limit, and a second, stricter cap here would reject a document the
 reader accepted.</p>
-<p><strong>Version directives.</strong> A canonical copy of a spec-1.1 document needs the directive its
+<p><strong>Version directives.</strong> A canonical copy of a spec-1.1 or 1.2 document needs the directive its
 constructs require in order to re-read. <code>bvnr_canon_observer_set_version</code> records one to
 prepend; it is emitted lazily, just before the first event. Call it before any event is
 fed — typically from the reader's callback once <code>bvnr_reader_get_declared_version</code>
@@ -1805,7 +1819,7 @@ is still the whole-second epoch count read via <code>bvn_dom_get_i64</code>:</p>
 <div class="codehilite"><pre><span></span><code><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="nf">bvn_dom_get_datetime_fraction</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvn_dom_node_t</span><span class="w"> </span><span class="o">*</span><span class="n">node</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="o">*</span><span class="n">len_out</span><span class="p">);</span>
 </code></pre></div>
 
-<p>A value node also keeps its unit's <strong>spelling</strong> (spec 1.2) where that says
+<p>A value node also keeps its unit's <strong>spelling</strong> (library 2.0) where that says
 something <code>bvn_dom_get_unit</code> cannot — <code>ucum:mL{total}</code> is the unit <code>m~L</code>, and
 the annotation survives only here:</p>
 <div class="codehilite"><pre><span></span><code><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="nf">bvn_dom_get_unit_source</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvn_dom_node_t</span><span class="w"> </span><span class="o">*</span><span class="n">node</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="o">*</span><span class="n">len_out</span><span class="p">);</span>

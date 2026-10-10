@@ -1094,7 +1094,7 @@ UDUNITS or CF document that says `year` be read at all. It was refused outright 
 
 ## 4. Prefixes
 
-A prefix is attached to a base unit symbol either with the `~` separator — `prefix~baseunit`, the canonical form — or **compactly**, without it: `kg` is `k~g`, `MiB` is `Mi~B`. Both spellings parse to the same `value_unit_t`; the writer always emits the separated form, so a document that round-trips through the library comes back canonical. See §4.3 for what the compact form does and does not accept.
+A prefix is attached to a base unit symbol either with the `~` separator — `prefix~baseunit`, the canonical form — or **compactly**, without it: `kg` is `k~g`, `MiB` is `Mi~B`. Both spellings parse to the same `value_unit_t`. `bvn_unit_to_string` — and a writer handed only a `value_unit_t` — always emits the separated form; a document that is *re-serialised* keeps the spelling it was written in, and `bovnar pretty-print --canonical` restores the separated one. See §4.3 for what the compact form does and does not accept.
 
 ### 4.1 SI Prefixes
 
@@ -1199,7 +1199,7 @@ A prefixed physical unit may be written without the `~` separator, in the spelli
 .force     = <float:64,kg·m/s²> 9.81;   # compounds, exponents and groups too
 ```
 
-Both spellings produce the same `value_unit_t`, so they reconcile against each other (`<float:64,k~m> 1.5 km` is valid) and against a stored annotation. **The canonical output form is unchanged**: `bvn_unit_to_string` emits `k~g` for either spelling, so a compact unit is an input convenience that never propagates into what the library writes.
+Both spellings produce the same `value_unit_t`, so they reconcile against each other (`<float:64,k~m> 1.5 km` is valid) and against a stored annotation. **The canonical output form is unchanged**: `bvn_unit_to_string` emits `k~g` for either spelling. What the compact form does survive is a re-serialisation: the reader hands the spelling over beside the unit (`unit_source`, §12.1), and `pretty-print` or a typed Python round trip writes `km` back as `km`. `--canonical` is the mode that does not.
 
 The rules are exactly the rules of the separated form, with one addition:
 
@@ -2149,8 +2149,8 @@ typedef struct bvnr_data_s {
     uint32_t           length;
     const void*        frac_data;    /* spec 1.1 — ISO datetime sub-second digits, else NULL */
     uint32_t           frac_length;  /* spec 1.1 — length of frac_data, else 0 */
-    const void*        unit_source;        /* spec 1.2 — value_unit as the document spelled it */
-    uint32_t           unit_source_length; /* spec 1.2 — its length, 0 with NULL */
+    const void*        unit_source;        /* library 2.0 — value_unit as the document spelled it */
+    uint32_t           unit_source_length; /* library 2.0 — its length, 0 with NULL */
     bool               converted;    /* a read-time conversion restated this value */
     bvnr_converted_t   conv;         /* its result: the unit delivered, and the digits */
 } bvnr_data_t;
@@ -2505,7 +2505,7 @@ int32_t      bvn_unit_to_ucum(value_unit_t u, char *buf, size_t bufsize);
 
 **`bvn_unit_is_profile_only`** is true when a unit has no native spelling, which is exactly the units carrying an **opaque** base unit: a UCUM arbitrary atom (`[IU]`, `[PFU]`, …) or a UNECE package or count code (`XBX`, `C62`, …). For those, `bvn_unit_to_string` emits the profile form in the namespace that *owns* the unit, and re-parsing that output yields the same unit.
 
-**`bvn_unit_to_profile`** writes a code in the named vocabulary — `ucum`, `unece`, `qudt`, `qudt-qk` or `udunits`, without the `<ns>:` prefix — returning its length or a negative value. **`bvn_unit_to_ucum`** is the `ucum` case, kept for callers that predate the others. Both are **partial by construction**, in three ways: the Old German units, the water-hardness degrees, the turbidity kinds, `PSU`, `CF`, `mph`, `kph` and every currency have no code in any of these vocabularies; an opaque unit belonging to a *different* profile has none either; and a **flat** vocabulary (`unece`, `qudt`, `qudt-qk`) can spell only a single unprefixed component, so `k~m/h` has no UNECE form even though `unece:KMH` parses to exactly it. All three are refused rather than approximated.
+**`bvn_unit_to_profile`** writes a code in the named vocabulary — any of the seven namespaces, without the `<ns>:` prefix, though the read-only `cf` has a code for no unit — returning its length or a negative value. **`bvn_unit_to_ucum`** is the `ucum` case, kept for callers that predate the others. Both are **partial by construction**, in three ways: the Old German units, the water-hardness degrees, the turbidity kinds, `PSU`, `CF`, `kph` and every currency have no code in any of these vocabularies (membership is per unit, not per family: `mph` is `unece:HM` and `qudt:MI-PER-HR`, while `kph` has nothing); an opaque unit belonging to a *different* profile has none either; and a **flat** vocabulary (`unece`, `qudt`, `qudt-qk`, `om`) can spell only a single unprefixed component, so `k~m/h` has no UNECE form even though `unece:KMH` parses to exactly it. All three are refused rather than approximated.
 
 ```c
 char buf[BVNR_UNIT_STRING_MAX];

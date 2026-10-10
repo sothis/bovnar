@@ -2083,6 +2083,29 @@ if(Python3_Interpreter_FOUND AND NOT WIN32 AND NOT BVNR_SANITIZE
         LABELS "packaging;codegen;amalgam;profile" TIMEOUT 300)
 endif()
 
+# ── Tests that are about ALL the profiles ────────────────────────────────────
+# Seven gates hold documents and tables that name every vocabulary, and ask the
+# BUILT LIBRARY whether what they say is true: the WASM/CLI differential (it
+# validates examples/unit_profiles.bvnr against a WASM bundle that always
+# carries all seven), the embedded-example check (doc/11's examples are profile
+# units), the factor proof (it reads each table through the library), and the
+# four document gates that resolve the codes doc/07 and doc/11 quote and count
+# the assertions the per-profile suites run. In a build with a profile compiled
+# out (doc/11 §9.4) every one of them fails, for that reason and no other --
+# `ucum:st` "does not resolve", a refusal documented as "unsupported" comes back
+# "unknown", a suite runs fewer assertions than the document says. So there they
+# are disabled: visibly, as "Not Run", rather than left to report a defect that
+# is the build's own configuration. The documents describe the full build.
+if(NOT BVNR_ALL_PROFILES)
+    foreach(_bvnr_t bvnr_wasm_cli_diff bvnr_doc_examples bvnr_profile_factors
+                    bvnr_doc_unit_factors bvnr_doc_profile_atoms
+                    bvnr_doc_ambiguities bvnr_doc_counts)
+        if(TEST ${_bvnr_t})
+            set_tests_properties(${_bvnr_t} PROPERTIES DISABLED TRUE)
+        endif()
+    endforeach()
+endif()
+
 # ── Registration self-check ─────────────────────────────────────────────────
 # Only meaningful for a default configure; any option that adds or removes tests
 # makes the count legitimately differ, so this compares only when the relevant

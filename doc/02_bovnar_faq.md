@@ -99,21 +99,17 @@ Yes. The canonical extension is `.bvnr`.
 
 **Which version of the specification does the reference implementation target?**
 
-Spec 1.1 — the additive features documented here: the `#!bovnar` version
-directive itself, the `\u`/`\x` escapes, the `datetime` family and reference
-array indexing. `bvnr_spec_version()` reports it.
+Spec 1.2 — spec 1.1's additive features (the `#!bovnar` version directive
+itself, the `\u`/`\x` escapes, the `datetime` family and reference array
+indexing) plus the unit-profile notation. `bvnr_spec_version()` reports it.
 
 Spec 1.0 remains the frozen, stable baseline: a document that declares no
 `#!bovnar` directive is treated as 1.0, and every 1.0 document parses unchanged.
-`bvnr_version_string()` reports the library version, which is a different number
-from the spec version.
-
-The tree also carries a unit notation for foreign vocabularies (`ucum:`,
-`unece:`, `qudt:`, `qudt-qk:`, `udunits:` — see below) that is **under
-implementation**. It is
-not part of a published specification, `bovnar version` does not announce it, and
-a document reaches it only by opting in to a version this build does not
-advertise.
+`bvnr_version_string()` reports the **library** version, which is a different
+number from the spec version and has been since library 2.0.0: that release
+broke the C ABI and the Python API, which is what a library major is for, while
+the format it reads grew only additively. `bovnar version` prints both —
+`bovnar 2.0.0 (spec 1.2)`.
 
 ---
 
@@ -211,8 +207,8 @@ baseline grammar — so existing files need no change. The directive only opts i
 to a newer version.
 
 Opting in is what makes the construct legal, not merely what labels the
-document. A `datetime` value needs a declared 1.1, and the unit-profile notation (under
-implementation) a declared version above it; used in a document that declares less — or
+document. A `datetime` value needs a declared 1.1, and the unit-profile notation a
+declared 1.2; used in a document that declares less — or
 nothing — each is rejected. That is deliberate: it stops a document from carrying
 a construct that a conforming reader of its own declared version would have to
 refuse.
@@ -573,7 +569,7 @@ documentation-grade data, prefer the explicit form.
 
 ---
 
-**Can I write units as UCUM, UNECE, QUDT or UDUNITS codes?**
+**Can I write units as UCUM, UNECE, QUDT, UDUNITS, OM or CF codes?**
 
 Yes — seven foreign vocabularies are accepted in the unit slot. The notation is
 **spec 1.2**, and like every construct added after 1.0 a document opts in to it
@@ -1149,7 +1145,7 @@ Semantically equivalent notations that parse to the same internal representation
 | Base parameter on `float_fix` or `float_dec` | `error_illegal_value_type` |
 | `q ≥ width` in `float_fix` | `error_illegal_value_type` |
 | Empty unit component (`m//s`) | `error_unit_illegal` |
-| More than 8 unit components | `error_unit_illegal` |
+| More than 32 unit components (`BVNR_MAX_UNIT_COMPONENTS`) | `error_unit_illegal` |
 | Inline unit suffix inside an array | `error_unexpected_input_byte` |
 | Unknown escape sequence (`\0`, `\uXXXX`; `\x`/`\u{}` outside spec 1.1) | `error_illegal_escape_sequence` |
 | `\u{…}` surrogate or `> U+10FFFF` (spec 1.1) | `error_invalid_codepoint` |

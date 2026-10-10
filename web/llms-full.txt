@@ -66,7 +66,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
 - **Browser playground** — the real C reference parser, compiled to WebAssembly (`bovnar_parser_wasm.js` over `bovnar_wasm_core.js`), runs the reference verified event stream (with full type/unit/value validation) in the browser and powers an interactive web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
-- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 425-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
+- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 470-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
 
 ---
 
@@ -417,7 +417,7 @@ SI prefixes are written before the base unit symbol, either with the `~` separat
 .mebi   = <uint:64,Mi~B>   4096;    # mebibytes
 ```
 
-`<float:32,kΩ>` means exactly the same thing as `<float:32,k~Ω>` — the `~` is optional on a physical unit, and `kg`, `km`, `MHz`, `MiB` all parse as you would expect. Two things to know about the compact spelling. A token that is *itself* a unit always wins (`min` is the minute, so milli-inch has to be written `m~in`), and the writer always emits the `~` form, so a document you write out comes back canonical. A prefixed **currency** works the same way (`k$EUR` = `k~$EUR`), but its `$` sigil is never optional.
+`<float:32,kΩ>` means exactly the same thing as `<float:32,k~Ω>` — the `~` is optional on a physical unit, and `kg`, `km`, `MHz`, `MiB` all parse as you would expect. Two things to know about the compact spelling. A token that is *itself* a unit always wins (`min` is the minute, so milli-inch has to be written `m~in`), and the canonical spelling is the `~` form: that is what the library writes for a unit it is handed without a spelling, and what `bovnar pretty-print --canonical` produces. (Re-serialising a document otherwise keeps the spelling it was written in.) A prefixed **currency** works the same way (`k$EUR` = `k~$EUR`), but its `$` sigil is never optional.
 
 IEC binary prefixes (`Ki`, `Mi`, `Gi`, `Ti`, `Pi`, `Ei`, `Zi`, `Yi`, and the forward-looking `Ri`, `Qi` — IEC 80000-13 itself stops at `Yi`) follow the same rule:
 
@@ -1306,21 +1306,17 @@ Yes. The canonical extension is `.bvnr`.
 
 **Which version of the specification does the reference implementation target?**
 
-Spec 1.1 — the additive features documented here: the `#!bovnar` version
-directive itself, the `\u`/`\x` escapes, the `datetime` family and reference
-array indexing. `bvnr_spec_version()` reports it.
+Spec 1.2 — spec 1.1's additive features (the `#!bovnar` version directive
+itself, the `\u`/`\x` escapes, the `datetime` family and reference array
+indexing) plus the unit-profile notation. `bvnr_spec_version()` reports it.
 
 Spec 1.0 remains the frozen, stable baseline: a document that declares no
 `#!bovnar` directive is treated as 1.0, and every 1.0 document parses unchanged.
-`bvnr_version_string()` reports the library version, which is a different number
-from the spec version.
-
-The tree also carries a unit notation for foreign vocabularies (`ucum:`,
-`unece:`, `qudt:`, `qudt-qk:`, `udunits:` — see below) that is **under
-implementation**. It is
-not part of a published specification, `bovnar version` does not announce it, and
-a document reaches it only by opting in to a version this build does not
-advertise.
+`bvnr_version_string()` reports the **library** version, which is a different
+number from the spec version and has been since library 2.0.0: that release
+broke the C ABI and the Python API, which is what a library major is for, while
+the format it reads grew only additively. `bovnar version` prints both —
+`bovnar 2.0.0 (spec 1.2)`.
 
 ---
 
@@ -1418,8 +1414,8 @@ baseline grammar — so existing files need no change. The directive only opts i
 to a newer version.
 
 Opting in is what makes the construct legal, not merely what labels the
-document. A `datetime` value needs a declared 1.1, and the unit-profile notation (under
-implementation) a declared version above it; used in a document that declares less — or
+document. A `datetime` value needs a declared 1.1, and the unit-profile notation a
+declared 1.2; used in a document that declares less — or
 nothing — each is rejected. That is deliberate: it stops a document from carrying
 a construct that a conforming reader of its own declared version would have to
 refuse.
@@ -1780,7 +1776,7 @@ documentation-grade data, prefer the explicit form.
 
 ---
 
-**Can I write units as UCUM, UNECE, QUDT or UDUNITS codes?**
+**Can I write units as UCUM, UNECE, QUDT, UDUNITS, OM or CF codes?**
 
 Yes — seven foreign vocabularies are accepted in the unit slot. The notation is
 **spec 1.2**, and like every construct added after 1.0 a document opts in to it
@@ -2356,7 +2352,7 @@ Semantically equivalent notations that parse to the same internal representation
 | Base parameter on `float_fix` or `float_dec` | `error_illegal_value_type` |
 | `q ≥ width` in `float_fix` | `error_illegal_value_type` |
 | Empty unit component (`m//s`) | `error_unit_illegal` |
-| More than 8 unit components | `error_unit_illegal` |
+| More than 32 unit components (`BVNR_MAX_UNIT_COMPONENTS`) | `error_unit_illegal` |
 | Inline unit suffix inside an array | `error_unexpected_input_byte` |
 | Unknown escape sequence (`\0`, `\uXXXX`; `\x`/`\u{}` outside spec 1.1) | `error_illegal_escape_sequence` |
 | `\u{…}` surrogate or `> U+10FFFF` (spec 1.1) | `error_invalid_codepoint` |
@@ -3020,10 +3016,11 @@ very first line:
 **An unversioned document is spec 1.0.** A document with no directive is treated
 as targeting spec **1.0** — the frozen baseline grammar. The directive only ever
 *opts in* to a newer version; its absence is never ambiguous. Consequently, any
-syntax introduced after 1.0 (a future minor revision) is available only to a
-document that declares the matching version: a 1.1-only construct in an
-unversioned (i.e. 1.0) document is invalid, exactly as it would be to a 1.0
-reader. `bvnr_reader_get_declared_version` returns `false` for such a document
+syntax introduced after 1.0 is available only to a document that declares the
+version that introduced it, or a newer one. A 1.1 construct in an unversioned
+(i.e. 1.0) document is invalid, exactly as it would be to a 1.0 reader, and so
+is a 1.2 construct in a document declaring 1.1.
+`bvnr_reader_get_declared_version` returns `false` for an unversioned document
 (there is nothing declared), and a consumer that wants a concrete number should
 default to 1.0.
 
@@ -3058,7 +3055,8 @@ opened with `strict_version` instead rejects any unsupported version
 
 | Directive line | Outcome |
 |---|---|
-| `#!bovnar 1.1` | current — accepted |
+| `#!bovnar 1.2` | current — accepted |
+| `#!bovnar 1.1` | older minor — accepted |
 | `#!bovnar 1.0` | older minor — accepted |
 | `#!bovnar 1.9` | newer minor — lenient: accepted; strict: error |
 | `#!bovnar 2.0` | newer major — lenient: accepted; strict: error |
@@ -3970,7 +3968,7 @@ Comma-separated elements are distinct *values*, but since spec 1.0 they are no l
 Since spec 1.0 the elements of an array must be **homogeneous**. The rule is *"shape uniform, fields free"*, checked over the materialised value (above the lexer; it complements the streaming reader's per-value type and unit checks):
 
 - **Kind.** Every non-null element shares the same kind — number, string, symbol, bool, reference, octet stream, array, or struct. `[1, "two"]` and `[1, {.x=1;}]` are `error_array_element_type_mismatch`.
-- **Unit** (bare scalar arrays and matrices). Numeric elements must carry the **same unit**, not merely the same dimension; the numeric encodings (`uint`, `sint`, `float`, `float_fix`, `float_dec`) may mix freely. `[<float:64,m> 1.0, <float:64,k~g> 2.0]` (length vs mass) is rejected, and so are `[<float:64,m> 1.0, <float:64,ft> 2.0]` (a scale apart), `[<float_dec:64,$USD> 1.0, <float_dec:64,k~$USD> 2.0]` (a prefix apart) and `[<float:64,°C> 1.0, <float:64,K> 2.0]` (an affine **offset** apart). `[1, 2.5, 3]` (all dimensionless) is fine, and so is `[<float:64,m*s> 1.0, <float:64,s*m> 2.0]` — the comparison is order-insensitive, because unit multiplication commutes — as is an explicit `no_unit` beside an omitted unit, which are two spellings of the same thing. Each currency is its own unit, so a bare array may not mix `$USD` and `$EUR` values.
+- **Unit** (bare scalar arrays and matrices). Numeric elements must carry the **same unit**, not merely the same dimension (through spec 1.1 this rule read *the same dimension*; §17 records the correction); the numeric encodings (`uint`, `sint`, `float`, `float_fix`, `float_dec`) may mix freely. `[<float:64,m> 1.0, <float:64,k~g> 2.0]` (length vs mass) is rejected, and so are `[<float:64,m> 1.0, <float:64,ft> 2.0]` (a scale apart), `[<float_dec:64,$USD> 1.0, <float_dec:64,k~$USD> 2.0]` (a prefix apart) and `[<float:64,°C> 1.0, <float:64,K> 2.0]` (an affine **offset** apart). `[1, 2.5, 3]` (all dimensionless) is fine, and so is `[<float:64,m*s> 1.0, <float:64,s*m> 2.0]` — the comparison is order-insensitive, because unit multiplication commutes — as is an explicit `no_unit` beside an omitted unit, which are two spellings of the same thing. Each currency is its own unit, so a bare array may not mix `$USD` and `$EUR` values.
 
   The rule is the unit and not the dimension because of the sentence that closes this section: *a consumer may treat the elements identically*. Under dimensional homogeneity that sentence was false — a reader that took it at its word and applied one unit to `[1.0 m, 2.0 ft]` was wrong by 0.3048, and on `[1.0 °C, 2.0 K]` wrong by an added 273.15. An offset between two neighbouring cells is not a mistake anything downstream can notice, so it is refused at the parse, where every other wrong unit in this format is refused.
 - **`datetime` (spec 1.1).** A `datetime` is its own kind: it does **not** mix with the plain numeric encodings above (`[<datetime:64,unix> 1, <sint:64> 2]` is `error_array_element_type_mismatch`). And, exactly as for currencies, its **epoch is a dimension** — a bare array may not mix epochs (`[<datetime:64,unix> 1, <datetime:64,tai> 2]` is rejected); a homogeneous same-epoch datetime array is fine. (These are materialised-document/DOM-tier rules, like the rest of §7.4.)
@@ -4355,7 +4353,7 @@ The `/` separator divides the preceding components by the following ones. The fi
 - A bare base unit with no prefix requires no separator.
 - When a prefix is present on a **physical** unit, the `~` separator is optional: `k~g` and `kg` are the same unit, as are `Mi~B` and `MiB`. The base unit is matched as the longest alias suffix, so a bare unit always outranks a prefixed reading of the same token (`min` is the minute, not milli-inch) — a compact spelling is therefore only ever accepted where the separated form would have been `error_unit_illegal`, and no existing document decodes differently because of it. Prefixes still cannot be stacked (`kkg`, `k~kg` → `error_unit_illegal`), prefix–unit validity is unchanged, and three compact spellings are refused by name because the token is a well-known annotation for something else: `usb` (the bus, not microstilb — write `u~sb`), `kt` (a standard abbreviation for *two* units this format models, the kilotonne and the knot — write `k~t` or `kn`) and `ppt` (parts per trillion or per thousand in the wild, a picopint by the compact rule — write `pptr`, `‰` or `p~pt`). `pH`, `mph` and `kph` needed an exception until the quantities they name became units in their own right; a bare alias outranks any prefixed reading, so they now resolve without one. See §4.3 of the unit-system reference.
 - The same holds for a **currency**: `k~$EUR` and `k$EUR` are the same unit. The `$` sigil already separates the prefix from the code, so the compact form is unambiguous by construction — but the sigil itself stays mandatory, and `kUSD` is `error_unit_illegal` just as bare `USD` is.
-- The canonical output form always carries the separator: `bvn_unit_to_string` and the `bvnr_write_*` helpers emit `k~g` whichever spelling was read.
+- The canonical output form always carries the separator: `bvn_unit_to_string` and the `bvnr_write_*` helpers emit `k~g`. A *re-serialisation* is a different matter — it writes back the spelling the document carried (`unit_source`, §16.1), so `km` stays `km` through `bovnar pretty-print`; `--canonical` restores the separated form.
 
 ```bovnar
 # Simple (single-component) units — same as before
@@ -4469,7 +4467,7 @@ Seven namespaces are defined:
 | `qudt-qk` | QUDT quantity kinds — translated to the **coherent SI unit** of the kind | one whole code, never decomposed |
 | `udunits` | UDUNITS-2, the CF/netCDF units syntax | an expression over prefixed atoms |
 | `om` | OM 2 — Ontology of units of Measure | one whole code, never decomposed |
-| `cf` | CF standard names — translated to the **`canonical_units`** CF states for the name; **read-only**, a unit is never written back as one | one whole code, never decomposed |
+| `cf` | CF standard names — translated to the **`canonical_units`** CF states for the name; **read-only**: no unit is ever translated *into* a `cf:` code, though a spelling a document already carried is kept when it is re-serialised | one whole code, never decomposed |
 
 ```bovnar
 #!bovnar 1.2
@@ -4494,7 +4492,7 @@ A code that is one whole token is **never decomposed**: `unece:KGM` is the kilog
 | Valid in the profile, with no representation in this unit system | `error_unit_profile_unsupported` |
 | The namespace is not a profile this implementation supports | `error_unit_profile_unknown` |
 
-**Character set.** A profile unit may use `'`, `[`, `]`, `{` and `}` in addition to the native unit characters (§11.4). A `,` inside `{…}` belongs to the unit rather than ending the type parameter. `;`, `#`, `<`, `>` and `"` remain excluded, so an unterminated bracket or annotation cannot consume the remainder of the document.
+**Character set.** A profile unit may use `'`, `[`, `]`, `{` and `}` in addition to the native unit characters (§11.4). A `,` inside `{…}` belongs to the unit rather than ending the type parameter, and inside a type annotation SP and HT within the code belong to it too (§5.3) — UDUNITS multiplies with a space. An inline suffix admits neither. `;`, `#`, `<`, `>` and `"` remain excluded, so an unterminated bracket or annotation cannot consume the remainder of the document.
 
 The complete notation, the transliteration table, and the codes that have no representation are specified in [Unit Profiles](11_bovnar_unit_profiles.md).
 
@@ -5094,8 +5092,8 @@ typedef struct bvnr_data_s {
     uint32_t          length;
     const void*       frac_data;    /* spec 1.1 — ISO datetime sub-second digits, else NULL */
     uint32_t          frac_length;  /* spec 1.1 — length of frac_data, else 0 */
-    const void*       unit_source;        /* spec 1.2 — the unit as the document spelled it, else NULL */
-    uint32_t          unit_source_length; /* spec 1.2 — length of unit_source, else 0 */
+    const void*       unit_source;        /* library 2.0 — the unit as the document spelled it, else NULL */
+    uint32_t          unit_source_length; /* library 2.0 — length of unit_source, else 0 */
     bool              converted;    /* a want_unit read-time conversion was applied (§ read-time conversion) */
     bvnr_converted_t  conv;         /* the exact converted value (unit + text + rational); zeroed when converted is false */
 } bvnr_data_t;
@@ -5529,16 +5527,26 @@ revisions:
   additive direction as a new unit: a spelling is only ever accepted where the
   parser previously raised `error_unit_illegal`, the base symbol is still
   matched as the longest alias suffix so no existing spelling changes meaning,
-  and the **canonical output form is unaffected** — the writer keeps emitting
-  the separated `k~g`, so a document that round-trips stays readable to a
-  reader that predates the spelling;
+  and the **canonical output form is unaffected** — `bvn_unit_to_string` and a
+  writer handed no spelling keep emitting the separated `k~g`, and
+  `bovnar pretty-print --canonical` restores it, so a document can always be
+  made readable to a reader that predates the spelling. (A plain
+  re-serialisation keeps the spelling the document was written in.);
+- **new constructs gated on the version that introduced them** — available only
+  to a document whose `#!bovnar` directive declares that version or a newer
+  one, and an error in any other, so no existing document can acquire one by
+  accident. This is how both minor revisions so far were delivered: 1.1 added
+  the `datetime` family, the `\x`/`\u{}` escapes and reference array indexing;
+  1.2 added the unit-profile notation (§11.9);
 - **new error codes** appended after the current maximum (existing numeric values
   never change). The five the *grammar* of 1.1 required are
   `error_invalid_spec_version` (42), `error_unsupported_spec_version` (43),
   `error_invalid_codepoint` (44), `error_invalid_datetime_literal` (45), and
   `error_datetime_literal_unsupported_epoch` (46) — those carry a `spec 1.1`
-  note in §16.10. Codes have been appended since for facilities beside the
-  wire format and for reader policy. **§16.10 is the list**, and the current
+  note in §16.10. Codes appended since: 47 and 48 for facilities beside the
+  wire format, 49 and 50 for the spec 1.2 unit profiles, 51 for a reader
+  policy, and 52 for a lexical rule the grammar always implied (see the
+  corrections below). **§16.10 is the list**, and the current
   maximum is wherever it ends — never a number quoted somewhere else, this
   paragraph included;
 - the **optional version directive** (§3.4), added in 1.1: it is an ordinary
@@ -5550,9 +5558,29 @@ A reader from an older 1.x point release may not recognise a unit or currency
 added in a newer one; that is the expected direction of forward compatibility and
 is not a break of the 1.0 promise.
 
+**Two corrections made in 1.2, stated because they bend the sentence above.**
+Both refuse documents that a 1.1 reader accepted, and both apply to every
+document, whatever it declares. They are recorded as corrections of defects
+rather than as changes of the format, on these grounds:
+
+- *Whitespace inside a type-annotation parameter* is
+  `error_type_param_whitespace` (§5.3). The grammar never derived it — every
+  `ws` in an annotation sits beside a separator — but the reference reader
+  deleted it, so `<float:64,k g>` was read as `k~g`. A document relying on that
+  carried a unit its author did not write.
+- *A bare array is homogeneous in its unit, not merely its dimension* (§7.4).
+  The rule as written through 1.1 let `[1 m, 2 ft]`-shaped arrays through
+  while the same section promised that a consumer may treat the elements
+  identically; a consumer who believed it computed wrong numbers. The promise
+  was kept and the rule corrected to make it true.
+
+Neither changes what any accepted document *means*. A producer affected by
+either was already emitting data that could not be read correctly.
+
 **What requires a 2.0.** Any change that could render a valid 1.x document invalid,
-change how it decodes, renumber an error code, or alter the grammar is a breaking
-change and is reserved for a major (2.0) revision. The changes that motivated
+change how it decodes, renumber an error code, or change what an existing
+document's bytes mean is a breaking change and is reserved for a major (2.0)
+revision of the *format* — which is not the library's version (above). The changes that motivated
 the 1.0 freeze — the **mandatory `$` currency sigil** (§10.4 of the unit-system
 reference), **array element homogeneity** (§7.4), and **`float_fix` value-range
 validation** (§6.2, rejecting a value the declared Q-format cannot represent) —
@@ -8130,7 +8158,7 @@ UDUNITS or CF document that says `year` be read at all. It was refused outright 
 
 ## 4. Prefixes
 
-A prefix is attached to a base unit symbol either with the `~` separator — `prefix~baseunit`, the canonical form — or **compactly**, without it: `kg` is `k~g`, `MiB` is `Mi~B`. Both spellings parse to the same `value_unit_t`; the writer always emits the separated form, so a document that round-trips through the library comes back canonical. See §4.3 for what the compact form does and does not accept.
+A prefix is attached to a base unit symbol either with the `~` separator — `prefix~baseunit`, the canonical form — or **compactly**, without it: `kg` is `k~g`, `MiB` is `Mi~B`. Both spellings parse to the same `value_unit_t`. `bvn_unit_to_string` — and a writer handed only a `value_unit_t` — always emits the separated form; a document that is *re-serialised* keeps the spelling it was written in, and `bovnar pretty-print --canonical` restores the separated one. See §4.3 for what the compact form does and does not accept.
 
 ### 4.1 SI Prefixes
 
@@ -8235,7 +8263,7 @@ A prefixed physical unit may be written without the `~` separator, in the spelli
 .force     = <float:64,kg·m/s²> 9.81;   # compounds, exponents and groups too
 ```
 
-Both spellings produce the same `value_unit_t`, so they reconcile against each other (`<float:64,k~m> 1.5 km` is valid) and against a stored annotation. **The canonical output form is unchanged**: `bvn_unit_to_string` emits `k~g` for either spelling, so a compact unit is an input convenience that never propagates into what the library writes.
+Both spellings produce the same `value_unit_t`, so they reconcile against each other (`<float:64,k~m> 1.5 km` is valid) and against a stored annotation. **The canonical output form is unchanged**: `bvn_unit_to_string` emits `k~g` for either spelling. What the compact form does survive is a re-serialisation: the reader hands the spelling over beside the unit (`unit_source`, §12.1), and `pretty-print` or a typed Python round trip writes `km` back as `km`. `--canonical` is the mode that does not.
 
 The rules are exactly the rules of the separated form, with one addition:
 
@@ -9185,8 +9213,8 @@ typedef struct bvnr_data_s {
     uint32_t           length;
     const void*        frac_data;    /* spec 1.1 — ISO datetime sub-second digits, else NULL */
     uint32_t           frac_length;  /* spec 1.1 — length of frac_data, else 0 */
-    const void*        unit_source;        /* spec 1.2 — value_unit as the document spelled it */
-    uint32_t           unit_source_length; /* spec 1.2 — its length, 0 with NULL */
+    const void*        unit_source;        /* library 2.0 — value_unit as the document spelled it */
+    uint32_t           unit_source_length; /* library 2.0 — its length, 0 with NULL */
     bool               converted;    /* a read-time conversion restated this value */
     bvnr_converted_t   conv;         /* its result: the unit delivered, and the digits */
 } bvnr_data_t;
@@ -9541,7 +9569,7 @@ int32_t      bvn_unit_to_ucum(value_unit_t u, char *buf, size_t bufsize);
 
 **`bvn_unit_is_profile_only`** is true when a unit has no native spelling, which is exactly the units carrying an **opaque** base unit: a UCUM arbitrary atom (`[IU]`, `[PFU]`, …) or a UNECE package or count code (`XBX`, `C62`, …). For those, `bvn_unit_to_string` emits the profile form in the namespace that *owns* the unit, and re-parsing that output yields the same unit.
 
-**`bvn_unit_to_profile`** writes a code in the named vocabulary — `ucum`, `unece`, `qudt`, `qudt-qk` or `udunits`, without the `<ns>:` prefix — returning its length or a negative value. **`bvn_unit_to_ucum`** is the `ucum` case, kept for callers that predate the others. Both are **partial by construction**, in three ways: the Old German units, the water-hardness degrees, the turbidity kinds, `PSU`, `CF`, `mph`, `kph` and every currency have no code in any of these vocabularies; an opaque unit belonging to a *different* profile has none either; and a **flat** vocabulary (`unece`, `qudt`, `qudt-qk`) can spell only a single unprefixed component, so `k~m/h` has no UNECE form even though `unece:KMH` parses to exactly it. All three are refused rather than approximated.
+**`bvn_unit_to_profile`** writes a code in the named vocabulary — any of the seven namespaces, without the `<ns>:` prefix, though the read-only `cf` has a code for no unit — returning its length or a negative value. **`bvn_unit_to_ucum`** is the `ucum` case, kept for callers that predate the others. Both are **partial by construction**, in three ways: the Old German units, the water-hardness degrees, the turbidity kinds, `PSU`, `CF`, `kph` and every currency have no code in any of these vocabularies (membership is per unit, not per family: `mph` is `unece:HM` and `qudt:MI-PER-HR`, while `kph` has nothing); an opaque unit belonging to a *different* profile has none either; and a **flat** vocabulary (`unece`, `qudt`, `qudt-qk`, `om`) can spell only a single unprefixed component, so `k~m/h` has no UNECE form even though `unece:KMH` parses to exactly it. All three are refused rather than approximated.
 
 ```c
 char buf[BVNR_UNIT_STRING_MAX];
@@ -10451,7 +10479,7 @@ A unit component is resolved in this order. Knowing the order explains every tab
 |------|------|-------------|
 | 1 | A `$` anywhere selects the **currency** table | `$USD`, `k$EUR`, `k~$EUR`. A bare code is never a currency: `USD` is `error_unit_illegal` |
 | 2 | Otherwise the base symbol is the **longest alias suffix** of the token | `min` matches the alias `min` (minute) before it could match `in` (inch) |
-| 3 | Whatever precedes the base is the **prefix**, with `~` optional | `k~g` and `kg` are one unit; the writer always emits `k~g` |
+| 3 | Whatever precedes the base is the **prefix**, with `~` optional | `k~g` and `kg` are one unit; the canonical spelling is `k~g` |
 | 4 | The **prefix policy** of that unit must allow it | `Ki~m` and `Kim` both fail; IEC prefixes are for `b`/`B` only |
 | 5 | A handful of spellings are **refused by name** | `usb`, `kt` — see §4 |
 
@@ -11044,7 +11072,7 @@ Every row below was produced by the reference implementation.
 
 Two rules make this tractable, and both are worth knowing before writing a profile code:
 
-- **A flat vocabulary's code is one whole token.** `unece:`, `qudt:` and `qudt-qk:` recognise no
+- **A flat vocabulary's code is one whole token.** `unece:`, `qudt:`, `qudt-qk:`, `om:` and `cf:` recognise no
   operators and strip no prefixes, so a code either matches entire or is refused. `unece:KGM/MTR`
   and `qudt:M/SEC` are `error_unit_illegal`, not compounds.
 - **A whole atom beats a prefix in an expression vocabulary**, exactly as it does natively.
@@ -11469,7 +11497,7 @@ if (d->frac_data && d->frac_length) {
 }
 ```
 
-**The unit's own spelling (`unit_source`, spec 1.2).** `d->value_unit` is what a
+**The unit's own spelling (`unit_source`, library 2.0).** `d->value_unit` is what a
 unit *means*; `d->unit_source` / `d->unit_source_length` are what the document
 *wrote*. The two differ wherever formatting a `value_unit_t` is lossy: `km` and
 `k~m` are one unit, `ucum:mm[Hg]` and `mmHg` are one unit, and `ucum:mL{total}`
@@ -12516,9 +12544,12 @@ bvnr_write_float_unit(w, "volume", 64, 1.5, mL);   /* <float:64,ucum:mL{total}> 
 bvnr_write_float_unit(w, "other",  64, 2.5, mL);   /* <float:64,m~L> — one shot */
 ```
 
-It is one shot so that it cannot leak onto a later value; it is also dropped
-when that write fails, when the writer is re-opened, and by passing `NULL` or a
-zero length. The text is copied.
+It is one shot, and for the **next value only**. If that value takes no unit — a
+string, a bool, a struct, a bare number — the spelling does not travel on to
+whichever later value happens to carry one: the write fails with
+`error_unit_mismatch` (for a helper that writes no annotation at all, at the
+key that follows it). It is also dropped when a write fails, when the writer is
+re-opened, and by passing `NULL` or a zero length. The text is copied.
 
 A caller driving `bvnr_write_event` directly needs no setter: set
 `bvnr_data_t.unit_source` on the unit-parameter event (annotation slot) or on
@@ -12530,10 +12561,17 @@ document that says two things:
 |---|---|
 | parses to a different unit than the one given | `error_unit_mismatch` |
 | does not parse | whatever `bvn_unit_error_code` says: `error_unit_illegal`, `error_unit_profile_unknown`, `error_unit_profile_unsupported` |
-| is longer than `BVNR_UNIT_SOURCE_MAX` (255) bytes | `error_unit_too_long` |
+| is longer than `BVNR_UNIT_SOURCE_MAX` (255) bytes, or than what is left of an annotation's 255 after the family and the parameters before it | `error_unit_too_long` |
 | is profile notation and no `#!bovnar 1.2` directive was emitted | `error_unsupported_spec_version` |
 | would not be read back as itself in that unit slot | `error_unit_illegal` |
 | was set for a value that turned out to carry no unit | `error_unit_mismatch` |
+| is headed for an inline suffix on an array element | `error_unit_illegal` — the format has no inline unit inside `[…]` |
+
+The unit parameter's `data` text is held to the same table. It is what the
+reader fills on that event and what every caller before 2.0 passed, and the
+writer emits it when there is no `unit_source` — so it has to name
+`value_unit` too, and where both fields are set they must agree. (A datetime's
+parameter is its epoch, and there the one text accepted is the epoch's name.)
 
 The fifth row is the one a unit parser cannot answer, and it is answered by
 reading the text back through the real reader. The two unit slots end in
@@ -12542,8 +12580,10 @@ annotation parameter and neither is a legal inline suffix, so the same spelling
 is written in one slot and refused in the other.
 
 **A unit flag wins.** With `BVN_UNIT_REDUCE` or `BVN_UNIT_ASCII_EXP` set in
-`bvnr_write_flags_t.unit_flags` the spelling is ignored, unchecked, and the
-canonical form is written: those flags ask for a particular spelling themselves.
+`bvnr_write_flags_t.unit_flags`, `unit_source` is ignored, unchecked, and the
+flagged form is written: those flags ask for a particular spelling themselves.
+The `data` text is still checked there, in the form the flag produces — it may
+be `m` for a `value_unit` of `k~m` under `BVN_UNIT_REDUCE`, and may not be `s`.
 
 ---
 
@@ -12714,7 +12754,7 @@ fprintf(stderr, "error: %s\n", bvn_error_to_string(bvnr_reader_get_error(r)));
 
 | Code | Value | String | Trigger |
 |------|-------|--------|---------|
-| `error_unit_illegal` | 32 | `"unit_illegal"` | Unparseable unit string (unknown base, bad prefix, empty component, >8 components) |
+| `error_unit_illegal` | 32 | `"unit_illegal"` | Unparseable unit string (unknown base, bad prefix, empty component, more than `BVNR_MAX_UNIT_COMPONENTS` = 32 components) |
 | `error_unit_too_long` | 22 | `"unit_too_long"` | An **inline** unit suffix exceeds its 255-byte lexer buffer; a unit in an annotation raises `error_type_too_long` instead |
 | `error_unit_mismatch` | 38 | `"unit_mismatch"` | Inline unit suffix present, type-annotation unit also present, and the two differ; or a `want_unit` target dimensionally incompatible with the value's unit (§1.10) |
 | `error_unit_inexact` | 47 | `"unit_inexact"` | A `want_unit` conversion could not be delivered exactly: irrational factor, or a non-terminating expansion in the output base without `want_unit_allow_nonterminating` (§1.10) |
@@ -12756,7 +12796,7 @@ For the same reason its array-nesting cap is set to the maximum: the reader has 
 enforced its own limit, and a second, stricter cap here would reject a document the
 reader accepted.
 
-**Version directives.** A canonical copy of a spec-1.1 document needs the directive its
+**Version directives.** A canonical copy of a spec-1.1 or 1.2 document needs the directive its
 constructs require in order to re-read. `bvnr_canon_observer_set_version` records one to
 prepend; it is emitted lazily, just before the first event. Call it before any event is
 fed — typically from the reader's callback once `bvnr_reader_get_declared_version`
@@ -12929,7 +12969,7 @@ is still the whole-second epoch count read via `bvn_dom_get_i64`:
 const char *bvn_dom_get_datetime_fraction(const bvn_dom_node_t *node, uint32_t *len_out);
 ```
 
-A value node also keeps its unit's **spelling** (spec 1.2) where that says
+A value node also keeps its unit's **spelling** (library 2.0) where that says
 something `bvn_dom_get_unit` cannot — `ucum:mL{total}` is the unit `m~L`, and
 the annotation survives only here:
 
@@ -13263,7 +13303,7 @@ int main(void)
 > **Scope:** Installation, the high-level and streaming APIs, the DOM, `Quantity`, and the NumPy and pint bridges.
 
 Pure-`ctypes` Python bindings for the **Bovnar (BVNR)** typed serialisation
-library (spec v1.1).
+library (library 2.0.0, format spec 1.2).
 
 No compiled extension module is needed — the bindings load `libbvnr.so` at
 import time via the standard `ctypes.CDLL` machinery.
@@ -13491,7 +13531,7 @@ The `BvnrData` payload passed to a callback exposes:
 | `data.converted_in_base(base)` | `str \| None` | The exact conversion re-rendered in `base` |
 | `data.converted_rational()` | `tuple[int, int] \| None` | The exact conversion as `(numerator, denominator)` |
 | `data.frac_str()` | `str \| None` | Verbatim ISO sub-second digits of a `datetime` literal (spec 1.1), or `None` |
-| `data.unit_source_str()` | `str \| None` | The unit exactly as the document spelled it (spec 1.2), or `None` when the value carries no unit. Read it inside the callback |
+| `data.unit_source_str()` | `str \| None` | The unit exactly as the document spelled it (library 2.0), or `None` when the value carries no unit. Read it inside the callback |
 
 It also carries the `converted` (bool) and `value_type` / `value_unit` fields directly.
 
@@ -13612,7 +13652,7 @@ bovnar.units_compatible(vu, bovnar.parse_unit("k~Pa"))   # → True
 bovnar.available_profiles()
 # → ('ucum', 'unece', 'qudt', 'qudt-qk', 'udunits', 'om', 'cf')
 
-# The same unit, five ways — all one ValueUnit
+# The same unit in other vocabularies — all one ValueUnit
 kg = bovnar.parse_unit("k~g")
 bovnar.unit_to_profile("ucum",    kg)   # → "kg"
 bovnar.unit_to_profile("unece",   kg)   # → "KGM"
@@ -14047,7 +14087,7 @@ validates the width for the chosen family.
 | `q.epoch_name` | `str \| None` | For a `datetime`, the epoch name (`"unix"`, `"tai"`, …); `None` otherwise |
 | `q.epoch_mjd` | `int \| None` | For a `datetime`, the epoch's Modified Julian Day; `None` otherwise |
 | `q.datetime_fraction` | `str \| None` | For a `datetime` written as a literal with a fractional second, the verbatim sub-second digits (spec 1.1); `None` otherwise |
-| `q.unit_source` | `str \| None` | The unit exactly as the document spelled it (spec 1.2) — `ucum:mL{total}` where `q.unit` is `m~L`. Set by `loads(typed=True)`, or by the `unit_source=` constructor argument; `dumps()` writes it back, and refuses one that does not parse to `q.unit`. `None` writes the canonical form |
+| `q.unit_source` | `str \| None` | The unit exactly as the document spelled it (library 2.0) — `ucum:mL{total}` where `q.unit` is `m~L`. Set by `loads(typed=True)`, or by the `unit_source=` constructor argument; `dumps()` writes it back, and refuses one that does not parse to `q.unit`. `None` writes the canonical form |
 
 ### 6.3 Lossless numeric access (`float_dec`, `float_fix`, `float:128`/`256`)
 
@@ -14441,7 +14481,8 @@ manager or call `r.close()` explicitly to release the C object.
 ### 11.2 `read_mem`
 
 `read_mem(data, *, on_verified, on_unverified, max_file_size, continue_on_error,
-strict_version, want_unit, want_unit_allow_nonterminating, max_conversion_length)`
+strict_version, text_only, want_unit, want_unit_allow_nonterminating,
+max_conversion_length)`
 
 Parse BVNR from a `bytes`, `bytearray`, or `memoryview` object.
 
@@ -14453,6 +14494,7 @@ Parse BVNR from a `bytes`, `bytearray`, or `memoryview` object.
 | `max_file_size` | `int` | `0` (unlimited) | Hard limit on bytes consumed |
 | `continue_on_error` | `bool` | `False` | Enable resync mode |
 | `strict_version` | `bool` | `False` | Reject a declared spec version newer than this build (`error_unsupported_spec_version`) |
+| `text_only` | `bool` | `False` | Refuse a document that contains an octet stream (`error_octet_stream_forbidden`), for a channel that is not byte-transparent |
 | `want_unit` | `Callable[[BvnrData], tuple \| None] \| None` | `None` | Optional read-time lossless unit/base conversion hook. Called per numeric value; return `(unit, base)` to request a conversion (the exact result arrives on the payload as `converted`/`converted_text`), or `None` to leave the value untouched. An inexact conversion aborts the parse (`error_unit_inexact`). |
 | `want_unit_allow_nonterminating` | `bool` | `False` | Deliver an exact-rational-but-non-terminating conversion (e.g. km/h→m/s) as a rational with `converted_text` `None` instead of aborting with `error_unit_inexact` |
 | `max_conversion_length` | `int` | `0` (default 1024) | Longest converted text a conversion may produce, in characters; a longer exact result aborts with `error_value_out_of_range` |
@@ -14701,7 +14743,7 @@ for as long as any derived `DomNode` is in use.
 | `node.as_bytes()` | `bytes` for `OCTET_STREAM` nodes |
 | `node.as_int_str(base=10)` | Integer value as a string in the given base; result C string is freed before return |
 | `node.datetime_fraction` | `str` of the verbatim ISO sub-second digits for a `datetime` written as a literal with a fraction (spec 1.1), else `None`; the carrier value is unchanged and still read via `to_python()` |
-| `node.unit_source` | `str` of the unit exactly as the document spelled it (spec 1.2), where that differs from the canonical form — `ucum:mL{total}` for a unit of `m~L`; `None` for a node with no unit, one already written canonically, or one a unit policy converted |
+| `node.unit_source` | `str` of the unit exactly as the document spelled it (library 2.0), where that differs from the canonical form — `ucum:mL{total}` for a unit of `m~L`; `None` for a node with no unit, one already written canonically, or one a unit policy converted |
 | `node[key]` | Child `DomNode` by string key (STRUCT) or integer index (ARRAY) |
 | `key in node` | Membership test for STRUCT nodes |
 | `len(node)` | Element count for STRUCT or ARRAY nodes |
@@ -14991,9 +15033,14 @@ only invite the bounds check it can no longer support. Use `UNIT_NATIVE_FIRST`
 
 ## 19. Spec 1.1 additions
 
-These bindings target the **Bovnar spec (v1.1)**; spec 1.0 remains the
-frozen baseline. The 1.1 features (all gated on a `#!bovnar 1.1` directive — an
-unversioned document is treated as 1.0) are exposed as:
+These bindings target the **Bovnar spec 1.2**; spec 1.0 remains the frozen
+baseline, and the package's own version (2.0.0) is a separate number
+(`bovnar.version()` against `bovnar.spec_version()`). Spec 1.2's one addition,
+the unit-profile notation, is covered in [§5.1](#51-the-unit-profile-notations-spec-12):
+it is gated on a `#!bovnar 1.2` directive, which `dumps()` prepends when a
+kept spelling or a profile-only unit needs it. The 1.1 features (all gated on a
+`#!bovnar 1.1` directive — an unversioned document is treated as 1.0) are
+exposed as:
 
 - **Version:** `bovnar.version()` (library version string), `bovnar.spec_version()`
   → `(major, minor)` of the highest spec understood, and
@@ -15407,10 +15454,10 @@ admitted after that pass, which is why they sit after it rather than beside thei
 |---|---|---|---|---|
 | `ucum:` | UCUM — Unified Code for Units of Measure | expression | 206 mapped + 41 arbitrary, **all 312 UCUM defines** | [2](#2-syntax)–[10](#10-cost-risk-and-what-is-left-out) |
 | `unece:` | UN/ECE Recommendation 20 and 21 | flat | 1298 + 25 opaque | [11](#11-the-unece-profile) |
-| `qudt:` | QUDT unit local names | flat | 2233, **all 2808 QUDT defines** | [12](#12-the-qudt-profiles) |
+| `qudt:` | QUDT unit local names | flat | 2238, **all 2808 QUDT defines** | [12](#12-the-qudt-profiles) |
 | `qudt-qk:` | QUDT quantity kinds | flat | 903, **all 1165 QUDT defines** | [12.3](#123-quantity-kinds-qudt-qk) |
 | `udunits:` | UDUNITS-2, the CF/netCDF units syntax | expression | 499, **all 580 UDUNITS defines** | [13](#13-the-udunits-profile) |
-| `om:` | OM 2 — Ontology of units of Measure | flat | 1338 + 122 refused, **every unit individual OM states** | [16](#16-the-om-2-profile) |
+| `om:` | OM 2 — Ontology of units of Measure | flat | 1341 + 119 refused, **every unit individual OM states** | [16](#16-the-om-2-profile) |
 | `cf:` | CF standard names | flat, read-only | 4454 + 617 refused, **all 5071 names of table v94** | [17](#17-the-cf-standard-name-profile) |
 
 Companion to [Unit & Currency Reference](05_bovnar_unit_system.md) (the native registry and notation
@@ -15428,7 +15475,7 @@ pass changed and what it cost.
 
 Every acceptance, refusal and conversion factor quoted below was produced by running the
 reference implementation built from this tree, and the behavioural claims are pinned by the test
-files named above (741 assertions across the seven profiles, plus 4776 in the cross-vocabulary
+files named above (1277 assertions across the seven profiles, plus 4789 in the cross-vocabulary
 suite). The VOCABULARY side — whether each foreign code is *worth* what the table says — is checked
 too, but not by the same means and not to the same strength: `check_profile_factors.py` (§9.5)
 resolves every mapped code against its publisher's own machine-readable definitions, and `unece`
@@ -15490,7 +15537,7 @@ tables wrong in the same way would agree with each other perfectly.
     - 9.3 [Tests](#93-tests)
     - 9.4 [One build switch per vocabulary](#94-one-build-switch-per-vocabulary)
     - 9.5 [The factor proof](#95-the-factor-proof)
-    - 9.6 [Synchronisation between the five tables](#96-synchronisation-between-the-five-tables)
+    - 9.6 [Synchronisation between the tables](#96-synchronisation-between-the-tables)
 10. [Cost, risk, and what is left out](#10-cost-risk-and-what-is-left-out)
     - 10.1 [What it cost](#101-what-it-cost)
     - 10.2 [What can go wrong](#102-what-can-go-wrong)
@@ -15570,7 +15617,7 @@ them is exactly two things:
 
 - **The grammar.** An *expression* profile (`ucum`, `udunits`) writes a code as an expression over
   prefixed atoms, with operators, exponents and grouping. A *flat* profile (`unece`, `qudt`,
-  `qudt-qk`) has no operators and no prefixes at all: the whole code is one token, matched entire.
+  `qudt-qk`, `om`, `cf`) has no operators and no prefixes at all: the whole code is one token, matched entire.
   That is not a simplification but a correctness requirement — UNECE's `KGM` is the kilogram, and a
   parser that decomposed it would find a `k` prefix on a `GM` that UNECE never defined, just as it
   would read `MTS` as a mega-`TS` and QUDT's `MI` (the mile) as a milli-anything.
@@ -15663,8 +15710,8 @@ the split in §3.1:
 $ bovnar validate t.bvnr        # #!bovnar 1.2 / .a = <float:64,zz:m> 1.0;
 Validation failed: unit_profile_unknown at line 2, col 20
 
-$ bovnar validate t.bvnr        # #!bovnar 1.2 / .a = <float:64,ucum:osm> 1.0;
-Validation failed: unit_profile_unsupported at line 2, col 24
+$ bovnar validate t.bvnr        # #!bovnar 1.2 / .a = <float:64,ucum:B[SPL]> 1.0;
+Validation failed: unit_profile_unsupported at line 2, col 27
 
 $ bovnar validate t.bvnr        # #!bovnar 1.2 / .a = <float:64,ucum:mmHg> 1.0;
 Validation failed: unit_illegal at line 2, col 25
@@ -15699,8 +15746,10 @@ as it always did.
 The writer enforces the other half. A unit with no native spelling — one carrying an opaque base
 unit (§7.1) — can only be emitted in this notation, so writing one without having emitted the opt-in
 directive is `error_unsupported_spec_version` rather than a document the library cannot read back. A
-*translated* unit needs no such guard: `ucum:mm[Hg]` is written as the native `mmHg`, which every
-version accepts.
+*translated* unit needs no such guard when it is written from the unit alone: `ucum:mm[Hg]` parses
+to `mmHg`, and `mmHg` is what `bvn_unit_to_string` gives back, which every version accepts. The
+guard returns with the *spelling*: a writer handed `ucum:mm[Hg]` as the text to write (§5.2) is
+writing profile notation, and needs the directive for it exactly as an opaque unit does.
 
 Otherwise: everywhere a native unit may appear — as the unit parameter of a type annotation, and as
 an inline unit suffix. Parameter ordering stays free (doc/05 §2.1) and the annotation/inline agreement rule
@@ -15749,15 +15798,18 @@ The change is **15 state-table entries** — five bytes in each of three states 
 unit-byte class; letting them diverge here would be the odd choice, and anything nonsensical that
 reaches the type-spec parser through it is still `error_illegal_value_type`.
 
-This is the only lexer change the profile requires, and it is the one place where the profile is
+This is the only change to the unit *byte class* the profile requires — whitespace inside a
+namespaced annotation parameter is the other lexer change, and has its own section (§13.2) — and it
+is the one place where the profile is
 *not* invisible to a native-only document: after it, `<float:64,m[s]>` reaches `bvn_parse_unit`
 and fails there (`error_unit_illegal`) instead of failing in the lexer
 (`error_unexpected_input_byte`). One error code moves for a family of inputs that were errors
 before and are errors after. §9.3 pins that in the conformance corpus rather than leaving it to be
 discovered.
 
-Nothing else about the byte class changes. `<`, `>`, `"`, `;`, `#` and whitespace stay out, so a
-brace cannot swallow the rest of the document. Two consequences, and they land on different sides of
+Nothing else about the byte class changes. `<`, `>`, `"`, `;` and `#` stay out, so a brace cannot
+swallow the rest of the document; whitespace stays out of an inline suffix, and inside an annotation
+is admitted only within a parameter that carries a namespace (§13.2). Two consequences, and they land on different sides of
 the lexer boundary:
 
 ```
@@ -15837,8 +15889,8 @@ profile-char = (* any unit-char, plus "," at brace depth >= 1 *) ;
 **semantic**, as the native unit sub-grammar is (doc/05 §5.2): the lexer captures
 bytes, and `bvn_parse_unit` — which dispatches on the namespace — decides whether
 they are a valid code in that vocabulary. The normative grammar for what is
-inside is each vocabulary's own, and restating five of them here would create
-five second authorities to keep in step with the first.
+inside is each vocabulary's own, and restating them here would create a second
+authority for each, to keep in step with the first.
 
 ---
 
@@ -15955,7 +16007,7 @@ The annotation text is preserved for round-trip (§5.2), and is preserved *verba
 and spacing. It never affects equality, compatibility, conversion or normalisation.
 
 **Annotations are UCUM's, and only UCUM's.** The registry row carries a flag, and it is false for
-the other four namespaces, so `udunits:mL{x}` is `error_unit_illegal` rather than a millilitre with
+the other six namespaces, so `udunits:mL{x}` is `error_unit_illegal` rather than a millilitre with
 a comment. Admitting the syntax everywhere would let a UDUNITS code that is simply wrong look like a
 valid annotated one.
 
@@ -16261,7 +16313,7 @@ bindings keep it on a typed `Quantity` (§8.2).
 `bvn_unit_to_profile(ns, value_unit_t, char*, size_t)` writes a code in the named vocabulary for a
 unit that has one, for producers whose output field is foreign-typed;
 `bvn_unit_to_ucum(value_unit_t, char*, size_t)` is the `"ucum"` case, kept for callers that predate
-the other four. Both return a negative length when they fail.
+the other namespaces. Both return a negative length when they fail.
 
 The mapping is driven by a **generated reverse table**, one per namespace, not by searching the
 forward one. Three things depend on that.
@@ -16274,7 +16326,7 @@ grammar because the competing rows differ with it:
 | Grammar | The rows competing for one unit | Rule |
 |---|---|---|
 | expression (`ucum`, `udunits`) | *spellings of one atom* — `S` and `mho`, `cal` and `cal_th`, `L` and `l`, `mo` and `mo_j` | **shortest wins**, ties alphabetically: the vocabulary's own abbreviation is the short one |
-| flat (`unece`, `qudt`, `qudt-qk`) | *different codes for one unit* — `JOU` and `J55`, `PAL` and `C55`, `TON_SHORT` and `TON` | **first declared wins**: the data file lists the canonical code first and its aliases after |
+| flat (`unece`, `qudt`, `qudt-qk`, `om`) | *different codes for one unit* — `JOU` and `J55`, `PAL` and `C55`, `TON_SHORT` and `TON` | **first declared wins**: the data file lists the canonical code first and its aliases after |
 
 Applying the expression rule to a flat vocabulary is what made this worth stating. Every Rec 20 code
 is two or three bytes, so "shortest, ties alphabetically" degenerates into "alphabetically first" and
@@ -16965,8 +17017,8 @@ Malformed input, and a code over something the vocabulary does not define, stay 
 (32). The split is what a producer needs: "you wrote it wrong" and "you wrote it right and we cannot
 carry it" call for different fixes.
 
-`error_octet_stream_forbidden` (51) was appended after these two in the same release cycle, so the
-enum currently ends at 51 and `BVN_ERROR_COUNT` is 52. The static assertion in
+`error_octet_stream_forbidden` (51) and `error_type_param_whitespace` (52) were appended after
+these two in the same release cycle, so the enum ends at 52 and `BVN_ERROR_COUNT` is 53. The static assertion in
 `bvn_internal_dims.h` names the last enumerator explicitly, which is what makes that ordering a
 build-time fact rather than a comment.
 
@@ -17143,7 +17195,7 @@ At build time `gen_profiles.py` refuses to emit a table when:
   two vocabularies;
 - an opaque name collides across profiles;
 - a `.bovnar` target names a prefix or a unit this build's registry does not have;
-- the longest profile code this table could emit would overflow `BVNR_UNIT_STRING_MAX` (1024), which
+- the longest profile code this table could emit would overflow `BVNR_UNIT_STRING_MAX` (1088), which
   is what sizes the stack buffers in the writer and the CLI;
 - every row naming one unit carries `.reverse = false`, which would make that unit readable and
   unwritable.
@@ -17155,9 +17207,10 @@ these tables can produce.
 **What it does not check is the vocabulary side**, and that half now lives in a separate tool rather
 than in the generator. `gen_profiles.py` still carries no foreign value: a data file states the
 target and not what the publisher says the code is worth. Where a value was uncertain, or certainly
-*close but not equal* to a native unit, the code went into `.unsupported` instead — which is why
-`osm`, `[Btu]`, `cal_IT` and `[dr_ap]` are refused rather than mapped onto the nearly-right native
-unit.
+*close but not equal* to a native unit, the code went into `.unsupported` instead of being mapped
+onto the nearly-right one. That is where `[Btu]`, `cal_IT` and `[dr_ap]` sat until the registry
+gained units of exactly their value; all three map today, and the rule that kept them out is the
+rule that still holds for whatever has no exact target.
 
 `check_profile_factors.py` (CTest target `bvnr_profile_factors`) closes it for all seven profiles,
 though not for all of them equally. It reads UCUM's `ucum-essence.xml`, the UDUNITS-2 XML database
@@ -17178,13 +17231,13 @@ them to each other:
 
 | Test | Target | Assertions | Specifies |
 |---|---|---|---|
-| `tests/bovnar_ucum_test.c` | `bvnr_ucum_test` | 130 | §2–§10 |
-| `tests/bovnar_unece_test.c` | `bvnr_unece_test` | 134 | §11 |
-| `tests/bovnar_qudt_test.c` | `bvnr_qudt_test` | 187 | §12 |
-| `tests/bovnar_udunits_test.c` | `bvnr_udunits_test` | 153 | §13 |
-| `tests/bovnar_om_test.c` | `bvnr_om_test` | 92 | §16 |
-| `tests/bovnar_cf_test.c` | `bvnr_cf_test` | 45 | §17 |
-| `tests/bovnar_crossvocab_test.c` | `bvnr_crossvocab_test` | 4776 | §14 |
+| `tests/bovnar_ucum_test.c` | `bvnr_ucum_test` | 171 | §2–§10 |
+| `tests/bovnar_unece_test.c` | `bvnr_unece_test` | 557 | §11 |
+| `tests/bovnar_qudt_test.c` | `bvnr_qudt_test` | 201 | §12 |
+| `tests/bovnar_udunits_test.c` | `bvnr_udunits_test` | 199 | §13 |
+| `tests/bovnar_om_test.c` | `bvnr_om_test` | 103 | §16 |
+| `tests/bovnar_cf_test.c` | `bvnr_cf_test` | 46 | §17 |
+| `tests/bovnar_crossvocab_test.c` | `bvnr_crossvocab_test` | 4789 | §14 |
 
 `bvnr_ucum_test` (labels `unit;si;profile;ucum`) carries the behavioural claims of sections 2–10: the three
 outcomes with their exact error codes, equivalence with the native spelling, UCUM's non-latching
@@ -17287,8 +17340,8 @@ native side goes through `bvn_parse_unit` and `bvn_unit_to_si_factor` via the ct
 through a Python reimplementation of the unit grammar — that is exactly how a table starts
 disagreeing with the parser it feeds (§9.1).
 
-As of this tree it compares **10652 rows across the seven vocabularies** and reports **0 mismatches**,
-10 dead rows and **0 coverage suggestions** — the tables are closed against their publishers, so
+As of this tree it compares **10663 rows across the seven vocabularies** and reports **0 mismatches**,
+0 dead rows and **0 coverage suggestions** — the tables are closed against their publishers, so
 there is nothing left for the coverage half to propose.
 
 **Three outcomes, and only one fails the build.**
@@ -17432,14 +17485,14 @@ Arbitrary and special units (`isArbitrary`, `isSpecial`, and any QUDT unit with 
 refused. The standing risk of §10.2 is **reduced everywhere and retired nowhere**: four tables now
 rest on their publishers, and the fifth rests on another publisher's reading of its publisher.
 
-### 9.6 Synchronisation between the five tables
+### 9.6 Synchronisation between the tables
 
 Checking each table against its own publisher leaves a second question open: whether the five agree
 with **each other** about what bovnar's registry contains. §14's concept table asks that of the
 concepts it lists; this asks it of every native unit, and it is the same tool — the coverage half of
 `check_profile_factors.py`, read across all five outputs at once rather than one profile at a time.
 
-For each of the 180 native units, the question is which profiles map it against which vocabularies
+For each native unit, the question is which profiles map it against which vocabularies
 *define* something equal to it. A unit that three tables carry and a fourth omits — while that
 fourth vocabulary has a perfectly good code for it — is a synchronisation gap, and on the first
 sweep there were 65 of them. They were overwhelmingly one-sided:
@@ -17464,8 +17517,8 @@ label before it was accepted.
 **A second pass closed the compound half of the same gap.** The first pass could only see codes
 worth a bare native symbol (§9.5), which is why it reported nine for `unece` and none at all of the
 kind a flat vocabulary is most likely to be missing. Once the index carried the tables' own targets,
-another 71 rows landed — `unece` from 201 to 252 and `qudt` from 244 to 263, which are the counts
-shipping today — and they divide into two groups that are worth naming, because both are gaps a
+another 71 rows landed — `unece` from 201 to 252 and `qudt` from 244 to 263, the counts of that pass
+(§9.1 has today's) — and they divide into two groups that are worth naming, because both are gaps a
 flat grammar creates and an expression grammar cannot have:
 
 | Group | Examples | Why the expression profiles never had the gap |
@@ -17516,7 +17569,7 @@ out by name instead.
 |---|---|
 | Lexer | 15 state-table entries across three states (§2.3); brace/bracket-depth tracking in the type-parameter scanner (§2.4) |
 | Unit parser | `src/utils/bovnar_profiles.c` — namespace dispatch, the shared expression parser, the flat matcher, the translator, the fold |
-| Registry | Five data files in `src/gendata/` (§9.1); `gen_profiles.py` emitting the per-profile and shared tables; one `value_base_unit_t` BLOCK per profile (UCUM 200000–200040, UN/ECE 300000–300024) |
+| Registry | Five data files in `src/gendata/` in that pass, seven today (§9.1); `gen_profiles.py` emitting the per-profile and shared tables; one `value_base_unit_t` BLOCK per profile (UCUM 200000–200040, UN/ECE 300000–300024) |
 | Version gate | Two checks in the validator — the annotation unit parameter and the inline unit suffix (§2.2); one guard in the writer |
 | Compatibility | Two refusals, one each in `bvn_unit_to_si_factor` and `bvn_unit_dimension_vector` (§7.2) |
 | Serialisation | One guard at the head of each of the two formatters (§5.1) |
@@ -17591,8 +17644,8 @@ grammar as `error_unit_illegal`, which is the right layer: "no such code", not "
 §13.2, which used to explain why the space-separated form could not be supported, now explains how it
 is.
 
-**The refusal set is where adopters leave.** §6.4 refuses osmolality, the non-Julian years, the
-referenced bels and four decades of scale. A clinical corpus will meet several of those early, and
+**The refusal set is where adopters leave.** §6.4 refuses the referenced bels, the other
+function-defined special units, four decades of scale and the British series. A clinical corpus will meet several of those early, and
 each is a reason to conclude the profile does not really support UCUM. The counter-argument — that
 naming a refusal beats accepting a string you cannot reason about — is correct and will not always
 be persuasive. §15 makes this worse before it makes it better: the refusal set is now much larger,
@@ -18485,7 +18538,10 @@ row names this base" path, with no special case in the writer. A `.reverse` flag
 is a build error, because it would be describing a choice nothing makes.
 
 The refusal is this namespace's own. The same kelvin still writes as `qudt:K` and `om:kelvin`, and a
-`cf:` unit is not "profile only" (§5.1): it translates to an ordinary native unit and writes as one.
+`cf:` unit is not "profile only" (§5.1): it translates to an ordinary native unit, and written from
+that unit alone it comes back as one. A document that *spelled* it `cf:air_temperature` keeps that
+spelling when it is re-serialised (§5.2) — which is the text being preserved, not a unit being
+translated into a standard name.
 
 ### 17.4 What is absent, and what it costs
 
@@ -18619,7 +18675,7 @@ table nobody can trace.
 - [Unit Ambiguities §17](07_bovnar_unit_ambiguities.md#17-the-same-spelling-in-another-namespace) — the reader-facing index of the cross-namespace collisions §6.2 records
 - [Unit Policy](06_bovnar_unit_policy.md) — the reader- and writer-side policies a translated unit passes through unchanged
 - [Read/Write API](08_bovnar_readwrite_api.md#112-reader-side-unit-policy-bvnr_reader_set_unit_policy) — the reader-side unit policy, and the `want_unit` hook a profile unit reaches unmodified
-- [Conformance Test Tool](13_bovnar_conformance.md) — where the 53-case `unit_profile` group lives
+- [Conformance Test Tool](13_bovnar_conformance.md) — where the 59-case `unit_profile` group lives
 - [Unit Cheatsheet](04_bovnar_unit_cheatsheet.md) — the native spellings the transliteration tables target
 - [EBNF](12_bovnar.ebnf) — `unit-param`, `profile-unit` and the byte classes of §2.3
 
@@ -18631,7 +18687,7 @@ table nobody can trace.
 
 (* ================================================================== *)
 (*  BOVNAR  –  EBNF derived from parser/lexer/validator implementation *)
-(*  Version 1.1           Notation: ISO/IEC 14977:1996                *)
+(*  Version 1.2           Notation: ISO/IEC 14977:1996                *)
 (*    { }  = zero or more       [ ]  = optional                       *)
 (*    ( )  = grouping           |  = alternation                      *)
 (*    ,    = concatenation      ;  = rule terminator                  *)
@@ -19050,8 +19106,14 @@ unit-char    = (* any byte accepted by copy_type_byte that is not     *)
 (* are defined -- "ucum", "unece", "qudt", "qudt-qk", "udunits", "om"  *)
 (* and "cf"; any other is error_unit_profile_unknown, and a profile    *)
 (* expression that is malformed or names a code the profile does not   *)
-(* know is error_unit_illegal.  There is no third outcome in which the *)
-(* value carries a unit the library cannot reason about.               *)
+(* know is error_unit_illegal; one the profile does know and this unit *)
+(* system cannot represent is error_unit_profile_unsupported.  There   *)
+(* is no further outcome in which the value carries a unit the library *)
+(* cannot reason about.                                                *)
+(*                                                                     *)
+(* SPEC 1.2.  Available only when the document declares "#!bovnar 1.2" *)
+(* or newer; in a document that declares less, or nothing, a profile   *)
+(* unit is error_unit_illegal -- in that version it is not a unit.     *)
 (*                                                                     *)
 (* WHICH OF THE SEVEN A GIVEN BUILD CARRIES IS A BUILD OPTION          *)
 (* (BVNR_WITH_<NAME>_PROFILE, all on by default). A namespace that was *)
@@ -19070,8 +19132,8 @@ unit-char    = (* any byte accepted by copy_type_byte that is not     *)
 (* The code is NOT given a grammar here.  Like the native unit         *)
 (* sub-grammar below it is semantic, enforced by bvn_parse_unit; the   *)
 (* normative grammar for what is inside is each vocabulary's own, and  *)
-(* restating five of them would create five second authorities to keep *)
-(* in step with the first.                                             *)
+(* restating them here would create a second authority for each, to be *)
+(* kept in step with the first.                                        *)
 (*                                                                     *)
 (* The hyphen in profile-name may not LEAD, which is what keeps "-qk:" *)
 (* from being a namespace; it exists for "qudt-qk", where the          *)

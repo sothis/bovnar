@@ -15,7 +15,7 @@ authors:
 affiliations:
   - name: Independent Researcher, Germany
     index: 1
-date: 28 July 2026
+date: 10 October 2026
 bibliography: paper.bib
 ---
 
@@ -91,14 +91,15 @@ format, and each leaves a gap:
 Bovnar occupies the space between JSON (no type, no unit) and netCDF (arrays,
 external schema, binary container): heterogeneous, self-describing documents in
 which the enforcement point is the parser. Because these code systems address a
-different layer, they are potential components rather than rivals: unit
-*profiles* that translate a foreign code into a native unit at parse time —
-`ucum:`, `unece:`, `qudt:`, `qudt-qk:` and `udunits:` — are under implementation
-for a future specification version and are not part of the released 1.1 format.
+different layer, they are components rather than rivals: specification 1.2
+adds seven unit *profiles* that translate a foreign code into a native unit at
+parse time — `ucum:`, `unece:`, `qudt:`, `qudt-qk:`, `udunits:`, `om:` (OM 2)
+and the read-only `cf:` (CF standard names). A document opts in to the
+notation with its version directive.
 Because every profile resolves to the same internal representation, a code
 written in one vocabulary compares equal to the same quantity written in
-another, and the reference implementation checks that property across all five
-with a cross-vocabulary test suite.
+another, and the reference implementation checks that property across the
+vocabularies with a cross-vocabulary test suite.
 
 Beyond units, the format provides several features aimed at measurement data:
 native binary embedding through length-prefixed octet streams (no Base64
@@ -111,11 +112,11 @@ integers, and optional error recovery for parsing unreliable log streams.
 # Quality control
 
 The implementation is roughly 30,000 lines of C against a test suite of
-comparable size: 144 CTest targets covering unit, integration, concurrency and
+comparable size: 180 CTest targets covering unit, integration, concurrency and
 socket-pair round-trip tests, a Python test suite, self-contained fuzz
 harnesses for the reader, writer, DOM and utility layers (with optional
 libFuzzer/AFL++ targets), and ASan/UBSan builds. Conformance is defined
-independently of the implementation by a 387-case suite with a documented
+independently of the implementation by a 470-case suite with a documented
 implementation-under-test protocol, so a third-party parser can be measured
 against the same corpus. Continuous integration runs the full suite on Linux
 and builds the MSVC and MinGW Windows targets. The command-line tool includes a
@@ -127,7 +128,8 @@ Bovnar is MIT licensed and developed at <https://github.com/sothis/bovnar>;
 the unit-profile tables additionally carry identifier strings from the
 vocabularies they translate, which remain under their publishers' own licences
 and are recorded in the repository's third-party notices. This paper describes
-version 1.1.0. The format is defined by a versioned
+version 2.0.0 of the reference implementation, which implements version 1.2
+of the format; the two are versioned separately. The format is defined by a versioned
 specification with a formal EBNF grammar, and has a registered IANA media type,
 `text/vnd.bovnar` [@iana_bovnar]; an Internet-Draft describing it has been
 prepared for the IETF independent submission stream and is included in the

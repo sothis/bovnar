@@ -12,10 +12,10 @@
           ~/.local/share/mime/packages/text-vnd.bovnar.xml
       update-mime-database ~/.local/share/mime
 
-  Detection is by the *.bvnr glob, which is the reliable mechanism for a text
+  Detection is by the *.bvnr (and *.bovnar) glob, which is the reliable mechanism for a text
   format with no fixed byte signature (the same approach shared-mime-info uses
-  for *.toml, *.ini, etc.). A low-priority heuristic <magic> is included only to
-  help with extension-less files and never overrides a real signature.
+  for *.toml, *.ini, etc.). The one <magic> rule is the version directive,
+  which an extension-less document may or may not carry.
 -->
 <mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
   <mime-type type="text/vnd.bovnar">
@@ -24,16 +24,17 @@
     <expanded-acronym>Bovnar typed, unit-aware serialisation</expanded-acronym>
     <sub-class-of type="text/plain"/>
     <glob pattern="*.bvnr"/>
-    <!-- Strong heuristic: the spec-1.1 version directive on the first line. -->
+    <!-- The registration lists a second extension; it is rarer and the same type. -->
+    <glob pattern="*.bovnar"/>
+    <!-- The version directive (spec 1.1 and later) on the first line. -->
     <magic priority="50">
       <match type="string" value="#!bovnar " offset="0"/>
     </magic>
-    <!-- Weaker heuristic: a top-level assignment line ".<ident> = ..." appearing
-         near the start of the file. Low priority so the glob and any stronger
-         match win. -->
-    <magic priority="20">
-      <match type="string" value="\n." offset="0:4096"/>
-    </magic>
+    <!-- No content heuristic beyond the directive. There used to be one — a
+         newline followed by "." within the first 4 KiB — and it typed any
+         extension-less text file with a line beginning with a full stop as a
+         Bovnar document, system-wide. A document without the directive is
+         recognised by its extension. -->
     <icon name="text-x-generic"/>
   </mime-type>
 </mime-info>

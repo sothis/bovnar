@@ -53,6 +53,8 @@ BLOCK_RE = re.compile(r'<li class="nav-dl">(.*?)\n\s*</li>\s*\n\s*<li>', re.S)
 HREF_RE = re.compile(r'href="([^"]+)"')
 # "Latest release <b>v1.1.0</b>" — the version the panel shows the reader.
 HEAD_RE = re.compile(r'<div class="nav-dl-head">[^<]*<b>([^<]+)</b>')
+# The schema.org SoftwareApplication entry's own statement of the version.
+SOFTWARE_VERSION_RE = re.compile(r'"softwareVersion":\s*"([^"]+)"')
 
 
 def git(*args):
@@ -142,6 +144,20 @@ def main():
         return fail(f"web/index.html: the downloads menu has no {RELEASES_URL} "
                     "link. That one is the only entry that survives a release "
                     "untouched; keep it.")
+
+    # --- the page agrees with itself ------------------------------------------
+    # The JSON-LD block further down states a softwareVersion of its own. It is
+    # outside the menu and nothing else reads it, so the menu could move to a
+    # new release and leave the structured data -- what a search engine quotes
+    # -- on the old one. This needs no git, so it holds in a tarball too.
+    panel = HEAD_RE.search(block)
+    declared = SOFTWARE_VERSION_RE.findall(html)
+    if panel and declared != [panel.group(1).lstrip("v")]:
+        return fail(
+            f"web/index.html: the downloads menu is headed {panel.group(1)} "
+            f"but the JSON-LD \"softwareVersion\" says "
+            f"{', '.join(declared) if declared else 'nothing'}.",
+            "They name the same release; move them together.")
 
     # --- what the tree says the newest release is ---------------------------
     # Ask git rather than looking for a .git DIRECTORY: in a `git worktree` it is

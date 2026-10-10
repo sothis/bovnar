@@ -72,4 +72,19 @@ struct bvn_dom_doc_s {
 	uint32_t         cap;
 	error_code_t     parse_error;
 };
+/*
+ * The attach functions without the public ones' argument checks -- no test that
+ * the container is of the right kind, and no duplicate-key scan. For the DOM
+ * builder only, which knows the kind from its own scope stack and has to let a
+ * duplicate key INTO the tree so the document-tier pass can report it; see
+ * bvn_dom_struct_add in bovnar_dom.c. Same ownership rule: the value is
+ * destroyed on every failure path.
+ */
+bool bvn_dom_struct_add_nocheck(bvn_dom_node_t *s,
+				const char *key, uint32_t klen,
+				bvn_dom_node_t *val);
+bool bvn_dom_doc_add_nocheck(bvn_dom_doc_t *d,
+			     const char *key, uint32_t klen,
+			     bvn_dom_node_t *val);
+bool bvn_dom_array_append_nocheck(bvn_dom_node_t *a, bvn_dom_node_t *elem);
 #endif

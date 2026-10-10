@@ -27,6 +27,7 @@ import tempfile
 import pytest
 
 from conftest import needs_lib
+import bovnar
 from bovnar.writer import Writer, DEFAULT_MEM_CAP
 from bovnar.reader import Reader
 from bovnar.enums import Event, ValueTypeFamily, BaseUnit, SIPrefix, IECPrefix, Exponent
@@ -1052,3 +1053,69 @@ def test_a_unit_that_cannot_be_serialised_is_refused_not_dropped():
     w2._write_scalar('d', 'float', vt, bovnar.parse_unit('k~g·m/s²'), '1.5')
     w2.finish()
     assert 'k~g·m/s²' in w2.get_output().decode()
+
+
+@needs_lib
+class TestWriterMatchesReaderLimits:
+    """The reader is opened at the 255-level nesting cap (reader.py says why);
+    the writer was left at the C default of 64, so a document `loads()` took
+    could not be handed back to `dumps()`."""
+
+    def test_arrays_nested_past_64_round_trip(self):
+        src = b'.a=' + b'[' * 100 + b'1' + b']' * 100 + b';'
+        doc = bovnar.loads(src)
+        assert bovnar.loads(bovnar.dumps(doc)) == doc
+
+    def test_structs_nested_past_64_round_trip(self):
+        src = b'.a=' + b'{.a=' * 100 + b'1;' + b'};' * 100
+        doc = bovnar.loads(src)
+        assert bovnar.loads(bovnar.dumps(doc)) == doc
+
+
+@needs_lib
+class TestWriterFlagsKeywords:
+    """`unit_flags` and `emit_version` are fields of bvnr_write_flags_t the
+    bindings mirrored and never let a caller set, while the docs and one error
+    message both sent callers to UnitFlags.REDUCE for write-side rewriting."""
+
+    def test_unit_flags_reduce_rescales_the_value(self):
+        from bovnar import UnitFlags
+        w = Writer.to_mem(pretty=False, unit_flags=UnitFlags.REDUCE)
+        w.write_float('a', 2.5, unit_str='k~g')
+        w.finish()
+        assert w.get_output() == b'.a=<float:64,g>2500;'
+
+    def test_emit_version_leads_the_document(self):
+        w = Writer.to_mem(pretty=False, emit_version=True)
+        w.write_uint('a', 1)
+        w.finish()
+        major, minor = bovnar.spec_version()
+        assert w.get_output().startswith(b'#!bovnar %d.%d\n' % (major, minor))
+
+    def test_num_canonical_is_mirrored(self):
+        from bovnar import UnitFlags
+        assert int(UnitFlags.NUM_CANONICAL) == 1 << 2
+
+    def test_to_file_takes_them_too(self, tmp_path):
+        p = str(tmp_path / 'o.bvnr')
+        with Writer.to_file(p, pretty=False, emit_version=True) as w:
+            w.write_uint('a', 1)
+        assert open(p, 'rb').read().startswith(b'#!bovnar ')
+
+
+@needs_lib
+class TestSignedHighBaseRefusedByName:
+    """Base 64 and 85 are unsigned -- '+' and '-' are digits there. Asking for
+    a signed one reported "bvn_format_int64 overflow" with ErrorCode.NONE."""
+
+    @pytest.mark.parametrize('base', [64, 85])
+    def test_write_sint(self, base):
+        w = Writer.to_mem(pretty=False)
+        with pytest.raises(BovnarArgumentError, match='unsigned'):
+            w.write_sint('a', -255, base=base)
+
+    @pytest.mark.parametrize('base', [64, 85])
+    def test_write_bvni_signed(self, base):
+        w = Writer.to_mem(pretty=False)
+        with pytest.raises(BovnarArgumentError, match='unsigned'):
+            w.write_bvni('a', -255, base=base)

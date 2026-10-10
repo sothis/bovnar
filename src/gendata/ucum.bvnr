@@ -77,6 +77,11 @@
 # .decade is the power of ten. The profile applies it as a decade on top of the
 # atom's native target rather than as a bovnar prefix id, so a target that
 # already carries a prefix composes correctly.
+#
+# UCUM's four BINARY prefixes (Ki, Mi, Gi, Ti) are not in this list: they have no
+# decade. They are read by bovnar_profiles.c (bvn_prof_binary_pfx), which maps
+# them onto the IEC prefix of the same name where the atom's native target
+# accepts one -- KiBy, Mibit -- and refuses them as unsupported elsewhere.
 .prefixes = [
   { .code = "Y";  .decade =  24; },
   { .code = "Z";  .decade =  21; },
@@ -108,12 +113,12 @@
   { .code = "a_g";                       .bovnar = "yr_greg"; .metric = false; },
   { .code = "mo_s";                      .bovnar = "mo_syn"; .metric = false; },
   { .code = "mo_g";                      .bovnar = "mo_greg";      .metric = false; },
-  { .code = "[e]";                       .bovnar = "e"; .metric = false; },
+  { .code = "[e]";                       .bovnar = "e"; .metric = true;  },
   { .code = "sph";                       .bovnar = "sph"; .metric = false; },
-  { .code = "Lmb";                       .bovnar = "Lmb"; .metric = false; },
-  { .code = "cal_m";                     .bovnar = "cal_m"; .metric = false; },
-  { .code = "cal_[15]";                  .bovnar = "cal_15"; .metric = false; },
-  { .code = "cal_[20]";                  .bovnar = "cal_20"; .metric = false; },
+  { .code = "Lmb";                       .bovnar = "Lmb"; .metric = true;  },
+  { .code = "cal_m";                     .bovnar = "cal_m"; .metric = true;  },
+  { .code = "cal_[15]";                  .bovnar = "cal_15"; .metric = true;  },
+  { .code = "cal_[20]";                  .bovnar = "cal_20"; .metric = true;  },
   { .code = "[Btu_59]";                  .bovnar = "Btu_59"; .metric = false; },
   { .code = "[Btu_60]";                  .bovnar = "Btu_60"; .metric = false; },
   { .code = "[Btu_m]";                   .bovnar = "Btu_m"; .metric = false; },
@@ -400,33 +405,39 @@
   # .reverse = false so the unit is written back under the qualified spelling.
   { .code = "[Btu_th]"; .bovnar = "Btu_th"; .metric = false; },
   { .code = "[Btu]";    .bovnar = "Btu_th"; .metric = false; .reverse = false; },
-  { .code = "erg";      .bovnar = "erg";    .metric = false; },
+  { .code = "erg";      .bovnar = "erg";    .metric = true;  },
   { .code = "[HP]";     .bovnar = "hp";     .metric = false; },
   { .code = "[kn_i]";   .bovnar = "kn";     .metric = false; },
-  { .code = "dyn";      .bovnar = "dyn";    .metric = false; },
+  { .code = "dyn";      .bovnar = "dyn";    .metric = true;  },
   # Bovnar has no gram-force, but gram times standard gravity IS one, exactly:
   # dimensions [1,1,-2,0,0,0,0], factor 0.00980665. A mapping need not be
   # atom-to-atom.
-  { .code = "gf";       .bovnar = "g·gn";   .metric = false; },
+  { .code = "gf";       .bovnar = "g·gn";   .metric = true;  },
   { .code = "[lbf_av]"; .bovnar = "lbf";    .metric = false; },
-  { .code = "[g]";      .bovnar = "gn";     .metric = false; },
+  { .code = "[g]";      .bovnar = "gn";     .metric = true;  },
 
   # CGS and radiation
-  { .code = "P";     .bovnar = "P";     .metric = false; },
-  { .code = "St";    .bovnar = "St";    .metric = false; },
-  { .code = "Gal";   .bovnar = "Gal";   .metric = false; },
-  { .code = "G";     .bovnar = "G";     .metric = false; },
-  { .code = "Mx";    .bovnar = "Mx";    .metric = false; },
-  { .code = "Oe";    .bovnar = "Oe";    .metric = false; },
+  # Every unit in UCUM's CGS table is METRIC (isMetric="yes" in
+  # ucum-essence.xml), and so are gf, erg, dyn, [g], [e], g%, Lmb and the three
+  # calories further up. Twenty of these rows said otherwise, so the prefixed
+  # codes -- cP, cSt, mGal, mG, kgf: among the commonest UCUM there is -- were
+  # refused as error_unit_illegal, "that is not a UCUM atom". The flag is
+  # UCUM's own and is checked against the XML, not chosen here.
+  { .code = "P";     .bovnar = "P";     .metric = true;  },
+  { .code = "St";    .bovnar = "St";    .metric = true;  },
+  { .code = "Gal";   .bovnar = "Gal";   .metric = true;  },
+  { .code = "G";     .bovnar = "G";     .metric = true;  },
+  { .code = "Mx";    .bovnar = "Mx";    .metric = true;  },
+  { .code = "Oe";    .bovnar = "Oe";    .metric = true;  },
   # The biot is ten amperes; the kayser is one reciprocal centimetre.
-  { .code = "Bi";    .bovnar = "da~A";  .metric = false; },
+  { .code = "Bi";    .bovnar = "da~A";  .metric = true;  },
   { .code = "Ky";    .bovnar = "c~m^-1"; .metric = true;  },
   # The gilbert, transliterated from UCUM's own definition of it (Oe.cm) rather
   # than from its value. Both give the same number; only this one gives a row a
   # reader can check against the publication.
-  { .code = "Gb";    .bovnar = "Oe·c~m"; .metric = false; },
-  { .code = "sb";    .bovnar = "sb";    .metric = false; },
-  { .code = "ph";    .bovnar = "ph";    .metric = false; },
+  { .code = "Gb";    .bovnar = "Oe·c~m"; .metric = true;  },
+  { .code = "sb";    .bovnar = "sb";    .metric = true;  },
+  { .code = "ph";    .bovnar = "ph";    .metric = true;  },
   { .code = "Ci";    .bovnar = "Ci";    .metric = true;  },
   # "RAD" and "REM", NOT "[RAD]"/"[REM]": the bracketed forms are UCUM's
   # CASE-INSENSITIVE codes, and this profile is the case-sensitive variant
@@ -476,7 +487,7 @@
   { .code = "U";   .bovnar = "u~mol/min";  .metric = true; },
   # Gram percent is UCUM's own g/dl, written the native way. It is a mass
   # concentration and not a ratio, which is why it sits here and not beside %.
-  { .code = "g%";  .bovnar = "g/d~L";      .metric = false; },
+  { .code = "g%";  .bovnar = "g/d~L";      .metric = true;  },
 
   # Optics. The dioptre is exactly a reciprocal metre.
   { .code = "[diop]"; .bovnar = "m^-1"; .metric = false; },

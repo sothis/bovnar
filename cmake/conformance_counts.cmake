@@ -43,6 +43,37 @@ if(NOT _actual EQUAL _documented)
         "README.md and web/index.html).")
 endif()
 
+# doc/13 calls a case's id its unique identifier, and a report names a case by
+# nothing else. Five were not: a block of new encoding cases was numbered from
+# ENC-005 beside the ENC-005..009 already there, so "not ok - [ENC-007]" named
+# two cases with opposite expectations. The TAP lines carry every id.
+string(REGEX MATCHALL "ok [0-9]+ - \\[[A-Z0-9]+-[0-9]+[a-z]?\\]" _idlines "${_tap}")
+set(_ids "")
+foreach(_l IN LISTS _idlines)
+    string(REGEX REPLACE ".*- \\[(.*)\\]" "\\1" _id "${_l}")
+    list(APPEND _ids "${_id}")
+endforeach()
+list(LENGTH _ids _nids)
+if(NOT _nids EQUAL _actual)
+    message(FATAL_ERROR
+        "read ${_nids} case ids from a suite of ${_actual} cases; the TAP line "
+        "format has changed and the uniqueness check below is blind")
+endif()
+set(_uniq ${_ids})
+list(REMOVE_DUPLICATES _uniq)
+list(LENGTH _uniq _nuniq)
+if(NOT _nuniq EQUAL _nids)
+    set(_dups "")
+    foreach(_id IN LISTS _uniq)
+        string(REGEX MATCHALL "\\[${_id}\\]" _hits "${_tap}")
+        list(LENGTH _hits _n)
+        if(_n GREATER 1)
+            list(APPEND _dups "${_id}")
+        endif()
+    endforeach()
+    message(FATAL_ERROR "conformance case ids used more than once: ${_dups}")
+endif()
+
 # Every group the suite reports must appear in the table, with the right count.
 string(REGEX MATCHALL "# Subtest: [a-z_]+" _groups "${_tap}")
 string(REGEX MATCHALL "    1\\.\\.[0-9]+" _plans "${_tap}")

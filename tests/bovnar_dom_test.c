@@ -26,6 +26,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
+#include <time.h>
 #include "bovnar_dom.h"
 #include "bovnar.h"
 #include "bvn_int.h"
@@ -1097,8 +1099,520 @@ static void test_dom_leading_sign_digit_in_base_64_and_85(void)
 		    "a signed text for an unsigned base-16 value is still refused");
 	bvn_dom_doc_destroy(doc);
 }
+/*
+ * The attach functions refuse what they cannot attach.
+ *
+ * They are public, and they checked nothing: bvn_dom_array_append on a struct
+ * node returned true and left array_count at 0, bvn_dom_struct_add on an
+ * integer node returned true, and a hand-built struct took the duplicate key a
+ * parsed document is refused for. doc/08 4.5 promises that a failure destroys
+ * the value and returns false -- so each case here hands over a freshly
+ * allocated node and never frees it; under ASan a refusal that forgot to
+ * destroy it is a leak, and one that the caller ALSO freed would be a double
+ * free.
+ */
+static void test_dom_attach_refuses_wrong_container(void)
+{
+	bvn_dom_node_t *st  = bvn_dom_node_alloc(BVN_DOM_STRUCT);
+	bvn_dom_node_t *arr = bvn_dom_node_alloc(BVN_DOM_ARRAY);
+	bvn_dom_node_t *num = bvn_dom_node_from_i64(3);
+	ASSERT_TRUE(st && arr && num, "allocations");
+	if (!st || !arr || !num) return;
+
+	ASSERT_TRUE(!bvn_dom_array_append(st, bvn_dom_node_from_i64(1)),
+		    "array_append on a struct node is refused");
+	ASSERT_TRUE(!bvn_dom_array_append(num, bvn_dom_node_from_i64(1)),
+		    "array_append on an integer node is refused");
+	ASSERT_TRUE(!bvn_dom_array_append(NULL, bvn_dom_node_from_i64(1)),
+		    "array_append on NULL is refused, not a crash");
+	ASSERT_TRUE(!bvn_dom_array_append(arr, NULL),
+		    "array_append of NULL is refused");
+	ASSERT_EQ_UINT(bvn_dom_array_count(arr), 0u, "nothing was attached");
+	ASSERT_TRUE(bvn_dom_array_append(arr, bvn_dom_node_from_i64(1)),
+		    "array_append on an array still works");
+	ASSERT_EQ_UINT(bvn_dom_array_count(arr), 1u, "one element");
+
+	ASSERT_TRUE(!bvn_dom_struct_add(arr, "k", 1, bvn_dom_node_from_i64(1)),
+		    "struct_add on an array node is refused");
+	ASSERT_TRUE(!bvn_dom_struct_add(num, "k", 1, bvn_dom_node_from_i64(1)),
+		    "struct_add on an integer node is refused");
+	ASSERT_TRUE(!bvn_dom_struct_add(NULL, "k", 1, bvn_dom_node_from_i64(1)),
+		    "struct_add on NULL is refused, not a crash");
+	ASSERT_TRUE(bvn_dom_struct_add(st, "k", 1, bvn_dom_node_from_i64(1)),
+		    "struct_add on a struct works");
+	ASSERT_TRUE(!bvn_dom_struct_add(st, "k", 1, bvn_dom_node_from_i64(2)),
+		    "a second member under the same key is refused");
+	ASSERT_TRUE(bvn_dom_struct_add(st, "kk", 2, bvn_dom_node_from_i64(2)),
+		    "a key that merely shares a prefix is a different key");
+	ASSERT_EQ_UINT(bvn_dom_struct_count(st), 2u, "two members, not three");
+	int64_t v = 0;
+	ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_struct_get(st, "k"), &v) && v == 1,
+		    "the first value under the key is the one kept");
+
+	bvn_dom_doc_t *doc = bvn_dom_doc_create();
+	ASSERT_NOT_NULL(doc, "doc");
+	if (doc) {
+		ASSERT_TRUE(!bvn_dom_doc_add(NULL, "a", 1, bvn_dom_node_from_i64(1)),
+			    "doc_add on NULL is refused");
+		ASSERT_TRUE(bvn_dom_doc_add(doc, "a", 1, bvn_dom_node_from_i64(1)),
+			    "doc_add works");
+		ASSERT_TRUE(!bvn_dom_doc_add(doc, "a", 1, bvn_dom_node_from_i64(2)),
+			    "a duplicate top-level key is refused");
+		ASSERT_EQ_UINT(bvn_dom_doc_count(doc), 1u, "one entry");
+		bvn_dom_doc_destroy(doc);
+	}
+	bvn_dom_node_destroy(st);
+	bvn_dom_node_destroy(arr);
+	bvn_dom_node_destroy(num);
+
+	/* The PARSER still lets a duplicate into the tree and reports it as the
+	 * document-tier error it is -- the refusal above is for hand-built trees
+	 * and must not turn error_duplicate_struct_key into a callback failure. */
+	static const char dup[] = ".s = {.a = 1; .a = 2;};";
+	doc = bvn_dom_parse(dup, (uint32_t)(sizeof dup - 1));
+	ASSERT_TRUE(doc && bvn_dom_doc_get_parse_error(doc) ==
+				   error_duplicate_struct_key,
+		    "a parsed duplicate key is still error_duplicate_struct_key");
+	bvn_dom_doc_destroy(doc);
+}
+
+/*
+ * A value a unit policy converted is stored under a type that can hold it.
+ *
+ * The builder kept the DECLARED type over the converted digits, in three ways
+ * that each failed a whole document -- or described a node no document could
+ * contain:
+ *
+ *   - `<uint:8,k~m> 2` to metres is 2000, which is not a uint:8. make_int
+ *     range-checks, so the parse failed with error_value_out_of_range and
+ *     `bovnar query --unit m .anything file` blamed the file, for a policy
+ *     `validate` and `events` accept.
+ *   - `<uint:8,g> 5` to kilograms is 0.005; the node became a float of width 8,
+ *     and a float is 16 or a multiple of 32 bits wide.
+ *   - a float asked for in base 2 (or 36) was stamped `_2`, a base a float has
+ *     no literal in, and its digits could not be read back: out of range again.
+ */
+static void test_dom_policy_conversion_retypes_node(void)
+{
+	static const bvnr_unit_target_t to_m[]  = { { "m", 0 } };
+	static const bvnr_unit_target_t to_kg[] = { { "k~g", 0 } };
+	static const bvnr_unit_target_t to_m2[] = { { "m", 2 } };
+	static const bvnr_unit_target_t to_m36[] = { { "m", 36 } };
+	static const bvnr_unit_target_t to_m16[] = { { "m", 16 } };
+	bvnr_unit_policy_t p;
+	bvn_dom_doc_t *doc;
+	bvn_dom_node_t *n;
+	value_type_spec_t vt;
+	uint64_t u = 0; int64_t i = 0; double f = 0.0;
+
+	/* an integer that outgrows its width is widened, not refused */
+	static const char grow[] =
+		".i = <uint:8,k~m> 2;\n.j = <sint:8,m> -3;\n"
+		".k = <sint:8,k~m> -100;\n.w = <uint:64,Y~m> 18446744073709551615;\n";
+	memset(&p, 0, sizeof p); p.targets = to_m; p.num_targets = 1;
+	doc = bvn_dom_parse_policy(grow, (uint32_t)(sizeof grow - 1), &p);
+	ASSERT_TRUE(doc && bvn_dom_doc_get_parse_error(doc) == error_none,
+		    "a converted integer wider than its declared type parses");
+	if (doc && bvn_dom_doc_get_parse_error(doc) == error_none) {
+		n  = bvn_dom_lookup(doc, ".i");
+		vt = bvn_dom_get_value_type(n);
+		ASSERT_TRUE(bvn_dom_get_u64(n, &u) && u == 2000u, ".i is 2000 m");
+		ASSERT_TRUE(vt.family == vt_uint && vt.width == 16u,
+			    "2000 is stored as a uint:16");
+		n  = bvn_dom_lookup(doc, ".j");
+		vt = bvn_dom_get_value_type(n);
+		ASSERT_TRUE(bvn_dom_get_i64(n, &i) && i == -3 &&
+			    vt.family == vt_sint && vt.width == 8u,
+			    "a value the conversion left alone keeps its type");
+		n  = bvn_dom_lookup(doc, ".k");
+		vt = bvn_dom_get_value_type(n);
+		ASSERT_TRUE(bvn_dom_get_i64(n, &i) && i == -100000 &&
+			    vt.family == vt_sint && vt.width == 32u,
+			    "-100000 is stored as a sint:32");
+		n  = bvn_dom_lookup(doc, ".w");
+		vt = bvn_dom_get_value_type(n);
+		char *s = bvn_dom_int_to_str(n, 10);
+		ASSERT_TRUE(vt.family == vt_uint && vt.width == 256u &&
+			    bvn_dom_get_bigint(n) != NULL,
+			    "a result past 64 bits becomes a wide integer");
+		ASSERT_EQ_STR(s, "18446744073709551615000000000000000000000000",
+			      "and keeps every digit");
+		bvn_dom_free_string(s);
+	}
+	bvn_dom_doc_destroy(doc);
+
+	/* an integer that becomes a fraction is a float of a width floats have */
+	static const char frac[] = ".m = <uint:8,g> 5;\n.n = <sint:128,g> -5;\n";
+	memset(&p, 0, sizeof p); p.targets = to_kg; p.num_targets = 1;
+	doc = bvn_dom_parse_policy(frac, (uint32_t)(sizeof frac - 1), &p);
+	ASSERT_TRUE(doc && bvn_dom_doc_get_parse_error(doc) == error_none,
+		    "integer-to-fraction parses");
+	if (doc && bvn_dom_doc_get_parse_error(doc) == error_none) {
+		n  = bvn_dom_lookup(doc, ".m");
+		vt = bvn_dom_get_value_type(n);
+		ASSERT_TRUE(bvn_dom_node_type(n) == BVN_DOM_FLOAT &&
+			    bvn_dom_get_float(n, &f) && f == 0.005, ".m is 0.005");
+		ASSERT_TRUE(vt.family == vt_float && vt.width == 64u,
+			    "the promoted node is a float:64, not a float:8");
+		n  = bvn_dom_lookup(doc, ".n");
+		vt = bvn_dom_get_value_type(n);
+		ASSERT_TRUE(bvn_dom_get_float(n, &f) && f == -0.005 &&
+			    vt.family == vt_float && vt.width == 64u,
+			    "from a wide integer too");
+	}
+	bvn_dom_doc_destroy(doc);
+
+	/* a float in a base it has no literal in keeps its value and its type */
+	static const char flt[] =
+		".a = <float:64,k~m> 2.5;\n.b = <float:64,c~m> 12.5;\n"
+		".c = <float_fix:32,q16,k~m> 1.5;\n.d = <uint:16,m~m> 500;\n"
+		".e = <float_dec:64,k~m> 0.25;\n";
+	static const struct { const bvnr_unit_target_t *t; const char *what; }
+	bases[] = { { to_m2, "base 2" }, { to_m36, "base 36" },
+		    { to_m16, "base 16" } };
+	for (size_t k = 0; k < sizeof bases / sizeof bases[0]; k++) {
+		memset(&p, 0, sizeof p);
+		p.targets = bases[k].t; p.num_targets = 1;
+		doc = bvn_dom_parse_policy(flt, (uint32_t)(sizeof flt - 1), &p);
+		ASSERT_TRUE(doc && bvn_dom_doc_get_parse_error(doc) == error_none,
+			    bases[k].what);
+		if (doc && bvn_dom_doc_get_parse_error(doc) == error_none) {
+			n  = bvn_dom_lookup(doc, ".a");
+			vt = bvn_dom_get_value_type(n);
+			ASSERT_TRUE(bvn_dom_get_float(n, &f) && f == 2500.0,
+				    "2.5 km is 2500 m in any output base");
+			ASSERT_TRUE(vt.family == vt_float &&
+				    (vt.base == 0u || vt.base == 10u || vt.base == 16u),
+				    "and the float keeps a base a float can have");
+			n = bvn_dom_lookup(doc, ".b");
+			ASSERT_TRUE(bvn_dom_get_float(n, &f) && f == 0.125,
+				    "a fractional result is the same number");
+			n  = bvn_dom_lookup(doc, ".c");
+			vt = bvn_dom_get_value_type(n);
+			ASSERT_TRUE(bvn_dom_get_float(n, &f) && f == 1500.0 &&
+				    vt.family == vt_float_fix && vt.base == 16u,
+				    "a float_fix keeps its Q, which lives in .base");
+			n  = bvn_dom_lookup(doc, ".d");
+			vt = bvn_dom_get_value_type(n);
+			ASSERT_TRUE(bvn_dom_get_float(n, &f) && f == 0.5 &&
+				    vt.family == vt_float && vt.width == 64u &&
+				    (vt.base == 0u || vt.base == 10u || vt.base == 16u),
+				    "an integer promoted in that base is a legal float");
+			n = bvn_dom_lookup(doc, ".e");
+			ASSERT_TRUE(bvn_dom_get_float(n, &f) && f == 250.0,
+				    "a float_dec is read from the rational too");
+		}
+		bvn_dom_doc_destroy(doc);
+	}
+}
+/* error code of parsing `doc`, or -1 when no document came back */
+static int dom_err(const char *doc)
+{
+	bvn_dom_doc_t *d = bvn_dom_parse(doc, (uint32_t)strlen(doc));
+	int e = d ? (int)bvn_dom_doc_get_parse_error(d) : -1;
+	bvn_dom_doc_destroy(d);
+	return e;
+}
+/*
+ * Array homogeneity does not depend on where the holes are.
+ *
+ * Each element used to be compared with the FIRST non-null one, and a null in
+ * that first element said nothing about its position -- so later elements were
+ * never compared with each other there. Metres and seconds shared a matrix
+ * column; three records validated in one order and not in another.
+ */
+static void test_dom_homogeneity_is_order_independent(void)
+{
+	static const struct { const char *doc; int want; } cases[] = {
+		/* a hole in the first sibling no longer hides the others */
+		{ ".a = [[null,null],[<float:64,m> 1, null],[<float:64,s> 2, null]];",
+		  error_array_element_type_mismatch },
+		{ ".a = [{.x = null;}, {.x = 1;}, {.x = \"s\";}];",
+		  error_array_element_type_mismatch },
+		{ ".a = [{.x = 1;}, {.x = null;}, {.x = \"s\";}];",
+		  error_array_element_type_mismatch },
+		{ ".a = [{.x = \"s\";}, {.x = 1;}, {.x = null;}];",
+		  error_array_element_type_mismatch },
+		{ ".a = [[null], [1], [\"x\"]];",
+		  error_array_element_type_mismatch },
+		{ ".a = [{.x = ;}, {.x = <float:64,m> 1;}, {.x = [1,2];}];",
+		  error_array_element_type_mismatch },
+		/* a matrix has ONE element type, not one per column */
+		{ ".a = [[null, 1], [\"x\", null]];",
+		  error_array_element_type_mismatch },
+		{ ".a = [[null, 1], [\"x\", null], [2, null]];",
+		  error_array_element_type_mismatch },
+		/* a hole two levels down, and in a struct inside a matrix */
+		{ ".a = [[[null]], [[<float:64,m> 1]], [[<float:64,s> 2]]];",
+		  error_array_element_type_mismatch },
+		{ ".a = [[{.k = ;}], [{.k = 1;}], [{.k = true;}]];",
+		  error_array_element_type_mismatch },
+		{ ".a = [{.l = [null];}, {.l = [1, 2];}, {.l = [\"s\"];}];",
+		  error_array_element_type_mismatch },
+		/* ...and none of this makes a sparse but consistent array invalid */
+		{ ".a = [[null,null],[<float:64,m> 1, null],[null, <float:64,m> 2]];",
+		  error_none },
+		{ ".a = [{.x = null;}, {.x = 1;}, {.x = 2.5;}, {.x = ;}];", error_none },
+		{ ".a = [[null], [1], [null], [2.5]];", error_none },
+		{ ".a = [null, null];", error_none },
+		{ ".a = [[], []];", error_none },
+		/* fields stay free: units and list lengths may differ per record */
+		{ ".a = [{.p = 1 $USD; .l = [1];}, {.p = 2 $EUR; .l = [1, 2, 3];}];",
+		  error_none },
+		{ ".a = [{.l = [<float:64,m> 1];}, {.l = <float:64,s> [1, 2];}];", error_none },
+		/* but a list inside ONE record is still a bare array */
+		{ ".a = [{.l = <float:64,m> [1, 2];}, {.l = [<float:64,m> 1, <float:64,s> 2];}];",
+		  error_array_element_type_mismatch },
+		{ ".a = [{.s = {.l = [1, \"x\"];};}];",
+		  error_array_element_type_mismatch },
+		/* the rules that never involved a hole are unchanged */
+		{ ".a = [<float:64,m> 1, <float:64,s> 2];",
+		  error_array_element_type_mismatch },
+		{ ".a = [[1, 2], [3]];", error_array_row_size_mismatch },
+		{ ".a = [{.x = 1;}, {.y = 1;}];", error_struct_shape_mismatch },
+		{ ".a = [{.x = 1; .x = 2;}];", error_duplicate_struct_key },
+		{ ".a = [{.s = {.x = 1; .x = 2;};}];", error_duplicate_struct_key },
+		{ ".a = [[{.x = 1; .x = 2;}]];", error_duplicate_struct_key },
+		{ ".a = [1, 2.5, 3];", error_none },
+	};
+	for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++)
+		ASSERT_EQ_INT(dom_err(cases[i].doc), cases[i].want, cases[i].doc);
+}
+/* the integer at `path`, or INT64_MIN when it is not there */
+static int64_t dom_i64_at(const bvn_dom_doc_t *doc, const char *path)
+{
+	int64_t v = INT64_MIN;
+	bvn_dom_node_t *n = bvn_dom_lookup(doc, path);
+	if (!n || !bvn_dom_get_i64(n, &v)) return INT64_MIN;
+	return v;
+}
+/*
+ * Row sizes belong to the array they are rows of.
+ *
+ * The element count at which the current row began was one variable for the
+ * whole builder, so opening an inner array reset it under the outer one.
+ */
+static void test_dom_row_sizes_are_per_array(void)
+{
+	static const char m1[] = "#!bovnar 1.1\n.a = [[1]/[2]] / [[3]/[4]];";
+	bvn_dom_doc_t *doc = bvn_dom_parse(m1, (uint32_t)(sizeof m1 - 1));
+	ASSERT_TRUE(doc && bvn_dom_doc_get_parse_error(doc) == error_none, m1);
+	if (doc) {
+		ASSERT_EQ_INT(dom_i64_at(doc, ".a[0][0][0][0]"), 1, "[0][0][0][0]");
+		ASSERT_EQ_INT(dom_i64_at(doc, ".a[0][0][1][0]"), 2, "[0][0][1][0]");
+		ASSERT_EQ_INT(dom_i64_at(doc, ".a[1][0][0][0]"), 3, "[1][0][0][0]");
+		ASSERT_EQ_INT(dom_i64_at(doc, ".a[1][0][1][0]"), 4, "[1][0][1][0]");
+	}
+	bvn_dom_doc_destroy(doc);
+
+	static const char m2[] =
+		".a = [[1,2,3]/[4,5,6]] / [[7,8,9]/[10,11,12]];";
+	doc = bvn_dom_parse(m2, (uint32_t)(sizeof m2 - 1));
+	ASSERT_TRUE(doc && bvn_dom_doc_get_parse_error(doc) == error_none, m2);
+	if (doc) {
+		ASSERT_EQ_INT(dom_i64_at(doc, ".a[1][0][1][2]"), 12, "[1][0][1][2]");
+		ASSERT_EQ_INT(dom_i64_at(doc, ".a[0][0][0][1]"), 2, "[0][0][0][1]");
+		ASSERT_EQ_INT(dom_i64_at(doc, ".a[0][0][1][0]"), 4, "[0][0][1][0]");
+		ASSERT_EQ_INT(dom_i64_at(doc, ".a[1][0][0][0]"), 7, "[1][0][0][0]");
+	}
+	bvn_dom_doc_destroy(doc);
+
+	/* The recorded row size of the OUTER array is its own: one element. It was
+	 * 0 - 2 = 4294967294, the inner array's start subtracted from nothing. */
+	static const char m3[] = ".a = [[1,2,3]/[4,5,6]];";
+	doc = bvn_dom_parse(m3, (uint32_t)(sizeof m3 - 1));
+	ASSERT_TRUE(doc && bvn_dom_doc_get_parse_error(doc) == error_none, m3);
+	if (doc) {
+		bvn_dom_node_t *a = bvn_dom_lookup(doc, ".a");
+		ASSERT_EQ_UINT(bvn_dom_array_count(a), 1u, "outer holds one matrix");
+		ASSERT_EQ_UINT(bvn_dom_array_dims(a), 1u, "outer has one row");
+		ASSERT_EQ_INT(dom_i64_at(doc, ".a[0][1][2]"), 6, "[0][1][2]");
+		ASSERT_EQ_INT(dom_i64_at(doc, ".a[0][0][0]"), 1, "[0][0][0]");
+	}
+	bvn_dom_doc_destroy(doc);
+
+	/* A valid ragged-looking shape that is not ragged: the garbage row size
+	 * made the two outer rows disagree. */
+	ASSERT_EQ_INT(dom_err(".a = [[[1,1]/[2,2], null], [null, null]];"),
+		      error_none, "matrix element beside holes");
+	ASSERT_EQ_INT(dom_err(".a = [[[1,1]/[2,2]], [[3,3]/[4,4]]];"),
+		      error_none, "matrices as elements");
+	/* and a real row mismatch inside a nested matrix is still one */
+	ASSERT_EQ_INT(dom_err(".a = [[[1,1]/[2,2]], [[3,3,3]/[4,4,4]]];"),
+		      error_array_row_size_mismatch, "2x2 beside 2x3");
+	ASSERT_EQ_INT(dom_err(".a = [[1,2]/[3,4]] / [[5,6]/[7]];"),
+		      error_array_row_size_mismatch, "ragged inner matrix");
+}
+/*
+ * nan / inf / ninf are special only as bare words: quoted under an integer
+ * type they are digits.
+ */
+static void test_dom_quoted_digits_are_not_special_floats(void)
+{
+	static const char d1[] =
+		".a = <uint:64,_36> \"nan\";\n.b = <uint:64,_36> \"inf\";\n"
+		".c = <sint:64,_36> \"-ninf\";\n.f = <float:64> nan;\n.g = inf;\n";
+	bvn_dom_doc_t *doc = bvn_dom_parse(d1, (uint32_t)(sizeof d1 - 1));
+	ASSERT_TRUE(doc && bvn_dom_doc_get_parse_error(doc) == error_none, d1);
+	if (doc && bvn_dom_doc_get_parse_error(doc) == error_none) {
+		uint64_t u = 0; int64_t i = 0; double f = 0.0;
+		bvn_dom_node_t *n = bvn_dom_lookup(doc, ".a");
+		ASSERT_TRUE(bvn_dom_node_type(n) == BVN_DOM_INT &&
+			    bvn_dom_get_u64(n, &u) && u == 30191u,
+			    "\"nan\" in base 36 is the integer 30191");
+		n = bvn_dom_lookup(doc, ".b");
+		ASSERT_TRUE(bvn_dom_node_type(n) == BVN_DOM_INT &&
+			    bvn_dom_get_u64(n, &u) && u == 24171u,
+			    "\"inf\" in base 36 is the integer 24171");
+		n = bvn_dom_lookup(doc, ".c");
+		ASSERT_TRUE(bvn_dom_node_type(n) == BVN_DOM_INT &&
+			    bvn_dom_get_i64(n, &i) && i == -1097259,
+			    "\"-ninf\" in base 36 is -1097259");
+		n = bvn_dom_lookup(doc, ".f");
+		ASSERT_TRUE(bvn_dom_node_type(n) == BVN_DOM_FLOAT &&
+			    bvn_dom_get_float(n, &f) && f != f,
+			    "a bare nan under a float is still NaN");
+		n = bvn_dom_lookup(doc, ".g");
+		ASSERT_TRUE(bvn_dom_node_type(n) == BVN_DOM_FLOAT &&
+			    bvn_dom_get_float(n, &f) && f > 1e308,
+			    "a bare inf is still infinity");
+	}
+	bvn_dom_doc_destroy(doc);
+	/* 24171 does not fit eight bits, and the range check now sees it. */
+	ASSERT_TRUE(dom_err(".c = <uint:8,_36> \"inf\";") != error_none,
+		    "an out-of-range quoted integer spelled inf is refused");
+}
+/*
+ * The document tier reads a float in time that follows the literal's length,
+ * and gets the same bits as the exact parser.
+ */
+static void test_dom_float_magnitude_fast_path(void)
+{
+	/* Bit-identical to bvn_parse_double_in_base, at every boundary the
+	 * shortcut decides: the subnormal floor and its half-way point, the
+	 * overflow threshold and ITS half-way point, and mantissas padded with
+	 * hundreds of zeros or carrying more digits than any double can use. */
+	static char z400a[512], z400b[512], long9[1200], half_min[1400];
+	static char half_lo[1400];
+	{   /* 0.000…001e400 (399 zeros) == 10.0 ; 1000…0e-400 (400 zeros) == 1.0 */
+		size_t n = 0;
+		z400a[n++] = '0'; z400a[n++] = '.';
+		for (int i = 0; i < 399; i++) z400a[n++] = '0';
+		memcpy(z400a + n, "1e400", 6);
+		n = 0;
+		z400b[n++] = '1';
+		for (int i = 0; i < 400; i++) z400b[n++] = '0';
+		memcpy(z400b + n, "e-400", 6);
+		/* 1.000…0001 with 1000 zeros: rounds to exactly 1.0, sticky or not */
+		n = 0;
+		long9[n++] = '1'; long9[n++] = '.';
+		for (int i = 0; i < 1000; i++) long9[n++] = '0';
+		memcpy(long9 + n, "1", 2);
+		/* Half the smallest subnormal is 2^-1075, which in decimal is the 752
+		 * digits of 5^1075 against e-1075 -- exactly on the boundary between
+		 * 0 and 4.9e-324, where ties-to-even gives 0. The same digits followed
+		 * by a hundred zeros and a 1 are above it, by a digit that lies PAST
+		 * the 800 the fast path keeps: only its sticky digit can carry that
+		 * literal to the subnormal instead of to zero. */
+		bvn_int_t *p5 = bvn_int_alloc();
+		char digits[800];
+		int32_t nd = -1;
+		if (p5 && bvn_int_from_uint32(p5, 1u)) {
+			bool ok = true;
+			for (int i = 0; ok && i < 1075; i++) ok = bvn_int_mul_u32(p5, 5u);
+			if (ok) nd = bvn_int_to_str(p5, digits, sizeof digits, 10u);
+		}
+		bvn_int_free(p5);
+		ASSERT_EQ_INT(nd, 752, "5^1075 has 752 digits");
+		if (nd != 752) return;
+		memcpy(half_lo, digits, 752);
+		memcpy(half_lo + 752, "e-1075", 7);
+		memcpy(half_min, digits, 752); n = 752;
+		for (int i = 0; i < 100; i++) half_min[n++] = '0';
+		memcpy(half_min + n, "1e-1176", 8);
+	}
+	static const char *const lits[] = {
+		"4.9e-324", "2.4e-324", "2.5e-324", "2.47e-324", "2.48e-324",
+		"4.9406564584124654e-324", "2.4703282292062327e-324",
+		"2.4703282292062328e-324", "7.4e-324", "7.5e-324",
+		"2.2250738585072011e-308", "2.2250738585072014e-308",
+		"1.7976931348623157e308", "1.7976931348623158e308",
+		"1.7976931348623159e308", "1.8e308", "1.79769313486231580793e308",
+		"1.797693134862315807e308", "1.797693134862315808e308",
+		"9.9999999999999999e308", "1e309", "1e-325", "9.9e-325", "1e-326",
+		"0.00000000000000000000000000000000000001e346",
+		"17976931348623157000000000000000000000000e268",
+		"1e400", "1e-400", "1e99999", "1e-99999", "-1e99999", "-1e-99999",
+		"0e99999", "0.0e-99999", "-0e5",
+		"1e999999999999999999999", "1e-999999999999999999999",
+		"0.1", "1.5", "-2.5e-3", "123456789.125", "5e-1", "1.0", "100",
+		"9007199254740993", "9007199254740993.0000000000000000000000001",
+		"0.30000000000000004", "1e23", "8.5e22", "3.0e0",
+		z400a, z400b, long9, half_min, half_lo,
+	};
+	char doc[1700];
+	for (size_t i = 0; i < sizeof lits / sizeof lits[0]; i++) {
+		double want = 0.0, got = 0.0;
+		uint64_t wb = 0, gb = 1;
+		int n = snprintf(doc, sizeof doc, ".v = <float:64> %s;", lits[i]);
+		ASSERT_TRUE(bvn_parse_double_in_base(lits[i], 10u, &want),
+			    "the exact parser reads the literal");
+		bvn_dom_doc_t *d = bvn_dom_parse(doc, (uint32_t)n);
+		ASSERT_TRUE(d && bvn_dom_doc_get_parse_error(d) == error_none &&
+			    bvn_dom_get_float(bvn_dom_lookup(d, ".v"), &got), lits[i]);
+		bvn_dom_doc_destroy(d);
+		memcpy(&wb, &want, sizeof wb);
+		memcpy(&gb, &got,  sizeof gb);
+		if (wb != gb)
+			fprintf(stderr, "  %.60s: exact %016llx, dom %016llx\n", lits[i],
+				(unsigned long long)wb, (unsigned long long)gb);
+		ASSERT_TRUE(wb == gb, "the DOM stores the exact parser's bits");
+	}
+	/* The one input where the two differ, and the exact parser is the one that
+	 * is wrong: zero times ten to ANY power is zero, and with an exponent past
+	 * its own counter bvn_parse_double_in_base answers infinity. The DOM
+	 * settles a zero mantissa before the exponent is looked at. */
+	{
+		static const char z[] = ".v = <float:64> 0.000e999999999999999999999;";
+		double got = 1.0;
+		bvn_dom_doc_t *d = bvn_dom_parse(z, (uint32_t)(sizeof z - 1));
+		ASSERT_TRUE(d && bvn_dom_doc_get_parse_error(d) == error_none &&
+			    bvn_dom_get_float(bvn_dom_lookup(d, ".v"), &got) &&
+			    got == 0.0, "a zero mantissa is zero under any exponent");
+		bvn_dom_doc_destroy(d);
+	}
+	/* ...and it does so without the exact parser's cost: 20 000 literals with
+	 * a five-digit exponent took 84 seconds. The bound is loose on purpose --
+	 * it separates milliseconds from minutes, not one machine from another. */
+	enum { N = 20000 };
+	size_t cap = (size_t)N * 10u + 32u, n = 0;
+	char  *big = malloc(cap);
+	ASSERT_NOT_NULL(big, "allocation");
+	if (!big) return;
+	n += (size_t)snprintf(big + n, cap - n, ".a = [");
+	for (int i = 0; i < N; i++)
+		n += (size_t)snprintf(big + n, cap - n, "%s1e-99999", i ? "," : "");
+	n += (size_t)snprintf(big + n, cap - n, "];");
+	clock_t t0 = clock();
+	bvn_dom_doc_t *d = bvn_dom_parse(big, (uint32_t)n);
+	double secs = (double)(clock() - t0) / CLOCKS_PER_SEC;
+	ASSERT_TRUE(d && bvn_dom_doc_get_parse_error(d) == error_none &&
+		    bvn_dom_array_count(bvn_dom_lookup(d, ".a")) == (uint32_t)N,
+		    "20000 tiny floats parse");
+	if (secs >= 10.0)
+		fprintf(stderr, "  20000 x 1e-99999 took %.1f s\n", secs);
+	ASSERT_TRUE(secs < 10.0, "in time proportional to the text, not the exponent");
+	bvn_dom_doc_destroy(d);
+	free(big);
+}
 int main(void)
 {
+	test_dom_homogeneity_is_order_independent();
+	test_dom_row_sizes_are_per_array();
+	test_dom_quoted_digits_are_not_special_floats();
+	test_dom_float_magnitude_fast_path();
+	test_dom_attach_refuses_wrong_container();
+	test_dom_policy_conversion_retypes_node();
 	test_dom_leading_sign_digit_in_base_64_and_85();
 	test_dom_accessors_fail_rather_than_lie();
 	test_dom_string_carried_numbers_are_numbers();

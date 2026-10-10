@@ -199,7 +199,8 @@ BVN_API bool bvn_float_from_bin256(bvn_float_t *f, const uint32_t bits[8]);
  * with IEEE on 26.4 % of them; this one is exact on all of them.
  *
  * width is 16/32/64/128/256, bits32 the number of uint32_t words in out
- * (1/1/2/4/8). Returns false for an unsupported width or a short buffer,
+ * (1/1/2/4/8). Reads inf, ninf and nan as bvn_float_from_str does. Returns
+ * false for an unsupported width, a short buffer or text that is not a number,
  * leaving *out untouched. */
 BVN_API bool bvn_float_strtodec(const char *s, uint32_t width,
                                 uint32_t *out, int bits32);

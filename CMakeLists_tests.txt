@@ -198,6 +198,18 @@ set_tests_properties(bvnr_float_fix_dec_test PROPERTIES
     LABELS "unit;float_fix;float_dec"
     FAIL_REGULAR_EXPRESSION "passed, [1-9][0-9]* failed")
 
+# wasm/bvnr_wasm.c built NATIVELY against the library, with an allocator that
+# can be made to fail: the result shapes of the WebAssembly exports, including
+# the out-of-memory ones no browser can be driven into. Runs without emscripten,
+# so the JSON contract of the npm package is checked on every build and not only
+# where dist/wasm has been rebuilt. See wasm/test/native_shape_test.c.
+add_executable(bvnr_wasm_native_shape_test wasm/test/native_shape_test.c)
+target_link_libraries(bvnr_wasm_native_shape_test PRIVATE bvnr_static)
+add_test(NAME bvnr_wasm_native_shape COMMAND bvnr_wasm_native_shape_test)
+set_tests_properties(bvnr_wasm_native_shape PROPERTIES
+    LABELS "unit;wasm"
+    PASS_REGULAR_EXPRESSION "PASSED")
+
 add_test(NAME bvnr_dom_test COMMAND bvnr_dom_test)
 set_tests_properties(bvnr_dom_test PROPERTIES
     LABELS "unit;dom"
@@ -1290,6 +1302,21 @@ add_test(
 set_tests_properties(bvnr_cli_stream_roundtrip PROPERTIES
     LABELS "cli;stream" TIMEOUT 30)
 
+# ── the command line's own contract ───────────────────────────────────────────
+# Exit statuses (0 / 1 the document or the I/O failed / 2 the command line was
+# wrong), refused arguments, where help goes, and the messages that have to name
+# their cause -- some hundred cases, each one a defect a review found by running
+# the tool and each seen to fail against the binary before its fix. They live in
+# one script because they share one shape; see cmake/cli_regressions.cmake.
+add_test(
+    NAME    bvnr_cli_regressions
+    COMMAND "${CMAKE_COMMAND}"
+            -DBOVNAR=$<TARGET_FILE:bovnar> -DEMULATOR=${CMAKE_CROSSCOMPILING_EMULATOR}
+            -DTMP_DIR=${CMAKE_CURRENT_BINARY_DIR}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cli_regressions.cmake)
+set_tests_properties(bvnr_cli_regressions PROPERTIES
+    LABELS "cli" TIMEOUT 120)
+
 _bvnr_convert_fail(bad_key          bad_key.json              "not a valid bovnar identifier")
 _bvnr_convert_fail(int_overflow     bad_overflow.json         "out of range")
 _bvnr_convert_fail(trailing         bad_trailing.json         "trailing content")
@@ -1417,7 +1444,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 179)   # 129 base + unit_source + 3 for examples/unit_profiles.bvnr + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier)
+set(BVNR_EXPECTED_TEST_COUNT 182)   # 129 base + unit_source + 3 for examples/unit_profiles.bvnr + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier) + cli_regressions + wasm_native_shape
                                     #             + citation
                                     #         + profiles_off_build
                                     # + om_test + cf_test
@@ -1433,6 +1460,7 @@ set(BVNR_EXPECTED_TEST_COUNT 179)   # 129 base + unit_source + 3 for examples/un
                                     #           + cli_events_long_unit
                                     #           + py_currency_parity
                                     #           + doc_layout + doc_refs
+                                    #           + llms
 
 # ── bvnr_data.py vs the reference reader ────────────────────────────────────
 # bvnr_data.py is a SECOND implementation of the format: a dependency-free parser
@@ -1628,6 +1656,7 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/gen_html_doc
         RESULT_VARIABLE _bvnr_markdown_probe
         OUTPUT_QUIET ERROR_QUIET)
     if(_bvnr_markdown_probe EQUAL 0)
+        set(_bvnr_have_markdown TRUE)
         add_test(NAME bvnr_html_docs
                  COMMAND ${Python3_EXECUTABLE}
                          ${CMAKE_CURRENT_SOURCE_DIR}/gen_html_docs.py --check)
@@ -1637,6 +1666,20 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/gen_html_doc
             "markdown not importable by ${Python3_EXECUTABLE} -- skipping the "
             "generated HTML doc check. Run 'pip install markdown' to enable it.")
     endif()
+endif()
+
+# ── The LLM views are regenerated when the documents are ────────────────────
+# web/llms.txt, web/index.md and web/llms-full.txt -- the last a megabyte, a
+# concatenation of the README and every document -- are committed, and nothing
+# compared them with their sources: publish_web.sh regenerates them, so the live
+# site was right, while the tree a tag is cut from and the source tarball could
+# carry a copy from before the last doc edit. (f058bb2 was exactly that.) The
+# generator is stdlib-only and deterministic, so it needs no probe.
+if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/gen_llms.py)
+    add_test(NAME bvnr_llms
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/gen_llms.py --check)
+    set_tests_properties(bvnr_llms PROPERTIES LABELS "web;docs" TIMEOUT 60)
 endif()
 
 # ── Every internal link on the site goes somewhere ──────────────────────────
@@ -1694,13 +1737,36 @@ endif()
 # carried symbolically) and compared, along with the DIMENSION the cell's own
 # unit product implies and its "(exact)" claim. It found five truncated factors
 # and a section written in ASCII-degraded notation.
+# Where the six gates below find THIS build. They load libbvnr through the Python
+# package, run the CLI and run the per-profile test binaries, and they used to
+# look for all three under <source>/build -- so from a build directory by any
+# other name they printed "no built library; skipped" and passed, and in the
+# sanitizer pass, which CI configures into build-asan, they re-checked the first
+# pass's binaries. BVNR_REQUIRE_BUILD turns each of those skips into a failure
+# (bvnr_build_env.py); run by hand, without it, the scripts still skip.
+#
+# Only where the host interpreter can load what was built: not a sanitized
+# libbvnr (ASan refuses to be dlopen'ed into an uninstrumented python), not a PE
+# DLL from the cross build, not Windows. There the gates keep their old search
+# and their old skip -- they are document checks, and the documents are checked
+# by the plain build.
+if(NOT WIN32 AND NOT CMAKE_CROSSCOMPILING AND NOT BVNR_SANITIZE)
+    set(_bvnr_doc_gate_env
+        "LIBBOVNAR_PATH=$<TARGET_FILE:bvnr_shared>"
+        "BOVNAR_CLI=$<TARGET_FILE:bovnar>"
+        "BVNR_TESTS_DIR=${CMAKE_CURRENT_BINARY_DIR}/tests"
+        "BVNR_REQUIRE_BUILD=1")
+else()
+    set(_bvnr_doc_gate_env "BVNR_DOC_GATE_BUILD=unpinned")
+endif()
 if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_unit_factors.py)
     add_test(NAME bvnr_doc_unit_factors
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_unit_factors.py
                      ${CMAKE_CURRENT_SOURCE_DIR})
     set_tests_properties(bvnr_doc_unit_factors PROPERTIES
-        LABELS "docs;units;gendata" TIMEOUT 60)
+        LABELS "docs;units;gendata" TIMEOUT 60
+        ENVIRONMENT "${_bvnr_doc_gate_env}")
 endif()
 
 # ── doc/11 §6.1 lists every mapped UCUM atom, and lists it right ───────────
@@ -1718,7 +1784,8 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_pr
                      ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_profile_atoms.py
                      ${CMAKE_CURRENT_SOURCE_DIR})
     set_tests_properties(bvnr_doc_profile_atoms PROPERTIES
-        LABELS "docs;units;gendata;profiles" TIMEOUT 60)
+        LABELS "docs;units;gendata;profiles" TIMEOUT 60
+        ENVIRONMENT "${_bvnr_doc_gate_env}")
 endif()
 
 # ── doc/07's claims, put to the reference parser ───────────────────────────
@@ -1737,7 +1804,8 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_am
                      ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_ambiguities.py
                      ${CMAKE_CURRENT_SOURCE_DIR})
     set_tests_properties(bvnr_doc_ambiguities PROPERTIES
-        LABELS "docs;units;gendata" TIMEOUT 60)
+        LABELS "docs;units;gendata" TIMEOUT 60
+        ENVIRONMENT "${_bvnr_doc_gate_env}")
 endif()
 
 # ── doc/09's `# →` expectations are evaluated ──────────────────────────────
@@ -1756,7 +1824,8 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_py
                      ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_python_examples.py
                      ${CMAKE_CURRENT_SOURCE_DIR})
     set_tests_properties(bvnr_doc_python_examples PROPERTIES
-        LABELS "docs;python;units" TIMEOUT 60)
+        LABELS "docs;python;units" TIMEOUT 60
+        ENVIRONMENT "${_bvnr_doc_gate_env}")
 endif()
 
 # ── doc/06's unit-policy claims, put to the library ────────────────────────
@@ -1771,7 +1840,8 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_po
                      ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_policy.py
                      ${CMAKE_CURRENT_SOURCE_DIR})
     set_tests_properties(bvnr_doc_policy PROPERTIES
-        LABELS "docs;units" TIMEOUT 120)
+        LABELS "docs;units" TIMEOUT 120
+        ENVIRONMENT "${_bvnr_doc_gate_env}")
 endif()
 
 # ── The catalogue counts stated in prose match src/gendata ─────────────────
@@ -1788,7 +1858,8 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_co
                      ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_counts.py
                      ${CMAKE_CURRENT_SOURCE_DIR})
     set_tests_properties(bvnr_doc_counts PROPERTIES
-        LABELS "docs;units;gendata" TIMEOUT 60)
+        LABELS "docs;units;gendata" TIMEOUT 60
+        ENVIRONMENT "${_bvnr_doc_gate_env}")
 endif()
 
 # ── The documents embedded in the docs parse ───────────────────────────────
@@ -2115,12 +2186,17 @@ endif()
 # makes the count legitimately differ, so this compares only when the relevant
 # knobs are at their defaults. _bvnr_have_pytest, not Python3_Interpreter_FOUND:
 # the Python gates now need the module too, so an interpreter without it is a
-# legitimate shortfall of 20 (the 19 bvnr_py_* gates plus the bvnr_abi_dump_build
+# legitimate shortfall (the bvnr_py_* gates plus the bvnr_abi_dump_build
 # fixture registered beside them) rather than something silently unregistering.
+# _bvnr_have_markdown for the same reason: bvnr_html_docs registers only where
+# python-markdown imports, and without this term a machine with pytest and
+# without markdown could not configure at all -- "registered 179 tests,
+# expected 180", for a module the message above had just called optional.
 get_property(_bvnr_all_tests DIRECTORY PROPERTY TESTS)
 list(LENGTH _bvnr_all_tests _bvnr_ntests)
 if(BVNR_PACKAGE AND BVNR_FUZZ_TEST AND NOT BVNR_SANITIZE AND NOT WIN32
-   AND NOT CMAKE_CROSSCOMPILING AND _bvnr_have_pytest AND BVNR_ALL_PROFILES)
+   AND NOT CMAKE_CROSSCOMPILING AND _bvnr_have_pytest AND _bvnr_have_markdown
+   AND BVNR_ALL_PROFILES)
     if(NOT _bvnr_ntests EQUAL ${BVNR_EXPECTED_TEST_COUNT})
         message(FATAL_ERROR
             "registered ${_bvnr_ntests} tests, expected "

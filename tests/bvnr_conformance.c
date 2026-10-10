@@ -707,21 +707,21 @@ static const cf_case_t g_cases[] = {
 	/* The BOM rule (spec 3.2) has three branches and ENC-002/003 pinned two
 	 * of them. The middle one is the only path that produces its own error
 	 * code, and it was the untested one. */
-	ERROR_CASE("ENC-005", "encoding", "UTF-8 BOM inside the first comment line",
+	ERROR_CASE("ENC-010", "encoding", "UTF-8 BOM inside the first comment line",
 	           "# comment \xEF\xBB\xBF text\n.x = 1;",
 	           error_invalid_byte_order_mark),
-	ERROR_CASE("ENC-006", "encoding", "a second BOM at byte 3 is not a BOM",
+	ERROR_CASE("ENC-011", "encoding", "a second BOM at byte 3 is not a BOM",
 	           "\xEF\xBB\xBF\xEF\xBB\xBF.x = 1;",
 	           error_unexpected_input_byte),
-	ERROR_CASE("ENC-007", "encoding", "BOM after a version directive",
+	ERROR_CASE("ENC-012", "encoding", "BOM after a version directive",
 	           "#!bovnar 1.1\n\xEF\xBB\xBF.x = 1;",
 	           error_unexpected_input_byte),
 	/* Truncation. Spec 13.3 also makes this the second error reported when
 	 * EOF is reached while the parser is resyncing. */
-	ERROR_CASE("ENC-008", "encoding", "stream ends inside an open struct",
+	ERROR_CASE("ENC-013", "encoding", "stream ends inside an open struct",
 	           "#!bovnar 1.1\n.x = {.a = 1;",
 	           error_got_incomplete_bvnr_stream),
-	ERROR_CASE("ENC-009", "encoding", "stream ends after '=' with no value",
+	ERROR_CASE("ENC-014", "encoding", "stream ends after '=' with no value",
 	           "#!bovnar 1.1\n.x =",
 	           error_got_incomplete_bvnr_stream),
 	/* Lexer token-length caps. Both buffers hold UINT8_MAX+1 bytes, so 255 is

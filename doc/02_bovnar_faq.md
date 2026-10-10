@@ -162,13 +162,18 @@ valid UTF-8 leader byte. A leading digit is a hard parse error.
 **Are comments supported?**
 
 Yes. A `#` character starts a comment that runs to the end of the line. Comments
-are legal anywhere whitespace is legal — before the first assignment, between
+are legal wherever whitespace is legal — before the first assignment, between
 tokens, and at the end of a value line:
 
 ```bovnar
 # full-line comment
 .port = 5432;   # inline comment
 ```
+
+One restriction: `#` does not *end* a bare token. Directly after a key, a number,
+a symbol, a keyword, a reference or a datetime literal it is
+`error_unexpected_input_byte` (`.x = 42# note` fails), so put a space first.
+After a string, a bracket, `=`, `;` or an inline unit it may follow directly.
 
 ---
 
@@ -183,13 +188,16 @@ are freely interleaved between all tokens.
 **Is a UTF-8 BOM accepted?**
 
 A UTF-8 BOM (`EF BB BF`) is accepted only at byte offset 0 of the stream.
-A BOM appearing later in a string is valid UTF-8 and passes through without error.
-For BOMs in other positions the error code depends on where the BOM appears:
+Anywhere else it is an error or ordinary content, depending on whether the first
+assignment has begun (specification §3.2).
 
-- A BOM found **inside the first comment line** (the dedicated `first_comment_*` states) produces `error_invalid_byte_order_mark`.
-- A BOM byte (`0xEF`) found **after the first comment line** but before the first `.` identifier (the `first_bom` state) is not handled in the state table and produces `error_unexpected_input_byte`.
+Before the first assignment:
 
-A BOM appearing inside any *subsequent* comment is valid UTF-8 and accepted without error.
+- A BOM **inside any comment** — the first comment line, a version directive line, or a later comment line — produces `error_invalid_byte_order_mark`.
+- A BOM **after leading whitespace**, with no comment line before it, produces `error_invalid_byte_order_mark`.
+- A BOM **at the start of a line that follows a comment line or a version directive** produces `error_unexpected_input_byte`.
+
+Once the first assignment has begun, a BOM inside a comment or a string is valid UTF-8 and passes through without error; between assignments it is `error_unexpected_input_byte`.
 
 ---
 
@@ -296,8 +304,9 @@ and `tai` (the offset is folded before `tai`'s leap-second lookup). A second of
 second (POSIX time has none to spend on it), but on `tai` it keeps its own value
 one below the boundary, which is what makes UTC⇄TAI injective there. The atomic
 GNSS epochs (`gps`/`galileo`/`glonass`/`beidou`) reject a literal
-(`error_datetime_literal_unsupported_epoch`) — give those an integer carrier. A
-malformed or out-of-range literal is `error_invalid_datetime_literal`.
+(`error_datetime_literal_unsupported_epoch`) — give those an integer carrier. An
+out-of-range field is `error_invalid_datetime_literal`; a literal of the wrong
+shape is a lexical error, `error_unexpected_input_byte`.
 
 **Timestamp vs. duration — don't confuse them.** A *timestamp* (an instant) is a
 `datetime`; a *duration* (an elapsed amount) is a plain number with a time unit,
@@ -315,6 +324,9 @@ on the literal:
 - Positive integer literal → `uint:64`
 - Negative integer literal → `sint:64`
 - Literal containing `.` or `e` → `float:64`
+- Special number (`nan`, `inf`, `ninf`) → `float:64`
+- Any number with an inline currency unit (`5 $USD`) → `float_dec:64` with that
+  unit — this takes precedence over the three rows above
 - Quoted string → `utf8`
 - Boolean keyword (`true`/`false`/`on`/`off`) → `bool`
 - ISO-8601 datetime literal (spec 1.1) → `datetime:64,unix`
@@ -436,7 +448,8 @@ Place the unit symbol inside the angle brackets after the other type parameters:
 An SI prefix is written before the unit symbol, either with the `~` separator —
 `k~m` (kilometer), `m~V` (millivolt), `G~Hz` (gigahertz) — or compactly, in the
 spelling everyone else uses: `km`, `mV`, `GHz`. Both parse to the same unit.
-The `~` form is canonical: it is what the writer emits, and it is the form that
+The `~` form is canonical: it is what the writer emits for a unit it is handed
+without a spelling, and it is the form that
 says *exactly* which reading you mean, which matters for the handful of tokens
 that are a unit in their own right (`min` is the minute, so milli-inch must be
 written `m~in`).
@@ -470,10 +483,12 @@ In four situations, all of which are `error_unit_illegal`:
 3. **A prefix the unit does not accept.** `Kim` fails exactly as `Ki~m` does
    (IEC prefixes are for `b`/`B` only), as do `mB`, `kPfd` and `kppm`.
 4. **A spelling refused by name.** `usb` would otherwise resolve to the
-   microstilb, and `kt` to the kilotonne — but `kt` is equally the standard
-   abbreviation for the knot, and only the author knows which was meant. Both
-   stay errors; write `u~sb`, and `k~t` (mass) or `kn` (speed). The list lives
-   in `src/gendata/units.bvnr`.
+   microstilb, `kt` to the kilotonne — but `kt` is equally the standard
+   abbreviation for the knot, and only the author knows which was meant — and
+   `ppt` to the picopint, where everyone means parts per trillion or per
+   thousand. All three stay errors: write `u~sb`; `k~t` (mass) or `kn`
+   (speed); `pptr`, `‰` or `p~pt`. The list lives in
+   `src/gendata/units.bvnr`.
 
    `pH`, `mph` and `kph` were on that list until Bovnar gained the units they
    name — the acidity scale and two speeds. A bare unit alias outranks any
@@ -687,7 +702,10 @@ The `bu_gram` base unit is used for mass so that the `k~` prefix can carry the k
 
 Yes. Bovnar's lexer distinguishes bare words (symbols) from numbers by context.
 A bare `FF` in value position is a symbol, not a hex number, and will produce
-`error_type_value_mismatch`. Any non-decimal value must be a quoted string:
+`error_type_value_mismatch`. A bare literal made only of digits of the base does
+parse, and is read in that base — `<uint:8,_16> 10` is sixteen, and
+`<uint:_16> 1e3` is 483, because `e` is a hex digit — so write every
+non-decimal value as a quoted string:
 
 <!-- bovnar-example: rejected -->
 ```bovnar
@@ -1093,8 +1111,10 @@ fprintf(stderr, "%s at line %" PRIu64 " col %" PRIu64
 
 When `continue_on_error` is set in `bvnr_read_flags_t`, a parse error invokes
 the `on_error` callback and enters a resync state machine that skips bytes while
-tracking bracket and brace nesting. Once the resync state machine finds a `;`
-at the original nesting depth, normal parsing resumes. The recovery count
+tracking bracket and brace nesting. Normal parsing resumes at whichever comes
+first: a `;` at the original nesting depth, or the start of the next
+assignment — a `.` at that depth followed by a byte that can begin an
+identifier. The recovery count
 (accessible via `bvnr_reader_get_recovery_count`) is incremented at error entry,
 not on resync completion.
 

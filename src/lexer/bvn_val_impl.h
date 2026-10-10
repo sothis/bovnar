@@ -313,6 +313,16 @@ struct bvnr_writer_s {
 	bool			gov_typed;
 	bool			arr_gov_typed[UINT8_MAX+1];
 	bool			struct_typed[UINT8_MAX+1];
+	/* The TYPE that annotation declares, as it was actually written (the
+	 * family from the family event, the width, base and Q from whichever
+	 * parameter events came), and scoped exactly like gov_unit. A value is
+	 * validated against this and not against its own event's value_type:
+	 * `<uint:8>` followed by a data event saying uint:64, or saying nothing,
+	 * used to be range-checked as what the event claimed and written as 300
+	 * under the annotation. Meaningful only while gov_typed is set. */
+	value_type_spec_t	ann_type;
+	value_type_spec_t	gov_type;
+	value_type_spec_t	arr_gov_type[UINT8_MAX+1];
 	/* Elements written into the row open at each depth, and the width the
 	 * "/"-sequence that row belongs to has established. */
 	uint64_t		arr_count[UINT8_MAX+1];

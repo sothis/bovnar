@@ -20,3 +20,9 @@ bovnar.zip
 # Keyed to the locales that actually exist, not to any two-letter directory:
 # a blanket web/??/ would silently untrack a future web/js/ or web/ui/.
 web/de/
+
+# A local `python -m build` / cibuildwheel run. dist/ is tracked (registration
+# assets), so these would otherwise ride along into the next sdist.
+wheelhouse/
+dist/*.tar.gz
+dist/*.whl

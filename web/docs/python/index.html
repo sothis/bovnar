@@ -258,6 +258,54 @@ for lossless round-trips:</p>
 <p><code>dumps()</code> starts with a 4 MiB write buffer and doubles it automatically on
 overflow, up to 256 MiB.  The <code>cap</code> keyword argument that existed in earlier
 versions is no longer accepted.</p>
+<p><code>dumps()</code> takes <code>None</code>, <code>bool</code>, <code>int</code> of any size, <code>float</code>, <code>str</code>, <code>Decimal</code>,
+a terminating <code>Fraction</code>, <code>bytes</code> / <code>bytearray</code> / <code>memoryview</code> (written as an
+octet stream — which is what <code>loads()</code> returns as <code>bytes</code>), <code>Quantity</code>, a
+<code>dict</code> with <code>str</code> keys, and a <code>list</code> / <code>tuple</code> of those. NumPy scalars are
+taken as the Python numbers they are.</p>
+<blockquote>
+<p><strong><code>dumps()</code> writes what <code>loads()</code> reads — the streaming tier, not the
+document tier.</strong> <code>loads()</code> checks the grammar and each value's own type,
+unit and range and stops there; <code>dumps()</code> is its inverse and stops in the
+same place, so <code>dumps(loads(x))</code> works for every <code>x</code> that <code>loads()</code> accepts.
+Three shapes are therefore written without complaint and then <strong>refused by
+the document tier</strong> (<code>dom_parse</code>, <code>bovnar validate</code>), where an array is
+homogeneous and rectangular:</p>
+<table>
+<thead>
+<tr>
+<th>Python value</th>
+<th>Written as</th>
+<th>Document tier says</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>[1, "a"]</code>, <code>[True, 1]</code> — a list mixing kinds</td>
+<td><code>[1, "a"]</code></td>
+<td><code>array_element_type_mismatch</code></td>
+</tr>
+<tr>
+<td><code>[[1], [2, 3]]</code> — a ragged list of lists</td>
+<td><code>[[1], [2, 3]]</code></td>
+<td><code>array_row_size_mismatch</code></td>
+</tr>
+<tr>
+<td><code>[{"a": 1}, {"b": 2}]</code> — dicts that do not share their keys</td>
+<td><code>[{.a = &lt;uint:64&gt; 1;}, {.b = &lt;uint:64&gt; 2;}]</code></td>
+<td><code>struct_shape_mismatch</code></td>
+</tr>
+</tbody>
+</table>
+<p>A list mixing <code>int</code> and <code>float</code>, or holding <code>None</code> beside values, is fine at
+both tiers. If the output has to pass <code>bovnar validate</code>, run it through
+<code>dom_parse()</code> before shipping it.</p>
+<p>What <code>dumps()</code> does refuse, with <code>BovnarArgumentError</code>, is what <em>neither</em>
+tier reads: a list whose elements carry different units, an integer wider
+than 64 bits in a list that cannot take the width annotation it needs
+(<code>[2**70, 1.5]</code>), a <code>Decimal</code> past the range of <code>float_dec:64</code>, and a key
+that is not a <code>str</code>.</p>
+</blockquote>
 <h3 id="42-sax-style-streaming-reader">4.2 SAX-style streaming reader</h3>
 <p>The verified callback receives exactly <strong>two</strong> positional arguments: the event
 code and the data payload.  There is no userdata/context argument — capture
@@ -388,6 +436,9 @@ treatment):</p>
 <span class="n">inner</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">parse_embedded</span><span class="p">(</span><span class="n">bovnar</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">outer</span><span class="p">)[</span><span class="s2">&quot;payload&quot;</span><span class="p">])</span>   <span class="c1"># {&quot;v&quot;: 1}</span>
 </code></pre></div>
 
+<p><code>parse_embedded</code> raises <code>BovnarParseError</code> carrying the inner document's own
+error code and position. <code>mux_dump</code> takes channels in the unsigned 64-bit
+range and raises <code>BovnarArgumentError</code> for anything outside it.</p>
 <hr />
 <h2 id="5-unit-helpers">5. Unit helpers</h2>
 <div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">bovnar</span>
@@ -420,9 +471,10 @@ which of them a given build carries is a question to ask rather than assume; see
 <span class="n">bovnar</span><span class="o">.</span><span class="n">units_compatible</span><span class="p">(</span><span class="n">vu</span><span class="p">,</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;k~Pa&quot;</span><span class="p">))</span>   <span class="c1"># → True</span>
 
 <span class="c1"># Which profiles THIS build carries. Each namespace is a compile-time switch,</span>
-<span class="c1"># so a wheel may have been built without some of them; a namespace that is</span>
-<span class="c1"># absent raises BovnarArgumentError(&quot;unknown unit profile&quot;) rather than being</span>
-<span class="c1"># reported as a bad unit.</span>
+<span class="c1"># so a wheel may have been built without some of them. parse_unit raises the</span>
+<span class="c1"># same BovnarArgumentError(&quot;Invalid unit string: ...&quot;) for an absent namespace</span>
+<span class="c1"># as for a bad unit; unit_error_code() below is what tells the two apart (49</span>
+<span class="c1"># against 32).</span>
 <span class="n">bovnar</span><span class="o">.</span><span class="n">available_profiles</span><span class="p">()</span>
 <span class="c1"># → (&#39;ucum&#39;, &#39;unece&#39;, &#39;qudt&#39;, &#39;qudt-qk&#39;, &#39;udunits&#39;, &#39;om&#39;, &#39;cf&#39;)</span>
 
@@ -465,7 +517,12 @@ therefore no declared version, so it accepts the notation unconditionally.</p>
 and the codes that have no representation.</p>
 <h3 id="52-extended-unit-functions">5.2 Extended unit functions</h3>
 <p>The following functions operate on <code>ValueUnit</code> objects and are available both
-from the top-level <code>bovnar</code> namespace and from <code>bovnar.units</code>.</p>
+from the top-level <code>bovnar</code> namespace and from <code>bovnar.units</code>. Each of them —
+and <code>unit_to_str</code>, <code>unit_to_profile</code>, <code>unit_to_ucum</code>, <code>unit_is_profile_only</code>,
+the pint and NumPy bridges, <code>write_array(vu=)</code> and a <code>want_unit</code> callback's
+return value — takes a <code>Unit</code> (what <code>Quantity.unit</code> and <code>Unit.parse()</code> hand
+out) wherever it takes a <code>ValueUnit</code>, so <code>unit_to_str(q.unit)</code> needs no
+<code>.raw</code>.</p>
 <div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">unit_valid</span><span class="p">,</span> <span class="n">unit_prefix_factor</span><span class="p">,</span> <span class="n">unit_prefix_exponent</span><span class="p">,</span>
     <span class="n">prefix_unit_valid</span><span class="p">,</span>
@@ -534,8 +591,14 @@ from the top-level <code>bovnar</code> namespace and from <code>bovnar.units</co
 <span class="n">UnitFlags</span><span class="o">.</span><span class="n">NONE</span>      <span class="c1"># 0 — no special formatting</span>
 <span class="n">UnitFlags</span><span class="o">.</span><span class="n">REDUCE</span>    <span class="c1"># reduce to a canonical named SI unit before serialising</span>
 <span class="n">UnitFlags</span><span class="o">.</span><span class="n">ASCII_EXP</span> <span class="c1"># use ^N exponent notation instead of Unicode superscripts</span>
+<span class="n">UnitFlags</span><span class="o">.</span><span class="n">NUM_CANONICAL</span>  <span class="c1"># writer only: a float REDUCE rescaled keeps float shape</span>
 </code></pre></div>
 
+<p>The same flags configure a <strong>writer</strong>: <code>Writer.to_mem(unit_flags=UnitFlags.REDUCE)</code>
+(and <code>to_fd</code> / <code>to_file</code>) rewrites each unit as it is written <em>and</em> rescales the
+value with it — <code>2.5 k~g</code> goes out as <code>&lt;float:64,g&gt; 2500</code>. <code>NUM_CANONICAL</code> is
+meaningful only there: it appends <code>.0</code> to a rescaled float that came out as an
+integer string, so the canonical document mode lands on one spelling.</p>
 <blockquote>
 <p><strong><code>UnitFlags.REDUCE</code> returns the reduced unit, not a rescaled value.</strong> Reduction
 folds every prefix out, so <code>unit_to_str_ex(parse_unit("k~g"), UnitFlags.REDUCE)</code>
@@ -674,8 +737,9 @@ a bare number reaching the file:</p>
 
 <p>A policy carrying <code>targets</code>, <code>normalise_si</code>, <code>base</code> or <code>leave_inexact</code> raises
 <code>BovnarArgumentError</code> there rather than being half-honoured: write-side unit
-rewriting is <code>UnitFlags.REDUCE</code>'s job, and two rewriting modes with different
-rules about exactness is how a document ends up meaning two things.</p>
+rewriting is <code>UnitFlags.REDUCE</code>'s job — open the writer with
+<code>Writer.to_mem(unit_flags=UnitFlags.REDUCE)</code> — and two rewriting modes with
+different rules about exactness is how a document ends up meaning two things.</p>
 <p>Module-level helpers back the same decisions outside the reader:</p>
 <div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">units_equal</span><span class="p">,</span> <span class="n">units_compatible</span><span class="p">,</span> <span class="n">units_convertible</span><span class="p">,</span>
                     <span class="n">unit_si_normal_form</span><span class="p">,</span> <span class="n">parse_unit</span><span class="p">)</span>
@@ -706,6 +770,20 @@ performed. Only the last is the right screen for a conversion target.</p>
 <div class="codehilite"><pre><span></span><code><span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;m&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;m&quot;</span><span class="p">)</span>                  <span class="c1"># → True</span>
 </code></pre></div>
 
+<p>The hash follows the equality in the one place the two could part: a
+component with <strong>no prefix</strong> is the same component whether its prefix system
+says SI or IEC, so <code>parse_unit("B")</code> and <code>make_unit_iec(BaseUnit.BYTE)</code> are
+equal <em>and</em> one dict key.</p>
+<p>A <code>Unit</code> also compares equal to a <strong>string</strong> that parses to it
+(<code>q.unit == "k~m"</code>). That is a convenience for comparison only and is <strong>not
+hash-compatible</strong> — <code>"km"</code>, <code>"k~m"</code> and <code>"ucum:km"</code> are three strings with
+three hashes and one unit — so <code>Unit.parse("m") in {"m"}</code> is <code>False</code>. Key a
+dict or set on <code>Unit</code> objects (or on <code>str(unit)</code>), never on a mix of the two.</p>
+<p><code>Unit.convert_factor(other)</code> and <code>Unit.factor</code> return a bare number, so they
+<strong>raise</strong> <code>BovnarArgumentError</code> where there is no such number: an affine pair
+(<code>°C</code> → <code>K</code>) has no multiplicative factor and an affine unit no SI factor.
+Use <code>convert_value()</code> there, or <code>unit_to_si_factor()</code> for the scale and the
+offset.</p>
 <p>That comparison used to be <strong>False</strong>. <code>ValueUnit</code> is a <code>ctypes.Structure</code>, which
 defines no <code>__eq__</code>, so <code>==</code> fell back to identity — see the note in
 <a href="#57-building-a-valueunit">§5.7</a> on why the raw struct is worth knowing about at
@@ -779,7 +857,10 @@ is lossless to the format's precision):</p>
 
 <p>It accepts a <code>Decimal</code>, <code>Fraction</code> (must be a terminating decimal), <code>int</code>,
 <code>str</code> (a verbatim literal), or <code>float</code> (only as precise as the double), and
-validates the width for the chosen family.</p>
+validates the width for the chosen family. For <code>float_dec</code> it also refuses a
+finite value past the width's range — <code>Decimal('1e400')</code> does not fit
+<code>float_dec:64</code> and would materialise to infinity — and a non-finite <code>float</code>
+is stored under the format's own spelling (<code>inf</code>, <code>ninf</code>, <code>nan</code>).</p>
 <h3 id="62-properties-and-methods">6.2 Properties and methods</h3>
 <table>
 <thead>
@@ -833,7 +914,7 @@ validates the width for the chosen family.</p>
 <tr>
 <td><code>q.stored_value</code></td>
 <td><code>Decimal</code></td>
-<td>The value materialised into the declared IEEE/fixed format (round-to-nearest-even) — differs from <code>decimal</code> only when the literal carries more precision than the format holds</td>
+<td>The value materialised into the declared IEEE/fixed format (round-to-nearest-even) — differs from <code>decimal</code> only when the literal carries more precision than the format holds. <code>None</code> for a typed null, as <code>decimal</code> is</td>
 </tr>
 <tr>
 <td><code>q.ieee_bits</code></td>
@@ -858,7 +939,7 @@ validates the width for the chosen family.</p>
 <tr>
 <td><code>q.unit_source</code></td>
 <td><code>str \| None</code></td>
-<td>The unit exactly as the document spelled it (library 2.0) — <code>ucum:mL{total}</code> where <code>q.unit</code> is <code>m~L</code>. Set by <code>loads(typed=True)</code>, or by the <code>unit_source=</code> constructor argument; <code>dumps()</code> writes it back, and refuses one that does not parse to <code>q.unit</code>. <code>None</code> writes the canonical form</td>
+<td>The unit exactly as the document spelled it (library 2.0) — <code>ucum:mL{total}</code> where <code>q.unit</code> is <code>m~L</code>. Set by <code>loads(typed=True)</code>, or by the <code>unit_source=</code> constructor argument; <code>dumps()</code> writes it back, and refuses one that does not parse to <code>q.unit</code> — including a spelling on a <code>Quantity</code> that has no unit at all. <code>None</code> writes the canonical form</td>
 </tr>
 </tbody>
 </table>
@@ -898,7 +979,23 @@ when the type is <code>FLOAT:64</code> with no unit and no non-decimal base (mat
 C library's own default-annotation omission rules).</p>
 <p><code>dumps()</code> also accepts bare <code>decimal.Decimal</code> (written as an exact
 <code>float_dec:64</code> literal) and terminating <code>fractions.Fraction</code> values directly —
-a non-terminating fraction (e.g. <code>Fraction(1, 3)</code>) raises <code>BovnarArgumentError</code>.</p>
+a non-terminating fraction (e.g. <code>Fraction(1, 3)</code>) raises <code>BovnarArgumentError</code>,
+as does a <code>Decimal</code> outside the range of <code>float_dec:64</code>. A list whose elements
+are all <code>Decimal</code> / <code>Fraction</code> is written under one <code>&lt;float_dec:64&gt;</code>
+annotation, so the elements mean what the scalars mean.</p>
+<p><strong>Arrays of <code>Quantity</code>.</strong> An array has one annotation. Elements that agree on
+type and unit are written under it. Elements that agree on the unit but not
+the type — or that carry no unit and differ in type, <code>[&lt;uint:8&gt; 1, &lt;float:64&gt;
+2.5]</code> — are each written under their own annotation, as they were read.
+Elements that carry <em>different</em> units have no valid form and raise.</p>
+<p><strong>Octet streams.</strong> <code>loads()</code> returns an octet stream as <code>bytes</code>, and <code>dumps()</code>
+writes <code>bytes</code> / <code>bytearray</code> / <code>memoryview</code> back as one, so a document holding
+one round-trips.</p>
+<p><strong>What "can be passed directly to <code>dumps()</code>" does not promise</strong> is that the
+result passes the <em>document</em> tier: <code>dumps()</code> writes what <code>loads()</code> reads, and
+<code>loads()</code> reads heterogeneous and ragged arrays that <code>dom_parse</code> and
+<code>bovnar validate</code> refuse. See the note in
+<a href="#41-high-level-api-loads--dumps">§4.1</a>.</p>
 <hr />
 <h2 id="7-write_array-helper">7. <code>write_array</code> helper</h2>
 <p><code>write_array</code> is a high-level helper exported from the top-level <code>bovnar</code>
@@ -920,10 +1017,19 @@ namespace. It handles both flat and multi-dimensional arrays.</p>
 </code></pre></div>
 
 <p>Element types accepted per element: <code>int</code>, <code>float</code>, <code>str</code>, <code>bool</code>, <code>None</code>,
-<code>dict</code> (written as a struct), or nested <code>list</code>/<code>tuple</code> (written as a nested
-array). When <em>rows</em> is a flat sequence it is treated as a single-row array;
-when all top-level elements are themselves <code>list</code> or <code>tuple</code> it is treated as a
-multi-row array.</p>
+<code>bytes</code> (an octet stream), <code>dict</code> (written as a struct), or nested
+<code>list</code>/<code>tuple</code> (written as a nested array). When <em>rows</em> is a flat sequence it
+is treated as a single-row array; when all top-level elements are themselves
+<code>list</code> or <code>tuple</code> it is treated as a multi-row array. Any other iterable (a
+generator, a <code>range</code>) is materialised first.</p>
+<p><strong>With <code>vt</code>, every element is held to it.</strong> An <code>int</code> under an integer
+annotation is checked against the width and written in the annotation's base —
+quoted where the base requires it, so <code>255</code> under <code>&lt;uint:16,_16&gt;</code> is <code>"ff"</code>.
+An element the annotation cannot describe — <code>80800</code> under <code>&lt;uint:16&gt;</code>, a
+<code>float</code> or a <code>str</code> under an integer type, a <code>dict</code> under any — raises
+<code>BovnarArgumentError</code> instead of producing a document nothing reads. <code>None</code> is
+a null hole and is always allowed; a <code>Quantity</code> element carries its own
+literal and is written as it is. <code>vu</code> takes a <code>ValueUnit</code> or a <code>Unit</code>.</p>
 <hr />
 <h2 id="8-pint-bridge">8. pint bridge</h2>
 <p>bovnar units interoperate with <a href="https://pint.readthedocs.io/">pint</a> through a
@@ -981,6 +1087,10 @@ unscaled, so a wrapped numpy array is never silently rescaled.</p>
 a prefix or exponent — pint forbids it and bovnar never emits it. A prefixed or
 exponentiated affine unit raises <code>BovnarArgumentError</code> rather than a cryptic
 pint error.</p>
+<p><code>to_pint</code> / <code>to_pint_unit</code> take a <code>ValueUnit</code> or a <code>Unit</code>, so
+<code>bovnar.to_pint(q.value, q.unit)</code> works on a typed value as it stands. A unit
+pint cannot name raises <code>BovnarArgumentError</code>: the profile-only units, and
+anything carrying the IEC prefixes <code>Ri~</code> / <code>Qi~</code>, which pint does not define.</p>
 <h3 id="83-validation">8.3 Validation</h3>
 <p><code>from_pint</code> / <code>from_pint_unit</code> validate the resulting <code>ValueUnit</code> by default
 (<code>validate=True</code>); a pint unit that maps to a structurally invalid bovnar unit
@@ -1141,8 +1251,11 @@ output re-parses.</p>
 <ul>
 <li>an array that mixes numeric encodings (e.g. <code>uint:8</code> and <code>float:64</code>) raises
   unless you pass <code>dtype=</code> to coerce to one;</li>
-<li>bovnar 1.0 arrays are rectangular and homogeneous, so the result is always a
-  regular ndarray — there is no ragged case to handle;</li>
+<li>a Bovnar array is rectangular and homogeneous <strong>at the document tier</strong>
+  (<code>dom_parse</code>, <code>bovnar validate</code>), so a <code>DomNode</code> always yields a regular
+  ndarray. The streaming tier — <code>loads()</code>, and therefore <code>dumps()</code> — does not
+  enforce that (see <a href="#41-high-level-api-loads--dumps">§4.1</a>): a ragged typed
+  list raises here unless you pass <code>dtype=object</code>;</li>
 <li>a <code>null</code> element cannot fill a dtype with no null slot — integer, <code>bool</code>, or
   string (which would otherwise silently become <code>0</code>/<code>False</code>/<code>'None'</code>); pass
   <code>dtype=float</code> (→ <code>NaN</code>) or <code>dtype=object</code> (→ <code>None</code>);</li>
@@ -1173,15 +1286,20 @@ output re-parses.</p>
 <ul>
 <li><code>from_numpy</code> requires a 1-D-or-higher array; write a 0-D scalar with the
   scalar <code>Writer</code> API instead.</li>
-<li><em>unit</em> may be a bovnar unit string, a <code>ValueUnit</code>, or a pint <code>Unit</code>/<code>Quantity</code>
-  (anything else raises <code>BovnarArgumentError</code>).</li>
+<li><em>unit</em> may be a bovnar unit string, a <code>Unit</code>, a <code>ValueUnit</code>, or a pint
+  <code>Unit</code>/<code>Quantity</code> (anything else raises <code>BovnarArgumentError</code>).</li>
 <li>Units apply to <strong>numeric</strong> arrays only — a unit on a <code>bool</code> or string array
   raises <code>BovnarArgumentError</code>.</li>
 <li>An <strong>object array of <code>Decimal</code>/<code>Fraction</code></strong> is written as an exact
   decimal/fixed/wide-binary float. <code>float_format=(family, width[, frac])</code> —
   family <code>'float'</code>, <code>'float_dec'</code> (the default for a Decimal object array), or
-  <code>'float_fix'</code> — selects the target; it is required to disambiguate an object
-  array that is not purely <code>Decimal</code>/<code>Fraction</code>.</li>
+  <code>'float_fix'</code> — selects the target.</li>
+<li>An <strong>object array of Python <code>int</code>s</strong> — what <code>to_numpy(..., dtype=object)</code>
+  returns for integers wider than 64 bits — is written as integers, at the
+  narrowest width that holds them and never under 64 (<code>&lt;uint:71&gt;[…]</code>).</li>
+<li>Any other object array is ambiguous and needs <code>float_format</code>.</li>
+<li>A <strong>bytes array</strong> (dtype kind <code>S</code>) is refused: decode it first
+  (<code>arr.astype('U')</code>).</li>
 <li>A <strong>masked array</strong> with any masked entry is rejected (it would otherwise
   serialise the underlying value of a masked cell); fill or unmask it first.</li>
 <li><code>array_to_bvnr</code> grows its write buffer like <code>dumps()</code> (4 MiB, doubling up to
@@ -1455,21 +1573,27 @@ the fd in a <code>finally</code> block. The <code>max_file_size</code> default i
 </thead>
 <tbody>
 <tr>
-<td><code>Writer.to_mem(buf=None, cap=4194304, *, pretty=True)</code></td>
+<td><code>Writer.to_mem(buf=None, cap=4194304, *, pretty=True, unit_flags=0, emit_version=False)</code></td>
 <td>Write to an in-process buffer. <code>buf</code> may be a pre-allocated <code>bytearray</code>; when <code>None</code> an internal buffer of size <code>cap</code> is allocated.</td>
 </tr>
 <tr>
-<td><code>Writer.to_fd(fd, *, pretty=True)</code></td>
+<td><code>Writer.to_fd(fd, *, pretty=True, unit_flags=0, emit_version=False)</code></td>
 <td>Write to an open POSIX file descriptor.</td>
 </tr>
 <tr>
-<td><code>Writer.to_file(path, *, pretty=True)</code></td>
+<td><code>Writer.to_file(path, *, pretty=True, unit_flags=0, emit_version=False)</code></td>
 <td>Open <code>path</code> for writing (<code>O_WRONLY\|O_CREAT\|O_TRUNC</code>, mode <code>0o644</code>) and write to it; the fd is closed when the writer is finished or destroyed.</td>
 </tr>
 </tbody>
 </table>
 <p>All three are used as context managers.  On clean exit (<code>exc_type is None</code>)
 the context manager calls <code>finish()</code> automatically.</p>
+<p><code>unit_flags</code> takes <a href="#53-unitflags"><code>UnitFlags</code></a> — <code>REDUCE</code> rewrites each unit
+and rescales its value, <code>ASCII_EXP</code> writes <code>^N</code> exponents, <code>NUM_CANONICAL</code>
+keeps a rescaled float in float shape. <code>emit_version=True</code> writes a leading
+<code>#!bovnar M.N</code> naming the spec version this build implements, as
+<code>write_version()</code> would. Every writer accepts structs and arrays nested up to
+<strong>255</strong> deep, the same limit <code>Reader</code> and <code>loads()</code> read at.</p>
 <h3 id="122-output-retrieval">12.2 Output retrieval</h3>
 <table>
 <thead>
@@ -1505,7 +1629,9 @@ priority: <code>unit_str</code> (parsed via <code>bvn_parse_unit_n</code>) → <
 <p>Write an unsigned integer. <code>base</code> selects the numeral system (10 or 16 for
 inline values; any Bovnar-supported base for <code>write_bvni</code>).</p>
 <h4 id="write_sintkey-value--width64-base10-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear"><code>write_sint(key, value, *, width=64, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)</code></h4>
-<p>Write a signed integer.</p>
+<p>Write a signed integer. <code>base</code> 64 and 85 are <strong>unsigned</strong> — <code>+</code> and <code>-</code> are
+digits in those alphabets — and raise <code>BovnarArgumentError</code> here and for a
+signed <code>write_bvni</code>.</p>
 <h4 id="write_floatkey-value--width64-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear"><code>write_float(key, value, *, width=64, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)</code></h4>
 <p>Write an IEEE 754 binary float.</p>
 <h4 id="write_float_fixkey-value--width64-q0-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear"><code>write_float_fix(key, value, *, width=64, q=0, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)</code></h4>
@@ -1598,8 +1724,8 @@ ceiling of <code>BVN_DOM_FD_MAX_BYTES</code> (256 MiB). This is 16× larger than
 directly if you need a different limit.
 | <code>DomDoc.parse_file(path)</code> | Class method. Open path and parse (fd closed in <code>finally</code>). Applies an internal hard cap of <code>BVN_DOM_FD_MAX_BYTES</code> (256 MiB) via the C function <code>bvn_dom_parse_fd</code>. This ceiling is distinct from <code>Reader.read_file</code>'s <code>MAX_FILESIZE_BYTES</code> (16 MiB). |
 | <code>doc.parse_error</code> | <code>ErrorCode</code> — <code>NONE</code> on success. |
-| <code>doc[key]</code> | Return top-level <code>DomNode</code> by key; raises <code>KeyError</code> when absent. |
-| <code>key in doc</code> | <code>True</code> when the top-level key exists. |
+| <code>doc[key]</code> | Return a <code>DomNode</code> by key; raises <code>KeyError</code> when absent. <code>key</code> goes to the path lookup, so <code>doc["server"]</code> is a top-level entry and a dotted or indexed path reaches below it: <code>doc["server.tls"]</code> is <code>doc["server"]["tls"]</code>, <code>doc["matrix[1][0]"]</code> an element. A key cannot contain <code>.</code> or <code>[</code>, so the two readings never collide. |
+| <code>key in doc</code> | <code>True</code> when <code>doc[key]</code> would succeed — the same path rule. A non-<code>str</code> is never in a document. |
 | <code>len(doc)</code> | Number of top-level entries. |
 | <code>iter(doc)</code> | Iterate over <code>(key, DomNode)</code> pairs. |
 | <code>doc.entries()</code> | Return all top-level <code>(key, DomNode)</code> pairs as a list. |
@@ -1691,7 +1817,7 @@ for as long as any derived <code>DomNode</code> is in use.</p>
 </tr>
 <tr>
 <td><code>key in node</code></td>
-<td>Membership test for STRUCT nodes</td>
+<td>Membership test for STRUCT nodes (a direct member only; a non-<code>str</code> is never one)</td>
 </tr>
 <tr>
 <td><code>len(node)</code></td>
@@ -1711,7 +1837,7 @@ for as long as any derived <code>DomNode</code> is in use.</p>
 </tr>
 <tr>
 <td><code>node.to_python()</code></td>
-<td>Recursively convert to a native Python value (drops type/unit info)</td>
+<td>Recursively convert to a native Python value (drops type/unit info). A multi-row array comes back as a list of rows, empty rows included (<code>[]/[]</code> → <code>[[], []]</code>), as <code>loads()</code> gives it</td>
 </tr>
 </tbody>
 </table>
@@ -1752,28 +1878,33 @@ are skipped automatically when <code>numpy</code> / <code>pint</code> is not ins
 ├── enums.py         # Python IntEnum mirrors of C enums
 ├── exceptions.py    # BovnarError hierarchy
 ├── quantity.py      # Quantity — typed, unit-annotated scalar for lossless round-trips
-├── reader.py        # Reader class + EventPayload dataclass
+├── reader.py        # Reader, EventPayload, UnitPolicy, UnitRule
+├── stream.py        # framing, octet multiplexing, document-in-document
 ├── structs.py       # ctypes Structure/Union definitions + ValueUnitPrefix + make_* helpers
+├── unit.py          # Unit — a ValueUnit with equality, hashing and its operations
 ├── units.py         # unit_to_si_factor, unit_convert_factor, etc.
 └── writer.py        # Writer class
 
 tests/
-├── conftest.py                   # shared fixtures, needs_lib marker
-├── test_analytics.py             # analytic / benchmarking tests (needs_lib)
-├── test_array_parser.py          # array parsing integration tests (needs_lib)
-├── test_currency_units.py        # currency unit round-trip tests (needs_lib)
-├── test_dom.py                   # DOM API integration tests (needs_lib)
-├── test_enums.py                 # pure-Python enum tests
-├── test_example_numpy_roundtrip.py # NumPy bridge end-to-end example (needs_lib + numpy)
-├── test_lossless_floats.py       # exact decimal/fixed/float128-256 round-trips (needs_lib)
-├── test_numpy_bridge.py          # NumPy bridge tests (needs_lib + numpy)
-├── test_pint_bridge.py           # pint bridge + unit-table integrity (needs_lib + pint)
-├── test_reader.py                # integration: Reader (needs_lib)
-├── test_structs.py               # pure-Python struct / helper tests
-├── test_unit_physics.py          # unit physics / conversion tests (needs_lib)
-├── test_units.py                 # mixed: unit parsing / serialisation (needs_lib for FFI)
-├── test_write_array.py           # write_array integration tests (needs_lib)
-└── test_writer.py                # integration: Writer (needs_lib)
+├── conftest.py                          # shared fixtures, needs_lib marker
+├── test_abi.py                          # ctypes struct sizes/offsets against the C compiler
+├── test_enums.py, test_structs.py       # the enum and struct mirrors
+├── test_version.py                      # library / spec version reporting
+├── test_reader.py, test_writer.py       # Reader and Writer
+├── test_stream.py                       # framing, mux, document-in-document
+├── test_dom.py, test_dom_vs_loads_parity.py   # the DOM, and its agreement with loads()
+├── test_write_array.py, test_array_parser.py, test_array_roundtrip_fidelity.py
+├── test_roundtrip_property.py, test_writers_agree.py, test_dumps_directive.py
+├── test_escapes.py, test_unicode_normalisation.py
+├── test_datetime.py, test_datetime_oracle.py
+├── test_lossless_floats.py, test_hex_float_decode.py, test_decimal_tie_rounding.py
+├── test_units.py, test_unit_object.py, test_unit_physics.py, test_unit_source.py
+├── test_unit_policy.py, test_unit_factors_derived.py
+├── test_base_rendering_property.py, test_convertible_implies_convertible.py
+├── test_currency_units.py, test_currency_table_parity.py
+├── test_numpy_bridge.py, test_example_numpy_roundtrip.py      # need numpy
+├── test_pint_bridge.py, test_pint_factor_parity.py            # need pint
+└── test_example_consistency.py          # the shipped examples
 </code></pre></div>
 
 <hr />
@@ -1806,7 +1937,7 @@ tests/
 </tbody>
 </table>
 <p><strong><code>unit_convert_factor</code> error semantics:</strong> The C function uses the
-<code>(ok, requires_affine)</code> pair to signal three distinct outcomes:</p>
+<code>(ok, requires_affine)</code> pair to signal four distinct outcomes:</p>
 <table>
 <thead>
 <tr>
@@ -1822,9 +1953,14 @@ tests/
 <td>Multiplicative conversion; <code>factor</code> is ready to use</td>
 </tr>
 <tr>
+<td><code>True</code></td>
+<td><code>True</code></td>
+<td>Both sides are affine and share their zero (e.g. °C ↔ °Ré), so <code>factor</code> alone is correct</td>
+</tr>
+<tr>
 <td><code>False</code></td>
 <td><code>True</code></td>
-<td>Affine conversion required (e.g. °C ↔ K); <code>factor</code> is still valid but a plain multiply is insufficient</td>
+<td>Affine conversion the offsets do not cancel (e.g. °C ↔ K). <strong><code>factor</code> is <code>0.0</code></strong> — not a usable multiplier</td>
 </tr>
 <tr>
 <td><code>False</code></td>
@@ -1833,10 +1969,13 @@ tests/
 </tr>
 </tbody>
 </table>
-<p><code>BovnarArgumentError</code> is raised <strong>only</strong> when both <code>ok=False</code> and
-<code>requires_affine=False</code>.  When <code>requires_affine=True</code>, call <code>convert_value</code>
-which handles the two-step affine path automatically, or call <code>unit_to_si_factor</code>
-on both units and perform the conversion manually.</p>
+<p><code>unit_convert_factor</code> raises <code>BovnarArgumentError</code> <strong>only</strong> when both
+<code>ok=False</code> and <code>requires_affine=False</code>; the result does not carry <code>ok</code>, so
+check <code>requires_affine</code> before multiplying by <code>factor</code>. When it is set, call
+<code>convert_value</code>, which handles the two-step affine path, or call
+<code>unit_to_si_factor</code> on both units and convert by hand. The <code>Unit</code> method
+<code>convert_factor()</code> returns the bare number and therefore raises for the
+<code>0.0</code> row instead of returning it.</p>
 <p><strong>Callbacks returning <code>False</code>:</strong> When an <code>on_verified</code> or <code>on_unverified</code>
 callback returns <code>False</code>, the C parser stops and <code>bvnr_read</code> returns failure.
 The Python layer then calls <code>_raise_error()</code> and raises <code>BovnarParseError</code> with
@@ -1898,8 +2037,17 @@ the trailing <code>unit_flags</code> field (<code>bvn_unit_flags_t</code>, a <co
 <td><code>1 &lt;&lt; 1</code></td>
 <td>Use <code>^N</code> ASCII exponent notation instead of Unicode superscripts</td>
 </tr>
+<tr>
+<td><code>BVN_NUM_CANONICAL</code></td>
+<td><code>1 &lt;&lt; 2</code></td>
+<td>Write a float that <code>BVN_UNIT_REDUCE</code> rescaled in float shape (<code>5000.0</code>, not <code>5000</code>)</td>
+</tr>
 </tbody>
 </table>
+<p>They are set from Python with the <code>unit_flags=</code> keyword of <code>Writer.to_mem</code> /
+<code>to_fd</code> / <code>to_file</code>, as <code>UnitFlags</code> values; <code>emit_version=</code> sets the struct's
+<code>emit_version</code> field. The constructors also set <code>max_struct_nesting</code> and
+<code>max_array_nesting</code> to 255.</p>
 <p>The writer respects the <code>unit_flags</code> stored inside the C writer object when
 serialising unit annotations. <code>_emit_annotation</code> retrieves the live flags via
 <code>bvnr_writer_unit_flags(w)</code> and passes them to <code>bvn_unit_to_string_ex</code>.</p>

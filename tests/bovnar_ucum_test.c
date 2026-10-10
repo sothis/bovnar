@@ -482,7 +482,7 @@ static void test_sweep_round_trip(void)
 	}
 	/* The figures doc/11 §5.3 quotes. Kept as named constants so the failure
 	 * message cannot disagree with what is actually compared. */
-	enum { DOC_SAME = 689, DOC_NO_CODE = 2102, DOC_REJECTED = 377 };
+	enum { DOC_SAME = 865, DOC_NO_CODE = 1926, DOC_REJECTED = 377 };
 	tests++;
 	if (same != DOC_SAME || no_code != DOC_NO_CODE || rejected != DOC_REJECTED) {
 		fprintf(stderr,
@@ -703,6 +703,54 @@ static void test_regressions(void)
 
 /* ── the spec-1.2 gate ──────────────────────────────────────────────────── */
 
+/*
+ * UCUM's own metric flag, and its binary prefixes.
+ *
+ * Twenty rows of ucum.bvnr carried `.metric = false` for atoms ucum-essence.xml
+ * marks isMetric="yes" -- the whole CGS table, gf, erg, dyn, [g], [e], g%, Lmb
+ * and three calories. A prefix is only tried on a metric atom, so the prefixed
+ * codes fell through to "not a UCUM atom": cP, cSt and kgf, three of the
+ * commonest codes in the vocabulary, were error_unit_illegal. And the four
+ * binary prefixes were described by doc/11 section 3.2 and read by nothing.
+ */
+static void test_metric_flags_and_binary_prefixes(void)
+{
+	printf("  metric flags and binary prefixes...\n");
+	chk_str("ucum:cP",   "c~P");
+	chk_factor("ucum:cP", 0.001);                 /* 1 cP = 1 mPa.s */
+	chk_str("ucum:cSt",  "c~St");
+	chk_factor("ucum:cSt", 1e-6);
+	chk_str("ucum:mGal", "m~Gal");
+	chk_factor("ucum:mGal", 1e-5);
+	chk_str("ucum:mG",   "m~G");
+	chk_factor("ucum:kgf", 9.80665);
+	chk_factor("ucum:kdyn", 1e-2);
+	chk_factor("ucum:kcal_m", 4190.02);
+	chk_factor("ucum:m[g]", 9.80665e-3);
+	/* Still an error where UCUM says non-metric: the fix is the flag, not a
+	 * prefix on everything. */
+	chk_error("ucum:kAo",  error_unit_illegal);       /* angstrom */
+	chk_error("ucum:matm", error_unit_illegal);
+	chk_error("ucum:k[arb'U]", error_unit_illegal);
+
+	chk_str("ucum:KiBy",  "Ki~B");
+	chk_str("ucum:MiBy",  "Mi~B");
+	chk_str("ucum:Gibit", "Gi~b");
+	chk_str("ucum:TiBy",  "Ti~B");
+	chk_str("ucum:KiBy/s", "Ki~B/s");
+	chk_str("ucum:MiBy2", "Mi~B²");
+	chk_factor("ucum:KiBy", 1024.0);
+	/* A kibimetre is legal UCUM and bovnar has no such unit: known, and not
+	 * carryable -- as natively, where Ki~m is refused. */
+	chk_error("ucum:Kim", error_unit_profile_unsupported);
+	chk_error("ucum:Kig", error_unit_profile_unsupported);
+	/* The decimal reading is untouched, and a whole atom still wins. */
+	chk_str("ucum:kBy", "k~B");
+	chk_str("ucum:Mm",  "M~m");
+	/* Binary prefixes are UCUM's; UDUNITS has none. */
+	chk_error("udunits:Kibyte", error_unit_illegal);
+}
+
 static void test_version_gate(void)
 {
 	printf("  the notation is gated on a declared 1.2...\n");
@@ -819,6 +867,7 @@ int main(void)
 	test_sweep_round_trip();
 	test_to_ucum();
 	test_regressions();
+	test_metric_flags_and_binary_prefixes();
 	test_version_gate();
 	test_policy_strings();
 

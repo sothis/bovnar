@@ -166,7 +166,50 @@ void bvn_dom_node_destroy(bvn_dom_node_t *n)
 	}
 	free(stack);
 }
+/*
+ * The three attach functions are public, and were written as if only the
+ * builder called them: no check that the container IS one, none for NULL, and
+ * none for a key the scope already has. bvn_dom_array_append on a struct node
+ * returned true and stored the element where nothing reads it -- array_count
+ * stayed 0, the caller was told it had succeeded -- and a hand-built struct
+ * could carry the duplicate key a parsed one is refused for
+ * (error_duplicate_struct_key).
+ *
+ * The contract in doc/08 4.5 already said what a refusal looks like: the value
+ * is destroyed and the call returns false. The checks below make the refusals
+ * exist.
+ *
+ * The duplicate test is a linear scan, which is right for a tree built by hand
+ * and wrong for the parser: a document with a 100 000-member struct would pay
+ * for it quadratically, and the parser has to REPORT a duplicate as a
+ * document-tier error after the tree is complete rather than refuse the member
+ * that carries it. So the builder attaches through the *_nocheck forms
+ * (bvn_dom_impl.h), which are these functions as they used to be.
+ */
+static bool bvn_dom_entries_have_key(const bvn_dom_entry_t *e, uint32_t n,
+				     const char *key, uint32_t klen)
+{
+	for (uint32_t i = 0; i < n; i++) {
+		if (e[i].key && strlen(e[i].key) == (size_t)klen &&
+		    memcmp(e[i].key, key, klen) == 0)
+			return true;
+	}
+	return false;
+}
 bool bvn_dom_struct_add(bvn_dom_node_t *s,
+						const char *key, uint32_t klen,
+						bvn_dom_node_t *val)
+{
+	if (!s || s->type != BVN_DOM_STRUCT || !val || val == s ||
+	    (!key && klen) ||
+	    bvn_dom_entries_have_key(s->members.entries, s->members.count,
+				     key, klen)) {
+		bvn_dom_node_destroy(val);
+		return false;
+	}
+	return bvn_dom_struct_add_nocheck(s, key, klen, val);
+}
+bool bvn_dom_struct_add_nocheck(bvn_dom_node_t *s,
 						const char *key, uint32_t klen,
 						bvn_dom_node_t *val)
 {
@@ -200,6 +243,17 @@ bool bvn_dom_doc_add(bvn_dom_doc_t *d,
 					 const char *key, uint32_t klen,
 					 bvn_dom_node_t *val)
 {
+	if (!d || !val || (!key && klen) ||
+	    bvn_dom_entries_have_key(d->entries, d->count, key, klen)) {
+		bvn_dom_node_destroy(val);
+		return false;
+	}
+	return bvn_dom_doc_add_nocheck(d, key, klen, val);
+}
+bool bvn_dom_doc_add_nocheck(bvn_dom_doc_t *d,
+					 const char *key, uint32_t klen,
+					 bvn_dom_node_t *val)
+{
 	if (d->count == d->cap) {
 		if (d->cap > UINT32_MAX / 2u) {
 			bvn_dom_node_destroy(val); return false;
@@ -223,6 +277,14 @@ bool bvn_dom_doc_add(bvn_dom_doc_t *d,
 	return true;
 }
 bool bvn_dom_array_append(bvn_dom_node_t *a, bvn_dom_node_t *elem)
+{
+	if (!a || a->type != BVN_DOM_ARRAY || !elem || elem == a) {
+		bvn_dom_node_destroy(elem);
+		return false;
+	}
+	return bvn_dom_array_append_nocheck(a, elem);
+}
+bool bvn_dom_array_append_nocheck(bvn_dom_node_t *a, bvn_dom_node_t *elem)
 {
 	if (a->arr.count == a->arr.cap) {
 		if (a->arr.cap > UINT32_MAX / 2u) {

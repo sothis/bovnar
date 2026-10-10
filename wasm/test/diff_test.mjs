@@ -44,11 +44,24 @@ function cliValidate(text) {
     return { ok: false, error_name: m ? m[1] : '?' };
   }
 }
-function cliJson(text) {
+/* `convert` exits 1 when the JSON it wrote cannot be converted back to the same
+   document -- a unit, a wide integer, and (since the report learned of them) a
+   datetime or a non-finite float. The JSON is still on stdout, and for the value
+   cases below it is exactly what toJSON() is being compared with, so `lossy`
+   takes it from the failed run. Without it a lossy document has no CLI value,
+   which is what the example loop wants. */
+function cliJson(text, { lossy = false } = {}) {
   const f = join(tmp, 'in.bvnr');
   writeFileSync(f, text);
-  try { return JSON.parse(execFileSync(CLI, ['convert', f], { encoding: 'utf8' })); }
-  catch { return undefined; }
+  try {
+    return JSON.parse(execFileSync(CLI, ['convert', f],
+                                   { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
+  } catch (e) {
+    if (lossy && e.status === 1 && /LOSSY/.test(e.stderr || '')) {
+      try { return JSON.parse(e.stdout); } catch { return undefined; }
+    }
+    return undefined;
+  }
 }
 
 function deepEq(a, b) {
@@ -130,7 +143,7 @@ for (const { name, text } of examples) {
 console.log('# values (must match the CLI exactly)');
 for (const { name, text } of valueCases) {
   const w = b.toJSON(text);
-  const c = cliJson(text);
+  const c = cliJson(text, { lossy: true });
   ok(w.ok && c !== undefined && deepEq(w.value, c),
      `value ${name}: wasm=${JSON.stringify(w.ok ? w.value : w.error)} cli=${JSON.stringify(c)}`);
 }
@@ -230,6 +243,109 @@ for (const [label, text] of resyncCases) {
      `unit_source: inline ${JSON.stringify(data[1])}`);
   ok(data[2] && !('unit_source' in data[2]),
      `unit_source: unitless ${JSON.stringify(data[2])}`);
+}
+
+// --- the document tier (validate/errors vs the CLI) ---------------------------
+// `bovnar validate` runs two passes: the reader, then the whole-document rules
+// (array homogeneity, one shape per array of records, unique keys). validate()
+// and errors() ran the first only, so each of these came back {"ok":true} from
+// the module -- while toJSON() and doc() in the same module refused them, and
+// the HARD validate assertion above never noticed because its corpus had no
+// document-tier case in it.
+console.log('# document tier (validate/errors/toJSON/doc vs the CLI)');
+const docTierCases = [
+  ['duplicate top-level key', '.a = 1;\n.a = 2;\n'],
+  ['duplicate key in struct', '.s = {.a = 1; .a = 2;};\n'],
+  ['heterogeneous array',     '.a = [1, "x"];\n'],
+  ['unit mismatch in array',  '.a = [<float:64,m> 1.0, <float:64,s> 2.0];\n'],
+  ['ragged matrix',           '.a = [[1, 2], [3]];\n'],
+  ['record shapes differ',    '.a = [{.x = 1;}, {.y = 2;}];\n'],
+  ['mismatch behind a hole',  '.a = [[null], [1], ["x"]];\n'],
+];
+for (const [label, text] of docTierCases) {
+  const c = cliValidate(text);
+  const w = b.validate(text);
+  const r = b.errors(text);
+  const j = b.toJSON(text);
+  const d = b.doc(text);
+  ok(!c.ok, `doc-tier "${label}": premise — CLI must reject it (${c.error_name})`);
+  ok(!w.ok && w.error_name === c.error_name && w.tier === 'document' && w.line === 0,
+     `doc-tier "${label}": validate=${w.ok}/${w.error_name}/${w.tier} cli=${c.error_name}`);
+  ok(!r.ok && r.errors.length === 1 && r.errors[0].error_name === c.error_name &&
+     r.errors[0].tier === 'document',
+     `doc-tier "${label}": errors=${JSON.stringify(r)}`);
+  ok(!j.ok && j.error_name === c.error_name, `doc-tier "${label}": toJSON=${j.error_name}`);
+  // doc() used to say only {ok:false}; it names the error now.
+  ok(!d.ok && d.error_name === c.error_name && d.error === w.error,
+     `doc-tier "${label}": doc=${d.ok}/${d.error_name}`);
+  // events() and parse() are the STREAMING view and say so in the README: the
+  // reader delivered every value, so they are ok. Pinned so that a change to
+  // either is a decision and not an accident.
+  ok(b.events(text).ok === true, `doc-tier "${label}": events is streaming-tier`);
+  if (typeof b.parse === 'function')
+    ok(b.parse(text).ok === true && b.parse(text).errors.length === 0,
+       `doc-tier "${label}": parse is streaming-tier`);
+}
+// A valid document, and a stream error, are unchanged by the second pass.
+{
+  const w = b.validate('.a = [1, 2];\n.s = {.x = 1;};\n');
+  ok(w.ok && w.tier === null, `doc-tier: valid document ${JSON.stringify(w)}`);
+  const s = b.validate('.a = @;\n');
+  ok(!s.ok && s.tier === 'stream' && s.line === 1, `doc-tier: stream error ${JSON.stringify(s)}`);
+  const r = b.errors('.a = @;\n.b = <uint:8> 999;\n');
+  ok(r.errors.length === 2 && r.errors.every(x => x.tier === 'stream'),
+     `doc-tier: stream errors keep their tier ${JSON.stringify(r)}`);
+}
+
+// --- the FIRST error, also when the last one is fatal -------------------------
+// events() and parse() named the first error only when the reader's final code
+// had been cleared by a clean EOF. An unterminated string holding a bad byte
+// ends on incomplete_bvnr_stream, and that is what they reported, while
+// errors()[0] and validate() said invalid_utf8_byte.
+{
+  const bytes = new Uint8Array([0x2e, 0x61, 0x3d, 0x22, 0xff, 0xfe, 0x22, 0x3b]);
+  const v = b.validate(bytes), r = b.errors(bytes), e = b.events(bytes);
+  ok(r.errors.length >= 2, `first error: premise — several errors (${r.errors.length})`);
+  ok(e.error_name === v.error_name && e.error_name === r.errors[0].error_name,
+     `first error: events=${e.error_name} validate=${v.error_name} errors[0]=${r.errors[0].error_name}`);
+  if (typeof b.parse === 'function') {
+    const p = b.parse(bytes);
+    ok(p.error_name === v.error_name && p.error === p.errors[0].error,
+       `first error: parse=${p.error_name} validate=${v.error_name}`);
+  }
+}
+
+// --- toJSON does not truncate a datetime --------------------------------------
+// Half past midnight projected to midnight, ok:true. `bovnar convert` refuses
+// the document; so does toJSON now, and says where.
+{
+  const text = '#!bovnar 1.1\n.when = <datetime:64> 2026-06-15T12:00:00.5Z;\n';
+  const j = b.toJSON(text);
+  ok(cliJson(text, { lossy: true }) === undefined, 'datetime fraction: premise — CLI refuses');
+  ok(!j.ok && j.value === null && /sub-second/.test(j.detail || '') && /'when'/.test(j.detail),
+     `datetime fraction: toJSON=${JSON.stringify(j)}`);
+  ok(b.validate(text).ok, 'datetime fraction: the document itself is valid');
+  const frac = (b.events(text).events || []).find(x => x.ev === 'data');
+  ok(frac && frac.frac === '5', `datetime fraction: events keeps it ${JSON.stringify(frac)}`);
+  const whole = b.toJSON('#!bovnar 1.1\n.when = <datetime:64> 2026-06-15T12:00:00Z;\n');
+  ok(whole.ok && whole.value.when === 1781524800, `datetime: whole second ${JSON.stringify(whole)}`);
+}
+
+// --- wide integers are strings, as the README now says -------------------------
+{
+  const j = b.toJSON('.w = <uint:128> 340282366920938463463374607431768211455;\n.n = 18446744073709551615;\n');
+  ok(j.ok && j.value.w === '340282366920938463463374607431768211455' &&
+     typeof j.value.n === 'number', `wide integer: ${JSON.stringify(j)}`);
+}
+
+// --- a NUL does not end the unit argument early --------------------------------
+// The unit crosses as a C string, so 'm\0junk' was read as 'm' and converted.
+{
+  const e = b.eventsConvert('.v = 1 k~m;\n', 'm\0junk');
+  ok(!e.ok && e.error_name === 'unit_illegal' && e.events.length === 0,
+     `NUL in unit: ${JSON.stringify(e).slice(0, 160)}`);
+  const good = b.eventsConvert('.v = 1 k~m;\n', 'm');
+  ok(good.ok && good.events.some(x => x.converted === '1000'), 'NUL in unit: plain unit still converts');
 }
 
 // --- report ----------------------------------------------------------------

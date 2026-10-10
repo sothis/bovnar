@@ -302,6 +302,8 @@ WAIVED_MODEL = {
     # defines the octet as the number 8 where bovnar's B is a base unit of
     # information with no factor to the bit.
     ("udunits", "octet"),
+    # ...and their regular plurals, which are rows of their own now.
+    ("udunits", "bytes"), ("udunits", "octets"),
 } | {("qudt", code) for code in _QUDT_INFO_MODEL} \
   | {("unece", code) for code in _UNECE_INFO_MODEL}
 
@@ -371,6 +373,9 @@ WAIVED_UPSTREAM = {
         "UDUNITS states the EC therm as 1.05506e8 J (6 digits); native thm_ec "
         "is the exact 100 000 Btu_IT = 105 505 585.262 J. 3.9 ppm, publisher "
         "rounding -- the same file states the US therm exactly.",
+    ("udunits", "EC_therms"):
+        "The regular plural of EC_therm, and the same 6-digit publisher "
+        "rounding: 1.05506e8 J against the exact 105 505 585.262 J. 3.9 ppm.",
     ("om", "therm-EC"):
         "OM states the EC therm as 105 506 000 J (6 digits); native thm_ec is "
         "the exact 105 505 585.262 J. 3.9 ppm, the same rounding UDUNITS "
@@ -492,6 +497,12 @@ WAIVED_UPSTREAM = {
 # standing as WAIVED_UPSTREAM and reported the same way. Keyed on
 # (QUDT local name, the cross-referenced code).
 WAIVED_XREF = {
+    ("MicroGM-PER-CentiM2", "u[g].cm-2"):
+        "[g] is UCUM's standard acceleration of free fall, and a METRIC atom "
+        "(isMetric=\"yes\"), so u[g] is a micro-gn and the code is an "
+        "acceleration per area. QUDT's label and multiplier are the microgram "
+        "per square centimetre: a typo for ug.cm-2. It read as unreachable "
+        "only while bovnar's table wrongly had [g] non-metric.",
     ("BIT-PER-SEC", "Bd"):
         "QUDT cross-references the bit per second to the BAUD. A baud is a "
         "SYMBOL rate and a bit per second an information rate; one symbol "
@@ -711,9 +722,21 @@ class Udunits:
         # singular and a def like "12 international_inches" names a spelling
         # that is never a key. Synthesise them -- but keep them OUT of `real`,
         # or every plural would be reported as an unmapped coverage gap.
+        #
+        # By UDUNITS' own rule (ut_form_plural), one plural per spelling, and
+        # not "+s and +es for everything": that made `miles` the plural of the
+        # MIL (mil + es, 2.54e-5 m) before the mile was reached, which went
+        # unnoticed only while the table had no regular plurals to compare.
+        def plural(n):
+            if len(n) == 1:
+                return n + "s"
+            if n[-1] == "y":
+                return n + "s" if n[-2] in "aeiou" else n[:-1] + "ies"
+            if n[-1] in "sxz" or n.endswith(("ch", "sh")):
+                return n + "es"
+            return n + "s"
         for n in list(self.defs):
-            for p in (n + "s", n + "es"):
-                self.defs.setdefault(p, self.defs[n])
+            self.defs.setdefault(plural(n), self.defs[n])
         plain = set(self.defs)
         names = set(plain)
         for nm in plain:

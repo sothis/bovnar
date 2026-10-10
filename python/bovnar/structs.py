@@ -117,7 +117,16 @@ class ValueUnitPrefix(ctypes.Structure):
 
     def _key(self):
         # id is a union, so id.si covers the IEC member's storage too.
-        return (int(self.system), int(self.id.si))
+        #
+        # WITHOUT A PREFIX THE SYSTEM IS NOT PART OF THE IDENTITY. "no SI
+        # prefix" and "no IEC prefix" are the same statement, and
+        # bvn_unit_equal treats them so: parse_unit("B") is SI/none,
+        # make_unit_iec(BaseUnit.BYTE) is IEC/none, and the two compare equal.
+        # This key fed ValueUnit.__hash__ with the system in it, so one unit
+        # hashed two ways and `{Unit(a): 1}[Unit(b)]` was a KeyError for a key
+        # the dict held -- the contract ValueUnit.__hash__ exists to keep.
+        pid = int(self.id.si)
+        return (int(self.system), pid) if pid else (0, 0)
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, ValueUnitPrefix):
@@ -156,13 +165,23 @@ class ValueUnitComponent(ctypes.Structure):
         return IECPrefix(self.prefix.id.iec)
 
     def __repr__(self) -> str:
-        sys = self.prefix_system
-        if sys == PrefixSystem.SI:
-            pfx = f"si={self.si_prefix.name}"
+        # A repr must not raise, and this one did: BaseUnit has no member for a
+        # profile's opaque atoms (ucum:[IU] is base 200000, see doc/09 §18), so
+        # going through the enum made print(parse_unit("ucum:[IU]")) a
+        # ValueError -- in a debugger, a log line, or pytest's own failure
+        # report. Anything the enums cannot name is shown as its number.
+        def _name(enum, value):
+            try:
+                return enum(value).name
+            except ValueError:
+                return str(int(value))
+
+        if int(self.prefix.system) == int(PrefixSystem.IEC):
+            pfx = f"iec={_name(IECPrefix, self.prefix.id.iec)}"
         else:
-            pfx = f"iec={self.iec_prefix.name}"
-        return (f"ValueUnitComponent(base={self.base_unit.name}, "
-                f"exp={self.exp.name}, {pfx})")
+            pfx = f"si={_name(SIPrefix, self.prefix.id.si)}"
+        return (f"ValueUnitComponent(base={_name(BaseUnit, self.base)}, "
+                f"exp={_name(Exponent, self.exponent)}, {pfx})")
 
     def _key(self):
         return (int(self.base), int(self.exponent), self.prefix._key())

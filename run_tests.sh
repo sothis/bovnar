@@ -91,7 +91,7 @@ run_test() {
     fi
 
     printf '  %-52s ' "$label"
-    if "${RUNNER[@]}" "$exe" "$@"; then
+    if ${RUNNER[@]+"${RUNNER[@]}"} "$exe" "$@"; then
         _green "PASS"
         (( PASS++ )) || true
     else

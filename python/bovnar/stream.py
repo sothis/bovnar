@@ -38,10 +38,10 @@ from typing import Iterable
 
 from ._ffi import get_library
 from .enums import ErrorCode
-from .exceptions import BovnarParseError, BovnarWriteError
+from .exceptions import BovnarParseError, BovnarWriteError, BovnarArgumentError
 from .structs import (
     BvnrSink, BvnrSource, BvnrReadFlags, BvnrDocStreamOpts,
-    EVENT_CALLBACK_FUNC, ON_DOCUMENT_FUNC, MUX_ON_MSG_FUNC,
+    EVENT_CALLBACK_FUNC, ON_DOCUMENT_FUNC, MUX_ON_MSG_FUNC, ON_ERROR_FUNC,
 )
 from .reader import Reader
 from .writer import Writer
@@ -196,6 +196,13 @@ def mux_dump(messages: Iterable[tuple], *, key: str = 'mux') -> bytes:
     :func:`mux_load`."""
     lib  = get_library()
     msgs = [(int(ch), _as_bytes(p)) for ch, p in messages]
+    # The channel crosses the FFI as a uint64_t, and ctypes wraps an
+    # out-of-range int without a word: channel -1 was written as 2**64-1, and
+    # the reader then reported a channel the producer never used.
+    for ch, _ in msgs:
+        if not 0 <= ch < (1 << 64):
+            raise BovnarArgumentError(
+                f"mux channel {ch} is outside the unsigned 64-bit range")
     total = sum(len(p) for _, p in msgs)
     kb    = key.encode('utf-8')
     # Output is the payload plus octet-chunk framing (a few bytes per 64 KiB
@@ -334,11 +341,26 @@ def parse_embedded(inner, *, typed: bool = False) -> dict:
 
     cb = Reader._wrap_callback(parser.on_event)
 
+    # bvnr_parse_embedded owns its reader and answers one bool, so the error it
+    # hit is gone by the time it returns -- and every failure used to be
+    # reported as GOT_INCOMPLETE_BVNR_STREAM, an unexpected byte included. The
+    # reader does tell its on_error hook what went wrong and where; that is the
+    # only place the code survives, so it is caught there. The first report is
+    # the one that stopped the parse.
+    seen: list = []
+
+    def _on_error(_ud, err, line, column, byte, offset):
+        if not seen:
+            seen.append((int(err), int(line), int(column), int(offset),
+                         int(byte)))
+    cb_err = ON_ERROR_FUNC(_on_error)
+
     flags = BvnrReadFlags()
     flags.max_file_size      = BVNR_FILESIZE_UNLIMITED
     flags.max_array_nesting  = 255
     flags.max_struct_nesting = 255
     flags.on_verified        = cb
+    flags.on_error           = cb_err
 
     dptr, _keep = _void_copy(inner)
     ok = lib.bvnr_parse_embedded(dptr, len(inner), ctypes.byref(flags))
@@ -347,6 +369,12 @@ def parse_embedded(inner, *, typed: bool = False) -> dict:
     if cb_state is not None and cb_state.get('exc') is not None:
         raise cb_state['exc']
     if not ok:
+        if seen:
+            code, line, column, offset, byte = seen[0]
+            msg_b = lib.bvn_error_to_string(code)
+            raise BovnarParseError(
+                ErrorCode(code), line, column, offset, byte,
+                "embedded document: " + (msg_b.decode('utf-8') if msg_b else ''))
         raise BovnarParseError(ErrorCode.GOT_INCOMPLETE_BVNR_STREAM,
                                message="embedded document parse error")
     return parser.result()

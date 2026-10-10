@@ -303,6 +303,9 @@ def check_nearmisses(path, parse, to_str):
 
 def main(argv):
     repo = os.path.abspath(argv[1]) if len(argv) > 1 else REPO
+    sys.path.insert(0, REPO)
+    import bvnr_build_env
+    bvnr_build_env.require_build(repo, "check_doc_profile_atoms", ("library",))
     sys.path.insert(0, repo)
     import bvnr_data
 

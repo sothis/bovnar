@@ -31,6 +31,9 @@
 #include <string.h>
 #include "bvn_float.h"
 #include "bvn_float_impl.h"
+/* The value layer's entry to the binary parser (bovnar.h). Declared rather than
+ * included: this suite is built against the float sources alone. */
+bool bvn_parse_double_in_base(const char *s, uint32_t base, double *out);
 
 static int g_fails = 0;
 static int g_pass  = 0;
@@ -1038,6 +1041,86 @@ static void test_bvnf_strtodec_ties(void)
 	CHECK(!bvn_float_strtodec("1.5", 64u, b, 1), "short buffer refused");
 	CHECK(b[0] == 0xdeadbeefu, "short buffer leaves the buffer alone");
 	CHECK(!bvn_float_strtodec(NULL, 64u, b, 2), "NULL string refused");
+	/* The verdict of the parse was dropped, so text that is no number came
+	 * back as success and +0 -- and so did "ninf", which is how the format
+	 * and bvn_float_to_str spell negative infinity. */
+	b[0] = b[1] = 0xa5a5a5a5u;
+	CHECK(!bvn_float_strtodec("abc", 64u, b, 2), "non-number refused");
+	CHECK(!bvn_float_strtodec("", 64u, b, 2), "empty string refused");
+	CHECK(b[0] == 0xa5a5a5a5u && b[1] == 0xa5a5a5a5u,
+	      "...and the buffer is left alone");
+	CHECK(bvn_float_strtodec("ninf", 64u, b, 2) && b[1] == 0xf8000000u &&
+	      b[0] == 0u, "ninf is decimal64 -Infinity");
+	CHECK(bvn_float_strtodec("inf", 64u, b, 2) && b[1] == 0x78000000u,
+	      "inf is decimal64 +Infinity");
+	/* ...and a literal ends where the text does. The keywords were matched
+	 * on their first three letters and a number on its leading digits, so
+	 * "nanometer" was a NaN, "info" an infinity and "1.5abc" 1.5 -- all of
+	 * which the binary sibling, bvn_float_strtoieee_bin, reads as nothing. */
+	{
+		static const char *const junk[] = {
+			"nanometer", "info", "infinity", "1.5abc", "1e5x", "1 ",
+			"-ninf", "ninfx", "0x10", "1e", ".",
+		};
+		for (size_t k = 0; k < sizeof junk / sizeof junk[0]; k++) {
+			b[0] = b[1] = 0xa5a5a5a5u;
+			CHECK(!bvn_float_strtodec(junk[k], 64u, b, 2) &&
+			      b[0] == 0xa5a5a5a5u && b[1] == 0xa5a5a5a5u,
+			      "trailing bytes refuse the literal");
+		}
+		uint32_t d32 = 0;
+		CHECK(bvn_float_strtodec("ninf", 32u, &d32, 1) && d32 == 0xf8000000u,
+		      "ninf is decimal32 -Infinity");
+		CHECK(bvn_float_strtodec("-inf", 32u, &d32, 1) && d32 == 0xf8000000u,
+		      "-inf still is too");
+		CHECK(bvn_float_strtodec("nan", 32u, &d32, 1) && d32 == 0x7c000000u,
+		      "nan");
+		CHECK(bvn_float_strtodec("1.5e3", 32u, &d32, 1), "1.5e3");
+		CHECK(bvn_float_strtodec(" 1", 32u, &d32, 1),
+		      "leading blanks are skipped, as they always were");
+	}
+	/* Zero times any power is zero. An exponent too long for the counter was
+	 * answered "overflow" before the mantissa was looked at, so a zero with
+	 * such an exponent was +inf -- on every path that reads a literal. */
+	{
+		static const char *const z[] = {
+			"0e999999999999999999999", "0.000e999999999999999999999",
+			"0e-999999999999999999999", "0.0e+999999999999999999999",
+		};
+		for (size_t k = 0; k < sizeof z / sizeof z[0]; k++) {
+			double d = 1.0;
+			uint32_t w[2] = { 1u, 1u };
+			CHECK(bvn_parse_double_in_base(z[k], 10u, &d) && d == 0.0 &&
+			      !signbit(d), "binary: zero mantissa is +0");
+			CHECK(bvn_float_strtod(z[k]) == 0.0, "strtod: zero");
+			CHECK(bvn_float_strtodec(z[k], 64u, w, 2) &&
+			      (w[1] & 0x7c000000u) != 0x78000000u &&
+			      (w[1] & 0x80000000u) == 0u,
+			      "decimal: zero mantissa is not an infinity");
+			bvn_float_t *f = bvn_float_alloc(64);
+			CHECK(f && bvn_float_from_str(f, z[k], 10) &&
+			      bvn_float_is_zero(f) && !bvn_float_is_neg(f),
+			      "from_str: zero mantissa is +0");
+			bvn_float_free(f);
+		}
+		double d = 1.0;
+		uint32_t w[2] = { 1u, 1u };
+		CHECK(bvn_parse_double_in_base("-0e99999999999999999999", 10u, &d) &&
+		      d == 0.0 && signbit(d), "binary: the sign of zero is kept");
+		CHECK(bvn_float_strtodec("-0e99999999999999999999", 64u, w, 2) &&
+		      (w[1] & 0x80000000u) != 0u &&
+		      (w[1] & 0x7c000000u) != 0x78000000u,
+		      "decimal: -0, not -inf");
+		CHECK(bvn_parse_double_in_base("0x0p99999999999999999999", 16u, &d) &&
+		      d == 0.0, "hex: zero mantissa is zero");
+		/* A non-zero mantissa still saturates, either way. */
+		CHECK(bvn_parse_double_in_base("1e999999999999999999999", 10u, &d) &&
+		      isinf(d) && d > 0, "1e<huge> is +inf");
+		CHECK(bvn_parse_double_in_base("1e-999999999999999999999", 10u, &d) &&
+		      d == 0.0, "1e-<huge> is 0");
+		CHECK(bvn_float_strtodec("1e999999999999999999999", 64u, w, 2) &&
+		      w[1] == 0x78000000u, "decimal 1e<huge> is +Infinity");
+	}
 
 	/* Every supported width works. */
 	static const struct { uint32_t w, words; } W[] = {

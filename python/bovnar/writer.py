@@ -58,12 +58,38 @@ class Writer:
             raise MemoryError("bvnr_writer_create() returned NULL")
         self._ptr = ptr
 
+    @staticmethod
+    def _make_flags(unit_flags, emit_version) -> BvnrWriteFlags:
+        """The write options every constructor opens with.
+
+        NESTING. The reader is opened at the 255-level cap in both directions
+        (reader.py says why: it is what the CLI and the DOM use), and a zeroed
+        bvnr_write_flags_t selects the C default of 64 -- so a document
+        loads() had just taken, nested 65 to 255 deep, was refused by dumps()
+        with *_nesting_too_high. The writer now matches what the reader reads.
+
+        UNIT FLAGS AND THE DIRECTIVE. Both are fields this struct has always
+        mirrored and no constructor let a caller set, while set_unit_policy's
+        own error message sent callers to UnitFlags.REDUCE "for write-side
+        unit rewriting". `unit_flags` takes UnitFlags (REDUCE, ASCII_EXP,
+        NUM_CANONICAL); `emit_version` writes a leading "#!bovnar M.N" naming
+        the spec version this build implements, as write_version() would.
+        """
+        flags = BvnrWriteFlags()
+        flags.max_struct_nesting = 255
+        flags.max_array_nesting  = 255
+        flags.unit_flags         = int(unit_flags)
+        flags.emit_version       = bool(emit_version)
+        return flags
+
     @classmethod
     def to_mem(cls,
                buf: bytearray | None = None,
                cap: int = DEFAULT_MEM_CAP,
                *,
-               pretty: bool = True) -> 'Writer':
+               pretty: bool = True,
+               unit_flags: int = 0,
+               emit_version: bool = False) -> 'Writer':
 
         w = cls()
 
@@ -78,7 +104,7 @@ class Writer:
         w._buf     = raw_buf
         w._buf_cap = cap
 
-        flags = BvnrWriteFlags()
+        flags = cls._make_flags(unit_flags, emit_version)
         ok = w._lib.bvnr_open_write_mem(
             w._ptr,
             ctypes.cast(raw_buf, ctypes.c_void_p),
@@ -91,7 +117,8 @@ class Writer:
         return w
 
     @classmethod
-    def to_fd(cls, fd: int, *, pretty: bool = True) -> 'Writer':
+    def to_fd(cls, fd: int, *, pretty: bool = True,
+              unit_flags: int = 0, emit_version: bool = False) -> 'Writer':
 
         if not isinstance(fd, int) or fd < 0:
             raise BovnarArgumentError(f"Invalid file descriptor: {fd!r}")
@@ -101,7 +128,7 @@ class Writer:
         w._lib.bvnr_sink_to_fd(ctypes.byref(sink), fd)
         w._sink = sink
 
-        flags = BvnrWriteFlags()
+        flags = cls._make_flags(unit_flags, emit_version)
         ok = w._lib.bvnr_open_write_sink(
             w._ptr,
             ctypes.byref(sink),
@@ -113,12 +140,14 @@ class Writer:
         return w
 
     @classmethod
-    def to_file(cls, path: str, *, pretty: bool = True) -> 'Writer':
+    def to_file(cls, path: str, *, pretty: bool = True,
+                unit_flags: int = 0, emit_version: bool = False) -> 'Writer':
 
         import os
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
         try:
-            w = cls.to_fd(fd, pretty=pretty)
+            w = cls.to_fd(fd, pretty=pretty, unit_flags=unit_flags,
+                          emit_version=emit_version)
         except BaseException:
             os.close(fd)
             raise
@@ -218,8 +247,8 @@ class Writer:
             raise BovnarArgumentError(
                 "the writer takes only the validation half of a UnitPolicy "
                 "(require_unit / require_dimension_of, and rules with "
-                "convert=False); use UnitFlags.REDUCE for write-side unit "
-                "rewriting")
+                "convert=False); for write-side unit rewriting open the writer "
+                "with unit_flags=UnitFlags.REDUCE")
         try:
             cp, keepalive = build_unit_policy(
                 require_unit=policy.require_unit,
@@ -514,6 +543,7 @@ class Writer:
                    unit_si_prefix: SIPrefix = SIPrefix.NONE,
                    unit_si_exp: Exponent = Exponent.LINEAR) -> None:
 
+        self._refuse_signed_high_base(base)
         vt  = make_type_spec(ValueTypeFamily.SINT, width, base)
         vu  = self._resolve_unit(unit_str, unit_si_base, unit_si_prefix,
                                  unit_si_exp, None, IECPrefix.NONE)
@@ -659,6 +689,18 @@ class Writer:
             self._raise_error()
 
     @staticmethod
+    def _refuse_signed_high_base(base: int) -> None:
+        # Base64 and Ascii85 have '+' and '-' among their DIGITS, so there is
+        # no sign to write and the format has no signed integer in either. This
+        # used to surface as "bvn_format_int64 overflow" carrying
+        # ErrorCode.NONE from write_sint, and as illegal_value_type from
+        # write_bvni -- neither of which names the cause.
+        if base in (64, 85):
+            raise BovnarArgumentError(
+                f"base {base} is unsigned: its alphabet uses '+' and '-' as "
+                "digits, so a signed integer cannot be written in it")
+
+    @staticmethod
     def _resolve_unit(unit_str, si_base, si_prefix, si_exp,
                       iec_base, iec_prefix) -> ValueUnit:
 
@@ -783,6 +825,8 @@ class Writer:
             use_signed = value < 0
         else:
             use_signed = signed
+        if use_signed:
+            self._refuse_signed_high_base(base)
         family = ValueTypeFamily.SINT if use_signed else ValueTypeFamily.UINT
         vt_base = 0 if base == 10 else base
         vt  = make_type_spec(family, width, vt_base)

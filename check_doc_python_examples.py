@@ -288,6 +288,9 @@ def property_calls(repo):
 
 def main(argv):
     repo = os.path.abspath(argv[1]) if len(argv) > 1 else REPO
+    sys.path.insert(0, REPO)
+    import bvnr_build_env
+    bvnr_build_env.require_build(repo, "check_doc_python_examples", ("library",))
     problems, checked, skipped = check(repo)
     try:
         problems = problems + property_calls(repo)

@@ -498,3 +498,69 @@ class TestTypedArraysSurviveDumps:
         doc, out, back = self._again(src)
         assert out == src
         assert [q.value for q in back['a']] == [255, 16]
+
+
+@needs_lib
+class TestWriteArrayHeldToAnnotation:
+    """With `vt` given, every element is held to it.
+
+    The elements used to be range-checked against a type synthesised per
+    element -- uint:64 for any non-negative int -- and the annotation was only
+    ever written. So `write_array(..., vt=<uint:16>)` wrote 80800 under
+    <uint:16>, a document nothing reads, and under a base-16 annotation it
+    wrote the DECIMAL digits of each int: 255 went out as `255` and came back
+    as 0x255."""
+
+    @staticmethod
+    def _write(rows, vt, **kw):
+        w = Writer.to_mem(pretty=False)
+        write_array(w, 'p', rows, vt=vt, **kw)
+        w.finish()
+        return w.get_output()
+
+    def test_out_of_range_element_is_refused(self):
+        with pytest.raises(BovnarArgumentError):
+            self._write([80, 443, 80800], make_type_spec(ValueTypeFamily.UINT, 16))
+
+    def test_negative_under_uint_is_refused(self):
+        with pytest.raises(BovnarArgumentError):
+            self._write([-1, 1], make_type_spec(ValueTypeFamily.UINT, 8))
+
+    def test_float_under_integer_annotation_is_refused(self):
+        with pytest.raises(BovnarArgumentError):
+            self._write([1.5], make_type_spec(ValueTypeFamily.UINT, 32))
+
+    def test_string_under_numeric_annotation_is_refused(self):
+        with pytest.raises(BovnarArgumentError):
+            self._write(["a"], make_type_spec(ValueTypeFamily.UINT, 32))
+
+    def test_bool_under_numeric_annotation_is_refused(self):
+        with pytest.raises(BovnarArgumentError):
+            self._write([True], make_type_spec(ValueTypeFamily.UINT, 8))
+
+    def test_in_range_elements_still_write(self):
+        out = self._write([[-128, 127], [0, None]],
+                          make_type_spec(ValueTypeFamily.SINT, 8))
+        assert loads(out)['p'] == [[-128, 127], [0, None]]
+
+    def test_non_decimal_base_writes_the_value(self):
+        out = self._write([255, 16], make_type_spec(ValueTypeFamily.UINT, 16, 16))
+        assert out == b'.p=<uint:16,_16>["ff","10"];'
+        assert loads(out)['p'] == [255, 16]
+
+    def test_ints_under_a_float_annotation_are_floats(self):
+        out = self._write([1, 2], make_type_spec(ValueTypeFamily.FLOAT, 32))
+        assert loads(out)['p'] == [1.0, 2.0]
+
+    def test_generator_rows_keep_their_first_element(self):
+        # The "is this a list of rows" probe ran all() over the rows and so ate
+        # the head of a generator before a single element was written.
+        w = Writer.to_mem(pretty=False)
+        write_array(w, 'p', (x for x in [1, 2, 3]))
+        w.finish()
+        assert loads(w.get_output())['p'] == [1, 2, 3]
+
+    def test_a_unit_object_is_a_unit(self):
+        out = self._write([1.0], make_type_spec(ValueTypeFamily.FLOAT, 64),
+                          vu=bovnar.Unit.parse('m'))
+        assert out == b'.p=<float:64,m>[1.0];'

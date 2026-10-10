@@ -389,23 +389,32 @@
 <p>Overlong sequences and surrogate halves (U+D800–U+DFFF) are rejected.</p>
 <h3 id="32-byte-order-mark-bom">3.2 Byte Order Mark (BOM)</h3>
 <p>The UTF-8 BOM <code>EF BB BF</code> is only legal <strong>at byte offset 0</strong> of a stream.</p>
-<p>The lexer runs a dedicated <code>first_comment_*</code> state machine over the first comment line to detect misplaced BOMs:</p>
+<p>A BOM anywhere else is an error or is ordinary content, depending on whether the first assignment has begun.</p>
+<p><strong>Before the first assignment:</strong></p>
 <ul>
-<li>A BOM (<code>EF BB BF</code>) detected <strong>inside the first-line comment</strong> produces <code>error_invalid_byte_order_mark</code>.</li>
-<li>A BOM byte (<code>EF</code>) seen <strong>after</strong> the first comment line (in the <code>first_bom</code> state, before the first <code>.</code> identifier) is unhandled and produces <code>error_unexpected_input_byte</code>.</li>
+<li>A BOM (<code>EF BB BF</code>) <strong>inside any comment</strong> — the first comment line, a version directive line, or a later comment line — produces <code>error_invalid_byte_order_mark</code>.</li>
+<li>A BOM <strong>after leading whitespace</strong>, with no comment line before it, produces <code>error_invalid_byte_order_mark</code>.</li>
+<li>A BOM <strong>at the start of a line that follows a comment line or a version directive</strong> produces <code>error_unexpected_input_byte</code>, as does a second BOM directly after the one at offset 0.</li>
+</ul>
+<p><strong>Once the first assignment has begun:</strong></p>
+<ul>
+<li><code>EF BB BF</code> inside a comment or a string is <strong>valid UTF-8</strong> and is accepted as content.</li>
+<li><code>EF BB BF</code> between assignments produces <code>error_unexpected_input_byte</code>.</li>
 </ul>
 <!-- bovnar-example: illustrative -->
 
 <div class="codehilite"><pre><code class="language-bovnar"># BOM at byte offset 0: valid
 EF BB BF.foo = 1;
 
-# BOM bytes inside the first comment → error_invalid_byte_order_mark
+# BOM bytes inside a comment before the first assignment → error_invalid_byte_order_mark
 # comment text: # EF BB BF text
 
-# BOM bytes after the first comment line → error_unexpected_input_byte
+# BOM bytes after leading whitespace → error_invalid_byte_order_mark
+   EF BB BF.foo = 1;
+
+# BOM bytes at the start of the line after a comment line → error_unexpected_input_byte
 # comment line
 EF BB BF.foo = 1;</code></pre></div>
-<p>A BOM appearing <strong>inside</strong> any later comment or string is <strong>valid UTF-8</strong> and accepted (only the <code>first_comment_*</code> states guard against BOM).</p>
 <h3 id="33-byte-classes">3.3 Byte Classes</h3>
 <table>
 <thead>
@@ -424,7 +433,7 @@ EF BB BF.foo = 1;</code></pre></div>
 <tr>
 <td>Control (rejected)</td>
 <td><code>0x00–0x08</code>, <code>0x0E–0x1F</code>, <code>0x7F</code> (DEL)</td>
-<td>Hard errors outside strings</td>
+<td>Hard errors everywhere outside octet streams, strings and comments included (<code>0x00</code> where a value is expected opens an octet stream)</td>
 </tr>
 <tr>
 <td>Safe ASCII</td>
@@ -454,7 +463,7 @@ is a 1.2 construct in a document declaring 1.1.
 (there is nothing declared), and a consumer that wants a concrete number should
 default to 1.0.</p>
 <p><strong>Form.</strong> <code>#</code> <code>!bovnar</code> followed by one or more spaces/tabs, a <code>&lt;major&gt;.&lt;minor&gt;</code>
-decimal version, optional trailing whitespace, then end-of-line (LF/CR) or EOF.
+decimal version, optional trailing spaces/tabs, then end-of-line (LF/CR) or EOF.
 Each component is a decimal integer with no leading zero (a bare <code>0</code> excepted)
 and must fit in 16 bits.</p>
 <p><strong>Backward compatible by construction.</strong> Lexically the directive <em>is</em> a comment
@@ -526,7 +535,7 @@ resume on the next line, where they are ordinary and inert.</p>
 <hr />
 <h2 id="4-lexical-structure">4. Lexical Structure</h2>
 <h3 id="41-whitespace--comments">4.1 Whitespace &amp; Comments</h3>
-<p>Whitespace and comments are freely interleaved between all tokens.</p>
+<p>Whitespace and comments are freely interleaved between all tokens, with the one restriction on where a comment may <em>start</em> that is stated below.</p>
 <p><strong>Whitespace characters:</strong></p>
 <div class="codehilite"><pre><span></span><code>HT (0x09), LF (0x0A), VT (0x0B), FF (0x0C), CR (0x0D), SP (0x20)
 </code></pre></div>
@@ -538,6 +547,15 @@ resume on the next line, where they are ordinary and inert.</p>
 
 <div class="codehilite"><pre><code class="language-bovnar"># A full-line comment
 .foo = 42;  # an inline comment</code></pre></div>
+<p><strong><code>#</code> is not a terminator of a bare token.</strong> A comment may not start immediately after a key, a number, a symbol, a reserved word, a reference or a datetime literal: there <code>#</code> is <code>error_unexpected_input_byte</code>, and at least one whitespace byte must come first. After a string, <code>]</code>, <code>}</code>, <code>&gt;</code>, <code>=</code>, <code>;</code> or an inline unit, <code>#</code> may follow directly.</p>
+<!-- bovnar-example: rejected -->
+
+<div class="codehilite"><pre><code class="language-bovnar">.ok1 = 42 # whitespace first: valid
+;
+.ok2 = &quot;text&quot;# directly after a string: valid
+;
+.bad = 42# directly after a number: error_unexpected_input_byte
+;</code></pre></div>
 <h3 id="42-identifiers-keys">4.2 Identifiers (Keys)</h3>
 <p>Every assignment begins with <code>.</code> followed by an identifier (the key).</p>
 <p><strong>Syntax:</strong></p>
@@ -708,10 +726,11 @@ after <code>\</code> causes <code>error_illegal_escape_sequence</code>.</p>
 <p><strong>Syntax:</strong></p>
 <div class="codehilite"><pre><span></span><code>reference     = &quot;&amp;&quot; ref-segment { ref-segment | index }
 ref-segment   = &quot;.&quot; id-start { ref-body-char }
-ref-body-char = same as symbol-body-char | &quot;.&quot;
+ref-body-char = same as symbol-body-char
 index         = &quot;[&quot; digit { digit } &quot;]&quot;        (* spec 1.1 *)
 </code></pre></div>
 
+<p>A <code>.</code> never extends a segment: it starts the next one, which must begin with an <code>id-start</code> character. A trailing or doubled dot (<code>&amp;.x.</code>, <code>&amp;.x..y</code>) is <code>error_unexpected_input_byte</code>.</p>
 <p>The stored text includes the leading dot and all intermediate dots:</p>
 <div class="codehilite"><pre><code class="language-bovnar">.host = &quot;localhost&quot;;
 .port = 8080;
@@ -766,7 +785,7 @@ dec-exponent  = (&quot;e&quot; | &quot;E&quot;) [ &quot;+&quot; | &quot;-&quot; 
 </code></pre></div>
 
 <ul>
-<li>Only <code>e</code>/<code>E</code> accepted as exponent marker in bare literals (base-16 float values in quoted string literals use <code>p</code>/<code>P</code> — see §6.3)</li>
+<li>Only <code>e</code>/<code>E</code> accepted as exponent marker in bare literals (base-16 float values in quoted string literals use <code>p</code>/<code>P</code> — see §6.3). Under a declared base of 15 or above the <code>e</code>/<code>E</code> of a bare literal is read as a digit, not as an exponent marker (§5.5)</li>
 <li>Leading zeros are valid (<code>007</code> is accepted)</li>
 <li>A trailing dot without fractional digits is valid (<code>123.</code>)</li>
 <li><code>.</code> alone is a hard error</li>
@@ -924,8 +943,13 @@ idempotent (<code>2026-06-15</code> becomes <code>&lt;datetime:64&gt; 1781481600
 with no annotation infers <code>&lt;datetime:64,unix&gt;</code>, so <code>.t = 2026-06-15;</code> is a
 timestamp without any annotation. Fields are strictly validated (month <code>01</code>–<code>12</code>,
 a valid day-of-month, hour <code>00</code>–<code>23</code>, minute <code>00</code>–<code>59</code>, second <code>00</code>–<code>60</code>, offset
-<code>±HH:MM</code> with two-digit components); a malformed or out-of-range literal is
-<code>error_invalid_datetime_literal</code>. A second of <code>60</code> is a <strong>UTC leap second</strong> and
+<code>±HH:MM</code> with two-digit components). A literal with an
+out-of-range field, a field of the wrong width (<code>2026-6-15</code>) or an empty
+fraction is <code>error_invalid_datetime_literal</code>; one that stops being a literal
+part-way (a
+missing seconds field, <code>+0200</code> without its colon, a lowercase <code>t</code> or <code>z</code>) is a
+lexical error, <code>error_unexpected_input_byte</code>; and a literal in a document that
+declares less than 1.1 is <code>error_illegal_value_type</code>. A second of <code>60</code> is a <strong>UTC leap second</strong> and
 is accepted. What it stores depends on the epoch:</p>
 <ul>
 <li>On the <strong>civil epochs</strong> (<code>unix</code>, <code>mjd</code>, <code>ntp</code>, <code>y2000</code>) it normalises onto the
@@ -1158,7 +1182,7 @@ flux in netCDF and CF metadata.</p>
                                              # grammar, not from the lexer
 .bad = &lt;float:64,qudt:Kilo GM&gt; 1.0;          # error_unit_illegal — a flat
                                              # vocabulary has no operators</code></pre></div>
-<p>Three details of that exception:</p>
+<p>Four details of that exception:</p>
 <ul>
 <li><strong>The family <code>:</code> is not a namespace.</strong> Only a second <code>:</code> at bracket depth 0
   makes a parameter namespaced, so <code>&lt;uint:6 4&gt;</code> is still
@@ -1227,9 +1251,10 @@ available in a type annotation only.</p>
 # .bad = &lt;float_fix:32,q8,_10&gt; 1.0;   # ERROR: base forbidden for float_fix
 # .bad = &lt;float_dec:64,_10&gt; 1.0;      # ERROR: base forbidden for float_dec</code></pre></div>
 <h3 id="55-non-decimal-base-with-bare-numbers">5.5 Non-decimal Base with Bare Numbers</h3>
-<p>A non-decimal base with a bare number literal is not caught by the validator (no error is raised). In practice, a bare non-decimal value such as <code>ff</code> is parsed as a symbol token, not a number, so type/value compatibility validation will flag the mismatch instead. Use a quoted string for non-decimal values:</p>
-<div class="codehilite"><pre><code class="language-bovnar"># CORRECT: quoted string
-.n = &lt;uint:_16&gt; &quot;ff&quot;;     # hex value 255</code></pre></div>
+<p>A bare number literal under a non-decimal base is valid when every byte of it is a digit of that base, and it is read <strong>in that base</strong>: <code>&lt;uint:_16&gt; 10</code> is sixteen, not ten. In base 15 and above <code>e</code> and <code>E</code> are digits, so a bare <code>1e3</code> under <code>_16</code> is the integer 0x1E3 (483) and not an exponent form; below base 15 the <code>e</code> is still an exponent marker, and under an integer family that is <code>error_type_value_mismatch</code>. A value that needs a letter the number lexer does not accept cannot be written bare — <code>ff</code> is lexed as a symbol, and the type/value check reports <code>error_type_value_mismatch</code> — so it must be a quoted string. Producers SHOULD quote every non-decimal value:</p>
+<div class="codehilite"><pre><code class="language-bovnar">.n = &lt;uint:_16&gt; &quot;ff&quot;;     # hex value 255 — the form to write
+.m = &lt;uint:_16&gt; 10;       # valid, and sixteen: the bare digits are read in base 16
+.k = &lt;uint:_16&gt; 1e3;      # valid, and 483: in base 16 the &#x27;e&#x27; is a digit</code></pre></div>
 <hr />
 <h2 id="6-value-tokens">6. Value Tokens</h2>
 <h3 id="61-typevalue-compatibility">6.1 Type/Value Compatibility</h3>
@@ -1275,10 +1300,11 @@ available in a type annotation only.</p>
 </tr>
 <tr>
 <td><code>vt_datetime</code> (spec 1.1)</td>
-<td>Number only — a decimal signed integer (epoch seconds); <code>.</code>/<code>e</code> and string carriers are rejected</td>
+<td>A decimal signed integer (epoch seconds), an ISO-8601 literal (§5.1), or a special number (§6.4); <code>.</code>/<code>e</code> and string carriers are rejected</td>
 </tr>
 </tbody>
 </table>
+<p>Two value kinds stand outside this table. A <strong>null</strong> takes any annotation and carries its type (§4.7). An <strong>octet stream</strong> under an annotation is accepted under <em>every</em> family: the annotation is carried on the stream's events and is <strong>not checked</strong> against it, so <code>&lt;uint:8&gt;</code>, <code>&lt;utf8&gt;</code> or <code>&lt;bool&gt;</code> in front of an octet stream is not <code>error_type_value_mismatch</code>. It says nothing about the payload, and producers SHOULD NOT write one.</p>
 <h3 id="62-validation-rules-per-numeric-type">6.2 Validation Rules per Numeric Type</h3>
 <p><strong>uint (unsigned integer):</strong></p>
 <!-- bovnar-example: rejected -->
@@ -1299,6 +1325,12 @@ available in a type annotation only.</p>
 <p><strong>float (binary floating-point):</strong></p>
 <p>Valid widths: <code>0</code> (default 64), <code>16</code>, or any multiple of <code>32</code> up to <code>32768</code>.
 Base <code>10</code> (default) or <code>16</code> are accepted; all other bases are rejected.</p>
+<p><strong>No range or precision check.</strong> A <code>float</code> or <code>float_dec</code> literal with more
+precision or a larger exponent than the declared width can hold is valid
+(<code>&lt;float:16&gt; 1e30</code>, <code>&lt;float_dec:16&gt; 1234</code>, a bare <code>1e999</code>). The excess is the
+consumer's to round, and a consumer may deliver ±infinity. For these two
+families the width bounds what a producer promises, not what the reader
+rejects; only the integer families and <code>float_fix</code> are range-checked.</p>
 <!-- bovnar-example: rejected -->
 
 <div class="codehilite"><pre><code class="language-bovnar">.valid = &lt;float:64&gt; 3.14;
@@ -1358,7 +1390,7 @@ Values are written as ordinary decimal literals or special numbers.</p>
 .value = &lt;uint:_2&gt; &quot;1010&quot;;     # OK: valid binary
 .value = &lt;uint:_2&gt; &quot;210&quot;;      # error_digit_not_in_base</code></pre></div>
 <h4 id="exponent-markers-in-quoted-string-literals">Exponent Markers in Quoted String Literals</h4>
-<p>Bare number literals always use <code>e</code>/<code>E</code> as the exponent separator (§4.6). Quoted string number literals follow the same rule <strong>except</strong> for base-16 (<code>_16</code>) float values, where <code>p</code>/<code>P</code> must be used instead of <code>e</code>/<code>E</code>. This is required because <code>e</code> and <code>E</code> are valid hexadecimal digits: with base 16 you must write <code>"1.8p+2"</code>, not <code>"1.8e+2"</code> — the <code>e</code> would be read as a mantissa digit rather than an exponent marker, leaving the trailing <code>+2</code> invalid. Float values support a decimal base (the default) and base-16 (<code>_16</code>); the <code>p</code>/<code>P</code> exponent separator applies to the base-16 form.</p>
+<p>Bare number literals use <code>e</code>/<code>E</code> as the exponent separator (§4.6) — in a base below 15; from base 15 up the letter is a digit, bare or quoted (§5.5). Quoted string number literals follow the same rule <strong>except</strong> for base-16 (<code>_16</code>) float values, where <code>p</code>/<code>P</code> must be used instead of <code>e</code>/<code>E</code>. This is required because <code>e</code> and <code>E</code> are valid hexadecimal digits: with base 16 you must write <code>"1.8p+2"</code>, not <code>"1.8e+2"</code> — the <code>e</code> would be read as a mantissa digit rather than an exponent marker, leaving the trailing <code>+2</code> invalid. Float values support a decimal base (the default) and base-16 (<code>_16</code>); the <code>p</code>/<code>P</code> exponent separator applies to the base-16 form.</p>
 <div class="codehilite"><pre><code class="language-bovnar">.hex_float  = &lt;float:64,_16&gt; &quot;1.8p+2&quot;;   # OK: 1.8₁₆ × 2² = 6.0  (p = binary exponent)
 .hex_mant   = &lt;float:64,_16&gt; &quot;1.8e&quot;;     # OK: &#x27;e&#x27; is a hex digit → mantissa 1.8e₁₆
 .dec_float  = &lt;float:64&gt; 12.0;           # OK: default decimal base</code></pre></div>
@@ -1442,6 +1474,7 @@ Values are written as ordinary decimal literals or special numbers.</p>
 # Both present and different — error_unit_mismatch
 .dist = &lt;float:64,m&gt; 1.5 s;     # ERROR: annotation says m, inline says s</code></pre></div>
 <p>An invalid inline unit string (unrecognised base unit, bad prefix, etc.) produces <code>error_unit_illegal</code>. The suffix may appear after <code>no_unit</code> checks as with any other unit string.</p>
+<p><strong>An inline unit after a <code>utf8</code> string is accepted.</strong> The inline path does not consult the type family: <code>&lt;utf8&gt; "text" m</code> and a bare <code>"text" m</code> are valid, the unit is carried on the value and is written back on re-serialisation — although the same unit as an annotation parameter (<code>&lt;utf8,m&gt;</code>) is <code>error_illegal_value_type</code> (§5.1). The suffix exists for quoted <em>numeric</em> literals (<code>&lt;uint:_16&gt; "ff" m</code>); producers SHOULD NOT attach one to text.</p>
 <hr />
 <h2 id="7-arrays">7. Arrays</h2>
 <h3 id="71-row-syntax">7.1 Row Syntax</h3>
@@ -2474,7 +2507,7 @@ for anything genuinely out of range.</p>
 .flux     = &lt;float:64,udunits:kg*m-2*s-1&gt; 0.5;</code></pre></div>
 <p>A code that is one whole token is <strong>never decomposed</strong>: <code>unece:KGM</code> is the kilogram, not a <code>k</code> prefix on a <code>GM</code>, and <code>qudt:MI</code> is the mile, not a milli-anything. Only an expression namespace strips prefixes and recognises operators.</p>
 <p><strong>Gated on the declared version.</strong> A profile unit requires a <code>#!bovnar</code> directive declaring 1.2 or later, exactly as the datetime family and the <code>\x</code>/<code>\u</code> escapes require 1.1 (§3.4). In a document declaring less — or declaring nothing, which declares less than anything — a profile unit is <code>error_unit_illegal</code>, because in that version it is not a unit. A <strong>native</strong> unit is unaffected in every version; the notation is purely additive.</p>
-<p><strong>Three outcomes, and no fourth.</strong> A profile expression becomes a real unit, or it becomes an error. There is no state in which a value carries a unit the parser cannot reason about — every guarantee this section makes is a guarantee about units the parser understands. The refusals are distinguished so a producer can act on them:</p>
+<p><strong>A unit, an opaque unit, or one of three errors — and nothing else.</strong> A profile expression becomes a real unit, or it becomes an error. There is no state in which a value carries a unit the parser cannot reason about — every guarantee this section makes is a guarantee about units the parser understands. The refusals are distinguished so a producer can act on them:</p>
 <table>
 <thead>
 <tr>
@@ -2636,11 +2669,11 @@ for anything genuinely out of range.</p>
 <td><code>error_type_value_mismatch</code></td>
 </tr>
 <tr>
-<td>Dot or exponent in integer-typed value</td>
+<td>Dot or exponent in integer-typed value (an <code>e</code>/<code>E</code> is an exponent only in a base below 15, §5.5)</td>
 <td><code>error_type_value_mismatch</code></td>
 </tr>
 <tr>
-<td>Malformed or out-of-range ISO-8601 datetime literal (spec 1.1)</td>
+<td>ISO-8601 datetime literal with an out-of-range or wrong-width field, or an empty fraction (spec 1.1); one that breaks off part-way is <code>error_unexpected_input_byte</code></td>
 <td><code>error_invalid_datetime_literal</code></td>
 </tr>
 <tr>
@@ -2662,10 +2695,6 @@ for anything genuinely out of range.</p>
 <tr>
 <td><code>utf8</code> (string) type given a number value</td>
 <td><code>error_type_value_mismatch</code></td>
-</tr>
-<tr>
-<td>Non-decimal base for float type</td>
-<td><code>error_illegal_value_type</code></td>
 </tr>
 <tr>
 <td>Base <code>_N</code> (N≠10, N≠16) for <code>float</code></td>
@@ -2786,8 +2815,12 @@ tool's "Validation tiers" (§3 of <code>doc/13_bovnar_conformance.md</code>).</p
 </thead>
 <tbody>
 <tr>
-<td>Empty key (<code>.=</code> or <code>.</code> + non-identifier char)</td>
+<td>Empty key (<code>.</code> followed by <code>=</code> or by whitespace)</td>
 <td><code>error_empty_identifier</code></td>
+</tr>
+<tr>
+<td><code>.</code> followed by any other byte that cannot start an identifier (<code>.1</code>, <code>.;</code>, <code>.-a</code>)</td>
+<td><code>error_unexpected_input_byte</code></td>
 </tr>
 <tr>
 <td>Invalid character in identifier</td>
@@ -2899,7 +2932,7 @@ tool's "Validation tiers" (§3 of <code>doc/13_bovnar_conformance.md</code>).</p
 </code></pre></div>
 
 <h3 id="132-recovery-mode">13.2 Recovery Mode</h3>
-<p>When <code>bvnr_read_flags_t.continue_on_error</code> is <code>true</code>, the parser enters <strong>resync mode</strong> after any error:</p>
+<p>When <code>bvnr_read_flags_t.continue_on_error</code> is <code>true</code>, the parser enters <strong>resync mode</strong> after an error — any error but one inside a comment (below):</p>
 <ol>
 <li>The <code>on_error</code> callback is invoked with error details</li>
 <li>A <strong>resync state machine</strong> (<code>state_t: resync, resync_dot, resync_string, resync_string_escape, resync_comment</code>) skips bytes</li>
@@ -2921,6 +2954,19 @@ skipped-over junk (<code>1.5</code>, <code>.5</code>, a <code>.</code> in binary
 skipped byte. A <code>.</code> inside a bracket opened <em>since</em> recovery began opens no
 assignment either, and is skipped. Neither boundary recovers less than the other
 alone would: <code>;</code> remains a boundary in every case it was one before.</p>
+<p><strong>What recovery leaves open.</strong> On entry the reader closes — with their
+<code>ev_array_row_end</code> events — only the arrays opened <em>inside</em> the innermost open
+struct, the ones the broken statement itself was in. An array that struct is an
+<em>element of</em> stays open, with its row and element counts, so the struct's own
+<code>}</code> and the array's <code>,</code> or <code>]</code> are read normally afterwards and the start/end
+events a consumer sees always nest. A <code>}</code> that is itself the offending byte
+(<code>.s = {.a = 1 };</code>, a member missing its <code>;</code>) is not discarded: it closes its
+struct.</p>
+<p><strong>An error inside a comment does not enter resync.</strong> An invalid UTF-8 sequence
+or a control byte in a comment is reported through <code>on_error</code> and counted —
+<code>recovery_count</code> and the skipped-byte total each go up by one — and the comment
+continues to its line end. Nothing is unwound and no value is lost, and the rest
+of the comment is never read as document text.</p>
 <p><strong>State machine behavior during resync:</strong></p>
 <table>
 <thead>
@@ -3690,7 +3736,7 @@ All functions return <code>false</code> on serialisation error.</p>
 <span class="w">    </span><span class="cm">/* whitespace split a type-annotation PARAMETER in two (§5.3). Every `ws` the</span>
 <span class="cm">     * grammar allows inside an annotation sits beside a separator; in the middle</span>
 <span class="cm">     * of a parameter there is no production for it, and the lexer used to drop it</span>
-<span class="cm">     * anyway -- so &quot;&lt;float:64,k g&gt;&quot; was accepted as the kilogram and &quot;&lt;uint:6 4&gt;&quot;</span>
+<span class="cm">     * anyway -- so &quot;&lt;float:64,m in&gt;&quot; was accepted as the minute and &quot;&lt;uint:6 4&gt;&quot;</span>
 <span class="cm">     * as a 64-bit width. Reported at the first byte after the whitespace. A byte</span>
 <span class="cm">     * that is illegal anywhere in an annotation is still</span>
 <span class="cm">     * error_unexpected_input_byte. */</span>
@@ -3791,8 +3837,8 @@ rather than as changes of the format, on these grounds:</p>
 </ul>
 <p>Neither of the two changes what any accepted document <em>means</em>. A producer
 affected by either was already emitting data that could not be read correctly.</p>
-<p><strong>Reader defects fixed in the same release.</strong> Beside those two, the 1.2
-reference reader stopped letting through — or misreading — input the
+<p><strong>Reader defects fixed in the same release.</strong> Beside those two, the reference
+reader of library 2.0.0 (which implements 1.2) stopped letting through — or misreading — input the
 specification already excluded. They are listed because a document that
 depended on one behaves differently, and because the first of them is the one
 case in which an accepted document now decodes to a different value:</p>
@@ -3805,9 +3851,9 @@ case in which an accepted document now decodes to a different value:</p>
   (<code>&lt;float:64,s&gt;[&lt;float:64&gt; 1, 3]</code>) no longer strips the unit from the elements
   after it. The <code>3</code> is in seconds again — and the document tier then refuses the
   array as mixed.</li>
-<li><em>A byte-order mark anywhere but offset 0</em> is
-  <code>error_invalid_byte_order_mark</code> (§3.2 always said so; one after leading
-  whitespace was accepted).</li>
+<li><em>A byte-order mark after leading whitespace</em> is
+  <code>error_invalid_byte_order_mark</code> (§3.2 always made offset 0 the only legal
+  place; this one was accepted).</li>
 <li><em>A version directive ended by end-of-input</em> is parsed like one ended by a
   newline, so a malformed one is <code>error_invalid_spec_version</code>.</li>
 <li><em>An array left open at the <code>;</code></em> (<code>.a = [1;</code>) is
@@ -3817,7 +3863,43 @@ case in which an accepted document now decodes to a different value:</p>
   value (<code>.f = [{.x = 7, 1;}];</code>) is <code>error_unexpected_input_byte</code>; it was
   accepted, and the member read as <code>71</code>. And an array left open at a <code>;</code> is
   detected inside a struct as well, after an array nested in it has closed
-  (<code>.p = {.s = [{.a = [1];}; .q = 1;];};</code>).</li>
+  (<code>.p = {.s = [{.a = [1];}; .q = 1;];};</code>). A <code>]</code> is held to the same rule:
+  <code>.a = [{.x = 1];};</code> closed the array from inside its own element and was
+  accepted; it is <code>error_unexpected_input_byte</code>.</li>
+<li><em>The width of a <code>/</code>-row counts each element once</em> (§7.3). A nested array —
+  an element, or an array that is only a member of a struct element — was
+  counted twice in the row that holds it. So <code>[[1]]/[null,null]</code> (one element
+  against two) was accepted and is <code>error_array_row_size_mismatch</code>; and
+  <code>[[1],[2]]/[null,null]</code> and <code>[{.m = [1];}]/[{.m = null;}]</code> (equal widths)
+  were refused and are valid. This is the one entry here that also <em>accepts</em>
+  documents a 1.1 reader refused. Rows whose elements are all arrays, or all
+  not, compared correctly before and are unchanged.</li>
+<li><em><code>float_fix</code> and <code>float_dec</code> are one keyword each.</em> Whitespace or a comment
+  before the suffix (<code>&lt;float _fix:32,q8&gt;</code>) is <code>error_type_param_whitespace</code>,
+  for the reason given above for whitespace inside a parameter; it was read
+  as <code>float_fix</code>.</li>
+<li><em>After a reference index only <code>.</code>, <code>[</code> or the end of the reference may
+  follow</em> (§4.5). <code>&amp;.a[0]b</code> is <code>error_unexpected_input_byte</code>; it was accepted
+  as the path <code>.a[0]b</code>, which the grammar does not derive and no lookup
+  resolves.</li>
+<li><em>A comment that ends at end-of-input inside a multi-byte UTF-8 sequence</em> is
+  <code>error_invalid_utf8_byte</code> (§3.1), as the same bytes followed by a newline
+  always were.</li>
+<li><em>Quoted digits are range-checked whatever they spell.</em> In base 24 and up
+  <code>n</code>, <code>a</code>, <code>i</code> and <code>f</code> are digits, and a quoted <code>"nan"</code>, <code>"inf"</code> or <code>"ninf"</code>
+  under <code>uint</code>/<code>sint</code> was exempted from the range check as though it were the
+  keyword: <code>&lt;uint:8,_36&gt; "inf"</code> (24171) is <code>error_value_out_of_range</code>. The
+  bare keywords keep the exemption of §6.4.</li>
+<li><em>Homogeneity (§7.4) no longer depends on element order.</em> The document tier
+  compared every element with the first non-null one, so a hole in that one
+  hid whatever stood at the same position in the others:
+  <code>[[null], [1], ["x"]]</code> and <code>[{.x = null;}, {.x = 1;}, {.x = "s";}]</code> were
+  accepted — as was a matrix whose rows carry different units behind a leading
+  row of nulls — while the same elements in another order were refused. They
+  are <code>error_array_element_type_mismatch</code> in every order. In the other
+  direction, nested <code>/</code>-matrices such as <code>[[[1,1]/[2,2], null], [null, null]]</code>
+  were refused as ragged through a row count shared between array scopes, and
+  are valid.</li>
 <li><em>A datetime literal with a fraction whose UTC year falls outside 0000–9999</em>
   (reachable only through a timezone offset) is
   <code>error_invalid_datetime_literal</code>.</li>
@@ -3918,9 +4000,11 @@ dimensionally consistent with each other, or that the producer measured what it
 claims. <em>It parsed</em> means the dimension is stated and internally consistent, not
 that it is correct.</p>
 <p>Read-time unit conversion carries a further trap: asking for a value in some
-unit is a <strong>request, not a guarantee</strong>. Where the conversion cannot be
-performed — different dimensions, or two different currencies — the value is
-delivered in its <em>original</em> unit rather than the request failing. A caller that
+unit is a <strong>request, not a guarantee</strong>. A target <em>list</em> (<code>want_unit</code>, <code>--unit</code>,
+<code>--si</code>) leaves a value it cannot convert — different dimensions, or two
+different currencies — in its <em>original</em> unit and reports no error; a
+per-field rule (<code>--field</code>, a policy rule by key path) fails with
+<code>error_unit_mismatch</code> instead. Only the first needs the check. A caller that
 assumes success then holds a number it believes is in one unit and which is in
 another, which is exactly the failure this format exists to prevent. Check
 whether the conversion occurred; do not infer it from the absence of an error.</p>
@@ -4008,21 +4092,21 @@ ev_type_annotation_type_family &quot;uint&quot;
 ...params...
 ev_type_annotation_end
 ev_data                        data=&quot;1&quot;
-ev_type_annotation_start       (synthesised for 2)
-...params...
-ev_type_annotation_end
 ev_data                        data=&quot;2&quot;
 ev_array_row_end
 ev_array_dim_start
 ev_array_row_start
-ev_type_annotation_start       (synthesised for 3)
-...params...
-ev_type_annotation_end
 ev_data                        data=&quot;3&quot;
-... (4) ...
+ev_data                        data=&quot;4&quot;
 ev_array_row_end
 </code></pre></div>
 
+<p>Inside an array a synthesised annotation is emitted only when the element's
+synthesised type differs from the type currently in force — at the first
+element, and again at each change. It is not repeated per element or per row;
+an explicit element annotation is always emitted. So <code>[1, 2.5, 3]</code> carries
+three annotation blocks (<code>uint</code>, <code>float</code>, <code>uint</code>) and <code>[1, 2]/[3, 4]</code> carries
+one.</p>
 <h3 id="a5-struct">A.5 Struct</h3>
 <p>Input: <code>.s = {.x = 1; .y = 2;};</code></p>
 <div class="codehilite"><pre><span></span><code>ev_assignment_start            data=&quot;s&quot;

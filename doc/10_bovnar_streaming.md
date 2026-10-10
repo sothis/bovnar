@@ -47,8 +47,14 @@ capabilities are sub-protocols carried in or around them.
 
 Every byte/offset/line/column counter in the core is 64-bit, so a single
 never-ending document — or a single octet stream of unbounded length — is
-limited only by one policy knob: `max_file_size` on `bvnr_read_flags_t` /
-`bvnr_write_flags_t`.
+limited only by policy knobs on `bvnr_read_flags_t`: `max_file_size` for the
+stream as a whole, and — for its *text* — `max_text_bytes`, whose default is
+finite. With both left at `0` an octet stream may run without bound, but the
+text of a document stops at 2 147 483 647 bytes (`error_text_data_too_long`);
+raise `max_text_bytes` as well (to `UINT64_MAX` if need be) for a text stream
+longer than 2 GiB. (`max_file_size`
+exists on `bvnr_write_flags_t` too, for symmetry, and the writer ignores
+it: a writer never limits how much it writes.)
 
 ```c
 #define BVNR_FILESIZE_UNLIMITED  0   /* in bovnar.h */

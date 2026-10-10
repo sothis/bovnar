@@ -55,6 +55,7 @@ from .quantity import Quantity
 from .structs import ValueUnit, make_type_spec, make_unit_none
 from .enums import PrefixSystem
 from .exceptions import BovnarArgumentError
+from .unit import Unit
 
 __all__ = ['to_numpy', 'to_pint_array', 'from_numpy', 'from_pint_array',
            'array_to_bvnr']
@@ -161,7 +162,15 @@ def _dtype_to_family_width(dt):
         return F.FLOAT, bits
     if kind == 'b':
         return F.BOOL, 0
-    if kind in ('U', 'S'):
+    if kind == 'S':
+        # A bytes array was mapped to utf8 here and then failed element by
+        # element, as "Cannot serialise array element of type 'bytes'". Which
+        # text the bytes are is the caller's knowledge, not something to guess
+        # at the first element; say so before anything is written.
+        raise BovnarArgumentError(
+            f"a bytes array ({dt.name}) has no bovnar mapping: decode it to "
+            f"text first, e.g. arr.astype('U') or np.char.decode(arr, 'utf-8')")
+    if kind == 'U':
         return F.UTF8, 0
     if kind == 'M':                               # datetime64[*] -> unix epoch
         return F.DATETIME, 64
@@ -250,6 +259,8 @@ def _unit_key(unit):
         sysid = int(c.prefix.system)
         pid = int(c.prefix.id.iec) if sysid == int(PrefixSystem.IEC) \
             else int(c.prefix.id.si)
+        if not pid:
+            sysid = 0       # no prefix is no prefix in either system
         out.append((int(c.base), int(c.exponent), sysid, pid))
     return tuple(sorted(out))
 
@@ -493,6 +504,8 @@ def _resolve_unit_arg(unit):
     """unit arg (None|str|ValueUnit|pint Unit/Quantity) -> ValueUnit or None."""
     if unit is None:
         return None
+    if isinstance(unit, Unit):                    # what Quantity.unit hands out
+        return unit.raw
     if isinstance(unit, ValueUnit):
         return unit
     if isinstance(unit, str):
@@ -503,8 +516,8 @@ def _resolve_unit_arg(unit):
     # AttributeError from deep inside the pint bridge.
     if not (hasattr(unit, 'dimensionality') or hasattr(unit, 'units')):
         raise BovnarArgumentError(
-            f"unit must be a unit string, ValueUnit, or pint Unit/Quantity, "
-            f"not {type(unit).__name__}")
+            f"unit must be a unit string, Unit, ValueUnit, or pint "
+            f"Unit/Quantity, not {type(unit).__name__}")
     from ._pint_bridge import from_pint_unit
     return from_pint_unit(unit)
 
@@ -604,8 +617,26 @@ def from_numpy(writer, key: str, arr, *, unit=None, float_format=None) -> None:
         if all(x is None or isinstance(x, (Decimal, Fraction)) for x in flat):
             _from_exact_float_array(writer, key, arr, unit, None)
             return
+        if any(x is not None for x in flat) and all(
+                x is None or (isinstance(x, int) and not isinstance(x, bool))
+                for x in flat):
+            # An object array of Python ints is how to_numpy hands out
+            # integers wider than 64 bits, and there was no way to write one
+            # back: this fell through to the message below, whose only advice
+            # was to store them as floats. The width is the narrowest that
+            # holds them all and never under 64 -- the same rule dumps()
+            # applies to a list of ints.
+            from . import write_array, _array_int_annotation
+            rows = arr.tolist()
+            vt = _array_int_annotation(rows)
+            if vt is None:
+                vt = make_type_spec(
+                    F.SINT if any(x is not None and x < 0 for x in flat)
+                    else F.UINT, 64, 0)
+            write_array(writer, key, rows, vt=vt, vu=_resolve_unit_arg(unit))
+            return
         raise BovnarArgumentError(
-            "object array is not all Decimal/Fraction; pass "
+            "object array is neither all int nor all Decimal/Fraction; pass "
             "float_format=(family,width[,frac]) to choose the target float type")
 
     family, width = _dtype_to_family_width(arr.dtype)

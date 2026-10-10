@@ -45,6 +45,230 @@ rebuild consumers against the new headers. **SOVERSION is bumped 1 → 2**
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
 
+### Fixed — a fourth review round
+
+Six reviews run side by side — reader, writer and units, Python, the CLI with
+the C API document and the WASM build, the specification against the grammar
+and the implementation, and the build and release machinery — and each fix
+checked against the binary from before it.
+
+**Reader.**
+
+- **The width of a `/`-row counted a nested array twice.** An element that is an
+  array, or a struct with an array among its members, added two to the row
+  holding it. `[[1]]/[null, null]` validated; `[[1], [2]]/[null, null]` and
+  `[{.m = [1];}]/[{.m = null;}]` — both rectangular — were
+  `error_array_row_size_mismatch`. This is the one reader fix in the release
+  that also *accepts* documents earlier releases refused.
+- **A `]` closed an array across a struct opened inside it.**
+  `.a = [{.x = 1];};` validated and converted to `{"a":[{"x":1}]}`. It is
+  `error_unexpected_input_byte`, as `,` and `;` there already were.
+- **`<float _fix:32,q8>` was read as `float_fix`**, with whitespace or a comment
+  inside the family keyword — the same class as the whitespace correction, and
+  now the same error (`error_type_param_whitespace`).
+- **`&.a[0]b` was a reference no grammar derives** and `bvn_dom_lookup` could
+  not resolve. After an index only `.`, `[` or the end may follow.
+- **A quoted integer whose digits spell a special number escaped its range
+  check.** In base 24 and up `nan`, `inf` and `ninf` are digit strings:
+  `<uint:8,_36> "inf"` is 24171. The streaming tier exempted it as the keyword
+  and the DOM stored a float NaN. Only the bare keyword is the keyword.
+- A comment ending at end-of-input inside a multi-byte UTF-8 sequence was
+  accepted; it is `error_invalid_utf8_byte`.
+- **Error offsets after an octet stream were short by the stream's size** —
+  the counter counted text bytes — and an out-of-sync chunk tag was reported
+  one byte late with byte `0x00`. `max_file_size` depended on how the source
+  was chunked; it is exact now, and the reader delivers everything up to the
+  cap before `error_file_too_long`.
+- **`max_array_items` never limited an array of structs**: every member
+  assignment reset the count. The budget is per outermost array.
+- A version directive padded with more than 21 spaces was
+  `error_invalid_spec_version`; `bvnr_peek_version` did not skip VT and FF as
+  the reader does.
+- **`continue_on_error` delivered events that did not nest.** An error in a
+  struct inside an array closed the array around the struct and then went on
+  delivering the struct's members; over 150 000 mutated documents 8322
+  produced an ill-nested stream, and none does now. An error inside a comment
+  had the rest of the comment read as code (`# bad <ff> byte; .q = 9;`
+  delivered `.q = 9`); `"\x4"` cut by its closing quote swallowed the rest of
+  the document; a member missing its `;` before `}` left the struct open.
+  doc/03 §13.2 states the three rules.
+
+**Document tier.**
+
+- **A hole in the first sibling hid any mismatch after it.** Homogeneity was
+  checked against the first non-null element only, so
+  `[[null], [1], ["x"]]` validated, as did a matrix with metres in one row and
+  seconds in the next behind a leading row of nulls — and the verdict depended
+  on element order. The reference shape is now filled in as holes resolve.
+- **`query` returned the wrong element of a nested `/`-matrix.** One row
+  counter served every array scope: in `[[1]/[2]] / [[3]/[4]]`,
+  `.a[1][0][0][0]` answered 1. Some rectangular nestings were refused as
+  ragged for the same reason.
+- **20 000 copies of `1e-99999` took `bovnar validate` 84 seconds.** Every
+  float literal far outside binary64 paid for an exact-rational conversion
+  whose answer is zero or infinity. Magnitude is classified first.
+- **A converted integer that outgrew its width failed the whole document**
+  under a unit policy (`<uint:8,k~m> 255` with `--unit m`), and a `uint` that
+  went negative wrapped (`<uint:64,°F> 5` in °C printed
+  18446744073709551601). The node is widened, and re-typed `float:64` when
+  the result is a fraction.
+- `bvn_dom_array_append`, `bvn_dom_struct_add` and `bvn_dom_doc_add` wrote
+  through the wrong union member when handed the wrong kind of node, and took
+  a duplicate key. They refuse, and destroy the value as documented.
+
+**Writer.** The third round made a value's *unit* answer to the annotation it
+is written under. Its type did not, and several checks ran off whatever the
+data event said about itself.
+
+- **A value was checked against its own event's type, not the annotation just
+  written.** `<uint:8>` followed by 300, by `1.5`, by a string, a symbol or a
+  reference; `<utf8>` followed by a number: all written, all reported as
+  success, all refused by the reader. Every check now runs against the
+  governing annotation.
+- **`BVN_UNIT_REDUCE` wrote `5 k~m` as `5 m`** when the data event left its
+  type plain: the unit lost its prefix and the digits were not rescaled.
+- **The writer's unit policy checked the wrong unit, or none**: a bare number
+  with a plain-typed event passed `require_unit`; the second element of an
+  annotated row was checked against a stale unit; a unit given only on the
+  annotation's start event was not seen at all.
+- **An integer with no declared width was never range-checked**, so 2^128
+  went out under `<uint>`, which the reader holds to 64 bits.
+- **Inside an array the writer put a `,` between the chunks of one octet
+  stream**, so any payload over 65536 bytes was unreadable as an element.
+- An inline unit was written after `nan`/`inf`/`ninf` and after a datetime,
+  where the format has none. `bvnr_write_float_dec` and `bvnr_write_float_fix`
+  narrowed widths up to 32 through binary32 — 24 bits for a type that promises
+  7 decimal digits or 32 bits. Under `BVN_UNIT_REDUCE` a `float:32` could be
+  rescaled past its range, and `-0.0` lost its sign.
+  `bvn_validate_reference` accepted `.a[0]b`, which the reader now refuses.
+
+**Units and numbers.**
+
+- **A conversion between two units defined through π was reported inexact
+  even when π cancels.** One revolution is 360 degrees, a kiloparsec is 1000
+  parsecs: `events --unit '°'` over `1 rev` was `unit_inexact`, and
+  `pretty-print --canonical` failed on `k~pc`, `M~pc`, `m~arcsec` and — for a
+  related reason — on a prefixed affine unit in a compound (`m~°C/s`). A
+  change of prefix alone is settled first for every pair, and the π-defined
+  units carry their π power, so `exact` is claimed when it cancels and not
+  otherwise (°→rad, pc→m stay inexact).
+- **Valid UCUM codes were refused as illegal.** Twenty units — the cgs set
+  (`P`, `St`, `Gal`, `G`, `Oe`, `dyn`, `erg`, …), `gf`, `[g]`, `[e]`, three
+  calories — were flagged non-metric against UCUM's own `isMetric`, so `cP`,
+  `cSt`, `mGal` and `kgf` did not parse; and the binary prefixes (`KiBy`,
+  `Mibit`) that doc/11 §3.2 said were read were not.
+- **UDUNITS regular plurals were refused.** `meters`, `seconds`, `days` —
+  what CF files routinely write — were `error_unit_illegal`; only irregular
+  plurals had rows. 266 are generated from the UDUNITS-2 database by its own
+  rule, and `a`/`are` take prefixes, which is how UDUNITS reads `ha`.
+- `0e999999999999999999999` was +inf: a zero mantissa under an exponent too
+  long to count. `bvn_dt_datetime_to_epoch_seconds` failed within a day of
+  `INT64_MIN`, against the header's "mutual inverses over the whole range".
+
+**CLI.** Exit status is now uniform — `0` success, `1` the document or the
+I/O failed, `2` the command line was wrong — which moves a number of usage
+errors from 1 to 2.
+
+- **A failed write to stdout exited 0** for every command that prints through
+  stdio (`bovnar query .a f > /dev/full`).
+- **`pretty-print` and `convert` refused documents nested 65–255 deep** that
+  `validate` accepts: the reader side was raised to the format's limit and the
+  writer side was not.
+- **`events -c -` reported "All tokens validated successfully"** after
+  discarding input, and exited 0 where the same file by name exited 1.
+- **`convert` did not report every loss.** bvnr → json turned `inf`/`nan` into
+  `null`, rounded `float:128` and `float_dec` values to a double and wrote a
+  datetime as a bare integer without listing any of it; json → bvnr turned
+  `1e999` into `inf`. The first three are counted in the LOSSY report, the
+  last is an error naming the key, and the help says what exit 1 means.
+- A bad `--base` was blamed on a correct `--unit`. `query --base`, which was
+  either invisible or fatal, is refused by name.
+- Extra arguments and unknown options were ignored by several commands
+  (`convert j.json a.bvnr` converted the last file); they are refused.
+  `--help` printed to stderr. `bench --size N` generated about N + 1000 bytes,
+  `--min-overhead` was described backwards, and a cell that failed printed
+  `SKIP` and exited 0.
+
+**C API.**
+
+- **`bvn_parse_double` had no failure path.** `""`, `"abc"` and `"1x"`
+  returned true with 0.0, against doc/08 §1.11.
+- **`bvn_float_strtodec` read `ninf` as +0** and any non-number as zero, both
+  as success — the decimal twin of the `bvn_float_from_str` fix above.
+- **`bvnr_write_bvni(…, width 0, …)` did not range-check** and wrote
+  `<uint> 18446744073709551616`, which the reader refuses.
+- doc/08's `write_string` example failed as printed; sixteen exported writer
+  helpers were undocumented; six statements did not match the code. The
+  `BVN_TYPE_*` / `BVN_UNIT_*` macros are documented as C-only.
+
+**WASM.** `validate()` and `errors()` stopped at the streaming tier and said
+`ok: true` for `.a=1;.a=2;`, where the CLI — which the README promises they
+match — says `duplicate_struct_key`. They run the document tier now and say
+which tier refused (`tier`). `events()` and `parse()` named the last error
+where the others named the first; `toJSON()` dropped a datetime's fraction;
+`doc()` failed without a code.
+
+**Python.**
+
+- **`write_array(vt=…)` did not hold elements to the annotation.** Under
+  `<uint:16,_16>` it wrote the decimal digits of each int, so 255 read back as
+  597; under `<uint:16>` it wrote 80800, a float or a string. Elements are
+  range-checked, written in the annotation's base, and refused otherwise.
+- `dumps()` could not write what `loads()` returned for an octet stream
+  (`bytes`), nor a document nested deeper than 64; it wrote `[2**70, None]`
+  unreadably, a list of `Decimal` bare (re-read as binary floats), and a typed
+  array of unit-less mixed types without its types.
+- `a == b` did not imply `hash(a) == hash(b)` for a unit with no prefix under
+  two prefix systems. `Unit.convert_factor` returned 0.0 for an affine pair.
+  `repr()` of a `ValueUnit` holding a profile-only unit raised.
+  `Quantity.from_number(float('-inf'))` produced a literal the writer refuses.
+  `loads(typed=True)` kept 1.8 kB per scalar alive.
+- A `Unit` is accepted wherever a `ValueUnit` is; `Writer` constructors take
+  `unit_flags=` and `emit_version=`; `dumps()` takes numpy scalars as values.
+- `dumps()` is documented as the inverse of `loads()` — the streaming tier — so
+  a heterogeneous or ragged list is written and then refused by `dom_parse`.
+
+**Specification and documents.** Where the reference reader and the text
+disagreed and the reader was not wrong, the text now says what the reader does:
+
+- **A bare literal under a non-decimal base is read in that base**
+  (`<uint:_16> 10` is sixteen, and from base 15 up a bare `1e3` is digits).
+  The specification said such a token lexes as a symbol; the IETF draft said
+  it MUST be quoted.
+- **A comment may not start directly after a key, number, symbol, reserved
+  word, reference or datetime literal.** "Freely interleaved between all
+  tokens" was never true of `.a = 1# c`.
+- The BOM rule (four documents, four versions of it), the event sequence for
+  arrays (an annotation per change of type, not per element or per row), the
+  two 255-byte caps (reachable by valid documents), `float`/`float_dec` range
+  (not checked), an octet stream under an annotation (carried, not checked).
+- doc/13 did not describe the `--max-*` arguments the conformance driver
+  passes an adapter, without which eight cases fail; five case ids
+  (`ENC-005`…`009`) were used twice and are `ENC-010`…`014`.
+- The JOSS paper and both wiki articles still described 1.1.0 with the
+  profiles "under implementation".
+
+**Build and release.**
+
+- **The macOS wheel job ran on an image GitHub is retiring**, with scheduled
+  brownouts that fail it through October (`macos-14` → `macos-15`).
+- **`release` did not wait for the wheels.** A wheel leg failing on the tag —
+  the only place the suite runs on aarch64 and macOS — would have left an
+  immutable GitHub release with nothing on PyPI.
+- **Six documentation gates checked nothing outside `<repo>/build`**: from any
+  other build directory they printed "no built library; skipped" and passed,
+  and in the sanitizer pass they re-checked the first pass's binaries. CTest
+  now tells them where the build is and a missing one is a failure.
+- A machine with pytest and without python-markdown could not configure
+  (the test-count guard). `bvnr_html_docs` failed in the release's own source
+  tarball, which has no history to date pages from. `gen_llms.py --check` was
+  gated by nothing.
+- **The installed MIME rule typed any text file with a line starting `.` as a
+  Bovnar document**, system-wide. Detection is by extension and directive.
+- The VS Code extension's `configurationDefaults` sat outside `contributes`
+  and was ignored; the pkg-config description called the format binary; the
+  build-system floor was below the first scikit-build-core that reads PEP 639.
+
 ### Fixed — a third review round, with a differential fuzzer
 
 Reader against writer, writer against reader, this tree against 1.1.0, and
@@ -106,7 +330,7 @@ beside this tree over the 1.1.0 examples, documentation and conformance inputs,
   DOM refused it as out of range. 1.1.0 accepted it. Conformance case TYP-039
   declares it valid and passed only because that suite reads at the streaming
   tier.
-- **The list of compatibility changes was short by six.** Beside the two
+- **The list of compatibility changes was short by seven.** Beside the two
   corrections: a `tai` leap-second literal decodes one second lower (the one
   case of an accepted document changing value); an element annotation without
   a unit no longer strips the unit from the elements after it; a BOM not at

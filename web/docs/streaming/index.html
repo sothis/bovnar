@@ -116,8 +116,14 @@ capabilities are sub-protocols carried in or around them.</p>
 <h2 id="1-endless-streaming">1. Endless streaming</h2>
 <p>Every byte/offset/line/column counter in the core is 64-bit, so a single
 never-ending document — or a single octet stream of unbounded length — is
-limited only by one policy knob: <code>max_file_size</code> on <code>bvnr_read_flags_t</code> /
-<code>bvnr_write_flags_t</code>.</p>
+limited only by policy knobs on <code>bvnr_read_flags_t</code>: <code>max_file_size</code> for the
+stream as a whole, and — for its <em>text</em> — <code>max_text_bytes</code>, whose default is
+finite. With both left at <code>0</code> an octet stream may run without bound, but the
+text of a document stops at 2 147 483 647 bytes (<code>error_text_data_too_long</code>);
+raise <code>max_text_bytes</code> as well (to <code>UINT64_MAX</code> if need be) for a text stream
+longer than 2 GiB. (<code>max_file_size</code>
+exists on <code>bvnr_write_flags_t</code> too, for symmetry, and the writer ignores
+it: a writer never limits how much it writes.)</p>
 <div class="codehilite"><pre><span></span><code><span class="cp">#define BVNR_FILESIZE_UNLIMITED  0   </span><span class="cm">/* in bovnar.h */</span>
 </code></pre></div>
 

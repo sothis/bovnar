@@ -46,7 +46,17 @@
 (*    ( )  = grouping           |  = alternation                      *)
 (*    ,    = concatenation      ;  = rule terminator                  *)
 (*    &quot;…&quot;  = literal terminal   (*…*) = comment                       *)
-(*  Updated: 2026-06-17 — drop the residual &quot;1.1 (draft)&quot; label (spec   *)
+(*  Updated: 2026-10-10 — spec 1.2: the unit-profile notation        *)
+(*    (profile-unit), whitespace inside a type parameter as an error,  *)
+(*    array homogeneity by unit; consistency pass vs the reader -- a   *)
+(*    comment may not start directly after a bare token, a bare        *)
+(*    literal under a non-decimal base is read in that base, an        *)
+(*    annotation before an octet stream is carried unchecked, the BOM  *)
+(*    rule before/after the first assignment, epoch-param, and the     *)
+(*    two resync boundaries. The entries below are HISTORY: the        *)
+(*    counts they quote were true on their dates (see base-unit for    *)
+(*    today&#39;s 264 units / 745 spellings).                              *)
+(*  2026-06-17 — drop the residual &quot;1.1 (draft)&quot; label (spec   *)
 (*    1.1 is released); note datetime also accepts a width parameter;    *)
 (*    reframe base-unit as a lookup into the full 180-unit / 529-spelling *)
 (*    table (NOT the closed SI subset it previously claimed).             *)
@@ -155,6 +165,12 @@ version-int  = &quot;0&quot;
              | ( (&quot;1&quot;|&quot;2&quot;|&quot;3&quot;|&quot;4&quot;|&quot;5&quot;|&quot;6&quot;|&quot;7&quot;|&quot;8&quot;|&quot;9&quot;) , {DIGIT} ) ;
 
 (* Whitespace: blank characters and comments, freely intermixed.     *)
+(* ONE RESTRICTION this production cannot carry: &quot;#&quot; is not a          *)
+(* terminator of a bare token. A comment may not start immediately     *)
+(* after a key, a number, a symbol, a reserved word, a reference or a  *)
+(* datetime literal -- there &quot;#&quot; is error_unexpected_input_byte, and   *)
+(* at least one ws-char must come first. After a string, &quot;]&quot;, &quot;}&quot;,     *)
+(* &quot;&gt;&quot;, &quot;=&quot;, &quot;;&quot; or an inline unit, &quot;#&quot; may follow directly.           *)
 ws           = {ws-char | comment} ;
 
 (* At least one whitespace character, followed by optional further    *)
@@ -185,7 +201,9 @@ comment-char = &quot;\x09&quot;                               (* HT             
 (* The leading &quot;.&quot; is a syntactic sigil; it is not stored in the key. *)
 (* At least one id-start character after &quot;.&quot; is required;             *)
 (* &quot;.=&quot; is error_empty_identifier.                                    *)
-(* Comments are permitted between the last key character and &quot;=&quot;.     *)
+(* Comments are permitted between the key and &quot;=&quot;, but only after at   *)
+(* least one ws-char: &quot;#&quot; directly after the last key byte is a hard  *)
+(* error (see ws, and the id-body-char hard-error list below).        *)
 
 assignment   = &quot;.&quot; , key , ws , &quot;=&quot; , ws , value , ws , &quot;;&quot; ;
 
@@ -317,8 +335,16 @@ bool-value   = &quot;true&quot; | &quot;false&quot; | &quot;on&quot; | &quot;off
 (*   negative integers           → &lt;sint:64,_10,no_unit&gt;             *)
 (*   plain integers              → &lt;uint:64,_10,no_unit&gt;             *)
 (*   bool keywords (true/false/on/off) → &lt;bool&gt;                      *)
-(* The full type-annotation event sequence is always emitted for      *)
-(* number and string values, whether annotated explicitly or not.     *)
+(*   any number with an inline currency unit → &lt;float_dec:64,$XXX&gt;   *)
+(*     (takes precedence over the float / integer rows)               *)
+(*   ISO-8601 datetime literal (spec 1.1) → &lt;datetime:64,unix&gt;       *)
+(* The full type-annotation event sequence is emitted for a scalar     *)
+(* number or string value whether annotated explicitly or not.        *)
+(* Inside an array a synthesised annotation is emitted only when the   *)
+(* element&#39;s synthesised type differs from the type currently in       *)
+(* force -- at the first element, and again at each change. It is not  *)
+(* repeated per element or per row; an explicit element annotation is  *)
+(* always emitted.                                                     *)
 
 type-annotation = &quot;&lt;&quot; , ws , param-type , ws , &quot;&gt;&quot; ;
 
@@ -381,11 +407,11 @@ param-type   = (&quot;uint&quot; | &quot;sint&quot; | &quot;float&quot; | &quot;
 (* error_type_param_whitespace.                                       *)
 (*                                                                     *)
 (* The lexer used to DROP whitespace wherever it fell, which made      *)
-(* &quot;&lt;float:64,k g&gt;&quot; the kilogram and &quot;&lt;uint:6 4&gt;&quot; a 64-bit width, and  *)
-(* turned the UDUNITS spelling &quot;udunits:m s-1&quot; into a reciprocal       *)
-(* millisecond. Nothing in this grammar ever derived those; the        *)
-(* implementation was leniently wrong and now matches what is written  *)
-(* here.                                                              *)
+(* &quot;&lt;float:64,m in&gt;&quot; the minute and &quot;&lt;uint:6 4&gt;&quot; a 64-bit width, and   *)
+(* would have turned the UDUNITS spelling &quot;udunits:m s-1&quot; into a       *)
+(* reciprocal millisecond. Nothing in this grammar ever derived those;  *)
+(* the implementation was leniently wrong and now matches what is      *)
+(* written here.                                                      *)
 (*                                                                     *)
 (* A &quot;,&quot; or &quot;:&quot; nested inside a UCUM annotation or bracketed atom is   *)
 (* part of profile-code and NOT a separator, so &quot;ucum:mL{cells,tot}&quot;   *)
@@ -408,9 +434,17 @@ type-param-list = type-param , {ws , &quot;,&quot; , ws , type-param} ;
 type-param   = width-param           (* e.g. 32, 64                        *)
              | base-param            (* e.g. _16, _64, _85                 *)
              | q-param               (* e.g. q8, q16  – float_fix only     *)
+             | epoch-param           (* e.g. unix, tai – datetime only     *)
              | unit-param ;          (* e.g. m~s, Gi~B, m^2                *)
 
-(* Width: one or more decimal digits.  0 means &quot;no width restriction&quot;.*)
+(* Epoch (spec 1.1): the epoch name of a datetime. An epoch name and a  *)
+(* unit are both bare words; they are told apart by the family -- under *)
+(* &quot;datetime&quot; a bare-word parameter is an epoch, under every other      *)
+(* family it is a unit.                                                 *)
+epoch-param  = &quot;unix&quot; | &quot;tai&quot; | &quot;gps&quot; | &quot;mjd&quot; | &quot;ntp&quot;
+             | &quot;galileo&quot; | &quot;glonass&quot; | &quot;y2000&quot; | &quot;beidou&quot; ;
+
+(* Width: one or more decimal digits.  0 selects the default width, 64.*)
 (* float:      0, 16, or any multiple of 32 up to BVN_FLOAT_MAX_PREC.*)
 (* float_fix,  *)
 (* float_dec:  0, 16, 32, 64, 128, 256.                               *)
@@ -424,9 +458,13 @@ width-param  = DIGIT , {DIGIT} ;
 (*   other bases → error_illegal_value_type.                          *)
 (* &quot;float_fix&quot; and &quot;float_dec&quot; reject the base parameter entirely:   *)
 (*   any base-param → error_illegal_value_type.                       *)
-(* A non-decimal base with uint/sint should use a quoted string value; *)
-(* a bare literal is not rejected by the validator but will be parsed  *)
-(* as a symbol token, causing a type/value mismatch instead.          *)
+(* A bare number literal under a non-decimal base is valid when every   *)
+(* byte of it is a digit of that base, and it is read IN THAT BASE:    *)
+(* &lt;uint:_16&gt; 10 is sixteen. In base 15 and above &quot;e&quot;/&quot;E&quot; are digits,  *)
+(* so a bare 1e3 under _16 is the integer 0x1E3 and not an exponent    *)
+(* form. A value needing a letter the number lexer does not accept     *)
+(* (&quot;ff&quot;) lexes as a symbol -- error_type_value_mismatch -- and must   *)
+(* be a quoted string. Producers SHOULD quote every non-decimal value. *)
 base-param   = &quot;_&quot; , DIGIT , {DIGIT} ;
 
 (* Q~parameter: lowercase &quot;q&quot; followed by one or more decimal digits. *)
@@ -729,6 +767,11 @@ hex-digit      = DIGIT | &quot;a&quot;..&quot;f&quot; | &quot;A&quot;..&quot;F&q
 (*   .d = 1.5e3 k~J;          (* number with exponent *)              *)
 (*   .e = &quot;FF&quot; m;             (* string literal with unit *)          *)
 (*                                                                     *)
+(* The inline path does not consult the type family: an inline unit    *)
+(* after a utf8 string (&lt;utf8&gt; &quot;text&quot; m) is accepted and carried,      *)
+(* although the same unit as an annotation parameter (&lt;utf8,m&gt;) is     *)
+(* error_illegal_value_type. Producers SHOULD NOT attach one to text.  *)
+(*                                                                     *)
 (* State-machine flow:                                                 *)
 (*   1. Whitespace from a number-body state fires ACT_to_number_outro *)
 (*      → number_outro.  Strings enter string_outro_nosp after the    *)
@@ -1006,17 +1049,21 @@ byte         = (* any single byte 0x00–0xFF *) ;
      lexer state the parser is in.  Overlong encodings and surrogate
      halves are rejected.
 
-  b) BOM uniqueness
+  b) BOM placement
      The UTF-8 BOM (EF BB BF) is legal only at byte offset 0.
-     If the stream begins with &quot;#&quot; instead (a first-line comment), the
-     special first_comment_* state machine watches the comment body for
-     the exact byte sequence 0xEF 0xBB 0xBF and rejects it as
-     error_invalid_byte_order_mark.  This detection applies only while
-     the first_comment_* states are active (i.e. until the first
-     newline); subsequent regular comments (comment_intro state) have
-     no BOM detection, so U+FEFF encoded as 0xEF 0xBB 0xBF appearing
-     in any later comment body or string literal is valid UTF-8 and is
-     accepted.
+     Before the first assignment:
+       - a BOM inside any comment (the first comment line, a version
+         directive line, or a later comment line) is
+         error_invalid_byte_order_mark;
+       - a BOM after leading whitespace, with no comment line before it,
+         is error_invalid_byte_order_mark;
+       - a BOM at the start of a line that follows a comment line or a
+         version directive is error_unexpected_input_byte, as is a
+         second BOM directly after the one at offset 0.
+     Once the first assignment has begun:
+       - EF BB BF inside a comment or a string is valid UTF-8 and is
+         accepted as content;
+       - EF BB BF between assignments is error_unexpected_input_byte.
 
   c) 0xC2 at token boundaries
      The byte 0xC2 (UTF-8 leader for U+0080–U+00BF) is mapped to
@@ -1094,8 +1141,18 @@ byte         = (* any single byte 0x00–0xFF *) ;
      For &quot;float_dec&quot;: accepted widths are 0, 16, 32, 64, 128, 256;
        the base parameter (_N) is forbidden (error_illegal_value_type);
        the Q parameter is not valid for float_dec.
-     Neither &quot;float_fix&quot; nor &quot;float_dec&quot; can be synthesised by the
-       validator&#39;s default type synthesis; both require explicit annotation.
+     &quot;float_fix&quot; is never synthesised by the validator&#39;s default type
+       synthesis. &quot;float_dec&quot; is synthesised in exactly one case -- a
+       number carrying an inline currency unit, &lt;float_dec:64,$XXX&gt; --
+       and otherwise requires an explicit annotation.
+     &quot;float&quot; and &quot;float_dec&quot; values are NOT range- or precision-checked:
+       a literal with more precision or a larger exponent than the
+       declared width can hold is valid; the excess is the consumer&#39;s to
+       round, and a consumer may deliver +/-infinity.
+     An octet-stream value under a type annotation is accepted under
+       EVERY family: the annotation is carried on the stream&#39;s events and
+       is not checked against it (no error_type_value_mismatch).
+       Producers SHOULD NOT write one.
 
   j) Identifier (key) non-empty
      The grammar requires at least one id-start character after &quot;.&quot;.
@@ -1118,13 +1175,15 @@ byte         = (* any single byte 0x00–0xFF *) ;
   n) Error recovery (continue_on_error mode)
      When bvnr_read_flags_t.continue_on_error is set, any parse error
      invokes the on_error callback and then enters the resync state
-     machine (states: resync, resync_string, resync_string_escape,
-     resync_comment).  The resync machine skips bytes while tracking
-     bracket and brace nesting depths, and attempts to re-synchronise
-     at the next &quot;;&quot; at the current nesting depth.  recovery_count
+     machine (states: resync, resync_dot, resync_string,
+     resync_string_escape, resync_comment).  The resync machine skips
+     bytes while tracking bracket and brace nesting depths, and resumes
+     at whichever comes first: a &quot;;&quot; at the saved nesting depth, or the
+     start of the next assignment -- a &quot;.&quot; at that depth followed by a
+     byte that can begin an identifier.  recovery_count
      (bvnr_reader_get_recovery_count) is incremented immediately when
      an error triggers entry into resync mode, not when resync
-     completes at &quot;;&quot;.  EOF inside any resync state raises a final
+     completes.  EOF inside any resync state raises a final
      error_got_incomplete_bvnr_stream (delivered to on_error and
      returned by bvnr_reader_get_error); the original error that
      triggered resync was already delivered to on_error earlier, at

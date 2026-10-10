@@ -15,7 +15,7 @@ admitted after that pass, which is why they sit after it rather than beside thei
 | `unece:` | UN/ECE Recommendation 20 and 21 | flat | 1298 + 25 opaque | [11](#11-the-unece-profile) |
 | `qudt:` | QUDT unit local names | flat | 2238, **all 2808 QUDT defines** | [12](#12-the-qudt-profiles) |
 | `qudt-qk:` | QUDT quantity kinds | flat | 903, **all 1165 QUDT defines** | [12.3](#123-quantity-kinds-qudt-qk) |
-| `udunits:` | UDUNITS-2, the CF/netCDF units syntax | expression | 499, **all 580 UDUNITS defines** | [13](#13-the-udunits-profile) |
+| `udunits:` | UDUNITS-2, the CF/netCDF units syntax | expression | 765 (its regular plurals included), **all 580 UDUNITS defines** | [13](#13-the-udunits-profile) |
 | `om:` | OM 2 — Ontology of units of Measure | flat | 1341 + 119 refused, **every unit individual OM states** | [16](#16-the-om-2-profile) |
 | `cf:` | CF standard names | flat, read-only | 4454 + 617 refused, **all 5071 names of table v94** | [17](#17-the-cf-standard-name-profile) |
 
@@ -34,7 +34,7 @@ pass changed and what it cost.
 
 Every acceptance, refusal and conversion factor quoted below was produced by running the
 reference implementation built from this tree, and the behavioural claims are pinned by the test
-files named above (1277 assertions across the seven profiles, plus 4789 in the cross-vocabulary
+files named above (1328 assertions across the seven profiles, plus 4789 in the cross-vocabulary
 suite). The VOCABULARY side — whether each foreign code is *worth* what the table says — is checked
 too, but not by the same means and not to the same strength: `check_profile_factors.py` (§9.5)
 resolves every mapped code against its publisher's own machine-readable definitions, and `unece`
@@ -943,8 +943,8 @@ round trip that starts in a vocabulary returns to it; one that starts in Bovnar'
 may have nowhere to go.
 
 Sweeping the whole native registry — all 264 physical units, each at the twelve prefixes
-`si_none da h k M G T d c m µ n` — **689** combinations survive a native → UCUM → native round trip
-unchanged, **2102** have no UCUM code, 377 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
+`si_none da h k M G T d c m µ n` — **865** combinations survive a native → UCUM → native round trip
+unchanged, **1926** have no UCUM code, 377 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
 before the question arises, and **none round-trips to a different unit**. The last of those is the
 invariant; the two counts move whenever the registry gains a unit, so `test_sweep_round_trip` in
 `tests/bovnar_ucum_test.c` pins all three rather than leaving them as prose.
@@ -1727,7 +1727,7 @@ One hand-edited data file per namespace in `src/gendata/`, in the same shape as 
 | `unece.bvnr` | 1298 mapped, 25 opaque, 156 unsupported |
 | `qudt.bvnr` | 2238 mapped, 570 unsupported |
 | `qudt-qk.bvnr` | 903 mapped, 262 unsupported |
-| `udunits.bvnr` | 41 prefixes, 499 mapped, 81 unsupported |
+| `udunits.bvnr` | 41 prefixes, 765 mapped, 101 unsupported |
 | `om.bvnr` | 1341 mapped, 119 unsupported |
 | `cf.bvnr` | 4454 mapped, 617 unsupported |
 
@@ -2580,9 +2580,9 @@ same equivalence class.
 
 > `udunits:` — UDUNITS-2, Unidata's unit library, whose string grammar is the de-facto units syntax
 > of netCDF and the CF conventions.
-> Data file `src/gendata/udunits.bvnr` (41 prefixes, 499 mapped, 81 unsupported — every one of
+> Data file `src/gendata/udunits.bvnr` (41 prefixes, 765 mapped, 101 unsupported — every one of
 > the 580 spellings the UDUNITS-2 database defines);
-> pinned by `tests/bovnar_udunits_test.c` (199 assertions).
+> pinned by `tests/bovnar_udunits_test.c` (224 assertions).
 
 ### 13.1 An expression profile, sharing the UCUM parser
 
@@ -2603,7 +2603,7 @@ back as `k~g·s/m` — for exactly this reason: getting it backwards turns a vis
 reciprocal and still formats cleanly.
 
 UDUNITS accepts symbols and spelled-out names for units *and* prefixes, which is why the table
-carries 499 codes and 41 prefix spellings for a vocabulary no larger than UCUM's: `m`, `meter` and
+carries 765 codes and 41 prefix spellings for a vocabulary no larger than UCUM's: `m`, `meter` and
 `metre` are three rows, and `kilo` is a prefix beside `k`. `udunits:km`, `udunits:kilometer` and
 `udunits:kilometre` are one unit.
 

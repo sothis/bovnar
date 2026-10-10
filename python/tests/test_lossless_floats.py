@@ -433,9 +433,84 @@ class TestNumpyLossless:
 
     def test_ambiguous_object_array_rejected(self):
         import numpy as np
+        # An all-int object array is no longer ambiguous -- it is how to_numpy
+        # hands out integers past 64 bits, and it is written as integers (see
+        # test_numpy_bridge.TestWriteSideGaps). Mixed with anything else it
+        # still has to be told what it is.
         with pytest.raises(BovnarArgumentError, match="float_format"):
-            bovnar.array_to_bvnr('a', np.array([10 ** 30, 1], dtype=object), pretty=False)
+            bovnar.array_to_bvnr('a', np.array([10 ** 30, Decimal('1.5')],
+                                               dtype=object), pretty=False)
+        with pytest.raises(BovnarArgumentError, match="float_format"):
+            bovnar.array_to_bvnr('a', np.array([10 ** 30, 1.5], dtype=object),
+                                 pretty=False)
 
     def test_dom_path_default_raises_points_at_typed(self):
         with pytest.raises(BovnarArgumentError, match="loads\\(typed=True\\)"):
             bovnar.to_numpy(bovnar.dom_parse(b'.a=<float_dec:64>[1.1,2.2];')['a'])
+
+
+@needs_lib
+class TestDecimalNonFinite:
+    """`ieee_bits` on a float_dec `ninf` returned the encoding of +0 at every
+    width while `stored_value` on the same object said -Infinity."""
+
+    @pytest.mark.parametrize('width', [16, 32, 64, 128, 256])
+    def test_ninf_bits_are_negative_infinity(self, width):
+        q = loads(('.a=<float_dec:%d>ninf;' % width).encode(), typed=True)['a']
+        bits = q.ieee_bits
+        assert bits == BvnFloat.from_str('ninf').to_decimal_bits(width)
+        assert bits[-1] & 0x80
+        pos = loads(('.a=<float_dec:%d>inf;' % width).encode(), typed=True)['a']
+        assert bytes(bits[:-1]) == bytes(pos.ieee_bits[:-1])
+
+    def test_ninf_decimal64(self):
+        q = loads(b'.a=<float_dec:64>ninf;', typed=True)['a']
+        assert q.ieee_bits.hex() == '00000000000000f8'
+
+    @pytest.mark.parametrize('text', ['abc', '', '1.2.3', '--1'])
+    def test_strtodec_bits_rejects_garbage(self, text):
+        # It promised BovnarArgumentError and returned eight zero bytes.
+        with pytest.raises(BovnarArgumentError):
+            BvnFloat.strtodec_bits(text, 64)
+
+    def test_strtodec_bits_still_reads_numbers(self):
+        assert BvnFloat.strtodec_bits('-1', 64).hex() == '010000000000c0b1'
+        assert BvnFloat.strtodec_bits('nan', 64).hex() == '000000000000007c'
+
+
+@needs_lib
+class TestExactNumberEdges:
+    def test_from_number_negative_infinity_is_ninf(self):
+        # repr(float('-inf')) is '-inf'; the format spells it 'ninf', and the
+        # writer refused the Quantity from_number had just built.
+        q = Quantity.from_number(float('-inf'))
+        assert q.raw == 'ninf'
+        assert dumps({'a': q}, pretty=False) == b'.a=<float_dec:64>ninf;'
+        assert Quantity.from_number(float('inf')).raw == 'inf'
+        assert Quantity.from_number(float('nan')).raw == 'nan'
+
+    def test_from_number_refuses_a_decimal_past_the_width(self):
+        # decimal64 tops out below 1e385; this was written as
+        # <float_dec:64> 1e+400, which materialises to infinity.
+        with pytest.raises(BovnarArgumentError):
+            Quantity.from_number(Decimal('1e400'))
+        with pytest.raises(BovnarArgumentError):
+            dumps({'a': Decimal('-1e400')})
+        assert Quantity.from_number(Decimal('1e400'), width=128).raw == '1e+400'
+        assert Quantity.from_number(Decimal('9.99e384')).raw == '9.99e+384'
+
+    def test_decimal_list_is_written_as_float_dec(self):
+        # The scalar path annotates <float_dec:64>; the list path wrote the
+        # elements bare, so 1.10 came back a binary float and 2 an integer.
+        out = dumps({'k': [Decimal('1.10'), Fraction(1, 4), None]}, pretty=False)
+        assert out == b'.k=<float_dec:64>[1.10,0.25,null];'
+        back = loads(out, typed=True)['k']
+        assert [q.decimal for q in back] == [Decimal('1.10'), Decimal('0.25'), None]
+        assert all(int(q.vtype.family) == int(F.FLOAT_DEC) for q in back)
+
+    def test_stored_value_of_a_typed_null_is_none(self):
+        q = loads(b'.a=<float:64,m>;', typed=True)['a']
+        assert q.decimal is None
+        assert q.stored_value is None
+        with pytest.raises(BovnarArgumentError):
+            q.ieee_bits

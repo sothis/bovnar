@@ -425,3 +425,19 @@ class TestBridgeBoundsFollowTheLibrary:
         # test_abi.py already close against include/bovnar.h.
         assert (EXPONENT_MIN, EXPONENT_MAX) == (-100, 100)
         assert MAX_UNIT_COMPONENTS == 32
+
+
+@needs_lib
+class TestBridgeEdges:
+    @pytest.mark.parametrize('spelling', ['Ri~B', 'Qi~B', 'Ri~b', 'Qi~b'])
+    def test_robi_and_quebi_are_refused_as_bovnar_errors(self, spelling):
+        # pint has neither prefix; the raw pint.UndefinedUnitError leaked out.
+        with pytest.raises(BovnarArgumentError, match="pint"):
+            bovnar.to_pint_unit(bovnar.parse_unit(spelling))
+        with pytest.raises(BovnarArgumentError, match="pint"):
+            bovnar.to_pint(1.0, bovnar.parse_unit(spelling))
+
+    def test_a_unit_object_is_accepted(self):
+        q = bovnar.loads(b'.a=<float:64,k~m>5.0;', typed=True)['a']
+        assert str(bovnar.to_pint(q.value, q.unit).units) == "kilometer"
+        assert str(bovnar.to_pint_unit(q.unit)) == "kilometer"

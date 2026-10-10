@@ -43,7 +43,7 @@ from .reader   import Reader, EventPayload, UnitPolicy, UnitRule, MAX_FILESIZE_B
 from .writer   import Writer
 from .dom      import DomDoc, DomNode, DomType
 from .quantity import Quantity
-from .unit     import Unit
+from .unit     import Unit, _as_vu
 from .units   import (
     UnitFlags,
     SIConversion, UnitConversion, ReducedUnit, SI_DIM_NAMES,
@@ -89,7 +89,7 @@ __all__ = [
     'make_type_spec', 'make_unit_dimensionless', 'make_unit_none',
     'make_unit_si', 'make_unit_iec', 'make_unit_compound',
 
-    'Event', 'ValueTypeFamily', 'PrefixSystem',
+    'Event', 'TokenType', 'ValueTypeFamily', 'PrefixSystem',
     'SIPrefix', 'IECPrefix', 'BaseUnit', 'Exponent', 'ErrorCode',
 
     'UnitFlags',
@@ -228,6 +228,41 @@ def _uses_spec_1_2(obj) -> bool:
 
 
 def dumps(obj: dict, *, pretty: bool = True) -> bytes:
+    """Serialise a dict to a BVNR document.
+
+    Values may be ``None``, ``bool``, ``int`` (any size), ``float``, ``str``,
+    ``Decimal``, a terminating ``Fraction``, ``bytes`` / ``bytearray`` /
+    ``memoryview`` (written as an octet stream, which is what ``loads()`` hands
+    back as ``bytes``), a :class:`Quantity`, a ``dict`` with ``str`` keys (a
+    struct), or a ``list`` / ``tuple`` of those (an array). numpy scalars are
+    taken as the Python numbers they are.
+
+    **dumps() writes what loads() reads -- the STREAMING tier, not the document
+    tier.** ``loads()`` enforces the grammar and each value's own type, unit
+    and range, and stops there (see its docstring); ``dumps()`` is its inverse
+    and stops in the same place, so ``dumps(loads(x))`` works for every ``x``
+    that ``loads()`` accepts. It follows that three shapes are written without
+    complaint and then refused by the DOCUMENT tier -- :func:`dom_parse`,
+    ``bovnar validate`` -- because a Bovnar array is homogeneous and
+    rectangular there:
+
+      * a list mixing kinds: ``[1, "a"]``, ``[True, 1]``
+        (``array_element_type_mismatch``);
+      * a ragged list of lists: ``[[1], [2, 3]]``
+        (``array_row_size_mismatch``);
+      * a list of dicts that do not share their keys: ``[{"a": 1}, {"b": 2}]``
+        (``struct_shape_mismatch``).
+
+    A list mixing ``int`` and ``float``, or holding ``None`` beside values, is
+    fine at both tiers. If the output has to pass ``bovnar validate``, hand it
+    to :func:`dom_parse` before shipping it.
+
+    What dumps() does refuse (``BovnarArgumentError``) is what NEITHER tier
+    reads: a list whose elements carry different units, an integer wider than
+    64 bits in a list that cannot take the width annotation it needs, a
+    ``Decimal`` past the range of ``float_dec:64``, a key that is not a
+    ``str``.
+    """
     if not isinstance(obj, dict):
         raise BovnarArgumentError("dumps() requires a dict at the top level")
     # The directive names the LOWEST version that admits everything written, so
@@ -298,7 +333,7 @@ def unit_to_str(unit: ValueUnit) -> str:
     from ._ffi import get_library
     lib = get_library()
     buf = _ct.create_string_buffer(UNIT_STRING_MAX)
-    n   = lib.bvn_unit_to_string(unit, buf, UNIT_STRING_MAX)
+    n   = lib.bvn_unit_to_string(_as_vu(unit), buf, UNIT_STRING_MAX)
     if n < 0:
         raise BovnarArgumentError("unit_to_str: output buffer overflow")
     return buf.raw[:n].decode('utf-8')
@@ -328,7 +363,7 @@ def unit_to_profile(namespace: str, unit: ValueUnit) -> str:
     from ._ffi import get_library
     lib = get_library()
     buf = _ct.create_string_buffer(UNIT_STRING_MAX)
-    n   = lib.bvn_unit_to_profile(namespace.encode('utf-8'), unit, buf,
+    n   = lib.bvn_unit_to_profile(namespace.encode('utf-8'), _as_vu(unit), buf,
                                   UNIT_STRING_MAX)
     if n < 0:
         raise BovnarArgumentError(
@@ -347,7 +382,7 @@ def unit_to_ucum(unit: ValueUnit) -> str:
     from ._ffi import get_library
     lib = get_library()
     buf = _ct.create_string_buffer(UNIT_STRING_MAX)
-    n   = lib.bvn_unit_to_ucum(unit, buf, UNIT_STRING_MAX)
+    n   = lib.bvn_unit_to_ucum(_as_vu(unit), buf, UNIT_STRING_MAX)
     if n < 0:
         raise BovnarArgumentError("unit_to_ucum: this unit has no UCUM code")
     return buf.raw[:n].decode('utf-8')
@@ -365,7 +400,7 @@ def unit_is_profile_only(unit: ValueUnit) -> bool:
     namespace that owns it.
     """
     from ._ffi import get_library
-    return bool(get_library().bvn_unit_is_profile_only(unit))
+    return bool(get_library().bvn_unit_is_profile_only(_as_vu(unit)))
 
 
 def available_profiles() -> tuple:
@@ -456,7 +491,21 @@ def write_array(w: Writer,
     *unit_source* spells *vu* the way the caller wants it written -- say
     ``"ucum:mL{total}"`` for a *vu* of ``m~L`` -- instead of the canonical form;
     it must parse to *vu* or the write is refused.
+
+    **With *vt*, every element is held to it.** An ``int`` under an integer
+    annotation is range-checked against its width and written in its base
+    (quoted where the base requires it: 255 under ``<uint:16,_16>`` is
+    ``"ff"``); a ``float`` under an integer annotation, a ``str`` under a
+    numeric one, a ``dict`` under any, and so on raise ``BovnarArgumentError``
+    before anything is written for that element. :class:`Quantity` elements
+    carry their own literal and are written as they are.
     """
+    # Materialise once: the row probe below iterates `rows` and a generator
+    # does not survive that -- write_array(w, k, (x for x in [1, 2, 3])) wrote
+    # [2, 3].
+    if not isinstance(rows, (list, tuple)):
+        rows = list(rows)
+    vu = _as_vu(vu)
     w.emit(Event.ASSIGNMENT_START, key=key)
 
     if vt is not None:
@@ -473,10 +522,10 @@ def write_array(w: Writer,
         w._emit_annotation(name, vt, vu if vu is not None else make_unit_none(),
                            unit_source if vu is not None else None)
 
-    _emit_rows(w, rows, _annotate_elements)
+    _emit_rows(w, rows, _annotate_elements, vt)
 
 
-def _emit_rows(w: Writer, rows, annotate: bool = False) -> None:
+def _emit_rows(w: Writer, rows, annotate: bool = False, vt=None) -> None:
     """One list as array text: ``[..]/[..]`` rows for a rectangular
     list-of-lists, a nested ``[[..]]`` otherwise.
 
@@ -485,7 +534,11 @@ def _emit_rows(w: Writer, rows, annotate: bool = False) -> None:
     as [0,1,2,3] read back with shape (4,) instead of (1,4). So a single row is
     nested -- at EVERY depth ([[[1.5]]] came back as [[1.5]]) -- and rows of
     different lengths are nested too: [[1],[2,3]] written as [1]/[2,3] is
-    error_array_row_size_mismatch, a document nothing reads."""
+    error_array_row_size_mismatch, a document nothing reads.
+
+    *vt* is the array-level annotation the elements are held to, or None."""
+    if not isinstance(rows, (list, tuple)):
+        rows = list(rows)
     is_rows = bool(rows) and all(isinstance(r, (list, tuple)) for r in rows)
     if is_rows and len(rows) > 1 and len({len(r) for r in rows}) == 1:
         first = True
@@ -495,12 +548,12 @@ def _emit_rows(w: Writer, rows, annotate: bool = False) -> None:
             first = False
             w.begin_array_row()
             for elem in row:
-                _emit_array_element(w, elem, annotate)
+                _emit_array_element(w, elem, annotate, vt)
             w.end_array_row()
         return
     w.begin_array_row()
     for elem in rows:
-        _emit_array_element(w, elem, annotate)
+        _emit_array_element(w, elem, annotate, vt)
     w.end_array_row()
 
 
@@ -674,6 +727,38 @@ class _DictParser:
 class _TypedDictParser(_DictParser):
     """Like _DictParser but wraps typed values in Quantity for lossless round-trips."""
 
+    # WHAT A QUANTITY KEEPS. `data` is the Python-owned snapshot of the event,
+    # a whole bvnr_data_t: 1136 bytes, most of it two inline 516-byte units.
+    # `data.value_type` and `data.value_unit` are ctypes VIEWS into it, and a
+    # view keeps its parent alive -- so storing them on the Quantity pinned
+    # one snapshot per scalar, about 1.8 kB each, and a million-element typed
+    # array cost well over a gigabyte where the plain load costs megabytes.
+    #
+    # The type is three integers and is copied. The unit is copied ONCE PER
+    # DISTINCT UNIT per load and the resulting Unit shared: a document names
+    # few units and repeats them on every element of every array, and Unit is
+    # a value -- nothing in the package mutates one. (Mutating `q.unit.raw` in
+    # place would now show through every Quantity of that unit from the same
+    # load. It was never a supported way to change a unit; build a new
+    # Quantity.)
+    def __init__(self) -> None:
+        super().__init__()
+        self._unit_cache: dict = {}
+        self._no_unit = Unit(make_unit_none())
+
+    def _shared_unit(self, vu) -> Unit:
+        import ctypes as _ct
+        n = min(int(vu.num_components), len(vu.components))
+        if n == 0:
+            return self._no_unit
+        key = _ct.string_at(
+            _ct.addressof(vu),
+            ValueUnit.components.offset + n * _ct.sizeof(ValueUnitComponent))
+        unit = self._unit_cache.get(key)
+        if unit is None:
+            unit = self._unit_cache[key] = Unit(ValueUnit.from_buffer_copy(vu))
+        return unit
+
     def _decode_data(self, raw: bytes, fam: ValueTypeFamily, vt,
                      tok_type: int, data) -> object:
         if fam == ValueTypeFamily.PLAIN:
@@ -684,10 +769,13 @@ class _TypedDictParser(_DictParser):
             # it). Other PLAIN values (null) decode to a native Python value.
             if tok_type in (_TOKEN_IS_SYMBOL, _TOKEN_IS_REFERENCE):
                 text = raw.decode('utf-8', errors='replace') if raw else None
-                return Quantity(text, vt, make_unit_none(), tok_type)
+                return Quantity(text, ValueTypeSpec(vt.family, vt.width, vt.base),
+                                self._no_unit, tok_type)
             return _decode_value(raw, fam, vt, tok_type)
         text = raw.decode('utf-8', errors='replace') if raw else None
-        vu   = data.value_unit if data is not None else make_unit_none()
+        vu   = (self._shared_unit(data.value_unit) if data is not None
+                else self._no_unit)
+        vt   = ValueTypeSpec(vt.family, vt.width, vt.base)
         # spec 1.1 — a datetime literal's sub-second digits live on the event,
         # not in `raw` (the whole-second carrier); carry them so dumps() can
         # round-trip the fraction losslessly.
@@ -877,6 +965,22 @@ def _needs_annotation(vt: ValueTypeSpec, vu: ValueUnit, raw: str | None = None) 
 def _emit_quantity(w: Writer, key: str, q: 'Quantity') -> None:
     import ctypes as _ct
     fam = int(q.vtype.family)
+    # A spelling is checked against the unit it spells, by the C writer, at the
+    # place the unit is written. A Quantity with NO unit has no such place, so
+    # a spelling on it was carried to the writer and dropped there in silence:
+    # Quantity('5', vt, None, unit_source='m') wrote `.a = 5;`. That is the
+    # mismatch doc/09 §6.2 says is refused -- 'm' does not parse to "no unit".
+    # A spelling that itself means no unit (no_unit, ucum:1, a bare UCUM
+    # annotation) says nothing false and is let through.
+    if q.unit_source and not _has_real_unit(q.unit.raw):
+        try:
+            spelled_none = Unit.parse(q.unit_source).is_dimensionless
+        except BovnarArgumentError:
+            spelled_none = False
+        if not spelled_none:
+            raise BovnarArgumentError(
+                f"Cannot serialise {key!r}: unit_source {q.unit_source!r} does "
+                "not spell this Quantity's unit, which is no unit at all")
     w.emit(Event.ASSIGNMENT_START, key=key)
     fam_name = _FAM_NAMES.get(fam)
     if fam_name is not None and _needs_annotation(q.vtype, q.unit.raw, q.raw):
@@ -1055,6 +1159,12 @@ def _array_int_annotation(rows):
         for e in cur:
             if isinstance(e, bool):
                 return None
+            if e is None:
+                # A null hole constrains nothing (_array_quantity_annotation
+                # says the same). It used to switch the annotation off, and
+                # [2**70, None] then went out as a bare 71-bit number -- a
+                # document loads() refuses with value_out_of_range.
+                continue
             if isinstance(e, (list, tuple)):
                 stack.append(e)
             elif isinstance(e, int):
@@ -1077,6 +1187,78 @@ def _array_int_annotation(rows):
     if max_pos_b <= 64:
         return None
     return make_type_spec(ValueTypeFamily.UINT, max_pos_b, 10)
+
+
+def _array_has_wide_int(rows) -> bool:
+    """True if any plain-int leaf needs more than 64 bits (unsigned for a
+    non-negative value, signed for a negative one)."""
+    stack = [rows]
+    while stack:
+        cur = stack.pop()
+        for e in cur:
+            if isinstance(e, (list, tuple)):
+                stack.append(e)
+            elif isinstance(e, int) and not isinstance(e, bool) and not (
+                    -0x8000000000000000 <= e <= 0xFFFFFFFFFFFFFFFF):
+                return True
+    return False
+
+
+def _array_decimal_annotation(rows):
+    """``<float_dec:64>`` for an array whose leaves are all Decimal / Fraction
+    (nulls aside), else None.
+
+    A scalar Decimal is written as ``<float_dec:64> 1.10`` -- that is the
+    documented meaning of handing dumps() a Decimal. In a list the same values
+    were written BARE, so they re-read under default synthesis: 1.10 as a
+    binary float:64 and Decimal('2') as an unsigned integer. The width is the
+    scalar path's, for the same reason: one rule for what a Decimal means."""
+    saw = False
+    stack = [rows]
+    while stack:
+        cur = stack.pop()
+        for e in cur:
+            if isinstance(e, (list, tuple)):
+                stack.append(e)
+            elif e is None:
+                continue
+            elif isinstance(e, (Decimal, Fraction)):
+                saw = True
+            else:
+                return None
+    return make_type_spec(ValueTypeFamily.FLOAT_DEC, 64, 0) if saw else None
+
+
+def _array_mixed_numeric_types(rows) -> bool:
+    """True for an array of unit-less numeric Quantities that needs its types
+    written and cannot have them written once.
+
+    That is: every non-null leaf is a numeric Quantity with a literal and no
+    unit, and at least one of them carries a type default synthesis would not
+    give back. The caller has already established that no single annotation
+    fits (or it would have used it), so what is left is one annotation per
+    element -- which is what `[<uint:8> 1, <float:64> 2.5]` was read from."""
+    numeric = (int(ValueTypeFamily.FLOAT), int(ValueTypeFamily.FLOAT_DEC),
+               int(ValueTypeFamily.FLOAT_FIX), int(ValueTypeFamily.UINT),
+               int(ValueTypeFamily.SINT))
+    needed = False
+    stack = [rows]
+    while stack:
+        cur = stack.pop()
+        for e in cur:
+            if isinstance(e, (list, tuple)):
+                stack.append(e)
+            elif e is None:
+                continue
+            elif not (isinstance(e, Quantity)
+                      and int(e.vtype.family) in numeric
+                      and not _has_real_unit(e.unit.raw)):
+                return False
+            elif e.raw is None:
+                continue                      # a typed null is written `null`
+            elif _needs_annotation(e.vtype, e.unit.raw, e.raw):
+                needed = True
+    return needed
 
 
 def _array_datetime_annotation(rows):
@@ -1117,7 +1299,67 @@ def _array_datetime_annotation(rows):
     return make_type_spec(ValueTypeFamily.DATETIME, width or 64, base or 0)
 
 
+def _coerce_scalar(value):
+    """A numpy scalar as the Python value it is; anything else unchanged.
+
+    np.float64 subclasses float and always worked. The others do not subclass
+    anything dumps() dispatches on, and were handled in one place only: taken
+    inside a list (as "some real number") and refused as a dict value, or --
+    np.bool_, which is not a number at all -- refused in both. numpy is looked
+    up in sys.modules, never imported: if it has not been imported, no value
+    here can be one of its scalars."""
+    import numbers
+    import sys
+    if value is None or isinstance(value, (bool, int, float, str, Decimal,
+                                           Fraction, Quantity)):
+        return value
+    np = sys.modules.get('numpy')
+    if np is not None and isinstance(value, np.bool_):
+        return bool(value)
+    if isinstance(value, numbers.Integral):
+        return int(value)
+    if isinstance(value, numbers.Real):
+        return float(value)
+    return value
+
+
+def _emit_octets(w: Writer, payload: bytes) -> None:
+    """One octet stream: the events bvnr_embed_document sends, minus the key.
+
+    The payload goes out in chunks of at most 65536 bytes, the most one chunk
+    header can count."""
+    import ctypes as _ct
+    from ._ffi import get_library
+    lib = get_library()
+    chunk = 65536
+    empty = BvnrData()
+    if not lib.bvnr_write_event(w._ptr, int(Event.OCTET_STREAM_START),
+                                _ct.byref(empty)):
+        w._raise_error()
+    for off in range(0, len(payload), chunk):
+        part = payload[off:off + chunk]
+        d = BvnrData()
+        d.type   = TokenType.OCTET_STREAM
+        d.data   = _ct.cast(_ct.c_char_p(part), _ct.c_void_p)
+        d.length = len(part)
+        if not lib.bvnr_write_event(w._ptr, int(Event.DATA), _ct.byref(d)):
+            w._raise_error()
+    empty = BvnrData()
+    if not lib.bvnr_write_event(w._ptr, int(Event.OCTET_STREAM_END),
+                                _ct.byref(empty)):
+        w._raise_error()
+
+
 def _emit_value(w: Writer, key: str, value) -> None:
+    # Checked here and not in _emit_dict because a struct inside an array comes
+    # through here too. `{1: 2}` used to die on `key.encode` with an
+    # AttributeError about ints -- an accident of the implementation where
+    # every other refusal of this function is a BovnarArgumentError.
+    if not isinstance(key, str):
+        raise BovnarArgumentError(
+            f"Cannot serialise key {key!r}: a key must be a str, "
+            f"not {type(key).__name__}")
+    value = _coerce_scalar(value)
     if value is None:
         w.write_null(key)
     elif isinstance(value, bool):
@@ -1146,6 +1388,11 @@ def _emit_value(w: Writer, key: str, value) -> None:
         _emit_quantity(w, key, Quantity.from_number(value))
     elif isinstance(value, str):
         w.write_string(key, value)
+    elif isinstance(value, (bytes, bytearray, memoryview)):
+        # loads() returns an octet stream as bytes; this is the way back. Until
+        # it existed, a document holding one could be read and not written.
+        w.emit(Event.ASSIGNMENT_START, key=key)
+        _emit_octets(w, bytes(value))
     elif isinstance(value, dict):
         w.begin_struct(key)
         _emit_dict(w, value)
@@ -1174,8 +1421,29 @@ def _emit_value(w: Writer, key: str, value) -> None:
                 "agree on one type and unit, and a Bovnar array has a single "
                 "annotation for all of them. Give them a common unit, or use a "
                 "struct with one field per value.")
+        if vt is None and _array_mixed_numeric_types(value):
+            # No unit, several numeric types -- [<uint:8> 1, <float:64> 2.5].
+            # Same answer as the one-unit case above, and for the same reason:
+            # written bare, every element re-read at its default type and the
+            # widths the document stated were gone.
+            write_array(w, key, value, _annotate_elements=True)
+            return
         if vt is None:
             vt = _array_int_annotation(value)
+        if vt is None:
+            vt = _array_decimal_annotation(value)
+        if vt is None and _array_has_wide_int(value):
+            # An integer past 64 bits is only readable under a width
+            # annotation, and an array has one annotation. Beside a float, a
+            # bool or a string there is no annotation that covers them all, and
+            # the bare number that used to be written here is
+            # value_out_of_range to every reader, this one included.
+            raise BovnarArgumentError(
+                f"Cannot serialise {key!r}: it holds an integer wider than 64 "
+                "bits beside elements that are not integers, and a Bovnar "
+                "array has a single annotation to give the width in. Keep "
+                "wide integers in an all-integer array, or wrap them in a "
+                "Quantity.")
         write_array(w, key, value, vt=vt, vu=vu,
                     unit_source=_array_unit_source(value) if vu is not None
                     else None)
@@ -1185,7 +1453,95 @@ def _emit_value(w: Writer, key: str, value) -> None:
             f"for key {key!r}")
 
 
-def _emit_array_element(w: Writer, elem, annotate: bool = False) -> None:
+def _refuse_under(elem, vt, why: str):
+    fam = ValueTypeFamily(int(vt.family)).name.lower()
+    spec = fam if not vt.width else f"{fam}:{int(vt.width)}"
+    raise BovnarArgumentError(
+        f"array element {elem!r} cannot be written under <{spec}>: {why}")
+
+
+def _emit_held_element(w: Writer, elem, vt) -> bool:
+    """Write one plain scalar as an element of an array annotated *vt*.
+
+    Returns False for an annotation that holds its elements to nothing (the
+    plain family), so the caller writes the element as it always did.
+
+    WHY THIS EXISTS. The element used to be written with a type made up for it
+    -- uint:64 for any non-negative int, float:64 for any float -- and that
+    made-up type is what the writer range-checked it against. The annotation in
+    front of the array was never consulted, so write_array(vt=<uint:16>) wrote
+    80800, a float, or a string under it; and under <uint:16,_16> it wrote the
+    DECIMAL digits of each int, which read back as a different number (255 ->
+    0x255 = 597). Every one of those is a document saying two things, and the
+    second kind is not even detectable by the reader.
+    """
+    import ctypes as _ct
+    from .quantity import _exact_number_text, _check_decimal_fits
+    F = ValueTypeFamily
+    fam = int(vt.family)
+    if fam not in _FAM_NAMES and fam != int(F.BOOL):
+        return False
+    tok = TokenType.ARRAY_NUMBER
+    if fam == int(F.BOOL):
+        if not isinstance(elem, bool):
+            _refuse_under(elem, vt, "it is not a bool")
+        text, tok = ('true' if elem else 'false'), TokenType.BOOL
+    elif fam == int(F.UTF8):
+        if not isinstance(elem, str):
+            _refuse_under(elem, vt, "it is not a str")
+        text, tok = elem, TokenType.ARRAY_STRING
+    elif isinstance(elem, bool):
+        _refuse_under(elem, vt, "a bool is not a number")
+    elif fam in (int(F.UINT), int(F.SINT), int(F.DATETIME)):
+        if not isinstance(elem, int):
+            _refuse_under(elem, vt, "it is not an integer")
+        width = int(vt.width) or 64
+        if fam == int(F.UINT):
+            lo, hi = 0, (1 << width) - 1
+        else:
+            lo, hi = -(1 << (width - 1)), (1 << (width - 1)) - 1
+        if not lo <= elem <= hi:
+            _refuse_under(elem, vt, f"it is outside [{lo}, {hi}]")
+        # A datetime's `base` is its epoch index, not a radix.
+        base = 10 if fam == int(F.DATETIME) else (int(vt.base) or 10)
+        if base == 10:
+            text = str(elem)
+        else:
+            if fam == int(F.SINT) and base in (64, 85):
+                _refuse_under(elem, vt, f"base {base} is unsigned")
+            text = Writer._format_bigint(elem, base)
+            # Quoted, as the scalar writers do for every non-decimal base: an
+            # unquoted "ff" is a symbol, and an unquoted "255" is the hazard
+            # this function exists to remove.
+            tok = TokenType.ARRAY_STRING
+    else:                                   # float / float_dec / float_fix
+        if not isinstance(elem, (int, float, Decimal, Fraction)):
+            _refuse_under(elem, vt, "it is not a number")
+        if fam == int(F.FLOAT) and int(vt.base) not in (0, 10):
+            _refuse_under(elem, vt, "a non-decimal float literal has to be "
+                          "given verbatim, as a Quantity")
+        text = _exact_number_text(elem)
+        width = int(vt.width) or 64
+        if fam == int(F.FLOAT_DEC):
+            _check_decimal_fits(text, width)
+        elif fam == int(F.FLOAT_FIX) and text not in ('nan', 'inf', 'ninf'):
+            from ._ffi import get_library
+            if not get_library().bvn_float_str_fits_fix(
+                    text.encode('ascii'), 10, width, int(vt.base)):
+                _refuse_under(elem, vt, f"it does not fit q{int(vt.base)}")
+    raw = text.encode('utf-8')
+    d = BvnrData()
+    d.type       = tok
+    d.value_type = vt
+    d.value_unit = make_unit_dimensionless()
+    d.data       = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p)
+    d.length     = len(raw)
+    _write_event_data(w, d)
+    return True
+
+
+def _emit_array_element(w: Writer, elem, annotate: bool = False,
+                        vt=None) -> None:
     import ctypes as _ct
 
     _TOKEN_IS_ARRAY_NUMBER = TokenType.ARRAY_NUMBER
@@ -1252,10 +1608,24 @@ def _emit_array_element(w: Writer, elem, annotate: bool = False) -> None:
         _emit_array_element(w, elem.value)
         return
 
+    elem = _coerce_scalar(elem)
+    if vt is not None and elem is not None \
+            and not isinstance(elem, (list, tuple)):
+        # The array has an annotation: this element answers to it. (A null
+        # hole and a nested row do not -- the first has no value, the second
+        # passes the annotation down to its own elements.)
+        if isinstance(elem, (dict, bytes, bytearray, memoryview)):
+            _refuse_under(elem, vt, "an annotated array holds scalars")
+        if _emit_held_element(w, elem, vt):
+            return
+
     if elem is None:
         d = BvnrData()
         d.type = _TOKEN_IS_NULL_VALUE
         _write_event_data(w, d)
+
+    elif isinstance(elem, (bytes, bytearray, memoryview)):
+        _emit_octets(w, bytes(elem))
 
     elif isinstance(elem, bool):
         sym = b'true' if elem else b'false'
@@ -1336,26 +1706,13 @@ def _emit_array_element(w: Writer, elem, annotate: bool = False) -> None:
         w.emit(Event.STRUCT_END)
 
     elif isinstance(elem, (list, tuple)):
-        _emit_rows(w, elem, annotate)
+        _emit_rows(w, elem, annotate, vt)
 
     else:
-        import numbers
-        if isinstance(elem, (numbers.Integral, numbers.Real)):
-            # any other real numeric scalar (e.g. np.float32, np.int64) reaching
-            # an object array: format it exactly and emit as a bare number. The
-            # array-level annotation supplies the real family/width.
-            from .quantity import _exact_number_text
-            raw = _exact_number_text(elem).encode('ascii')
-            d = BvnrData()
-            d.type       = _TOKEN_IS_ARRAY_NUMBER
-            d.value_type = make_type_spec(ValueTypeFamily.FLOAT_DEC, 64, 0)
-            d.value_unit = make_unit_dimensionless()
-            d.data       = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p)
-            d.length     = len(raw)
-            _write_event_data(w, d)
-        else:
-            raise BovnarArgumentError(
-                f"Cannot serialise array element of type {type(elem).__name__!r}")
+        # numpy's scalars were turned into Python ones by _coerce_scalar above,
+        # so what arrives here is something with no Bovnar form at all.
+        raise BovnarArgumentError(
+            f"Cannot serialise array element of type {type(elem).__name__!r}")
 
 
 def _write_event_data(w: Writer, d: BvnrData) -> None:

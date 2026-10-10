@@ -127,7 +127,14 @@ BVN_API bool bvn_unit_convert_value(double value, value_unit_t from,
  *     it rather than computing with the low bits.
  * *exact is set false when the true conversion factor is irrational (π-based
  * angles): the result is then only an approximation and a lossless consumer
- * must reject it. On any false return *exact is unspecified. This is the engine
+ * must reject it. On any false return *exact is unspecified.
+ *
+ * "The true factor" is the factor BETWEEN the two units, not either unit's own
+ * factor to SI. Two units defined through π convert exactly wherever the π
+ * cancels -- 1 rev is 360°, 1 arcmin is 1/60° -- and a change of prefix alone
+ * is exact for every unit there is (k~pc -> pc is 1000, although a parsec in
+ * metres is irrational). ° -> rad, pc -> au and Oe -> A/m keep their π and stay
+ * inexact. This is the engine
  * behind the reader's want_unit hook; it is exact for any value width and any
  * base. */
 BVN_API bool bvn_unit_convert_rational(const bvn_int_t *vnum, const bvn_int_t *vden,

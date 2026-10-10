@@ -212,7 +212,8 @@ def cli_flags(text):
 
 def check_cli(repo, text):
     """doc/06 §7.3 — which subcommands take a policy, and how the others refuse."""
-    exe = os.path.join(repo, "build", "bovnar")
+    import bvnr_build_env
+    exe = bvnr_build_env.cli(repo)
     if not os.path.exists(exe):
         print("check_doc_policy: no built CLI; doc/06 §7.3 not checked")
         return [], 0
@@ -297,6 +298,9 @@ def check_cli(repo, text):
 
 def main(argv):
     repo = os.path.abspath(argv[1]) if len(argv) > 1 else REPO
+    sys.path.insert(0, REPO)
+    import bvnr_build_env
+    bvnr_build_env.require_build(repo, "check_doc_policy", ("library", "cli"))
     path = os.path.join(repo, DOC)
     if not os.path.exists(path):
         print("check_doc_policy: %s is absent" % DOC)

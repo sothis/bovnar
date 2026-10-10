@@ -148,3 +148,14 @@ def test_dumps_refuses_an_array_whose_units_it_cannot_write():
     # Units that agree are written under the one annotation, as before.
     d = bovnar.loads(b'.a = <float:64,s> [1, 3];', typed=True)
     assert bovnar.dumps(d) == b'.a = <float:64,s> [1, 3];\n'
+
+
+def test_a_spelling_on_a_unitless_quantity_is_refused():
+    """A spelling is checked against the unit it spells; with no unit there was
+    nothing to check it against and it was dropped in silence."""
+    vt = bovnar.make_type_spec(bovnar.ValueTypeFamily.UINT, 64, 0)
+    with pytest.raises(BovnarArgumentError):
+        bovnar.dumps({'a': Quantity('5', vt, None, unit_source='m')})
+    # A spelling that itself means "no unit" says nothing false.
+    assert bovnar.dumps({'a': Quantity('5', vt, None, unit_source='no_unit')},
+                        pretty=False) == b'.a=5;'

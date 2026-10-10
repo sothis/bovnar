@@ -808,6 +808,9 @@ def check_api_named(repo):
 
 def main(argv):
     repo = argv[1] if len(argv) > 1 else REPO
+    sys.path.insert(0, REPO)
+    import bvnr_build_env
+    bvnr_build_env.require_build(repo, "check_doc_unit_factors", ("library",))
     problems, checked, prose = check(repo)
     api_problems, api_count = check_api_named(repo)
     problems += api_problems

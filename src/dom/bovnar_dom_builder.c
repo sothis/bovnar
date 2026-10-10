@@ -72,6 +72,15 @@ typedef enum bvn_scope_kind_e {
 typedef struct bvn_scope_s {
 	bvn_scope_kind_t  kind;
 	bvn_dom_node_t   *node;
+	/* For an array scope: the element count at which the row now being read
+	 * began, so ev_array_row_end can size it. It lives HERE, per array, and
+	 * used to be one variable for the whole builder -- so an inner array
+	 * opening reset it to 0 under the outer one, and the outer row's size was
+	 * computed from the inner array's start: `[[1,2,3]/[4,5,6]]` recorded an
+	 * outer row of 4294967294 elements, `[[1]/[2]] / [[3]/[4]]` indexed
+	 * .a[1][0][0][0] to 1 instead of 3, and a valid `[[[1,1]/[2,2], null],
+	 * [null, null]]` was refused as array_row_size_mismatch. */
+	uint32_t          row_start_count;
 } bvn_scope_t;
 typedef struct bvn_builder_s {
 	bvn_dom_doc_t  *doc;
@@ -87,7 +96,6 @@ typedef struct bvn_builder_s {
 	uint32_t        oct_len;
 	uint32_t        oct_cap;
 	bool            in_octet_stream;
-	uint32_t        row_start_count;
 	error_code_t    last_error;
 	/* The last unit spelling judged by builder_keep_unit_source, and the
 	 * verdict: an array repeats one spelling per element, and formatting the
@@ -153,6 +161,7 @@ static bool builder_push(bvn_builder_t *b, bvn_scope_kind_t kind,
 	bvn_scope_t *s = &b->scopes[b->scope_count++];
 	s->kind = kind;
 	s->node = node;
+	s->row_start_count = 0;
 	return true;
 }
 static void builder_pop(bvn_builder_t *b)
@@ -192,15 +201,15 @@ static bool builder_attach(bvn_builder_t *b, bvn_dom_node_t *val)
 	bvn_scope_t *top = builder_top(b);
 	if (!top) return false;
 	if (top->kind == BVN_SCOPE_DOC) {
-		return bvn_dom_doc_add(b->doc, b->key, b->key_len, val);
+		return bvn_dom_doc_add_nocheck(b->doc, b->key, b->key_len, val);
 	}
 	if (top->kind == BVN_SCOPE_STRUCT) {
-		bool ok = bvn_dom_struct_add(top->node,
+		bool ok = bvn_dom_struct_add_nocheck(top->node,
 									 b->key, b->key_len, val);
 		if (ok) builder_clear_key(b);
 		return ok;
 	}
-	return bvn_dom_array_append(top->node, val);
+	return bvn_dom_array_append_nocheck(top->node, val);
 }
 static bool builder_oct_append(bvn_builder_t *b, const uint8_t *data,
 							   uint32_t len)
@@ -335,6 +344,120 @@ static bvn_dom_node_t *make_int(const char *str, uint32_t len,
 	if (!parse_ok) { bvn_dom_node_destroy(n); return NULL; }
 	return n;
 }
+/*
+ * A decimal literal as the nearest double, without paying for digits that
+ * cannot matter.
+ *
+ * bvn_parse_double_in_base is exact: it builds the literal as a rational and
+ * rounds once. That is what makes it correct, and it is also why its cost
+ * follows the MAGNITUDE OF THE EXPONENT rather than the length of the text --
+ * "1e-99999" is eight bytes and a hundred-thousand-digit denominator. Each such
+ * literal cost milliseconds, so a 180 kB array of them held `bovnar validate`
+ * for 84 seconds: the document tier's running time was set by the shape of the
+ * input, not its size.
+ *
+ * Nothing about the answer needs that work. A binary64 spans roughly 1e-324 to
+ * 1.8e308, so the position of the leading significant digit settles most
+ * literals outright:
+ *
+ *   - leading digit at 10^309 or above: the value is at least 1e309, past the
+ *     largest double by any rounding -- infinity;
+ *   - leading digit at 10^-326 or below: the value is under 1e-325, less than
+ *     half the smallest subnormal (2.47e-324) -- zero;
+ *   - all digits zero: zero, whatever the exponent says.
+ *
+ * Everything between goes to the exact parser, but NORMALISED first: leading
+ * and trailing zeros are folded into the exponent (so 0.000...001e400 and
+ * 1000...0e-400 arrive as "1e..." with a small exponent, not as hundreds of
+ * digits against a large one), and the significant digits are cut at
+ * BVN_DEC_SIG_MAX with one sticky '1' standing for a non-zero remainder. That
+ * cut is exact: the boundary between two doubles is a number of at most 767
+ * significant decimal digits, so no digit past that can move a value across
+ * one -- it can only say "not exactly on it", which is what the sticky digit
+ * says. The exact parser then sees an exponent within a few hundred of zero
+ * and at most 801 digits, for any input.
+ *
+ * The result is bit-identical to handing the original text to the exact
+ * parser; tests/bovnar_dom_test.c holds it to that at every boundary named
+ * here. Returns false -- and the caller falls back to the exact path -- for
+ * anything that is not a plain decimal literal.
+ */
+#define BVN_DEC_SIG_MAX 800u
+static bool builder_decimal_to_double(const char *s, double *out)
+{
+	const char *p   = s;
+	bool        neg = false;
+	if (*p == '-') { neg = true; p++; }
+	const char *mant = p;
+	int64_t ndig = 0, point = -1, first_nz = -1, last_nz = -1;
+	for (;; p++) {
+		if (*p >= '0' && *p <= '9') {
+			if (*p != '0') {
+				if (first_nz < 0) first_nz = ndig;
+				last_nz = ndig;
+			}
+			ndig++;
+		} else if (*p == '.' && point < 0) {
+			point = ndig;
+		} else {
+			break;
+		}
+	}
+	if (ndig == 0) return false;
+	if (point < 0) point = ndig;
+	int64_t e10 = 0;
+	if (*p == 'e' || *p == 'E') {
+		bool eneg = false;
+		p++;
+		if (*p == '+' || *p == '-') { eneg = (*p == '-'); p++; }
+		if (*p < '0' || *p > '9') return false;
+		for (; *p >= '0' && *p <= '9'; p++) {
+			/* Saturate: past this the verdict cannot change, and the digits
+			 * of an exponent must not be able to overflow the counter. */
+			if (e10 < (int64_t)1000000000000)
+				e10 = e10 * 10 + (*p - '0');
+		}
+		if (eneg) e10 = -e10;
+	}
+	if (*p != '\0') return false;
+	if (first_nz < 0) {
+		*out = neg ? -0.0 : 0.0;
+		return true;
+	}
+	/* The power of ten of the leading significant digit. */
+	int64_t lead = point - 1 - first_nz + e10;
+	if (lead >= 309) {
+		*out = neg ? -INFINITY : INFINITY;
+		return true;
+	}
+	if (lead <= -326) {
+		*out = neg ? -0.0 : 0.0;
+		return true;
+	}
+	char     norm[BVN_DEC_SIG_MAX + 48u];
+	size_t   n = 0;
+	int64_t  idx = 0, kept = 0;
+	bool     sticky = false;
+	if (neg) norm[n++] = '-';
+	for (const char *q = mant; idx <= last_nz; q++) {
+		if (*q == '.') continue;
+		if (idx >= first_nz) {
+			if (kept < (int64_t)BVN_DEC_SIG_MAX) {
+				norm[n++] = *q;
+				kept++;
+			} else if (*q != '0') {
+				sticky = true;
+			}
+		}
+		idx++;
+	}
+	if (sticky) { norm[n++] = '1'; kept++; }
+	/* The digits now stand as one integer, so the exponent is the leading
+	 * digit's power less the digits after it. */
+	snprintf(norm + n, sizeof(norm) - n, "e%lld",
+		 (long long)(lead - (kept - 1)));
+	return bvn_parse_double_in_base(norm, 10u, out);
+}
 static bvn_dom_node_t *make_float(const char *str, uint32_t len,
 								  value_type_spec_t vt, value_unit_t vu)
 {
@@ -371,7 +494,8 @@ static bvn_dom_node_t *make_float(const char *str, uint32_t len,
 		 * so nothing is lost by delegating). For non-decimal bases this still
 		 * rejects a literal the parser cannot consume.
 		 */
-		if (!bvn_parse_double_in_base(buf, base, &v)) {
+		if (!(base == 10u && builder_decimal_to_double(buf, &v)) &&
+		    !bvn_parse_double_in_base(buf, base, &v)) {
 			if (buf_on_heap) free(buf);
 			bvn_dom_node_destroy(n);
 			return NULL;
@@ -380,6 +504,92 @@ static bvn_dom_node_t *make_float(const char *str, uint32_t len,
 	}
 	if (buf_on_heap) free(buf);
 	return n;
+}
+/*
+ * num/den as the nearest double.
+ *
+ * For a value a unit policy converted into a base its type has no literal in
+ * (see the ev_data handler): the digits in conv.text are then unreadable as a
+ * float, but the exact rational travels beside them. The quotient is taken to
+ * 64 significant bits with a sticky low bit, so the one rounding that happens
+ * -- uint64 to double, to nearest-even -- sees everything it needs and the
+ * result is correctly rounded across the normal range.
+ */
+static bool builder_rational_to_double(const bvn_int_t *num,
+				       const bvn_int_t *den, double *out)
+{
+	if (!num || !den || bvn_int_is_zero(den)) return false;
+	if (bvn_int_is_zero(num)) { *out = 0.0; return true; }
+	bool       ok = false;
+	bvn_int_t *n = bvn_int_alloc(), *q = bvn_int_alloc(), *r = bvn_int_alloc();
+	bvn_int_t *dd = bvn_int_alloc();
+	if (!n || !q || !r || !dd || !bvn_int_copy(n, num) || !bvn_int_copy(dd, den))
+		goto done;
+	bool neg = (num->negative != den->negative);
+	n->negative  = false;
+	dd->negative = false;
+	int shift = 66 + bvn_int_bitlen(dd) - bvn_int_bitlen(n);
+	if (shift < 0) shift = 0;
+	if (shift && !bvn_int_shl(n, shift)) goto done;
+	if (!bvn_int_divrem(q, r, n, dd)) goto done;
+	bool sticky = !bvn_int_is_zero(r);
+	int  ql     = bvn_int_bitlen(q);
+	int  drop   = ql > 64 ? ql - 64 : 0;
+	for (int i = 0; i < drop && !sticky; i++)
+		if (bvn_int_getbit(q, i)) sticky = true;
+	if (drop) bvn_int_shr(q, drop);
+	uint64_t m = 0;
+	if (!bvn_int_to_uint64(q, &m)) goto done;
+	if (sticky) m |= 1u;
+	double v = ldexp((double)m, drop - shift);
+	*out = neg ? -v : v;
+	ok = true;
+done:
+	bvn_int_free(n); bvn_int_free(q); bvn_int_free(r); bvn_int_free(dd);
+	return ok;
+}
+static bvn_dom_node_t *make_float_from_rational(const bvn_int_t *num,
+						const bvn_int_t *den,
+						value_type_spec_t vt,
+						value_unit_t vu)
+{
+	bvn_dom_node_t *n = bvn_dom_node_alloc(BVN_DOM_FLOAT);
+	if (!n) return NULL;
+	n->value_type = vt;
+	n->value_unit = vu;
+	if (!builder_rational_to_double(num, den, &n->val.float_val)) {
+		bvn_dom_node_destroy(n);
+		return NULL;
+	}
+	return n;
+}
+/*
+ * The type a converted integer is stored under: the declared one, widened to
+ * the smallest power-of-two width (8 at least) that holds `num` when the
+ * declared width no longer does. A uint that came out negative becomes a sint,
+ * for the same reason an integer that came out fractional becomes a float --
+ * the node has to describe the value it now holds.
+ */
+static value_type_spec_t builder_widen_converted_int(value_type_spec_t vt,
+						     const bvn_int_t *num)
+{
+	if (!num) return vt;
+	if (vt.family == vt_uint && num->negative && !bvn_int_is_zero(num))
+		vt.family = vt_sint;
+	int      bl   = bvn_int_bitlen(num);
+	uint32_t need = (uint32_t)bl + (vt.family == vt_sint ? 1u : 0u);
+	/* -2^(w-1) is the one signed value that fits in its own bit length. */
+	if (vt.family == vt_sint && num->negative && bl > 0) {
+		bool pow2 = true;
+		for (int i = 0; i < bl - 1 && pow2; i++)
+			if (bvn_int_getbit(num, i)) pow2 = false;
+		if (pow2) need = (uint32_t)bl;
+	}
+	if (need <= bvn_effective_width(vt)) return vt;
+	uint32_t w = 8u;
+	while (w < need && w < BVN_MAX_INT_WIDTH) w *= 2u;
+	vt.width = w;
+	return vt;
 }
 static bvn_dom_node_t *make_string(const char *str, uint32_t len,
 								   value_type_spec_t vt, value_unit_t vu)
@@ -483,12 +693,22 @@ static bool bvn_is_integer_text(const char *s, uint32_t len)
 	}
 	return true;
 }
+/*
+ * `quoted` is whether the literal came as a string token. It matters for one
+ * thing: nan / inf / ninf are special numbers only as BARE words. Quoted under
+ * a uint or sint they are digits -- "nan" in base 36 is 30191 -- and the test
+ * below used to run before the family was looked at, so `<uint:64,_36> "nan"`
+ * was stored as a float NaN and `<uint:8,_36> "inf"` (24171, which does not fit
+ * eight bits) was accepted as infinity without ever reaching the range check.
+ */
 static bool number_is_float(const char *s, uint32_t len,
-							value_type_spec_t vt)
+							value_type_spec_t vt, bool quoted)
 {
 	if (vt.family == vt_float ||
 		vt.family == vt_float_fix ||
 		vt.family == vt_float_dec) return true;
+	if (quoted && (vt.family == vt_uint || vt.family == vt_sint))
+		return false;
 	if (len <= 9) {
 		char tmp[10];
 		memcpy(tmp, s, len);
@@ -562,10 +782,8 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 		if (b->array_dim_continue) {
 			b->array_dim_continue = false;
 			bvn_scope_t *top = builder_top(b);
-			if (top && top->node)
-				b->row_start_count = top->node->arr.count;
-			else
-				b->row_start_count = 0;
+			if (top && top->kind == BVN_SCOPE_ARRAY && top->node)
+				top->row_start_count = top->node->arr.count;
 			break;
 		}
 		builder_do_deferred_pop(b);
@@ -575,7 +793,6 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 			return false;
 		if (!builder_push(b, BVN_SCOPE_ARRAY, a)) return false;
 		builder_clear_key(b);
-		b->row_start_count = 0;
 		break;
 	}
 	case ev_array_row_end: {
@@ -593,7 +810,7 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 		builder_do_deferred_pop(b);
 		bvn_scope_t *top = builder_top(b);
 		if (top && top->kind == BVN_SCOPE_ARRAY) {
-			uint32_t row_size = top->node->arr.count - b->row_start_count;
+			uint32_t row_size = top->node->arr.count - top->row_start_count;
 			uint32_t dim = top->node->arr.num_dims - 1u;
 			if (dim < 8)
 				top->node->arr.rows_per_dim[dim] = row_size;
@@ -646,6 +863,7 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 		uint32_t   len = d->length;
 		value_type_spec_t vt = d->value_type;
 		value_unit_t      vu = d->value_unit;
+		bool              conv_from_rational = false;
 		/*
 		 * A unit policy that converts is asking for the CONVERTED value, so that
 		 * is what the tree stores — `bovnar query .x --unit m` would otherwise
@@ -673,11 +891,54 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 			 * an explicit 10, which is a different thing to the float
 			 * formatter: `100` came back out as `1e+02`. */
 			if (d->conv.base &&
-			    d->conv.base != bvn_effective_base(d->value_type))
-				vt.base = d->conv.base;
+			    d->conv.base != bvn_effective_base(d->value_type)) {
+				/* ...and only where the type HAS a base to move. A uint/sint
+				 * is written in any base bovnar has, so its digits and its
+				 * base travel together. A float has a literal in base 10 and
+				 * 16 and no other; float_fix keeps its Q in this very field
+				 * and float_dec leaves it unused, both always decimal. Stamping
+				 * conv.base on those produced a type no document can declare
+				 * (`<float:64,_2>`), digits no float parser reads, and for
+				 * float_fix a silently different Q -- and the failure surfaced
+				 * as error_value_out_of_range against the document. There the
+				 * VALUE is taken from the exact rational instead (it is a
+				 * double either way) and the type keeps its own base. */
+				if (vt.family == vt_uint || vt.family == vt_sint ||
+				    (vt.family == vt_float &&
+				     (d->conv.base == 10u || d->conv.base == 16u)))
+					vt.base = d->conv.base;
+				else if (bvn_type_is_numeric(vt))
+					conv_from_rational = true;
+			}
 			if ((vt.family == vt_uint || vt.family == vt_sint) &&
-			    !bvn_is_integer_text(str, len))
+			    !bvn_is_integer_text(str, len)) {
 				vt.family = vt_float;
+				/* The WIDTH has to follow the family. `<uint:8,g> 5` in
+				 * kilograms came back as a float of width 8, which is not a
+				 * float any reader accepts (16, or a multiple of 32) -- a
+				 * value_type the node's own document could not be written
+				 * with. The payload is a double whatever the integer's width
+				 * was, so 64 is the honest one; the base goes with it, since a
+				 * float is written in 10 or 16 and the digits about to be
+				 * parsed are in conv.base (see builder_float_from_rational
+				 * for the bases a float has no literal in). */
+				vt.width = 64u;
+				if (vt.base != 0u && vt.base != 10u && vt.base != 16u) {
+					vt.base = 0u;
+					conv_from_rational = true;
+				}
+			} else if (vt.family == vt_uint || vt.family == vt_sint) {
+				/* ...and an integer that stays one can still outgrow the width
+				 * it was declared with: `<uint:8,k~m> 2` is 2000 m. make_int
+				 * range-checks against the declared width, so that one value
+				 * failed the WHOLE document with error_value_out_of_range --
+				 * `bovnar query --unit m .other f` blamed the file for a
+				 * conversion `validate` and `events` deliver without comment.
+				 * Widen to the smallest power-of-two width that holds the
+				 * result, counted from the exact numerator the reader hands
+				 * over beside the digits. */
+				vt = builder_widen_converted_int(vt, d->conv.num);
+			}
 		}
 		bvn_dom_node_t *nd = NULL;
 		switch (d->type) {
@@ -686,7 +947,10 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 			break;
 		case token_is_number:
 		case token_is_array_number:
-			if (number_is_float(str, len, vt))
+			if (conv_from_rational)
+				nd = make_float_from_rational(d->conv.num, d->conv.den,
+							      vt, vu);
+			else if (number_is_float(str, len, vt, false))
 				nd = make_float(str, len, vt, vu);
 			else
 				nd = make_int(str, len, vt, vu);
@@ -719,7 +983,10 @@ static bool on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 			 * unreachable. The declared family decides what the node is; the
 			 * token only says how it was spelled. */
 			if (bvn_type_is_numeric(vt)) {
-				if (number_is_float(str, len, vt))
+				if (conv_from_rational)
+					nd = make_float_from_rational(d->conv.num,
+								      d->conv.den, vt, vu);
+				else if (number_is_float(str, len, vt, true))
 					nd = make_float(str, len, vt, vu);
 				else
 					nd = make_int(str, len, vt, vu);
@@ -836,21 +1103,67 @@ static bool bvn_dom_same_unit(value_unit_t a, value_unit_t b)
 		return true;
 	return bvn_unit_equal(a, b);
 }
-static const bvn_dom_node_t *bvn_dom_first_nonnull_elem(
-	const bvn_dom_node_t *arr)
-{
-	uint32_t n = bvn_dom_array_count(arr);
-	for (uint32_t i = 0; i < n; i++) {
-		const bvn_dom_node_t *e = bvn_dom_array_at(arr, i);
-		if (e && bvn_dom_node_type(e) != BVN_DOM_NULL)
-			return e;
-	}
-	return NULL;
-}
 /*
- * Structural type-shape equality of two array siblings. Returns error_none when
- * a and b are mutually homogeneous, otherwise the specific mismatch code. null
- * on either side is a hole and always matches.
+ * Hard recursion-depth guard for the post-parse structural validators below.
+ * The reader caps array and struct nesting at 255 *each*, so a materialised tree
+ * reaching these checks is at most ~510 levels deep; this ceiling sits well above
+ * that yet stops any pathological tree (or a future caller that bypasses the
+ * reader caps) from exhausting the C stack. The destructor is iterative for the
+ * same reason (see bovnar_dom.c); these checks fail closed instead.
+ */
+#define BVN_DOM_CHECK_MAX_DEPTH 4096u
+/*
+ * THE SHAPE AN ARRAY'S ELEMENTS SHARE, accumulated as the elements are read.
+ *
+ * Homogeneity used to be a pairwise test of each element against the FIRST
+ * non-null one. A null is a hole that matches anything, and "matches anything"
+ * is not transitive: where the first element had a hole, it said nothing about
+ * that position, and the elements after it were compared with IT and never with
+ * each other. So
+ *
+ *      [[null, null], [<float:64,m> 1, null], [<float:64,s> 2, null]]
+ *
+ * put metres and seconds in one matrix column and validated, and
+ * `[{.x = null;}, {.x = 1;}, {.x = "s";}]` validated while the same three
+ * records in the order 1, null, "s" were array_element_type_mismatch. The
+ * verdict depended on where the holes happened to be.
+ *
+ * The reference is therefore not an element but a shape: one slot per position
+ * (a scalar, the element of an array, each field of a struct), EMPTY until
+ * some sibling has a non-null value there, and from then on what every later
+ * sibling is held to. A hole neither fills a slot nor is tested against one,
+ * which is all that "matches anything" was ever meant to say. The result no
+ * longer depends on the order of the elements.
+ *
+ * `rep` is the first node seen at the position: for a scalar its kind and unit,
+ * for an array its row geometry, for a struct its keys. `sub` is the one
+ * element slot of an array, or one slot per field of a struct.
+ */
+typedef struct bvn_dom_shape_s {
+	const bvn_dom_node_t   *rep;
+	struct bvn_dom_shape_s *sub;
+	uint32_t                nsub;
+} bvn_dom_shape_t;
+static void bvn_dom_shape_free(bvn_dom_shape_t *s, unsigned depth)
+{
+	/* No depth guard of its own: the merge never builds deeper than its guard
+	 * allows, so this recursion is bounded by the same number -- and a guard
+	 * here could only ever return early, which would be a leak. */
+	(void)depth;
+	if (!s->sub) return;
+	for (uint32_t i = 0; i < s->nsub; i++)
+		bvn_dom_shape_free(&s->sub[i], depth + 1u);
+	free(s->sub);
+	s->sub  = NULL;
+	s->nsub = 0;
+}
+static error_code_t bvn_dom_check_homogeneous(
+	const bvn_dom_node_t *node, unsigned depth);
+static error_code_t bvn_dom_keys_unique(
+	const bvn_dom_entry_t *ent, uint32_t n);
+/*
+ * Hold node `n` to the shape `s`, filling in whatever `s` does not know yet.
+ * Returns error_none when n fits, otherwise the specific mismatch code.
  *
  * check_dim distinguishes the two scopes of the spec-1.0 rule ("shape uniform,
  * fields free"). In a bare array / matrix context (check_dim = true) elements
@@ -861,90 +1174,126 @@ static const bvn_dom_node_t *bvn_dom_first_nonnull_elem(
  * different length in each record (e.g. per-record argument lists). So
  * struct-field recursion passes check_dim = false, freeing both unit and array
  * length.
+ *
+ * `internal` says that n has not been checked on its OWN account yet: that the
+ * arrays below it are each homogeneous and no struct below it repeats a key.
+ * For a sub-array under check_dim that needs no second walk -- holding all of
+ * its elements to the one shared element slot is exactly its own homogeneity --
+ * so the flag is simply passed down. A struct's fields are the place the two
+ * diverge: across records they are compared loosely (fields free), while a list
+ * inside ONE record is still a bare array with one unit, so each field value
+ * gets its own bvn_dom_check_homogeneous there.
  */
-/*
- * Hard recursion-depth guard for the post-parse structural validators below.
- * The reader caps array and struct nesting at 255 *each*, so a materialised tree
- * reaching these checks is at most ~510 levels deep; this ceiling sits well above
- * that yet stops any pathological tree (or a future caller that bypasses the
- * reader caps) from exhausting the C stack. The destructor is iterative for the
- * same reason (see bovnar_dom.c); these checks fail closed instead.
- */
-#define BVN_DOM_CHECK_MAX_DEPTH 4096u
-static error_code_t bvn_dom_shape_equal(
-	const bvn_dom_node_t *a, const bvn_dom_node_t *b, bool check_dim,
-	unsigned depth)
+static error_code_t bvn_dom_shape_merge(
+	bvn_dom_shape_t *s, const bvn_dom_node_t *n, bool check_dim,
+	bool internal, unsigned depth)
 {
 	if (depth > BVN_DOM_CHECK_MAX_DEPTH)
 		return error_array_nesting_too_high;
-	bvn_dom_type_t ta = bvn_dom_node_type(a);
-	bvn_dom_type_t tb = bvn_dom_node_type(b);
-	if (ta == BVN_DOM_NULL || tb == BVN_DOM_NULL)
+	if (!n)
 		return error_none;
-	bool a_num = (ta == BVN_DOM_INT || ta == BVN_DOM_FLOAT);
-	bool b_num = (tb == BVN_DOM_INT || tb == BVN_DOM_FLOAT);
-	if (a_num && b_num) {
-		/* Both numeric: kinds match (encodings may mix). Dimension only when
-		 * comparing array/matrix elements, not struct fields. */
-		/* datetime (spec 1.1) is its own kind: a timestamp does not mix with a
-		 * plain count/measurement (spec §7.4 lists the mixable encodings; datetime
-		 * is not among them), and — like a currency — its epoch is a dimension, so
-		 * two datetimes on different epochs (time scales) may not share an array. */
-		bool a_dt = (a->value_type.family == vt_datetime);
-		bool b_dt = (b->value_type.family == vt_datetime);
-		if (a_dt != b_dt)
+	bvn_dom_type_t tn = bvn_dom_node_type(n);
+	if (tn == BVN_DOM_NULL)
+		return error_none;              /* a hole: says nothing, breaks nothing */
+	if (!s->rep) {
+		uint32_t want = tn == BVN_DOM_ARRAY  ? 1u
+			      : tn == BVN_DOM_STRUCT ? bvn_dom_struct_count(n) : 0u;
+		if (want) {
+			s->sub = calloc(want, sizeof(*s->sub));
+			/* Fail closed: a check that could not run has not passed. */
+			if (!s->sub)
+				return error_invalid_argument;
+			s->nsub = want;
+		}
+		s->rep = n;
+	} else {
+		const bvn_dom_node_t *a = s->rep;
+		bvn_dom_type_t ta = bvn_dom_node_type(a);
+		bool a_num = (ta == BVN_DOM_INT || ta == BVN_DOM_FLOAT);
+		bool b_num = (tn == BVN_DOM_INT || tn == BVN_DOM_FLOAT);
+		if (a_num && b_num) {
+			/* Both numeric: kinds match (encodings may mix). Dimension only
+			 * when comparing array/matrix elements, not struct fields. */
+			/* datetime (spec 1.1) is its own kind: a timestamp does not mix
+			 * with a plain count/measurement (spec §7.4 lists the mixable
+			 * encodings; datetime is not among them), and — like a currency —
+			 * its epoch is a dimension, so two datetimes on different epochs
+			 * (time scales) may not share an array. */
+			bool a_dt = (a->value_type.family == vt_datetime);
+			bool b_dt = (n->value_type.family == vt_datetime);
+			if (a_dt != b_dt)
+				return error_array_element_type_mismatch;
+			if (a_dt && b_dt && check_dim &&
+				a->value_type.base != n->value_type.base)
+				return error_array_element_type_mismatch;
+			if (check_dim &&
+				!bvn_dom_same_unit(bvn_dom_get_unit(a), bvn_dom_get_unit(n)))
+				return error_array_element_type_mismatch;
+			return error_none;
+		}
+		if (ta != tn)
 			return error_array_element_type_mismatch;
-		if (a_dt && b_dt && check_dim &&
-			a->value_type.base != b->value_type.base)
-			return error_array_element_type_mismatch;
-		if (check_dim &&
-			!bvn_dom_same_unit(bvn_dom_get_unit(a), bvn_dom_get_unit(b)))
-			return error_array_element_type_mismatch;
-		return error_none;
-	}
-	if (ta != tb)
-		return error_array_element_type_mismatch;
-	switch (ta) {
-	case BVN_DOM_ARRAY: {
-		/* rectangular only in the bare array / matrix context; list fields of
-		 * records may vary in length (check_dim == false). */
-		if (check_dim) {
-			if (bvn_dom_array_count(a) != bvn_dom_array_count(b))
+		if (tn == BVN_DOM_ARRAY && check_dim) {
+			/* rectangular only in the bare array / matrix context; list
+			 * fields of records may vary in length (check_dim == false). */
+			if (bvn_dom_array_count(a) != bvn_dom_array_count(n))
 				return error_array_row_size_mismatch;
 			/* A '/'-row matrix stores its cells flat, with the row geometry in
 			 * num_dims + rows_per_dim[]. Equal total cell count is NOT enough to
 			 * mean equal shape: a 2x3 block and a 3x2 block (or a flat 4-element
 			 * array and a 2x2 matrix) both hold the same number of cells but are
 			 * different shapes, so the row geometry must match too. */
-			if (a->arr.num_dims != b->arr.num_dims)
+			if (a->arr.num_dims != n->arr.num_dims)
 				return error_array_row_size_mismatch;
 			uint32_t nd = a->arr.num_dims;
 			if (nd > 8u) nd = 8u;   /* rows_per_dim records only the first 8 rows */
 			for (uint32_t i = 0; i < nd; i++)
-				if (a->arr.rows_per_dim[i] != b->arr.rows_per_dim[i])
+				if (a->arr.rows_per_dim[i] != n->arr.rows_per_dim[i])
 					return error_array_row_size_mismatch;
 		}
-		const bvn_dom_node_t *ra = bvn_dom_first_nonnull_elem(a);
-		const bvn_dom_node_t *rb = bvn_dom_first_nonnull_elem(b);
-		if (ra && rb)
-			return bvn_dom_shape_equal(ra, rb, check_dim,
-				depth + 1u);   /* matrices stay uniform */
+		if (tn == BVN_DOM_STRUCT) {
+			uint32_t na = bvn_dom_struct_count(a);
+			if (na != bvn_dom_struct_count(n))
+				return error_struct_shape_mismatch;
+			const bvn_dom_entry_t *ea = bvn_dom_struct_entries(a);
+			const bvn_dom_entry_t *eb = bvn_dom_struct_entries(n);
+			for (uint32_t i = 0; i < na; i++)
+				if (!ea[i].key || !eb[i].key ||
+					strcmp(ea[i].key, eb[i].key) != 0)
+					return error_struct_shape_mismatch;
+		}
+	}
+	switch (tn) {
+	case BVN_DOM_ARRAY: {
+		uint32_t cnt = bvn_dom_array_count(n);
+		for (uint32_t i = 0; i < cnt; i++) {
+			/* matrices stay uniform: every cell of every sibling is held to
+			 * the one element slot. */
+			error_code_t e = bvn_dom_shape_merge(&s->sub[0],
+				bvn_dom_array_at(n, i), check_dim, internal, depth + 1u);
+			if (e != error_none)
+				return e;
+		}
 		return error_none;
 	}
 	case BVN_DOM_STRUCT: {
-		uint32_t na = bvn_dom_struct_count(a);
-		if (na != bvn_dom_struct_count(b))
-			return error_struct_shape_mismatch;
-		const bvn_dom_entry_t *ea = bvn_dom_struct_entries(a);
-		const bvn_dom_entry_t *eb = bvn_dom_struct_entries(b);
-		for (uint32_t i = 0; i < na; i++) {
-			if (!ea[i].key || !eb[i].key ||
-				strcmp(ea[i].key, eb[i].key) != 0)
-				return error_struct_shape_mismatch;
+		uint32_t cnt = bvn_dom_struct_count(n);
+		const bvn_dom_entry_t *ent = bvn_dom_struct_entries(n);
+		if (internal) {
+			error_code_t dup = bvn_dom_keys_unique(ent, cnt);
+			if (dup != error_none)
+				return dup;
+		}
+		for (uint32_t i = 0; i < cnt && i < s->nsub; i++) {
+			if (internal) {
+				error_code_t own =
+					bvn_dom_check_homogeneous(ent[i].value, depth + 1u);
+				if (own != error_none)
+					return own;
+			}
 			/* fields free: compare kind/shape, not dimension. */
-			error_code_t e =
-				bvn_dom_shape_equal(ea[i].value, eb[i].value, false,
-					depth + 1u);
+			error_code_t e = bvn_dom_shape_merge(&s->sub[i], ent[i].value,
+				false, false, depth + 1u);
 			if (e != error_none)
 				return e;
 		}
@@ -1008,6 +1357,15 @@ static error_code_t bvn_dom_keys_unique(
 	free(keys);
 	return r;
 }
+/* -fanalyzer reports shape.sub as leaked at the end of this function. It is
+ * freed on every path: bvn_dom_shape_free walks the same tree the merge built.
+ * The analyzer gives up following the two mutually recursive walks a few levels
+ * down and reports what it could not finish proving. LeakSanitizer, which sees
+ * what actually happens, is clean over the DOM tests and the fuzz corpus. */
+#if defined(__GNUC__) || defined(__clang__)
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
+#endif
 static error_code_t bvn_dom_check_homogeneous(
 	const bvn_dom_node_t *node, unsigned depth)
 {
@@ -1020,25 +1378,16 @@ static error_code_t bvn_dom_check_homogeneous(
 	switch (bvn_dom_node_type(node)) {
 	case BVN_DOM_ARRAY: {
 		uint32_t n = bvn_dom_array_count(node);
-		const bvn_dom_node_t *ref = NULL;
-		for (uint32_t i = 0; i < n; i++) {
-			const bvn_dom_node_t *e = bvn_dom_array_at(node, i);
-			error_code_t sub = bvn_dom_check_homogeneous(e, depth + 1u);
-			if (sub != error_none)
-				return sub;
-			if (!e || bvn_dom_node_type(e) == BVN_DOM_NULL)
-				continue;             /* hole */
-			if (!ref)
-				ref = e;              /* first non-null sets the shape */
-			else {
-				/* array elements: dimension is enforced (bare arrays and
-				 * matrices are uniform). */
-				error_code_t cmp = bvn_dom_shape_equal(ref, e, true, depth + 1u);
-				if (cmp != error_none)
-					return cmp;
-			}
-		}
-		return error_none;
+		/* array elements: dimension is enforced (bare arrays and matrices
+		 * are uniform), against the shape the elements build between them --
+		 * see bvn_dom_shape_t for why not against the first one. */
+		bvn_dom_shape_t shape = { NULL, NULL, 0u };
+		error_code_t r = error_none;
+		for (uint32_t i = 0; r == error_none && i < n; i++)
+			r = bvn_dom_shape_merge(&shape, bvn_dom_array_at(node, i),
+						true, true, depth + 1u);
+		bvn_dom_shape_free(&shape, 0u);
+		return r;
 	}
 	case BVN_DOM_STRUCT: {
 		uint32_t n = bvn_dom_struct_count(node);
@@ -1058,6 +1407,9 @@ static error_code_t bvn_dom_check_homogeneous(
 		return error_none;
 	}
 }
+#if defined(__GNUC__) || defined(__clang__)
+#  pragma GCC diagnostic pop
+#endif
 bvn_dom_doc_t *bvn_dom_parse_policy(const void *data, uint32_t len,
 				    const bvnr_unit_policy_t *policy)
 {

@@ -891,7 +891,17 @@ static bvnf_rkind bvnf_parse_rational(const char *s, uint32_t base,
 			has_e = true; s++;
 		}
 		if (!has_e) return BVNF_RK_FAIL;
-		if (exp_overflow) return eneg ? BVNF_RK_UNDERFLOW : BVNF_RK_INF;
+		if (exp_overflow) {
+			/* An exponent too long to COUNT says nothing about a mantissa
+			 * of zero: zero times any power is zero, and
+			 * "0.000e999999999999999999999" came back as +inf because the
+			 * shortcut answered before looking. The sign is the caller's
+			 * (*neg_out), so "-0e..." stays -0. The literal still has to
+			 * end here to be one. */
+			if (*s != '\0') return BVNF_RK_FAIL;
+			if (!overflow && bvn_int_is_zero(num)) return BVNF_RK_ZERO;
+			return eneg ? BVNF_RK_UNDERFLOW : BVNF_RK_INF;
+		}
 		exp_val = eneg ? -eabs : eabs;
 	}
 	/* Everything above stops at the first byte it does not recognise, so without
@@ -2328,13 +2338,24 @@ void bvn_float_to_dec32(const bvn_float_t *f, uint32_t *out)
  * this direct path is exact on all 4000.
  *
  * width is 16, 32, 64, 128 or 256; bits32 is the number of uint32_t words in
- * out (1, 1, 2, 4, 8 respectively). Returns false for an unsupported width or a
- * short buffer, leaving *out untouched.
+ * out (1, 1, 2, 4, 8 respectively). Returns false for an unsupported width, a
+ * short buffer or text that is not a number, leaving *out untouched.
  */
 bool bvn_float_strtodec(const char *s, uint32_t width, uint32_t *out, int bits32)
 {
 	if (!s || !out || bits32 < 1)
 		return false;
+	/* The encoders below pack whatever the parser left and do not look at its
+	 * verdict, so text that is not a number came back as true with all-zero
+	 * bits: "abc" and "" were +0, and so was "ninf" -- the format's own
+	 * spelling of negative infinity -- until bvn_float_parse_ro learned it.
+	 * Ask once here, where there is a result to return. */
+	{
+		bvn_float_ctx_t ctx; bvn_float_ctx_init(&ctx);
+		PNum p; bvn_float_pnum_init(&p);
+		if (!bvn_float_parse_ro(&ctx, s, &p))
+			return false;
+	}
 	switch (width) {
 	case 16:  if (bits32 < 1) return false;
 		  out[0] = bvn_float_parse_dec16(s);  return true;

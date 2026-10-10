@@ -151,7 +151,7 @@
 .bad,key    = 1;       # error: comma is forbidden in identifiers</code></pre></div>
 <hr />
 <h2 id="4-value-tokens-what-can-follow-the--sign">4. Value Tokens: What Can Follow the <code>=</code> Sign</h2>
-<p>There are ten categories of raw values:</p>
+<p>These are the categories of raw values you will write by hand (two more — the ISO-8601 datetime literal of spec 1.1, §5.3, and the octet stream, §16 — complete the list):</p>
 <table>
 <thead>
 <tr>
@@ -290,7 +290,7 @@
 <p>For <code>sint</code> and <code>uint</code>, any width from 1 up to 32768 bits (<code>BVN_MAX_INT_WIDTH</code>) is accepted — <code>&lt;uint:12&gt;</code> is perfectly valid for a 12-bit ADC sample.</p>
 <h4 id="base">Base</h4>
 <p>The base parameter starts with <code>_</code> followed by a decimal number. For <code>uint</code> and <code>sint</code>, every base from <code>_2</code> through <code>_62</code> (consecutive) is allowed. Bases <code>_64</code> (standard Base64) and <code>_85</code> (Ascii85) are also available, but <strong>only for <code>uint</code></strong>: their alphabets claim the sign glyphs as digits — Base64 uses <code>+</code> (digit 62) and <code>/</code>, Ascii85 uses both <code>+</code> and <code>-</code> — so no unambiguous sign character remains and signed values are illegal (<code>error_illegal_value_type</code>). The base selects the numeral system used to interpret the value.</p>
-<p>This is the biggest surprise for newcomers: <strong>non-decimal values must be provided as quoted strings</strong>. A bare <code>ff</code> in value position is lexed as a <em>symbol</em>, not a number, and will produce a type mismatch error. Always quote non-decimal digits:</p>
+<p>This is the biggest surprise for newcomers: <strong>non-decimal values should be provided as quoted strings</strong>. A bare <code>ff</code> in value position is lexed as a <em>symbol</em>, not a number, and will produce a type mismatch error. A bare literal made only of digits of the base does parse — and is read in that base, so <code>&lt;uint:8,_16&gt; 10</code> is sixteen, and <code>&lt;uint:_16&gt; 1e3</code> is 483 because <code>e</code> is a hex digit — which is one more reason to always quote non-decimal digits:</p>
 <!-- bovnar-example: rejected -->
 
 <div class="codehilite"><pre><code class="language-bovnar">.hex = &lt;uint:8,_16&gt;  &quot;FF&quot;;       # correct — 255
@@ -753,7 +753,7 @@ they are rejected only in a 1.0 or unversioned document.)</p>
 # note: [[1,2],[3,4,5]] is also rejected — sibling sub-arrays must match in length (1.0 homogeneity)</code></pre></div>
 <hr />
 <h2 id="19-error-recovery-mode">19. Error Recovery Mode</h2>
-<p>The parser supports an optional <code>continue_on_error</code> mode. When enabled, a parse error invokes the <code>on_error</code> callback and then enters a resync state machine that skips bytes while tracking bracket and brace nesting. The <code>recovery_count</code> counter (accessible via <code>bvnr_reader_get_recovery_count</code>) is incremented immediately when an error triggers entry into resync mode — not when the resync eventually completes. When the resync state machine reaches a <code>;</code> at the original nesting depth, it resumes normal parsing.</p>
+<p>The parser supports an optional <code>continue_on_error</code> mode. When enabled, a parse error invokes the <code>on_error</code> callback and then enters a resync state machine that skips bytes while tracking bracket and brace nesting. The <code>recovery_count</code> counter (accessible via <code>bvnr_reader_get_recovery_count</code>) is incremented immediately when an error triggers entry into resync mode — not when the resync eventually completes. Normal parsing resumes at whichever comes first: a <code>;</code> at the original nesting depth, or the start of the next assignment — a <code>.</code> at that depth followed by a byte that can begin an identifier.</p>
 <p>This mode is intended for log streams and unreliable transports — situations where one malformed assignment should not discard the rest of the file. For configuration and data serialization, disable it: fail fast and reject corrupt input entirely.</p>
 <hr />
 <h2 id="20-size-limits">20. Size Limits</h2>

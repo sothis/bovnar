@@ -23,7 +23,7 @@ and exercised — rather than from the prose. Where the two disagreed, the imple
 5. [Recommendation: three layers, each useful alone](#5-recommendation-three-layers-each-useful-alone)
     - 5.1 [Layer 0 — the measurand struct (spec 1.2, no grammar change)](#51-layer-0--the-measurand-struct-spec-12-no-grammar-change)
     - 5.2 [Layer 1 — the `±` clause (spec 1.3, additive)](#52-layer-1--the--clause-spec-13-additive)
-    - 5.3 [Layer 2 — fold into named parameters (2.0)](#53-layer-2--fold-into-named-parameters-20)
+    - 5.3 [Layer 2 — fold into named parameters (spec 2.0)](#53-layer-2--fold-into-named-parameters-spec-20)
 6. [The interval rule](#6-the-interval-rule)
 7. [Grammar changes for Layer 1](#7-grammar-changes-for-layer-1)
 8. [What each code site has to do](#8-what-each-code-site-has-to-do)
@@ -109,7 +109,7 @@ both the suffix and the annotation-parameter position. The ASCII digraph `+-` is
 
 **`=` is not available.** The named-parameter form `<float:64,u=0.5>` is
 `error_unexpected_input_byte` — `=` is not among the bytes `copy_type_byte` accepts. Named parameters
-need a lexer change, which is why [v2 §7](bovnar_v2_proposals.md) files them under 2.0. Any 1.x
+need a lexer change, which is why [v2 §7](bovnar_v2_proposals.md) files them under spec 2.0. Any 1.x
 proposal must live inside the shape-identified parameter space.
 
 **The ratio units are already there, already dimensionless.** `%`, `‰`, `‱`, `pcm`, `ppm`, `ppb`,
@@ -261,7 +261,7 @@ closed keyword namespace opened by the `±` sigil** — which sidesteps
 [v2 §8](bovnar_v2_proposals.md) entirely, because unlike the bare-word namespace this one is closed
 from birth and can be extended in 1.4 without rewriting the meaning of any document.
 
-### 5.3 Layer 2 — fold into named parameters (2.0)
+### 5.3 Layer 2 — fold into named parameters (spec 2.0)
 
 When [v2 §7](bovnar_v2_proposals.md) lands, the annotation form becomes
 `<float:64, unit=m, u=0.001, k=2>` and the shape-identified `±0.001` parameter retires into it. When
@@ -469,7 +469,7 @@ settles the two questions that are genuinely hard — the interval rule and the 
 they are still cheap to change. Layer 1 is then sugar with a defined meaning rather than a syntax in
 search of one.
 
-**The test [v2 §14](bovnar_v2_proposals.md) sets** — mechanical transcodability — is passed in both
+**The test [v2 §15](bovnar_v2_proposals.md) sets** — mechanical transcodability — is passed in both
 directions here, which is unusual: Layer 1 → Layer 0 is a rewrite of the suffix into the struct, and
 Layer 0 → Layer 1 is the same rewrite backwards for any struct that uses only `.value`, `.u` and
 `.k`. That the two layers are inter-transcodable is the strongest evidence that they are one design.
@@ -484,10 +484,10 @@ gap, because the gap is at least visible.
 
 - [Temperature Difference (Design Note)](temperature_difference.md) — the delta units §6 is built on,
   and the model this note follows
-- [Version 2 Grammar Proposals](bovnar_v2_proposals.md) — the inline-unit defect and the `utf8` bypass
+- [Spec 2.0 Grammar Proposals](bovnar_v2_proposals.md) — the inline-unit defect and the `utf8` bypass
   ([v2 §6](bovnar_v2_proposals.md)), named parameters ([v2 §7](bovnar_v2_proposals.md)), why a closed
   keyword namespace matters ([v2 §8](bovnar_v2_proposals.md)), and the transcode test
-  ([v2 §14](bovnar_v2_proposals.md))
+  ([v2 §15](bovnar_v2_proposals.md))
 - [Specification](03_bovnar_spec.md) — spec §5 (annotations), spec §6.5 (the inline suffix),
   spec §16.10 (the error list), spec §17 (what may grow additively in 1.x)
 - [EBNF Grammar](12_bovnar.ebnf) — the value, type-param and constraint-tier rules §7 amends

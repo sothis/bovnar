@@ -273,8 +273,10 @@ bool bvnr_write_bool(bvnr_writer_t *w, const char *key, bool value)
  * The scalar helpers below all follow one pattern, with a no-unit wrapper
  * delegating to a _unit variant: validate width, format the value to text, then
  * emit_numeric. A width of 0 means "unspecified" (the reader infers a default).
- * Float helpers narrow the value through float when width<=32 so the emitted
- * text matches the precision the type promises rather than the full double.
+ * The BINARY float helper narrows the value through float when width<=32 so the
+ * emitted text matches the precision the type promises rather than the full
+ * double. The fixed-point and decimal helpers do not: a binary32 is not what
+ * either of those types promises (see the notes in them).
  */
 bool bvnr_write_uint(bvnr_writer_t *w, const char *key,
 			 uint32_t width, uint64_t value)
@@ -372,7 +374,11 @@ bool bvnr_write_float_fix_unit(bvnr_writer_t *w, const char *key,
 	 && width != 128u && width != 256u)
 		return bvn_writer_set_error(w, error_invalid_argument);
 	value_type_spec_t vt = BVN_TYPE_FLOAT_FIX(width, q);
-	if (width != 0u && width <= 32u) value = (double)(float)value;
+	/* No narrowing through a binary32 here, unlike bvnr_write_float_unit. A
+	 * Q16.16 value has 32 significant bits and a float has 24, so the "matching"
+	 * narrowing threw away a quarter of what the type holds: 12345.67 was
+	 * written 7.8e-5 off where the format resolves 1.5e-5, and 2147483647 in a
+	 * q0 field rounded up to 2^31 and was then refused as out of range. */
 	char buf[64];
 	if (bvn_format_double(buf, sizeof(buf), value, vt) < 0)
 	{
@@ -397,7 +403,11 @@ bool bvnr_write_float_dec_unit(bvnr_writer_t *w, const char *key,
 	 && width != 128u && width != 256u)
 		return bvn_writer_set_error(w, error_invalid_argument);
 	value_type_spec_t vt = BVN_TYPE_FLOAT_DEC(width);
-	if (width != 0u && width <= 32u) value = (double)(float)value;
+	/* No narrowing through a binary32 here, unlike bvnr_write_float_unit. A
+	 * decimal32 holds seven DECIMAL digits, and not every seven-digit decimal
+	 * survives a binary32: 8.589973e9 went out as 8.589973504e+9, which a
+	 * decimal32 reader rounds to 8.589974e9 -- a value the type represents
+	 * exactly, written as its neighbour. */
 	char buf[64];
 	if (bvn_format_double(buf, sizeof(buf), value, vt) < 0)
 	{
@@ -487,6 +497,23 @@ bool bvnr_write_bvni_unit(bvnr_writer_t *w, const char *key,
 	 * which is illegal in those bases — reject it before emitting anything. */
 	if (n->negative && (effective_base == 64u || effective_base == 85u))
 		return bvn_writer_set_error(w, error_illegal_value_type);
+	/* Width 0 is "the default", and the default is 64 -- to the reader as well,
+	 * which holds `<uint> 18446744073709551616` to 64 bits and refuses it. The
+	 * range check further down runs off the declared width, so with none
+	 * declared there was no check, and this wrote a document that the library
+	 * could not read back. A sint:64 reaches -2^63, whose magnitude alone has
+	 * the 64 bits; anything else negative has at most 63. */
+	if (width == 0u) {
+		int bl = bvn_int_bitlen(n);
+		bool min64 = false;
+		if (n->negative && bl == 64) {
+			min64 = true;
+			for (int i = 0; i < 63 && min64; i++)
+				if (bvn_int_getbit(n, i)) min64 = false;
+		}
+		if (bl > (n->negative ? 63 : 64) && !min64)
+			return bvn_writer_set_error(w, error_value_out_of_range);
+	}
 	if (!emit_key(w, key)) return false;
 	value_type_family_t fam = n->negative ? vt_sint : vt_uint;
 	value_type_spec_t vt;

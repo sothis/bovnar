@@ -1,5 +1,7 @@
 [build-system]
-requires      = ["scikit-build-core>=0.10"]
+# 0.11 is the first scikit-build-core that understands PEP 639, which the
+# `license` expression and `license-files` below are.
+requires      = ["scikit-build-core>=0.11"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -98,7 +100,7 @@ test-command  = "python -c \"import bovnar; assert bovnar.version() == '2.0.0'\"
 archs = ["auto64"]
 
 [tool.cibuildwheel.macos]
-# Build both macOS arches on the Apple-Silicon runner (macos-14): arm64 native
+# Build both macOS arches on the Apple-Silicon runner (macos-15): arm64 native
 # plus x86_64 cross-compiled. This avoids the scarce/deprecated Intel
 # (macos-13) hosted runners, which routinely never get picked up. The x86_64
 # slice is build-only — cibuildwheel skips its test phase on an arm host.

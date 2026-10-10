@@ -132,7 +132,7 @@ This would fail:
 
 ## 4. Value Tokens: What Can Follow the `=` Sign
 
-There are ten categories of raw values:
+These are the categories of raw values you will write by hand (two more — the ISO-8601 datetime literal of spec 1.1, §5.3, and the octet stream, §16 — complete the list):
 
 | Category | Example |
 |---|---|
@@ -240,7 +240,7 @@ For `sint` and `uint`, any width from 1 up to 32768 bits (`BVN_MAX_INT_WIDTH`) i
 
 The base parameter starts with `_` followed by a decimal number. For `uint` and `sint`, every base from `_2` through `_62` (consecutive) is allowed. Bases `_64` (standard Base64) and `_85` (Ascii85) are also available, but **only for `uint`**: their alphabets claim the sign glyphs as digits — Base64 uses `+` (digit 62) and `/`, Ascii85 uses both `+` and `-` — so no unambiguous sign character remains and signed values are illegal (`error_illegal_value_type`). The base selects the numeral system used to interpret the value.
 
-This is the biggest surprise for newcomers: **non-decimal values must be provided as quoted strings**. A bare `ff` in value position is lexed as a *symbol*, not a number, and will produce a type mismatch error. Always quote non-decimal digits:
+This is the biggest surprise for newcomers: **non-decimal values should be provided as quoted strings**. A bare `ff` in value position is lexed as a *symbol*, not a number, and will produce a type mismatch error. A bare literal made only of digits of the base does parse — and is read in that base, so `<uint:8,_16> 10` is sixteen, and `<uint:_16> 1e3` is 483 because `e` is a hex digit — which is one more reason to always quote non-decimal digits:
 
 <!-- bovnar-example: rejected -->
 ```bovnar
@@ -926,7 +926,7 @@ they are rejected only in a 1.0 or unversioned document.)
 
 ## 19. Error Recovery Mode
 
-The parser supports an optional `continue_on_error` mode. When enabled, a parse error invokes the `on_error` callback and then enters a resync state machine that skips bytes while tracking bracket and brace nesting. The `recovery_count` counter (accessible via `bvnr_reader_get_recovery_count`) is incremented immediately when an error triggers entry into resync mode — not when the resync eventually completes. When the resync state machine reaches a `;` at the original nesting depth, it resumes normal parsing.
+The parser supports an optional `continue_on_error` mode. When enabled, a parse error invokes the `on_error` callback and then enters a resync state machine that skips bytes while tracking bracket and brace nesting. The `recovery_count` counter (accessible via `bvnr_reader_get_recovery_count`) is incremented immediately when an error triggers entry into resync mode — not when the resync eventually completes. Normal parsing resumes at whichever comes first: a `;` at the original nesting depth, or the start of the next assignment — a `.` at that depth followed by a byte that can begin an identifier.
 
 This mode is intended for log streams and unreliable transports — situations where one malformed assignment should not discard the rest of the file. For configuration and data serialization, disable it: fail fast and reject corrupt input entirely.
 

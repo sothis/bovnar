@@ -307,13 +307,17 @@ static bool bvn_validate_number_for_writer(bvnr_writer_t* w,
 				goto out;
 			}
 		}
-		if (vt.family == vt_uint && vt.width) {
+		/* `width` is the EFFECTIVE width, so an annotation that names none is
+		 * held to the 64 bits the reader reads it at. These two tests used to
+		 * be skipped when no width was declared, and `<uint> 2^128` went out
+		 * for the reader to refuse. */
+		if (vt.family == vt_uint) {
 			if (!bvn_validate_uint_range(buf, width, base)) {
 				ok = bvn_writer_set_error(w,
 					error_value_out_of_range);
 				goto out;
 			}
-		} else if ((vt.family == vt_sint || vt.family == vt_datetime) && vt.width) {
+		} else if (vt.family == vt_sint || vt.family == vt_datetime) {
 			/* datetime carrier is a signed integer (base 10); range-check like sint */
 			if (!bvn_validate_sint_range(buf, width, base)) {
 				ok = bvn_writer_set_error(w,
@@ -368,6 +372,23 @@ static bool bvn_validate_string_as_number(bvnr_writer_t* w,
 					error_digit_not_in_base);
 				goto out;
 			}
+			/* A QUOTED "nan", "inf" or "ninf" under an integer type is not a
+			 * special number, it is DIGITS: in base 36 "nan" is 30191. The
+			 * range helpers below exempt those three spellings because they
+			 * cannot tell a keyword from a string, and the reader -- which
+			 * can -- holds the quoted form to the width. Measure it here. */
+			if (bvn_is_special_number_string(buf)) {
+				bvn_int_t *n = bvn_int_alloc();
+				bool fits = n && bvn_int_from_str(n, buf, base) &&
+					(uint32_t)bvn_int_bitlen(n) <=
+						(vt.family == vt_uint ? width : width - 1u);
+				bvn_int_free(n);
+				if (!fits) {
+					ok = bvn_writer_set_error(w,
+						error_value_out_of_range);
+					goto out;
+				}
+			}
 		} else if (vt.family == vt_float ||
 			   vt.family == vt_float_fix ||
 			   vt.family == vt_float_dec) {
@@ -377,13 +398,17 @@ static bool bvn_validate_string_as_number(bvnr_writer_t* w,
 				goto out;
 			}
 		}
-		if (vt.family == vt_uint && vt.width) {
+		/* `width` is the EFFECTIVE width, so an annotation that names none is
+		 * held to the 64 bits the reader reads it at. These two tests used to
+		 * be skipped when no width was declared, and `<uint> 2^128` went out
+		 * for the reader to refuse. */
+		if (vt.family == vt_uint) {
 			if (!bvn_validate_uint_range(buf, width, base)) {
 				ok = bvn_writer_set_error(w,
 					error_value_out_of_range);
 				goto out;
 			}
-		} else if ((vt.family == vt_sint || vt.family == vt_datetime) && vt.width) {
+		} else if (vt.family == vt_sint || vt.family == vt_datetime) {
 			/* datetime carrier is a signed integer (base 10); range-check like sint */
 			if (!bvn_validate_sint_range(buf, width, base)) {
 				ok = bvn_writer_set_error(w,
@@ -914,10 +939,60 @@ static void bvn_w_element_done(bvnr_writer_t* w, uint32_t struct_depth)
 	    struct_depth == s->struct_depth_at_array_start[s->array_depth - 1u]) {
 		w->gov_unit  = w->arr_gov_unit[s->array_depth - 1u];
 		w->gov_typed = w->arr_gov_typed[s->array_depth - 1u];
+		w->gov_type  = w->arr_gov_type[s->array_depth - 1u];
 	} else if (s->array_depth == 0u) {
 		w->gov_unit  = BVN_UNIT_NONE;
 		w->gov_typed = false;
 	}
+}
+/*
+ * The type a number token with no annotation over it will be READ as: the
+ * reader synthesises `<uint:64>`, `<sint:64>` or `<float:64>` from the text
+ * (spec §10), whatever the event that wrote it claimed. `text` is the token,
+ * NUL-terminated or not.
+ */
+static value_type_spec_t bvn_w_bare_number_type(const void* text, uint32_t len)
+{
+	const char* p = (const char*)text;
+	bool is_float = false;
+	char sb[8] = {0};
+	if (p && len && len < sizeof sb) {
+		memcpy(sb, p, len);
+		if (bvn_is_special_number_string(sb))
+			is_float = true;
+	}
+	for (uint32_t i = 0; p && i < len; i++)
+		if (p[i] == '.' || p[i] == 'e' || p[i] == 'E')
+			is_float = true;
+	if (is_float)
+		return BVN_TYPE_FLOAT(64);
+	if (p && len && p[0] == '-')
+		return BVN_TYPE_SINT(64);
+	return BVN_TYPE_UINT(64);
+}
+static bool bvn_w_is_special_number(const void* text, uint32_t len)
+{
+	char sb[8] = {0};
+	if (!text || !len || len >= sizeof sb)
+		return false;
+	memcpy(sb, text, len);
+	return bvn_is_special_number_string(sb);
+}
+/*
+ * The type a value is validated and serialised as: the governing annotation's
+ * where there is one, and otherwise what the reader will infer. `typed` and
+ * `gtype` are the governing state as it stood BEFORE the event was validated.
+ */
+static value_type_spec_t bvn_w_effective_type(const bvnr_data_t* d,
+	bool typed, value_type_spec_t gtype)
+{
+	if (typed)
+		return gtype;
+	if (d->type == token_is_number || d->type == token_is_array_number)
+		return bvn_type_is_plain(d->value_type)
+			? bvn_w_bare_number_type(d->data, d->length)
+			: d->value_type;
+	return d->value_type;
 }
 static bool bvn_writer_validate_event(bvnr_writer_t* w,
 	bvnr_event_t ev, bvnr_data_t* data)
@@ -1041,6 +1116,7 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		w->ser.stream_begun = true;
 		w->gov_unit  = BVN_UNIT_NONE;
 		w->gov_typed = false;
+		w->gov_type  = BVN_TYPE_PLAIN;
 		/* A member of a struct that stands under a type annotation is what
 		 * the reader refuses (error_type_value_mismatch). */
 		if (w->ser.struct_depth > 0u &&
@@ -1075,8 +1151,15 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		w->val.parsed_unit = data->value_unit;
 		w->ann_unit        = data->value_unit;
 		w->ann_family      = data->value_type.family;
+		/* The type as WRITTEN is assembled from the events that write it:
+		 * the family now (the family event confirms it), and the width,
+		 * base and Q as their parameter events arrive. */
+		w->ann_type.family = data->value_type.family;
+		w->ann_type.width  = 0;
+		w->ann_type.base   = 0;
 		w->gov_unit        = BVN_UNIT_NONE;
 		w->gov_typed       = false;
+		w->gov_type        = BVN_TYPE_PLAIN;
 		/*
 		 * A unit with no native spelling — one carrying a UCUM arbitrary atom —
 		 * can only be written in the spec-1.2 profile notation, which the reader
@@ -1128,11 +1211,29 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 					error_unsupported_spec_version);
 			if (!bvn_writer_check_unit_param(w, data))
 				return false;
+			/* A datetime's parameter is its epoch, checked just above to
+			 * be this event's own. */
+			if (data->value_type.family == vt_datetime)
+				w->ann_type.base = data->value_type.base;
+		} else if (data->type == token_is_type_width) {
+			/* Mirrors the serialiser, which writes the EFFECTIVE value. */
+			w->ann_type.width = bvn_effective_width(data->value_type);
+		} else if (data->type == token_is_type_base) {
+			/* For float_fix and datetime the field is Q or the epoch, and
+			 * bvn_effective_base answers 10 for them by design. */
+			if (w->ann_type.family == vt_uint ||
+			    w->ann_type.family == vt_sint ||
+			    w->ann_type.family == vt_float)
+				w->ann_type.base = bvn_effective_base(data->value_type);
+		} else if (data->type == token_is_type_q) {
+			w->ann_type.base = bvn_effective_q(data->value_type);
 		}
 		/* fallthrough */
 	case ev_type_annotation_type_family:
-		if (ev == ev_type_annotation_type_family)
-			w->ann_family = data->value_type.family;
+		if (ev == ev_type_annotation_type_family) {
+			w->ann_family      = data->value_type.family;
+			w->ann_type.family = data->value_type.family;
+		}
 		w->val.value_type  = data->value_type;
 		w->val.parsed_unit = data->value_unit;
 		break;
@@ -1147,6 +1248,13 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		               bvn_w_family_takes_unit(w->ann_family))
 		              ? w->ann_unit : BVN_UNIT_NONE;
 		w->gov_typed           = true;
+		w->gov_type            = w->ann_type;
+		/* The start event's type was checked when it arrived; what the
+		 * parameter events then wrote is checked here, since they are free
+		 * to say something else -- a width event carrying 7 under a start
+		 * event that said float:64 wrote `<float:7>`. */
+		if (!bvn_validate_type_spec_for_writer(w, w->ann_type))
+			return false;
 		break;
 	case ev_data: {
 		w->ser.stream_begun = true;
@@ -1155,7 +1263,41 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		if (!w->ser.in_octet_stream)
 			w->ser.w_awaiting_value = false;
 		token_type_t tt = data->type;
+		/*
+		 * WHAT TYPE THIS VALUE HAS. Not the one its event claims: the one the
+		 * document will say it has, which is the governing annotation's where
+		 * there is one and otherwise what the reader infers from the token.
+		 *
+		 * Every check below used to run against data->value_type, and the
+		 * annotation just written was never consulted. So `<uint:8>` followed
+		 * by a data event typed uint:64 -- or left zero-initialised, which is
+		 * plain and skips nearly everything -- wrote `<uint:8>300`,
+		 * `<uint:8>1.5`, `<uint:8>"hello"`, `<utf8>5` and `<bool>"x"`, each
+		 * reported as success and each refused by the reader. The unit of a
+		 * value was made to answer to its annotation in an earlier pass; this
+		 * is the same rule for its type.
+		 *
+		 * So under an annotation the event's own value_type is not consulted
+		 * at all. It is not REFUSED for disagreeing either: nothing of it
+		 * reaches the document, and existing producers state a carrier type
+		 * there that is deliberately wider than the annotation (the Python
+		 * binding types every array element at 64 bits or more). What the
+		 * value must satisfy is the annotation, and that is now checked.
+		 * An octet chunk is not a typed value and keeps what it was given.
+		 */
+		const bool typed = w->gov_typed && tt != token_is_octet_stream;
 		value_type_spec_t vt = data->value_type;
+		if (typed) {
+			vt = w->gov_type;
+			/* Under an annotation the reader takes a number, a string, a
+			 * bool or a null -- never a symbol or a reference, whatever the
+			 * family. bvn_check_type_value_compat lets them through for a
+			 * plain type because that is what an UNannotated value has. */
+			if (tt == token_is_symbol || tt == token_is_reference)
+				return bvn_writer_set_error(w, error_type_value_mismatch);
+		} else {
+			vt = bvn_w_effective_type(data, false, vt);
+		}
 		if (!bvn_check_type_value_compat(w, tt, vt))
 			return false;
 		bool carries = tt == token_is_number || tt == token_is_array_number ||
@@ -1185,6 +1327,16 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 			    !bvn_w_declares_1_2(&w->ser))
 				return bvn_writer_set_error(w,
 					error_unsupported_spec_version);
+			/* Nor does a special number take one (spec §6.4: "supply a
+			 * unit through the type annotation instead"), nor a datetime,
+			 * whose only parameter is its epoch. Both went out --
+			 * `<float:64>nan k~m`, `<datetime:64>5 k~m` -- and neither
+			 * reads back. */
+			if ((tt == token_is_number || tt == token_is_array_number) &&
+			    bvn_w_is_special_number(data->data, data->length))
+				return bvn_writer_set_error(w, error_unit_illegal);
+			if (vt.family == vt_datetime)
+				return bvn_writer_set_error(w, error_unit_illegal);
 			if (!bvn_writer_check_inline_unit(w, data))
 				return false;
 		}
@@ -1202,13 +1354,24 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		 * recording that it did. That flag is what makes the fallback safe:
 		 * parsed_unit persists past the value it belonged to, and reading it
 		 * unguarded would let one annotated value vouch for the next bare one.
+		 *
+		 * The fallback is gov_unit, the unit the serialiser is about to write
+		 * this value under. It was val.parsed_unit, which is only "whatever
+		 * the last annotation event carried" and was wrong three ways: an
+		 * element annotation overwrote it for every later element of the
+		 * array (`<float:64,m>[<float:64,s> 1, 2]` had its 2 checked as
+		 * seconds), a unit named on the annotation's start event alone was
+		 * forgotten by the events after it and the value refused as bare, and
+		 * -- `vt` being the event's own type then -- a number whose event
+		 * left the type plain was not looked at at all, which let `.a=5;`
+		 * through require_unit.
 		 */
 		if (w->val.policy.active && bvn_type_is_numeric(vt) &&
 		    (tt == token_is_number || tt == token_is_array_number ||
 		     tt == token_is_string || tt == token_is_array_string)) {
 			value_unit_t u = data->value_unit;
 			if (BVN_UNIT_IS_UNITLESS(u) && w->ser.emitted_unit)
-				u = w->val.parsed_unit;
+				u = w->gov_unit;
 			if (!bvn_unit_policy_accepts(&w->val.policy, u))
 				return bvn_writer_set_error(w, error_unit_mismatch);
 			/* ...and what the policy says about THIS field specifically. The
@@ -1280,6 +1443,14 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 			}
 			if (!bvn_validate_number_for_writer(w,
 					data->data, data->length, vt))
+				return false;
+			/* With no annotation over it the token is read as the type its
+			 * TEXT implies, at 64 bits, whatever this event says: a bare
+			 * 2^128 is out of range to the reader even from an event typed
+			 * uint:128. */
+			if (!typed && !bvn_type_is_plain(data->value_type) &&
+			    !bvn_validate_number_for_writer(w, data->data, data->length,
+					bvn_w_bare_number_type(data->data, data->length)))
 				return false;
 		} else if (tt == token_is_string ||
 				   tt == token_is_array_string) {
@@ -1354,6 +1525,7 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		w->struct_typed[w->ser.struct_depth] = w->gov_typed;
 		w->gov_unit  = BVN_UNIT_NONE;
 		w->gov_typed = false;
+		w->gov_type  = BVN_TYPE_PLAIN;
 		if (w->val.policy.num_rules)
 			bvn_path_push(&w->val.path);
 		w->ser.w_awaiting_value = false;   /* the struct IS the value */
@@ -1371,6 +1543,7 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 			w->arr_count[d - 1u] += w->ser.w_after_dim ? 1u : 2u;
 		w->arr_gov_unit[d]  = w->gov_unit;
 		w->arr_gov_typed[d] = w->gov_typed;
+		w->arr_gov_type[d]  = w->gov_type;
 		w->arr_count[d]     = 0;
 		if (!w->ser.w_after_dim)
 			w->arr_dim_set[d] = false;
@@ -1391,9 +1564,11 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		/* What the serialiser does to emitted_unit, done to the unit. */
 		w->gov_unit  = w->arr_gov_unit[d];
 		w->gov_typed = w->arr_gov_typed[d];
+		w->gov_type  = w->arr_gov_type[d];
 		if (d > 0u && bvn_ser_is_direct_array_element(&w->ser, d - 1u)) {
 			w->gov_unit  = w->arr_gov_unit[d - 1u];
 			w->gov_typed = w->arr_gov_typed[d - 1u];
+			w->gov_type  = w->arr_gov_type[d - 1u];
 		}
 		break;
 	}
@@ -1404,6 +1579,7 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		if (w->ser.array_depth < w->ser.max_array_nesting) {
 			w->gov_unit  = w->arr_gov_unit[w->ser.array_depth];
 			w->gov_typed = w->arr_gov_typed[w->ser.array_depth];
+			w->gov_type  = w->arr_gov_type[w->ser.array_depth];
 		}
 		break;
 	default:
@@ -1606,6 +1782,34 @@ static bool bvn_ser_append_inline_unit(bvnr_serializer_t *s,
 	if (!bvn_ser_push_byte(s, ' ')) return false;
 	return bvn_ser_push(s, ubuf, (uint32_t)un);
 }
+/*
+ * Does this literal overflow the IEEE binary format a `<float:width>` names --
+ * i.e. does it round to an infinity there? Answered for the five interchange
+ * widths; any other width has no fixed exponent range to leave.
+ */
+static bool bvn_ser_float_overflows(const char *text, uint32_t base,
+				    uint32_t width)
+{
+	uint32_t exp_bits, man_bits, bits[8] = {0};
+	int32_t  bias;
+	int      n;
+	switch (width) {
+	case 16:  exp_bits = 5;  man_bits = 10;  bias = 15;     n = 1; break;
+	case 32:  exp_bits = 8;  man_bits = 23;  bias = 127;    n = 1; break;
+	case 64:  exp_bits = 11; man_bits = 52;  bias = 1023;   n = 2; break;
+	case 128: exp_bits = 15; man_bits = 112; bias = 16383;  n = 4; break;
+	case 256: exp_bits = 19; man_bits = 236; bias = 262143; n = 8; break;
+	default:  return false;
+	}
+	bvn_float_strtoieee_bin(text, base == 16u ? 16u : 10u,
+				exp_bits, man_bits, bias, bits, n);
+	/* Sign, then the exponent field, at the top of the highest word; for
+	 * binary16 the value sits in the low half of the one word there is. */
+	uint32_t top   = bits[n - 1];
+	uint32_t shift = (width == 16u ? 16u : 32u) - 1u - exp_bits;
+	uint32_t mask  = (1u << exp_bits) - 1u;
+	return ((top >> shift) & mask) == mask;
+}
 static int bvn_ser_reduced_number(bvnr_serializer_t *s, const bvnr_data_t *d,
 				  char **text, int32_t *len)
 {
@@ -1726,6 +1930,32 @@ static int bvn_ser_reduced_number(bvnr_serializer_t *s, const bvnr_data_t *d,
 						    bvn_effective_width(d->value_type),
 						    bvn_effective_q(d->value_type)))
 				goto done;
+		} else if (d->value_type.family == vt_float) {
+			/* "float needs no such test" was true of the reader, which does
+			 * not range-check a float literal, and not of the VALUE: 3e38
+			 * in a `<float:32,k~m>` is finite, and the 3e41 the rescale
+			 * writes under `<float:32,m>` is an infinity to anything that
+			 * decodes it at the declared width. A literal that was already
+			 * past the range is left to the caller, as it always was; one
+			 * the rescale pushed there is refused, like the integer above. */
+			uint32_t fw = bvn_effective_width(d->value_type);
+			if (bvn_ser_float_overflows(out, base, fw) &&
+			    !bvn_ser_float_overflows(nb, base, fw))
+				goto done;
+		}
+		/* Zero times any scale is zero, and the rational it went through has
+		 * no sign to give back: `-0.0 k~m` came out as `0 m`. A float's
+		 * negative zero is a value of its own, so put the sign back. */
+		if (bvn_int_is_zero(on) && nb[0] == '-' &&
+		    (d->value_type.family == vt_float ||
+		     d->value_type.family == vt_float_dec ||
+		     d->value_type.family == vt_float_fix)) {
+			char *wider = realloc(out, (size_t)l + 2u);
+			if (!wider) goto done;
+			out = wider;
+			memmove(out + 1, out, (size_t)l + 1u);
+			out[0] = '-';
+			l++;
 		}
 		/*
 		 * BVN_NUM_CANONICAL: keep a rescaled float looking like a float.
@@ -2115,6 +2345,31 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 		bvn_ser_mark_value_done(s);
 		break;
 	case ev_data:
+		/* A chunk is PART of the element its octet stream is, not an element.
+		 * ev_octet_stream_start wrote the separator the stream is owed and
+		 * ev_octet_stream_end marks it done; treating each chunk as a value
+		 * of its own armed the comma after the first one, so a stream of two
+		 * chunks inside an array went out as 0x00 chunk "," chunk 0x00 --
+		 * a byte the framing does not have, and octet_stream_out_of_sync to
+		 * the reader. Outside an array nothing arms a comma, which is why the
+		 * same events wrote correctly at the top level and in a struct. */
+		if (d->type == token_is_octet_stream) {
+			if (d->data && d->length) {
+				if (d->length > 65536u)
+					return false;
+				uint8_t hdr[3];
+				uint32_t clen = d->length;
+				hdr[0] = 0x01;
+				if (clen == 65536u) clen = 0;
+				hdr[1] = (uint8_t)(clen & 0xFFu);
+				hdr[2] = (uint8_t)((clen >> 8) & 0xFFu);
+				if (!bvn_ser_push(s, hdr, 3))
+					return false;
+				if (!bvn_ser_push(s, d->data, d->length))
+					return false;
+			}
+			break;
+		}
 		if (!s->had_type_annotation) {
 			if (!bvn_ser_emit_pending_comma(s))
 				return false;
@@ -2268,21 +2523,6 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 				if (!bvn_ser_push(s, d->data, d->length))
 					return false;
 			}
-		} else if (d->type == token_is_octet_stream) {
-			if (d->data && d->length) {
-				if (d->length > 65536u)
-					return false;
-				uint8_t hdr[3];
-				uint32_t clen = d->length;
-				hdr[0] = 0x01;
-				if (clen == 65536u) clen = 0;
-				hdr[1] = (uint8_t)(clen & 0xFFu);
-				hdr[2] = (uint8_t)((clen >> 8) & 0xFFu);
-				if (!bvn_ser_push(s, hdr, 3))
-					return false;
-				if (!bvn_ser_push(s, d->data, d->length))
-					return false;
-			}
 		}
 		/*
 		 * NB: emitted_unit is intentionally NOT reset here. A single annotation
@@ -2381,6 +2621,9 @@ bool bvnr_write_event(
 	/* The unit in force for a value, before validation moves it on. */
 	const bool         governed = w->ser.emitted_unit;
 	const value_unit_t gov      = w->gov_unit;
+	/* ...and the type in force, for the same reason. */
+	const bool              typed = w->gov_typed;
+	const value_type_spec_t gtype = w->gov_type;
 	if (!bvn_writer_validate_event(w, ev, data))
 		return false;
 	w->ser.ser_error = error_none;
@@ -2418,6 +2661,23 @@ bool bvnr_write_event(
 		local = *data;
 		local.value_unit = gov;
 		data = &local;
+	}
+	if (ev == ev_data &&
+	    (data->type == token_is_number || data->type == token_is_array_number ||
+	     data->type == token_is_string || data->type == token_is_array_string)) {
+		/* The serialiser decides whether a value is a NUMBER -- and so whether
+		 * BVN_UNIT_REDUCE has digits to rescale -- from the event's value_type.
+		 * A caller who left that plain, which is the natural way to write a
+		 * bare `5 k~m`, got the unit reduced and the digits left alone: `5 m`,
+		 * a factor of a thousand, reported as success. Hand over the type the
+		 * validator just held the value to. */
+		value_type_spec_t et = bvn_w_effective_type(data, typed, gtype);
+		if (!bvn_type_spec_eq(et, data->value_type)) {
+			if (data != &local)
+				local = *data;
+			local.value_type = et;
+			data = &local;
+		}
 	}
 	if (!bvn_ser_serialize_event(&w->ser, ev, data)) {
 		if (w->ser.ser_error != error_none)

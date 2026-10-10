@@ -184,7 +184,7 @@ CF attaches one `units` attribute to a whole netCDF variable. That is the right 
 
 Nine epochs are supported — `unix`, `tai`, `gps`, `mjd`, `ntp`, `galileo`, `glonass`, `y2000`, `beidou` — and mixing them in one array is `array_element_type_mismatch`, because the epoch is part of the type, not a note about it.
 
-**Currency.** Neither UCUM nor CF has monetary units at all. Bovnar treats 216 denominations as dimensions with the same machinery as physical units: `[<float_dec:64,$USD> 1, <float_dec:64,$EUR> 2]` is rejected, and a cross-currency conversion is refused (`error_unit_mismatch`) rather than guessed, because the library carries no exchange-rate table and never will.
+**Currency.** Neither UCUM nor CF has monetary units at all. Bovnar treats 216 denominations as dimensions with the same machinery as physical units: `[<float_dec:64,$USD> 1, <float_dec:64,$EUR> 2]` is rejected, and a cross-currency conversion is never performed — a per-field rule asking for one fails with `error_unit_mismatch`, a target list leaves the amount in the currency it was written in — because the library carries no exchange-rate table and never will.
 
 **Explicit prefix boundaries.** UCUM splits prefix from atom by longest-match and needs brackets to protect the units that lose that fight. Bovnar's `~` makes the boundary explicit, which separates three units that differ by one character and seven orders of dimension:
 
@@ -492,14 +492,16 @@ The `bovnar` binary built above wraps the library for everyday use:
 | Command | Description |
 |---|---|
 | `bovnar validate [opts] <file>` | Validate a `.bvnr` file; exit non-zero on the first error. `--require-unit` additionally rejects any numeric value that carries no unit; `--require-dimension <unit>` (repeatable) requires every numeric value to be validly convertible to one of the named units — "this document is lengths, in whatever unit it wrote them". `--require-field <path>=<unit>` (repeatable) asserts one key path rather than the whole document, and a path may end in `.*` to name a subtree. `--text-only` rejects a document containing an octet stream, for a consumer whose transport is not binary-safe. |
-| `bovnar query [opts] <path> <file>` | Print a single **value** by dotted path, e.g. `.sensor.temperature` — the number alone, so it pipes into other tools; the unit is deliberately not printed, so read `25` from a `°C` field as 25 °C and not 25 K. Floats print as the shortest decimal that reads back as the same double; a `float_dec` or `float:128` wider than a double is rounded on the way through the DOM, so use the reader or the Python bindings when you need the stored digits verbatim. Takes the same unit-policy options as `events`, so a query can assert what it expects and ask for the unit it wants back: `--field .a.b=m`, `--require-unit`. |
+| `bovnar query [opts] <path> <file>` | Print a single **value** by dotted path, e.g. `.sensor.temperature` — the number alone, so it pipes into other tools; the unit is deliberately not printed, so read `25` from a `°C` field as 25 °C and not 25 K. Floats print as the shortest decimal that reads back as the same double; a `float_dec` or `float:128` wider than a double is rounded on the way through the DOM, so use the reader or the Python bindings when you need the stored digits verbatim. Takes the unit-policy options of `events` except `--base` (the value is printed in decimal), so a query can assert what it expects and ask for the unit it wants back: `--field .a.b=m`, `--require-unit`. |
 | `bovnar pretty-print [--canonical] <file>` | Re-serialise a document in pretty form, keeping each unit's spelling. `--canonical` writes each unit in reduced form and rescales its value (`km` → `m`, `kg` → `g`; a prefix on a named derived unit such as `kN` stays, as `k~N`), so two spellings of one unit produce the same bytes; it fails with `value_out_of_range` rather than round where an integer cannot be rescaled. |
-| `bovnar convert <file>` | Convert between `json` and `bvnr`; direction is auto-detected from the `.json`/`.bvnr` extension. Add `--from <fmt> --to <fmt>` to override. |
-| `bovnar events [opts] <file\|->` | Print the lexer (unverified) and validator (verified) event streams side by side. `-c` resync on error, `-d` debug re-serialisation, `-p` pretty debug output. Pass `-` to read stdin. (`-d` re-serialises the event stream and re-emits the source's `#!bovnar` version directive, so its debug output round-trips even for spec-1.1-gated values.) Unit policy: `--unit <unit>` (repeatable) converts values to the first unit they fit, `--si` converts anything left over to coherent SI base units, `--base <N>` renders conversions in base N, `--leave-inexact` leaves a value the conversion cannot deliver exactly rather than failing the parse. |
+| `bovnar convert <file>` | Convert between `json` and `bvnr`; direction is auto-detected from the `.json`/`.bvnr` extension. Add `--from <fmt>` or `--to <fmt>` to override. bvnr → json is lossy for most documents — JSON has no units, types, symbols, references, octet streams, non-finite floats or datetimes — so the JSON is still written, what was lost is listed on stderr, and the exit status is 1: exit 0 means the JSON converts back to the same document. A datetime with sub-second digits is refused outright. json → bvnr refuses what Bovnar cannot hold (a number too large for a 64-bit float, a string with a control character, a key that is not an identifier) and names the key. |
+| `bovnar events [opts] <file\|->` | Print the lexer (unverified) and validator (verified) event streams side by side. `-c` resync on error (the exit status is still non-zero if any occurred), `-d` debug re-serialisation, `-p` pretty debug output. Pass `-` to read stdin. (`-d` re-serialises the event stream and re-emits the source's `#!bovnar` version directive, so its debug output round-trips even for spec-1.1-gated values.) Unit policy: `--unit <unit>` (repeatable) converts values to the first unit they fit, `--si` converts anything left over to coherent SI base units, `--base <N>` renders conversions in base N, `--leave-inexact` leaves a value the conversion cannot deliver exactly rather than failing the parse. |
 | `bovnar frames pack\|list <file…\|->` | Wrap each document in a length-prefixed frame, or list the documents in a frame stream. |
 | `bovnar mux pack\|list <chan:file…\|->` | Multiplex files onto channels in one octet stream, or list the channel/message sizes in a multiplexed stream. |
 | `bovnar version` | Print the library version and supported spec version. |
-| `bovnar bench [options]` | Benchmark parsing throughput. `--profile <list>` picks the payload shape (`scalars,typed,structs,arrays,units,mixed`, or `all`), `--size <list>` the payload sizes in bytes. `--iterations <N>` parse rounds per cell (default 100) and `--warmup <N>` warm-up rounds (default 10); `--min-overhead` drops the `on_verified` callback to time the parser alone. `--verbose` for per-run detail, `--json` for machine-readable output. |
+| `bovnar bench [options]` | Benchmark parsing throughput. `--profile <list>` picks the payload shape (`scalars,typed,structs,arrays,units,mixed`, or `all`), `--size <list>` the payload sizes in bytes (each payload is whole assignments up to that size). `--iterations <N>` parse rounds per cell (default 100) and `--warmup <N>` warm-up rounds (default 10); `--min-overhead` drops the `on_unverified` (lexer) callback and keeps only `on_verified`. `--verbose` for per-run detail, `--json` for machine-readable output. |
+
+Exit status: `0` success; `1` the document, the input or the output failed; `2` the command line was wrong. Asked-for help (`--help`) goes to stdout.
 
 ```bash
 bovnar validate examples/units.bvnr
@@ -601,7 +603,7 @@ static bool on_event(void *userdata, bvnr_event_t ev, bvnr_data_t *d)
 {
     (void)userdata;
     if (ev == ev_data)
-        printf("key=%.*s\n", (int)d->length, (const char *)d->data);
+        printf("value=%.*s\n", (int)d->length, (const char *)d->data);
     return true;
 }
 
@@ -711,7 +713,7 @@ def on_event(ev, data):
         print(data.raw_str(), bovnar.unit_to_str(data.value_unit))
 
 Reader().read_mem(b".velocity = <float:64,m/s> 9.81;", on_verified=on_event)
-# → 9.81  m/s
+# → 9.81 m/s
 ```
 
 Beyond `loads`/`dumps`, the package provides `dom_parse()` for random-access tree traversal, `loads(..., typed=True)` to preserve each value's exact type and unit as `Quantity` objects for lossless round-trips, and a `currency` module mirroring the C currency API.

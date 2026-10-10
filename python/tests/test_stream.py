@@ -172,3 +172,28 @@ def test_constants_present():
     assert stream.BVNR_FILESIZE_UNLIMITED == 0
     assert stream.BVNR_DOC_DEFAULT_MAX == 256 * 1024 * 1024
     assert stream.BVNR_MUX_DEFAULT_MAX == 64 * 1024 * 1024
+
+
+@needs_lib
+def test_mux_channel_out_of_range_is_refused():
+    # -1 crossed the FFI as a uint64_t and was written as channel 2**64-1.
+    from bovnar.exceptions import BovnarArgumentError
+    with pytest.raises(BovnarArgumentError):
+        stream.mux_dump([(-1, b'x')])
+    with pytest.raises(BovnarArgumentError):
+        stream.mux_dump([(2 ** 64, b'x')])
+    assert stream.mux_load(stream.mux_dump([(2 ** 64 - 1, b'x')])) == \
+        [(2 ** 64 - 1, b'x')]
+
+
+@needs_lib
+def test_parse_embedded_reports_the_real_error():
+    # Every failure was GOT_INCOMPLETE_BVNR_STREAM, whatever went wrong.
+    from bovnar.enums import ErrorCode
+    with pytest.raises(BovnarParseError) as ei:
+        stream.parse_embedded(b'.a=@;')
+    assert ei.value.code == ErrorCode.UNEXPECTED_INPUT_BYTE
+    assert (ei.value.line, ei.value.offset) == (1, 3)
+    with pytest.raises(BovnarParseError) as ei:
+        stream.parse_embedded(b'.a={.b=1;')
+    assert ei.value.code == ErrorCode.GOT_INCOMPLETE_BVNR_STREAM

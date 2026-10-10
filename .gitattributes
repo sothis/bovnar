@@ -22,3 +22,8 @@ web/bovnar_highlight.js linguist-vendored=true
 
 # Example documents are real Bovnar, not generated/vendored — leave detectable.
 examples/*.bvnr linguist-language=Bovnar
+
+# Shell scripts are run from the release archives, including the two built on
+# Windows runners, where core.autocrlf=true would otherwise check them out CRLF
+# and bash stops at the first $'\r'.
+*.sh text eol=lf

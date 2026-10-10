@@ -44,7 +44,7 @@
   };
 
   var wasm = null;
-  import('./bovnar_wasm.js?v=80dc75db57d7')
+  import('./bovnar_wasm.js?v=2625d3503b01')
     .then(function (m) { return m.loadBovnar(); })
     .then(function (b) {
       wasm = b;
@@ -633,7 +633,13 @@
   }
   function docTierError(text) {
     try {
-      var d = wasm.toJSON(text);
+      /* validate() runs the document tier itself and says which tier refused.
+         toJSON() was the probe before it did, and is a poor one: it also
+         refuses a valid document JSON cannot express (a fractional datetime).
+         It stays as the fallback for a core that predates `tier`. */
+      var d = wasm.validate(text);
+      if (d && d.tier === undefined) d = wasm.toJSON(text);
+      else if (d && d.tier !== 'document') return null;
       if (!d || d.ok || !d.error) return null;
       return { code: d.error_name, codeNum: d.error, message: d.error_name,
                line: 0, col: 0, offset: 0, tier: 'document' };

@@ -36,6 +36,8 @@ import subprocess
 import sys
 
 REPO = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, REPO)
+import bvnr_build_env                                    # noqa: E402
 
 
 def counts(repo):
@@ -362,7 +364,8 @@ def check_assertion_counts(repo):
     problems, checked = [], 0
     ran = False
     for _src, vocab, stated in claims:
-        exe = os.path.join(repo, "build", "tests", "bvnr_%s_test" % vocab)
+        exe = os.path.join(bvnr_build_env.tests_dir(repo),
+                           "bvnr_%s_test" % vocab)
         if not os.path.exists(exe):
             continue
         try:
@@ -428,6 +431,9 @@ def inventory(repo, want):
 
 def main(argv):
     repo = os.path.abspath(argv[1]) if len(argv) > 1 else REPO
+    sys.path.insert(0, REPO)
+    import bvnr_build_env
+    bvnr_build_env.require_build(repo, "check_doc_counts", ("tests",))
     want = _add_profile_keys(repo, counts(repo))
     bad, checked = [], 0
     inv_bad, inv_checked = inventory(repo, want)

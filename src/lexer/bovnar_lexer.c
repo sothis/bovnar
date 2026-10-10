@@ -199,11 +199,28 @@ static inline void bvn_set_error_pos(bvnr_reader_t* r, uint32_t byte,
 	r->val.error_byte   = byte;
 	r->val.error_offset = offset;
 }
+/*
+ * Offset, in the STREAM, of the text byte the scanner consumed last.
+ *
+ * text_bytes counts what the text scanner has consumed and nothing else, which
+ * is what max_text_bytes needs and is not a position: an octet stream's tags,
+ * lengths and payload go past the scanner without being counted. Reporting
+ * text_bytes - 1 as the error offset was therefore right up to the first octet
+ * stream and short by its whole binary size after it -- in
+ * ".a = <8 binary bytes>;\n.c = @;" the '@' is byte 20 and was reported as 13,
+ * against a header that says to index the input buffer with this number.
+ * octet_bytes is the other half of the count.
+ */
+static inline uint64_t bvn_last_text_offset(const bvnr_lexer_t* l)
+{
+	uint64_t consumed = l->text_bytes + l->octet_bytes;
+	return consumed > 0 ? consumed - 1 : 0;
+}
 static inline void bvn_lexer_set_error(bvnr_reader_t* r, error_code_t err)
 {
 	r->val.last_error = err;
 	bvn_set_error_pos(r, (uint32_t)r->lex.byte & 0xffu,
-		r->lex.text_bytes > 0 ? r->lex.text_bytes - 1 : 0);
+		bvn_last_text_offset(&r->lex));
 }
 static inline void bvn_notify_error(bvnr_reader_t* p)
 {
@@ -220,35 +237,142 @@ static inline void bvn_notify_error(bvnr_reader_t* p)
  * The tricky part is that the validator downstream tracks open arrays and
  * structs; if we just skipped bytes we would leave it with dangling open
  * scopes and every subsequent token would be misinterpreted. So before
- * switching to the `resync` state we synthesise the array-row-end events
- * needed to close every currently-open array level, restoring each parent
- * frame's saved type/unit as we unwind. Struct nesting is intentionally left
- * standing and remembered in resync_saved_struct_nesting: structs are closed
- * later, at the resync boundary, because a stray byte inside a struct should
- * not silently discard the whole enclosing object. For the same reason recovery
- * ends at the start of the next assignment as well as at the next ';' — see
- * bvn_action_resync_resume_identifier. All scratch state (string
- * buffers, UTF-8 progress, accumulator) is reset so the next good token starts
- * clean, and recovery_count is bumped for diagnostics.
+ * switching to the `resync` state we synthesise the array-row-end events for
+ * the arrays the broken statement itself opened -- those of the innermost open
+ * struct level, see bvn_resync_close_own_arrays -- restoring each parent
+ * frame's saved type/unit as we unwind. Struct nesting is left standing and
+ * remembered in resync_saved_struct_nesting, and so is every array that
+ * struct is an element of: a stray byte inside a struct should not silently
+ * discard the whole enclosing object, and the events must keep nesting. For
+ * the same reason recovery ends at the start of the next assignment as well as
+ * at the next ';' — see bvn_action_resync_resume_identifier. All scratch state
+ * (string buffers, UTF-8 progress, accumulator) is reset so the next good
+ * token starts clean, and recovery_count is bumped for diagnostics.
+ *
+ * An error inside a COMMENT never gets here: bvn_recover_in_comment.
  */
+/*
+ * Close the arrays that were opened INSIDE the innermost open struct (or at top
+ * level, when no struct is open) and leave every other one alone.
+ *
+ * Recovery used to close every open array, whatever it enclosed. An error in a
+ * struct that is itself an array element --
+ *
+ *     .a = [{.x = @; .y = 5;}, {.x = 1;}]; .b = 2;
+ *
+ * -- therefore emitted ev_array_row_end for the array AROUND the struct, went
+ * on to deliver ".y = 5" as a member of that still-open struct, and closed the
+ * struct after the array it sits in: start and end events that do not nest,
+ * which no consumer building anything from them survives (the canonical
+ * observer wrote ".a=[{.x=<uint:8>];.y=..."). The array around the struct is
+ * not broken; the member is. So only the arrays this struct level owns are
+ * unwound, exactly as a ']' would unwind them, and the enclosing ones keep
+ * their row counters, their annotation and their frames for the ',' or ']'
+ * that follows the struct.
+ *
+ * open_struct_level is what tells the two apart, and it is the same test
+ * bvn_action_value_outro and bvn_action_new_array_value make.
+ */
+static bool bvn_resync_close_own_arrays(bvnr_reader_t* p)
+{
+	bvnr_lexer_t* l = &p->lex;
+	while (l->array_nesting_level > 0 &&
+	       l->arr_frames[l->array_nesting_level].open_struct_level ==
+	       l->struct_nesting_level) {
+		if (!bvn_val_receive_event(p, ev_array_row_end))
+			return false;
+		--l->array_nesting_level;
+		bvn_array_frame_t *f = &l->arr_frames[l->array_nesting_level];
+		l->curr_row_size          = f->saved_curr;
+		l->array_row_size         = f->saved_row;
+		p->val.value_type         = f->saved_vtype;
+		p->val.parsed_unit        = f->saved_vunit;
+		bvn_usrc_restore(&p->val, f);
+		p->val.parsed_unit_serial = f->saved_unit_serial;
+	}
+	/* Everything above the innermost array still open is scratch now; its own
+	 * open_struct_level is not (see bvn_action_value_outro). */
+	uint32_t base = l->array_nesting_level;
+	uint32_t hwm  = l->arr_used_max;
+	if (hwm > base) {
+		uint8_t open_level = l->arr_frames[base].open_struct_level;
+		memset(l->arr_frames + base, 0,
+		       (hwm - base) * sizeof(bvn_array_frame_t));
+		l->arr_frames[base].open_struct_level = open_level;
+	}
+	l->arr_used_max = (uint16_t)base;
+	if (!base) {
+		l->curr_row_size  = 0;
+		l->array_row_size = 0;
+		l->array_items    = 0;
+	}
+	return true;
+}
+/*
+ * An error INSIDE A COMMENT -- a control byte, or a byte that is not UTF-8,
+ * which is what a Latin-1 comment in an otherwise clean file looks like.
+ *
+ * Nothing structural is wrong with the document: a comment carries no data,
+ * and it ends at the end of its line whatever it contains. Recovery treated it
+ * like any other fault and went to plain resync, which read the REST OF THE
+ * COMMENT as code -- ".z = 0; # bad <ff> byte; .q = 9;" delivered ".q = 9" out
+ * of the comment text, a '[', '{' or '"' after the bad byte opened a bracket
+ * or a string nothing ever closed, so every assignment to the end of the
+ * document was skipped and the read failed -- and which closed any array the
+ * comment happened to sit in.
+ *
+ * So the error is reported and counted, the one byte is dropped, and the
+ * comment simply goes on: no state is unwound and no value is lost. Returns
+ * false when the lexer is not in a comment, and the caller recovers the
+ * ordinary way.
+ *
+ * `ends_line` is for the one case in which the offending byte is the line end
+ * itself -- a multi-byte sequence cut short by it. The byte is not looked at
+ * again, so the comment is closed here. A first comment that needed this is
+ * not a version directive, whatever it began with.
+ */
+static bool bvn_recover_in_comment(bvnr_reader_t* p, bool ends_line)
+{
+	bvnr_lexer_t* l = &p->lex;
+	bool first;
+	switch (l->next_state) {
+	case comment_intro:
+	case ignore_comment_byte:
+		first = false;
+		break;
+	case first_comment_intro:
+	case first_comment_after_ef:
+	case first_comment_after_ef_bb:
+		first = true;
+		break;
+	default:
+		return false;
+	}
+	l->utf8_need = 0;
+	l->utf8_lo   = 0;
+	l->utf8_hi   = 0;
+	p->val.error_line   = 0;
+	p->val.error_column = 0;
+	p->val.error_byte   = 0;
+	p->val.error_offset = 0;
+	++l->recovery_count;
+	++l->skipped_bytes;
+	if (first) {
+		l->ver_checked = true;
+		l->next_state  = ends_line ? first_bom : first_comment_intro;
+	} else if (ends_line) {
+		(void)bvn_action_comment_outro(p);
+	}
+	return true;
+}
 static bool bvn_enter_resync(bvnr_reader_t* p)
 {
 	bvnr_lexer_t* l = &p->lex;
 	l->resync_saved_struct_nesting = l->struct_nesting_level;
-	while (l->array_nesting_level > 0) {
-		if (!bvn_val_receive_event(p, ev_array_row_end)) {
-			p->val.value_type  = BVN_TYPE_PLAIN;
-			p->val.parsed_unit = BVN_UNIT_NO_PREFIX(bu_none);
-			return false;
-		}
-		--l->array_nesting_level;
-		if (l->array_nesting_level > 0) {
-			bvn_array_frame_t *f = &l->arr_frames[l->array_nesting_level];
-			p->val.value_type         = f->saved_vtype;
-			p->val.parsed_unit        = f->saved_vunit;
-			bvn_usrc_restore(&p->val, f);
-			p->val.parsed_unit_serial = f->saved_unit_serial;
-		}
+	if (!bvn_resync_close_own_arrays(p)) {
+		p->val.value_type  = BVN_TYPE_PLAIN;
+		p->val.parsed_unit = BVN_UNIT_NO_PREFIX(bu_none);
+		return false;
 	}
 	l->utf8_need = 0;
 	l->utf8_lo = 0;
@@ -266,18 +390,27 @@ static bool bvn_enter_resync(bvnr_reader_t* p)
 	p->val.error_column        = 0;
 	p->val.error_byte          = 0;
 	p->val.error_offset        = 0;
+	/* The unit just went back to "none" under an array frame that may still be
+	 * open; move the serial so that frame puts its own unit back. */
+	p->val.parsed_unit_serial++;
 	l->resync_array_depth  = 0;
 	l->resync_struct_depth = 0;
-	l->array_items         = 0;
 	/*
 	 * If the error fired while inside a string body or an escape sequence
 	 * (incl. the spec-1.1 \x / \u escapes), the broken string's closing '"'
 	 * is still ahead in the stream. Skip in the resync_string sub-machine so
 	 * that '"' is consumed as the close — entering plain resync instead would
 	 * treat it as the OPEN of a new string-to-skip and swallow every following
-	 * good assignment up to the next quote (or EOF). An error inside a string
-	 * never lands on the closing quote itself, so the next '"' is always the
-	 * real terminator.
+	 * good assignment up to the next quote (or EOF).
+	 *
+	 * With one exception, which this used to deny: a \x or \u{...} escape cut
+	 * short BY the closing quote. In "\x4" and "\u{41" the byte the escape
+	 * rejects is the quote that ends the string, so there is no closing quote
+	 * ahead and waiting for one swallowed the rest of the document --
+	 * ".a = \"\x4\"; .b = 2; .c = \"z\"; .d = 4;" lost .b, .c and .d and ended
+	 * in error_got_incomplete_bvnr_stream. Those four states go to plain resync
+	 * when the offending byte is the quote. (escape_from_copy is not among
+	 * them: there a '"' is the escaped quote, never an error for being one.)
 	 *
 	 * string_intro is a string-body state too — it is where the FIRST body byte
 	 * is read, and its transition row is byte-for-byte identical to
@@ -293,11 +426,13 @@ static bool bvn_enter_resync(bvnr_reader_t* p)
 	case string_intro:
 	case copy_string_byte:
 	case escape_from_copy:
+		l->next_state = resync_string;
+		break;
 	case esc_x1:
 	case esc_x2:
 	case esc_u_open:
 	case esc_u_hex:
-		l->next_state = resync_string;
+		l->next_state = (l->byte == '"') ? resync : resync_string;
 		break;
 	default:
 		/* The offending byte may itself be a '"' in a state where a quote is
@@ -312,12 +447,6 @@ static bool bvn_enter_resync(bvnr_reader_t* p)
 	++l->recovery_count;
 	l->resync_start_bytes  = l->text_bytes;
 	l->in_array_element    = false;
-	l->curr_row_size       = 0;
-	l->array_row_size      = 0;
-	if (l->arr_used_max)
-		memset(l->arr_frames, 0,
-		       l->arr_used_max * sizeof(bvn_array_frame_t));
-	l->arr_used_max = 0;
 	return true;
 }
 /*
@@ -696,7 +825,12 @@ bool bvn_action_value_intro(bvnr_reader_t* p)
 	if (!bvn_val_on_value_intro(p))
 		return false;
 	p->lex.str_len          = 0;
-	p->lex.array_items      = 0;
+	/* max_array_items is a budget for everything under one OUTERMOST '['. It
+	 * was reset here for every assignment, and a struct member is an
+	 * assignment: "[{.a=1;},{.a=1;},...]" restarted the count at each element
+	 * and was never limited at all. Reset only where no array is open. */
+	if (!p->lex.array_nesting_level)
+		p->lex.array_items = 0;
 	p->lex.token_type       = token_is_null_value;
 	p->lex.in_array_element = false;
 	bvn_acc_reset(&p->val);
@@ -787,6 +921,21 @@ bool bvn_action_type_outro(bvnr_reader_t* p)
 bool bvn_action_copy_type_byte(bvnr_reader_t* p)
 {
 	bvnr_lexer_t* l = &p->lex;
+	/*
+	 * "float_fix" and "float_dec" are ONE keyword each. The keyword machine
+	 * stops at "float" and the "_fix" / "_dec" arrive here as ordinary body
+	 * bytes -- from type_body_outro, where whitespace and comments are
+	 * ignorable, so "<float _fix:32,q8>" and "<float # c <LF> _dec:64>" were
+	 * read as float_fix and float_dec: whitespace in the middle of a token,
+	 * which is the thing error_type_param_whitespace exists to refuse. The
+	 * suffix has to be the very next byte after the 't'.
+	 */
+	if (l->byte == '_' && l->type_len == 5u &&
+	    memcmp(l->type_data, "float", 5u) == 0 &&
+	    l->text_bytes != l->type_kw_end + 1u) {
+		bvn_lexer_set_error(p, error_type_param_whitespace);
+		return false;
+	}
 	if (l->type_len == BVN_TYPE_BUF_CAP - 1u) {
 		bvn_lexer_set_error(p, error_type_too_long);
 		return false;
@@ -1026,12 +1175,28 @@ bool bvn_action_array_intro(bvnr_reader_t* p)
  * parent's counters/type are restored. The unit_serial guard avoids
  * needlessly overwriting a unit that the inner scope never changed.
  */
-bool bvn_action_array_outro(bvnr_reader_t* p)
+/*
+ * A ']' closes the innermost '[' -- and only where no struct has been opened
+ * inside it since. The ',' and the ';' were given this test in the round
+ * before; the ']' itself was not, so ".a = [{.x = 1];};" validated: the ']'
+ * closed the array from inside its own element, ev_array_row_end arrived
+ * before the ev_struct_end of the struct the array contains, and the
+ * mismatched brackets were a document. Same test as bvn_action_new_array_value.
+ */
+static inline bool bvn_array_close_allowed(bvnr_reader_t* p)
 {
-	if (!p->lex.array_nesting_level) {
+	if (!p->lex.array_nesting_level ||
+	    p->lex.arr_frames[p->lex.array_nesting_level].open_struct_level !=
+	    p->lex.struct_nesting_level) {
 		bvn_lexer_set_error(p, error_unexpected_input_byte);
 		return false;
 	}
+	return true;
+}
+bool bvn_action_array_outro(bvnr_reader_t* p)
+{
+	if (!bvn_array_close_allowed(p))
+		return false;
 	if (!bvn_lex_finalize(p, bvn_val_receive))
 		return false;
 	if (!bvn_val_on_array_outro(p, p->lex.curr_row_size,
@@ -1041,7 +1206,7 @@ bool bvn_action_array_outro(bvnr_reader_t* p)
 	uint64_t level = p->lex.array_nesting_level;
 	bvn_array_frame_t *f = &p->lex.arr_frames[level];
 	f->dim_row_size       = p->lex.array_row_size;
-	p->lex.curr_row_size  = f->saved_curr + 1u;
+	p->lex.curr_row_size  = f->saved_curr;
 	p->lex.array_row_size = f->saved_row;
 	p->val.value_type     = f->saved_vtype;
 	if (p->val.parsed_unit_serial != f->saved_unit_serial) {
@@ -1065,10 +1230,8 @@ bool bvn_action_array_outro(bvnr_reader_t* p)
  */
 bool bvn_action_array_outro_empty(bvnr_reader_t* p)
 {
-	if (!p->lex.array_nesting_level) {
-		bvn_lexer_set_error(p, error_unexpected_input_byte);
+	if (!bvn_array_close_allowed(p))
 		return false;
-	}
 	/* Clear the null placeholder array_intro pre-seeded. We skip
 	 * bvn_lex_finalize (which would emit it as an element AND reset the token),
 	 * so reset the pending-token state here — otherwise the lingering
@@ -1083,7 +1246,7 @@ bool bvn_action_array_outro_empty(bvnr_reader_t* p)
 	uint64_t level = p->lex.array_nesting_level;
 	bvn_array_frame_t *f = &p->lex.arr_frames[level];
 	f->dim_row_size       = p->lex.array_row_size;
-	p->lex.curr_row_size  = f->saved_curr + 1u;
+	p->lex.curr_row_size  = f->saved_curr;
 	p->lex.array_row_size = f->saved_row;
 	p->val.value_type     = f->saved_vtype;
 	if (p->val.parsed_unit_serial != f->saved_unit_serial) {
@@ -1203,7 +1366,11 @@ bool bvn_action_tf_uint_done(bvnr_reader_t* p)
 bool bvn_action_tf_sint_done(bvnr_reader_t* p)
 	{ return bvn_tf_family_done(p, "sint",      4, type_body_outro); }
 bool bvn_action_tf_float_done(bvnr_reader_t* p)
-	{ return bvn_tf_family_done(p, "float",     5, type_body_outro); }
+{
+	/* Where the keyword ended, for bvn_action_copy_type_byte. */
+	p->lex.type_kw_end = p->lex.text_bytes;
+	return bvn_tf_family_done(p, "float",     5, type_body_outro);
+}
 bool bvn_action_tf_utf8_done(bvnr_reader_t* p)
 	{ return bvn_tf_family_done(p, "utf8",      4, type_body_outro); }
 bool bvn_action_tf_bool_done(bvnr_reader_t* p)
@@ -1256,6 +1423,18 @@ bool bvn_action_copy_reference_dot(bvnr_reader_t* p)
 }
 bool bvn_action_copy_reference_byte(bvnr_reader_t* p)
 {
+	/* After an index only '.', '[' or the end of the reference may follow
+	 * (reference = "&" ref-segment {ref-segment | ref-index}). An index close
+	 * returns to reference_segment_body, whose row takes body bytes, so
+	 * "&.a[0]b" was read as the path ".a[0]b" -- which the grammar does not
+	 * derive and bvn_dom_lookup cannot resolve. A ']' is in the stored path
+	 * only as the close of an index, so the byte before says where we are.
+	 * (bvn_try_bulk_run makes the same test before copying a run.) */
+	if (p->lex.str_len > 0u &&
+	    p->lex.str_data[p->lex.str_len - 1u] == ']') {
+		bvn_lexer_set_error(p, error_unexpected_input_byte);
+		return false;
+	}
 	return bvn_push_reference_byte(p, reference_segment_body);
 }
 /*
@@ -1273,8 +1452,11 @@ bool bvn_action_reference_index_open(bvnr_reader_t* p)
 		return false;
 	}
 	/* require at least one digit before ']' (reference_index_first has no ']'
-	 * transition), so an empty "[]" is rejected — the lexer then accepts exactly
-	 * what bvn_dom_lookup / bvn_validate_reference accept on the resolve/write side. */
+	 * transition), so an empty "[]" is rejected. With the test in
+	 * bvn_action_copy_reference_byte -- nothing but '.', '[' or the end after an
+	 * index -- the lexer accepts exactly the paths bvn_dom_lookup can walk.
+	 * bvn_validate_reference on the write side is still wider by that one
+	 * case: it lets ".a[0]b" through. */
 	return bvn_push_reference_byte(p, reference_index_first);
 }
 bool bvn_action_reference_index_byte(bvnr_reader_t* p)
@@ -1384,6 +1566,24 @@ bvn_verdir_t bvn_parse_version_directive(
 static inline void bvn_first_comment_capture(bvnr_lexer_t* l)
 {
 	if (l->ver_checked) return;
+	/*
+	 * A run of spaces and tabs is captured as its first byte only.
+	 *
+	 * The directive's grammar is "!bovnar" hspace+ version hspace* and puts no
+	 * bound on either run, while the capture buffer holds 32 bytes -- so
+	 * "#!bovnar 1.1" followed by twenty-two spaces overflowed it and was
+	 * refused as error_invalid_spec_version, a document failing on trailing
+	 * blanks its own grammar allows (and bvnr_peek_version, which reads the
+	 * line where it lies, accepted). bvn_parse_version_directive only ever
+	 * asks whether a run is there, so one byte of it says everything; the
+	 * longest well-formed directive is then 20 bytes and overflow means what
+	 * it was meant to mean, a line that is not a version.
+	 */
+	if ((l->byte == ' ' || l->byte == '\t') && l->ver_len > 0u &&
+	    !l->ver_overflow &&
+	    (l->ver_buf[l->ver_len - 1u] == ' ' ||
+	     l->ver_buf[l->ver_len - 1u] == '\t'))
+		return;
 	if (l->ver_len < (uint8_t)sizeof(l->ver_buf))
 		l->ver_buf[l->ver_len++] = (uint8_t)l->byte;
 	else
@@ -1469,8 +1669,12 @@ bool bvnr_peek_version(
 	uint64_t i = 0;
 	if (len >= 3 && b[0] == 0xefu && b[1] == 0xbbu && b[2] == 0xbfu)
 		i = 3;                                   /* skip UTF-8 BOM */
+	/* The six bytes the reader skips before the first comment (the [undefined]
+	 * row of the state table). VT and FF were missing, so a document the
+	 * reader took as 1.1 peeked as undeclared. */
 	while (i < len && (b[i] == ' ' || b[i] == '\t' ||
-	                   b[i] == '\n' || b[i] == '\r'))
+	                   b[i] == '\n' || b[i] == '\r' ||
+	                   b[i] == 0x0b || b[i] == 0x0c))
 		i++;
 	if (i >= len || b[i] != '#')
 		return false;
@@ -1551,14 +1755,18 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 			l->next_state = resync;
 			return true;
 		}
-		if (l->array_nesting_level > 0) {
+		/* Only an array this struct level owns: a ']' cannot close an array
+		 * across the struct that is open inside it (bvn_resync_close_own_arrays). */
+		if (l->array_nesting_level > 0 &&
+		    l->arr_frames[l->array_nesting_level].open_struct_level ==
+		    l->struct_nesting_level) {
 			if (!bvn_val_receive_event(p, ev_array_row_end))
 				return false;
 			--l->array_nesting_level;
 			uint64_t level = l->array_nesting_level;
 			bvn_array_frame_t *f = &l->arr_frames[level];
 			f->dim_row_size      = l->curr_row_size;
-			l->curr_row_size     = f->saved_curr + 1u;
+			l->curr_row_size     = f->saved_curr;
 			l->array_row_size    = f->saved_row;
 			p->val.value_type    = f->saved_vtype;
 			p->val.parsed_unit   = f->saved_vunit;
@@ -1576,26 +1784,11 @@ bool bvn_action_resync_close_bracket(bvnr_reader_t* p)
 			return true;
 		}
 		if (l->struct_nesting_level > 0) {
-			while (l->array_nesting_level > 0) {
-				if (!bvn_val_receive_event(p, ev_array_row_end))
-					return false;
-				--l->array_nesting_level;
-				if (l->array_nesting_level > 0) {
-					bvn_array_frame_t *f = &l->arr_frames[l->array_nesting_level];
-					p->val.value_type  = f->saved_vtype;
-					p->val.parsed_unit = f->saved_vunit;
-					bvn_usrc_restore(&p->val, f);
-					p->val.parsed_unit_serial = f->saved_unit_serial;
-				}
-			}
-			l->curr_row_size    = 0;
-			l->array_row_size   = 0;
+			/* The arrays opened inside this struct go with it; one the
+			 * struct is an element OF stays open. */
+			if (!bvn_resync_close_own_arrays(p))
+				return false;
 			l->in_array_element = false;
-			if (l->arr_used_max)
-				memset(l->arr_frames, 0,
-				       l->arr_used_max *
-				       sizeof(bvn_array_frame_t));
-			l->arr_used_max = 0;
 			--l->struct_nesting_level;
 			if (!bvn_val_receive_event(p, ev_struct_end))
 				return false;
@@ -1643,18 +1836,16 @@ static bool bvn_resync_reset(bvnr_reader_t* p)
 	l->utf8_hi              = 0;
 	l->in_array_element     = false;
 	l->struct_nesting_level = l->resync_saved_struct_nesting;
-	l->array_nesting_level  = 0;
 	l->resync_array_depth   = 0;
 	l->resync_struct_depth  = 0;
-	l->array_items          = 0;
-	l->curr_row_size        = 0;
-	l->array_row_size       = 0;
-	if (l->arr_used_max)
-		memset(l->arr_frames, 0,
-		       l->arr_used_max * sizeof(bvn_array_frame_t));
-	l->arr_used_max = 0;
+	/* Parsing resumes at an assignment boundary of THIS struct level, so the
+	 * arrays it owns are over; an array this struct is an element of is not,
+	 * and keeps its state for the rest of its row. */
+	if (!bvn_resync_close_own_arrays(p))
+		ok = false;
 	p->val.value_type          = BVN_TYPE_PLAIN;
 	p->val.parsed_unit         = BVN_UNIT_NO_PREFIX(bu_none);
+	p->val.parsed_unit_serial++;
 	p->val.has_annotation_unit = false;
 	bvn_acc_reset(&p->val);
 	return ok;
@@ -1721,20 +1912,7 @@ bool bvn_action_resync_semicolon(bvnr_reader_t* p)
 		l->next_state = resync;
 		return true;
 	}
-	while (l->array_nesting_level > 0) {
-		if (!bvn_val_receive_event(p, ev_array_row_end)) {
-			(void)bvn_resync_semicolon_reset(p);
-			return false;
-		}
-		--l->array_nesting_level;
-		if (l->array_nesting_level > 0) {
-			bvn_array_frame_t *f = &l->arr_frames[l->array_nesting_level];
-			p->val.value_type         = f->saved_vtype;
-			p->val.parsed_unit        = f->saved_vunit;
-			bvn_usrc_restore(&p->val, f);
-			p->val.parsed_unit_serial = f->saved_unit_serial;
-		}
-	}
+	/* bvn_resync_reset closes the arrays this struct level owns. */
 	if (!bvn_resync_semicolon_reset(p))
 		return false;
 	return true;
@@ -1880,9 +2058,19 @@ static bool bvn_os_read_exact(
 		}
 	}
 	uint32_t need = length - from_resid;
-	if (!need) return true;
+	if (!need) {
+		p->lex.octet_bytes += (uint64_t)length;
+		return true;
+	}
 	uint32_t total = 0, got;
 	while (total != need) {
+		if (p->lex.file_cap_hit) {
+			/* bvn_lex_run already cut this document at max_file_size. */
+			bvn_capture_os_error(p, error_file_too_long, src->resid_left);
+			p->val.error_offset = p->lex.max_file_size;
+			bvn_notify_error(p);
+			return false;
+		}
 		if (!bvn_source_pull(&p->lex.src, buf + from_resid + total,
 						  need - total, &got) || !got) {
 			bvn_capture_os_error(p,
@@ -1896,6 +2084,9 @@ static bool bvn_os_read_exact(
 			p->lex.processed_bytes > p->lex.max_file_size) {
 			bvn_capture_os_error(p, error_file_too_long,
 					     src->resid_left);
+			/* The first byte over the cap, whatever the size of the pull
+			 * that crossed it -- see bvn_lex_run. */
+			p->val.error_offset = p->lex.max_file_size;
 			bvn_notify_error(p);
 			return false;
 		}
@@ -1910,6 +2101,7 @@ static bool bvn_os_read_exact(
 		}
 		total += got;
 	}
+	p->lex.octet_bytes += (uint64_t)length;
 	return true;
 }
 /*
@@ -1945,6 +2137,13 @@ static bool bvn_read_octet_stream(
 		if (tag != 0x01) {
 			bvn_capture_os_error(p, error_octet_stream_out_of_sync,
 					     src.resid_left);
+			/* The tag has been consumed, so the position reached is one past
+			 * it; the error is the tag itself, and it is a single byte, so it
+			 * is reported the way every text error is -- its own offset, and
+			 * the byte. (It used to be offset + 1 and byte 0.) */
+			if (p->val.error_offset > 0)
+				p->val.error_offset -= 1u;
+			p->val.error_byte = (uint32_t)tag;
 			bvn_notify_error(p);
 			return false;
 		}
@@ -2203,6 +2402,10 @@ static inline uint32_t bvn_try_bulk_run(
 		dst_cap = l->max_symbol_length;
 		break;
 	case reference_segment_body:
+		/* Directly after an index: the per-byte path decides (see
+		 * bvn_action_copy_reference_byte). */
+		if (l->str_len > 0u && l->str_data[l->str_len - 1u] == ']')
+			return 0;
 		lut = bvn_run_lut_reference;
 		dst_cap = l->max_reference_length;
 		break;
@@ -2375,7 +2578,7 @@ static bool bvn_interpret_input_buffer(
 			p->val.error_line   = l->line;
 			p->val.error_column = col;
 			p->val.error_byte   = (uint32_t)offending & 0xffu;
-			p->val.error_offset = l->text_bytes;
+			p->val.error_offset = l->text_bytes + l->octet_bytes;
 			bvn_notify_error(p);
 			return false;
 		}
@@ -2394,14 +2597,22 @@ static bool bvn_interpret_input_buffer(
 				++l->column;
 			p->val.last_error = error_invalid_utf8_byte;
 			bvn_set_error_pos(p, (uint32_t)l->byte & 0xffu,
-				l->text_bytes - 1);
+				bvn_last_text_offset(l));
 			bvn_notify_error(p);
 			bvn_advance_line(l, prev);
 			line_advanced = true;
 			if (l->continue_on_error) {
 				bool was_continuation = (saved_need > 0);
-				if (!bvn_enter_resync(p))
+				if (bvn_recover_in_comment(p,
+					l->byte == 0x0a || l->byte == 0x0d)) {
+					if (!was_continuation || l->byte == 0x0a ||
+						l->byte == 0x0d)
+						continue;
+					/* the byte that cut the sequence short starts a new
+					 * character of the comment; fall through to it */
+				} else if (!bvn_enter_resync(p)) {
 					return false;
+				}
 				if (!was_continuation || l->byte == 0x09 ||
 					l->byte == 0x0a || l->byte == 0x0d) {
 					continue;
@@ -2421,7 +2632,7 @@ static bool bvn_interpret_input_buffer(
 			++l->column;
 		if (!bvn_call_action_for_new_byte(p)) {
 			bvn_set_error_pos(p, (uint32_t)l->byte & 0xffu,
-				l->text_bytes - 1);
+				bvn_last_text_offset(l));
 			bvn_notify_error(p);
 			if (!line_advanced)
 				bvn_advance_line(l, prev);
@@ -2433,6 +2644,8 @@ static bool bvn_interpret_input_buffer(
 			if (p->val.last_error == error_scanner_callback_failed)
 				return false;
 			if (l->continue_on_error) {
+				if (bvn_recover_in_comment(p, false))
+					continue;
 				if (!bvn_enter_resync(p))
 					return false;
 				/*
@@ -2445,8 +2658,22 @@ static bool bvn_interpret_input_buffer(
 				 * nesting depth") treat the just-consumed ';' as that
 				 * boundary and resume normal parsing immediately.
 				 */
-				if (l->byte == (uint8_t)';')
+				if (l->next_state == resync && l->byte == (uint8_t)';')
 					bvn_resync_semicolon_reset(p);
+				/*
+				 * The same goes for a '}' that was itself the offending
+				 * byte -- ".s = {.a = 1 }; .b = 2;", a member missing its
+				 * ';'. It was consumed as the error and then forgotten, so
+				 * the struct it closes stayed open: ".b" was delivered as a
+				 * member of ".s" and the document ended incomplete. Give it
+				 * to the recovery machine, which closes the struct exactly
+				 * as it does for a '}' it meets while skipping. (A ']' needs
+				 * nothing: the arrays it could close were closed on entry.)
+				 */
+				else if (l->next_state == resync &&
+					 l->byte == (uint8_t)'}' &&
+					 !bvn_action_resync_close_bracket(p))
+					return false;
 			} else {
 				return false;
 			}
@@ -2593,6 +2820,42 @@ bool bvn_lex_run(bvnr_reader_t* r)
 			data = stack_data;
 		}
 		if (!nb) {
+			/*
+			 * End of input inside a multi-byte sequence. Every other place
+			 * such a sequence can be cut short is refused already, because
+			 * the byte after it is not a continuation byte -- but a comment
+			 * may run to end of input, and there nothing came after it:
+			 * ".a = 1; #<c3>" was accepted, where the same bytes followed by
+			 * a newline are error_invalid_utf8_byte. Asked only where the
+			 * document would otherwise be accepted; elsewhere a truncated
+			 * document stays error_got_incomplete_bvnr_stream.
+			 */
+			bool eof_in_first_comment =
+				l->next_state == first_comment_intro ||
+				l->next_state == first_comment_after_ef ||
+				l->next_state == first_comment_after_ef_bb;
+			bool eof_acceptable =
+				((l->next_state == value_outro ||
+				  l->next_state == undefined   ||
+				  l->next_state == first_bom   ||
+				  eof_in_first_comment) ||
+				 ((l->next_state == comment_intro ||
+				   l->next_state == ignore_comment_byte) &&
+				  l->last_state == value_outro)) &&
+				!l->struct_nesting_level;
+			if (eof_acceptable && l->utf8_need != 0u) {
+				bvn_set_eof_error(r, error_invalid_utf8_byte);
+				bvn_notify_error(r);
+				if (!l->continue_on_error)
+					return false;
+				/* Nothing is left to resynchronise on: the comment, and the
+				 * document, end here. Reported and counted like any other
+				 * recovered error. */
+				l->utf8_need = 0;
+				++l->recovery_count;
+				if (eof_in_first_comment)
+					l->next_state = first_comment_intro;
+			}
 			if ((l->next_state == value_outro ||
 				 l->next_state == undefined   ||
 				 l->next_state == first_bom   ||
@@ -2647,13 +2910,30 @@ bool bvn_lex_run(bvnr_reader_t* r)
 			bvn_notify_error(r);
 			return false;
 		}
-		l->processed_bytes += (uint64_t)nb;
+		/*
+		 * max_file_size. The cap used to be tested against whole pulled
+		 * buffers, before any byte of the buffer that crossed it was read --
+		 * so where a too-long document stopped, what had been delivered by
+		 * then, and the offset reported all depended on how the bytes
+		 * happened to arrive: 150 bytes under a cap of 70 gave no events and
+		 * offset 150 from a memory buffer, and seventy parsed bytes and
+		 * offset 71 from a source handing over one byte at a time (which
+		 * could also meet an earlier syntax error first, and report that
+		 * instead). Read exactly what the cap allows, then refuse at the
+		 * first byte over it: the same events and the same position whatever
+		 * the chunking.
+		 */
+		bool over_cap = false;
 		if (l->max_file_size &&
-			l->processed_bytes > l->max_file_size) {
-			bvn_set_eof_error(r, error_file_too_long);
-			bvn_notify_error(r);
-			return false;
+			l->processed_bytes + (uint64_t)nb > l->max_file_size) {
+			nb = (l->processed_bytes < l->max_file_size)
+				? (uint32_t)(l->max_file_size - l->processed_bytes) : 0u;
+			over_cap = true;
+			/* The octet reader pulls for itself once its residual runs
+			 * out, and the bytes cut off here are gone from the source. */
+			l->file_cap_hit = true;
 		}
+		l->processed_bytes += (uint64_t)nb;
 		off = 0;
 		while (off < nb) {
 			uint32_t text_start = off;
@@ -2677,6 +2957,11 @@ bool bvn_lex_run(bvnr_reader_t* r)
 					return false;
 				off = nb - os_leftover;
 			}
+		}
+		if (over_cap) {
+			bvn_set_eof_error(r, error_file_too_long);
+			bvn_notify_error(r);
+			return false;
 		}
 	}
 	if (!bvn_val_receive_event(r, ev_stream_end))

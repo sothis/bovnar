@@ -379,13 +379,41 @@ class BvnFloat:
         if words is None:
             raise BovnarArgumentError(
                 f"no decimal interchange format for width {width}")
+        nbytes = {16: 2, 32: 4, 64: 8, 128: 16, 256: 32}[width]
+        # TWO THINGS THE C ROUTINE DOES NOT DO, both checked here so that this
+        # method keeps its own promise whichever libbvnr is loaded.
+        #
+        # It does not read "ninf", the format's spelling of negative infinity
+        # and what bvn_float_to_str writes: it answered true with a buffer of
+        # zeros, so Quantity.ieee_bits returned the encoding of +0 for a value
+        # whose stored_value was -Infinity. Negative infinity is positive
+        # infinity with the sign bit set, in every one of these formats.
+        #
+        # And it does not refuse what it cannot parse: "abc" and "" also came
+        # back as true-with-zeros, where the docstring above promises a raise.
+        # bvn_float_from_str is the same grammar and does say no, so it is
+        # asked first (at a token precision; only the verdict is used).
+        low = text.strip().lower()
+        if low in ('ninf', '-inf', '-infinity'):
+            raw = bytearray(BvnFloat.strtodec_bits('inf', width))
+            raw[-1] |= 0x80
+            return bytes(raw)
+        probe = BvnFloat(64)
+        try:
+            ok = bool(lib.bvn_float_from_str(probe._ptr,
+                                             text.encode('ascii', 'replace'), 10))
+        finally:
+            probe.close()
+        if not ok:
+            raise BovnarArgumentError(
+                f"bvn_float_strtodec: {text!r} is not a decimal literal")
         buf = (ctypes.c_uint32 * words)()
         if not lib.bvn_float_strtodec(text.encode(), ctypes.c_uint32(width),
                                       buf, ctypes.c_int(words)):
             raise BovnarArgumentError(
                 f"bvn_float_strtodec rejected {text!r} at width {width}")
         raw = b''.join(int(w).to_bytes(4, 'little') for w in buf)
-        return raw[:{16: 2, 32: 4, 64: 8, 128: 16, 256: 32}[width]]
+        return raw[:nbytes]
 
     def to_decimal_bits(self, width: int) -> bytes:
         lib = self._lib

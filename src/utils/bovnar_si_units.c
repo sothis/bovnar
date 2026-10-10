@@ -95,6 +95,16 @@ typedef struct {
 	const char       *offset_num;
 	const char       *offset_den;
 	bool              exact;
+	/* For a unit that is inexact ONLY because its factor carries a power of π:
+	 * factor = (pi_num / pi_den) · π^pi_pow, with the rational part stated
+	 * exactly. NULL/NULL/0 for every other row. π is transcendental, so a ratio
+	 * of two such factors is rational exactly when the powers cancel — 1 rev is
+	 * 360° and 1 arcmin is 1/60° with nothing rounded — and that is the one case
+	 * in which a unit with exact == false may take part in a lossless
+	 * conversion. See bvn_unit_convert_rational. */
+	const char       *pi_num;
+	const char       *pi_den;
+	int32_t           pi_pow;
 } bvn_si_conv_entry_t;
 /*
  * The master conversion table, one row per defined base unit and indexed by
@@ -109,7 +119,7 @@ typedef struct {
  * business of bovnar_currency.c, not of SI conversion.
  */
 static const bvn_si_conv_entry_t si_conv_table[BVN_UNIT_SLOT_COUNT] = {
-	[0]                     = { bu_none,               1.0,        {0, 0, 0, 0, 0, 0, 0}, false, 0.0,    "1", "1", "0", "1", true },
+	[0]                     = { bu_none,               1.0,        {0, 0, 0, 0, 0, 0, 0}, false, 0.0,    "1", "1", "0", "1", true, NULL, NULL, 0 },
 	/*
 	 * The native units — generated from src/gendata/units.bvnr by gen_units.py.
 	 */
@@ -857,13 +867,39 @@ double bvn_unit_convert_factor(value_unit_t a, value_unit_t b,
 	 * signal callers read for °C -> °C. bvn_unit_convert_value and
 	 * bvn_unit_convert_rational short-circuit earlier because they must also
 	 * rescue an irrational factor, which has no bearing on an identity. */
-	if (!bvn_units_compatible(a, b)) {
-		/* Same unit apart from prefixes — a currency, which has no SI row and so
-		 * cannot be judged by dimension. Identity is just the delta-zero case of
-		 * this. */
+	/* Same unit apart from prefixes. Identity is just the delta-zero case of
+	 * this, and it is asked first for every pair, as bvn_unit_convert_rational
+	 * asks it and for the same reason: the base units cancel, so nothing about
+	 * them matters — not that a currency has no SI row, not that a parsec's
+	 * factor is irrational, not that °C has no meaning inside a compound. Going
+	 * through the two SI factors instead returned 999.99999999999989 for
+	 * `k~rev -> rev` and refused `k~°C/s -> °C/s`.
+	 *
+	 * requires_affine keeps the meaning callers already read from it for
+	 * `°C -> °C`: an affine scale is involved, and here its offset cancels. */
+	{
 		int32_t sid = 0, iecd = 0;
-		if (bvn_unit_prefix_only_delta(a, b, &sid, &iecd))
-			return bvni_pow10(sid) * bvni_ipow(2.0, iecd);
+		if (bvn_unit_prefix_only_delta(a, b, &sid, &iecd)) {
+			/* A scale a double cannot hold is a refusal here, as it is on
+			 * the general path: `Q~m¹⁰⁰ -> q~m¹⁰⁰` is 10^6000, and handing
+			 * back inf (or 0 the other way) as a "factor" would turn every
+			 * value into it. bvn_unit_convert_rational carries it exactly. */
+			double f = bvni_pow10(sid) * bvni_ipow(2.0, iecd);
+			if (!isfinite(f) || f == 0.0) {
+				*ok = false;
+				return 0.0;
+			}
+			for (uint32_t i = 0; i < a.num_components &&
+			     i < BVNR_MAX_UNIT_COMPONENTS; i++) {
+				const bvn_si_conv_entry_t *conv =
+					bvn_find_si_conv(a.components[i].base);
+				if (conv && conv->is_affine)
+					*requires_affine = true;
+			}
+			return f;
+		}
+	}
+	if (!bvn_units_compatible(a, b)) {
 		*ok = false;
 		return 0.0;
 	}
@@ -1020,10 +1056,17 @@ static bool rat_set_decstr(bvn_int_t *n, bvn_int_t *d,
 static bool bvn_unit_to_si_rational(value_unit_t u,
 				    bvn_int_t *fnum, bvn_int_t *fden,
 				    bvn_int_t *onum, bvn_int_t *oden,
-				    bool *exact)
+				    bool *exact, int32_t *pi_pow)
 {
 	bvn_verify_conv_table();
 	*exact = true;
+	/* `pi_pow` non-NULL selects the π-SEPARATED form: a component whose row
+	 * states its factor as rational·π^k contributes the rational to fnum/fden
+	 * and k times its exponent to *pi_pow, and is not counted against *exact.
+	 * The factor returned is then NOT the unit's SI factor on its own — it is
+	 * that divided by π^*pi_pow — and only a caller that goes on to compare two
+	 * powers may use it. NULL keeps the plain form, π rounded into the decimal. */
+	if (pi_pow) *pi_pow = 0;
 	bool ok = bvn_int_from_uint64(fnum, 1u) && bvn_int_from_uint64(fden, 1u) &&
 		  bvn_int_from_uint64(oden, 1u);
 	bvn_int_zero(onum);
@@ -1048,9 +1091,15 @@ static bool bvn_unit_to_si_rational(value_unit_t u,
 		int32_t abs_exp = bvni_exp_abs(c->exponent);
 		const bvn_si_conv_entry_t *conv = bvn_find_si_conv(c->base);
 		if (!conv) { ok = false; break; }
-		if (!conv->exact) *exact = false;
+		bool pi_form = pi_pow && conv->pi_num && conv->pi_den;
+		if (pi_form)
+			*pi_pow += conv->pi_pow * uexp;
+		else if (!conv->exact)
+			*exact = false;
 		/* base factor ^ abs_exp */
-		if (!rat_set_decstr(bfn, bfd, conv->factor_num, conv->factor_den)) {
+		if (!rat_set_decstr(bfn, bfd,
+				    pi_form ? conv->pi_num : conv->factor_num,
+				    pi_form ? conv->pi_den : conv->factor_den)) {
 			ok = false; break; }
 		if (!bvn_int_copy(cfn, bfn) || !bvn_int_copy(cfd, bfd)) { ok = false; break; }
 		for (int32_t e = 1; e < abs_exp; e++)
@@ -1114,13 +1163,28 @@ bool bvn_unit_convert_rational(const bvn_int_t *vnum, const bvn_int_t *vden,
 		return bvn_int_copy(out_num, vnum) && bvn_int_copy(out_den, vden) &&
 		       rat_reduce(out_num, out_den);
 	}
-	if (!bvn_units_compatible(from, to)) {
-		/* Same unit apart from prefixes: the scale is a power of ten times a
-		 * power of two, both exact, so this stays lossless without ever touching
-		 * si_conv_table — which is the point, since a currency has no row there. */
+	/* Same unit apart from prefixes: the scale is a power of ten times a power
+	 * of two, both exact, so this stays lossless without ever touching
+	 * si_conv_table.
+	 *
+	 * Asked FIRST, for every pair, and not only once bvn_units_compatible has
+	 * said no. It used to be the currencies' fallback alone, and a unit that
+	 * does have an SI row took the general path below even for a pure prefix
+	 * change — where the base unit's own properties are consulted for what is
+	 * a multiplication by 1000. So `k~pc -> pc` was "inexact" because a parsec
+	 * is, `m~arcsec -> arcsec` likewise, and `k~°C/s -> °C/s` was refused
+	 * outright because an affine scale means nothing in a compound. None of
+	 * that bears on a prefix: the base units are the same on both sides and
+	 * cancel, whatever they are. BVN_UNIT_REDUCE asks for exactly this
+	 * conversion, which is how `pretty-print --canonical` came to fail on a
+	 * kiloparsec. */
+	{
 		int32_t sid = 0, iecd = 0;
-		if (!bvn_unit_prefix_only_delta(from, to, &sid, &iecd))
-			return false;                       /* genuine dim mismatch */
+		if (!bvn_unit_prefix_only_delta(from, to, &sid, &iecd)) {
+			if (!bvn_units_compatible(from, to))
+				return false;                   /* genuine dim mismatch */
+			goto general;
+		}
 		*exact = true;
 		if (!bvn_int_copy(out_num, vnum) || !bvn_int_copy(out_den, vden))
 			return false;
@@ -1130,6 +1194,7 @@ bool bvn_unit_convert_rational(const bvn_int_t *vnum, const bvn_int_t *vden,
 		if (iecd < 0 && !bvn_int_shl(out_den, -iecd))       return false;
 		return rat_reduce(out_num, out_den);
 	}
+general:;
 	bvn_int_t *ffn = bvn_int_alloc(), *ffd = bvn_int_alloc();
 	bvn_int_t *fon = bvn_int_alloc(), *fod = bvn_int_alloc();
 	bvn_int_t *tfn = bvn_int_alloc(), *tfd = bvn_int_alloc();
@@ -1139,8 +1204,32 @@ bool bvn_unit_convert_rational(const bvn_int_t *vnum, const bvn_int_t *vden,
 	bool exf = true, ext = true;
 	bool ok = ffn && ffd && fon && fod && tfn && tfd && ton && tod &&
 		  sn && sd && un && ud;
-	if (ok) ok = bvn_unit_to_si_rational(from, ffn, ffd, fon, fod, &exf);
-	if (ok) ok = bvn_unit_to_si_rational(to,   tfn, tfd, ton, tod, &ext);
+	/*
+	 * π. A unit defined through π has an irrational SI factor, and its row says
+	 * exact == false — but the RATIO of two such units is what a conversion
+	 * computes, and π^a / π^b is rational exactly when a == b (π is
+	 * transcendental, so no other combination of rational coefficients can
+	 * cancel it). 1 rev -> ° is 2π over π/180: 360, with nothing rounded.
+	 *
+	 * So the factors are first taken with π split off. If the powers on the two
+	 * sides agree, π has cancelled and the conversion is done on the rational
+	 * parts alone, exactly. If they do not, the ratio really is irrational and
+	 * the old path runs unchanged: the rounded decimals, and *exact = false.
+	 * `exact` is therefore still never claimed for an irrational ratio; what
+	 * changed is that it is no longer DENIED to a rational one, which the
+	 * header's "the true factor is irrational" had always promised. The rounded
+	 * path also returned the wrong number there: 1 rev came out as
+	 * 1256637061435917200/3490658503988659 degrees.
+	 *
+	 * An affine unit never carries π, so the offsets are untouched by this.
+	 */
+	int32_t pif = 0, pit = 0;
+	if (ok) ok = bvn_unit_to_si_rational(from, ffn, ffd, fon, fod, &exf, &pif);
+	if (ok) ok = bvn_unit_to_si_rational(to,   tfn, tfd, ton, tod, &ext, &pit);
+	if (ok && pif != pit) {
+		ok = bvn_unit_to_si_rational(from, ffn, ffd, fon, fod, &exf, NULL) &&
+		     bvn_unit_to_si_rational(to,   tfn, tfd, ton, tod, &ext, NULL);
+	}
 	if (ok) {
 		*exact = exf && ext;
 		/* si = value*(from factor) + (from offset) */

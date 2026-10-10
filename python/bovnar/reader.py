@@ -35,6 +35,7 @@ from .structs import (
     EVENT_CALLBACK_FUNC, WANT_UNIT_FUNC,
     make_unit_dimensionless,
 )
+from .unit import _as_vu
 
 MAX_FILESIZE_BYTES = 16 * 1024 * 1024
 
@@ -355,10 +356,13 @@ class Reader:
                     want, base = res
                 else:
                     want, base = res, 0
+                # A Unit is a unit: Quantity.unit and Unit.parse() hand those
+                # out, and refusing one here sent callers hunting for `.raw`.
+                want = _as_vu(want)
                 if not isinstance(want, ValueUnit):
                     raise BovnarArgumentError(
-                        "want_unit callback must return a ValueUnit, "
-                        "(ValueUnit, base), or None")
+                        "want_unit callback must return a ValueUnit or Unit, "
+                        "(unit, base), or None")
                 ctypes.memmove(ctypes.addressof(want_ptr.contents),
                                ctypes.addressof(want), unit_size)
                 if want_base_ptr:

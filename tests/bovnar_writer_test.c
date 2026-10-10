@@ -753,6 +753,654 @@ static void test_write_bvni_decimal(void)
 	bvnr_writer_destroy(w);
 }
 
+/* Width 0 is the default width, 64, and is held to it: 2^64 under a bare <uint>
+ * is a document the reader refuses, and bvnr_write_bvni used to write it. One
+ * writer per case -- the first refusal is the writer's error from then on. */
+static void test_write_bvni_width0_is_64(void)
+{
+	printf("  test_write_bvni_width0_is_64...\n");
+
+	static const struct { const char *digits; bool ok; } C[] = {
+		{ "18446744073709551615",  true  },   /* UINT64_MAX     */
+		{ "18446744073709551616",  false },   /* 2^64           */
+		{ "-9223372036854775808",  true  },   /* INT64_MIN      */
+		{ "-9223372036854775809",  false },   /* INT64_MIN - 1  */
+		{ "-18446744073709551615", false },
+	};
+	for (size_t i = 0; i < sizeof C / sizeof C[0]; i++) {
+		uint8_t output[1024];
+		bvnr_sink_t sink;
+		bvnr_writer_t *w = make_writer(output, sizeof(output), &sink);
+		bvn_int_t *n = bvn_int_alloc();
+		ASSERT_NOT_NULL(w, "make_writer must succeed");
+		ASSERT_NOT_NULL(n, "bvn_int_alloc must succeed");
+		if (!w || !n) { bvn_int_free(n); bvnr_writer_destroy(w); return; }
+		ASSERT_TRUE(bvn_int_from_str(n, C[i].digits, 10), "from_str");
+		bool ok = bvnr_write_bvni(w, "v", n, 0u, 10u);
+		ASSERT_TRUE(ok == C[i].ok, C[i].digits);
+		if (C[i].ok) {
+			last_event_t le = {0};
+			ASSERT_TRUE(bvnr_write_finish(w), "finish must succeed");
+			ASSERT_TRUE(roundtrip(output, bvnr_writer_bytes_written(w), &le),
+						"what width 0 wrote reads back");
+		} else {
+			ASSERT_EQ_INT(bvnr_writer_get_error(w), error_value_out_of_range,
+						  "refused as error_value_out_of_range");
+		}
+		bvn_int_free(n);
+		bvnr_writer_destroy(w);
+	}
+}
+
+/* ── fourth review round ─────────────────────────────────────────────────── */
+
+/* A writer on `out` with the given unit flags, and a 1.2 directive if asked. */
+static bvnr_writer_t *r4_open(uint8_t *out, size_t cap, bvn_unit_flags_t uf,
+			      bool version)
+{
+	memset(out, 0, cap);
+	bvnr_writer_t *w = bvnr_writer_create();
+	if (!w) return NULL;
+	bvnr_write_flags_t wf;
+	memset(&wf, 0, sizeof wf);
+	wf.unit_flags   = uf;
+	wf.emit_version = version;
+	if (!bvnr_open_write_mem(w, out, cap - 1u, false, &wf)) {
+		bvnr_writer_destroy(w);
+		return NULL;
+	}
+	return w;
+}
+static bool r4_key(bvnr_writer_t *w, const char *k)
+{
+	bvnr_data_t d;
+	memset(&d, 0, sizeof d);
+	d.type = token_is_identifier; d.data = k; d.length = (uint32_t)strlen(k);
+	return bvnr_write_event(w, ev_assignment_start, &d);
+}
+/* `<family:width[,unit]>`. `start_unit` goes on the start event; `param` adds a
+ * unit-parameter event carrying `text` (NULL: the event has its type only). */
+static bool r4_ann(bvnr_writer_t *w, value_type_spec_t vt, value_unit_t start_unit,
+		   bool param, value_unit_t param_unit, const char *text)
+{
+	bvnr_data_t d;
+	memset(&d, 0, sizeof d);
+	d.type = token_is_type; d.value_type = vt; d.value_unit = start_unit;
+	if (!bvnr_write_event(w, ev_type_annotation_start, &d)) return false;
+	d.value_unit = BVN_UNIT_NONE;
+	if (!bvnr_write_event(w, ev_type_annotation_type_family, &d)) return false;
+	if (vt.width) {
+		d.type = token_is_type_width;
+		if (!bvnr_write_event(w, ev_type_annotation_type_family_parameter, &d))
+			return false;
+	}
+	if (param) {
+		d.type = token_is_unit; d.value_unit = param_unit;
+		d.data = text; d.length = text ? (uint32_t)strlen(text) : 0u;
+		if (!bvnr_write_event(w, ev_type_annotation_type_family_parameter, &d))
+			return false;
+	}
+	memset(&d, 0, sizeof d);
+	d.type = token_is_type; d.value_type = vt;
+	return bvnr_write_event(w, ev_type_annotation_end, &d);
+}
+static bool r4_val(bvnr_writer_t *w, token_type_t tt, value_type_spec_t vt,
+		   value_unit_t vu, const char *text)
+{
+	bvnr_data_t d;
+	memset(&d, 0, sizeof d);
+	d.type = tt; d.value_type = vt; d.value_unit = vu;
+	d.data = text; d.length = text ? (uint32_t)strlen(text) : 0u;
+	return bvnr_write_event(w, ev_data, &d);
+}
+static bool r4_ev(bvnr_writer_t *w, bvnr_event_t ev)
+{
+	bvnr_data_t d;
+	memset(&d, 0, sizeof d);
+	return bvnr_write_event(w, ev, &d);
+}
+/* Finish, compare the bytes with `want` (NULL: do not compare) and read them
+ * back: whatever the writer reports as written, the reader has to take. */
+static void r4_expect(bvnr_writer_t *w, const uint8_t *out, const char *want,
+		      const char *what)
+{
+	last_event_t le = {0};
+	ASSERT_TRUE(bvnr_write_finish(w), what);
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_none, what);
+	if (want)
+		ASSERT_TRUE(strcmp((const char *)out, want) == 0, what);
+	ASSERT_TRUE(roundtrip(out, bvnr_writer_bytes_written(w), &le), what);
+	bvnr_writer_destroy(w);
+}
+
+/*
+ * A value answers to the annotation it stands under, not to the value_type its
+ * own event happens to carry.
+ *
+ * Every check ran against data->value_type. An event typed uint:64 under a
+ * `<uint:8>` annotation was range-checked as uint:64; one left zero-initialised
+ * is "plain" and skipped the checks altogether. All eight of these were written
+ * and reported as success, and the reader refuses every one.
+ */
+static void test_value_is_held_to_its_annotation(void)
+{
+	printf("  test_value_is_held_to_its_annotation...\n");
+	const value_type_spec_t u8 = BVN_TYPE_UINT(8), u64 = BVN_TYPE_UINT(64);
+	static const struct {
+		int ann;                  /* 0 uint:8, 1 utf8, 2 bool */
+		token_type_t tt; int dvt; /* 0 plain, 1 uint:64 */
+		const char *text; error_code_t want;
+	} C[] = {
+		{ 0, token_is_number,    1, "300",   error_value_out_of_range  },
+		{ 0, token_is_number,    0, "300",   error_value_out_of_range  },
+		{ 0, token_is_number,    0, "1.5",   error_type_value_mismatch },
+		{ 0, token_is_string,    0, "hello", error_digit_not_in_base   },
+		{ 0, token_is_symbol,    0, "hello", error_type_value_mismatch },
+		{ 0, token_is_bool,      0, "true",  error_type_value_mismatch },
+		{ 0, token_is_reference, 0, ".b",    error_type_value_mismatch },
+		{ 1, token_is_number,    0, "5",     error_type_value_mismatch },
+		{ 2, token_is_string,    0, "x",     error_type_value_mismatch },
+	};
+	for (size_t i = 0; i < sizeof C / sizeof C[0]; i++) {
+		uint8_t out[256];
+		bvnr_writer_t *w = r4_open(out, sizeof out, 0, false);
+		ASSERT_NOT_NULL(w, "writer");
+		if (!w) return;
+		value_type_spec_t avt = C[i].ann == 0 ? u8
+				      : C[i].ann == 1 ? BVN_TYPE_UTF8 : BVN_TYPE_BOOL;
+		ASSERT_TRUE(r4_key(w, "a") &&
+			    r4_ann(w, avt, BVN_UNIT_NONE, false, BVN_UNIT_NONE, NULL),
+			    "the annotation writes");
+		ASSERT_FALSE(r4_val(w, C[i].tt, C[i].dvt ? u64 : BVN_TYPE_PLAIN,
+				    BVN_UNIT_NONE, C[i].text), C[i].text);
+		ASSERT_EQ_INT(bvnr_writer_get_error(w), C[i].want, C[i].text);
+		bvnr_writer_destroy(w);
+	}
+	/* What the annotation admits still writes, whatever the event's own type
+	 * says: plain, the annotation's own, or a wider carrier (the Python
+	 * binding types every array element at 64 bits or more). */
+	{
+		uint8_t out[256];
+		bvnr_writer_t *w = r4_open(out, sizeof out, 0, false);
+		ASSERT_NOT_NULL(w, "writer");
+		if (!w) return;
+		ASSERT_TRUE(r4_key(w, "a") &&
+			    r4_ann(w, u8, BVN_UNIT_NONE, false, BVN_UNIT_NONE, NULL) &&
+			    r4_val(w, token_is_number, BVN_TYPE_PLAIN, BVN_UNIT_NONE, "255") &&
+			    r4_key(w, "b") &&
+			    r4_ann(w, u8, BVN_UNIT_NONE, false, BVN_UNIT_NONE, NULL) &&
+			    r4_val(w, token_is_number, u64, BVN_UNIT_NONE, "255") &&
+			    r4_key(w, "c") &&
+			    r4_ann(w, u8, BVN_UNIT_NONE, false, BVN_UNIT_NONE, NULL) &&
+			    r4_ev(w, ev_array_row_start) &&
+			    r4_val(w, token_is_array_number, u64, BVN_UNIT_NONE, "1") &&
+			    r4_val(w, token_is_null_value, BVN_TYPE_PLAIN, BVN_UNIT_NONE, NULL) &&
+			    r4_ev(w, ev_array_row_end),
+			    "values the annotation admits");
+		r4_expect(w, out, ".a=<uint:8>255;.b=<uint:8>255;.c=<uint:8>[1,null];",
+			  "in-range values under <uint:8>");
+	}
+	/* ...and inside an annotated array each element is held to it too. */
+	{
+		uint8_t out[256];
+		bvnr_writer_t *w = r4_open(out, sizeof out, 0, false);
+		ASSERT_NOT_NULL(w, "writer");
+		if (!w) return;
+		ASSERT_TRUE(r4_key(w, "c") &&
+			    r4_ann(w, u8, BVN_UNIT_NONE, false, BVN_UNIT_NONE, NULL) &&
+			    r4_ev(w, ev_array_row_start) &&
+			    r4_val(w, token_is_array_number, u64, BVN_UNIT_NONE, "1"),
+			    "first element");
+		ASSERT_FALSE(r4_val(w, token_is_array_number, u64, BVN_UNIT_NONE, "256"),
+			     "256 is not a uint:8, in the second element either");
+		ASSERT_EQ_INT(bvnr_writer_get_error(w), error_value_out_of_range, "256");
+		bvnr_writer_destroy(w);
+	}
+}
+
+/*
+ * An integer with no declared width is 64 bits wide -- to the reader, and so to
+ * the writer. The range tests were skipped when the annotation named no width
+ * (and a bare number had none to name), so 2^128 went out under `<uint>`,
+ * under `<sint>`, quoted in base 16, and bare.
+ */
+static void test_unstated_integer_width_is_64(void)
+{
+	printf("  test_unstated_integer_width_is_64...\n");
+	const char *big = "340282366920938463463374607431768211456";
+	for (int k = 0; k < 4; k++) {
+		uint8_t out[256];
+		bvnr_writer_t *w = r4_open(out, sizeof out, 0, false);
+		ASSERT_NOT_NULL(w, "writer");
+		if (!w) return;
+		bool ok = r4_key(w, "a");
+		if (k == 0) {
+			ok = ok && r4_ann(w, BVN_TYPE_UINT(0), BVN_UNIT_NONE, false,
+					  BVN_UNIT_NONE, NULL) &&
+			     r4_val(w, token_is_number, BVN_TYPE_UINT(0), BVN_UNIT_NONE, big);
+		} else if (k == 1) {
+			ok = ok && r4_ann(w, BVN_TYPE_SINT(0), BVN_UNIT_NONE, false,
+					  BVN_UNIT_NONE, NULL) &&
+			     r4_val(w, token_is_number, BVN_TYPE_SINT(0), BVN_UNIT_NONE,
+				    "-340282366920938463463374607431768211456");
+		} else if (k == 2) {
+			/* bare, the event leaving its type plain */
+			ok = ok && r4_val(w, token_is_number, BVN_TYPE_PLAIN,
+					  BVN_UNIT_NONE, big);
+		} else {
+			/* bare, the event CLAIMING 128 bits nothing in the document says */
+			ok = ok && r4_val(w, token_is_number, BVN_TYPE_UINT(128),
+					  BVN_UNIT_NONE, big);
+		}
+		ASSERT_FALSE(ok, "2^128 with no width declared is refused");
+		ASSERT_EQ_INT(bvnr_writer_get_error(w), error_value_out_of_range,
+			      "...as out of range");
+		bvnr_writer_destroy(w);
+	}
+	uint8_t out[256];
+	bvnr_writer_t *w = r4_open(out, sizeof out, 0, false);
+	ASSERT_NOT_NULL(w, "writer");
+	if (!w) return;
+	ASSERT_TRUE(r4_key(w, "a") &&
+		    r4_val(w, token_is_number, BVN_TYPE_PLAIN, BVN_UNIT_NONE,
+			   "18446744073709551615") &&
+		    r4_key(w, "b") &&
+		    r4_val(w, token_is_number, BVN_TYPE_PLAIN, BVN_UNIT_NONE,
+			   "-9223372036854775808") &&
+		    r4_key(w, "c") &&
+		    r4_val(w, token_is_number, BVN_TYPE_PLAIN, BVN_UNIT_NONE, "1e400"),
+		    "the 64-bit extremes and a float still write bare");
+	r4_expect(w, out, NULL, "bare extremes read back");
+}
+
+/*
+ * BVN_UNIT_REDUCE moves the VALUE with the unit whatever the event's type says.
+ *
+ * The serialiser took "is this a number" from data->value_type, so an event that
+ * left it plain -- the natural way to write a bare `5 k~m` -- had its unit
+ * reduced and its digits left alone: `5 m`. Five kilometres, written as five
+ * metres, reported as success.
+ */
+static void test_reduce_rescales_whatever_the_event_type(void)
+{
+	printf("  test_reduce_rescales_whatever_the_event_type...\n");
+	const value_unit_t km = BVN_UNIT_SI(bu_meter, si_kilo);
+	uint8_t out[256];
+	bvnr_writer_t *w = r4_open(out, sizeof out, BVN_UNIT_REDUCE, false);
+	ASSERT_NOT_NULL(w, "writer");
+	if (!w) return;
+	ASSERT_TRUE(r4_key(w, "a") &&
+		    r4_val(w, token_is_number, BVN_TYPE_PLAIN, km, "5") &&
+		    r4_key(w, "b") &&
+		    r4_ann(w, BVN_TYPE_FLOAT(64), km, true, km, "k~m") &&
+		    r4_val(w, token_is_number, BVN_TYPE_PLAIN, km, "5") &&
+		    r4_key(w, "c") &&
+		    r4_ann(w, BVN_TYPE_FLOAT(64), km, true, km, "k~m") &&
+		    r4_val(w, token_is_number, BVN_TYPE_PLAIN, BVN_UNIT_NONE, "2.5"),
+		    "plain-typed values with a prefixed unit");
+	r4_expect(w, out, ".a=5000 m;.b=<float:64,m>5000;.c=<float:64,m>2500;",
+		  "the digits moved with the unit");
+}
+
+/*
+ * The rescale keeps a float a float: its sign of zero, and its range.
+ */
+static void test_reduce_float_edges(void)
+{
+	printf("  test_reduce_float_edges...\n");
+	const value_unit_t km = BVN_UNIT_SI(bu_meter, si_kilo);
+	uint8_t out[512];
+	bvnr_writer_t *w = r4_open(out, sizeof out, BVN_UNIT_REDUCE, false);
+	ASSERT_NOT_NULL(w, "writer");
+	if (!w) return;
+	/* Zero through a rational has no sign: -0.0 k~m came out as "0 m". */
+	ASSERT_TRUE(bvnr_write_float_unit(w, "z", 64, -0.0, km), "-0.0 writes");
+	r4_expect(w, out, ".z=<float:64,m>-0;", "negative zero keeps its sign");
+
+	/* 3e38 fits a binary32; the 3e41 it becomes in metres is an infinity to
+	 * anything decoding at the declared width. Refused, like an integer the
+	 * rescale pushes past its width. */
+	w = r4_open(out, sizeof out, BVN_UNIT_REDUCE, false);
+	ASSERT_NOT_NULL(w, "writer");
+	if (!w) return;
+	ASSERT_FALSE(bvnr_write_float_unit(w, "e", 32, 3e38, km),
+		     "a rescale past FLT_MAX is refused");
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_value_out_of_range,
+		      "...as out of range");
+	bvnr_writer_destroy(w);
+
+	/* The same value in a float:64 has room. */
+	w = r4_open(out, sizeof out, BVN_UNIT_REDUCE, false);
+	ASSERT_NOT_NULL(w, "writer");
+	if (!w) return;
+	ASSERT_TRUE(bvnr_write_float_unit(w, "e", 64, 3e38, km), "float:64 has room");
+	r4_expect(w, out, NULL, "3e41 under float:64");
+}
+
+/*
+ * A prefix is a prefix whatever it is attached to. BVN_UNIT_REDUCE asks for the
+ * conversion `k~pc -> pc`, and that went through the parsec's SI factor -- which
+ * is irrational, so the write failed as "value_out_of_range". The same for a
+ * milliarcsecond, and for a prefixed °C inside a compound, where an affine
+ * scale has no SI factor at all.
+ */
+static void test_reduce_prefix_on_any_base(void)
+{
+	printf("  test_reduce_prefix_on_any_base...\n");
+	static const struct { const char *unit; double v; const char *want; } C[] = {
+		{ "k~pc",     2.5,   ".v=<float:64,pc>2500;"      },
+		{ "m~arcsec", 150.0, ".v=<float:64,arcsec>0.15;"  },
+		{ "k~rev",    2.0,   ".v=<float:64,rev>2000;"     },
+		{ "m~°C/s",   7.5,   ".v=<float:64,°C/s>0.0075;"  },
+	};
+	for (size_t i = 0; i < sizeof C / sizeof C[0]; i++) {
+		uint8_t out[256];
+		bool ok = false;
+		value_unit_t u = bvn_parse_unit((const uint8_t *)C[i].unit, &ok);
+		ASSERT_TRUE(ok, C[i].unit);
+		bvnr_writer_t *w = r4_open(out, sizeof out, BVN_UNIT_REDUCE, false);
+		ASSERT_NOT_NULL(w, "writer");
+		if (!w) return;
+		ASSERT_TRUE(bvnr_write_float_unit(w, "v", 64, C[i].v, u), C[i].unit);
+		r4_expect(w, out, C[i].want, C[i].unit);
+	}
+}
+
+/*
+ * The format has no inline unit after nan/inf/ninf (spec section 6.4) or after
+ * a datetime. Both were written -- `<float:64>nan k~m`, `<datetime:64>5 k~m` --
+ * and neither reads back. With the unit on the annotation they are fine.
+ */
+static void test_no_inline_unit_on_special_or_datetime(void)
+{
+	printf("  test_no_inline_unit_on_special_or_datetime...\n");
+	const value_unit_t km = BVN_UNIT_SI(bu_meter, si_kilo);
+	const value_type_spec_t f64 = BVN_TYPE_FLOAT(64);
+	const value_type_spec_t dt  = { .family = vt_datetime, .width = 64 };
+	static const char *const sp[] = { "nan", "inf", "ninf" };
+	for (size_t i = 0; i < 3; i++) {
+		uint8_t out[128];
+		bvnr_writer_t *w = r4_open(out, sizeof out, 0, false);
+		ASSERT_NOT_NULL(w, "writer");
+		if (!w) return;
+		ASSERT_TRUE(r4_key(w, "a") &&
+			    r4_ann(w, f64, BVN_UNIT_NONE, false, BVN_UNIT_NONE, NULL),
+			    "annotation");
+		ASSERT_FALSE(r4_val(w, token_is_number, f64, km, sp[i]), sp[i]);
+		ASSERT_EQ_INT(bvnr_writer_get_error(w), error_unit_illegal, sp[i]);
+		bvnr_writer_destroy(w);
+	}
+	uint8_t out[128];
+	bvnr_writer_t *w = r4_open(out, sizeof out, 0, false);
+	ASSERT_NOT_NULL(w, "writer");
+	if (!w) return;
+	ASSERT_FALSE(r4_key(w, "a") &&
+		     r4_val(w, token_is_number, BVN_TYPE_PLAIN, km, "nan"),
+		     "bare nan with an inline unit");
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_unit_illegal, "bare nan");
+	bvnr_writer_destroy(w);
+
+	w = r4_open(out, sizeof out, 0, true);
+	ASSERT_NOT_NULL(w, "writer");
+	if (!w) return;
+	ASSERT_TRUE(r4_key(w, "a") &&
+		    r4_ann(w, dt, BVN_UNIT_NONE, false, BVN_UNIT_NONE, NULL),
+		    "datetime annotation");
+	ASSERT_FALSE(r4_val(w, token_is_number, dt, km, "5"),
+		     "a datetime takes no inline unit");
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_unit_illegal, "datetime");
+	bvnr_writer_destroy(w);
+
+	w = r4_open(out, sizeof out, 0, false);
+	ASSERT_NOT_NULL(w, "writer");
+	if (!w) return;
+	volatile double zero_d = 0.0;        /* a NaN without <math.h> */
+	ASSERT_TRUE(bvnr_write_float_unit(w, "a", 64, 0.0 / zero_d, km),
+		    "nan with the unit on the annotation");
+	r4_expect(w, out, ".a=<float:64,k~m>nan;", "nan under <float:64,k~m>");
+}
+
+/*
+ * The writer's unit policy checks the unit the value is WRITTEN under.
+ *
+ * It read val.parsed_unit -- whatever the last annotation event carried -- and
+ * decided "is this a number" from the event's own type. Three ways wrong.
+ */
+static void test_writer_policy_checks_the_written_unit(void)
+{
+	printf("  test_writer_policy_checks_the_written_unit...\n");
+	const value_unit_t m = BVN_UNIT_NO_PREFIX(bu_meter);
+	const value_unit_t s = BVN_UNIT_NO_PREFIX(bu_second);
+	const value_type_spec_t f64 = BVN_TYPE_FLOAT(64);
+	uint8_t out[256];
+	bvnr_unit_policy_t req;
+	memset(&req, 0, sizeof req);
+	req.require_unit = true;
+
+	/* (a) A bare number whose event left its type plain was not looked at. */
+	bvnr_writer_t *w = r4_open(out, sizeof out, 0, false);
+	ASSERT_NOT_NULL(w, "writer");
+	if (!w) return;
+	ASSERT_TRUE(bvnr_writer_set_unit_policy(w, &req), "policy");
+	ASSERT_FALSE(r4_key(w, "a") &&
+		     r4_val(w, token_is_number, BVN_TYPE_PLAIN, BVN_UNIT_NONE, "5"),
+		     "require_unit refuses a bare number, however it is typed");
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_unit_mismatch, "bare 5");
+	bvnr_writer_destroy(w);
+
+	/* (b) An element annotation overwrote the unit for the rest of the array:
+	 * the 2.0 here is in METRES, and passed a policy asking for seconds. */
+	static const char *const dims_s[] = { "s" };
+	bvnr_unit_policy_t dim;
+	memset(&dim, 0, sizeof dim);
+	dim.require_dimension_of     = dims_s;
+	dim.num_require_dimension_of = 1;
+	w = r4_open(out, sizeof out, 0, false);
+	ASSERT_NOT_NULL(w, "writer");
+	if (!w) return;
+	ASSERT_TRUE(bvnr_writer_set_unit_policy(w, &dim), "policy");
+	/* the outer annotation is metres, so the array is refused at the first
+	 * element NOT under its own seconds annotation */
+	ASSERT_TRUE(r4_key(w, "a") && r4_ann(w, f64, m, true, m, "m") &&
+		    r4_ev(w, ev_array_row_start) &&
+		    r4_ann(w, f64, s, true, s, "s") &&
+		    r4_val(w, token_is_array_number, f64, BVN_UNIT_NONE, "1.0"),
+		    "the element in seconds passes");
+	ASSERT_FALSE(r4_val(w, token_is_array_number, f64, BVN_UNIT_NONE, "2.0"),
+		     "the next element is in metres again, and is refused");
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_unit_mismatch, "metres");
+	bvnr_writer_destroy(w);
+
+	/* (c) A unit named on the annotation's start event alone is the value's
+	 * unit (bovnar.h says so, and it is what gets written); the events after
+	 * it carry none, and the value was refused as bare. */
+	for (int with_param = 0; with_param < 2; with_param++) {
+		w = r4_open(out, sizeof out, 0, false);
+		ASSERT_NOT_NULL(w, "writer");
+		if (!w) return;
+		ASSERT_TRUE(bvnr_writer_set_unit_policy(w, &req), "policy");
+		ASSERT_TRUE(r4_key(w, "a") &&
+			    r4_ann(w, f64, m, with_param != 0, BVN_UNIT_NONE, NULL) &&
+			    r4_val(w, token_is_number, f64, BVN_UNIT_NONE, "1.5"),
+			    "a unit given on the start event satisfies require_unit");
+		r4_expect(w, out, ".a=<float:64,m>1.5;", "start-event unit");
+	}
+}
+
+/*
+ * bvnr_write_float_dec / _fix do not narrow through a binary32. A decimal32 has
+ * seven decimal digits and a Q16.16 thirty-two bits; a float has neither.
+ */
+static void test_dec_and_fix_are_not_narrowed_through_float(void)
+{
+	printf("  test_dec_and_fix_are_not_narrowed_through_float...\n");
+	uint8_t out[512];
+	bvnr_writer_t *w = r4_open(out, sizeof out, 0, false);
+	ASSERT_NOT_NULL(w, "writer");
+	if (!w) return;
+	/* 8589973000 is a seven-digit decimal no binary32 holds: it used to be
+	 * written 8.589973504e+9, which decimal32 rounds UP to 8.589974e9. */
+	ASSERT_TRUE(bvnr_write_float_dec(w, "d", 32, 8.589973e9), "decimal32");
+	/* Q16.16 resolves 1.5e-5; through a float this was 7.8e-5 off. */
+	ASSERT_TRUE(bvnr_write_float_fix(w, "f", 32, 16, 12345.67), "Q16.16");
+	/* INT32_MAX in a q0 field rounded to 2^31 as a float and was refused. */
+	ASSERT_TRUE(bvnr_write_float_fix(w, "g", 32, 0, 2147483647.0), "Q32.0 max");
+	ASSERT_TRUE(bvnr_write_finish(w), "finish");
+	const char *o = (const char *)out;
+	ASSERT_TRUE(strstr(o, ".d=<float_dec:32>8.589973e+9;") != NULL,
+		    "the seven digits written are the seven given");
+	ASSERT_TRUE(strstr(o, ".f=<float_fix:32,q16>1.234567e+4;") != NULL,
+		    "12345.67 keeps its digits");
+	ASSERT_TRUE(strstr(o, ".g=<float_fix:32>2.147483647e+9;") != NULL,
+		    "2147483647 is written, and exactly");
+	last_event_t le = {0};
+	ASSERT_TRUE(roundtrip(out, bvnr_writer_bytes_written(w), &le), "reads back");
+	bvnr_writer_destroy(w);
+}
+
+/*
+ * Two places where the writer's text checks were laxer than the reader's.
+ */
+static void test_reference_and_quoted_keyword_digits(void)
+{
+	printf("  test_reference_and_quoted_keyword_digits...\n");
+	/* After an index a reference continues with '.', '[' or ends. */
+	static const struct { const char *ref; bool ok; } R[] = {
+		{ ".a[0]",    true  }, { ".a[0].b", true }, { ".a[0][1]", true },
+		{ ".a[0]b",   false }, { ".a[0]1",  false }, { ".a[0]_", false },
+	};
+	for (size_t i = 0; i < sizeof R / sizeof R[0]; i++) {
+		uint8_t out[128];
+		bvnr_writer_t *w = r4_open(out, sizeof out, 0, true);
+		ASSERT_NOT_NULL(w, "writer");
+		if (!w) return;
+		bool ok = r4_key(w, "r") &&
+			  r4_val(w, token_is_reference, BVN_TYPE_PLAIN, BVN_UNIT_NONE,
+				 R[i].ref);
+		ASSERT_TRUE(ok == R[i].ok, R[i].ref);
+		if (!R[i].ok)
+			ASSERT_EQ_INT(bvnr_writer_get_error(w),
+				      error_type_value_mismatch, R[i].ref);
+		bvnr_writer_destroy(w);
+	}
+	/* `<uint:8,_36> "nan"` is the number 30191, not a NaN: out of range. */
+	const value_type_spec_t u8b36  = BVN_TYPE_UINT_BASE(8, 36);
+	const value_type_spec_t u16b36 = BVN_TYPE_UINT_BASE(16, 36);
+	for (int wide = 0; wide < 2; wide++) {
+		uint8_t out[128];
+		value_type_spec_t vt = wide ? u16b36 : u8b36;
+		bvnr_writer_t *w = r4_open(out, sizeof out, 0, false);
+		ASSERT_NOT_NULL(w, "writer");
+		if (!w) return;
+		bvnr_data_t d;
+		memset(&d, 0, sizeof d);
+		d.type = token_is_type; d.value_type = vt;
+		bool ok = r4_key(w, "a") &&
+			  bvnr_write_event(w, ev_type_annotation_start, &d) &&
+			  bvnr_write_event(w, ev_type_annotation_type_family, &d);
+		d.type = token_is_type_width;
+		ok = ok && bvnr_write_event(w, ev_type_annotation_type_family_parameter, &d);
+		d.type = token_is_type_base;
+		ok = ok && bvnr_write_event(w, ev_type_annotation_type_family_parameter, &d);
+		d.type = token_is_type;
+		ok = ok && bvnr_write_event(w, ev_type_annotation_end, &d);
+		ASSERT_TRUE(ok, "annotation");
+		ok = r4_val(w, token_is_string, vt, BVN_UNIT_NONE, "nan");
+		if (wide) {
+			ASSERT_TRUE(ok, "30191 fits sixteen bits");
+			r4_expect(w, out, ".a=<uint:16,_36>\"nan\";", "quoted nan, base 36");
+		} else {
+			ASSERT_FALSE(ok, "30191 does not fit eight bits");
+			ASSERT_EQ_INT(bvnr_writer_get_error(w), error_value_out_of_range,
+				      "quoted nan under uint:8");
+			bvnr_writer_destroy(w);
+		}
+	}
+}
+
+/* Counts the octet payload a document delivers, and its values. */
+typedef struct { uint64_t octets; uint32_t streams; uint32_t numbers; } r4_oct_t;
+static bool r4_oct_cb(void *ud, bvnr_event_t ev, bvnr_data_t *d)
+{
+	r4_oct_t *o = ud;
+	if (ev == ev_octet_stream_start) o->streams++;
+	if (ev == ev_data && d->type == token_is_octet_stream) o->octets += d->length;
+	if (ev == ev_data && (d->type == token_is_number ||
+			      d->type == token_is_array_number)) o->numbers++;
+	return true;
+}
+/*
+ * An octet stream is ONE array element however many chunks it is written in.
+ *
+ * Each chunk was treated as a value of its own, so the element separator was
+ * armed after the first and written before the second: 0x00, chunk, ",", chunk,
+ * 0x00. The framing has no such byte and the reader answered
+ * octet_stream_out_of_sync. Outside an array nothing arms a comma, which is why
+ * the same events wrote correctly at the top level.
+ */
+static void test_multi_chunk_octet_stream_in_array(void)
+{
+	printf("  test_multi_chunk_octet_stream_in_array...\n");
+	enum { BIG = 65536, SMALL = 4464 };
+	static uint8_t payload[BIG];
+	static uint8_t out[4 * (BIG + SMALL) + 1024];
+	/* ',' is the byte that went astray; a payload full of it proves the
+	 * check below is about the framing and not about the data. */
+	memset(payload, ',', sizeof payload);
+
+	/* shape 0: [stream]   1: [1, stream, 2]   2: [stream]/[stream] */
+	for (int shape = 0; shape < 3; shape++) {
+		bvnr_writer_t *w = r4_open(out, sizeof out, 0, false);
+		ASSERT_NOT_NULL(w, "writer");
+		if (!w) return;
+		bool ok = r4_key(w, "a") && r4_ev(w, ev_array_row_start);
+		int rows = shape == 2 ? 2 : 1;
+		for (int r = 0; ok && r < rows; r++) {
+			if (r > 0)
+				ok = r4_ev(w, ev_array_dim_start) &&
+				     r4_ev(w, ev_array_row_start);
+			if (ok && shape == 1)
+				ok = r4_val(w, token_is_array_number, BVN_TYPE_PLAIN,
+					    BVN_UNIT_NONE, "1");
+			bvnr_data_t d;
+			memset(&d, 0, sizeof d);
+			ok = ok && bvnr_write_event(w, ev_octet_stream_start, &d);
+			d.type = token_is_octet_stream; d.data = payload;
+			d.length = BIG;
+			ok = ok && bvnr_write_event(w, ev_data, &d);
+			d.length = SMALL;
+			ok = ok && bvnr_write_event(w, ev_data, &d);
+			memset(&d, 0, sizeof d);
+			ok = ok && bvnr_write_event(w, ev_octet_stream_end, &d);
+			if (ok && shape == 1)
+				ok = r4_val(w, token_is_array_number, BVN_TYPE_PLAIN,
+					    BVN_UNIT_NONE, "2");
+			ok = ok && r4_ev(w, ev_array_row_end);
+		}
+		ASSERT_TRUE(ok, "the events are accepted");
+		ASSERT_TRUE(bvnr_write_finish(w), "finish");
+		uint64_t n = bvnr_writer_bytes_written(w);
+		bvnr_writer_destroy(w);
+
+		r4_oct_t seen = {0};
+		bvnr_reader_t *r = bvnr_reader_create();
+		ASSERT_NOT_NULL(r, "reader");
+		if (!r) return;
+		bvnr_read_flags_t rf;
+		memset(&rf, 0, sizeof rf);
+		rf.userdata = &seen; rf.on_verified = r4_oct_cb;
+		ASSERT_TRUE(bvnr_open_read_mem(r, out, n, NULL, 0, &rf), "open");
+		ASSERT_TRUE(bvnr_read(r), "a multi-chunk element reads back");
+		ASSERT_EQ_INT(bvnr_reader_get_error(r), error_none, "no error");
+		ASSERT_EQ_UINT(seen.streams, (uint32_t)rows, "one stream per row");
+		ASSERT_EQ_UINT(seen.octets, (uint64_t)rows * (BIG + SMALL),
+			       "every payload byte, and no more");
+		ASSERT_EQ_UINT(seen.numbers, shape == 1 ? 2u : 0u,
+			       "the neighbouring elements");
+		bvnr_reader_destroy(r);
+	}
+}
+
 static void test_write_bvni_hex(void)
 {
 	printf("  test_write_bvni_hex...\n");
@@ -1549,6 +2197,39 @@ static int reduce_emit(char *out, size_t cap, value_unit_t u,
 	return ok ? 0 : (int)err;
 }
 
+/* The same value under `<type,unit>`: the unit on the annotation, the event's
+ * own unit left to it. */
+static int reduce_emit_annotated(char *out, size_t cap, value_unit_t u,
+				 value_type_spec_t vt, const char *lit)
+{
+	memset(out, 0, cap);
+	bvnr_sink_t sink;
+	bvnr_sink_to_mem(&sink, out, cap);
+	bvnr_writer_t *w = bvnr_writer_create();
+	if (!w) return -1;
+	bvnr_write_flags_t wf;
+	memset(&wf, 0, sizeof wf);
+	wf.unit_flags = BVN_UNIT_REDUCE;
+	if (!bvnr_open_write_sink(w, &sink, false, &wf)) {
+		bvnr_writer_destroy(w); return -1;
+	}
+	bvnr_data_t d;
+	memset(&d, 0, sizeof d);
+	d.type = token_is_identifier; d.data = "d"; d.length = 1;
+	bvnr_write_event(w, ev_assignment_start, &d);
+	bool ok = bvnr_write_type_annotation(w, vt, u);
+	memset(&d, 0, sizeof d);
+	d.type       = token_is_number;
+	d.value_type = vt;
+	d.value_unit = u;
+	d.data       = lit;
+	d.length     = (uint32_t)strlen(lit);
+	ok = ok && bvnr_write_event(w, ev_data, &d);
+	error_code_t err = bvnr_writer_get_error(w);
+	bvnr_writer_destroy(w);
+	return ok ? 0 : (int)err;
+}
+
 /*
  * The same, for a QUOTED number literal.
  *
@@ -1724,12 +2405,15 @@ static void test_unit_reduce_rescales_the_value(void)
 
 	/* Every digit survives: the rescale goes through exact rational arithmetic,
 	 * not the double scale. */
+	/* Under its annotation: a bare number is 64 bits to the reader whatever
+	 * the event claims, so this used to assert a document nothing reads. */
 	value_type_spec_t u128 = { .family = vt_uint, .width = 128 };
-	ASSERT_EQ_INT(reduce_emit(out, sizeof out, BVN_UNIT_SI(bu_meter, si_kilo),
+	ASSERT_EQ_INT(reduce_emit_annotated(out, sizeof out,
+				  BVN_UNIT_SI(bu_meter, si_kilo),
 				  u128, "340282366920938463463374607431768211"),
 		      0, "a 128-bit value writes");
 	ASSERT_TRUE(strcmp(out,
-		".d=340282366920938463463374607431768211000 m") == 0,
+		".d=<uint:128,m>340282366920938463463374607431768211000") == 0,
 		    "the rescale is exact for a value far wider than a double");
 
 	/* ...but the rescaled value still has to fit the type it was declared with.
@@ -1782,9 +2466,12 @@ static void test_unit_reduce_rescales_the_value(void)
 	}
 
 	/* nan/inf carry no finite value, so no scale applies. */
-	ASSERT_EQ_INT(reduce_emit(out, sizeof out, BVN_UNIT_SI(bu_meter, si_kilo),
+	/* The unit goes on the annotation: a special number takes no inline
+	 * suffix (spec section 6.4), and ".d=nan m" was never readable. */
+	ASSERT_EQ_INT(reduce_emit_annotated(out, sizeof out,
+				  BVN_UNIT_SI(bu_meter, si_kilo),
 				  f64, "nan"), 0, "nan writes");
-	ASSERT_TRUE(strcmp(out, ".d=nan m") == 0, "nan is not scaled");
+	ASSERT_TRUE(strcmp(out, ".d=<float:64,m>nan") == 0, "nan is not scaled");
 
 	/* A scale that does not terminate in the value's OWN base cannot be written
 	 * exactly — 1/100 in base 16 needs a factor of 5. Refuse rather than round. */
@@ -2403,6 +3090,17 @@ int main(void)
 	test_write_bvnf_base10();
 	test_write_bvnf_base16();
 	test_write_bvni_decimal();
+	test_write_bvni_width0_is_64();
+	test_value_is_held_to_its_annotation();
+	test_unstated_integer_width_is_64();
+	test_reduce_rescales_whatever_the_event_type();
+	test_reduce_float_edges();
+	test_reduce_prefix_on_any_base();
+	test_no_inline_unit_on_special_or_datetime();
+	test_writer_policy_checks_the_written_unit();
+	test_dec_and_fix_are_not_narrowed_through_float();
+	test_multi_chunk_octet_stream_in_array();
+	test_reference_and_quoted_keyword_digits();
 	test_write_bvni_hex();
 	test_write_bvni_base64_signchar();
 	test_write_streaming_flush();

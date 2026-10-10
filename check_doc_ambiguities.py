@@ -455,6 +455,9 @@ def check_families(c, text, catalogue):
 
 def main(argv):
     repo = os.path.abspath(argv[1]) if len(argv) > 1 else REPO
+    sys.path.insert(0, REPO)
+    import bvnr_build_env
+    bvnr_build_env.require_build(repo, "check_doc_ambiguities", ("library",))
     problems, checked = check(repo)
     if problems:
         sys.stderr.write("check_doc_ambiguities: %s disagrees with the "

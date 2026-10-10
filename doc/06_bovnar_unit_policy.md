@@ -473,6 +473,10 @@ that appears to work has not normalised anything.
 | `--base <N>` | `base` |
 | `--leave-inexact` | `bvnr_inexact_leave` |
 
+`query` takes all of them except `--base`, which it refuses by name (exit 2):
+it prints the value it found in decimal, and a base would change nothing it
+shows.
+
 **A conversion flag on `validate` is not a no-op.** `validate` produces no output,
 so it is easy to read `--unit` and `--si` there as flags that could not matter —
 and they change the verdict, because a conversion the policy cannot deliver

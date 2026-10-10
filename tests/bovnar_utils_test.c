@@ -472,6 +472,55 @@ static void test_parse_helpers_respect_declared_width(void)
 	ASSERT_FALSE(bvn_parse_uint64("-1", u8, &u), "uint:8 rejects a sign");
 	ASSERT_FALSE(bvn_parse_uint64("-1", u64, &u), "uint:64 rejects a sign");
 
+	/* After an index a reference path continues with a member, another index,
+	 * or ends -- as the reader has it. ".a[0]b" was accepted here and so
+	 * could be written, for the reader to refuse. */
+	ASSERT_TRUE(bvn_validate_reference(".a[0]"), ".a[0]");
+	ASSERT_TRUE(bvn_validate_reference(".a[0].b"), ".a[0].b");
+	ASSERT_TRUE(bvn_validate_reference(".a[0][1]"), ".a[0][1]");
+	ASSERT_TRUE(bvn_validate_reference(".a[0][1].b[2]"), ".a[0][1].b[2]");
+	ASSERT_FALSE(bvn_validate_reference(".a[0]b"), ".a[0]b");
+	ASSERT_FALSE(bvn_validate_reference(".a[0]0"), ".a[0]0");
+	ASSERT_FALSE(bvn_validate_reference(".a[0]_x.b"), ".a[0]_x.b");
+
+	/* bvn_parse_double had no failure path at all: the rounding engine under
+	 * it returns no verdict, so every string was the number zero. */
+	{
+		double d = 7.0;
+		value_type_spec_t f64 = { .family = vt_float, .width = 64 };
+		static const char *const bad[] = {
+			"", "abc", "1x", "1 ", " 1", "+-1", "--1", "1e", "1e+", ".",
+			"-", "1.5.2", "0x10", "infinity", "-ninf",
+		};
+		for (size_t k = 0; k < sizeof bad / sizeof bad[0]; k++)
+			ASSERT_FALSE(bvn_parse_double(bad[k], f64, &d),
+				"bvn_parse_double refuses text that is not a float token");
+		ASSERT_TRUE(d == 7.0, "...and leaves the out parameter alone");
+		ASSERT_TRUE(bvn_parse_double("1", f64, &d) && d == 1.0, "1");
+		/* A leading '+' is NOT bad text: the reader accepts it on a quoted
+		 * float literal in every base (`<float:64> "+5"`, `<float:64,_16>
+		 * "+a"`), and the DOM builder parses that token through here. The
+		 * first cut of this gate refused it, and those documents stopped
+		 * loading with error_value_out_of_range. */
+		ASSERT_TRUE(bvn_parse_double("+1", f64, &d) && d == 1.0, "+1");
+		ASSERT_TRUE(bvn_parse_double("+5.5e1", f64, &d) && d == 55.0, "+5.5e1");
+		ASSERT_TRUE(bvn_parse_double_in_base("+a", 16u, &d) && d == 10.0,
+			"+a in base 16");
+		ASSERT_TRUE(bvn_parse_double_in_base("+1p3", 16u, &d) && d == 8.0,
+			"+1p3 in base 16");
+		ASSERT_TRUE(bvn_parse_double("-2.5e3", f64, &d) && d == -2500.0,
+			"-2.5e3");
+		ASSERT_TRUE(bvn_parse_double("1.", f64, &d) && d == 1.0, "1.");
+		ASSERT_TRUE(bvn_parse_double(".5", f64, &d) && d == 0.5, ".5");
+		ASSERT_TRUE(bvn_parse_double("ninf", f64, &d) && d < 0 && d * 0.5 == d,
+			"ninf");
+		ASSERT_TRUE(bvn_parse_double("nan", f64, &d) && d != d, "nan");
+		ASSERT_TRUE(bvn_parse_double_in_base("1.8p+1", 16u, &d) && d == 3.0,
+			"hex float");
+		ASSERT_FALSE(bvn_parse_double_in_base("1.8e+1x", 16u, &d),
+			"hex float with trailing bytes");
+	}
+
 	ASSERT_TRUE(bvn_parse_uint64("1", u1, &u) && u == 1, "uint:1 accepts 1");
 	ASSERT_FALSE(bvn_parse_uint64("2", u1, &u), "uint:1 rejects 2");
 

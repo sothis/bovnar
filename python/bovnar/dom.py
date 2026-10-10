@@ -276,7 +276,9 @@ class DomNode:
         raise TypeError(f"DomType.{dt.name} is not iterable")
 
     def __contains__(self, key: str) -> bool:
-        if self.dom_type != DomType.STRUCT:
+        # A key is a str; anything else is simply not one of them. (It was an
+        # AttributeError from `.encode`, where `in` should just answer.)
+        if not isinstance(key, str) or self.dom_type != DomType.STRUCT:
             return False
         lib = get_library()
         return bool(lib.bvn_dom_struct_get(self._ptr, key.encode('utf-8')))
@@ -350,8 +352,12 @@ class DomNode:
             # streaming path (bovnar.loads) correctly gives [[1,2,3],[4,5,6]].
             # Row sizes are equal by construction -- an uneven one is
             # error_array_row_size_mismatch -- so the split is exact.
+            #
+            # That holds for rows of ZERO elements as well: "[]/[]" is two
+            # empty rows, loads() says [[], []], and skipping the split for an
+            # empty flat list answered [] here.
             rows = self.array_dims()
-            if rows > 1 and flat and len(flat) % rows == 0:
+            if rows > 1 and len(flat) % rows == 0:
                 width = len(flat) // rows
                 return [flat[i * width:(i + 1) * width] for i in range(rows)]
             return flat
@@ -370,12 +376,17 @@ class DomDoc:
     __slots__ = ('_ptr',)
 
     def __init__(self, ptr: int) -> None:
+        # Assigned before the check: __del__ runs on a half-built object too,
+        # and with __slots__ an unset `_ptr` is an AttributeError there --
+        # reported as "Exception ignored in DomDoc.__del__" right after the
+        # MemoryError the caller was actually owed.
+        self._ptr = 0
         if not ptr:
             raise MemoryError("DomDoc received a NULL pointer")
         self._ptr = ptr
 
     def __del__(self) -> None:
-        if self._ptr:
+        if getattr(self, '_ptr', 0):
             get_library().bvn_dom_doc_destroy(self._ptr)
             self._ptr = 0
 
@@ -458,7 +469,13 @@ class DomDoc:
         return DomNode(ptr, self) if ptr else None
 
     def __getitem__(self, key: str) -> DomNode:
-        """Return a top-level entry by key; raises KeyError if absent."""
+        """Return an entry by key; raises KeyError if absent.
+
+        *key* is handed to the path lookup, so a dotted or indexed path
+        reaches below the top level -- ``doc["server.tls"]`` is
+        ``doc["server"]["tls"]`` and ``doc["matrix[1][0]"]`` an element. A key
+        cannot itself contain '.' or '[', so the two readings never collide.
+        ``in`` follows the same rule."""
         ptr = get_library().bvn_dom_lookup(
             self._ptr, ('.' + key).encode('utf-8'))
         if not ptr:
@@ -466,6 +483,8 @@ class DomDoc:
         return DomNode(ptr, self)
 
     def __contains__(self, key: str) -> bool:
+        if not isinstance(key, str):
+            return False
         return bool(get_library().bvn_dom_lookup(
             self._ptr, ('.' + key).encode('utf-8')))
 

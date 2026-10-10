@@ -40,7 +40,9 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CLI = process.env.BOVNAR_CLI || join(ROOT, 'build', 'bovnar');
-const SHIM = join(ROOT, 'web', 'bovnar_parser_wasm.js');
+// BOVNAR_SHIM points the test at another copy of the shim -- for trying a change
+// to it against a rebuilt core before it lands in web/.
+const SHIM = process.env.BOVNAR_SHIM || join(ROOT, 'web', 'bovnar_parser_wasm.js');
 const tmp = mkdtempSync(join(tmpdir(), 'bvnr-shim-'));
 process.on('exit', () => { try { rmSync(tmp, { recursive: true, force: true }); } catch {} });
 

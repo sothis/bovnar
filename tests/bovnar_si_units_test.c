@@ -3224,11 +3224,106 @@ static void test_both_conversion_engines_agree(void)
 	printf("    %ld bare + %ld prefixed comparisons\n", compared, pcompared);
 }
 
+/*
+ * What a lossless conversion may and may not call exact.
+ *
+ * `exact` used to be the AND of the two units' own exactness, so any pair of
+ * π-defined units was "inexact" -- including the ones whose ratio is a plain
+ * rational because π cancels, and including a pure change of prefix. 1 rev is
+ * 360°; it came back as 1256637061435917200/3490658503988659, flagged inexact,
+ * and `k~pc -> pc` could not be done at all.
+ *
+ * Both directions are pinned: the rational ratios ARE exact and come out as the
+ * exact number, and an irrational ratio is never claimed.
+ */
+static void r4_conv(const char *v, const char *from, const char *to,
+		    bool want_ok, bool want_exact, const char *want_text)
+{
+	bool oa = false, ob = false;
+	value_unit_t a = bvn_parse_unit((const uint8_t *)from, &oa);
+	value_unit_t b = bvn_parse_unit((const uint8_t *)to,   &ob);
+	ASSERT_TRUE(oa && ob, from);
+	bvn_int_t *n = bvn_int_alloc(), *d = bvn_int_alloc();
+	bvn_int_t *on = bvn_int_alloc(), *od = bvn_int_alloc();
+	ASSERT_TRUE(n && d && on && od, "alloc");
+	bool exact = false;
+	bool ok = bvn_float_parse_rational(v, 10, n, d) &&
+		  bvn_unit_convert_rational(n, d, a, b, on, od, &exact);
+	ASSERT_TRUE(ok == want_ok, from);
+	if (ok && want_ok) {
+		ASSERT_TRUE(exact == want_exact, to);
+		if (want_exact && want_text) {
+			char txt[256];
+			bool tex = false;
+			int32_t l = bvn_rational_to_str(on, od, 10, txt, sizeof txt, &tex);
+			ASSERT_TRUE(l > 0 && tex && strcmp(txt, want_text) == 0, from);
+		}
+	}
+	bvn_int_free(n); bvn_int_free(d); bvn_int_free(on); bvn_int_free(od);
+}
+static void test_exactness_of_pi_and_prefix_conversions(void)
+{
+	printf("  test_exactness_of_pi_and_prefix_conversions...\n");
+	/* π cancels: exact, and the exact value. */
+	r4_conv("1",   "rev",      "°",        true, true, "360");
+	r4_conv("30",  "arcmin",   "°",        true, true, "0.5");
+	r4_conv("100", "grad",     "°",        true, true, "90");
+	r4_conv("1",   "°",        "arcsec",   true, true, "3600");
+	r4_conv("1",   "rev/min",  "°/s",      true, true, "6");
+	r4_conv("1",   "Lmb",      "apostilb", true, true, "10000");
+	r4_conv("1",   "rev·Oe",   "rad·A/m",  true, true, "500");
+	r4_conv("2",   "°²",       "arcmin²",  true, true, "7200");
+	/* A prefix only: exact whatever the base is. */
+	r4_conv("1",   "k~pc",     "pc",       true, true, "1000");
+	r4_conv("1",   "M~pc",     "k~pc",     true, true, "1000");
+	r4_conv("5",   "m~arcsec", "arcsec",   true, true, "0.005");
+	r4_conv("1",   "k~rev",    "rev",      true, true, "1000");
+	r4_conv("7.5", "m~°C/s",   "°C/s",     true, true, "0.0075");
+	r4_conv("1",   "k~°C",     "°C",       true, true, "1000");
+	/* π does NOT cancel: still delivered, and still never called exact. */
+	r4_conv("180", "°",        "rad",      true, false, NULL);
+	r4_conv("1",   "rev",      "rad",      true, false, NULL);
+	r4_conv("1",   "pc",       "au",       true, false, NULL);
+	r4_conv("1",   "pc",       "m",        true, false, NULL);
+	r4_conv("1",   "pc",       "ly",       true, false, NULL);
+	r4_conv("1",   "Oe",       "A/m",      true, false, NULL);
+	r4_conv("1",   "Lmb",      "cd/m²",    true, false, NULL);
+	r4_conv("1",   "sph",      "sr",       true, false, NULL);
+	r4_conv("1",   "°²",       "sr",       true, false, NULL);
+	r4_conv("1",   "°·pc",     "rad·m",    true, true,  NULL);  /* π¹·π⁻¹ */
+	/* Inexact for a reason that is not π stays inexact against anything
+	 * but itself. */
+	r4_conv("1",   "°dH",      "°fH",      true, false, NULL);
+	r4_conv("1",   "k~pc",     "ly",       true, false, NULL);
+	/* An affine scale in a compound still has no SI meaning. */
+	r4_conv("1",   "°C/s",     "K/s",      false, false, NULL);
+
+	/* The double path takes the same shortcut. */
+	bool ok = false, aff = false, pa = false, pb = false;
+	value_unit_t a = bvn_parse_unit((const uint8_t *)"k~rev", &pa);
+	value_unit_t b = bvn_parse_unit((const uint8_t *)"rev", &pb);
+	ASSERT_TRUE(pa && pb, "k~rev");
+	ASSERT_TRUE(bvn_unit_convert_factor(a, b, &ok, &aff) == 1000.0 && ok,
+		    "k~rev -> rev is 1000, not 999.99999999999989");
+	a = bvn_parse_unit((const uint8_t *)"k~°C/s", &pa);
+	b = bvn_parse_unit((const uint8_t *)"°C/s", &pb);
+	double out = 0.0;
+	ASSERT_TRUE(pa && pb && bvn_unit_convert_value(2.0, a, b, &out) &&
+		    out == 2000.0, "k~°C/s -> °C/s");
+	/* ...and still refuses a scale no double holds. */
+	a = bvn_parse_unit((const uint8_t *)"Q~m^100", &pa);
+	b = bvn_parse_unit((const uint8_t *)"q~m^100", &pb);
+	ASSERT_TRUE(pa && pb && !bvn_unit_convert_value(1.0, a, b, &out),
+		    "10^6000 is not a double");
+}
+
 int main(void)
 {
 	printf("══════════════════════════════════════\n");
 	printf("  Bovnar SI Units Test Suite\n");
 	printf("══════════════════════════════════════\n\n");
+
+	test_exactness_of_pi_and_prefix_conversions();
 
 	test_exponent_to_int();
 	test_exp_invalid_is_zero_init();

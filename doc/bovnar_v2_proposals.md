@@ -1,4 +1,4 @@
-# Bovnar — Version 2 Grammar Proposals (Design Note)
+# Bovnar — Spec 2.0 Grammar Proposals (Design Note)
 
 > **Spec version:** 2.0 (proposed; every item here is a break the spec reserves for a major revision)
 > **Status:** **Proposal.** Nothing here is built, scheduled, or decided. It is a list of the places
@@ -21,7 +21,8 @@
 11. [A number in any base is a number](#11-a-number-in-any-base-is-a-number)
 12. [Three changes in the unit sub-grammar](#12-three-changes-in-the-unit-sub-grammar)
 13. [Octet streams: declared, bounded, checked](#13-octet-streams-declared-bounded-checked)
-14. [Priority, and the test a breaking change has to pass](#14-priority-and-the-test-a-breaking-change-has-to-pass)
+14. [A comment may start after any token](#14-a-comment-may-start-after-any-token)
+15. [Priority, and the test a breaking change has to pass](#15-priority-and-the-test-a-breaking-change-has-to-pass)
 
 - [See also](#see-also)
 
@@ -30,10 +31,10 @@
 ## 1. What this is
 
 The spec's own stability rule (spec §17) is that anything which could make a valid 1.x document
-invalid, or change how it decodes, waits for a 2.0. That rule has been honoured — the mandatory `$`
+invalid, or change how it decodes, waits for a spec 2.0 — a major revision of the *format*, which is not library 2.0.0 (that release implements spec 1.2). That rule has been honoured — the mandatory `$`
 sigil, array homogeneity and `float_fix` range validation were all landed *before* 1.0 precisely
 because they could not land after. The cost of honouring it is that the warts which remain are
-permanent until there is a 2.0, and a 2.0 is worth doing only if the list is complete when it opens.
+permanent until there is a spec 2.0, and a spec 2.0 is worth doing only if the list is complete when it opens.
 
 This note is that list. Each section states what the grammar does today, what it costs, what the
 replacement would be, and what it breaks. Every "today" claim was taken from the reference
@@ -41,7 +42,7 @@ implementation rather than from the prose; where the two disagree the disagreeme
 
 Three of the items are not preferences. **One conformance tier** (section 3) and **the inline unit**
 (section 6) are correctness defects that happen to be spelled as design, and **the bare-word
-namespace** (section 8) is the only item on the list that becomes unfixable once 2.0 ships. If the
+namespace** (section 8) is the only item on the list that becomes unfixable once spec 2.0 ships. If the
 list has to be cut, it is cut down to those.
 
 ---
@@ -70,7 +71,7 @@ constraint (g) of doc/12_bovnar.ebnf: "only a DOM parse rejects ragged siblings,
 duplicate keys; the streaming reader accepts them."
 
 **Why it is a problem.** "Is this a valid Bovnar document" has no answer that does not name an API.
-A producer can emit a file that `bvnr_reader` blesses and `loads()` refuses, and both are conforming.
+A producer can emit a file that `bvnr_reader` (and `loads()`, which is built on it) blesses and `bvn_dom_parse` / `dom_parse()` refuses, and both are conforming.
 For a format whose entire pitch is *the parser validates it*, that is the deepest crack in the
 design — deeper than any single rule the two tiers disagree about.
 
@@ -243,7 +244,7 @@ application** — `.day = Monday;`, `.status = ok;` — and a word that merely s
 wants to add silently rewrites the meaning of documents that used that word as an enum, with no
 version directive able to save them, because the document was valid under the older grammar and stays
 valid under the newer one — it just means something else. This is the one item on the list that
-cannot be fixed after 2.0 opens: by then the set is either closed or it never will be.
+cannot be fixed after spec 2.0 opens: by then the set is either closed or it never will be.
 
 **Proposed.** Sigil the symbols and leave the keywords bare:
 
@@ -290,7 +291,7 @@ characters longer and unambiguous.
 ## 10. The version directive stops being a comment
 
 **Today.** `#!bovnar M.N` is lexically a comment, recognised only as the very first one. That was the
-right call for 1.1 — it is precisely what let a 1.0 reader ignore it — and the bill comes due at 2.0.
+right call for 1.1 — it is precisely what let a 1.0 reader ignore it — and the bill comes due at spec 2.0.
 
 **Why it is a problem.** The directive *gates syntax*: `datetime`, `\x` and `\u{…}` escapes, reference
 indices and profile units are each legal only in a document that declares enough. So the same bytes
@@ -311,7 +312,7 @@ A 1.x reader fails on it immediately, which is the correct outcome and the one t
 cannot deliver. Unknown *future* directives get their handling defined once, here, so the next
 extension does not need another comment-shaped hack.
 
-**Cost.** Every 2.0 document carries a mandatory line, and the "a bare file is spec 1.0" convenience
+**Cost.** Every spec-2.0 document carries a mandatory line, and the "a bare file is spec 1.0" convenience
 ends. Given the directive already decides what the grammar *is*, that convenience was never free.
 
 ---
@@ -321,6 +322,23 @@ ends. Given the directive already decides what the grammar *is*, that convenienc
 **Today.** A non-decimal integer is written as a **quoted string**: `<uint:64,_16> "FF"` is accepted
 and the bare `FF` form is `error_type_value_mismatch`. The type annotation says integer; the token is
 a string.
+
+The bare form is not refused outright, though, and what it does is the sharper half of the problem.
+A bare literal made only of digits of the declared base is accepted and read **in that base** (spec
+§5.5):
+
+```bovnar
+.a = <uint:8,_16> 99;     # valid — and 153, not 99
+.b = <uint:_16> 1e3;      # valid — and 483: in base 16 the lexer's exponent 'e' is a digit
+```
+
+<!-- bovnar-example: rejected -->
+```bovnar
+.c = <uint:_2> 1e1;       # error_type_value_mismatch — below base 15 the 'e' is an exponent again
+```
+
+So whether `e` is a digit or an exponent marker in one and the same token depends on a parameter two
+tokens to its left, and the value of `99` depends on it too.
 
 **Why it is a problem.** It costs three things at once. Five families must accept "a number **or** a
 string" as their value, which is the loosest type/value rule in the format. It is what makes a
@@ -339,8 +357,12 @@ radix form for the exotic ones the registry supports:
 
 A number is then always a number token, `utf8` never carries a unit, and the base parameter becomes
 what it should always have been: a *rendering* hint for the writer, not a precondition for the reader.
+A bare `99` is then ninety-nine under every annotation, and `1e3` is an exponent form or an error and
+never a hexadecimal integer.
 
-**Cost.** The lexer gains a radix path, and every base-N document is rewritten. The base parameter
+**Cost.** The lexer gains a radix path, and every base-N document is rewritten — including the ones
+that rely on a bare digit-only literal being read in the annotated base, which change *value* rather
+than fail, so the transcoder has to rewrite them and not merely re-quote them. The base parameter
 stays, so a document can still say "print this in base 36" independently of how it was written.
 
 ---
@@ -360,8 +382,8 @@ removes the question instead of documenting the answer.
 
 **Pick one prefix spelling.** Since compact prefixes were accepted, every prefixed unit has two
 spellings — `k~g` and `kg` — held apart by the longest-alias-suffix rule plus a hand-maintained
-`compact_exceptions` list (`usb`, `kt`) for the tokens where the rule gives the wrong answer. Two
-spellings and a patch list is the shape of a rule that will need a third entry. This one is a genuine
+`compact_exceptions` list (`usb`, `kt`, `ppt`) for the tokens where the rule gives the wrong answer.
+Two spellings and a patch list is the shape of a rule that keeps needing one more entry. This one is a genuine
 trade-off, and either resolution is defensible: compact-only with a normative collision table (my
 preference — `~` is the most alien thing in the format to a first-time reader, and it exists only
 because the registry has collisions), or `~`-mandatory, which is what the writer already emits. What
@@ -377,25 +399,74 @@ unrecoverable if any byte in a payload is rewritten. The spec's §18.4 is candid
 mode: desync "is not guaranteed" to be detected, and a length read out of a corrupted field is an
 allocation request.
 
+And a type annotation in front of one is carried but **not checked** (spec §6.1): `<uint:8>`,
+`<utf8>` and `<bool>` before an octet stream all validate, and the serialiser writes the annotation
+back. Every other value kind is held to the family that precedes it — `<uint:8> &.x` and
+`<uint:8> {…}` are `error_type_value_mismatch` — so this is the one value on which an annotation
+states a type nothing verifies.
+
 **Why it is a problem.** `--text-only` is a *consumer-side* defence for a hazard only the *producer*
 knows about, and the reader that most needs to refuse the document is the one that has already
 allocated on a corrupted length.
 
-**Proposed.** Three changes, none of which touch the text layer:
+**Proposed.** Four changes, none of which touch the text layer:
 
 - **declare it**: a document containing an octet stream says so in the header directive (section 10),
   so a text-shaped pipeline refuses at byte zero rather than at the first `0x00`;
 - **check it**: a per-stream total length and a checksum, so desync is *detected* rather than
   probably-detected;
 - **simplify it**: a 32-bit or varint length, which retires the `0x0000 means 65536` special case
-  along with the class of off-by-one it invites.
+  along with the class of off-by-one it invites;
+- **type it or leave it bare**: an annotation before an octet stream is `error_type_value_mismatch`
+  like any other family/kind disagreement — or, if a payload is to be describable at all, it gets a
+  family of its own (a media type is the obvious parameter) rather than borrowing `uint`.
 
 **Cost.** Wire-incompatible with every 1.x octet stream, and a checksum is real work on a hot path —
-so it belongs behind a per-document declaration, not on every chunk unconditionally.
+so it belongs behind a per-document declaration, not on every chunk unconditionally. Refusing the
+annotation invalidates any document that wrote one; the transcoder drops it, since it never meant
+anything.
 
 ---
 
-## 14. Priority, and the test a breaking change has to pass
+## 14. A comment may start after any token
+
+**Today.** "Whitespace and comments are freely interleaved between all tokens" is true of whitespace
+and not quite of comments. `#` is not a terminator of a bare token (spec §4.1): directly after a key,
+a number, a symbol, a reserved word, a reference or a datetime literal it is
+`error_unexpected_input_byte`, and a whitespace byte has to come first.
+
+<!-- bovnar-example: rejected -->
+```bovnar
+.ok1 = "text"# fine — a string is closed by its quote
+;
+.ok2 = [1]# fine — so is an array by its bracket
+;
+.ok3 = 42 # fine — a space came first
+;
+.bad = 42# error_unexpected_input_byte
+;
+```
+
+The EBNF's `ws` derives the refused form — `assignment = "." key ws "=" ws value ws ";"` — so the
+grammar and the reader disagree, and since spec 1.2 the prose sides with the reader.
+
+**Why it is a problem.** It is a rule nobody would guess, in the one construct every text format
+shares. A generator that emits `value# provenance` produces a document that fails on some values and
+not on others, by token kind. And it is the kind of divergence a second implementation gets "wrong"
+by following the grammar.
+
+**Proposed.** `#` terminates every bare token, exactly as whitespace does: the lexer's number, symbol,
+reference, datetime and key-outro states take `#` as "end of token, begin comment". One rule, and the
+`ws` production becomes true as written.
+
+**Cost.** Purely a loosening — no valid 1.x document changes, which is why this one could also ship in
+a 1.x revision as an accepted-input extension rather than wait for a major. It is listed here because
+the restriction is now *stated* in 1.2, and un-stating a rule deserves the same deliberateness as
+stating one. The only loss is the early error on `.x = 42#oops`, which becomes a comment.
+
+---
+
+## 15. Priority, and the test a breaking change has to pass
 
 **The test.** *Every change in a major revision must be mechanically transcodable from a 1.x parse
 tree.* Each item above passes it: quoted keys (quote when needed), holes to `null` (already what the
@@ -408,7 +479,7 @@ contents.
 **The order.** If the whole list ships, the order that minimises rework is: section 10 (the directive,
 because everything else needs a way to be declared), then section 7 (named parameters) and section 6
 (the inline unit) together, since the second is defined in terms of the first, then sections 8, 9, 11,
-5, 4, 12 and 13 in any order, and section 3 last — it is the only one whose blast radius is other
+5, 4, 12, 13 and 14 in any order, and section 3 last — it is the only one whose blast radius is other
 people's *readers* rather than other people's *documents*.
 
 **If it is cut to three:** sections 3, 6 and 8. The first two are defects, and the third is the only
@@ -419,7 +490,7 @@ door that closes for good.
 ## See also
 
 - [Specification](03_bovnar_spec.md) — spec §7.4 (homogeneity), spec §13.2 (recovery), spec §17 (what
-  1.0 freezes and what needs a 2.0), spec §18 (the security notes several proposals here answer)
+  1.0 freezes and what needs a spec 2.0), spec §18 (the security notes several proposals here answer)
 - [EBNF Grammar](12_bovnar.ebnf) — the grammar every "today" claim above was read from
 - [Unit & Currency Reference](05_bovnar_unit_system.md) — the notation grammar behind section 12
 - [Temperature Difference (Design Note)](temperature_difference.md) — the same shape of argument for
@@ -428,4 +499,4 @@ door that closes for good.
 
 ---
 
-*End of Bovnar — Version 2 Grammar Proposals (Design Note) (Bovnar spec 1.2).*
+*End of Bovnar — Spec 2.0 Grammar Proposals (Design Note) (Bovnar spec 1.2).*

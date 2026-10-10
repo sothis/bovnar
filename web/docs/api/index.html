@@ -80,6 +80,7 @@
 <li>2.13 <a href="#213-bvnr_write_bvni--bvnr_write_bvni_unit"><code>bvnr_write_bvni</code> / <code>bvnr_write_bvni_unit</code></a></li>
 <li>2.14 <a href="#214-bvn_type_float_base"><code>BVN_TYPE_FLOAT_BASE</code></a></li>
 <li>2.15 <a href="#215-writer-side-unit-policy-bvnr_writer_set_unit_policy">Writer-side unit policy (<code>bvnr_writer_set_unit_policy</code>)</a></li>
+<li>2.16 <a href="#216-value-helpers">Value helpers</a></li>
 </ul>
 </li>
 <li><a href="#3-shared">Shared</a><ul>
@@ -300,9 +301,12 @@ caret needs the right one:</p>
 </tr>
 </tbody>
 </table>
-<p>In <code>.x = "café"; .y = @;</code> the <code>@</code> is byte 20 but column 19. This matters here
-more than in most formats: unit symbols are routinely non-ASCII (<code>µ~m</code>, <code>°C</code>,
-<code>Ω</code>), so the two disagree often.</p>
+<p>In <code>.x = "café"; .y = @;</code> the <code>@</code> is reported at column 19 and offset 19 — the
+19th character, and the 20th byte, because <code>é</code> is two bytes: a 1-based character
+count and a 0-based byte count that happen to land on the same number. One more
+non-ASCII character pulls them apart: in <code>.x = "çafé"; .y = @;</code> the <code>@</code> is at
+column 19 and offset 20. This matters here more than in most formats: unit
+symbols are routinely non-ASCII (<code>µ~m</code>, <code>°C</code>, <code>Ω</code>), so the two disagree often.</p>
 <p>All five error/location getters above (everything except <code>bvnr_reader_get_recovery_count</code>) are only meaningful when <code>bvnr_read</code> returned <code>false</code> (or after a recoverable error when <code>continue_on_error</code> is set). <code>bvnr_reader_get_error_byte</code> returns the raw byte value that triggered the error. <code>bvnr_reader_get_recovery_count</code> is the exception: it returns how many errors triggered entry into resync mode in <code>continue_on_error</code> mode (and so is meaningful even when <code>bvnr_read</code> ultimately returned <code>true</code>). This count is incremented at error entry, not when resync completes at <code>";".</code>bvnr_reader_get_skipped_bytes` is the same kind of thing and answers the question the count cannot: how much of the input recovery threw away. One skipped assignment and a whole discarded struct both report a single recovery, and the skipped bytes were never parsed, so nothing else in the API mentions them — a non-zero total means the document your callbacks saw is not the whole document.</p>
 <div class="codehilite"><pre><span></span><code><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">bvnr_read</span><span class="p">(</span><span class="n">r</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="n">error_code_t</span><span class="w"> </span><span class="n">ec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvnr_reader_get_error</span><span class="p">(</span><span class="n">r</span><span class="p">);</span>
@@ -950,7 +954,7 @@ into the sink yourself. To size writer output, ask the writer:</p>
 
 <blockquote>
 <p><strong>Writer limits.</strong> Only <code>max_struct_nesting</code>, <code>max_array_nesting</code>, <code>on_event</code>, <code>userdata</code>,
-and <code>unit_flags</code> have any effect on the writer. All other fields are present solely to keep
+<code>unit_flags</code> and <code>emit_version</code> have any effect on the writer. All other fields are present solely to keep
 <code>bvnr_write_flags_t</code> structurally parallel to <code>bvnr_read_flags_t</code>; they are silently
 ignored. In particular, <code>continue_on_error</code>, <code>on_error</code>, and all per-token-length fields
 have no effect. The writer never internally limits array items, text bytes, or file size.</p>
@@ -1019,7 +1023,7 @@ have no effect. The writer never internally limits array items, text bytes, or f
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_event</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="n">bvnr_event_t</span><span class="w"> </span><span class="n">ev</span><span class="p">,</span><span class="w"> </span><span class="n">bvnr_data_t</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">);</span>
 </code></pre></div>
 
-<p>Emit one event to the writer. This is the only function used to produce output. It serialises the event and the data it describes directly into the configured sink.</p>
+<p>Emit one event to the writer. Every value in the output goes through this function: the helpers in <a href="#216-value-helpers">§2.16</a> and the multiprecision writers in §2.12–2.13 are sequences of these events, and a caller replaying a reader's stream calls it directly. It serialises the event and the data it describes directly into the configured sink.</p>
 <p>Returns <code>true</code> on success, <code>false</code> on any serialisation error.</p>
 <p>The event sequence you must emit for every assignment mirrors exactly what the reader delivers to <code>on_verified</code>. At minimum, for a typed scalar value:</p>
 <div class="codehilite"><pre><span></span><code>ev_assignment_start          (data-&gt;data = key, data-&gt;length = key length)
@@ -1101,6 +1105,7 @@ ev_data                      (data-&gt;data = value string, data-&gt;value_type/
 <span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">bvnr_write_event</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="n">ev_type_annotation_end</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">d</span><span class="p">))</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
 
 <span class="w">    </span><span class="n">d</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">bvnr_data_t</span><span class="p">){</span>
+<span class="w">        </span><span class="p">.</span><span class="n">type</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="n">token_is_string</span><span class="p">,</span><span class="w">   </span><span class="cm">/* required: says how the value is spelled */</span>
 <span class="w">        </span><span class="p">.</span><span class="n">value_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vt</span><span class="p">,</span>
 <span class="w">        </span><span class="p">.</span><span class="n">data</span><span class="w">       </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="p">)</span><span class="n">value</span><span class="p">,</span>
 <span class="w">        </span><span class="p">.</span><span class="n">length</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="p">)</span><span class="n">strlen</span><span class="p">(</span><span class="n">value</span><span class="p">),</span>
@@ -1109,6 +1114,9 @@ ev_data                      (data-&gt;data = value string, data-&gt;value_type/
 <span class="p">}</span>
 </code></pre></div>
 
+<p>The <code>ev_data</code> event's <code>type</code> is not optional. Left at zero it is
+<code>token_is_identifier</code>, which is not a value, and the write fails with
+<code>error_type_value_mismatch</code> after the annotation has already gone out.</p>
 <p><strong>Example: open and close a struct</strong></p>
 <div class="codehilite"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="nf">write_struct_start</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">key</span><span class="p">)</span>
 <span class="p">{</span>
@@ -1324,6 +1332,120 @@ two features end up disagreeing about what a document says.</p>
 <p>Like the reader's, the policy may be set before or after <code>bvnr_open_write_*</code>,
 survives re-opening the writer on another document, and is cleared with <code>NULL</code>.</p>
 <hr />
+<h3 id="216-value-helpers">2.16 Value helpers</h3>
+<p>One call per assignment: the key, its type annotation and its value, for the
+common scalar types. Each is the event sequence of §2.7 written out for you, and
+is what most producers should use.</p>
+<div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_string</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">key</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">value</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_plain</span><span class="w"> </span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">key</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">value</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_null</span><span class="w">  </span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">key</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_bool</span><span class="w">  </span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">key</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">value</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_uint</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">key</span><span class="p">,</span>
+<span class="w">                     </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">width</span><span class="p">,</span><span class="w"> </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">value</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_sint</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">key</span><span class="p">,</span>
+<span class="w">                     </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">width</span><span class="p">,</span><span class="w"> </span><span class="kt">int64_t</span><span class="w"> </span><span class="n">value</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_float</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">key</span><span class="p">,</span>
+<span class="w">                      </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">width</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">value</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_float_fix</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">key</span><span class="p">,</span>
+<span class="w">                          </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">width</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">q</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">value</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_float_dec</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">key</span><span class="p">,</span>
+<span class="w">                          </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">width</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">value</span><span class="p">);</span>
+
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_uint_unit</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">key</span><span class="p">,</span>
+<span class="w">                          </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">width</span><span class="p">,</span><span class="w"> </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">value</span><span class="p">,</span><span class="w"> </span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">unit</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_sint_unit</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">key</span><span class="p">,</span>
+<span class="w">                          </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">width</span><span class="p">,</span><span class="w"> </span><span class="kt">int64_t</span><span class="w"> </span><span class="n">value</span><span class="p">,</span><span class="w"> </span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">unit</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_float_unit</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">key</span><span class="p">,</span>
+<span class="w">                           </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">width</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">value</span><span class="p">,</span><span class="w"> </span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">unit</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_float_fix_unit</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">key</span><span class="p">,</span>
+<span class="w">                               </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">width</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">q</span><span class="p">,</span>
+<span class="w">                               </span><span class="kt">double</span><span class="w"> </span><span class="n">value</span><span class="p">,</span><span class="w"> </span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">unit</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_float_dec_unit</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">key</span><span class="p">,</span>
+<span class="w">                               </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">width</span><span class="p">,</span>
+<span class="w">                               </span><span class="kt">double</span><span class="w"> </span><span class="n">value</span><span class="p">,</span><span class="w"> </span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">unit</span><span class="p">);</span>
+
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_struct_start</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">key</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_struct_end</span><span class="w">  </span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">);</span>
+</code></pre></div>
+
+<table>
+<thead>
+<tr>
+<th>Helper</th>
+<th>Writes</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bvnr_write_string</code></td>
+<td><code>.key = "value";</code></td>
+<td><code>value</code> is escaped for you. It must be valid UTF-8 and may not hold a C0 control other than <code>\t</code> <code>\n</code> <code>\v</code> <code>\f</code> <code>\r</code>, nor DEL (<code>error_unexpected_input_byte</code>, <code>error_invalid_utf8_byte</code>)</td>
+</tr>
+<tr>
+<td><code>bvnr_write_plain</code></td>
+<td><code>.key = value;</code></td>
+<td>a bare <strong>symbol</strong> — <code>value</code> must be a valid symbol, it is not quoted</td>
+</tr>
+<tr>
+<td><code>bvnr_write_null</code></td>
+<td><code>.key = ;</code></td>
+<td>the null value</td>
+</tr>
+<tr>
+<td><code>bvnr_write_bool</code></td>
+<td><code>.key = true;</code> / <code>false</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>bvnr_write_uint</code> / <code>_sint</code></td>
+<td><code>.key = &lt;uint:16&gt; 443;</code></td>
+<td><code>width</code> 0 writes <code>&lt;uint&gt;</code> / <code>&lt;sint&gt;</code> (64 bits); a value that does not fit <code>width</code> is <code>error_value_out_of_range</code></td>
+</tr>
+<tr>
+<td><code>bvnr_write_float</code></td>
+<td><code>.key = &lt;float:64&gt; 1e-1;</code></td>
+<td><code>width</code> 0 writes <code>&lt;float&gt;</code>; <code>nan</code>, <code>inf</code> and <code>ninf</code> are written as those words; formatted as by <code>bvn_format_double</code> (§2.11)</td>
+</tr>
+<tr>
+<td><code>bvnr_write_float_fix</code></td>
+<td><code>.key = &lt;float_fix:32,q16&gt; 1.5e+0;</code></td>
+<td><code>q</code> is the number of fractional bits</td>
+</tr>
+<tr>
+<td><code>bvnr_write_float_dec</code></td>
+<td><code>.key = &lt;float_dec:64&gt; 1.25e+0;</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>…_unit</code></td>
+<td><code>.key = &lt;float:64,k~m&gt; 1e+0;</code></td>
+<td>the same, with <code>unit</code> as the annotation's unit parameter; honours <code>bvnr_writer_set_unit_source</code> (§3.1) and the writer's unit policy (§2.15)</td>
+</tr>
+<tr>
+<td><code>bvnr_write_struct_start</code> / <code>_end</code></td>
+<td><code>.key = {</code> … <code>};</code></td>
+<td>every helper called between the two writes a member</td>
+</tr>
+</tbody>
+</table>
+<p>All return <code>false</code> on failure with the reason latched in the writer
+(<code>bvnr_writer_get_error</code>); once a write has failed, every later one fails too.
+A <code>double</code> carries 53 significant bits whatever <code>width</code> says — for the full
+precision of a wider <code>float</code>, <code>float_dec</code> or <code>float_fix</code>, or an integer past 64
+bits, use <code>bvnr_write_bvnf_base</code> (§2.12) and <code>bvnr_write_bvni</code> (§2.13). A
+timestamp has its own helper, <code>bvnr_write_datetime</code> (§1.9). There is no array
+helper: an array is written as events (<code>ev_array_row_start</code>, one <code>ev_data</code> per
+element, <code>ev_array_row_end</code>).</p>
+<div class="codehilite"><pre><span></span><code><span class="n">bvnr_write_string</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;host&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;localhost&quot;</span><span class="p">);</span><span class="w">       </span><span class="cm">/* .host = &quot;localhost&quot;;      */</span>
+<span class="n">bvnr_write_uint</span><span class="w">  </span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;port&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span><span class="w"> </span><span class="mi">443</span><span class="p">);</span><span class="w">           </span><span class="cm">/* .port = &lt;uint:16&gt; 443;    */</span>
+<span class="n">bvnr_write_struct_start</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;limits&quot;</span><span class="p">);</span><span class="w">            </span><span class="cm">/* .limits = {               */</span>
+<span class="n">bvnr_write_bool</span><span class="w">  </span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;strict&quot;</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span><span class="w">            </span><span class="cm">/*     .strict = true;       */</span>
+<span class="n">bvnr_write_null</span><span class="w">  </span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;owner&quot;</span><span class="p">);</span><span class="w">                   </span><span class="cm">/*     .owner = ;            */</span>
+<span class="n">bvnr_write_struct_end</span><span class="p">(</span><span class="n">w</span><span class="p">);</span><span class="w">                        </span><span class="cm">/* };                        */</span>
+</code></pre></div>
+
+<hr />
 <h2 id="3-shared">3. Shared</h2>
 <hr />
 <h3 id="31-bvnr_write_type_annotation">3.1 <code>bvnr_write_type_annotation</code></h3>
@@ -1535,13 +1657,15 @@ be <code>m</code> for a <code>value_unit</code> of <code>k~m</code> under <code>
 
 <p>Convert one numeric quantity from unit <code>from</code> into unit <code>to</code>, writing the result
 to <code>*out</code>. Handles both the simple multiplicative case (<code>5 k~m → 5000 m</code>) and the
-affine case (<code>25 °C → 298.15 K</code>), routing the latter through SI base units. This
-is the same routine the reader's <code>want_unit</code> hook (§1.10) uses, and the C
-equivalent of the Python <code>convert_value</code>.</p>
+affine case (<code>25 °C → 298.15 K</code>), routing the latter through SI base units. It
+answers the same question the reader's <code>want_unit</code> hook (§1.10) does — may this
+value be delivered in that unit, and what is it there — in <code>double</code>, and is the
+C equivalent of the Python <code>convert_value</code>. It is <strong>not</strong> the routine the hook
+runs: the hook works in exact rationals (<code>bvn_unit_convert_rational</code>, below).</p>
 <p>Returns <code>false</code> — leaving <code>*out</code> untouched — when the two units are
 dimensionally <strong>incompatible</strong> or have no SI mapping. That boolean is the
-"validly convert only" guard: the reader turns a <code>false</code> here into
-<code>error_unit_mismatch</code>.</p>
+"validly convert only" guard; the same verdict from the exact engine is what
+the reader reports as <code>error_unit_mismatch</code>.</p>
 <div class="codehilite"><pre><span></span><code><span class="kt">double</span><span class="w"> </span><span class="n">m</span><span class="p">;</span>
 <span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">bvn_unit_convert_value</span><span class="p">(</span><span class="mf">5.0</span><span class="p">,</span>
 <span class="w">        </span><span class="n">bvn_parse_unit</span><span class="p">((</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="s">&quot;k~m&quot;</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ok</span><span class="p">),</span>
@@ -1676,7 +1800,9 @@ table in which a rounded decimal is passed off as exact.</p>
 <p>An adapter that lets a reader's event stream drive the serializer directly, without
 constructing a <code>bvnr_writer_t</code>. Installed as a reader callback it re-emits every event
 to a sink, producing a canonical — or pretty-printed — copy of the input. This is what
-the command-line pretty-printer and canonicaliser are built on.</p>
+<code>bovnar events -d</code> prints its re-serialisation with. (<code>bovnar pretty-print</code> is the other
+way to do the same job: a <code>bvnr_writer_t</code> fed from <code>on_verified</code>, which is what lets
+<code>--canonical</code> set <code>unit_flags</code>.)</p>
 <div class="codehilite"><pre><span></span><code><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">bvnr_canon_observer_s</span><span class="w"> </span><span class="n">bvnr_canon_observer_t</span><span class="p">;</span>
 
 <span class="n">bvnr_canon_observer_t</span><span class="w"> </span><span class="o">*</span><span class="nf">bvnr_canon_observer_create</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_sink_t</span><span class="w"> </span><span class="o">*</span><span class="n">sink</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">pretty</span><span class="p">);</span>
@@ -1774,8 +1900,19 @@ document still returns a non-NULL doc, so check <code>bvn_dom_doc_get_parse_erro
 The <code>bvn_dom_parse_fd*</code> variants instead return NULL on <strong>any</strong> failure
 (allocation, I/O, or exceeding the size cap). <code>bvn_dom_parse_fd_ex</code> caps the
 accumulated input at <code>max_bytes</code>, but only <em>downward</em>: <code>0</code> or any value above the
-built-in hard cap <code>BVN_DOM_FD_MAX_BYTES</code> (256 MiB) is clamped to that cap — there
-is no unlimited mode. Free every returned doc with <code>bvn_dom_doc_destroy</code>.</p>
+built-in hard cap of 256 MiB is clamped to that cap — there is no unlimited mode.
+(The cap is a build-time constant of the library, <code>BVN_DOM_FD_MAX_BYTES</code> in
+<code>src/dom/bovnar_dom_builder.c</code>; it is not in the public headers.) Free every
+returned doc with <code>bvn_dom_doc_destroy</code>.</p>
+<p><strong>The DOM reads at the format's nesting limit, not the reader's default.</strong> A
+<code>bvnr_reader_t</code> opened with zeroed flags stops at 64 levels of struct and 64 of
+array nesting (§1.4); every <code>bvn_dom_parse*</code> function sets both to the hard
+maximum of <strong>255</strong>. A document nested 65 to 255 deep therefore parses through
+the DOM and is <code>error_struct_nesting_too_high</code> / <code>error_array_nesting_too_high</code>
+from a default streaming reader — set <code>max_struct_nesting</code> and
+<code>max_array_nesting</code> to 255 on the reader to make the two agree, which is what
+the <code>bovnar</code> CLI does in every subcommand. The DOM's other limits are the
+reader's defaults.</p>
 <h3 id="42-navigation">4.2 Navigation</h3>
 <div class="codehilite"><pre><span></span><code><span class="n">bvn_dom_node_t</span><span class="w"> </span><span class="o">*</span><span class="nf">bvn_dom_lookup</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvn_dom_doc_t</span><span class="w"> </span><span class="o">*</span><span class="n">doc</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">path</span><span class="p">);</span><span class="w"> </span><span class="cm">/* dot path, e.g. &quot;server.tls.cert&quot; */</span>
 <span class="n">bvn_dom_node_t</span><span class="w"> </span><span class="o">*</span><span class="nf">bvn_dom_struct_get</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvn_dom_node_t</span><span class="w"> </span><span class="o">*</span><span class="n">node</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">key</span><span class="p">);</span>
@@ -1819,7 +1956,11 @@ or out-of-range index returns NULL.</p>
 <h3 id="44-typed-value-accessors">4.4 Typed value accessors</h3>
 <p>Each accessor returns <code>false</code> (leaving the out-param <strong>unchanged</strong> — no clamping
 or truncation) when the node is NULL, not of the requested kind, or does not fit
-the target type. Pointer results are <strong>borrowed</strong> — valid only until the owning
+the target type. "Kind" is strict with one deliberate exception:
+<code>bvn_dom_get_float</code> also succeeds on an <strong>integer</strong> node and returns its value
+as a <code>double</code> (a wide integer is rounded) — a caller asking for "the number"
+does not have to know whether the document wrote <code>5</code> or <code>5.0</code>. The reverse does
+not hold: the integer accessors fail on a float node. Pointer results are <strong>borrowed</strong> — valid only until the owning
 document is destroyed; do not free them.</p>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">bvn_dom_get_bool</span><span class="w">  </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvn_dom_node_t</span><span class="w"> </span><span class="o">*</span><span class="n">node</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w">   </span><span class="o">*</span><span class="n">out</span><span class="p">);</span>
 <span class="kt">bool</span><span class="w"> </span><span class="nf">bvn_dom_get_float</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvn_dom_node_t</span><span class="w"> </span><span class="o">*</span><span class="n">node</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="o">*</span><span class="n">out</span><span class="p">);</span>
@@ -1871,7 +2012,14 @@ make nodes; the <code>*_add</code>/<code>*_append</code> functions attach them.<
 <p><strong>Ownership.</strong> <code>bvn_dom_struct_add</code> / <code>bvn_dom_doc_add</code> / <code>bvn_dom_array_append</code>
 <strong>always</strong> take ownership of the value node: on success the container owns it, and
 on <strong>every</strong> failure path the node is destroyed internally — so never destroy it
-yourself after the call (doing so double-frees). <code>bvn_dom_node_from_bigint</code> is the
+yourself after the call (doing so double-frees).</p>
+<p><strong>What they refuse.</strong> Each returns <code>false</code> — having destroyed the value — when
+the container is NULL or of the wrong kind (<code>bvn_dom_array_append</code> on anything
+but a <code>BVN_DOM_ARRAY</code>, <code>bvn_dom_struct_add</code> on anything but a <code>BVN_DOM_STRUCT</code>),
+when the value is NULL, and, for the two keyed ones, when the scope <strong>already
+has that key</strong>: a hand-built tree cannot hold the duplicate a parsed document is
+refused for (<code>error_duplicate_struct_key</code>). The duplicate test is a linear scan
+of the scope. <code>bvn_dom_node_from_bigint</code> is the
 one exception with <em>asymmetric</em> ownership: on success it takes ownership of the
 <code>bvn_int_t</code>; on failure (NULL return) it does not, and you still own it.</p>
 <h3 id="46-minimal-example">4.6 Minimal example</h3>
@@ -2063,7 +2211,7 @@ bovnar<span class="w"> </span>query<span class="w"> </span>--require-unit<span c
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;unistd.h&gt;</span>
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;bovnar.h&quot;</span>
 
-<span class="cm">/* Emit: .velocity = &lt;float:64,m/s²&gt; 9.81; */</span>
+<span class="cm">/* Emit: .velocity = &lt;float:64,m/s²&gt; 9.81e+0; */</span>
 <span class="k">static</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="nf">write_velocity</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">)</span>
 <span class="p">{</span>
 <span class="w">    </span><span class="n">value_type_spec_t</span><span class="w"> </span><span class="n">vt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BVN_TYPE_FLOAT</span><span class="p">(</span><span class="mi">64</span><span class="p">);</span>
@@ -2115,7 +2263,8 @@ bovnar<span class="w"> </span>query<span class="w"> </span>--require-unit<span c
 <span class="w">    </span><span class="n">bvnr_writer_destroy</span><span class="p">(</span><span class="n">w</span><span class="p">);</span>
 <span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">ret</span><span class="p">;</span>
 <span class="p">}</span>
-<span class="cm">/* Output: .velocity = &lt;float:64,m/s²&gt; 9.81; */</span>
+<span class="cm">/* Output: .velocity = &lt;float:64,m/s²&gt; 9.81e+0;</span>
+<span class="cm"> * (bvn_format_double writes an exponent on every non-zero float -- see 2.11) */</span>
 </code></pre></div>
 
 <hr />

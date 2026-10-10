@@ -106,10 +106,19 @@ amalgamation and the source tarball are attached to the GitHub release, with a
   `bvn_unit_valid`. No exported function was removed and no prototype changed.
 - **Writer events are checked.** `bvnr_write_event` now refuses a unit
   parameter whose text does not name the annotation's unit, a value whose unit
-  contradicts the annotation it is written under, and an inline unit on an
-  array element (`error_unit_mismatch` / `error_unit_illegal`). The helpers
-  never produced such events; a caller that built them by hand was writing a
-  document that said two things.
+  contradicts the annotation it is written under, a value the annotation's
+  *type* does not admit (300 under `<uint:8>`, a string under a numeric
+  family, an integer past 64 bits with no width declared), and an inline unit
+  on an array element, a special number or a datetime (`error_unit_mismatch`,
+  `error_unit_illegal`, `error_value_out_of_range`,
+  `error_type_value_mismatch`). The helpers never produced such events; a
+  caller that built them by hand was writing a document that said two things.
+- **CLI exit status.** `0` success, `1` the document or the I/O failed, `2`
+  the command line was wrong — uniformly, which moves several usage errors
+  (no file, unknown command, bad `--from`) from 1 to 2. Extra arguments and
+  unknown options, which some commands ignored, are refused; a failed write to
+  stdout and an `events -c` run that recovered from errors are no longer
+  exit 0.
 
 ## New error codes (appended, non-breaking)
 
@@ -145,12 +154,25 @@ else. What does differ:
   own value, one second lower than before; 1.1 collapsed it onto the second
   after it.
 - **Reader fixes that refuse, or re-read, input 1.1 let through:** a byte-order
-  mark that is not at offset 0; a malformed `#!bovnar` directive with no
+  mark after leading whitespace; a malformed `#!bovnar` directive with no
   trailing newline; an array left open at its `;` (`.a = [1;`), which used to
   absorb the next assignment — also inside a struct; a `,` after the value of
   a struct member inside an array (`.f = [{.x = 7, 1;}];`, which 1.1 read as
-  `.x = 71`); a fractional datetime literal whose UTC year leaves 0000–9999. And in `<float:64,s>[<float:64> 1, 3]` the `3` keeps the
-  array's unit, where 1.1 delivered it with none.
+  `.x = 71`), and a `]` there that closed the array from inside its own
+  element (`.a = [{.x = 1];};`); whitespace or a comment inside `float_fix` /
+  `float_dec` (`<float _fix:32,q8>`); a reference with bytes directly after an
+  index (`&.a[0]b`); a comment cut off inside a UTF-8 sequence at end-of-input;
+  quoted digits that spell a special number and exceed their width
+  (`<uint:8,_36> "inf"` is 24171); a fractional datetime literal whose UTC
+  year leaves 0000–9999. And in `<float:64,s>[<float:64> 1, 3]` the `3` keeps
+  the array's unit, where 1.1 delivered it with none.
+- **Two array rules are now applied as written.** The width of a `/`-row
+  counted a nested array twice: `[[1]]/[null, null]` was accepted and is
+  `error_array_row_size_mismatch`, while `[[1], [2]]/[null, null]` was refused
+  and is valid — the one fix here that also *accepts* documents 1.1 refused.
+  And the document tier judged homogeneity against the first non-null element
+  only, so a `null` there hid a mismatch behind it (`[[null], [1], ["x"]]`);
+  the verdict no longer depends on element order.
 - **Eight unit factors were corrected** — `elle` by 3.3×10⁻⁴,
   `klafter`/`rute`/`morgen` by about 10⁻⁶, and `inHg`, `Da`, `slug`, `ft_lb`
   below 2×10⁻⁹. A document's digits are unchanged; what they convert to is not.

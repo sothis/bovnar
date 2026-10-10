@@ -327,9 +327,9 @@ typedef enum error_code_e {
 	 * keyword, either side of the family ':' or of a ',' between parameters, and
 	 * before the closing '>' -- and has no production for whitespace in the
 	 * middle of a parameter. The lexer used to drop it anyway, which is how
-	 * `<float:64,k g>` became a kilogram, `<uint:6 4>` became a 64-bit width,
-	 * and the UDUNITS spelling `udunits:m s-1` became a reciprocal millisecond
-	 * instead of a speed: the one place in the format where a wrong unit was
+	 * `<float:64,m in>` became the minute, `<uint:6 4>` became a 64-bit width,
+	 * and the UDUNITS spelling `udunits:m s-1` would have become a reciprocal
+	 * millisecond instead of a speed: the one place in the format where a wrong unit was
 	 * produced silently rather than refused. Reported at the first byte after
 	 * the whitespace, with its own code because the fix is specific -- delete
 	 * the space, or write the multiplication the notation actually has
@@ -618,8 +618,18 @@ typedef struct bvnr_read_flags_s {
 	 * 0 selects the internal default of 2147483647. */
 	uint64_t	max_text_bytes;
 	/* Bytes of INPUT, octet-stream payloads included -- the total-size cap.
-	 * 0 means unlimited (BVNR_FILESIZE_UNLIMITED), which is the default so
-	 * endless streaming works out of the box; set it explicitly in production. */
+	 * 0 means unlimited (BVNR_FILESIZE_UNLIMITED), and is the default; set it
+	 * explicitly in production. It is exact, and independent of how the bytes
+	 * arrive: a document of N bytes is read in full at a cap of N, and at a
+	 * smaller cap everything up to it is read and delivered before
+	 * error_file_too_long is raised at the first byte over it.
+	 *
+	 * Unlimited is not the same as endless. max_text_bytes above has a finite
+	 * default, so with both left at 0 an octet stream may run without bound
+	 * but the TEXT of a document stops at 2147483647 bytes
+	 * (error_text_data_too_long); raise max_text_bytes as well -- UINT64_MAX
+	 * if need be -- for a text stream longer than that. max_array_items has
+	 * the same default and bounds one array the same way. */
 	uint64_t	max_file_size;
 	uint8_t		max_struct_nesting;
 	uint8_t		max_array_nesting;
@@ -830,6 +840,14 @@ struct bvnr_sink_s {
 };
 typedef struct bvnr_reader_s bvnr_reader_t;
 typedef struct bvnr_writer_s bvnr_writer_t;
+/*
+ * The BVN_TYPE_* and BVN_UNIT_* constructors below are C99 compound literals
+ * with designated initialisers. The headers are usable from C++ (every
+ * declaration is extern "C"), but these macros are not: g++ and clang++ take
+ * the plain ones as an extension, with a -pedantic warning, and refuse the
+ * compound-unit ones outright. From C++, fill in a value_type_spec_t or a
+ * value_unit_t member by member, or call bvn_unit_parse.
+ */
 #define BVN_TYPE_PLAIN \
 	((value_type_spec_t){ .family = vt_plain, .width = 0,  .base = 0  })
 #define BVN_TYPE_UTF8 \
@@ -977,8 +995,10 @@ BVN_API bool bvnr_canon_observer_finish(bvnr_canon_observer_t* obs);
  *
  *   line   1-based line number.
  *   column 1-based CHARACTER column, not a byte column -- a multi-byte UTF-8
- *          sequence advances it by one. In `.x = "café"; .y = @;` the '@' is
- *          byte 20 but column 19. A tab advances to the next multiple of 4.
+ *          sequence advances it by one. In `.x = "çafé"; .y = @;` the '@' is
+ *          at column 19 and offset 20: two multi-byte characters before it,
+ *          a count from 1 against a count from 0. A tab advances to the next
+ *          multiple of 4.
  *          This matters here more than in most formats: unit symbols are
  *          routinely non-ASCII (µ~m, °C, Ω), so the two disagree often.
  *   offset  0-based BYTE offset into the stream -- use this one to index the

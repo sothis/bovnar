@@ -8,15 +8,15 @@ desktop environments, OS tooling, and developer platforms. The media type
 | Identity       | Value                          |
 |----------------|--------------------------------|
 | Media type     | `text/vnd.bovnar`              |
-| File extension | `.bvnr`                        |
-| Encoding       | UTF-8 (8-bit text)             |
+| File extension | `.bvnr` (canonical), `.bovnar` |
+| Encoding       | UTF-8 text; **binary** when a document contains an octet stream |
 | TextMate scope | `source.bovnar`                |
 
 ## Contents
 
 ### `mime/` — desktop / OS integration
 - **`text-vnd.bovnar.xml`** — freedesktop [shared-mime-info] database entry.
-  Detection is by the `*.bvnr` glob (the reliable mechanism for a text format).
+  Detection is by the `*.bvnr` and `*.bovnar` globs (the reliable mechanism for a text format).
   Installed by `make install` into `<datadir>/mime/packages/` (toggle with
   `-DBVNR_INSTALL_MIME=OFF`); then run `update-mime-database <datadir>/mime`.
 - **`bovnar.magic`** — `file(1)` content magic (best-effort fallback for

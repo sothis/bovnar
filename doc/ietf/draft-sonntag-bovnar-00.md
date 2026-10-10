@@ -393,7 +393,11 @@ grammar and are stated in prose only:
 A document that satisfies the ABNF but violates any of these is not a
 valid Bovnar document. Equivalently: the ABNF is a **necessary** condition
 for validity, never a sufficient one, and an implementation that checks
-only the grammar accepts documents this document declares invalid.
+only the grammar accepts documents this document declares invalid. The
+one exception to *necessary* lies in the facility this document does not
+specify: a unit parameter carrying a profile namespace may contain SP and
+HTAB, which `unit-param` does not admit ({{unit-profiles}},
+{{error-codes}}).
 
 Two points of the grammar require lookahead rather than a single-token
 decision, and an implementation built as a greedy lexer MUST account for
@@ -482,12 +486,23 @@ the first three octets of a document, where it MUST be ignored.
 BOM          = %xEF.BB.BF
 ~~~
 
-A BOM elsewhere is an error. Two positions are distinguished for
-diagnostic purposes: a BOM appearing inside the first comment line is
-`error_invalid_byte_order_mark`, and a BOM appearing after the first
-comment line but before the first assignment is
-`error_unexpected_input_byte`. A BOM inside any later comment or inside a
-string is ordinary well-formed UTF-8 and is accepted as content.
+A BOM anywhere else is an error or is ordinary content, depending on
+whether the first assignment has begun.
+
+Before the first assignment:
+
+* a BOM inside any comment - the first comment line, a version
+  declaration line, or a later comment line - is
+  `error_invalid_byte_order_mark`;
+* a BOM after leading blanks, with no comment line before it, is
+  `error_invalid_byte_order_mark`;
+* a BOM at the start of a line that follows a comment line or a version
+  declaration is `error_unexpected_input_byte`, as is a second BOM
+  directly after the one at offset 0.
+
+Once the first assignment has begun, `EF BB BF` inside a comment or a
+string is ordinary well-formed UTF-8 and is accepted as content, and
+between assignments it is `error_unexpected_input_byte`.
 
 Producers SHOULD NOT emit a byte order mark. It carries no information in
 a format whose encoding is fixed.
@@ -581,7 +596,8 @@ untrusted source SHOULD enable strict mode; see {{security-version}}.
 
 ## Whitespace and Comments
 
-Blanks and comments may appear freely between tokens.
+Blanks and comments may appear freely between tokens, with one
+restriction on where a comment may start, stated below.
 
 ~~~ abnf
 ws           = *( blank / comment )
@@ -591,7 +607,22 @@ comment-char = HTAB / VT / FF / %x20-7E / %x80-FF
 ~~~
 
 A comment runs from `#` to the next CR, LF, or end of document. The
-rejected control octets are errors inside a comment body. `ws-req`
+rejected control octets are errors inside a comment body.
+
+**`#` is not a terminator of a bare token.** A comment MUST NOT start
+immediately after a key, a number, a symbol, a reserved word, a reference
+or a datetime literal: there `#` is `error_unexpected_input_byte`, and at
+least one blank must come first. After a string, `]`, `}`, `>`, `=`, `;`
+or an inline unit, `#` may follow directly. The grammar's `ws` admits the
+forbidden placements; this prose forbids them.
+
+~~~
+.ok1 = 42 # a blank first: valid
+;
+.ok2 = "text"# directly after a string: valid
+;
+# .bad = 42# directly after a number: error_unexpected_input_byte
+~~~ `ws-req`
 denotes a mandatory separator, required in exactly one place: before an
 inline unit suffix ({{inline-units}}).
 
@@ -764,13 +795,24 @@ dec-exp      = ( %s"e" / %s"E" ) [ "+" / "-" ] 1*DIGIT
 Leading zeros are permitted (`007`). A trailing dot with no fractional
 digits is permitted (`123.`). A bare `.` is an error.
 
-Only `e` and `E` introduce an exponent in a bare literal. A value in a
-non-decimal base MUST be written as a quoted string, because a bare token
-such as `ff` lexes as a symbol rather than a number:
+Only `e` and `E` introduce an exponent in a bare literal.
+
+A bare number literal under a non-decimal base is valid when every octet
+of it is a digit of that base, and it is read **in that base**:
+`<uint:_16> 10` is sixteen, not ten. In base 15 and above `e` and `E` are
+digits, so a bare `1e3` under `_16` is the integer 0x1E3 (483) and not an
+exponent form; below base 15 the `e` is still an exponent marker, which
+under an integer family is `error_type_value_mismatch`. A value that
+needs a letter the number rule does not admit cannot be written bare - a
+token such as `ff` lexes as a symbol, and is `error_type_value_mismatch`
+- so it is written as a quoted string. Producers SHOULD quote every
+non-decimal value:
 
 ~~~
-.hex = <uint:_16> "ff";          # 255
+.hex = <uint:_16> "ff";          # 255 - the form to write
 .bin = <sint:_2>  "101010";      # 42
+.m   = <uint:_16> 10;            # valid, and sixteen
+.k   = <uint:_16> 1e3;           # valid, and 483: 'e' is a digit here
 ~~~
 
 Inside a quoted string, base-16 float values use `p` or `P` as the
@@ -797,8 +839,11 @@ dt-zone      = %s"Z" / ( "+" / "-" ) 2DIGIT ":" 2DIGIT
 
 Fields are strictly range-checked: month 01-12, a day valid for that
 month and year, hour 00-23, minute 00-59, second 00-60, and a two-digit
-offset. A malformed or out-of-range literal is
-`error_invalid_datetime_literal`.
+offset. A literal with an out-of-range field, a field of the wrong
+width (`2026-6-15`), or an empty fraction is
+`error_invalid_datetime_literal`; one that breaks off part-way - a
+missing seconds field, an offset without its colon - is
+`error_unexpected_input_byte`.
 
 A date with no time part denotes `00:00:00Z`. A date-time with no zone is
 UTC. An offset shifts the written civil time to UTC before conversion, so
@@ -931,6 +976,13 @@ A value whose kind is incompatible with the annotated family is
 `error_type_value_mismatch`. A dot or exponent in an integer-typed value
 is likewise `error_type_value_mismatch`.
 
+Two value kinds stand outside this table. A null takes any annotation and
+carries its type ({{null}}). An **octet stream** under an annotation is
+accepted under *every* family: the annotation is carried with the stream
+and is **not checked** against it, so `<uint:8>`, `<utf8>` or `<bool>` in
+front of an octet stream is not `error_type_value_mismatch`. It says
+nothing about the payload, and producers SHOULD NOT write one.
+
 ### Special Numbers
 
 `nan`, `inf`, and `ninf` are accepted under every numeric family -
@@ -984,6 +1036,12 @@ non-conforming width is `error_illegal_value_type`.
 An integer value that does not fit the declared width is
 `error_value_out_of_range`, including a negative value under `uint`.
 
+A `float` or `float_dec` literal is **not** range- or precision-checked.
+One with more precision or a larger exponent than the declared width can
+hold is valid; the excess is the consumer's to round, and a consumer may
+deliver positive or negative infinity. For these two families the width
+bounds what a producer promises, not what a consumer rejects.
+
 ### Base
 
 ~~~
@@ -1032,7 +1090,9 @@ values whose significand is a decimal integer, so that decimal fractions
 such as `0.1` are exact. It exists so that monetary and metrological
 values are not held in a binary float.
 
-The number of significant decimal digits available at each width is:
+The number of significant decimal digits available at each width is
+given below. It is what the width can hold, not a limit a consumer
+enforces ({{types}}): a literal with more digits is valid.
 
 | Width | Max decimal digits |
 |---|---|
@@ -1371,6 +1431,13 @@ commutes: `N·m` and `m·N` are the same unit and do not mismatch.
 
 An unrecognized unit in either position is `error_unit_illegal`.
 
+An inline unit after a `utf8` string is accepted. The suffix path does
+not consult the type family: `<utf8> "text" m` and a bare `"text" m` are
+valid and the unit is carried with the value, although the same unit as
+an annotation parameter (`<utf8,m>`) is `error_illegal_value_type`. The
+suffix exists for quoted *numeric* literals such as `<uint:_16> "ff" m`;
+producers SHOULD NOT attach one to text.
+
 ## Unit Profiles {#unit-profiles}
 
 Format version 1.2 adds a facility for expressing a unit in a foreign
@@ -1577,11 +1644,13 @@ everywhere.
 | Octet-stream chunk payload | 65536 octets | (encoded in the length field) |
 {: title="Fixed maxima"}
 
-The two 255-octet caps bound the text *between* the delimiters: the
-octets of a type annotation between `<` and `>`, and the octets of an
-inline unit suffix. Neither is reachable by a well-formed annotation -
-the longest compound unit the other limits permit is far shorter - so in
-practice they bound only malformed or adversarial input.
+The annotation cap counts the octets of the family and its parameters
+together with their `:` and `,`; blanks and comments beside those
+separators are not counted. The inline cap counts the octets of the
+suffix. A well-formed annotation can exceed its cap - a compound unit of
+many long aliases, or a long foreign code ({{unit-profiles}}) - and is
+then `error_type_too_long`, so the caps are limits on valid documents and
+not only on malformed ones.
 
 The document-size default of *unlimited* deserves emphasis. It is chosen
 so that endless streams work without configuration, which is the right
@@ -1810,17 +1879,31 @@ same section told it it could - compute wrong values. Neither changes
 what any accepted document means; both apply to every document whatever
 version it declares.
 
-The 1.2 reference consumer also fixed defects that had let through, or
-misread, input this format already excluded: a byte-order mark not at
-offset 0, a malformed version declaration ended by end-of-input, an array
+The reference consumer that implements 1.2 (library 2.0.0) also fixed defects that had let through, or
+misread, input this format already excluded: a byte-order mark after
+leading blanks, a malformed version declaration ended by end-of-input, an array
 left open at its `;`, a `,` after the value of a struct member inside an
-array (`[{.x = 7, 1;}]`, which had been read as `71`), and a fractional
-`datetime` literal whose UTC year leaves 0000-9999 are now errors; an element annotation without a unit no
+array (`[{.x = 7, 1;}]`, which had been read as `71`), a `]` that
+closed an array from inside a struct element (`[{.x = 1];}`), blanks or
+a comment inside the `float_fix` or `float_dec` keyword, octets directly
+after a reference index (`&.a[0]b`), a comment cut off inside a UTF-8
+sequence at end-of-input, quoted digits that spell `nan`, `inf` or
+`ninf` in a base of 24 or more and exceed their width, and a fractional
+`datetime` literal whose UTC year leaves 0000-9999 are now errors. The
+width of a `/`-separated row counted a nested array twice, which
+accepted some ragged arrays (`[[1]]/[null,null]`) and refused some
+rectangular ones (`[[1],[2]]/[null,null]`); and a consumer that checks
+homogeneity compared each element with the first non-null one only, so
+that a `null` there hid a mismatch behind it. An element annotation without a unit no
 longer strips the unit from the array elements after it; and a `tai`
 literal spelling a known leap second (`2016-12-31T23:59:60Z`) decodes one
 second lower than it did, having previously collapsed onto the second
 after it. That last is the one case in which an accepted document decodes
-to a different value.
+to a different value. In the registry {{BOVNAR-UNITS}}, eight conversion
+factors were corrected in the same release (`elle`, `klafter`, `rute`,
+`morgen`, `inHg`, `Da`, `slug`, `ft_lb`): a document's digits are
+unchanged, and what they convert to is not. Conversion is outside this
+document, so the correction is noted here and specified there.
 
 # Interoperability Considerations {#interop}
 
@@ -1894,7 +1977,15 @@ arrays. It fails, and MUST fail rather than distort, for:
 * a ragged or mixed-type array, which has no representation
   ({{array-homogeneity}});
 * an object with duplicate keys ({{model}});
-* a number whose magnitude or precision exceeds the target annotation.
+* an object key that is not a valid Bovnar key ({{lexis}}) - an empty
+  key, one beginning with a digit, or one containing a blank or any of
+  the excluded punctuation;
+* a number whose magnitude exceeds the target annotation - an integer
+  beyond its width, or a number that would overflow to infinity.
+
+A JSON number with more precision than IEEE 754 binary64 carries is not
+such a failure: it is rounded to nearest, as any JSON consumer rounds it
+{{RFC8259}}.
 
 JSON has no unit, so a converted document is dimensionless throughout.
 Converting *to* Bovnar is therefore an opportunity to add units, not an
@@ -1903,7 +1994,7 @@ operation that recovers them.
 ## File Naming and Detection {#interop-detection}
 
 The canonical file extension is `.bvnr`. The longer `.bovnar` is also
-registered ({{media-type}}) and MUST be recognized by tooling that
+registered ({{media-type}}) and SHOULD be recognized by tooling that
 dispatches on extension, but producers SHOULD emit `.bvnr`.
 
 There is no magic number. A version-declaring document begins with
@@ -2287,10 +2378,12 @@ relationships.
 
 Where an implementation offers read-time unit conversion, a further trap
 awaits the caller. Asking for a value in some unit is a *request*, not a
-guarantee: if the conversion cannot be performed - the quantities are of
-different dimension, or they are two different currencies - the value is
-delivered **in its original unit**, unconverted, rather than the request
-failing. An application that assumes its request succeeded then holds a
+guarantee. In the reference implementation a target *list* of units
+leaves a value it cannot convert - the quantities are of different
+dimension, or they are two different currencies - **in its original
+unit**, unconverted, and reports no error; a rule naming one field by its
+key path fails with `error_unit_mismatch` instead. Only the first needs
+the check. An application that assumes its request succeeded then holds a
 number it believes is in one unit and which is in fact in another, which
 is precisely the failure this format exists to prevent. A caller
 requesting a conversion MUST check whether it actually occurred before
@@ -2553,10 +2646,9 @@ base-unit-char = ALPHA / DIGIT / "_" / "%"
                / %xE2.80.B0 / %xE2.80.B1    ; U+2030, U+2031 (per mille)
 currency-code  = 3*4( %x41-5A )             ; uppercase ASCII, registry lookup
 
-; DIGIT occurs INSIDE a symbol (mH2O) and never at its end: a trailing
-; run of digits is scanned as the exponent, so no registry symbol may
-; terminate in one. A profile code that does is unreachable for the same
-; reason (Section 8.6).
+; DIGIT may occur inside a symbol (mH2O) and at its end (cal_15,
+; Btu_60). A trailing digit is never an exponent: an exponent needs
+; "^" or a superscript, so "m2" is not a unit.
 
 prefix        = si-prefix / iec-prefix
 si-prefix     = "Q" / "R" / "Y" / "Z" / "E" / "P" / "T" / "G" / "M"
@@ -2589,7 +2681,7 @@ Every violation this document specifies is reported with one of the codes
 below. The numeric values are stable: an existing value never changes,
 and a new code is appended above the current maximum ({{version-stability}}).
 
-The class column distinguishes seven kinds of code, only two of which say
+The class column distinguishes eight kinds of code, only two of which say
 the document is invalid:
 
 D:
@@ -2605,6 +2697,11 @@ I:
 : **Interface.** A failure of the surrounding I/O, callback, or argument
   handling, not a property of the document. A consumer that does not
   expose the corresponding interface never reports these.
+
+P:
+: **Producer interface.** Raised by an interface for *writing* documents
+  when it is handed something it cannot emit as a valid document. A
+  consumer never raises these: no document provokes them.
 
 R:
 : **Reserved.** Assigned but never raised. They exist so that the
@@ -2628,7 +2725,7 @@ U:
 | Value | Name | Class |
 |---|---|---|
 | 0 | `error_none` | - |
-| 1 | `error_unknown_token_type` | D |
+| 1 | `error_unknown_token_type` | P |
 | 2 | `error_array_row_size_mismatch` | D |
 | 3 | `error_identifier_too_long` | D |
 | 4 | `error_empty_identifier` | D |
@@ -2660,7 +2757,7 @@ U:
 | 30 | `error_writing_to_sink` | I |
 | 31 | `error_sink_buffer_exhausted` | I |
 | 32 | `error_unit_illegal` | D |
-| 33 | `error_base_requires_string_literal` | D |
+| 33 | `error_base_requires_string_literal` | P |
 | 34 | `error_type_value_mismatch` | D |
 | 35 | `error_value_out_of_range` | D |
 | 36 | `error_digit_not_in_base` | D |
@@ -2682,13 +2779,16 @@ U:
 | 52 | `error_type_param_whitespace` | D |
 {: title="Error codes"}
 
-Four entries warrant a note.
+Five entries warrant a note.
 
-`error_base_requires_string_literal` (33) is defined for a non-decimal
-base given a bare, unquoted numeric literal. In practice such a token
-lexes as a symbol rather than a number ({{numbers}}), so the mismatch
-surfaces as `error_type_value_mismatch` instead, and implementations are
-not required to raise code 33.
+`error_unknown_token_type` (1) is raised by a producer interface handed
+an event that cannot occur at that point of a document.
+
+`error_base_requires_string_literal` (33) is raised by a producer
+interface asked to write, bare, a value whose digits the `number` rule
+cannot carry - `ff` under base 16. A consumer never raises it: a bare
+literal in a non-decimal base is either read in that base or lexes as a
+symbol and is `error_type_value_mismatch` ({{numbers}}).
 
 `error_got_incomplete_bvnr_stream` (18) is the one code a consumer may
 report *in addition to* another, rather than instead of it: reaching end
@@ -2791,8 +2891,9 @@ whatever whitespace it contains.
 .three_factor = <float:64,k~g*m*s^-2>    9.81;
 ~~~
 
-The last two lines of the group are equal to the first: `k~g/(m·s²)` and
-`k~g/m·s²` resolve identically, and `k~g·m·s⁻²` is `k~g·m/s²`.
+The last line is the same unit as the first: `k~g·m·s⁻²` is `k~g·m/s²`.
+`.pressure` shows a grouped denominator, `k~g/(m·s²)`, which resolves
+identically to `k~g/m·s²`.
 
 ## Arrays {#example-arrays}
 

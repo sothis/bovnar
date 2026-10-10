@@ -118,6 +118,11 @@ static inline bool bvn_float_parse(bvn_float_ctx_t *ctx, const char *s, PNum *r)
 	while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r') s++;
 	if (*s == '+') s++;
 	else if (*s == '-') { r->neg = true; s++; }
+	/* "ninf" is the format's own spelling of negative infinity and what
+	 * bvn_float_to_str writes; it is not "-inf" with a different sign
+	 * character, so it has to be asked for by name. */
+	if (!r->neg && s[0]=='n' && s[1]=='i' && s[2]=='n' && s[3]=='f')
+		{ r->neg = true; r->inf = true; return true; }
 	{
 		char c1 = *s | 0x20;
 		if (c1 == 'i' && (s[1]|0x20)=='n' && (s[2]|0x20)=='f')
@@ -177,7 +182,9 @@ static inline bool bvn_float_parse(bvn_float_ctx_t *ctx, const char *s, PNum *r)
 		}
 		if (!has_e) return false;
 		if (eabs_ovf) {
-			r->inf = !eneg;
+			/* Not for a zero coefficient: 0e<anything> is zero, with the
+			 * sign it was written with, however long the exponent. */
+			r->inf = !eneg && !bvn_int_is_zero(&r->coeff);
 			bvn_int_zero(&r->coeff);
 			r->dex = 0;
 			return true;
@@ -238,12 +245,24 @@ static inline bool bvn_float_parse_ro(bvn_float_ctx_t *ctx, const char *s, PNum 
 	while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r') s++;
 	if (*s == '+') s++;
 	else if (*s == '-') { r->neg = true; s++; }
+	/* "ninf" is the format's own spelling of negative infinity and what
+	 * bvn_float_to_str writes. Without this it fell through to the digit scan,
+	 * found none, and the decimal encoders -- which did not look at the
+	 * verdict -- packed the empty coefficient: +0 for negative infinity.
+	 *
+	 * The keywords are also matched WHOLE here. This is the parser behind the
+	 * public bvn_float_strtodec, and a three-letter prefix test made
+	 * "nanometer" a NaN and "info" an infinity. */
+	if (!r->neg && strcmp(s, "ninf") == 0)
+		{ r->neg = true; r->inf = true; return true; }
 	{
 		char c1 = *s | 0x20;
-		if (c1 == 'i' && (s[1]|0x20)=='n' && (s[2]|0x20)=='f')
+		if (c1 == 'i' && (s[1]|0x20)=='n' && (s[2]|0x20)=='f' && !s[3])
 			{ r->inf = true; return true; }
-		if (c1 == 'n' && (s[1]|0x20)=='a' && (s[2]|0x20)=='n')
+		if (c1 == 'n' && (s[1]|0x20)=='a' && (s[2]|0x20)=='n' && !s[3])
 			{ r->nan = true; return true; }
+		if (c1 == 'i' || c1 == 'n')
+			return false;
 	}
 	uint32_t acc = 0;
 	int acc_digs = 0, int_digs = 0, frac_digs = 0;
@@ -316,14 +335,22 @@ static inline bool bvn_float_parse_ro(bvn_float_ctx_t *ctx, const char *s, PNum 
 			has_e = true; s++;
 		}
 		if (!has_e) return false;
+		/* ...and nothing after it: see below. */
+		if (*s) return false;
 		if (eabs_ovf) {
-			r->inf = !eneg;
+			/* Not for a zero coefficient: 0e<anything> is zero, with the
+			 * sign it was written with, however long the exponent. */
+			r->inf = !eneg && !bvn_int_is_zero(&r->coeff);
 			bvn_int_zero(&r->coeff);
 			r->dex = 0;
 			return true;
 		}
 		r->dex += eneg ? -eabs : eabs;
 	}
+	/* The literal ends here or it is not one. "1.5abc" used to be 1.5 and
+	 * "1e5x" 1e5, where the binary sibling bvn_float_strtoieee_bin refuses
+	 * both. */
+	if (*s) return false;
 	if (sticky && bvn_int_getbit(&r->coeff, 0) == 0)
 		bvni_add_u32(ctx, &r->coeff, 1u);
 	while (!bvn_int_is_zero(&r->coeff) && !bvn_float_has_overflow(ctx)) {

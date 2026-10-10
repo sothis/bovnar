@@ -490,6 +490,9 @@ that appears to work has not normalised anything.</p>
 </tr>
 </tbody>
 </table>
+<p><code>query</code> takes all of them except <code>--base</code>, which it refuses by name (exit 2):
+it prints the value it found in decimal, and a base would change nothing it
+shows.</p>
 <p><strong>A conversion flag on <code>validate</code> is not a no-op.</strong> <code>validate</code> produces no output,
 so it is easy to read <code>--unit</code> and <code>--si</code> there as flags that could not matter —
 and they change the verdict, because a conversion the policy cannot deliver

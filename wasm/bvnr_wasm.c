@@ -143,15 +143,30 @@ static void sb_json_cstr(sb_t *b, const char *s)
 }
 
 /* Return ownership of the buffer's NUL-terminated string to the caller. On OOM
- * frees what it has and returns a tiny static-ish JSON error (heap-allocated so
- * the caller's free() is always valid). */
+ * frees what it has and returns a small JSON error (heap-allocated so the
+ * caller's free() is always valid).
+ *
+ * That error has the SAME shape as every other result: ok, a numeric error and
+ * its error_name. It used to be {"ok":false,"error":"out_of_memory"} -- `error`
+ * a string where every other payload has a number, and no error_name at all, so
+ * `r.error_name` was undefined on the one path a caller is least likely to have
+ * tested. The library has no code of its own for exhaustion and reports it as
+ * error_invalid_argument (see bvnr_read_flags_t.want_unit); `detail` says which
+ * it was. */
 static char *sb_finish(sb_t *b)
 {
 	if (b->oom) {
 		free(b->p);
-		static const char oom[] = "{\"ok\":false,\"error\":\"out_of_memory\"}";
-		char *e = (char *)malloc(sizeof oom);           /* sizeof includes the NUL */
-		if (e) memcpy(e, oom, sizeof oom);
+		b->p = NULL; b->len = 0; b->cap = 0;
+		char oom[160];
+		int n = snprintf(oom, sizeof oom,
+			"{\"ok\":false,\"error\":%d,\"error_name\":\"%s\","
+			"\"detail\":\"out of memory\"}",
+			(int)error_invalid_argument,
+			bvn_error_to_string(error_invalid_argument));
+		if (n < 0 || (size_t)n >= sizeof oom) return NULL;
+		char *e = (char *)malloc((size_t)n + 1u);
+		if (e) memcpy(e, oom, (size_t)n + 1u);
 		return e;
 	}
 	if (!b->p) { /* empty -> "" */
@@ -161,6 +176,22 @@ static char *sb_finish(sb_t *b)
 	}
 	b->p[b->len] = '\0';
 	return b->p;
+}
+
+/* Splice a finished sub-buffer (the events or errors array body) into `into`,
+ * and release it.
+ *
+ * NOT by way of sb_finish: on exhaustion that returns the JSON error OBJECT,
+ * and the callers used to paste whatever it returned between "events":[ and ]
+ * -- a truncated listing became {"ok":true,...,"events":[{"ok":false,...}]},
+ * a well-formed success wrapped around the report of its own failure. An
+ * exhausted part makes the whole result the out-of-memory result. */
+static void sb_splice(sb_t *into, sb_t *part)
+{
+	if (part->oom) into->oom = 1;
+	else if (part->p) sb_put(into, part->p, part->len);
+	free(part->p);
+	part->p = NULL; part->len = 0; part->cap = 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -309,6 +340,58 @@ static void emit_status(sb_t *b, error_code_t err)
 /* exported entry points                                              */
 /* ================================================================== */
 
+/*
+ * The document tier's verdict on a buffer the streaming reader has accepted.
+ *
+ * Validity has two tiers (spec 12.4/12.5). The reader checks every value as it
+ * passes; that an array's elements agree with one another, that the records of
+ * an array share one shape and that no scope repeats a key are properties of
+ * the whole document, and are checked over the materialised tree. `bovnar
+ * validate` runs both. validate() and errors() here ran the first only -- so
+ * `.a = 1; .a = 2;` and `.a = [1, "x"];` came back {"ok":true} from the module
+ * whose README says it reports what the CLI reports, while toJSON() and doc()
+ * in the SAME module refused them.
+ */
+static error_code_t wasm_document_tier(const char *buf, int len)
+{
+	bvn_dom_doc_t *doc = bvn_dom_parse(buf, (uint32_t)len);
+	error_code_t err = doc ? bvn_dom_doc_get_parse_error(doc)
+	                       : error_invalid_argument;
+	if (doc) bvn_dom_doc_destroy(doc);
+	return err;
+}
+
+/* The first node in the subtree that is a datetime written with sub-second
+ * digits, or NULL. Mirrors find_fractional_datetime in src/bovnar.c. */
+static const bvn_dom_node_t *json_fractional_datetime(const bvn_dom_node_t *node)
+{
+	if (!node) return NULL;
+	switch (bvn_dom_node_type(node)) {
+	case BVN_DOM_INT:
+		return bvn_dom_get_datetime_fraction(node, NULL) ? node : NULL;
+	case BVN_DOM_STRUCT: {
+		uint32_t cnt = bvn_dom_struct_count(node);
+		const bvn_dom_entry_t *e = bvn_dom_struct_entries(node);
+		for (uint32_t i = 0; e && i < cnt; i++) {
+			const bvn_dom_node_t *hit = json_fractional_datetime(e[i].value);
+			if (hit) return hit;
+		}
+		return NULL;
+	}
+	case BVN_DOM_ARRAY: {
+		uint32_t cnt = bvn_dom_array_count(node);
+		for (uint32_t i = 0; i < cnt; i++) {
+			const bvn_dom_node_t *hit =
+				json_fractional_datetime(bvn_dom_array_at(node, i));
+			if (hit) return hit;
+		}
+		return NULL;
+	}
+	default:
+		return NULL;
+	}
+}
+
 WASM_EXPORT
 char *bvnr_wasm_to_json(const char *buf, int len)
 {
@@ -317,8 +400,33 @@ char *bvnr_wasm_to_json(const char *buf, int len)
 	bvn_dom_doc_t *doc = bvn_dom_parse(buf, (uint32_t)len);
 	error_code_t err = doc ? bvn_dom_doc_get_parse_error(doc) : error_invalid_argument;
 
+	/* A datetime written with a fractional second has only its whole-second
+	 * carrier to offer JSON, so projecting it CHANGES the value: half past
+	 * midnight came out as midnight, with ok:true. `bovnar convert` refuses
+	 * that document rather than truncate it, and the README says this
+	 * projection matches convert; it refuses too. There is no error code for
+	 * "valid, but not expressible here", so it is value_out_of_range with a
+	 * `detail` that says what and where. events() still delivers the digits
+	 * (`frac`). */
+	const char *frac_key = NULL;
+	if (doc && err == error_none) {
+		const bvn_dom_entry_t *e = bvn_dom_doc_entries(doc);
+		uint32_t cnt = bvn_dom_doc_count(doc);
+		for (uint32_t i = 0; e && i < cnt && !frac_key; i++)
+			if (json_fractional_datetime(e[i].value))
+				frac_key = e[i].key ? e[i].key : "";
+		if (frac_key) err = error_value_out_of_range;
+	}
+
 	sb_putc(&b, '{');
 	emit_status(&b, err);
+	if (frac_key) {
+		sb_puts(&b, ",\"detail\":\"a datetime with sub-second digits cannot "
+		            "be represented in JSON without dropping the fraction "
+		            "(under top-level key '");
+		sb_json_str_body(&b, frac_key, strlen(frac_key));
+		sb_puts(&b, "')\"");
+	}
 	sb_puts(&b, ",\"value\":");
 	if (doc && err == error_none)
 		json_emit_entries(&b, bvn_dom_doc_entries(doc), bvn_dom_doc_count(doc));
@@ -363,8 +471,22 @@ char *bvnr_wasm_validate(const char *buf, int len)
 	                     : error_invalid_argument;
 	if (!opened && err == error_none) err = error_invalid_argument;
 
+	/* The second tier, exactly where cmd_validate runs it: only once the
+	 * streaming pass is clean. Its errors are properties of the whole document
+	 * and have no position -- line, column, byte and offset stay 0 -- so `tier`
+	 * says which kind this is; a caller placing a caret must not put one at
+	 * 0:0. (See wasm_document_tier.) */
+	const char *tier = (err == error_none) ? NULL : "stream";
+	if (opened && err == error_none) {
+		err = wasm_document_tier(buf, len);
+		if (err != error_none) tier = "document";
+	}
+
 	sb_putc(&b, '{');
 	emit_status(&b, err);
+	sb_puts(&b, ",\"tier\":");
+	if (tier) sb_json_cstr(&b, tier);
+	else      sb_puts(&b, "null");
 	if (r) {
 		sb_printf(&b, ",\"line\":%llu",
 		          (unsigned long long)bvnr_reader_get_error_line(r));
@@ -619,10 +741,17 @@ static char *events_impl(const char *buf, int len,
 	if (!opened && err == error_none) err = error_invalid_argument;
 
 	/* `ok` from the error COUNT, not the final code -- see events_ud_t. The
-	 * reported code is the FIRST recovered error when the final one has been
-	 * cleared, so a caller learns what actually went wrong rather than reading
-	 * "none" beside a missing value. */
-	if (err == error_none && ud.err_count > 0u)
+	 * reported code is the FIRST error whenever on_error saw one, so a caller
+	 * learns what went wrong first rather than reading "none" beside a missing
+	 * value.
+	 *
+	 * Whenever, not only "when the final code has been cleared": that was the
+	 * condition, and it reported the LAST error for any document whose final
+	 * one was fatal. A string holding a bad byte and never closed came back as
+	 * incomplete_bvnr_stream here while errors()[0] and validate() both said
+	 * invalid_utf8_byte -- three surfaces documented to name the same, first,
+	 * error. */
+	if (ud.err_count > 0u)
 		err = ud.first_err;
 	sb_putc(&b, '{');
 	sb_printf(&b, "\"ok\":%s,",
@@ -631,8 +760,7 @@ static char *events_impl(const char *buf, int len,
 	sb_puts(&b, "\"error_name\":");
 	sb_json_cstr(&b, bvn_error_to_string(err));
 	sb_puts(&b, ",\"events\":[");
-	char *evs = sb_finish(&evbuf);
-	if (evs) { sb_puts(&b, evs); free(evs); }
+	sb_splice(&b, &evbuf);
 	sb_puts(&b, "]}");
 
 	if (r) bvnr_reader_destroy(r);
@@ -719,12 +847,15 @@ static void err_collect(void *ud, error_code_t err,
 	sb_printf(b, ",\"column\":%llu", (unsigned long long)column);
 	sb_printf(b, ",\"byte\":%u", byte);
 	sb_printf(b, ",\"offset\":%llu", (unsigned long long)offset);
+	sb_puts(b, ",\"tier\":\"stream\"");
 	sb_putc(b, '}');
 }
 
 /* Validate in resync mode, collecting EVERY error (not just the first) the way
  * the playground's on_error panel expects. Returns
- * { ok, errors:[{error,error_name,line,column,byte,offset}], declared_version }. */
+ * { ok, errors:[{error,error_name,line,column,byte,offset,tier}],
+ *   declared_version }. `tier` is "stream" for an error the reader raised at a
+ * position, "document" for a whole-document rule (no position; see below). */
 WASM_EXPORT
 char *bvnr_wasm_errors(const char *buf, int len)
 {
@@ -746,11 +877,27 @@ char *bvnr_wasm_errors(const char *buf, int len)
 	bool opened = r && bvnr_open_read_mem(r, buf, (uint64_t)len, NULL, 0, &flags);
 	if (opened) bvnr_read(r);
 
+	/* "EVERY error" includes the one the streaming pass cannot see. When that
+	 * pass found nothing, ask the document tier, and report what it says as
+	 * one more entry -- positionless, and marked as such. (Only then: the DOM
+	 * does not resync, so over a document with stream errors it could only
+	 * repeat the first of them.) Without this, errors() said {"ok":true,
+	 * "errors":[]} for a duplicate key. */
+	if (opened && ctx.count == 0) {
+		error_code_t derr = wasm_document_tier(buf, len);
+		if (derr != error_none) {
+			sb_printf(&ebuf, "{\"error\":%d,\"error_name\":", (int)derr);
+			sb_json_cstr(&ebuf, bvn_error_to_string(derr));
+			sb_puts(&ebuf, ",\"line\":0,\"column\":0,\"byte\":0,"
+			               "\"offset\":0,\"tier\":\"document\"}");
+			ctx.count++;
+		}
+	}
+
 	sb_putc(&b, '{');
 	sb_printf(&b, "\"ok\":%s", ctx.count == 0 ? "true" : "false");
 	sb_puts(&b, ",\"errors\":[");
-	char *es = sb_finish(&ebuf);
-	if (es) { sb_puts(&b, es); free(es); }
+	sb_splice(&b, &ebuf);
 	sb_puts(&b, "]");
 	if (r) {
 		uint16_t maj = 0, min = 0;
@@ -851,7 +998,9 @@ char *bvnr_wasm_parse(const char *buf, int len)
 	 * over events()+errors(), and the one the playground shim actually uses, so
 	 * it disagreed with the surface it replaced on the same document: events()
 	 * said unexpected_input_byte, parse() said none. Same fallback here. */
-	if (err == error_none && ud.er.count > 0)
+	/* ...and, as there, the first error whenever there was one -- not only
+	 * when the final code happens to have been cleared. */
+	if (ud.er.count > 0)
 		err = ud.er.first;
 	sb_putc(&b, '{');
 	sb_printf(&b, "\"ok\":%s,",
@@ -860,11 +1009,9 @@ char *bvnr_wasm_parse(const char *buf, int len)
 	sb_puts(&b, "\"error_name\":");
 	sb_json_cstr(&b, bvn_error_to_string(err));
 	sb_puts(&b, ",\"events\":[");
-	char *evs = sb_finish(&evbuf);
-	if (evs) { sb_puts(&b, evs); free(evs); }
+	sb_splice(&b, &evbuf);
 	sb_puts(&b, "],\"errors\":[");
-	char *es = sb_finish(&ebuf);
-	if (es) { sb_puts(&b, es); free(es); }
+	sb_splice(&b, &ebuf);
 	sb_putc(&b, ']');
 	if (r) {
 		uint16_t maj = 0, min = 0;
@@ -1083,7 +1230,8 @@ static void wdoc_emit_value(sb_t *b, const bvn_dom_node_t *node)
 
 /* Full document tree in document order, each value carrying its resolved type
  * fields. The shim turns this into parseFaithful's tree and replays it as
- * parseBovnar's event stream. Returns { ok, tree:[{key,value}...] }. */
+ * parseBovnar's event stream. Returns
+ * { ok, error, error_name, tree:[{key,value}...] }. */
 WASM_EXPORT
 char *bvnr_wasm_doc(const char *buf, int len)
 {
@@ -1092,8 +1240,11 @@ char *bvnr_wasm_doc(const char *buf, int len)
 	bvn_dom_doc_t *doc = bvn_dom_parse(buf, (uint32_t)len);
 	error_code_t err = doc ? bvn_dom_doc_get_parse_error(doc)
 	                       : error_invalid_argument;
+	/* The same {ok, error, error_name} preamble as every other result. It was
+	 * a bare "ok": a caller told false had no way to learn why, short of
+	 * parsing the document again through another entry point. */
 	sb_putc(&b, '{');
-	sb_printf(&b, "\"ok\":%s", err == error_none ? "true" : "false");
+	emit_status(&b, err);
 	sb_puts(&b, ",\"tree\":[");
 	if (doc) {
 		const bvn_dom_entry_t *e = bvn_dom_doc_entries(doc);

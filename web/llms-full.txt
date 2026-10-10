@@ -248,7 +248,7 @@ This would fail:
 
 ## 4. Value Tokens: What Can Follow the `=` Sign
 
-There are ten categories of raw values:
+These are the categories of raw values you will write by hand (two more — the ISO-8601 datetime literal of spec 1.1, §5.3, and the octet stream, §16 — complete the list):
 
 | Category | Example |
 |---|---|
@@ -356,7 +356,7 @@ For `sint` and `uint`, any width from 1 up to 32768 bits (`BVN_MAX_INT_WIDTH`) i
 
 The base parameter starts with `_` followed by a decimal number. For `uint` and `sint`, every base from `_2` through `_62` (consecutive) is allowed. Bases `_64` (standard Base64) and `_85` (Ascii85) are also available, but **only for `uint`**: their alphabets claim the sign glyphs as digits — Base64 uses `+` (digit 62) and `/`, Ascii85 uses both `+` and `-` — so no unambiguous sign character remains and signed values are illegal (`error_illegal_value_type`). The base selects the numeral system used to interpret the value.
 
-This is the biggest surprise for newcomers: **non-decimal values must be provided as quoted strings**. A bare `ff` in value position is lexed as a *symbol*, not a number, and will produce a type mismatch error. Always quote non-decimal digits:
+This is the biggest surprise for newcomers: **non-decimal values should be provided as quoted strings**. A bare `ff` in value position is lexed as a *symbol*, not a number, and will produce a type mismatch error. A bare literal made only of digits of the base does parse — and is read in that base, so `<uint:8,_16> 10` is sixteen, and `<uint:_16> 1e3` is 483 because `e` is a hex digit — which is one more reason to always quote non-decimal digits:
 
 <!-- bovnar-example: rejected -->
 ```bovnar
@@ -1042,7 +1042,7 @@ they are rejected only in a 1.0 or unversioned document.)
 
 ## 19. Error Recovery Mode
 
-The parser supports an optional `continue_on_error` mode. When enabled, a parse error invokes the `on_error` callback and then enters a resync state machine that skips bytes while tracking bracket and brace nesting. The `recovery_count` counter (accessible via `bvnr_reader_get_recovery_count`) is incremented immediately when an error triggers entry into resync mode — not when the resync eventually completes. When the resync state machine reaches a `;` at the original nesting depth, it resumes normal parsing.
+The parser supports an optional `continue_on_error` mode. When enabled, a parse error invokes the `on_error` callback and then enters a resync state machine that skips bytes while tracking bracket and brace nesting. The `recovery_count` counter (accessible via `bvnr_reader_get_recovery_count`) is incremented immediately when an error triggers entry into resync mode — not when the resync eventually completes. Normal parsing resumes at whichever comes first: a `;` at the original nesting depth, or the start of the next assignment — a `.` at that depth followed by a byte that can begin an identifier.
 
 This mode is intended for log streams and unreliable transports — situations where one malformed assignment should not discard the rest of the file. For configuration and data serialization, disable it: fail fast and reject corrupt input entirely.
 
@@ -1369,13 +1369,18 @@ valid UTF-8 leader byte. A leading digit is a hard parse error.
 **Are comments supported?**
 
 Yes. A `#` character starts a comment that runs to the end of the line. Comments
-are legal anywhere whitespace is legal — before the first assignment, between
+are legal wherever whitespace is legal — before the first assignment, between
 tokens, and at the end of a value line:
 
 ```bovnar
 # full-line comment
 .port = 5432;   # inline comment
 ```
+
+One restriction: `#` does not *end* a bare token. Directly after a key, a number,
+a symbol, a keyword, a reference or a datetime literal it is
+`error_unexpected_input_byte` (`.x = 42# note` fails), so put a space first.
+After a string, a bracket, `=`, `;` or an inline unit it may follow directly.
 
 ---
 
@@ -1390,13 +1395,16 @@ are freely interleaved between all tokens.
 **Is a UTF-8 BOM accepted?**
 
 A UTF-8 BOM (`EF BB BF`) is accepted only at byte offset 0 of the stream.
-A BOM appearing later in a string is valid UTF-8 and passes through without error.
-For BOMs in other positions the error code depends on where the BOM appears:
+Anywhere else it is an error or ordinary content, depending on whether the first
+assignment has begun (specification §3.2).
 
-- A BOM found **inside the first comment line** (the dedicated `first_comment_*` states) produces `error_invalid_byte_order_mark`.
-- A BOM byte (`0xEF`) found **after the first comment line** but before the first `.` identifier (the `first_bom` state) is not handled in the state table and produces `error_unexpected_input_byte`.
+Before the first assignment:
 
-A BOM appearing inside any *subsequent* comment is valid UTF-8 and accepted without error.
+- A BOM **inside any comment** — the first comment line, a version directive line, or a later comment line — produces `error_invalid_byte_order_mark`.
+- A BOM **after leading whitespace**, with no comment line before it, produces `error_invalid_byte_order_mark`.
+- A BOM **at the start of a line that follows a comment line or a version directive** produces `error_unexpected_input_byte`.
+
+Once the first assignment has begun, a BOM inside a comment or a string is valid UTF-8 and passes through without error; between assignments it is `error_unexpected_input_byte`.
 
 ---
 
@@ -1503,8 +1511,9 @@ and `tai` (the offset is folded before `tai`'s leap-second lookup). A second of
 second (POSIX time has none to spend on it), but on `tai` it keeps its own value
 one below the boundary, which is what makes UTC⇄TAI injective there. The atomic
 GNSS epochs (`gps`/`galileo`/`glonass`/`beidou`) reject a literal
-(`error_datetime_literal_unsupported_epoch`) — give those an integer carrier. A
-malformed or out-of-range literal is `error_invalid_datetime_literal`.
+(`error_datetime_literal_unsupported_epoch`) — give those an integer carrier. An
+out-of-range field is `error_invalid_datetime_literal`; a literal of the wrong
+shape is a lexical error, `error_unexpected_input_byte`.
 
 **Timestamp vs. duration — don't confuse them.** A *timestamp* (an instant) is a
 `datetime`; a *duration* (an elapsed amount) is a plain number with a time unit,
@@ -1522,6 +1531,9 @@ on the literal:
 - Positive integer literal → `uint:64`
 - Negative integer literal → `sint:64`
 - Literal containing `.` or `e` → `float:64`
+- Special number (`nan`, `inf`, `ninf`) → `float:64`
+- Any number with an inline currency unit (`5 $USD`) → `float_dec:64` with that
+  unit — this takes precedence over the three rows above
 - Quoted string → `utf8`
 - Boolean keyword (`true`/`false`/`on`/`off`) → `bool`
 - ISO-8601 datetime literal (spec 1.1) → `datetime:64,unix`
@@ -1643,7 +1655,8 @@ Place the unit symbol inside the angle brackets after the other type parameters:
 An SI prefix is written before the unit symbol, either with the `~` separator —
 `k~m` (kilometer), `m~V` (millivolt), `G~Hz` (gigahertz) — or compactly, in the
 spelling everyone else uses: `km`, `mV`, `GHz`. Both parse to the same unit.
-The `~` form is canonical: it is what the writer emits, and it is the form that
+The `~` form is canonical: it is what the writer emits for a unit it is handed
+without a spelling, and it is the form that
 says *exactly* which reading you mean, which matters for the handful of tokens
 that are a unit in their own right (`min` is the minute, so milli-inch must be
 written `m~in`).
@@ -1677,10 +1690,12 @@ In four situations, all of which are `error_unit_illegal`:
 3. **A prefix the unit does not accept.** `Kim` fails exactly as `Ki~m` does
    (IEC prefixes are for `b`/`B` only), as do `mB`, `kPfd` and `kppm`.
 4. **A spelling refused by name.** `usb` would otherwise resolve to the
-   microstilb, and `kt` to the kilotonne — but `kt` is equally the standard
-   abbreviation for the knot, and only the author knows which was meant. Both
-   stay errors; write `u~sb`, and `k~t` (mass) or `kn` (speed). The list lives
-   in `src/gendata/units.bvnr`.
+   microstilb, `kt` to the kilotonne — but `kt` is equally the standard
+   abbreviation for the knot, and only the author knows which was meant — and
+   `ppt` to the picopint, where everyone means parts per trillion or per
+   thousand. All three stay errors: write `u~sb`; `k~t` (mass) or `kn`
+   (speed); `pptr`, `‰` or `p~pt`. The list lives in
+   `src/gendata/units.bvnr`.
 
    `pH`, `mph` and `kph` were on that list until Bovnar gained the units they
    name — the acidity scale and two speeds. A bare unit alias outranks any
@@ -1894,7 +1909,10 @@ The `bu_gram` base unit is used for mass so that the `k~` prefix can carry the k
 
 Yes. Bovnar's lexer distinguishes bare words (symbols) from numbers by context.
 A bare `FF` in value position is a symbol, not a hex number, and will produce
-`error_type_value_mismatch`. Any non-decimal value must be a quoted string:
+`error_type_value_mismatch`. A bare literal made only of digits of the base does
+parse, and is read in that base — `<uint:8,_16> 10` is sixteen, and
+`<uint:_16> 1e3` is 483, because `e` is a hex digit — so write every
+non-decimal value as a quoted string:
 
 <!-- bovnar-example: rejected -->
 ```bovnar
@@ -2300,8 +2318,10 @@ fprintf(stderr, "%s at line %" PRIu64 " col %" PRIu64
 
 When `continue_on_error` is set in `bvnr_read_flags_t`, a parse error invokes
 the `on_error` callback and enters a resync state machine that skips bytes while
-tracking bracket and brace nesting. Once the resync state machine finds a `;`
-at the original nesting depth, normal parsing resumes. The recovery count
+tracking bracket and brace nesting. Normal parsing resumes at whichever comes
+first: a `;` at the original nesting depth, or the start of the next
+assignment — a `.` at that depth followed by a byte that can begin an
+identifier. The recovery count
 (accessible via `bvnr_reader_get_recovery_count`) is incremented at error entry,
 not on resync completion.
 
@@ -2974,32 +2994,41 @@ Overlong sequences and surrogate halves (U+D800–U+DFFF) are rejected.
 
 The UTF-8 BOM `EF BB BF` is only legal **at byte offset 0** of a stream.
 
-The lexer runs a dedicated `first_comment_*` state machine over the first comment line to detect misplaced BOMs:
+A BOM anywhere else is an error or is ordinary content, depending on whether the first assignment has begun.
 
-- A BOM (`EF BB BF`) detected **inside the first-line comment** produces `error_invalid_byte_order_mark`.
-- A BOM byte (`EF`) seen **after** the first comment line (in the `first_bom` state, before the first `.` identifier) is unhandled and produces `error_unexpected_input_byte`.
+**Before the first assignment:**
+
+- A BOM (`EF BB BF`) **inside any comment** — the first comment line, a version directive line, or a later comment line — produces `error_invalid_byte_order_mark`.
+- A BOM **after leading whitespace**, with no comment line before it, produces `error_invalid_byte_order_mark`.
+- A BOM **at the start of a line that follows a comment line or a version directive** produces `error_unexpected_input_byte`, as does a second BOM directly after the one at offset 0.
+
+**Once the first assignment has begun:**
+
+- `EF BB BF` inside a comment or a string is **valid UTF-8** and is accepted as content.
+- `EF BB BF` between assignments produces `error_unexpected_input_byte`.
 
 <!-- bovnar-example: illustrative -->
 ```bovnar
 # BOM at byte offset 0: valid
 EF BB BF.foo = 1;
 
-# BOM bytes inside the first comment → error_invalid_byte_order_mark
+# BOM bytes inside a comment before the first assignment → error_invalid_byte_order_mark
 # comment text: # EF BB BF text
 
-# BOM bytes after the first comment line → error_unexpected_input_byte
+# BOM bytes after leading whitespace → error_invalid_byte_order_mark
+   EF BB BF.foo = 1;
+
+# BOM bytes at the start of the line after a comment line → error_unexpected_input_byte
 # comment line
 EF BB BF.foo = 1;
 ```
-
-A BOM appearing **inside** any later comment or string is **valid UTF-8** and accepted (only the `first_comment_*` states guard against BOM).
 
 ### 3.3 Byte Classes
 
 | Class | Bytes | Usage |
 |-------|-------|-------|
 | Whitespace | `0x09` (HT), `0x0A` (LF), `0x0B` (VT), `0x0C` (FF), `0x0D` (CR), `0x20` (SP) | Token separators |
-| Control (rejected) | `0x00–0x08`, `0x0E–0x1F`, `0x7F` (DEL) | Hard errors outside strings |
+| Control (rejected) | `0x00–0x08`, `0x0E–0x1F`, `0x7F` (DEL) | Hard errors everywhere outside octet streams, strings and comments included (`0x00` where a value is expected opens an octet stream) |
 | Safe ASCII | `0x20–0x7E` except reserved punctuation | Identifier/symbol/reference bodies |
 | High bytes | `0x80–0xFF` | UTF-8 multi-byte sequences |
 
@@ -3025,7 +3054,7 @@ is a 1.2 construct in a document declaring 1.1.
 default to 1.0.
 
 **Form.** `#` `!bovnar` followed by one or more spaces/tabs, a `<major>.<minor>`
-decimal version, optional trailing whitespace, then end-of-line (LF/CR) or EOF.
+decimal version, optional trailing spaces/tabs, then end-of-line (LF/CR) or EOF.
 Each component is a decimal integer with no leading zero (a bare `0` excepted)
 and must fit in 16 bits.
 
@@ -3076,7 +3105,7 @@ resume on the next line, where they are ordinary and inert.
 
 ### 4.1 Whitespace & Comments
 
-Whitespace and comments are freely interleaved between all tokens.
+Whitespace and comments are freely interleaved between all tokens, with the one restriction on where a comment may *start* that is stated below.
 
 **Whitespace characters:**
 
@@ -3094,6 +3123,18 @@ HT (0x09), LF (0x0A), VT (0x0B), FF (0x0C), CR (0x0D), SP (0x20)
 ```bovnar
 # A full-line comment
 .foo = 42;  # an inline comment
+```
+
+**`#` is not a terminator of a bare token.** A comment may not start immediately after a key, a number, a symbol, a reserved word, a reference or a datetime literal: there `#` is `error_unexpected_input_byte`, and at least one whitespace byte must come first. After a string, `]`, `}`, `>`, `=`, `;` or an inline unit, `#` may follow directly.
+
+<!-- bovnar-example: rejected -->
+```bovnar
+.ok1 = 42 # whitespace first: valid
+;
+.ok2 = "text"# directly after a string: valid
+;
+.bad = 42# directly after a number: error_unexpected_input_byte
+;
 ```
 
 ### 4.2 Identifiers (Keys)
@@ -3236,9 +3277,11 @@ A **reference** is a dotted path to another key, introduced by `&`.
 ```
 reference     = "&" ref-segment { ref-segment | index }
 ref-segment   = "." id-start { ref-body-char }
-ref-body-char = same as symbol-body-char | "."
+ref-body-char = same as symbol-body-char
 index         = "[" digit { digit } "]"        (* spec 1.1 *)
 ```
+
+A `.` never extends a segment: it starts the next one, which must begin with an `id-start` character. A trailing or doubled dot (`&.x.`, `&.x..y`) is `error_unexpected_input_byte`.
 
 The stored text includes the leading dot and all intermediate dots:
 
@@ -3310,7 +3353,7 @@ dot-led       = "." DIGIT { DIGIT }
 dec-exponent  = ("e" | "E") [ "+" | "-" ] DIGIT { DIGIT }
 ```
 
-- Only `e`/`E` accepted as exponent marker in bare literals (base-16 float values in quoted string literals use `p`/`P` — see §6.3)
+- Only `e`/`E` accepted as exponent marker in bare literals (base-16 float values in quoted string literals use `p`/`P` — see §6.3). Under a declared base of 15 or above the `e`/`E` of a bare literal is read as a digit, not as an exponent marker (§5.5)
 - Leading zeros are valid (`007` is accepted)
 - A trailing dot without fractional digits is valid (`123.`)
 - `.` alone is a hard error
@@ -3456,8 +3499,13 @@ idempotent (`2026-06-15` becomes `<datetime:64> 1781481600`). A **bare** literal
 with no annotation infers `<datetime:64,unix>`, so `.t = 2026-06-15;` is a
 timestamp without any annotation. Fields are strictly validated (month `01`–`12`,
 a valid day-of-month, hour `00`–`23`, minute `00`–`59`, second `00`–`60`, offset
-`±HH:MM` with two-digit components); a malformed or out-of-range literal is
-`error_invalid_datetime_literal`. A second of `60` is a **UTC leap second** and
+`±HH:MM` with two-digit components). A literal with an
+out-of-range field, a field of the wrong width (`2026-6-15`) or an empty
+fraction is `error_invalid_datetime_literal`; one that stops being a literal
+part-way (a
+missing seconds field, `+0200` without its colon, a lowercase `t` or `z`) is a
+lexical error, `error_unexpected_input_byte`; and a literal in a document that
+declares less than 1.1 is `error_illegal_value_type`. A second of `60` is a **UTC leap second** and
 is accepted. What it stores depends on the epoch:
 
 * On the **civil epochs** (`unix`, `mjd`, `ntp`, `y2000`) it normalises onto the
@@ -3654,7 +3702,7 @@ flux in netCDF and CF metadata.
                                              # vocabulary has no operators
 ```
 
-Three details of that exception:
+Four details of that exception:
 
 - **The family `:` is not a namespace.** Only a second `:` at bracket depth 0
   makes a parameter namespaced, so `<uint:6 4>` is still
@@ -3729,11 +3777,12 @@ available in a type annotation only.
 
 ### 5.5 Non-decimal Base with Bare Numbers
 
-A non-decimal base with a bare number literal is not caught by the validator (no error is raised). In practice, a bare non-decimal value such as `ff` is parsed as a symbol token, not a number, so type/value compatibility validation will flag the mismatch instead. Use a quoted string for non-decimal values:
+A bare number literal under a non-decimal base is valid when every byte of it is a digit of that base, and it is read **in that base**: `<uint:_16> 10` is sixteen, not ten. In base 15 and above `e` and `E` are digits, so a bare `1e3` under `_16` is the integer 0x1E3 (483) and not an exponent form; below base 15 the `e` is still an exponent marker, and under an integer family that is `error_type_value_mismatch`. A value that needs a letter the number lexer does not accept cannot be written bare — `ff` is lexed as a symbol, and the type/value check reports `error_type_value_mismatch` — so it must be a quoted string. Producers SHOULD quote every non-decimal value:
 
 ```bovnar
-# CORRECT: quoted string
-.n = <uint:_16> "ff";     # hex value 255
+.n = <uint:_16> "ff";     # hex value 255 — the form to write
+.m = <uint:_16> 10;       # valid, and sixteen: the bare digits are read in base 16
+.k = <uint:_16> 1e3;      # valid, and 483: in base 16 the 'e' is a digit
 ```
 
 ---
@@ -3752,7 +3801,9 @@ A non-decimal base with a bare number literal is not caught by the validator (no
 | `vt_float` | Number or string (may have `.`, `e`/`E`; base 16 strings use `p`/`P`) — only base 10 or 16 |
 | `vt_float_fix` | Number or string (may have `.`, `e`/`E`) — base 10 only |
 | `vt_float_dec` | Number or string (may have `.`, `e`/`E`) — base 10 only |
-| `vt_datetime` (spec 1.1) | Number only — a decimal signed integer (epoch seconds); `.`/`e` and string carriers are rejected |
+| `vt_datetime` (spec 1.1) | A decimal signed integer (epoch seconds), an ISO-8601 literal (§5.1), or a special number (§6.4); `.`/`e` and string carriers are rejected |
+
+Two value kinds stand outside this table. A **null** takes any annotation and carries its type (§4.7). An **octet stream** under an annotation is accepted under *every* family: the annotation is carried on the stream's events and is **not checked** against it, so `<uint:8>`, `<utf8>` or `<bool>` in front of an octet stream is not `error_type_value_mismatch`. It says nothing about the payload, and producers SHOULD NOT write one.
 
 ### 6.2 Validation Rules per Numeric Type
 
@@ -3782,6 +3833,13 @@ A non-decimal base with a bare number literal is not caught by the validator (no
 
 Valid widths: `0` (default 64), `16`, or any multiple of `32` up to `32768`.
 Base `10` (default) or `16` are accepted; all other bases are rejected.
+
+**No range or precision check.** A `float` or `float_dec` literal with more
+precision or a larger exponent than the declared width can hold is valid
+(`<float:16> 1e30`, `<float_dec:16> 1234`, a bare `1e999`). The excess is the
+consumer's to round, and a consumer may deliver ±infinity. For these two
+families the width bounds what a producer promises, not what the reader
+rejects; only the integer families and `float_fix` are range-checked.
 
 <!-- bovnar-example: rejected -->
 ```bovnar
@@ -3858,7 +3916,7 @@ Digits in values are checked against the declared base:
 
 #### Exponent Markers in Quoted String Literals
 
-Bare number literals always use `e`/`E` as the exponent separator (§4.6). Quoted string number literals follow the same rule **except** for base-16 (`_16`) float values, where `p`/`P` must be used instead of `e`/`E`. This is required because `e` and `E` are valid hexadecimal digits: with base 16 you must write `"1.8p+2"`, not `"1.8e+2"` — the `e` would be read as a mantissa digit rather than an exponent marker, leaving the trailing `+2` invalid. Float values support a decimal base (the default) and base-16 (`_16`); the `p`/`P` exponent separator applies to the base-16 form.
+Bare number literals use `e`/`E` as the exponent separator (§4.6) — in a base below 15; from base 15 up the letter is a digit, bare or quoted (§5.5). Quoted string number literals follow the same rule **except** for base-16 (`_16`) float values, where `p`/`P` must be used instead of `e`/`E`. This is required because `e` and `E` are valid hexadecimal digits: with base 16 you must write `"1.8p+2"`, not `"1.8e+2"` — the `e` would be read as a mantissa digit rather than an exponent marker, leaving the trailing `+2` invalid. Float values support a decimal base (the default) and base-16 (`_16`); the `p`/`P` exponent separator applies to the base-16 form.
 
 ```bovnar
 .hex_float  = <float:64,_16> "1.8p+2";   # OK: 1.8₁₆ × 2² = 6.0  (p = binary exponent)
@@ -3926,6 +3984,8 @@ The inline unit suffix is **forbidden inside arrays**; any character that would 
 ```
 
 An invalid inline unit string (unrecognised base unit, bad prefix, etc.) produces `error_unit_illegal`. The suffix may appear after `no_unit` checks as with any other unit string.
+
+**An inline unit after a `utf8` string is accepted.** The inline path does not consult the type family: `<utf8> "text" m` and a bare `"text" m` are valid, the unit is carried on the value and is written back on re-serialisation — although the same unit as an annotation parameter (`<utf8,m>`) is `error_illegal_value_type` (§5.1). The suffix exists for quoted *numeric* literals (`<uint:_16> "ff" m`); producers SHOULD NOT attach one to text.
 
 ---
 
@@ -4496,7 +4556,7 @@ A code that is one whole token is **never decomposed**: `unece:KGM` is the kilog
 
 **Gated on the declared version.** A profile unit requires a `#!bovnar` directive declaring 1.2 or later, exactly as the datetime family and the `\x`/`\u` escapes require 1.1 (§3.4). In a document declaring less — or declaring nothing, which declares less than anything — a profile unit is `error_unit_illegal`, because in that version it is not a unit. A **native** unit is unaffected in every version; the notation is purely additive.
 
-**Three outcomes, and no fourth.** A profile expression becomes a real unit, or it becomes an error. There is no state in which a value carries a unit the parser cannot reason about — every guarantee this section makes is a guarantee about units the parser understands. The refusals are distinguished so a producer can act on them:
+**A unit, an opaque unit, or one of three errors — and nothing else.** A profile expression becomes a real unit, or it becomes an error. There is no state in which a value carries a unit the parser cannot reason about — every guarantee this section makes is a guarantee about units the parser understands. The refusals are distinguished so a producer can act on them:
 
 | Outcome | Result |
 |---------|--------|
@@ -4548,14 +4608,13 @@ Setting most fields to `0` in `bvnr_read_flags_t` substitutes an internal defaul
 | `float_fix` value outside the declared Q-format range (§6.2) | `error_value_out_of_range` |
 | Negative number with `uint` type | `error_value_out_of_range` |
 | Mismatched type family for value token | `error_type_value_mismatch` |
-| Dot or exponent in integer-typed value | `error_type_value_mismatch` |
-| Malformed or out-of-range ISO-8601 datetime literal (spec 1.1) | `error_invalid_datetime_literal` |
+| Dot or exponent in integer-typed value (an `e`/`E` is an exponent only in a base below 15, §5.5) | `error_type_value_mismatch` |
+| ISO-8601 datetime literal with an out-of-range or wrong-width field, or an empty fraction (spec 1.1); one that breaks off part-way is `error_unexpected_input_byte` | `error_invalid_datetime_literal` |
 | ISO-8601 literal for an atomic GNSS epoch — `gps`/`galileo`/`glonass`/`beidou` (spec 1.1) | `error_datetime_literal_unsupported_epoch` |
 | Invalid unit string | `error_unit_illegal` |
 | Empty parameter component — `<uint:>`, `<uint:8,>`, `<uint:8,,>`, `<uint:,_16>` (§5.3) | `error_illegal_value_type` |
 | Wholly empty annotation `<>` / `< >` (no family keyword) | `error_unexpected_input_byte` |
 | `utf8` (string) type given a number value | `error_type_value_mismatch` |
-| Non-decimal base for float type | `error_illegal_value_type` |
 | Base `_N` (N≠10, N≠16) for `float` | `error_illegal_value_type` |
 | Base param (`_N`) used with `float_fix` or `float_dec` | `error_illegal_value_type` |
 | Q param (`qN`) used with family other than `float_fix` | `error_illegal_value_type` |
@@ -4599,7 +4658,8 @@ Setting most fields to `0` in `bvnr_read_flags_t` substitutes an internal defaul
 
 | Check | Error |
 |-------|-------|
-| Empty key (`.=` or `.` + non-identifier char) | `error_empty_identifier` |
+| Empty key (`.` followed by `=` or by whitespace) | `error_empty_identifier` |
+| `.` followed by any other byte that cannot start an identifier (`.1`, `.;`, `.-a`) | `error_unexpected_input_byte` |
 | Invalid character in identifier | `error_unexpected_input_byte` |
 
 ### 12.7 String Validation
@@ -4649,7 +4709,7 @@ typedef void (*bvnr_on_error_fn)(
 
 ### 13.2 Recovery Mode
 
-When `bvnr_read_flags_t.continue_on_error` is `true`, the parser enters **resync mode** after any error:
+When `bvnr_read_flags_t.continue_on_error` is `true`, the parser enters **resync mode** after an error — any error but one inside a comment (below):
 
 1. The `on_error` callback is invoked with error details
 2. A **resync state machine** (`state_t: resync, resync_dot, resync_string, resync_string_escape, resync_comment`) skips bytes
@@ -4672,6 +4732,21 @@ skipped-over junk (`1.5`, `.5`, a `.` in binary corruption) is just another
 skipped byte. A `.` inside a bracket opened *since* recovery began opens no
 assignment either, and is skipped. Neither boundary recovers less than the other
 alone would: `;` remains a boundary in every case it was one before.
+
+**What recovery leaves open.** On entry the reader closes — with their
+`ev_array_row_end` events — only the arrays opened *inside* the innermost open
+struct, the ones the broken statement itself was in. An array that struct is an
+*element of* stays open, with its row and element counts, so the struct's own
+`}` and the array's `,` or `]` are read normally afterwards and the start/end
+events a consumer sees always nest. A `}` that is itself the offending byte
+(`.s = {.a = 1 };`, a member missing its `;`) is not discarded: it closes its
+struct.
+
+**An error inside a comment does not enter resync.** An invalid UTF-8 sequence
+or a control byte in a comment is reported through `on_error` and counted —
+`recovery_count` and the skipped-byte total each go up by one — and the comment
+continues to its line end. Nothing is unwound and no value is lost, and the rest
+of the comment is never read as document text.
 
 **State machine behavior during resync:**
 
@@ -5486,7 +5561,7 @@ typedef enum error_code_e {
     /* whitespace split a type-annotation PARAMETER in two (§5.3). Every `ws` the
      * grammar allows inside an annotation sits beside a separator; in the middle
      * of a parameter there is no production for it, and the lexer used to drop it
-     * anyway -- so "<float:64,k g>" was accepted as the kilogram and "<uint:6 4>"
+     * anyway -- so "<float:64,m in>" was accepted as the minute and "<uint:6 4>"
      * as a 64-bit width. Reported at the first byte after the whitespace. A byte
      * that is illegal anywhere in an annotation is still
      * error_unexpected_input_byte. */
@@ -5595,8 +5670,8 @@ rather than as changes of the format, on these grounds:
 Neither of the two changes what any accepted document *means*. A producer
 affected by either was already emitting data that could not be read correctly.
 
-**Reader defects fixed in the same release.** Beside those two, the 1.2
-reference reader stopped letting through — or misreading — input the
+**Reader defects fixed in the same release.** Beside those two, the reference
+reader of library 2.0.0 (which implements 1.2) stopped letting through — or misreading — input the
 specification already excluded. They are listed because a document that
 depended on one behaves differently, and because the first of them is the one
 case in which an accepted document now decodes to a different value:
@@ -5609,9 +5684,9 @@ case in which an accepted document now decodes to a different value:
   (`<float:64,s>[<float:64> 1, 3]`) no longer strips the unit from the elements
   after it. The `3` is in seconds again — and the document tier then refuses the
   array as mixed.
-- *A byte-order mark anywhere but offset 0* is
-  `error_invalid_byte_order_mark` (§3.2 always said so; one after leading
-  whitespace was accepted).
+- *A byte-order mark after leading whitespace* is
+  `error_invalid_byte_order_mark` (§3.2 always made offset 0 the only legal
+  place; this one was accepted).
 - *A version directive ended by end-of-input* is parsed like one ended by a
   newline, so a malformed one is `error_invalid_spec_version`.
 - *An array left open at the `;`* (`.a = [1;`) is
@@ -5621,7 +5696,43 @@ case in which an accepted document now decodes to a different value:
   value (`.f = [{.x = 7, 1;}];`) is `error_unexpected_input_byte`; it was
   accepted, and the member read as `71`. And an array left open at a `;` is
   detected inside a struct as well, after an array nested in it has closed
-  (`.p = {.s = [{.a = [1];}; .q = 1;];};`).
+  (`.p = {.s = [{.a = [1];}; .q = 1;];};`). A `]` is held to the same rule:
+  `.a = [{.x = 1];};` closed the array from inside its own element and was
+  accepted; it is `error_unexpected_input_byte`.
+- *The width of a `/`-row counts each element once* (§7.3). A nested array —
+  an element, or an array that is only a member of a struct element — was
+  counted twice in the row that holds it. So `[[1]]/[null,null]` (one element
+  against two) was accepted and is `error_array_row_size_mismatch`; and
+  `[[1],[2]]/[null,null]` and `[{.m = [1];}]/[{.m = null;}]` (equal widths)
+  were refused and are valid. This is the one entry here that also *accepts*
+  documents a 1.1 reader refused. Rows whose elements are all arrays, or all
+  not, compared correctly before and are unchanged.
+- *`float_fix` and `float_dec` are one keyword each.* Whitespace or a comment
+  before the suffix (`<float _fix:32,q8>`) is `error_type_param_whitespace`,
+  for the reason given above for whitespace inside a parameter; it was read
+  as `float_fix`.
+- *After a reference index only `.`, `[` or the end of the reference may
+  follow* (§4.5). `&.a[0]b` is `error_unexpected_input_byte`; it was accepted
+  as the path `.a[0]b`, which the grammar does not derive and no lookup
+  resolves.
+- *A comment that ends at end-of-input inside a multi-byte UTF-8 sequence* is
+  `error_invalid_utf8_byte` (§3.1), as the same bytes followed by a newline
+  always were.
+- *Quoted digits are range-checked whatever they spell.* In base 24 and up
+  `n`, `a`, `i` and `f` are digits, and a quoted `"nan"`, `"inf"` or `"ninf"`
+  under `uint`/`sint` was exempted from the range check as though it were the
+  keyword: `<uint:8,_36> "inf"` (24171) is `error_value_out_of_range`. The
+  bare keywords keep the exemption of §6.4.
+- *Homogeneity (§7.4) no longer depends on element order.* The document tier
+  compared every element with the first non-null one, so a hole in that one
+  hid whatever stood at the same position in the others:
+  `[[null], [1], ["x"]]` and `[{.x = null;}, {.x = 1;}, {.x = "s";}]` were
+  accepted — as was a matrix whose rows carry different units behind a leading
+  row of nulls — while the same elements in another order were refused. They
+  are `error_array_element_type_mismatch` in every order. In the other
+  direction, nested `/`-matrices such as `[[[1,1]/[2,2], null], [null, null]]`
+  were refused as ragged through a row count shared between array scopes, and
+  are valid.
 - *A datetime literal with a fraction whose UTC year falls outside 0000–9999*
   (reachable only through a timezone offset) is
   `error_invalid_datetime_literal`.
@@ -5745,9 +5856,11 @@ claims. *It parsed* means the dimension is stated and internally consistent, not
 that it is correct.
 
 Read-time unit conversion carries a further trap: asking for a value in some
-unit is a **request, not a guarantee**. Where the conversion cannot be
-performed — different dimensions, or two different currencies — the value is
-delivered in its *original* unit rather than the request failing. A caller that
+unit is a **request, not a guarantee**. A target *list* (`want_unit`, `--unit`,
+`--si`) leaves a value it cannot convert — different dimensions, or two
+different currencies — in its *original* unit and reports no error; a
+per-field rule (`--field`, a policy rule by key path) fails with
+`error_unit_mismatch` instead. Only the first needs the check. A caller that
 assumes success then holds a number it believes is in one unit and which is in
 another, which is exactly the failure this format exists to prevent. Check
 whether the conversion occurred; do not infer it from the absence of an error.
@@ -5856,20 +5969,21 @@ ev_type_annotation_type_family "uint"
 ...params...
 ev_type_annotation_end
 ev_data                        data="1"
-ev_type_annotation_start       (synthesised for 2)
-...params...
-ev_type_annotation_end
 ev_data                        data="2"
 ev_array_row_end
 ev_array_dim_start
 ev_array_row_start
-ev_type_annotation_start       (synthesised for 3)
-...params...
-ev_type_annotation_end
 ev_data                        data="3"
-... (4) ...
+ev_data                        data="4"
 ev_array_row_end
 ```
+
+Inside an array a synthesised annotation is emitted only when the element's
+synthesised type differs from the type currently in force — at the first
+element, and again at each change. It is not repeated per element or per row;
+an explicit element annotation is always emitted. So `[1, 2.5, 3]` carries
+three annotation blocks (`uint`, `float`, `uint`) and `[1, 2]/[3, 4]` carries
+one.
 
 ### A.5 Struct
 
@@ -7288,7 +7402,7 @@ A unit may be written directly after a scalar value literal, between the value a
 
 The inline unit uses the **same character set** and **same semantic parser** (`bvn_parse_unit`) as the type-annotation unit parameter. It is terminated by ASCII whitespace, `#` (comment), or `;`.
 
-**A native unit contains no whitespace, in either position.** Inline, whitespace ends the token, so `1.0 k g` is a value with a stray token after it (`error_unexpected_input_byte`). In a type annotation, whitespace is legal only beside a separator — the family `:`, a `,` between parameters, the closing `>` — and inside a native unit parameter it is `error_type_param_whitespace` (spec [§5.3](03_bovnar_spec.md#53-parameter-order)). `<float:64,k g>` used to be accepted as `k~g`, which made it the one place in the format where a wrong unit was produced silently instead of refused.
+**A native unit contains no whitespace, in either position.** Inline, whitespace ends the token, so `1.0 k g` is a value with a stray token after it (`error_unexpected_input_byte`). In a type annotation, whitespace is legal only beside a separator — the family `:`, a `,` between parameters, the closing `>` — and inside a native unit parameter it is `error_type_param_whitespace` (spec [§5.3](03_bovnar_spec.md#53-parameter-order)). Whitespace there used to be deleted, so `<float:64,m in>` was accepted as `min` — the minute — which made it the one place in the format where a wrong unit was produced silently instead of refused.
 
 A parameter carrying a **profile namespace** is the exception: there whitespace is kept verbatim and the vocabulary decides what it means, because UDUNITS multiplies with a space and `udunits:kg m-2 s-1` is the commonest spelling of a flux in CF metadata. That is a property of the foreign notation, not of the native one — see doc/11 §13.2.
 
@@ -8528,7 +8642,7 @@ The literal `no_unit` declares a value as **explicitly dimensionless**:
 
 `bvn_parse_unit` detects `no_unit` via `memcmp` and returns `BVN_UNIT_NONE` (`num_components = 0`).
 
-**Omitting the unit parameter** (e.g. `<float:64>`) yields `BVN_UNIT_NO_PREFIX(bu_none)` (`num_components = 1`, `base == bu_none`). Both forms are semantically equivalent — they compare as compatible via `bvn_units_compatible` and both serialize to `"no_unit"` — but they are structurally distinct internal states.
+**Omitting the unit parameter** inside an annotation (e.g. `<float:64>`) yields the same `BVN_UNIT_NONE` (`num_components = 0`). Only a **fully unannotated** value (`1.0`) gets `BVN_UNIT_NO_PREFIX(bu_none)` (`num_components = 1`, `base == bu_none`), from default type synthesis. The two states are semantically equivalent — they compare as compatible via `bvn_units_compatible` and both serialize to `"no_unit"` — but they are structurally distinct.
 
 ---
 
@@ -9779,7 +9893,7 @@ The validator raises the following unit-specific errors:
 | `error_unit_mismatch` | 38 | An inline unit suffix and an explicit type-annotation unit are both present, but parse to different `value_unit_t` representations |
 | `error_unexpected_input_byte` | 15 | An inline unit suffix appears inside an array element |
 
-All four errors are raised during the `on_unverified` → validator phase. In `continue_on_error` mode the parser invokes `on_error` and enters the resync state machine, which skips to the next `;` at the current nesting depth. `bvnr_reader_get_error`, `…_line`, `…_column`, `…_byte`, and `…_offset` all report the location of the offending token.
+All four errors are raised during the `on_unverified` → validator phase. In `continue_on_error` mode the parser invokes `on_error` and enters the resync state machine, which resumes at the next `;` at the current nesting depth or at the start of the next assignment, whichever comes first (specification §13.2). `bvnr_reader_get_error`, `…_line`, `…_column`, `…_byte`, and `…_offset` all report the location of the offending token.
 
 ---
 
@@ -10416,6 +10530,10 @@ that appears to work has not normalised anything.
 | `--si` | `bvnr_normalise_si` |
 | `--base <N>` | `base` |
 | `--leave-inexact` | `bvnr_inexact_leave` |
+
+`query` takes all of them except `--base`, which it refuses by name (exit 2):
+it prints the value it found in decimal, and a base would change nothing it
+shows.
 
 **A conversion flag on `validate` is not a no-op.** `validate` produces no output,
 so it is easy to read `--unit` and `--si` there as flags that could not matter —
@@ -11206,6 +11324,7 @@ The writer uses the same event/data model as the reader — `bvnr_event_t` and `
     - 2.13 [`bvnr_write_bvni` / `bvnr_write_bvni_unit`](#213-bvnr_write_bvni--bvnr_write_bvni_unit)
     - 2.14 [`BVN_TYPE_FLOAT_BASE`](#214-bvn_type_float_base)
     - 2.15 [Writer-side unit policy (`bvnr_writer_set_unit_policy`)](#215-writer-side-unit-policy-bvnr_writer_set_unit_policy)
+    - 2.16 [Value helpers](#216-value-helpers)
 3. [Shared](#3-shared)
     - 3.1 [`bvnr_write_type_annotation`](#31-bvnr_write_type_annotation)
     - 3.2 [`bvn_parse_unit` / `bvn_parse_unit_n`](#32-bvn_parse_unit--bvn_parse_unit_n)
@@ -11433,9 +11552,12 @@ caret needs the right one:
 | `..._column` | **characters** | 1 | a multi-byte UTF-8 sequence advances it by one; a tab advances to the next multiple of 4 |
 | `..._offset` | **bytes** | 0 | use this to index the input buffer |
 
-In `.x = "café"; .y = @;` the `@` is byte 20 but column 19. This matters here
-more than in most formats: unit symbols are routinely non-ASCII (`µ~m`, `°C`,
-`Ω`), so the two disagree often.
+In `.x = "café"; .y = @;` the `@` is reported at column 19 and offset 19 — the
+19th character, and the 20th byte, because `é` is two bytes: a 1-based character
+count and a 0-based byte count that happen to land on the same number. One more
+non-ASCII character pulls them apart: in `.x = "çafé"; .y = @;` the `@` is at
+column 19 and offset 20. This matters here more than in most formats: unit
+symbols are routinely non-ASCII (`µ~m`, `°C`, `Ω`), so the two disagree often.
 
 All five error/location getters above (everything except `bvnr_reader_get_recovery_count`) are only meaningful when `bvnr_read` returned `false` (or after a recoverable error when `continue_on_error` is set). `bvnr_reader_get_error_byte` returns the raw byte value that triggered the error. `bvnr_reader_get_recovery_count` is the exception: it returns how many errors triggered entry into resync mode in `continue_on_error` mode (and so is meaningful even when `bvnr_read` ultimately returned `true`). This count is incremented at error entry, not when resync completes at `";". `bvnr_reader_get_skipped_bytes` is the same kind of thing and answers the question the count cannot: how much of the input recovery threw away. One skipped assignment and a whole discarded struct both report a single recovery, and the skipped bytes were never parsed, so nothing else in the API mentions them — a non-zero total means the document your callbacks saw is not the whole document.
 
@@ -12120,7 +12242,7 @@ typedef struct bvnr_write_flags_s {
 ```
 
 > **Writer limits.** Only `max_struct_nesting`, `max_array_nesting`, `on_event`, `userdata`,
-> and `unit_flags` have any effect on the writer. All other fields are present solely to keep
+> `unit_flags` and `emit_version` have any effect on the writer. All other fields are present solely to keep
 > `bvnr_write_flags_t` structurally parallel to `bvnr_read_flags_t`; they are silently
 > ignored. In particular, `continue_on_error`, `on_error`, and all per-token-length fields
 > have no effect. The writer never internally limits array items, text bytes, or file size.
@@ -12178,7 +12300,7 @@ if (!bvnr_open_write_mem(w, out, sizeof(out), false, &opts))
 bool bvnr_write_event(bvnr_writer_t *w, bvnr_event_t ev, bvnr_data_t *data);
 ```
 
-Emit one event to the writer. This is the only function used to produce output. It serialises the event and the data it describes directly into the configured sink.
+Emit one event to the writer. Every value in the output goes through this function: the helpers in [§2.16](#216-value-helpers) and the multiprecision writers in §2.12–2.13 are sequences of these events, and a caller replaying a reader's stream calls it directly. It serialises the event and the data it describes directly into the configured sink.
 
 Returns `true` on success, `false` on any serialisation error.
 
@@ -12270,6 +12392,7 @@ static bool write_string(bvnr_writer_t *w,
     if (!bvnr_write_event(w, ev_type_annotation_end, &d)) return false;
 
     d = (bvnr_data_t){
+        .type       = token_is_string,   /* required: says how the value is spelled */
         .value_type = vt,
         .data       = (void*)value,
         .length     = (uint32_t)strlen(value),
@@ -12277,6 +12400,10 @@ static bool write_string(bvnr_writer_t *w,
     return bvnr_write_event(w, ev_data, &d);
 }
 ```
+
+The `ev_data` event's `type` is not optional. Left at zero it is
+`token_is_identifier`, which is not a value, and the write fails with
+`error_type_value_mismatch` after the annotation has already gone out.
 
 **Example: open and close a struct**
 
@@ -12548,6 +12675,78 @@ survives re-opening the writer on another document, and is cleared with `NULL`.
 
 ---
 
+### 2.16 Value helpers
+
+One call per assignment: the key, its type annotation and its value, for the
+common scalar types. Each is the event sequence of §2.7 written out for you, and
+is what most producers should use.
+
+```c
+bool bvnr_write_string(bvnr_writer_t *w, const char *key, const char *value);
+bool bvnr_write_plain (bvnr_writer_t *w, const char *key, const char *value);
+bool bvnr_write_null  (bvnr_writer_t *w, const char *key);
+bool bvnr_write_bool  (bvnr_writer_t *w, const char *key, bool value);
+bool bvnr_write_uint(bvnr_writer_t *w, const char *key,
+                     uint32_t width, uint64_t value);
+bool bvnr_write_sint(bvnr_writer_t *w, const char *key,
+                     uint32_t width, int64_t value);
+bool bvnr_write_float(bvnr_writer_t *w, const char *key,
+                      uint32_t width, double value);
+bool bvnr_write_float_fix(bvnr_writer_t *w, const char *key,
+                          uint32_t width, uint32_t q, double value);
+bool bvnr_write_float_dec(bvnr_writer_t *w, const char *key,
+                          uint32_t width, double value);
+
+bool bvnr_write_uint_unit(bvnr_writer_t *w, const char *key,
+                          uint32_t width, uint64_t value, value_unit_t unit);
+bool bvnr_write_sint_unit(bvnr_writer_t *w, const char *key,
+                          uint32_t width, int64_t value, value_unit_t unit);
+bool bvnr_write_float_unit(bvnr_writer_t *w, const char *key,
+                           uint32_t width, double value, value_unit_t unit);
+bool bvnr_write_float_fix_unit(bvnr_writer_t *w, const char *key,
+                               uint32_t width, uint32_t q,
+                               double value, value_unit_t unit);
+bool bvnr_write_float_dec_unit(bvnr_writer_t *w, const char *key,
+                               uint32_t width,
+                               double value, value_unit_t unit);
+
+bool bvnr_write_struct_start(bvnr_writer_t *w, const char *key);
+bool bvnr_write_struct_end  (bvnr_writer_t *w);
+```
+
+| Helper | Writes | Notes |
+|--------|--------|-------|
+| `bvnr_write_string` | `.key = "value";` | `value` is escaped for you. It must be valid UTF-8 and may not hold a C0 control other than `\t` `\n` `\v` `\f` `\r`, nor DEL (`error_unexpected_input_byte`, `error_invalid_utf8_byte`) |
+| `bvnr_write_plain` | `.key = value;` | a bare **symbol** — `value` must be a valid symbol, it is not quoted |
+| `bvnr_write_null` | `.key = ;` | the null value |
+| `bvnr_write_bool` | `.key = true;` / `false` | |
+| `bvnr_write_uint` / `_sint` | `.key = <uint:16> 443;` | `width` 0 writes `<uint>` / `<sint>` (64 bits); a value that does not fit `width` is `error_value_out_of_range` |
+| `bvnr_write_float` | `.key = <float:64> 1e-1;` | `width` 0 writes `<float>`; `nan`, `inf` and `ninf` are written as those words; formatted as by `bvn_format_double` (§2.11) |
+| `bvnr_write_float_fix` | `.key = <float_fix:32,q16> 1.5e+0;` | `q` is the number of fractional bits |
+| `bvnr_write_float_dec` | `.key = <float_dec:64> 1.25e+0;` | |
+| `…_unit` | `.key = <float:64,k~m> 1e+0;` | the same, with `unit` as the annotation's unit parameter; honours `bvnr_writer_set_unit_source` (§3.1) and the writer's unit policy (§2.15) |
+| `bvnr_write_struct_start` / `_end` | `.key = {` … `};` | every helper called between the two writes a member |
+
+All return `false` on failure with the reason latched in the writer
+(`bvnr_writer_get_error`); once a write has failed, every later one fails too.
+A `double` carries 53 significant bits whatever `width` says — for the full
+precision of a wider `float`, `float_dec` or `float_fix`, or an integer past 64
+bits, use `bvnr_write_bvnf_base` (§2.12) and `bvnr_write_bvni` (§2.13). A
+timestamp has its own helper, `bvnr_write_datetime` (§1.9). There is no array
+helper: an array is written as events (`ev_array_row_start`, one `ev_data` per
+element, `ev_array_row_end`).
+
+```c
+bvnr_write_string(w, "host", "localhost");       /* .host = "localhost";      */
+bvnr_write_uint  (w, "port", 16, 443);           /* .port = <uint:16> 443;    */
+bvnr_write_struct_start(w, "limits");            /* .limits = {               */
+bvnr_write_bool  (w, "strict", true);            /*     .strict = true;       */
+bvnr_write_null  (w, "owner");                   /*     .owner = ;            */
+bvnr_write_struct_end(w);                        /* };                        */
+```
+
+---
+
 ## 3. Shared
 
 ---
@@ -12753,14 +12952,16 @@ bool bvn_unit_convert_value(double value, value_unit_t from,
 
 Convert one numeric quantity from unit `from` into unit `to`, writing the result
 to `*out`. Handles both the simple multiplicative case (`5 k~m → 5000 m`) and the
-affine case (`25 °C → 298.15 K`), routing the latter through SI base units. This
-is the same routine the reader's `want_unit` hook (§1.10) uses, and the C
-equivalent of the Python `convert_value`.
+affine case (`25 °C → 298.15 K`), routing the latter through SI base units. It
+answers the same question the reader's `want_unit` hook (§1.10) does — may this
+value be delivered in that unit, and what is it there — in `double`, and is the
+C equivalent of the Python `convert_value`. It is **not** the routine the hook
+runs: the hook works in exact rationals (`bvn_unit_convert_rational`, below).
 
 Returns `false` — leaving `*out` untouched — when the two units are
 dimensionally **incompatible** or have no SI mapping. That boolean is the
-"validly convert only" guard: the reader turns a `false` here into
-`error_unit_mismatch`.
+"validly convert only" guard; the same verdict from the exact engine is what
+the reader reports as `error_unit_mismatch`.
 
 ```c
 double m;
@@ -12848,7 +13049,9 @@ fprintf(stderr, "error: %s\n", bvn_error_to_string(bvnr_reader_get_error(r)));
 An adapter that lets a reader's event stream drive the serializer directly, without
 constructing a `bvnr_writer_t`. Installed as a reader callback it re-emits every event
 to a sink, producing a canonical — or pretty-printed — copy of the input. This is what
-the command-line pretty-printer and canonicaliser are built on.
+`bovnar events -d` prints its re-serialisation with. (`bovnar pretty-print` is the other
+way to do the same job: a `bvnr_writer_t` fed from `on_verified`, which is what lets
+`--canonical` set `unit_flags`.)
 
 ```c
 typedef struct bvnr_canon_observer_s bvnr_canon_observer_t;
@@ -12967,8 +13170,20 @@ document still returns a non-NULL doc, so check `bvn_dom_doc_get_parse_error()`
 The `bvn_dom_parse_fd*` variants instead return NULL on **any** failure
 (allocation, I/O, or exceeding the size cap). `bvn_dom_parse_fd_ex` caps the
 accumulated input at `max_bytes`, but only *downward*: `0` or any value above the
-built-in hard cap `BVN_DOM_FD_MAX_BYTES` (256 MiB) is clamped to that cap — there
-is no unlimited mode. Free every returned doc with `bvn_dom_doc_destroy`.
+built-in hard cap of 256 MiB is clamped to that cap — there is no unlimited mode.
+(The cap is a build-time constant of the library, `BVN_DOM_FD_MAX_BYTES` in
+`src/dom/bovnar_dom_builder.c`; it is not in the public headers.) Free every
+returned doc with `bvn_dom_doc_destroy`.
+
+**The DOM reads at the format's nesting limit, not the reader's default.** A
+`bvnr_reader_t` opened with zeroed flags stops at 64 levels of struct and 64 of
+array nesting (§1.4); every `bvn_dom_parse*` function sets both to the hard
+maximum of **255**. A document nested 65 to 255 deep therefore parses through
+the DOM and is `error_struct_nesting_too_high` / `error_array_nesting_too_high`
+from a default streaming reader — set `max_struct_nesting` and
+`max_array_nesting` to 255 on the reader to make the two agree, which is what
+the `bovnar` CLI does in every subcommand. The DOM's other limits are the
+reader's defaults.
 
 ### 4.2 Navigation
 
@@ -13019,7 +13234,11 @@ double            bvn_dom_get_value_in_base_units(const bvn_dom_node_t *node);
 
 Each accessor returns `false` (leaving the out-param **unchanged** — no clamping
 or truncation) when the node is NULL, not of the requested kind, or does not fit
-the target type. Pointer results are **borrowed** — valid only until the owning
+the target type. "Kind" is strict with one deliberate exception:
+`bvn_dom_get_float` also succeeds on an **integer** node and returns its value
+as a `double` (a wide integer is rounded) — a caller asking for "the number"
+does not have to know whether the document wrote `5` or `5.0`. The reverse does
+not hold: the integer accessors fail on a float node. Pointer results are **borrowed** — valid only until the owning
 document is destroyed; do not free them.
 
 ```c
@@ -13083,7 +13302,15 @@ char *bvn_dom_strdup(const char *s, uint32_t len);
 **Ownership.** `bvn_dom_struct_add` / `bvn_dom_doc_add` / `bvn_dom_array_append`
 **always** take ownership of the value node: on success the container owns it, and
 on **every** failure path the node is destroyed internally — so never destroy it
-yourself after the call (doing so double-frees). `bvn_dom_node_from_bigint` is the
+yourself after the call (doing so double-frees).
+
+**What they refuse.** Each returns `false` — having destroyed the value — when
+the container is NULL or of the wrong kind (`bvn_dom_array_append` on anything
+but a `BVN_DOM_ARRAY`, `bvn_dom_struct_add` on anything but a `BVN_DOM_STRUCT`),
+when the value is NULL, and, for the two keyed ones, when the scope **already
+has that key**: a hand-built tree cannot hold the duplicate a parsed document is
+refused for (`error_duplicate_struct_key`). The duplicate test is a linear scan
+of the scope. `bvn_dom_node_from_bigint` is the
 one exception with *asymmetric* ownership: on success it takes ownership of the
 `bvn_int_t`; on failure (NULL return) it does not, and you still own it.
 
@@ -13305,7 +13532,7 @@ static bool on_verified(void *ud, bvnr_event_t ev, bvnr_data_t *d)
 #include <unistd.h>
 #include "bovnar.h"
 
-/* Emit: .velocity = <float:64,m/s²> 9.81; */
+/* Emit: .velocity = <float:64,m/s²> 9.81e+0; */
 static bool write_velocity(bvnr_writer_t *w)
 {
     value_type_spec_t vt = BVN_TYPE_FLOAT(64);
@@ -13357,7 +13584,8 @@ int main(void)
     bvnr_writer_destroy(w);
     return ret;
 }
-/* Output: .velocity = <float:64,m/s²> 9.81; */
+/* Output: .velocity = <float:64,m/s²> 9.81e+0;
+ * (bvn_format_double writes an exponent on every non-zero float -- see 2.11) */
 ```
 
 ---
@@ -13580,6 +13808,36 @@ assert bovnar.loads(out, typed=True) == doc
 overflow, up to 256 MiB.  The `cap` keyword argument that existed in earlier
 versions is no longer accepted.
 
+`dumps()` takes `None`, `bool`, `int` of any size, `float`, `str`, `Decimal`,
+a terminating `Fraction`, `bytes` / `bytearray` / `memoryview` (written as an
+octet stream — which is what `loads()` returns as `bytes`), `Quantity`, a
+`dict` with `str` keys, and a `list` / `tuple` of those. NumPy scalars are
+taken as the Python numbers they are.
+
+> **`dumps()` writes what `loads()` reads — the streaming tier, not the
+> document tier.** `loads()` checks the grammar and each value's own type,
+> unit and range and stops there; `dumps()` is its inverse and stops in the
+> same place, so `dumps(loads(x))` works for every `x` that `loads()` accepts.
+> Three shapes are therefore written without complaint and then **refused by
+> the document tier** (`dom_parse`, `bovnar validate`), where an array is
+> homogeneous and rectangular:
+>
+> | Python value | Written as | Document tier says |
+> |---|---|---|
+> | `[1, "a"]`, `[True, 1]` — a list mixing kinds | `[1, "a"]` | `array_element_type_mismatch` |
+> | `[[1], [2, 3]]` — a ragged list of lists | `[[1], [2, 3]]` | `array_row_size_mismatch` |
+> | `[{"a": 1}, {"b": 2}]` — dicts that do not share their keys | `[{.a = <uint:64> 1;}, {.b = <uint:64> 2;}]` | `struct_shape_mismatch` |
+>
+> A list mixing `int` and `float`, or holding `None` beside values, is fine at
+> both tiers. If the output has to pass `bovnar validate`, run it through
+> `dom_parse()` before shipping it.
+>
+> What `dumps()` does refuse, with `BovnarArgumentError`, is what *neither*
+> tier reads: a list whose elements carry different units, an integer wider
+> than 64 bits in a list that cannot take the width annotation it needs
+> (`[2**70, 1.5]`), a `Decimal` past the range of `float_dec:64`, and a key
+> that is not a `str`.
+
 ### 4.2 SAX-style streaming reader
 
 The verified callback receives exactly **two** positional arguments: the event
@@ -13688,6 +13946,10 @@ outer = stream.embed_document(bovnar.dumps({"v": 1}), key="payload")
 inner = stream.parse_embedded(bovnar.loads(outer)["payload"])   # {"v": 1}
 ```
 
+`parse_embedded` raises `BovnarParseError` carrying the inner document's own
+error code and position. `mux_dump` takes channels in the unsigned 64-bit
+range and raises `BovnarArgumentError` for anything outside it.
+
 ---
 
 ## 5. Unit helpers
@@ -13726,9 +13988,10 @@ bovnar.unit_to_ucum(vu)             # → "mm[Hg]" — back to a UCUM code
 bovnar.units_compatible(vu, bovnar.parse_unit("k~Pa"))   # → True
 
 # Which profiles THIS build carries. Each namespace is a compile-time switch,
-# so a wheel may have been built without some of them; a namespace that is
-# absent raises BovnarArgumentError("unknown unit profile") rather than being
-# reported as a bad unit.
+# so a wheel may have been built without some of them. parse_unit raises the
+# same BovnarArgumentError("Invalid unit string: ...") for an absent namespace
+# as for a bad unit; unit_error_code() below is what tells the two apart (49
+# against 32).
 bovnar.available_profiles()
 # → ('ucum', 'unece', 'qudt', 'qudt-qk', 'udunits', 'om', 'cf')
 
@@ -13775,7 +14038,12 @@ and the codes that have no representation.
 ### 5.2 Extended unit functions
 
 The following functions operate on `ValueUnit` objects and are available both
-from the top-level `bovnar` namespace and from `bovnar.units`.
+from the top-level `bovnar` namespace and from `bovnar.units`. Each of them —
+and `unit_to_str`, `unit_to_profile`, `unit_to_ucum`, `unit_is_profile_only`,
+the pint and NumPy bridges, `write_array(vu=)` and a `want_unit` callback's
+return value — takes a `Unit` (what `Quantity.unit` and `Unit.parse()` hand
+out) wherever it takes a `ValueUnit`, so `unit_to_str(q.unit)` needs no
+`.raw`.
 
 ```python
 from bovnar import (
@@ -13849,7 +14117,14 @@ from bovnar import UnitFlags   # also from bovnar.units
 UnitFlags.NONE      # 0 — no special formatting
 UnitFlags.REDUCE    # reduce to a canonical named SI unit before serialising
 UnitFlags.ASCII_EXP # use ^N exponent notation instead of Unicode superscripts
+UnitFlags.NUM_CANONICAL  # writer only: a float REDUCE rescaled keeps float shape
 ```
+
+The same flags configure a **writer**: `Writer.to_mem(unit_flags=UnitFlags.REDUCE)`
+(and `to_fd` / `to_file`) rewrites each unit as it is written *and* rescales the
+value with it — `2.5 k~g` goes out as `<float:64,g> 2500`. `NUM_CANONICAL` is
+meaningful only there: it appends `.0` to a rescaled float that came out as an
+integer string, so the canonical document mode lands on one spelling.
 
 > **`UnitFlags.REDUCE` returns the reduced unit, not a rescaled value.** Reduction
 > folds every prefix out, so `unit_to_str_ex(parse_unit("k~g"), UnitFlags.REDUCE)`
@@ -14021,8 +14296,9 @@ w.write_float("spare", 0.25)                        # BovnarWriteError,
 
 A policy carrying `targets`, `normalise_si`, `base` or `leave_inexact` raises
 `BovnarArgumentError` there rather than being half-honoured: write-side unit
-rewriting is `UnitFlags.REDUCE`'s job, and two rewriting modes with different
-rules about exactness is how a document ends up meaning two things.
+rewriting is `UnitFlags.REDUCE`'s job — open the writer with
+`Writer.to_mem(unit_flags=UnitFlags.REDUCE)` — and two rewriting modes with
+different rules about exactness is how a document ends up meaning two things.
 
 Module-level helpers back the same decisions outside the reader:
 
@@ -14059,6 +14335,23 @@ units_equal(parse_unit("mmHg"), parse_unit("ucum:mm[Hg]"))   # → True
 ```python
 parse_unit("m") == parse_unit("m")                  # → True
 ```
+
+The hash follows the equality in the one place the two could part: a
+component with **no prefix** is the same component whether its prefix system
+says SI or IEC, so `parse_unit("B")` and `make_unit_iec(BaseUnit.BYTE)` are
+equal *and* one dict key.
+
+A `Unit` also compares equal to a **string** that parses to it
+(`q.unit == "k~m"`). That is a convenience for comparison only and is **not
+hash-compatible** — `"km"`, `"k~m"` and `"ucum:km"` are three strings with
+three hashes and one unit — so `Unit.parse("m") in {"m"}` is `False`. Key a
+dict or set on `Unit` objects (or on `str(unit)`), never on a mix of the two.
+
+`Unit.convert_factor(other)` and `Unit.factor` return a bare number, so they
+**raise** `BovnarArgumentError` where there is no such number: an affine pair
+(`°C` → `K`) has no multiplicative factor and an affine unit no SI factor.
+Use `convert_value()` there, or `unit_to_si_factor()` for the scale and the
+offset.
 
 That comparison used to be **False**. `ValueUnit` is a `ctypes.Structure`, which
 defines no `__eq__`, so `==` fell back to identity — see the note in
@@ -14149,7 +14442,10 @@ Quantity.from_number(Fraction(837, 256),
 
 It accepts a `Decimal`, `Fraction` (must be a terminating decimal), `int`,
 `str` (a verbatim literal), or `float` (only as precise as the double), and
-validates the width for the chosen family.
+validates the width for the chosen family. For `float_dec` it also refuses a
+finite value past the width's range — `Decimal('1e400')` does not fit
+`float_dec:64` and would materialise to infinity — and a non-finite `float`
+is stored under the format's own spelling (`inf`, `ninf`, `nan`).
 
 ### 6.2 Properties and methods
 
@@ -14163,12 +14459,12 @@ validates the width for the chosen family.
 | `q.decimal` | `Decimal` | **Exact** value as `decimal.Decimal` from the verbatim literal — lossless at any width; raises for non-numeric families |
 | `q.fraction` | `Fraction` | Exact value as `fractions.Fraction` (for `float_fix`, the exact `mantissa / 2**frac`) |
 | `q.fixed_point` | `(int, int)` | `(mantissa, frac_bits)` of a `float_fix` value; the value is `mantissa / 2**frac_bits` |
-| `q.stored_value` | `Decimal` | The value materialised into the declared IEEE/fixed format (round-to-nearest-even) — differs from `decimal` only when the literal carries more precision than the format holds |
+| `q.stored_value` | `Decimal` | The value materialised into the declared IEEE/fixed format (round-to-nearest-even) — differs from `decimal` only when the literal carries more precision than the format holds. `None` for a typed null, as `decimal` is |
 | `q.ieee_bits` | `bytes` | IEEE-754 interchange bytes (binary16…256 for `float`, decimal16…256 for `float_dec`), little-endian word order |
 | `q.epoch_name` | `str \| None` | For a `datetime`, the epoch name (`"unix"`, `"tai"`, …); `None` otherwise |
 | `q.epoch_mjd` | `int \| None` | For a `datetime`, the epoch's Modified Julian Day; `None` otherwise |
 | `q.datetime_fraction` | `str \| None` | For a `datetime` written as a literal with a fractional second, the verbatim sub-second digits (spec 1.1); `None` otherwise |
-| `q.unit_source` | `str \| None` | The unit exactly as the document spelled it (library 2.0) — `ucum:mL{total}` where `q.unit` is `m~L`. Set by `loads(typed=True)`, or by the `unit_source=` constructor argument; `dumps()` writes it back, and refuses one that does not parse to `q.unit`. `None` writes the canonical form |
+| `q.unit_source` | `str \| None` | The unit exactly as the document spelled it (library 2.0) — `ucum:mL{total}` where `q.unit` is `m~L`. Set by `loads(typed=True)`, or by the `unit_source=` constructor argument; `dumps()` writes it back, and refuses one that does not parse to `q.unit` — including a spelling on a `Quantity` that has no unit at all. `None` writes the canonical form |
 
 ### 6.3 Lossless numeric access (`float_dec`, `float_fix`, `float:128`/`256`)
 
@@ -14214,7 +14510,26 @@ C library's own default-annotation omission rules).
 
 `dumps()` also accepts bare `decimal.Decimal` (written as an exact
 `float_dec:64` literal) and terminating `fractions.Fraction` values directly —
-a non-terminating fraction (e.g. `Fraction(1, 3)`) raises `BovnarArgumentError`.
+a non-terminating fraction (e.g. `Fraction(1, 3)`) raises `BovnarArgumentError`,
+as does a `Decimal` outside the range of `float_dec:64`. A list whose elements
+are all `Decimal` / `Fraction` is written under one `<float_dec:64>`
+annotation, so the elements mean what the scalars mean.
+
+**Arrays of `Quantity`.** An array has one annotation. Elements that agree on
+type and unit are written under it. Elements that agree on the unit but not
+the type — or that carry no unit and differ in type, `[<uint:8> 1, <float:64>
+2.5]` — are each written under their own annotation, as they were read.
+Elements that carry *different* units have no valid form and raise.
+
+**Octet streams.** `loads()` returns an octet stream as `bytes`, and `dumps()`
+writes `bytes` / `bytearray` / `memoryview` back as one, so a document holding
+one round-trips.
+
+**What "can be passed directly to `dumps()`" does not promise** is that the
+result passes the *document* tier: `dumps()` writes what `loads()` reads, and
+`loads()` reads heterogeneous and ragged arrays that `dom_parse` and
+`bovnar validate` refuse. See the note in
+[§4.1](#41-high-level-api-loads--dumps).
 
 ---
 
@@ -14241,10 +14556,20 @@ with Writer.to_mem() as w:
 ```
 
 Element types accepted per element: `int`, `float`, `str`, `bool`, `None`,
-`dict` (written as a struct), or nested `list`/`tuple` (written as a nested
-array). When *rows* is a flat sequence it is treated as a single-row array;
-when all top-level elements are themselves `list` or `tuple` it is treated as a
-multi-row array.
+`bytes` (an octet stream), `dict` (written as a struct), or nested
+`list`/`tuple` (written as a nested array). When *rows* is a flat sequence it
+is treated as a single-row array; when all top-level elements are themselves
+`list` or `tuple` it is treated as a multi-row array. Any other iterable (a
+generator, a `range`) is materialised first.
+
+**With `vt`, every element is held to it.** An `int` under an integer
+annotation is checked against the width and written in the annotation's base —
+quoted where the base requires it, so `255` under `<uint:16,_16>` is `"ff"`.
+An element the annotation cannot describe — `80800` under `<uint:16>`, a
+`float` or a `str` under an integer type, a `dict` under any — raises
+`BovnarArgumentError` instead of producing a document nothing reads. `None` is
+a null hole and is always allowed; a `Quantity` element carries its own
+literal and is written as it is. `vu` takes a `ValueUnit` or a `Unit`.
 
 ---
 
@@ -14287,6 +14612,11 @@ Offset/affine scales (`°C`, `°F`, Réaumur, Delisle, Newton, Rømer) cannot ca
 a prefix or exponent — pint forbids it and bovnar never emits it. A prefixed or
 exponentiated affine unit raises `BovnarArgumentError` rather than a cryptic
 pint error.
+
+`to_pint` / `to_pint_unit` take a `ValueUnit` or a `Unit`, so
+`bovnar.to_pint(q.value, q.unit)` works on a typed value as it stands. A unit
+pint cannot name raises `BovnarArgumentError`: the profile-only units, and
+anything carrying the IEC prefixes `Ri~` / `Qi~`, which pint does not define.
 
 ### 8.3 Validation
 
@@ -14447,8 +14777,11 @@ output re-parses.
 
 * an array that mixes numeric encodings (e.g. `uint:8` and `float:64`) raises
   unless you pass `dtype=` to coerce to one;
-* bovnar 1.0 arrays are rectangular and homogeneous, so the result is always a
-  regular ndarray — there is no ragged case to handle;
+* a Bovnar array is rectangular and homogeneous **at the document tier**
+  (`dom_parse`, `bovnar validate`), so a `DomNode` always yields a regular
+  ndarray. The streaming tier — `loads()`, and therefore `dumps()` — does not
+  enforce that (see [§4.1](#41-high-level-api-loads--dumps)): a ragged typed
+  list raises here unless you pass `dtype=object`;
 * a `null` element cannot fill a dtype with no null slot — integer, `bool`, or
   string (which would otherwise silently become `0`/`False`/`'None'`); pass
   `dtype=float` (→ `NaN`) or `dtype=object` (→ `None`);
@@ -14480,15 +14813,20 @@ bovnar.array_to_bvnr("a", prices, float_format=("float", 128))   # binary128
 
 * `from_numpy` requires a 1-D-or-higher array; write a 0-D scalar with the
   scalar `Writer` API instead.
-* *unit* may be a bovnar unit string, a `ValueUnit`, or a pint `Unit`/`Quantity`
-  (anything else raises `BovnarArgumentError`).
+* *unit* may be a bovnar unit string, a `Unit`, a `ValueUnit`, or a pint
+  `Unit`/`Quantity` (anything else raises `BovnarArgumentError`).
 * Units apply to **numeric** arrays only — a unit on a `bool` or string array
   raises `BovnarArgumentError`.
 * An **object array of `Decimal`/`Fraction`** is written as an exact
   decimal/fixed/wide-binary float. `float_format=(family, width[, frac])` —
   family `'float'`, `'float_dec'` (the default for a Decimal object array), or
-  `'float_fix'` — selects the target; it is required to disambiguate an object
-  array that is not purely `Decimal`/`Fraction`.
+  `'float_fix'` — selects the target.
+* An **object array of Python `int`s** — what `to_numpy(..., dtype=object)`
+  returns for integers wider than 64 bits — is written as integers, at the
+  narrowest width that holds them and never under 64 (`<uint:71>[…]`).
+* Any other object array is ambiguous and needs `float_format`.
+* A **bytes array** (dtype kind `S`) is refused: decode it first
+  (`arr.astype('U')`).
 * A **masked array** with any masked entry is rejected (it would otherwise
   serialise the underlying value of a masked cell); fill or unmask it first.
 * `array_to_bvnr` grows its write buffer like `dumps()` (4 MiB, doubling up to
@@ -14646,12 +14984,19 @@ Default `max_file_size` cap used by `Reader.read_file`.
 
 | Method | Description |
 |---|---|
-| `Writer.to_mem(buf=None, cap=4194304, *, pretty=True)` | Write to an in-process buffer. `buf` may be a pre-allocated `bytearray`; when `None` an internal buffer of size `cap` is allocated. |
-| `Writer.to_fd(fd, *, pretty=True)` | Write to an open POSIX file descriptor. |
-| `Writer.to_file(path, *, pretty=True)` | Open `path` for writing (`O_WRONLY\|O_CREAT\|O_TRUNC`, mode `0o644`) and write to it; the fd is closed when the writer is finished or destroyed. |
+| `Writer.to_mem(buf=None, cap=4194304, *, pretty=True, unit_flags=0, emit_version=False)` | Write to an in-process buffer. `buf` may be a pre-allocated `bytearray`; when `None` an internal buffer of size `cap` is allocated. |
+| `Writer.to_fd(fd, *, pretty=True, unit_flags=0, emit_version=False)` | Write to an open POSIX file descriptor. |
+| `Writer.to_file(path, *, pretty=True, unit_flags=0, emit_version=False)` | Open `path` for writing (`O_WRONLY\|O_CREAT\|O_TRUNC`, mode `0o644`) and write to it; the fd is closed when the writer is finished or destroyed. |
 
 All three are used as context managers.  On clean exit (`exc_type is None`)
 the context manager calls `finish()` automatically.
+
+`unit_flags` takes [`UnitFlags`](#53-unitflags) — `REDUCE` rewrites each unit
+and rescales its value, `ASCII_EXP` writes `^N` exponents, `NUM_CANONICAL`
+keeps a rescaled float in float shape. `emit_version=True` writes a leading
+`#!bovnar M.N` naming the spec version this build implements, as
+`write_version()` would. Every writer accepts structs and arrays nested up to
+**255** deep, the same limit `Reader` and `loads()` read at.
 
 ### 12.2 Output retrieval
 
@@ -14675,7 +15020,9 @@ inline values; any Bovnar-supported base for `write_bvni`).
 
 #### `write_sint(key, value, *, width=64, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)`
 
-Write a signed integer.
+Write a signed integer. `base` 64 and 85 are **unsigned** — `+` and `-` are
+digits in those alphabets — and raise `BovnarArgumentError` here and for a
+signed `write_bvni`.
 
 #### `write_float(key, value, *, width=64, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)`
 
@@ -14793,8 +15140,8 @@ tree; any `DomNode` derived from it becomes invalid after that point.
 > directly if you need a different limit.
 | `DomDoc.parse_file(path)` | Class method. Open path and parse (fd closed in `finally`). Applies an internal hard cap of `BVN_DOM_FD_MAX_BYTES` (256 MiB) via the C function `bvn_dom_parse_fd`. This ceiling is distinct from `Reader.read_file`'s `MAX_FILESIZE_BYTES` (16 MiB). |
 | `doc.parse_error` | `ErrorCode` — `NONE` on success. |
-| `doc[key]` | Return top-level `DomNode` by key; raises `KeyError` when absent. |
-| `key in doc` | `True` when the top-level key exists. |
+| `doc[key]` | Return a `DomNode` by key; raises `KeyError` when absent. `key` goes to the path lookup, so `doc["server"]` is a top-level entry and a dotted or indexed path reaches below it: `doc["server.tls"]` is `doc["server"]["tls"]`, `doc["matrix[1][0]"]` an element. A key cannot contain `.` or `[`, so the two readings never collide. |
+| `key in doc` | `True` when `doc[key]` would succeed — the same path rule. A non-`str` is never in a document. |
 | `len(doc)` | Number of top-level entries. |
 | `iter(doc)` | Iterate over `(key, DomNode)` pairs. |
 | `doc.entries()` | Return all top-level `(key, DomNode)` pairs as a list. |
@@ -14826,12 +15173,12 @@ for as long as any derived `DomNode` is in use.
 | `node.datetime_fraction` | `str` of the verbatim ISO sub-second digits for a `datetime` written as a literal with a fraction (spec 1.1), else `None`; the carrier value is unchanged and still read via `to_python()` |
 | `node.unit_source` | `str` of the unit exactly as the document spelled it (library 2.0), where that differs from the canonical form — `ucum:mL{total}` for a unit of `m~L`; `None` for a node with no unit, one already written canonically, or one a unit policy converted |
 | `node[key]` | Child `DomNode` by string key (STRUCT) or integer index (ARRAY) |
-| `key in node` | Membership test for STRUCT nodes |
+| `key in node` | Membership test for STRUCT nodes (a direct member only; a non-`str` is never one) |
 | `len(node)` | Element count for STRUCT or ARRAY nodes |
 | `iter(node)` | For STRUCT: iterate `(key, DomNode)` pairs; for ARRAY: iterate elements |
 | `node.entries()` | List of `(key, DomNode)` pairs (STRUCT nodes only) |
 | `node.array_dims()` | Number of `/`-separated dimensions (ARRAY nodes only) |
-| `node.to_python()` | Recursively convert to a native Python value (drops type/unit info) |
+| `node.to_python()` | Recursively convert to a native Python value (drops type/unit info). A multi-row array comes back as a list of rows, empty rows included (`[]/[]` → `[[], []]`), as `loads()` gives it |
 
 ### 13.4 `DomType`
 
@@ -14879,28 +15226,33 @@ bovnar/
 ├── enums.py         # Python IntEnum mirrors of C enums
 ├── exceptions.py    # BovnarError hierarchy
 ├── quantity.py      # Quantity — typed, unit-annotated scalar for lossless round-trips
-├── reader.py        # Reader class + EventPayload dataclass
+├── reader.py        # Reader, EventPayload, UnitPolicy, UnitRule
+├── stream.py        # framing, octet multiplexing, document-in-document
 ├── structs.py       # ctypes Structure/Union definitions + ValueUnitPrefix + make_* helpers
+├── unit.py          # Unit — a ValueUnit with equality, hashing and its operations
 ├── units.py         # unit_to_si_factor, unit_convert_factor, etc.
 └── writer.py        # Writer class
 
 tests/
-├── conftest.py                   # shared fixtures, needs_lib marker
-├── test_analytics.py             # analytic / benchmarking tests (needs_lib)
-├── test_array_parser.py          # array parsing integration tests (needs_lib)
-├── test_currency_units.py        # currency unit round-trip tests (needs_lib)
-├── test_dom.py                   # DOM API integration tests (needs_lib)
-├── test_enums.py                 # pure-Python enum tests
-├── test_example_numpy_roundtrip.py # NumPy bridge end-to-end example (needs_lib + numpy)
-├── test_lossless_floats.py       # exact decimal/fixed/float128-256 round-trips (needs_lib)
-├── test_numpy_bridge.py          # NumPy bridge tests (needs_lib + numpy)
-├── test_pint_bridge.py           # pint bridge + unit-table integrity (needs_lib + pint)
-├── test_reader.py                # integration: Reader (needs_lib)
-├── test_structs.py               # pure-Python struct / helper tests
-├── test_unit_physics.py          # unit physics / conversion tests (needs_lib)
-├── test_units.py                 # mixed: unit parsing / serialisation (needs_lib for FFI)
-├── test_write_array.py           # write_array integration tests (needs_lib)
-└── test_writer.py                # integration: Writer (needs_lib)
+├── conftest.py                          # shared fixtures, needs_lib marker
+├── test_abi.py                          # ctypes struct sizes/offsets against the C compiler
+├── test_enums.py, test_structs.py       # the enum and struct mirrors
+├── test_version.py                      # library / spec version reporting
+├── test_reader.py, test_writer.py       # Reader and Writer
+├── test_stream.py                       # framing, mux, document-in-document
+├── test_dom.py, test_dom_vs_loads_parity.py   # the DOM, and its agreement with loads()
+├── test_write_array.py, test_array_parser.py, test_array_roundtrip_fidelity.py
+├── test_roundtrip_property.py, test_writers_agree.py, test_dumps_directive.py
+├── test_escapes.py, test_unicode_normalisation.py
+├── test_datetime.py, test_datetime_oracle.py
+├── test_lossless_floats.py, test_hex_float_decode.py, test_decimal_tie_rounding.py
+├── test_units.py, test_unit_object.py, test_unit_physics.py, test_unit_source.py
+├── test_unit_policy.py, test_unit_factors_derived.py
+├── test_base_rendering_property.py, test_convertible_implies_convertible.py
+├── test_currency_units.py, test_currency_table_parity.py
+├── test_numpy_bridge.py, test_example_numpy_roundtrip.py      # need numpy
+├── test_pint_bridge.py, test_pint_factor_parity.py            # need pint
+└── test_example_consistency.py          # the shipped examples
 ```
 
 ---
@@ -14917,18 +15269,22 @@ All errors surface as subclasses of `BovnarError`:
 | `BovnarArgumentError` | Invalid argument passed to a helper (e.g. bad unit string, closed reader/writer) |
 
 **`unit_convert_factor` error semantics:** The C function uses the
-`(ok, requires_affine)` pair to signal three distinct outcomes:
+`(ok, requires_affine)` pair to signal four distinct outcomes:
 
 | ok | requires_affine | Meaning |
 |---|---|---|
 | `True` | `False` | Multiplicative conversion; `factor` is ready to use |
-| `False` | `True` | Affine conversion required (e.g. °C ↔ K); `factor` is still valid but a plain multiply is insufficient |
+| `True` | `True` | Both sides are affine and share their zero (e.g. °C ↔ °Ré), so `factor` alone is correct |
+| `False` | `True` | Affine conversion the offsets do not cancel (e.g. °C ↔ K). **`factor` is `0.0`** — not a usable multiplier |
 | `False` | `False` | Units are dimensionally incompatible → `BovnarArgumentError` |
 
-`BovnarArgumentError` is raised **only** when both `ok=False` and
-`requires_affine=False`.  When `requires_affine=True`, call `convert_value`
-which handles the two-step affine path automatically, or call `unit_to_si_factor`
-on both units and perform the conversion manually.
+`unit_convert_factor` raises `BovnarArgumentError` **only** when both
+`ok=False` and `requires_affine=False`; the result does not carry `ok`, so
+check `requires_affine` before multiplying by `factor`. When it is set, call
+`convert_value`, which handles the two-step affine path, or call
+`unit_to_si_factor` on both units and convert by hand. The `Unit` method
+`convert_factor()` returns the bare number and therefore raises for the
+`0.0` row instead of returning it.
 
 **Callbacks returning `False`:** When an `on_verified` or `on_unverified`
 callback returns `False`, the C parser stops and `bvnr_read` returns failure.
@@ -14983,6 +15339,12 @@ the trailing `unit_flags` field (`bvn_unit_flags_t`, a `uint32_t`):
 | `BVN_UNIT_FLAGS_NONE` | `0` | Default: full Unicode exponent characters |
 | `BVN_UNIT_REDUCE` | `1 << 0` | Reduce compound units before serialising |
 | `BVN_UNIT_ASCII_EXP` | `1 << 1` | Use `^N` ASCII exponent notation instead of Unicode superscripts |
+| `BVN_NUM_CANONICAL` | `1 << 2` | Write a float that `BVN_UNIT_REDUCE` rescaled in float shape (`5000.0`, not `5000`) |
+
+They are set from Python with the `unit_flags=` keyword of `Writer.to_mem` /
+`to_fd` / `to_file`, as `UnitFlags` values; `emit_version=` sets the struct's
+`emit_version` field. The constructors also set `max_struct_nesting` and
+`max_array_nesting` to 255.
 
 The writer respects the `unit_flags` stored inside the C writer object when
 serialising unit annotations. `_emit_annotation` retrieves the live flags via
@@ -15217,8 +15579,14 @@ capabilities are sub-protocols carried in or around them.
 
 Every byte/offset/line/column counter in the core is 64-bit, so a single
 never-ending document — or a single octet stream of unbounded length — is
-limited only by one policy knob: `max_file_size` on `bvnr_read_flags_t` /
-`bvnr_write_flags_t`.
+limited only by policy knobs on `bvnr_read_flags_t`: `max_file_size` for the
+stream as a whole, and — for its *text* — `max_text_bytes`, whose default is
+finite. With both left at `0` an octet stream may run without bound, but the
+text of a document stops at 2 147 483 647 bytes (`error_text_data_too_long`);
+raise `max_text_bytes` as well (to `UINT64_MAX` if need be) for a text stream
+longer than 2 GiB. (`max_file_size`
+exists on `bvnr_write_flags_t` too, for symmetry, and the writer ignores
+it: a writer never limits how much it writes.)
 
 ```c
 #define BVNR_FILESIZE_UNLIMITED  0   /* in bovnar.h */
@@ -15537,7 +15905,7 @@ admitted after that pass, which is why they sit after it rather than beside thei
 | `unece:` | UN/ECE Recommendation 20 and 21 | flat | 1298 + 25 opaque | [11](#11-the-unece-profile) |
 | `qudt:` | QUDT unit local names | flat | 2238, **all 2808 QUDT defines** | [12](#12-the-qudt-profiles) |
 | `qudt-qk:` | QUDT quantity kinds | flat | 903, **all 1165 QUDT defines** | [12.3](#123-quantity-kinds-qudt-qk) |
-| `udunits:` | UDUNITS-2, the CF/netCDF units syntax | expression | 499, **all 580 UDUNITS defines** | [13](#13-the-udunits-profile) |
+| `udunits:` | UDUNITS-2, the CF/netCDF units syntax | expression | 765 (its regular plurals included), **all 580 UDUNITS defines** | [13](#13-the-udunits-profile) |
 | `om:` | OM 2 — Ontology of units of Measure | flat | 1341 + 119 refused, **every unit individual OM states** | [16](#16-the-om-2-profile) |
 | `cf:` | CF standard names | flat, read-only | 4454 + 617 refused, **all 5071 names of table v94** | [17](#17-the-cf-standard-name-profile) |
 
@@ -15556,7 +15924,7 @@ pass changed and what it cost.
 
 Every acceptance, refusal and conversion factor quoted below was produced by running the
 reference implementation built from this tree, and the behavioural claims are pinned by the test
-files named above (1277 assertions across the seven profiles, plus 4789 in the cross-vocabulary
+files named above (1328 assertions across the seven profiles, plus 4789 in the cross-vocabulary
 suite). The VOCABULARY side — whether each foreign code is *worth* what the table says — is checked
 too, but not by the same means and not to the same strength: `check_profile_factors.py` (§9.5)
 resolves every mapped code against its publisher's own machine-readable definitions, and `unece`
@@ -16465,8 +16833,8 @@ round trip that starts in a vocabulary returns to it; one that starts in Bovnar'
 may have nowhere to go.
 
 Sweeping the whole native registry — all 264 physical units, each at the twelve prefixes
-`si_none da h k M G T d c m µ n` — **689** combinations survive a native → UCUM → native round trip
-unchanged, **2102** have no UCUM code, 377 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
+`si_none da h k M G T d c m µ n` — **865** combinations survive a native → UCUM → native round trip
+unchanged, **1926** have no UCUM code, 377 are prefix/unit pairs `bvn_prefix_unit_valid` rejects
 before the question arises, and **none round-trips to a different unit**. The last of those is the
 invariant; the two counts move whenever the registry gains a unit, so `test_sweep_round_trip` in
 `tests/bovnar_ucum_test.c` pins all three rather than leaving them as prose.
@@ -17249,7 +17617,7 @@ One hand-edited data file per namespace in `src/gendata/`, in the same shape as 
 | `unece.bvnr` | 1298 mapped, 25 opaque, 156 unsupported |
 | `qudt.bvnr` | 2238 mapped, 570 unsupported |
 | `qudt-qk.bvnr` | 903 mapped, 262 unsupported |
-| `udunits.bvnr` | 41 prefixes, 499 mapped, 81 unsupported |
+| `udunits.bvnr` | 41 prefixes, 765 mapped, 101 unsupported |
 | `om.bvnr` | 1341 mapped, 119 unsupported |
 | `cf.bvnr` | 4454 mapped, 617 unsupported |
 
@@ -18102,9 +18470,9 @@ same equivalence class.
 
 > `udunits:` — UDUNITS-2, Unidata's unit library, whose string grammar is the de-facto units syntax
 > of netCDF and the CF conventions.
-> Data file `src/gendata/udunits.bvnr` (41 prefixes, 499 mapped, 81 unsupported — every one of
+> Data file `src/gendata/udunits.bvnr` (41 prefixes, 765 mapped, 101 unsupported — every one of
 > the 580 spellings the UDUNITS-2 database defines);
-> pinned by `tests/bovnar_udunits_test.c` (199 assertions).
+> pinned by `tests/bovnar_udunits_test.c` (224 assertions).
 
 ### 13.1 An expression profile, sharing the UCUM parser
 
@@ -18125,7 +18493,7 @@ back as `k~g·s/m` — for exactly this reason: getting it backwards turns a vis
 reciprocal and still formats cleanly.
 
 UDUNITS accepts symbols and spelled-out names for units *and* prefixes, which is why the table
-carries 499 codes and 41 prefix spellings for a vocabulary no larger than UCUM's: `m`, `meter` and
+carries 765 codes and 41 prefix spellings for a vocabulary no larger than UCUM's: `m`, `meter` and
 `metre` are three rows, and `kilo` is a prefix beside `k`. `udunits:km`, `udunits:kilometer` and
 `udunits:kilometre` are one unit.
 
@@ -18778,7 +19146,17 @@ table nobody can trace.
 (*    ( )  = grouping           |  = alternation                      *)
 (*    ,    = concatenation      ;  = rule terminator                  *)
 (*    "…"  = literal terminal   (*…*) = comment                       *)
-(*  Updated: 2026-06-17 — drop the residual "1.1 (draft)" label (spec   *)
+(*  Updated: 2026-10-10 — spec 1.2: the unit-profile notation        *)
+(*    (profile-unit), whitespace inside a type parameter as an error,  *)
+(*    array homogeneity by unit; consistency pass vs the reader -- a   *)
+(*    comment may not start directly after a bare token, a bare        *)
+(*    literal under a non-decimal base is read in that base, an        *)
+(*    annotation before an octet stream is carried unchecked, the BOM  *)
+(*    rule before/after the first assignment, epoch-param, and the     *)
+(*    two resync boundaries. The entries below are HISTORY: the        *)
+(*    counts they quote were true on their dates (see base-unit for    *)
+(*    today's 264 units / 745 spellings).                              *)
+(*  2026-06-17 — drop the residual "1.1 (draft)" label (spec   *)
 (*    1.1 is released); note datetime also accepts a width parameter;    *)
 (*    reframe base-unit as a lookup into the full 180-unit / 529-spelling *)
 (*    table (NOT the closed SI subset it previously claimed).             *)
@@ -18887,6 +19265,12 @@ version-int  = "0"
              | ( ("1"|"2"|"3"|"4"|"5"|"6"|"7"|"8"|"9") , {DIGIT} ) ;
 
 (* Whitespace: blank characters and comments, freely intermixed.     *)
+(* ONE RESTRICTION this production cannot carry: "#" is not a          *)
+(* terminator of a bare token. A comment may not start immediately     *)
+(* after a key, a number, a symbol, a reserved word, a reference or a  *)
+(* datetime literal -- there "#" is error_unexpected_input_byte, and   *)
+(* at least one ws-char must come first. After a string, "]", "}",     *)
+(* ">", "=", ";" or an inline unit, "#" may follow directly.           *)
 ws           = {ws-char | comment} ;
 
 (* At least one whitespace character, followed by optional further    *)
@@ -18917,7 +19301,9 @@ comment-char = "\x09"                               (* HT             *)
 (* The leading "." is a syntactic sigil; it is not stored in the key. *)
 (* At least one id-start character after "." is required;             *)
 (* ".=" is error_empty_identifier.                                    *)
-(* Comments are permitted between the last key character and "=".     *)
+(* Comments are permitted between the key and "=", but only after at   *)
+(* least one ws-char: "#" directly after the last key byte is a hard  *)
+(* error (see ws, and the id-body-char hard-error list below).        *)
 
 assignment   = "." , key , ws , "=" , ws , value , ws , ";" ;
 
@@ -19049,8 +19435,16 @@ bool-value   = "true" | "false" | "on" | "off" ;
 (*   negative integers           → <sint:64,_10,no_unit>             *)
 (*   plain integers              → <uint:64,_10,no_unit>             *)
 (*   bool keywords (true/false/on/off) → <bool>                      *)
-(* The full type-annotation event sequence is always emitted for      *)
-(* number and string values, whether annotated explicitly or not.     *)
+(*   any number with an inline currency unit → <float_dec:64,$XXX>   *)
+(*     (takes precedence over the float / integer rows)               *)
+(*   ISO-8601 datetime literal (spec 1.1) → <datetime:64,unix>       *)
+(* The full type-annotation event sequence is emitted for a scalar     *)
+(* number or string value whether annotated explicitly or not.        *)
+(* Inside an array a synthesised annotation is emitted only when the   *)
+(* element's synthesised type differs from the type currently in       *)
+(* force -- at the first element, and again at each change. It is not  *)
+(* repeated per element or per row; an explicit element annotation is  *)
+(* always emitted.                                                     *)
 
 type-annotation = "<" , ws , param-type , ws , ">" ;
 
@@ -19113,11 +19507,11 @@ param-type   = ("uint" | "sint" | "float" | "float_fix" | "float_dec" | "utf8"
 (* error_type_param_whitespace.                                       *)
 (*                                                                     *)
 (* The lexer used to DROP whitespace wherever it fell, which made      *)
-(* "<float:64,k g>" the kilogram and "<uint:6 4>" a 64-bit width, and  *)
-(* turned the UDUNITS spelling "udunits:m s-1" into a reciprocal       *)
-(* millisecond. Nothing in this grammar ever derived those; the        *)
-(* implementation was leniently wrong and now matches what is written  *)
-(* here.                                                              *)
+(* "<float:64,m in>" the minute and "<uint:6 4>" a 64-bit width, and   *)
+(* would have turned the UDUNITS spelling "udunits:m s-1" into a       *)
+(* reciprocal millisecond. Nothing in this grammar ever derived those;  *)
+(* the implementation was leniently wrong and now matches what is      *)
+(* written here.                                                      *)
 (*                                                                     *)
 (* A "," or ":" nested inside a UCUM annotation or bracketed atom is   *)
 (* part of profile-code and NOT a separator, so "ucum:mL{cells,tot}"   *)
@@ -19140,9 +19534,17 @@ type-param-list = type-param , {ws , "," , ws , type-param} ;
 type-param   = width-param           (* e.g. 32, 64                        *)
              | base-param            (* e.g. _16, _64, _85                 *)
              | q-param               (* e.g. q8, q16  – float_fix only     *)
+             | epoch-param           (* e.g. unix, tai – datetime only     *)
              | unit-param ;          (* e.g. m~s, Gi~B, m^2                *)
 
-(* Width: one or more decimal digits.  0 means "no width restriction".*)
+(* Epoch (spec 1.1): the epoch name of a datetime. An epoch name and a  *)
+(* unit are both bare words; they are told apart by the family -- under *)
+(* "datetime" a bare-word parameter is an epoch, under every other      *)
+(* family it is a unit.                                                 *)
+epoch-param  = "unix" | "tai" | "gps" | "mjd" | "ntp"
+             | "galileo" | "glonass" | "y2000" | "beidou" ;
+
+(* Width: one or more decimal digits.  0 selects the default width, 64.*)
 (* float:      0, 16, or any multiple of 32 up to BVN_FLOAT_MAX_PREC.*)
 (* float_fix,  *)
 (* float_dec:  0, 16, 32, 64, 128, 256.                               *)
@@ -19156,9 +19558,13 @@ width-param  = DIGIT , {DIGIT} ;
 (*   other bases → error_illegal_value_type.                          *)
 (* "float_fix" and "float_dec" reject the base parameter entirely:   *)
 (*   any base-param → error_illegal_value_type.                       *)
-(* A non-decimal base with uint/sint should use a quoted string value; *)
-(* a bare literal is not rejected by the validator but will be parsed  *)
-(* as a symbol token, causing a type/value mismatch instead.          *)
+(* A bare number literal under a non-decimal base is valid when every   *)
+(* byte of it is a digit of that base, and it is read IN THAT BASE:    *)
+(* <uint:_16> 10 is sixteen. In base 15 and above "e"/"E" are digits,  *)
+(* so a bare 1e3 under _16 is the integer 0x1E3 and not an exponent    *)
+(* form. A value needing a letter the number lexer does not accept     *)
+(* ("ff") lexes as a symbol -- error_type_value_mismatch -- and must   *)
+(* be a quoted string. Producers SHOULD quote every non-decimal value. *)
 base-param   = "_" , DIGIT , {DIGIT} ;
 
 (* Q~parameter: lowercase "q" followed by one or more decimal digits. *)
@@ -19461,6 +19867,11 @@ hex-digit      = DIGIT | "a".."f" | "A".."F" ;
 (*   .d = 1.5e3 k~J;          (* number with exponent *)              *)
 (*   .e = "FF" m;             (* string literal with unit *)          *)
 (*                                                                     *)
+(* The inline path does not consult the type family: an inline unit    *)
+(* after a utf8 string (<utf8> "text" m) is accepted and carried,      *)
+(* although the same unit as an annotation parameter (<utf8,m>) is     *)
+(* error_illegal_value_type. Producers SHOULD NOT attach one to text.  *)
+(*                                                                     *)
 (* State-machine flow:                                                 *)
 (*   1. Whitespace from a number-body state fires ACT_to_number_outro *)
 (*      → number_outro.  Strings enter string_outro_nosp after the    *)
@@ -19738,17 +20149,21 @@ byte         = (* any single byte 0x00–0xFF *) ;
      lexer state the parser is in.  Overlong encodings and surrogate
      halves are rejected.
 
-  b) BOM uniqueness
+  b) BOM placement
      The UTF-8 BOM (EF BB BF) is legal only at byte offset 0.
-     If the stream begins with "#" instead (a first-line comment), the
-     special first_comment_* state machine watches the comment body for
-     the exact byte sequence 0xEF 0xBB 0xBF and rejects it as
-     error_invalid_byte_order_mark.  This detection applies only while
-     the first_comment_* states are active (i.e. until the first
-     newline); subsequent regular comments (comment_intro state) have
-     no BOM detection, so U+FEFF encoded as 0xEF 0xBB 0xBF appearing
-     in any later comment body or string literal is valid UTF-8 and is
-     accepted.
+     Before the first assignment:
+       - a BOM inside any comment (the first comment line, a version
+         directive line, or a later comment line) is
+         error_invalid_byte_order_mark;
+       - a BOM after leading whitespace, with no comment line before it,
+         is error_invalid_byte_order_mark;
+       - a BOM at the start of a line that follows a comment line or a
+         version directive is error_unexpected_input_byte, as is a
+         second BOM directly after the one at offset 0.
+     Once the first assignment has begun:
+       - EF BB BF inside a comment or a string is valid UTF-8 and is
+         accepted as content;
+       - EF BB BF between assignments is error_unexpected_input_byte.
 
   c) 0xC2 at token boundaries
      The byte 0xC2 (UTF-8 leader for U+0080–U+00BF) is mapped to
@@ -19826,8 +20241,18 @@ byte         = (* any single byte 0x00–0xFF *) ;
      For "float_dec": accepted widths are 0, 16, 32, 64, 128, 256;
        the base parameter (_N) is forbidden (error_illegal_value_type);
        the Q parameter is not valid for float_dec.
-     Neither "float_fix" nor "float_dec" can be synthesised by the
-       validator's default type synthesis; both require explicit annotation.
+     "float_fix" is never synthesised by the validator's default type
+       synthesis. "float_dec" is synthesised in exactly one case -- a
+       number carrying an inline currency unit, <float_dec:64,$XXX> --
+       and otherwise requires an explicit annotation.
+     "float" and "float_dec" values are NOT range- or precision-checked:
+       a literal with more precision or a larger exponent than the
+       declared width can hold is valid; the excess is the consumer's to
+       round, and a consumer may deliver +/-infinity.
+     An octet-stream value under a type annotation is accepted under
+       EVERY family: the annotation is carried on the stream's events and
+       is not checked against it (no error_type_value_mismatch).
+       Producers SHOULD NOT write one.
 
   j) Identifier (key) non-empty
      The grammar requires at least one id-start character after ".".
@@ -19850,13 +20275,15 @@ byte         = (* any single byte 0x00–0xFF *) ;
   n) Error recovery (continue_on_error mode)
      When bvnr_read_flags_t.continue_on_error is set, any parse error
      invokes the on_error callback and then enters the resync state
-     machine (states: resync, resync_string, resync_string_escape,
-     resync_comment).  The resync machine skips bytes while tracking
-     bracket and brace nesting depths, and attempts to re-synchronise
-     at the next ";" at the current nesting depth.  recovery_count
+     machine (states: resync, resync_dot, resync_string,
+     resync_string_escape, resync_comment).  The resync machine skips
+     bytes while tracking bracket and brace nesting depths, and resumes
+     at whichever comes first: a ";" at the saved nesting depth, or the
+     start of the next assignment -- a "." at that depth followed by a
+     byte that can begin an identifier.  recovery_count
      (bvnr_reader_get_recovery_count) is incremented immediately when
      an error triggers entry into resync mode, not when resync
-     completes at ";".  EOF inside any resync state raises a final
+     completes.  EOF inside any resync state raises a final
      error_got_incomplete_bvnr_stream (delivered to on_error and
      returned by bvnr_reader_get_error); the original error that
      triggered resync was already delivered to on_error earlier, at
@@ -19931,6 +20358,7 @@ byte         = (* any single byte 0x00–0xFF *) ;
     - 6.1 [Communication model](#61-communication-model)
     - 6.2 [Success response](#62-success-response)
     - 6.3 [Error response](#63-error-response)
+    - 6.4 [Arguments](#64-arguments)
 7. [Writing a Compliant IUT Adapter](#7-writing-a-compliant-iut-adapter)
     - 7.1 [Event log format reference](#71-event-log-format-reference)
     - 7.2 [Field details](#72-field-details)
@@ -20170,6 +20598,29 @@ The IUT must:
 Where `<code_name>` is the value returned by `bvn_error_to_string()` for
 the first error encountered, e.g. `value_out_of_range`.
 
+### 6.4 Arguments
+
+The Bovnar text arrives on stdin, but a case that overrides a reader limit
+passes the override on the adapter's **command line**. Each option is followed
+by one decimal value, and is present only when the case overrides that limit:
+
+| Option | Limit (`bvnr_read_flags_t`) |
+|--------|-----------------------------|
+| `--max-id <N>` | `max_identifier_length` |
+| `--max-str <N>` | `max_string_length` |
+| `--max-num <N>` | `max_number_length` |
+| `--max-sym <N>` | `max_symbol_length` |
+| `--max-ref <N>` | `max_reference_length` |
+| `--max-snest <N>` | `max_struct_nesting` |
+| `--max-anest <N>` | `max_array_nesting` |
+| `--max-aitems <N>` | `max_array_items` |
+
+An adapter MUST apply every option it is given and MUST ignore an option it
+does not know. An adapter that reads stdin and ignores its arguments fails the
+eight cases that pin a limit (`ID-011`, `STR-015`, `NUM-015`, `SYM-006`,
+`REF-004`, `STU-007`, `ARR-012`, `ARR-013`). No other state is passed: every
+case runs with recovery off and with the default, lenient version handling.
+
 ---
 
 ## 7. Writing a Compliant IUT Adapter
@@ -20181,27 +20632,29 @@ as a template for third-party implementors.
 A minimal conforming adapter must:
 
 1. **Read all of stdin** into a buffer.
-2. **Parse the buffer** using the implementation under test.
-3. **Collect events** from the `on_verified` callback.
-4. **Emit the event log** to stdout on success.
-5. **Emit** `ERROR <code_name>\n` to stdout and exit non-zero on failure.
+2. **Apply the limit options** on its command line (§6.4).
+3. **Parse the buffer** using the implementation under test.
+4. **Collect events** from the `on_verified` callback.
+5. **Emit the event log** to stdout on success.
+6. **Emit** `ERROR <code_name>\n` to stdout and exit non-zero on failure.
 
 ### 7.1 Event log format reference
 
 Each event maps to one line.  Text fields use `\xNN` escaping for any
 byte outside the printable ASCII range `0x20–0x7E` or for the backslash
-character `0x5C`.
+character `0x5C`.  The two hex digits are **lowercase** (`\x09`, `\xc3`,
+`\x5c`) — the comparison is byte for byte, so `\xC3` does not match.
 
 ```
 STREAM_START
 ASSIGNMENT_START <key>
-TYPE_ANN_START <family>
-TYPE_FAMILY <family>
+TYPE_ANN_START <ann>
+TYPE_FAMILY <ann>
 TYPE_PARAM_WIDTH <N>
 TYPE_PARAM_BASE <N>
 TYPE_PARAM_Q <N>
 TYPE_PARAM_UNIT <unit>
-TYPE_ANN_END <family>
+TYPE_ANN_END <ann>
 DATA <token_type> <value>
 STRUCT_START
 STRUCT_END
@@ -20225,7 +20678,7 @@ OCTET_STREAM_END
 | `TYPE_PARAM_Q <N>` | N: Q parameter | Only for `float_fix` |
 | `TYPE_PARAM_UNIT <unit>` | unit: unit string, safe-escaped | Emitted when the annotation carries a unit — and also for a `datetime`, whose **epoch name** travels in this line (`TYPE_PARAM_UNIT tai`). A datetime is not a numeric type; the epoch shares the unit parameter slot because it occupies the same position in the grammar |
 | `TYPE_ANN_END <ann>` | Same bytes as TYPE_ANN_START | |
-| `DATA <token_type> <value>` | token_type: see below; value: safe-escaped | |
+| `DATA <token_type> <value>` | token_type: see below; value: safe-escaped | The single space after the token type is always written, also when the value is empty: a null is the line `DATA null ` — with its trailing space — and an empty string is `DATA string ` |
 | `STRUCT_START` | — | |
 | `STRUCT_END` | — | |
 | `ARRAY_ROW_START` | — | |
@@ -20349,9 +20802,12 @@ DATA array_number 2
 ARRAY_ROW_END
 ```
 
-The element annotation is emitted **once per row**, not once per element: the
-array's element type is established at the first element and the rest inherit
-it.
+Inside an array a synthesised annotation is emitted only when the element's
+synthesised type differs from the type currently in force — at the first
+element, and again at each change. It is not repeated per element or per row
+(the second row of `[1, 2]/[3, 4]` carries no annotation lines at all, while
+`[1, 2.5, 3]` carries three blocks); an explicit element annotation is always
+emitted.
 
 **Input:** `.x = <uint:8> 999;` (error — value out of range)
 
@@ -20369,7 +20825,7 @@ specifies:
 
 | Field | Description |
 |-------|-------------|
-| `id` | Unique identifier, e.g. `TYP-019` |
+| `id` | Unique identifier, e.g. `TYP-019` (`ENC-001`…`ENC-014` for the `encoding` group) |
 | `group` | Group name for `--filter` |
 | `description` | Human-readable description |
 | `input` | Bovnar text (or binary) to parse |
@@ -20426,7 +20882,7 @@ TAP version 14
     ok 2 - [ENC-002] UTF-8 BOM at byte 0
     not ok 3 - [ENC-003] UTF-8 BOM after first comment
       ---
-      message: expected error invalid_byte_order_mark but parse succeeded
+      message: expected error unexpected_input_byte but parse succeeded
       ...
     1..14
 not ok 1 - encoding

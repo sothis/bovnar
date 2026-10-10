@@ -171,7 +171,7 @@ A unit may be written directly after a scalar value literal, between the value a
 
 The inline unit uses the **same character set** and **same semantic parser** (`bvn_parse_unit`) as the type-annotation unit parameter. It is terminated by ASCII whitespace, `#` (comment), or `;`.
 
-**A native unit contains no whitespace, in either position.** Inline, whitespace ends the token, so `1.0 k g` is a value with a stray token after it (`error_unexpected_input_byte`). In a type annotation, whitespace is legal only beside a separator — the family `:`, a `,` between parameters, the closing `>` — and inside a native unit parameter it is `error_type_param_whitespace` (spec [§5.3](03_bovnar_spec.md#53-parameter-order)). `<float:64,k g>` used to be accepted as `k~g`, which made it the one place in the format where a wrong unit was produced silently instead of refused.
+**A native unit contains no whitespace, in either position.** Inline, whitespace ends the token, so `1.0 k g` is a value with a stray token after it (`error_unexpected_input_byte`). In a type annotation, whitespace is legal only beside a separator — the family `:`, a `,` between parameters, the closing `>` — and inside a native unit parameter it is `error_type_param_whitespace` (spec [§5.3](03_bovnar_spec.md#53-parameter-order)). Whitespace there used to be deleted, so `<float:64,m in>` was accepted as `min` — the minute — which made it the one place in the format where a wrong unit was produced silently instead of refused.
 
 A parameter carrying a **profile namespace** is the exception: there whitespace is kept verbatim and the vocabulary decides what it means, because UDUNITS multiplies with a space and `udunits:kg m-2 s-1` is the commonest spelling of a flux in CF metadata. That is a property of the foreign notation, not of the native one — see doc/11 §13.2.
 
@@ -1411,7 +1411,7 @@ The literal `no_unit` declares a value as **explicitly dimensionless**:
 
 `bvn_parse_unit` detects `no_unit` via `memcmp` and returns `BVN_UNIT_NONE` (`num_components = 0`).
 
-**Omitting the unit parameter** (e.g. `<float:64>`) yields `BVN_UNIT_NO_PREFIX(bu_none)` (`num_components = 1`, `base == bu_none`). Both forms are semantically equivalent — they compare as compatible via `bvn_units_compatible` and both serialize to `"no_unit"` — but they are structurally distinct internal states.
+**Omitting the unit parameter** inside an annotation (e.g. `<float:64>`) yields the same `BVN_UNIT_NONE` (`num_components = 0`). Only a **fully unannotated** value (`1.0`) gets `BVN_UNIT_NO_PREFIX(bu_none)` (`num_components = 1`, `base == bu_none`), from default type synthesis. The two states are semantically equivalent — they compare as compatible via `bvn_units_compatible` and both serialize to `"no_unit"` — but they are structurally distinct.
 
 ---
 
@@ -2662,7 +2662,7 @@ The validator raises the following unit-specific errors:
 | `error_unit_mismatch` | 38 | An inline unit suffix and an explicit type-annotation unit are both present, but parse to different `value_unit_t` representations |
 | `error_unexpected_input_byte` | 15 | An inline unit suffix appears inside an array element |
 
-All four errors are raised during the `on_unverified` → validator phase. In `continue_on_error` mode the parser invokes `on_error` and enters the resync state machine, which skips to the next `;` at the current nesting depth. `bvnr_reader_get_error`, `…_line`, `…_column`, `…_byte`, and `…_offset` all report the location of the offending token.
+All four errors are raised during the `on_unverified` → validator phase. In `continue_on_error` mode the parser invokes `on_error` and enters the resync state machine, which resumes at the next `;` at the current nesting depth or at the start of the next assignment, whichever comes first (specification §13.2). `bvnr_reader_get_error`, `…_line`, `…_column`, `…_byte`, and `…_offset` all report the location of the offending token.
 
 ---
 

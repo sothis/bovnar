@@ -770,8 +770,14 @@ static bool bvn_apply_want_unit(bvnr_reader_t* r, token_type_t tt, bvnr_data_t* 
 
 	/* nan/inf are floats wearing a numeric token: there is no finite value to
 	 * convert, so they are handed over untouched. This is the ONLY pass-through —
-	 * every other parse failure below is reported, never swallowed. */
-	if (bvn_is_special_number_string(nb)) {
+	 * every other parse failure below is reported, never swallowed.
+	 *
+	 * A NUMBER token, that is: the reclassified keyword. A quoted string that
+	 * got this far under uint/sint is digits in its base, and in base 24 and up
+	 * "nan", "inf" and "ninf" are digits -- <uint:64,_36> "nan" is 30191, and
+	 * was passed through unconverted because it is spelled like the keyword. */
+	if ((tt == token_is_number || tt == token_is_array_number) &&
+	    bvn_is_special_number_string(nb)) {
 		if (nb != small) free(nb);
 		return true;
 	}
@@ -1609,7 +1615,6 @@ static bool bvn_acc_parse_number(bvnr_validator_t* v,
 bool bvn_check_acc_range(bvnr_validator_t* v,
 	const uint8_t* str, uint32_t str_len, token_type_t tt)
 {
-	(void)tt;
 	value_type_spec_t vt   = v->value_type;
 	/* datetime carries a decimal epoch-seconds value (base holds the epoch
 	 * index, not a numeric base), validated as a signed integer. */
@@ -1620,7 +1625,13 @@ bool bvn_check_acc_range(bvnr_validator_t* v,
 	bool is_neg = (base != 64u && base != 85u && str_len > 0 && str[0] == '-');
 	if (vt.family != vt_uint && vt.family != vt_sint && vt.family != vt_datetime)
 		return true;
-	if (str_len > 0) {
+	/* The special-number keywords are range-exempt (spec 6.4) -- the KEYWORDS,
+	 * which arrive as a number token. A quoted string under uint/sint is digits
+	 * in the declared base, and from base 24 up 'n', 'a', 'i' and 'f' are all
+	 * digits: <uint:8,_36> "inf" is 24171. Testing the spelling alone exempted
+	 * it from the range check, so it was accepted as a uint:8. */
+	if (str_len > 0 &&
+	    (tt == token_is_number || tt == token_is_array_number)) {
 		uint8_t c0 = str[0];
 		if ((c0 == 'n' || c0 == 'i') &&
 		    bvn_is_special_number_string((const char*)str))

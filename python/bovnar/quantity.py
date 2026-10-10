@@ -107,9 +107,49 @@ def _exact_number_text(value) -> str:
     if isinstance(value, numbers.Integral):      # Python int, numpy ints, ...
         return str(int(value))
     if isinstance(value, numbers.Real):          # Python/numpy floats
-        return repr(float(value))                # shortest round-tripping decimal
+        f = float(value)
+        # repr() spells the non-finite values Python's way, and '-inf' is not a
+        # bovnar number: the format writes 'ninf'. from_number(float('-inf'))
+        # built a Quantity the writer then refused (type_value_mismatch), and
+        # so did a numpy -inf scalar reaching an array through this path.
+        if f != f:
+            return 'nan'
+        if f in (float('inf'), float('-inf')):
+            return 'inf' if f > 0 else 'ninf'
+        return repr(f)                           # shortest round-tripping decimal
     raise BovnarArgumentError(
         f"cannot format {type(value).__name__} as a bovnar number")
+
+
+def _check_decimal_fits(text: str, width: int) -> None:
+    """Refuse a finite decimal literal that float_dec:*width* cannot hold.
+
+    decimal64 ends just below 1e385, and ``dumps({'a': Decimal('1e400')})``
+    wrote ``<float_dec:64> 1e+400`` without a word: a document whose value, the
+    moment anything materialises it into the type it declares, is infinity.
+    The reader does not range-check a decimal float, so nothing downstream
+    said so either. Only OVERFLOW is refused -- a literal with more digits
+    than the width keeps is rounded on materialisation, which is what
+    ``stored_value`` exists to show, and an underflow to zero is a rounding
+    too.
+
+    *text* that is not a plain decimal literal (a verbatim string the caller
+    supplied in some other shape) is left to the writer.
+    """
+    from decimal import Decimal, InvalidOperation
+    from ._bvnfloat import DECIMAL_FORMATS, decimal_stored_value
+    if int(width) not in DECIMAL_FORMATS:
+        return
+    try:
+        d = Decimal(text)
+    except (InvalidOperation, ValueError):
+        return
+    if not d.is_finite() or d == 0:
+        return
+    if decimal_stored_value(d, int(width)).is_infinite():
+        raise BovnarArgumentError(
+            f"{text} is out of range for float_dec:{int(width)} (it would "
+            f"materialise to infinity); use a wider float_dec")
 
 
 class Quantity:
@@ -217,6 +257,8 @@ class Quantity:
                     text.encode('ascii'), 10, int(width) or 64, base):
                 raise BovnarArgumentError(
                     f"{text} does not fit a signed float_fix:{width},q{base}")
+        if fam == int(_F.FLOAT_DEC):
+            _check_decimal_fits(text, int(width) or 64)
         vt = make_type_spec(family, int(width), base)
         return cls(text, vt, unit, tok_type=2)
 
@@ -342,6 +384,15 @@ class Quantity:
         (beyond its ~1e9865 intermediate cap)."""
         from ._bvnfloat import BvnFloat, decimal_to_interchange_bits
         width = int(self.vtype.width) or 64
+        # nan / inf / ninf have no digits to round, so they go straight to the
+        # encoder under one spelling each. strtodec_bits is also where 'ninf'
+        # is made to work: the C routine reads 'inf' and 'nan' and answered
+        # zeros for the format's own negative infinity.
+        nf = self._nonfinite_decimal()
+        if nf is not None:
+            return BvnFloat.strtodec_bits(
+                'nan' if nf.is_nan() else ('ninf' if nf.is_signed() else 'inf'),
+                width)
         f = BvnFloat.from_str(self.raw, 10)
         lit = self.decimal
         if self._parser_saturated(f, lit):
@@ -394,6 +445,11 @@ class Quantity:
         from ._bvnfloat import BvnFloat
         fam = int(self.vtype.family)
         width = int(self.vtype.width) or 64
+        # A typed null (`.a = <float:64,m>;`) has a type and no literal. .value,
+        # .decimal and .fraction all answer None for it; this one went on to
+        # encode the missing text and raised AttributeError from inside.
+        if self.raw is None and fam in _FLOATISH:
+            return None
         nf = self._nonfinite_decimal()
         if nf is not None and fam != int(_F.FLOAT_FIX):
             return nf
@@ -422,6 +478,10 @@ class Quantity:
         from ._bvnfloat import BvnFloat
         fam = int(self.vtype.family)
         width = int(self.vtype.width) or 64
+        if self.raw is None and fam in _FLOATISH:
+            raise BovnarArgumentError(
+                "ieee_bits() is not defined for a null value: it has a type "
+                "and no number to encode")
         if fam == int(_F.FLOAT) and width not in _IEEE_WIDTHS:
             raise BovnarArgumentError(
                 f"ieee_bits() materialises IEEE 16/32/64/128/256-bit floats; "

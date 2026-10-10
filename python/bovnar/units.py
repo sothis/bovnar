@@ -28,6 +28,7 @@ from ._ffi import get_library
 from .enums import BaseUnit, SIPrefix, IECPrefix, Exponent
 from .structs import ValueUnit, ValueUnitPrefix, make_unit_compound, UNIT_STRING_MAX
 from .exceptions import BovnarArgumentError
+from .unit import _as_vu
 
 _SI_DIM_COUNT = 7
 SI_DIM_NAMES  = ('m', 'kg', 's', 'A', 'K', 'mol', 'cd')
@@ -37,6 +38,11 @@ class UnitFlags(IntFlag):
     NONE      = 0
     REDUCE    = 1 << 0
     ASCII_EXP = 1 << 1
+    # BVN_NUM_CANONICAL. A WRITER flag (Writer.to_mem(unit_flags=...)), not a
+    # formatting one: a float that REDUCE rescaled is written in float shape,
+    # "5000.0" and not "5000". It was in the header and missing here, so the
+    # canonical document mode could not be asked for from Python at all.
+    NUM_CANONICAL = 1 << 2
 
 
 @dataclass(frozen=True)
@@ -82,7 +88,7 @@ def unit_valid(unit: ValueUnit) -> bool:
     A zero-component ValueUnit (BVN_UNIT_NONE) is valid. A unit whose
     components reference out-of-range base-unit or prefix values is not.
     """
-    return bool(get_library().bvn_unit_valid(unit))
+    return bool(get_library().bvn_unit_valid(_as_vu(unit)))
 
 
 def unit_prefix_factor(unit: ValueUnit) -> float:
@@ -100,7 +106,7 @@ def unit_prefix_factor(unit: ValueUnit) -> float:
       unit_prefix_factor(parse_unit("k~m/s")) → 1000.0
       unit_prefix_factor(parse_unit("Gi~B"))  → 2**30
     """
-    return float(get_library().bvn_unit_prefix_factor(unit))
+    return float(get_library().bvn_unit_prefix_factor(_as_vu(unit)))
 
 
 def unit_prefix_exponent(unit: ValueUnit) -> int:
@@ -113,7 +119,7 @@ def unit_prefix_exponent(unit: ValueUnit) -> int:
     individual component exponents are summed after sign adjustment.
     Returns 0 when no prefix is applied.
     """
-    return int(get_library().bvn_unit_prefix_exponent(unit))
+    return int(get_library().bvn_unit_prefix_exponent(_as_vu(unit)))
 
 
 def prefix_unit_valid(prefix: ValueUnitPrefix, base: BaseUnit | int) -> bool:
@@ -145,7 +151,7 @@ def unit_to_si_factor(unit: ValueUnit) -> SIConversion:
     is_affine    = ctypes.c_bool(False)
     affine_off   = ctypes.c_double(0.0)
     ok           = ctypes.c_bool(True)
-    factor       = lib.bvn_unit_to_si_factor(unit,
+    factor       = lib.bvn_unit_to_si_factor(_as_vu(unit),
                                               ctypes.byref(is_affine),
                                               ctypes.byref(affine_off),
                                               ctypes.byref(ok))
@@ -168,7 +174,7 @@ def units_compatible(a: ValueUnit, b: ValueUnit) -> bool:
       units_compatible(parse_unit("lm"), parse_unit("cd"))   → False (lm = cd·sr)
       units_compatible(parse_unit("°"),  parse_unit("rad"))  → True  (one kind)
     """
-    return bool(get_library().bvn_units_compatible(a, b))
+    return bool(get_library().bvn_units_compatible(_as_vu(a), _as_vu(b)))
 
 
 def units_equal(a: ValueUnit, b: ValueUnit) -> bool:
@@ -191,7 +197,7 @@ def units_equal(a: ValueUnit, b: ValueUnit) -> bool:
     to mean anything: a ctypes Structure defines no `__eq__`, so `==` compared
     identities and `parse_unit("m") == parse_unit("m")` was False.
     """
-    return bool(get_library().bvn_unit_equal(a, b))
+    return bool(get_library().bvn_unit_equal(_as_vu(a), _as_vu(b)))
 
 
 def units_convertible(a: ValueUnit, b: ValueUnit) -> bool:
@@ -211,7 +217,7 @@ def units_convertible(a: ValueUnit, b: ValueUnit) -> bool:
     (`s/°C` against `s/K`) passes here and is still refused by the conversion
     itself, since °C means nothing at an exponent other than 1.
     """
-    return bool(get_library().bvn_units_convertible(a, b))
+    return bool(get_library().bvn_units_convertible(_as_vu(a), _as_vu(b)))
 
 
 def unit_si_normal_form(u: ValueUnit) -> ValueUnit | None:
@@ -228,7 +234,7 @@ def unit_si_normal_form(u: ValueUnit) -> ValueUnit | None:
       unit_si_normal_form(parse_unit("%"))   → None
     """
     out = ValueUnit()
-    if not get_library().bvn_unit_si_normal_form(u, ctypes.byref(out)):
+    if not get_library().bvn_unit_si_normal_form(_as_vu(u), ctypes.byref(out)):
         return None
     return out
 
@@ -262,7 +268,8 @@ def unit_convert_factor(from_unit: ValueUnit,
     lib             = get_library()
     ok              = ctypes.c_bool(True)
     requires_affine = ctypes.c_bool(False)
-    factor          = lib.bvn_unit_convert_factor(from_unit, to_unit,
+    factor          = lib.bvn_unit_convert_factor(_as_vu(from_unit),
+                                                   _as_vu(to_unit),
                                                    ctypes.byref(ok),
                                                    ctypes.byref(requires_affine))
     if not ok.value and not requires_affine.value:
@@ -280,7 +287,7 @@ def unit_dimension_vector(unit: ValueUnit) -> list[int]:
     """
     lib  = get_library()
     dims = (ctypes.c_int32 * _SI_DIM_COUNT)()
-    if not lib.bvn_unit_dimension_vector(unit, dims):
+    if not lib.bvn_unit_dimension_vector(_as_vu(unit), dims):
         raise BovnarArgumentError(
             "bvn_unit_dimension_vector: invalid or unrepresentable unit")
     return list(dims)
@@ -306,7 +313,7 @@ def unit_reduce(unit: ValueUnit) -> ReducedUnit:
     lib      = get_library()
     scale    = ctypes.c_double(1.0)
     overflow = ctypes.c_bool(False)
-    reduced  = lib.bvn_unit_reduce(unit,
+    reduced  = lib.bvn_unit_reduce(_as_vu(unit),
                                     ctypes.byref(scale),
                                     ctypes.byref(overflow))
     if overflow.value:
@@ -357,6 +364,7 @@ def unit_to_str_ex(unit: ValueUnit,
     reduces to ``m¹⁰⁰`` and ``m⁵⁰·m⁵¹`` is refused. Without REDUCE such a unit
     serialises normally.
     """
+    unit = _as_vu(unit)
     lib = get_library()
     buf = ctypes.create_string_buffer(UNIT_STRING_MAX)
     n   = lib.bvn_unit_to_string_ex(unit, buf, UNIT_STRING_MAX, int(flags))
@@ -428,7 +436,8 @@ def convert_value(value: float,
     """
     out = ctypes.c_double(0.0)
     ok  = get_library().bvn_unit_convert_value(
-        ctypes.c_double(value), from_unit, to_unit, ctypes.byref(out))
+        ctypes.c_double(value), _as_vu(from_unit), _as_vu(to_unit),
+        ctypes.byref(out))
     if not ok:
         raise BovnarArgumentError(
             "convert_value: incompatible or invalid units")
@@ -442,6 +451,7 @@ __all__ = [
     'unit_prefix_factor', 'unit_prefix_exponent',
     'prefix_unit_valid',
     'unit_to_si_factor', 'units_compatible', 'units_convertible',
+    'units_equal',
     'unit_si_normal_form', 'unit_convert_factor',
     'unit_dimension_vector', 'unit_reduce',
     'unit_to_str_ex',

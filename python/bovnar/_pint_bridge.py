@@ -45,6 +45,7 @@ from .enums import (BaseUnit, SIPrefix, IECPrefix, Exponent, PrefixSystem,
 from .structs import (ValueUnit, MAX_UNIT_COMPONENTS,
                       make_unit_dimensionless, make_unit_compound)
 from .exceptions import BovnarArgumentError
+from .unit import _as_vu
 from ._pint_units import BASE_UNIT_TO_PINT, CURRENCY_TOKENS, build_registry
 
 __all__ = ['to_pint', 'to_pint_unit', 'from_pint', 'from_pint_unit']
@@ -138,11 +139,29 @@ def _unit_string(vu) -> str:
     return " * ".join(parts)
 
 
+def _pint_or_refuse(build, s: str):
+    """Run a registry call, turning pint's "no such unit" into ours.
+
+    The string was built from the table, so every NAME in it is one the
+    registry has; what pint can still lack is a PREFIX. It defines the IEC
+    prefixes only up to yobi, so `Ri~B` and `Qi~B` -- valid here -- became
+    "robibvnr_byte", and the raw pint.UndefinedUnitError leaked out of a
+    function whose every other refusal is a BovnarArgumentError."""
+    import pint
+    try:
+        return build()
+    except pint.errors.UndefinedUnitError as e:
+        raise BovnarArgumentError(
+            f"pint has no unit for {s!r} ({e}); pint defines no robi/quebi "
+            "prefix, so a unit carrying one cannot cross the bridge") from None
+
+
 def to_pint_unit(vu: ValueUnit, *, ureg=None):
-    """Convert a bovnar ValueUnit to a pint Unit (dimensionless if no real unit)."""
+    """Convert a bovnar ValueUnit (or Unit) to a pint Unit (dimensionless if no
+    real unit)."""
     reg = _registry(ureg)
-    s = _unit_string(vu)
-    return reg.Unit(s) if s else reg.dimensionless
+    s = _unit_string(_as_vu(vu))
+    return _pint_or_refuse(lambda: reg.Unit(s), s) if s else reg.dimensionless
 
 
 def to_pint(value, vu: ValueUnit, *, ureg=None):
@@ -151,7 +170,8 @@ def to_pint(value, vu: ValueUnit, *, ureg=None):
     The prefix lives in the unit, so *value* is returned unscaled.
     """
     reg = _registry(ureg)
-    return reg.Quantity(value, _unit_string(vu))
+    s = _unit_string(_as_vu(vu))
+    return _pint_or_refuse(lambda: reg.Quantity(value, s), s)
 
 
 # --------------------------------------------------------------------------- #

@@ -517,3 +517,54 @@ class TestDatetime64:
         a = to_numpy(loads(src, typed=True)['t'])
         raw = array_to_bvnr('t', a, pretty=False)
         assert loads(raw)['t'] == loads(src)['t']
+
+
+@needs_lib
+class TestWriteSideGaps:
+    def test_bytes_dtype_is_refused_up_front(self):
+        # kind 'S' was mapped to utf8 and then failed per element with
+        # "Cannot serialise array element of type 'bytes'".
+        with pytest.raises(BovnarArgumentError, match="astype"):
+            array_to_bvnr('a', np.array([b'a', b'bb']))
+
+    def test_object_array_of_bigints_round_trips(self):
+        # to_numpy(dtype=object) hands these out; nothing took them back.
+        a = np.array([2 ** 70, 1], dtype=object)
+        raw = array_to_bvnr('a', a, pretty=False)
+        assert raw == b'.a=<uint:71>[1180591620717411303424,1];'
+        back = to_numpy(loads(raw, typed=True)['a'], dtype=object)
+        assert back.tolist() == a.tolist()
+
+    def test_object_array_of_small_ints(self):
+        assert array_to_bvnr('a', np.array([[1, -2], [3, 4]], dtype=object),
+                             pretty=False) == b'.a=<sint:64>[1,-2]/[3,4];'
+        assert array_to_bvnr('a', np.array([1, 2], dtype=object), unit='m',
+                             pretty=False) == b'.a=<uint:64,m>[1,2];'
+
+    def test_unit_object_as_the_unit(self):
+        raw = array_to_bvnr('a', np.array([1.0]), unit=bovnar.Unit.parse('m/s'),
+                            pretty=False)
+        assert raw == b'.a=<float:64,m/s>[1.0];'
+
+
+@needs_lib
+class TestNumpyScalarsInDumps:
+    """A numpy scalar was taken inside a list and refused as a dict value
+    (np.int64, np.float32), or refused in both places (np.bool_)."""
+
+    def test_scalars_as_values(self):
+        out = bovnar.dumps({'i': np.int64(-5), 'u': np.uint64(2 ** 64 - 1),
+                            'f': np.float32(1.5), 'b': np.bool_(True)},
+                           pretty=False)
+        assert loads(out) == {'i': -5, 'u': 2 ** 64 - 1, 'f': 1.5, 'b': True}
+        assert type(loads(out)['b']) is bool
+
+    def test_scalars_in_a_list(self):
+        out = bovnar.dumps({'a': [np.bool_(True), np.bool_(False)],
+                            'b': [np.int16(3), np.int16(-4)]}, pretty=False)
+        assert out == b'.a=[true,false];.b=[3,-4];'
+
+    def test_negative_infinity_in_a_list(self):
+        out = bovnar.dumps({'a': [np.float32('-inf'), np.float32('inf')]},
+                           pretty=False)
+        assert out == b'.a=[ninf,inf];'

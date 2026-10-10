@@ -2861,6 +2861,534 @@ static void test_rb8_reader_limits_are_exact(void)
 		"...and is exact at its boundary");
 }
 
+/* ===========================================================================
+ * Fourth review round -- the read side.
+ *
+ * One recorder for all of it: the keys and values delivered, every error with
+ * its position, and whether the start/end events NEST (a row_end must close an
+ * array, a struct_end a struct, an assignment may not sit directly in an
+ * array, and nothing may be open at stream_end).
+ * ======================================================================== */
+typedef struct {
+	char         keys[256];
+	char         vals[256];
+	char         stk[600];
+	int          sp;
+	int          nest_violations;
+	int          nerr;
+	error_code_t errs[8];
+	uint64_t     offs[8];
+	uint32_t     bytes[8];
+	bool         ok;
+	error_code_t err;
+	uint64_t     off;
+	uint32_t     byte;
+	uint64_t     recoveries;
+	char         conv[64];
+} r4_t;
+static void r4_cat(char *dst, size_t cap, const void *s, uint32_t n)
+{
+	size_t l = strlen(dst);
+	if (l + n + 2u > cap) return;
+	memcpy(dst + l, s, n);
+	dst[l + n] = ',';
+	dst[l + n + 1u] = '\0';
+}
+static bool r4_cb(void *ud, bvnr_event_t ev, bvnr_data_t *d)
+{
+	r4_t *c = ud;
+	switch (ev) {
+	case ev_assignment_start:
+		if (c->sp > 0 && c->stk[c->sp - 1] == 'A') c->nest_violations++;
+		r4_cat(c->keys, sizeof c->keys, d->data, d->length);
+		break;
+	case ev_data:
+		if (d->type != token_is_octet_stream)
+			r4_cat(c->vals, sizeof c->vals, d->data, d->length);
+		if (d->converted && d->conv.text && d->conv.length < sizeof c->conv) {
+			memcpy(c->conv, d->conv.text, d->conv.length);
+			c->conv[d->conv.length] = '\0';
+		}
+		break;
+	case ev_struct_start:
+		if (c->sp < (int)sizeof c->stk) c->stk[c->sp++] = 'S';
+		break;
+	case ev_array_row_start:
+		if (c->sp < (int)sizeof c->stk) c->stk[c->sp++] = 'A';
+		break;
+	case ev_struct_end:
+		if (c->sp == 0 || c->stk[c->sp - 1] != 'S') c->nest_violations++;
+		if (c->sp > 0) c->sp--;
+		break;
+	case ev_array_row_end:
+		if (c->sp == 0 || c->stk[c->sp - 1] != 'A') c->nest_violations++;
+		if (c->sp > 0) c->sp--;
+		break;
+	case ev_stream_end:
+		if (c->sp != 0) c->nest_violations++;
+		break;
+	default: break;
+	}
+	return true;
+}
+static void r4_err(void *ud, error_code_t err, uint64_t line, uint64_t col,
+		   uint32_t byte, uint64_t off)
+{
+	r4_t *c = ud;
+	(void)line; (void)col;
+	if (c->nerr < 8) {
+		c->errs[c->nerr]  = err;
+		c->offs[c->nerr]  = off;
+		c->bytes[c->nerr] = byte;
+	}
+	c->nerr++;
+}
+static r4_t r4_run_flags(const void *doc, size_t n, bool cont,
+			 bvnr_read_flags_t fl)
+{
+	static r4_t c;
+	memset(&c, 0, sizeof c);
+	fl.userdata          = &c;
+	fl.on_verified       = r4_cb;
+	fl.on_error          = r4_err;
+	fl.continue_on_error = cont;
+	bvnr_reader_t *r = bvnr_reader_create();
+	c.ok = bvnr_open_read_mem(r, doc, n, NULL, 0, &fl) && bvnr_read(r);
+	c.err        = bvnr_reader_get_error(r);
+	c.off        = bvnr_reader_get_error_offset(r);
+	c.byte       = bvnr_reader_get_error_byte(r);
+	c.recoveries = bvnr_reader_get_recovery_count(r);
+	bvnr_reader_destroy(r);
+	return c;
+}
+static r4_t r4_run(const void *doc, size_t n, bool cont)
+{
+	bvnr_read_flags_t fl;
+	memset(&fl, 0, sizeof fl);
+	return r4_run_flags(doc, n, cont, fl);
+}
+static r4_t r4_str(const char *doc, bool cont)
+{
+	return r4_run(doc, strlen(doc), cont);
+}
+
+/* A nested array was counted twice in the row that holds it, so the "/"-row
+ * width check was wrong for every row containing one -- an array element, or
+ * an array that is only a member of a struct element. */
+static void test_r4_row_width_counts_a_nested_array_once(void)
+{
+	static const char *const ragged[] = {
+		".a = [[1]]/[null,null];",
+		".a = [[1],[2]]/[[3],null,null];",
+		".a = [{.m = [1];}]/[null, null];",
+		".a = [[1]]/[1,2];",
+		".a = [[]]/[null,null];",
+		".a = [{.m = [1]; .n = [2];}]/[null, null, null];",
+	};
+	static const char *const rectangular[] = {
+		".a = [[1],[2]]/[null,null];",
+		".a = [null,null]/[[1],[2]];",
+		".a = [{.m = [1];}]/[{.m = null;}];",
+		".a = [[],[]]/[null,null];",
+		".a = [[[1]]]/[null];",
+		".a = [[1],[2]]/[[3],[4]];",
+		".a = [1,2]/[null,null];",
+		".a = [[1]/[2], 5]/[null, 6];",
+	};
+	for (size_t i = 0; i < sizeof ragged / sizeof *ragged; i++) {
+		r4_t c = r4_str(ragged[i], false);
+		ASSERT_FALSE(c.ok, ragged[i]);
+		ASSERT_EQ_INT(c.err, error_array_row_size_mismatch, ragged[i]);
+	}
+	for (size_t i = 0; i < sizeof rectangular / sizeof *rectangular; i++) {
+		r4_t c = r4_str(rectangular[i], false);
+		ASSERT_TRUE(c.ok, rectangular[i]);
+	}
+	/* ...and the element that overshoots is still caught where it stands */
+	r4_t c = r4_str(".a = [[1],[2]]/[[3],[4],[5]];", false);
+	ASSERT_EQ_INT(c.err, error_array_row_size_mismatch, "third element");
+	ASSERT_EQ_UINT(c.off, 23u, "at the ',' that starts it");
+}
+
+static bool r4_want_same_unit_base10(void *ud, const bvnr_data_t *d,
+				     value_unit_t *want, uint32_t *want_base)
+{
+	(void)ud;
+	*want      = d->value_unit;
+	*want_base = 10u;
+	return true;
+}
+/* "nan", "inf" and "ninf" are DIGITS in base 24 and up. Only the bare keyword
+ * is a special number. */
+static void test_r4_quoted_digits_spelling_a_special_number(void)
+{
+	r4_t c = r4_str(".a = <uint:8,_36> \"inf\";", false);
+	ASSERT_FALSE(c.ok, "inf in base 36 is 24171: not a uint:8");
+	ASSERT_EQ_INT(c.err, error_value_out_of_range, "uint:8,_36 \"inf\"");
+	c = r4_str(".a = <sint:8,_36> \"ninf\";", false);
+	ASSERT_EQ_INT(c.err, error_value_out_of_range, "sint:8,_36 \"ninf\"");
+	c = r4_str(".a = <uint:8,_36> \"nan\";", false);
+	ASSERT_EQ_INT(c.err, error_value_out_of_range, "uint:8,_36 \"nan\"");
+	c = r4_str(".a = <uint:16,_36> \"nan\"; .b = <sint:16,_36> \"-inf\";", false);
+	ASSERT_TRUE(c.ok, "and where it fits, it is a number like any other");
+	/* the keyword keeps its exemption, in every family (spec 6.4) */
+	c = r4_str(".a = <uint:8> nan; .b = <sint:16> ninf; .c = <uint:8,_36> inf;"
+		   " .d = <float_fix:32,q8> inf;", false);
+	ASSERT_TRUE(c.ok, "bare nan/inf/ninf stay range-exempt");
+	/* a conversion sees the number too */
+	bvnr_read_flags_t fl;
+	memset(&fl, 0, sizeof fl);
+	fl.want_unit = r4_want_same_unit_base10;
+	const char *doc = ".a = <uint:64,_36> \"nan\";";
+	c = r4_run_flags(doc, strlen(doc), false, fl);
+	ASSERT_TRUE(c.ok, "base conversion of uint:64,_36 \"nan\"");
+	ASSERT_TRUE(strcmp(c.conv, "30191") == 0, "converted to 30191");
+}
+
+/* A struct member is an assignment, and the count was reset per assignment. */
+static void test_r4_max_array_items_counts_through_structs(void)
+{
+	bvnr_read_flags_t fl;
+	memset(&fl, 0, sizeof fl);
+	fl.max_array_items = 3;
+	const char *d;
+	r4_t c;
+	d = ".x = [1,2,3];";
+	c = r4_run_flags(d, strlen(d), false, fl);
+	ASSERT_TRUE(c.ok, "three items at a limit of three");
+	d = ".x = [{.a=1;},{.a=1;},{.a=1;}];";
+	c = r4_run_flags(d, strlen(d), false, fl);
+	ASSERT_TRUE(c.ok, "three struct items at a limit of three");
+	d = ".x = [{.a=1;},{.a=1;},{.a=1;},{.a=1;}];";
+	c = r4_run_flags(d, strlen(d), false, fl);
+	ASSERT_EQ_INT(c.err, error_too_many_array_items, "four struct items");
+	d = ".x = [{.a=1;},2,3,4];";
+	c = r4_run_flags(d, strlen(d), false, fl);
+	ASSERT_EQ_INT(c.err, error_too_many_array_items, "a struct, then three more");
+	ASSERT_EQ_UINT(c.off, 17u, "refused at the fourth item's comma");
+	d = ".x = [{.a=[1,2];}];";
+	c = r4_run_flags(d, strlen(d), false, fl);
+	ASSERT_TRUE(c.ok, "an array in a member draws on the same budget: 3");
+	d = ".x = [{.a=[1,2,3];}];";
+	c = r4_run_flags(d, strlen(d), false, fl);
+	ASSERT_EQ_INT(c.err, error_too_many_array_items, "...and exhausts it at 4");
+	/* the budget is per outermost array, as it always was */
+	d = ".x = [1,2,3]; .y = [1,2,3]; .s = {.a = [1,2,3]; .b = [1,2,3];};";
+	c = r4_run_flags(d, strlen(d), false, fl);
+	ASSERT_TRUE(c.ok, "separate arrays have separate budgets");
+}
+
+/* Recovery closed every open array, including the one AROUND the struct the
+ * error was in: row_end, then more members of that struct, then struct_end. */
+static void test_r4_recovery_keeps_events_nested(void)
+{
+	r4_t c = r4_str(".a = [{.x = @; .y = 5;}, {.x = 1;}]; .b = 2;", true);
+	ASSERT_TRUE(c.ok, "recovers");
+	ASSERT_EQ_INT(c.nest_violations, 0, "start/end events nest");
+	ASSERT_EQ_UINT(c.recoveries, 1u, "one error, one recovery");
+	ASSERT_TRUE(strcmp(c.keys, "a,x,y,x,b,") == 0, "every key but the broken value");
+	ASSERT_TRUE(strcmp(c.vals, "5,1,2,") == 0, "and the second element survives");
+
+	c = r4_str(".a = [{.x = <uint:8> 300; .y = 5;}, {.x = 1; .y = 6;}]; .b = 2;", true);
+	ASSERT_EQ_INT(c.nest_violations, 0, "semantic error at the ';'");
+	ASSERT_EQ_UINT(c.recoveries, 1u, "one recovery");
+	ASSERT_TRUE(strcmp(c.vals, "5,1,6,2,") == 0, "rest of the array delivered");
+
+	/* the array the struct OWNS is still closed */
+	c = r4_str(".a = [{.x = [1, @, 3]; .y = 5;}, 7]/[{.x = [1]; .y = 2;}, 8]; .b = 2;", true);
+	ASSERT_TRUE(c.ok, "inner array broken, outer intact");
+	ASSERT_EQ_INT(c.nest_violations, 0, "nested");
+	ASSERT_EQ_UINT(c.recoveries, 1u, "the outer rows still compare equal");
+	ASSERT_TRUE(strcmp(c.vals, "1,5,7,1,2,8,2,") == 0, "values");
+
+	/* a '}' or ']' met while skipping */
+	c = r4_str(".a = [{.x = @ }, {.x = 1;}]; .b = 2;", true);
+	ASSERT_TRUE(c.ok, "struct closed by the '}' during recovery");
+	ASSERT_EQ_INT(c.nest_violations, 0, "nested");
+	c = r4_str(".a = [{.x = [@ ]; .y = 1;}]; .b = 2;", true);
+	ASSERT_EQ_INT(c.nest_violations, 0, "']' of an already closed array");
+	ASSERT_TRUE(strcmp(c.keys, "a,x,y,b,") == 0, "keys");
+	c = r4_str(".a = [{.x = @ ] }, 4]; .b = 2;", true);
+	ASSERT_EQ_INT(c.nest_violations, 0, "a ']' cannot close across a struct");
+	c = r4_str(".a = [[{.x = @; .y = [1,2];}], [{.x = 3; .y = [4,5];}]]; .b = 2;", true);
+	ASSERT_TRUE(c.ok, "two array levels around the struct");
+	ASSERT_EQ_INT(c.nest_violations, 0, "nested");
+	ASSERT_TRUE(strcmp(c.vals, "1,2,3,4,5,2,") == 0, "values");
+	/* an annotated outer array gets its unit back for the next element */
+	c = r4_str(".a = [1, @, 3]; .b = [4, 5];", true);
+	ASSERT_EQ_INT(c.nest_violations, 0, "plain array, unchanged behaviour");
+	ASSERT_TRUE(strcmp(c.vals, "1,4,5,") == 0, "the broken array is closed");
+}
+
+static void test_r4_recovery_from_inside_a_comment(void)
+{
+	static const char d1[] = ".z = 0; # bad \xff byte; .q = 9;\n.a = 1;\n";
+	r4_t c = r4_run(d1, sizeof d1 - 1, true);
+	ASSERT_TRUE(c.ok, "recovers");
+	ASSERT_TRUE(strcmp(c.keys, "z,a,") == 0, "nothing is read out of a comment");
+	static const char d2[] = ".z = 0;\n# caf\xe9 [draft\n.a = 1;\n.b = 2;\n";
+	c = r4_run(d2, sizeof d2 - 1, true);
+	ASSERT_TRUE(c.ok, "a '[' in the comment opens nothing");
+	ASSERT_TRUE(strcmp(c.keys, "z,a,b,") == 0, "the document after it is read");
+	static const char d3[] = ".z = 0;\n# it\x01s \"quoted {\n.a = 1;\n.b = \"x\";\n";
+	c = r4_run(d3, sizeof d3 - 1, true);
+	ASSERT_TRUE(c.ok, "nor a quote, nor a brace");
+	ASSERT_TRUE(strcmp(c.keys, "z,a,b,") == 0, "keys");
+	static const char d4[] = "# first \xff line [\n.a = 1;\n";
+	c = r4_run(d4, sizeof d4 - 1, true);
+	ASSERT_TRUE(c.ok, "the first comment too");
+	ASSERT_TRUE(strcmp(c.keys, "a,") == 0, "keys");
+	/* the sequence is cut short BY the newline: the comment is over */
+	static const char d5[] = ".z = 0; # x \xc3\n.a = 1;\n";
+	c = r4_run(d5, sizeof d5 - 1, true);
+	ASSERT_TRUE(c.ok, "error on the newline itself");
+	ASSERT_TRUE(strcmp(c.keys, "z,a,") == 0, "the next line is not skipped");
+	/* a comment is not structure: what it sits in is untouched */
+	static const char d6[] = ".a = [1, # two \xff [\n 2,\n # \x01 {\n 3]; .s = {.x = 1; # \xc3(\n .y = 2;};\n";
+	c = r4_run(d6, sizeof d6 - 1, true);
+	ASSERT_TRUE(c.ok, "bad bytes in comments inside an array and a struct");
+	ASSERT_EQ_INT(c.nest_violations, 0, "nested");
+	ASSERT_EQ_UINT(c.recoveries, 3u, "each one reported and counted");
+	ASSERT_EQ_INT(c.nerr, 3, "on_error three times");
+	ASSERT_TRUE(strcmp(c.vals, "1,2,3,1,2,") == 0, "and nothing lost");
+	/* ...and one that runs to end of input still ends the document cleanly */
+	static const char d7[] = ".a = 1; # x\xff y";
+	c = r4_run(d7, sizeof d7 - 1, true);
+	ASSERT_TRUE(c.ok, "bad byte in a trailing comment without a newline");
+	static const char d8[] = ".a = 1; # x \xe2\x82";
+	c = r4_run(d8, sizeof d8 - 1, true);
+	ASSERT_TRUE(c.ok, "end of input mid-sequence is reported and recovered");
+	ASSERT_EQ_INT(c.nerr, 1, "once");
+	ASSERT_EQ_INT(c.errs[0], error_invalid_utf8_byte, "as invalid UTF-8");
+	ASSERT_EQ_UINT(c.recoveries, 1u, "and counted");
+	/* a first line with a bad byte in it declares nothing */
+	static const char d9[] = "#!bovnar 1.1 \xff\n.a = 2024-01-01;\n.b = 1;\n";
+	c = r4_run(d9, sizeof d9 - 1, true);
+	ASSERT_TRUE(strcmp(c.keys, "a,b,") == 0, "keys");
+	ASSERT_TRUE(strcmp(c.vals, "1,") == 0, "no directive: the ISO literal is refused");
+}
+
+static void test_r4_recovery_from_an_escape_cut_by_the_quote(void)
+{
+	r4_t c = r4_str("#!bovnar 1.1\n.a = \"\\x4\"; .b = 2; .c = \"z\"; .d = 4;\n", true);
+	ASSERT_TRUE(c.ok, "\\x4\" recovers");
+	ASSERT_TRUE(strcmp(c.keys, "a,b,c,d,") == 0, "only .a's value is lost");
+	c = r4_str("#!bovnar 1.1\n.a = \"\\x\"; .b = 2;\n", true);
+	ASSERT_TRUE(strcmp(c.keys, "a,b,") == 0, "\\x\"");
+	c = r4_str("#!bovnar 1.1\n.a = \"\\u\"; .b = 2;\n", true);
+	ASSERT_TRUE(strcmp(c.keys, "a,b,") == 0, "\\u\"");
+	c = r4_str("#!bovnar 1.1\n.a = \"\\u{41\"; .b = 2;\n.c = 3;\n", true);
+	ASSERT_TRUE(c.ok, "\\u{41\" recovers");
+	ASSERT_TRUE(strcmp(c.keys, "a,b,c,") == 0, "keys");
+	/* the quote is still ahead when the bad byte is something else */
+	c = r4_str("#!bovnar 1.1\n.a = \"\\x4g; .q = 1;\"; .b = 2;\n", true);
+	ASSERT_TRUE(strcmp(c.keys, "a,b,") == 0, "\\x4g: skip to the closing quote");
+}
+
+static void test_r4_recovery_when_the_bad_byte_closes_a_struct(void)
+{
+	r4_t c = r4_str(".s = {.a = 1 }; .b = 2;", true);
+	ASSERT_TRUE(c.ok, "a member missing its ';'");
+	ASSERT_EQ_INT(c.nest_violations, 0, "nested");
+	ASSERT_EQ_INT(c.sp, 0, "the struct was closed");
+	ASSERT_TRUE(strcmp(c.keys, "s,a,b,") == 0, "keys");
+	c = r4_str(".s = {.a = [1, 2 }; .b = 2;", true);
+	ASSERT_TRUE(c.ok, "with an array open inside it");
+	ASSERT_EQ_INT(c.nest_violations, 0, "nested");
+	c = r4_str(".a = 1 }; .b = 2;", true);
+	ASSERT_TRUE(c.ok, "a '}' with nothing to close");
+	ASSERT_TRUE(strcmp(c.keys, "a,b,") == 0, "keys");
+}
+
+/* error_offset is a STREAM offset: octet payloads count. */
+static void test_r4_error_offset_after_an_octet_stream(void)
+{
+	static const char d1[] = ".a = \x00\x01\x03\x00" "abc\x00;\n.c = @;";
+	r4_t c = r4_run(d1, sizeof d1 - 1, false);
+	ASSERT_EQ_INT(c.err, error_unexpected_input_byte, "the '@'");
+	ASSERT_EQ_UINT(c.off, 20u, "at its index in the buffer");
+	ASSERT_TRUE(d1[c.off] == '@', "which indexes the input");
+	ASSERT_EQ_UINT(c.offs[0], 20u, "on_error agrees");
+	static const char d2[] = ".a = \x00\x01\x03\x00" "abc\x07;";
+	c = r4_run(d2, sizeof d2 - 1, false);
+	ASSERT_EQ_INT(c.err, error_octet_stream_out_of_sync, "bad tag");
+	ASSERT_EQ_UINT(c.off, 12u, "the tag's own offset");
+	ASSERT_EQ_UINT(c.byte, 0x07u, "and the tag");
+	/* two streams, a semantic error, and a string error after them */
+	static const char d3[] = ".a = \x00\x01\x01\x00z\x00; .b = \x00\x00; .c = <uint:8> 300;";
+	c = r4_run(d3, sizeof d3 - 1, false);
+	ASSERT_EQ_INT(c.err, error_value_out_of_range, "300");
+	ASSERT_TRUE(d3[c.off] == ';', "reported at its ';'");
+	ASSERT_EQ_UINT(c.off, sizeof d3 - 2, "the last byte");
+	/* max_text_bytes: the first byte over the limit */
+	bvnr_read_flags_t fl;
+	memset(&fl, 0, sizeof fl);
+	fl.max_text_bytes = 10;
+	static const char d4[] = ".a = \x00\x01\x02\x00xy\x00;\n.b = 1;";
+	c = r4_run_flags(d4, sizeof d4 - 1, false, fl);
+	ASSERT_EQ_INT(c.err, error_text_data_too_long, "text cap");
+	ASSERT_EQ_UINT(c.off, 16u, "eleventh TEXT byte is stream byte 16");
+}
+
+/* max_file_size is exact, and what happens at it does not depend on how the
+ * bytes arrive. */
+static void test_r4_max_file_size_reads_up_to_the_cap(void)
+{
+	static const char d[] = ".a = 1;\n.b = 2;\n.c = 3;\n.d = 4;\n";
+	bvnr_read_flags_t fl;
+	memset(&fl, 0, sizeof fl);
+	fl.max_file_size = sizeof d - 1;
+	r4_t c = r4_run_flags(d, sizeof d - 1, false, fl);
+	ASSERT_TRUE(c.ok, "a document of N bytes at a cap of N");
+	fl.max_file_size = 20;
+	c = r4_run_flags(d, sizeof d - 1, false, fl);
+	ASSERT_EQ_INT(c.err, error_file_too_long, "over the cap");
+	ASSERT_EQ_UINT(c.off, 20u, "refused at the first byte over it");
+	ASSERT_TRUE(strcmp(c.vals, "1,2,") == 0, "having read what came before");
+	/* an error inside the allowed prefix is the error */
+	static const char e[] = ".a = @;\n.b = 2;\n.c = 3;\n.d = 4;\n";
+	c = r4_run_flags(e, sizeof e - 1, false, fl);
+	ASSERT_EQ_INT(c.err, error_unexpected_input_byte, "the earlier error wins");
+	/* the cap falls inside an octet chunk */
+	static const char o[] = ".a = \x00\x01\x08\x00" "abcdefgh\x00;";
+	fl.max_file_size = 12;
+	c = r4_run_flags(o, sizeof o - 1, false, fl);
+	ASSERT_EQ_INT(c.err, error_file_too_long, "cut inside a chunk");
+	ASSERT_EQ_UINT(c.off, 12u, "at the cap");
+}
+
+static void test_r4_eof_inside_a_utf8_sequence(void)
+{
+	static const char *const bad[] = {
+		".a = 1; #\xc3", "#\xc3", ".a = 1; # ok \xe2\x82",
+		".a = 1;\n#\xf0\x9f", "#x\n#\xc3", "#\xef", "#\xef\xbb",
+		"\xef\xbb\xbf# \xc3",
+	};
+	for (size_t i = 0; i < sizeof bad / sizeof *bad; i++) {
+		r4_t c = r4_str(bad[i], false);
+		ASSERT_FALSE(c.ok, "a comment ending mid-sequence");
+		ASSERT_EQ_INT(c.err, error_invalid_utf8_byte, "is invalid UTF-8");
+		ASSERT_EQ_UINT(c.off, strlen(bad[i]), "reported at end of input");
+	}
+	r4_t c = r4_str(".a = 1; # caf\xc3\xa9", false);
+	ASSERT_TRUE(c.ok, "a complete character at end of input is fine");
+	c = r4_str("# \xef\xbc\x81", false);
+	ASSERT_TRUE(c.ok, "in the first comment too");
+	c = r4_str(".a = \"\xc3", false);
+	ASSERT_EQ_INT(c.err, error_got_incomplete_bvnr_stream,
+		      "a truncated document is still a truncated document");
+}
+
+static void test_r4_directive_padding_and_peek(void)
+{
+	static const char *const docs[] = {
+		"#!bovnar 1.1                              \n.a = 2024-01-01;",
+		"#!bovnar                              1.1\n.a = 2024-01-01;",
+		"#!bovnar \t \t \t \t \t \t \t \t \t \t \t \t \t \t1.1 \t \t \t \t \t \t \t \t \t \t \t \t\n.a = 2024-01-01;",
+		"#!bovnar                    65535.65535                    \n",
+		"\x0b#!bovnar 1.1\n.a = 2024-01-01;",
+		"\x0c \x0b\n#!bovnar 1.1\n.a = 2024-01-01;",
+	};
+	for (size_t i = 0; i < sizeof docs / sizeof *docs; i++) {
+		r4_t c = r4_str(docs[i], false);
+		ASSERT_TRUE(c.ok, "padded directive is a directive");
+		uint16_t ma = 0, mi = 0;
+		ASSERT_TRUE(bvnr_peek_version(docs[i], strlen(docs[i]), &ma, &mi),
+			    "and peek agrees with the reader");
+		ASSERT_EQ_UINT(ma, i == 3 ? 65535u : 1u, "major");
+		ASSERT_EQ_UINT(mi, i == 3 ? 65535u : 1u, "minor");
+	}
+	static const char *const invalid[] = {
+		"#!bovnar 1.1                              x\n",
+		"#!bovnar                              1.1.\n",
+		"#!bovnar 1 .1\n",
+		"#!bovnar 1.1 this line is far longer than any version could ever be\n",
+		"#!bovnar 1.1\x0b\n",
+	};
+	for (size_t i = 0; i < sizeof invalid / sizeof *invalid; i++) {
+		r4_t c = r4_str(invalid[i], false);
+		ASSERT_EQ_INT(c.err, error_invalid_spec_version, invalid[i]);
+		ASSERT_FALSE(bvnr_peek_version(invalid[i], strlen(invalid[i]), NULL, NULL),
+			     "peek refuses it too");
+	}
+	r4_t c = r4_str("#!bovnarish                                        and on\n.a = 1;", false);
+	ASSERT_TRUE(c.ok, "a long ordinary comment is still an ordinary comment");
+}
+
+static void test_r4_float_fix_and_float_dec_are_one_word(void)
+{
+	static const char *const bad[] = {
+		".a = <float _fix:32,q8> 1.5;",
+		".a = <float\t_dec:64> 1.5;",
+		".a = <float#x\n_dec:64> 1.5;",
+		".a = <float # x\n _fix:32,q8> 1.5;",
+		".a = <float\n_fix> 1.5;",
+	};
+	for (size_t i = 0; i < sizeof bad / sizeof *bad; i++) {
+		r4_t c = r4_str(bad[i], false);
+		ASSERT_FALSE(c.ok, bad[i]);
+		ASSERT_EQ_INT(c.err, error_type_param_whitespace, bad[i]);
+	}
+	static const char *const good[] = {
+		".a = <float_fix:32,q8> 1.5;", ".a = <float_dec:64> 1.5;",
+		".a = < float_fix : 32 , q8 > 1.5;", ".a = <float_dec # c\n> 1.5;",
+		".a = <float :64> 1.5;", ".a = <float # c\n : 64, _16> \"1.8\";",
+		".a = <float> 1.5;", ".a = <float:64,_16> \"1.8\";",
+	};
+	for (size_t i = 0; i < sizeof good / sizeof *good; i++) {
+		r4_t c = r4_str(good[i], false);
+		ASSERT_TRUE(c.ok, good[i]);
+	}
+}
+
+static void test_r4_nothing_but_a_dot_or_an_index_after_an_index(void)
+{
+	static const char *const bad[] = {
+		"#!bovnar 1.1\n.r = &.a[0]b;",
+		"#!bovnar 1.1\n.r = &.a[0]bcdefgh;",
+		"#!bovnar 1.1\n.r = [&.a[0][1]_x];",
+		"#!bovnar 1.1\n.r = &.a[0]-;",
+		"#!bovnar 1.1\n.r = &.a[0]\xc3\xa9;",
+	};
+	for (size_t i = 0; i < sizeof bad / sizeof *bad; i++) {
+		r4_t c = r4_str(bad[i], false);
+		ASSERT_FALSE(c.ok, bad[i]);
+		ASSERT_EQ_INT(c.err, error_unexpected_input_byte, bad[i]);
+	}
+	r4_t c = r4_str("#!bovnar 1.1\n.r = &.a[0]b;", false);
+	ASSERT_EQ_UINT(c.off, 24u, "at the byte after the ']'");
+	c = r4_str("#!bovnar 1.1\n.p = &.a[0].b; .q = &.a[0][1]; .r = [&.a[0], &.b[1][2].c]; .s = &.a[0] ;", false);
+	ASSERT_TRUE(c.ok, "'.', '[' and the end of the reference stay valid");
+	ASSERT_TRUE(strcmp(c.vals, ".a[0].b,.a[0][1],.a[0],.b[1][2].c,.a[0],") == 0, "paths");
+}
+
+/* A ']' may not close an array from inside a struct that is its element. */
+static void test_r4_bracket_cannot_close_across_a_struct(void)
+{
+	static const char *const bad[] = {
+		".a = [{.x = 1];};",
+		".a = [{.x = [1]];};",
+		".a = [{.x = [1]/[2]];};",
+		".a = [{.x = <uint:8>];};",
+		".a = [{.x = \"s\"];};",
+		".a = [{.x = sym];};",
+		".a = [{.x = []];};",
+		".a = [[{.x = {.y = 1];};}]];",
+	};
+	for (size_t i = 0; i < sizeof bad / sizeof *bad; i++) {
+		r4_t c = r4_str(bad[i], false);
+		ASSERT_FALSE(c.ok, bad[i]);
+		ASSERT_EQ_INT(c.err, error_unexpected_input_byte, bad[i]);
+		ASSERT_EQ_INT(c.nest_violations, 0, "and no row_end was delivered for it");
+		c = r4_str(bad[i], true);
+		ASSERT_EQ_INT(c.nest_violations, 0, "nor under recovery");
+	}
+	r4_t c = r4_str(".a = [{.x = 1];};", false);
+	ASSERT_EQ_UINT(c.off, 13u, "at the ']'");
+	c = r4_str(".a = [{.x = [1]; .y = [[2],[]];}, {.x = []; .y = [[3],[4]];}];", false);
+	ASSERT_TRUE(c.ok, "arrays closed where they were opened are untouched");
+}
+
 int main(void)
 {
 	printf("Running bovnar_high_severity_test suite...\n\n");
@@ -2960,6 +3488,22 @@ int main(void)
 	test_rb6_read_without_open_does_not_fault();
 	test_rb7_error_position_counters();
 	test_rb8_reader_limits_are_exact();
+
+	printf("\nFourth review round: the read side\n");
+	test_r4_row_width_counts_a_nested_array_once();
+	test_r4_quoted_digits_spelling_a_special_number();
+	test_r4_max_array_items_counts_through_structs();
+	test_r4_recovery_keeps_events_nested();
+	test_r4_recovery_from_inside_a_comment();
+	test_r4_recovery_from_an_escape_cut_by_the_quote();
+	test_r4_recovery_when_the_bad_byte_closes_a_struct();
+	test_r4_error_offset_after_an_octet_stream();
+	test_r4_max_file_size_reads_up_to_the_cap();
+	test_r4_eof_inside_a_utf8_sequence();
+	test_r4_directive_padding_and_peek();
+	test_r4_float_fix_and_float_dec_are_one_word();
+	test_r4_nothing_but_a_dot_or_an_index_after_an_index();
+	test_r4_bracket_cannot_close_across_a_struct();
 
 	printf("\n");
 	if (g_failures == 0) {

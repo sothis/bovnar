@@ -36,6 +36,23 @@ from .exceptions import BovnarArgumentError
 from .structs import ValueUnit, make_unit_none
 
 
+def _as_vu(unit):
+    """A ``Unit`` -> its ``ValueUnit``; anything else is passed through.
+
+    ``Quantity.unit`` became a ``Unit`` in 2.0, and every entry point that takes
+    a unit went on declaring ``ValueUnit`` to ctypes -- so the unit a caller had
+    just been handed was the one thing ``unit_to_str``, ``units_compatible``,
+    ``convert_value`` and the bridges would not take, and the refusal was a
+    ``ctypes.ArgumentError`` (or an ``AttributeError`` from inside the pint
+    bridge) that named neither type. One helper at each of those doors, so the
+    two spellings of "a unit" are interchangeable as arguments.
+
+    Deliberately not a validator: whatever is not a ``Unit`` goes on to the
+    callee, whose own complaint about a wrong type is the right one.
+    """
+    return unit._vu if isinstance(unit, Unit) else unit
+
+
 class Unit:
     """A physical unit: the parsed form, with the operations that belong to it.
 
@@ -88,9 +105,19 @@ class Unit:
     @property
     def factor(self) -> float:
         """Value of one of this unit in coherent SI units. Raises for a unit
-        with no SI conversion -- a currency, or a profile-only unit."""
+        with no SI conversion -- a currency, or a profile-only unit -- and for
+        an AFFINE one (°C, °F): its SI value is ``x * factor + offset``, which
+        is not a factor. This used to return the scale alone, so ``°C`` answered
+        1.0 where one degree Celsius is 274.15 K. ``unit_to_si_factor`` reports
+        both halves."""
         from . import unit_to_si_factor
-        return unit_to_si_factor(self._vu).factor
+        conv = unit_to_si_factor(self._vu)
+        if conv.is_affine:
+            raise BovnarArgumentError(
+                "%s is an affine unit: its SI value is value * factor + offset, "
+                "not a factor. Use unit_to_si_factor() for both, or "
+                "convert_value() to convert a value." % (str(self) or 'this'))
+        return conv.factor
 
     # ── relations ──────────────────────────────────────────────────────────
     def compatible_with(self, other) -> bool:
@@ -103,10 +130,23 @@ class Unit:
 
     def convert_factor(self, other) -> float:
         """Multiply a value in this unit by the result to get *other*. Raises
-        when the two do not convert."""
+        when the two do not convert -- and when they convert only AFFINELY
+        (°C to K), where no multiplier exists.
+
+        ``unit_convert_factor`` reports that case as ``requires_affine`` with a
+        factor of 0.0, for a caller who checks the flag. This method returns the
+        bare number, so it had nowhere to put the flag and handed back 0.0 as if
+        it were the answer. A pair of affine scales that share their zero
+        (°C and °Ré) does have a factor and is returned as before."""
         from . import unit_convert_factor
         tgt = Unit.parse(other) if isinstance(other, str) else Unit(other)
-        return unit_convert_factor(self._vu, tgt.raw).factor
+        conv = unit_convert_factor(self._vu, tgt.raw)
+        if conv.requires_affine and conv.factor == 0.0:
+            raise BovnarArgumentError(
+                "%s -> %s is an affine conversion and has no multiplicative "
+                "factor; use convert_value()" % (str(self) or 'no_unit',
+                                                 str(tgt) or 'no_unit'))
+        return conv.factor
 
     # ── spellings ──────────────────────────────────────────────────────────
     def to_profile(self, namespace: str) -> str:
@@ -131,6 +171,13 @@ class Unit:
 
     # ── equality ───────────────────────────────────────────────────────────
     def __eq__(self, other) -> bool:
+        # A str is PARSED and compared as a unit: ``q.unit == "k~m"`` is the
+        # natural test to write and the suite writes it. It is a convenience
+        # for comparison only and cannot be made hash-compatible -- "km",
+        # "k~m" and "ucum:km" are three strings, three str hashes and one unit
+        # -- so ``Unit.parse("m") in {"m"}`` is False and a dict keyed by unit
+        # strings will not find a Unit. Key such a container on ``Unit``
+        # (``Unit.parse(s)``) or on ``str(unit)``.
         if isinstance(other, str):
             try:
                 other = Unit.parse(other)

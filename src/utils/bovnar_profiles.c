@@ -196,6 +196,9 @@ typedef struct {
 	 * meaning, but they are UCUM syntax and admitting them everywhere would let
 	 * a UDUNITS code that is simply wrong look like a valid annotated one. */
 	bool                    annotations;
+	/* Does this vocabulary have UCUM's binary prefixes (Ki, Mi, Gi, Ti)? See
+	 * bvn_prof_binary_pfx. */
+	bool                    binary_pfx;
 } bvn_profile_t;
 
 /* Does `s` contain `needle`? Plain scan: the strings are at most 255 bytes and
@@ -410,25 +413,25 @@ static const bvn_profile_t bvn_profiles[] = {
 	{ "ucum", 4, bvn_prof_grammar_expr,
 	  ucum_pfx_table, ucum_atom_table, ucum_unsup_table, ucum_rev_table,
 	  BVN_PROFILE_UCUM_OPAQUE_FIRST, BVN_PROFILE_UCUM_OPAQUE_LAST,
-	  "", false, NULL, true },
+	  "", false, NULL, true, true },
 #endif
 #if BVNR_WITH_UNECE_PROFILE
 	{ "unece", 5, bvn_prof_grammar_flat,
 	  NULL, unece_atom_table, unece_unsup_table, unece_rev_table,
 	  BVN_PROFILE_UNECE_OPAQUE_FIRST, BVN_PROFILE_UNECE_OPAQUE_LAST,
-	  NULL, false, NULL, false },
+	  NULL, false, NULL, false, false },
 #endif
 #if BVNR_WITH_QUDT_PROFILE
 	{ "qudt", 4, bvn_prof_grammar_flat,
 	  NULL, qudt_atom_table, qudt_unsup_table, qudt_rev_table,
 	  BVN_PROFILE_QUDT_OPAQUE_FIRST, BVN_PROFILE_QUDT_OPAQUE_LAST,
-	  NULL, false, NULL, false },
+	  NULL, false, NULL, false, false },
 #endif
 #if BVNR_WITH_QUDT_QK_PROFILE
 	{ "qudt-qk", 7, bvn_prof_grammar_flat,
 	  NULL, qudt_qk_atom_table, qudt_qk_unsup_table, qudt_qk_rev_table,
 	  BVN_PROFILE_QUDT_QK_OPAQUE_FIRST, BVN_PROFILE_QUDT_QK_OPAQUE_LAST,
-	  NULL, false, NULL, false },
+	  NULL, false, NULL, false, false },
 #endif
 	/*
 	 * '*' multiplies beside '.', and '^' introduces an exponent, so "kg*m-2"
@@ -450,22 +453,22 @@ static const bvn_profile_t bvn_profiles[] = {
 	  udunits_pfx_table, udunits_atom_table, udunits_unsup_table,
 	  udunits_rev_table,
 	  BVN_PROFILE_UDUNITS_OPAQUE_FIRST, BVN_PROFILE_UDUNITS_OPAQUE_LAST,
-	  "* ", true, "since", false },
+	  "* ", true, "since", false, false },
 #endif
 #if BVNR_WITH_OM_PROFILE
 	{ "om", 2, bvn_prof_grammar_flat,
 	  NULL, om_atom_table, om_unsup_table, om_rev_table,
 	  BVN_PROFILE_OM_OPAQUE_FIRST, BVN_PROFILE_OM_OPAQUE_LAST,
-	  NULL, false, NULL, false },
+	  NULL, false, NULL, false, false },
 #endif
 #if BVNR_WITH_CF_PROFILE
 	{ "cf", 2, bvn_prof_grammar_flat,
 	  NULL, cf_atom_table, cf_unsup_table, cf_rev_table,
 	  BVN_PROFILE_CF_OPAQUE_FIRST, BVN_PROFILE_CF_OPAQUE_LAST,
-	  NULL, false, NULL, false },
+	  NULL, false, NULL, false, false },
 #endif
 	{ NULL, 0, bvn_prof_grammar_flat, NULL, NULL, NULL, NULL, 0, -1,
-	  NULL, false, NULL, false },
+	  NULL, false, NULL, false, false },
 };
 #define BVN_PROFILE_COUNT \
 	(sizeof(bvn_profiles) / sizeof(bvn_profiles[0]))
@@ -646,6 +649,43 @@ static bool resolve_prefixed_unsupported(const bvn_profile_t* p,
 			return true;
 	}
 	return false;
+}
+
+/*
+ * UCUM's binary prefixes, all four of them (ucum-essence.xml: Ki = 1024,
+ * Mi = 1048576, Gi = 1073741824, Ti = 1099511627776). They cannot live in the
+ * generated prefix table, which is a table of DECADES and has no way to say
+ * 2^10; and they are not folded like one either, since a binary scale belongs
+ * on a component as an IEC prefix or nowhere.
+ *
+ * doc/11 section 3.2 described this mapping while nothing implemented it, so
+ * `ucum:KiBy` and `ucum:Mibit` -- conforming UCUM -- were error_unit_illegal.
+ */
+static const struct { const char* code; iec_prefix_id_t id; } bvn_prof_binary_pfx[] = {
+	{ "Ki", iec_kibi }, { "Mi", iec_mebi }, { "Gi", iec_gibi }, { "Ti", iec_tebi },
+};
+#define BVN_PROF_BINARY_PFX_COUNT \
+	(sizeof(bvn_prof_binary_pfx) / sizeof(bvn_prof_binary_pfx[0]))
+
+/* Resolve `s` as binary prefix + metric atom. The whole-atom lookup and the
+ * decimal-prefix walk have both already failed by the time this is asked, so it
+ * can never take a code away from either. */
+static const bvn_prof_atom_t* resolve_binary_prefixed(const bvn_profile_t* p,
+                                                      const char* s, uint32_t len,
+                                                      iec_prefix_id_t* id)
+{
+	if (!p->binary_pfx || len < 3)
+		return NULL;
+	for (size_t i = 0; i < BVN_PROF_BINARY_PFX_COUNT; i++) {
+		if (memcmp(s, bvn_prof_binary_pfx[i].code, 2) != 0)
+			continue;
+		const bvn_prof_atom_t* cand = find_atom(p, s + 2, len - 2);
+		if (cand && cand->metric) {
+			*id = bvn_prof_binary_pfx[i].id;
+			return cand;
+		}
+	}
+	return NULL;
 }
 
 /* ── the decade fold ────────────────────────────────────────────────────── */
@@ -1056,6 +1096,49 @@ have_atom:
 	const bvn_prof_atom_t*  atom = find_atom(p, abeg, blen);
 	if (!atom)
 		atom = resolve_prefixed(p, abeg, blen, &pdec);
+	if (!atom) {
+		iec_prefix_id_t iec = iec_none;
+		const bvn_prof_atom_t* batom =
+			resolve_binary_prefixed(p, abeg, blen, &iec);
+		if (batom) {
+			/*
+			 * A binary prefix has exactly one place to go: the prefix slot of
+			 * a single unprefixed component whose base accepts an IEC prefix
+			 * (bvn_prefix_unit_valid -- the byte and the bit, as natively).
+			 * "Kim" is a kibimetre and legal UCUM, and bovnar has no such
+			 * unit, so it is refused as known-and-not-carryable; so is a
+			 * target that is compound or already prefixed, where there is no
+			 * one component for 2^10 to belong to.
+			 */
+			bool         tok = false;
+			value_unit_t t   = BVN_UNIT_NONE;
+			if (batom->target)
+				t = bvn_parse_unit_n((const uint8_t*)batom->target,
+				                     (uint32_t)strlen(batom->target), &tok);
+			value_unit_prefix_t bp;
+			bp.system = prefix_iec;
+			bp.id.iec = iec;
+			int32_t total = sign * exp;
+			if (!tok || t.num_components != 1 ||
+			    t.components[0].exponent != exp_linear ||
+			    t.components[0].prefix.system != prefix_si ||
+			    t.components[0].prefix.id.si != si_none ||
+			    !bvn_prefix_unit_valid(bp, t.components[0].base) ||
+			    total == 0 || total > BVN_EXPONENT_MAX ||
+			    total < BVN_EXPONENT_MIN) {
+				*status = bvni_profile_unsupported;
+				return false;
+			}
+			value_unit_component_t c = t.components[0];
+			c.prefix   = bp;
+			c.exponent = bvn_int_to_exponent(total);
+			if (!acc_push(acc, c)) {
+				*status = bvni_profile_unsupported;
+				return false;
+			}
+			return true;
+		}
+	}
 	if (!atom) {
 		/*
 		 * Not translatable. Distinguish "UCUM knows this and we cannot carry it"

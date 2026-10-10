@@ -51,8 +51,11 @@ export async function loadBovnar(opts) {
     let outPtr = 0;
     try {
       outPtr = Module.ccall(fnName, 'number', ['number', 'number'], [inPtr, len]);
-      const json = outPtr ? Module.UTF8ToString(outPtr) : '';
-      return JSON.parse(json);
+      // A null result is the C side failing to allocate even its own error
+      // object. JSON.parse('') turned that into "SyntaxError: Unexpected end of
+      // JSON input", which names neither the cause nor this library.
+      if (!outPtr) throw new Error('bovnar: out of memory');
+      return JSON.parse(Module.UTF8ToString(outPtr));
     } finally {
       Module._free(inPtr);
       if (outPtr) Module.ccall('bvnr_wasm_free', 'void', ['number'], [outPtr]);
@@ -64,7 +67,13 @@ export async function loadBovnar(opts) {
   function callJsonConvert(input, unit, base, allowNonterminating) {
     const bytes = toBytes(input);
     const len = bytes.length;
-    const unitBytes = enc.encode(unit || '');
+    // The unit crosses as a NUL-terminated C string, so a NUL inside it ended it
+    // early: 'm\0anything' converted to metres as if the rest had not been
+    // written. No unit contains a NUL, so such a string is an unparseable unit
+    // and must come back as one (error_unit_illegal, decided by the C side like
+    // every other bad unit). Swapping the NUL for another control byte keeps
+    // the string whole and just as unparseable.
+    const unitBytes = enc.encode(String(unit || '').replace(/\0/g, '\x01'));
     // Both allocations happen before the try, so a failure in the second used to
     // leak the first. Allocate, check for the null emscripten returns on OOM,
     // and let the finally below release whichever succeeded.
@@ -83,8 +92,8 @@ export async function loadBovnar(opts) {
         'bvnr_wasm_events_convert', 'number',
         ['number', 'number', 'number', 'number', 'number'],
         [inPtr, len, uPtr, base | 0, allowNonterminating ? 1 : 0]);
-      const json = outPtr ? Module.UTF8ToString(outPtr) : '';
-      return JSON.parse(json);
+      if (!outPtr) throw new Error('bovnar: out of memory');
+      return JSON.parse(Module.UTF8ToString(outPtr));
     } finally {
       if (inPtr) Module._free(inPtr);
       if (uPtr) Module._free(uPtr);
@@ -93,23 +102,46 @@ export async function loadBovnar(opts) {
   }
 
   return {
-    /** Validate a document (stops at the first error). Returns { ok, error,
-     *  error_name, line, column, byte, offset, recovery_count,
-     *  declared_version }. */
+    /** Validate a document exactly as `bovnar validate` does: the streaming
+     *  pass (stops at the first error), then -- if that was clean -- the
+     *  document tier, which holds the rules no single value can break: array
+     *  homogeneity, one shape per array of records, no repeated key. Returns
+     *  { ok, error, error_name, tier, line, column, byte, offset,
+     *  recovery_count, declared_version }.
+     *
+     *  `tier` is null when ok, 'stream' for an error at a position, and
+     *  'document' for a whole-document rule -- which HAS no position: line,
+     *  column, byte and offset are 0 then, and must not be shown as 0:0. */
     validate: (input) => callJson('bvnr_wasm_validate', input),
 
     /** Validate in resync mode, collecting EVERY error. Returns
-     *  { ok, errors: [{ error, error_name, line, column, byte, offset }],
-     *  declared_version }. */
+     *  { ok, errors: [{ error, error_name, line, column, byte, offset, tier }],
+     *  declared_version }.
+     *
+     *  When the streaming pass finds nothing, the document tier is consulted
+     *  as in validate(), and its error -- there is at most one -- is the single
+     *  entry, with tier 'document' and a zero position. So `ok` here and in
+     *  validate() always agree. */
     errors: (input) => callJson('bvnr_wasm_errors', input),
 
     /** Parse and project the validated DOM to plain JSON. Returns
      *  { ok, error, error_name, value }. Unit/type metadata is dropped from
-     *  `value`; use events() for that. */
+     *  `value`; use events() for that.
+     *
+     *  One valid document is refused, as `bovnar convert` refuses it: a
+     *  datetime written with sub-second digits, whose JSON form would be a
+     *  different instant. That comes back as value_out_of_range with a
+     *  `detail` string naming the key. */
     toJSON: (input) => callJson('bvnr_wasm_to_json', input),
 
     /** The reference (verified) event stream. Returns { ok, error, error_name,
      *  events: [{ seq, ev, tok, text?, family?, width?, base?, unit?, ... }] }.
+     *
+     *  This is the STREAMING tier, and `ok` speaks for that tier only: it is
+     *  what a reader's on_verified callback sees, and a reader does not know
+     *  that two keys collide or that an array's elements disagree. A document
+     *  can be ok here and fail validate() with tier 'document'. Ask validate()
+     *  (or errors()) whether a document is valid; ask this what it contains.
      *
      *  Runs in resync mode, so a broken assignment is skipped rather than
      *  aborting the read and its events are simply absent. `ok` accounts for
@@ -122,9 +154,15 @@ export async function loadBovnar(opts) {
      *  Prefer this over calling events() and errors() for the same document —
      *  that walks it twice and pays two JSON round-trips.
      *
+     *  Like events(), this is the STREAMING tier: `errors` holds what the
+     *  reader raised, each with tier 'stream', and never a document-tier
+     *  error -- so it can be ok for a document validate() refuses. (A caller
+     *  that needs both pays for the second pass by calling validate() or
+     *  doc() when this one comes back clean.)
+     *
      *  `ok` is false if ANY error was reported, including ones the reader
      *  recovered from, and `error`/`error_name` name the first — matching
-     *  errors() and events(). All three count reported errors rather than
+     *  errors()[0] and events(). All three count reported errors rather than
      *  reading the reader's final code, which continue_on_error clears on a
      *  clean EOF; deriving the status from that code alone reported
      *  {"ok":false,"error_name":"none"} here, and plain {"ok":true} in events().
@@ -158,7 +196,8 @@ export async function loadBovnar(opts) {
 
     /** Full document tree in document order, each value carrying its resolved
      *  type fields (familyName/width/base/unit/epoch). Returns
-     *  { ok, tree: [{ key, value }] }. Used by the web playground's parser
+     *  { ok, error, error_name, tree: [{ key, value }] }. Built from the DOM,
+     *  so `ok` covers both tiers. Used by the web playground's parser
      *  shim to reconstruct the tree + event-stream shapes. */
     doc: (input) => callJson('bvnr_wasm_doc', input),
 

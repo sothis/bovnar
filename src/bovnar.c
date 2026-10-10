@@ -81,6 +81,7 @@ static void bvn_cli_format_double(char *buf, size_t cap, double v)
 		memcpy(buf, alt, n + 1);
 }
 #include "bovnar_stream.h"
+#include "bovnar_si_units.h"
 #include "bvn_datetime.h"
 #include <stdarg.h>
 
@@ -723,11 +724,22 @@ static int cli_parse_unit_opts(const char *cmd, int argc, char **argv, int *argi
 		if (*argi + 1 >= argc) {
 			fprintf(stderr, "%s: --base needs a number\n", cmd); return 2;
 		}
+		/* Decided HERE, against the library's own rule, and for digits only.
+		 * The old test was `b > 85`, which let 1, 63 and 65..84 through to
+		 * bvnr_reader_set_unit_policy -- and cli_report_unit_policy, probing
+		 * each entry with the bad base stamped on it, then accused the first
+		 * --unit it found: "--unit 'm' is not a unit bovnar can parse", for a
+		 * unit that parses and a base that was never named. strtoul also took
+		 * "" as 0 and "+16" as 16. */
+		const char *bs = argv[*argi + 1];
+		if (!bs) bs = "";   /* argc says it is there; -fanalyzer wants it said */
 		char *end = NULL;
-		unsigned long b = strtoul(argv[*argi + 1], &end, 10);
-		if (!end || *end || b > 85ul) {
+		unsigned long b = (bs[0] >= '0' && bs[0] <= '9')
+				? strtoul(bs, &end, 10) : 0ul;
+		if (!end || *end || b > 85ul ||
+		    !bvn_rational_base_valid((uint32_t)b)) {
 			fprintf(stderr, "%s: --base '%s' is not a base bovnar can write "
-					"(2..62, 64, 85)\n", cmd, argv[*argi + 1]);
+					"(2..62, 64, 85)\n", cmd, bs);
 			return 2;
 		}
 		/* Recorded, not applied: the targets are stamped with it in
@@ -797,7 +809,8 @@ static bool cli_policy_probe(const bvnr_unit_policy_t *p)
  * without a leading '.', and a bare ".*" are all PATH faults reported as unit
  * spellings, and a bad unit in --field / --require-field named neither flag.
  * The count limits (--unit, rules) and --base never get here -- cli_parse_unit_opts
- * catches those itself, with their own messages.
+ * catches those itself, with their own messages. (For --base that was only half
+ * true until it validated the value with bvn_rational_base_valid: see there.)
  *
  * Each entry is re-offered on its own; the first the library refuses is the one
  * to report. For a rule, the unit is then swapped for one that certainly parses
@@ -1004,6 +1017,11 @@ static int cmd_events(int argc, char **argv)
 		fprintf(stderr, "events: missing file argument\n");
 		return 2;
 	}
+	if (argc - argi > 1) {
+		fprintf(stderr, "events: takes exactly one file (or -), got %d\n",
+			argc - argi);
+		return 2;
+	}
 	if (debug_pretty && !enable_debug)
 		fprintf(stderr, "Warning: -p has no effect without -d\n");
 	const char *filename  = argv[argi];
@@ -1161,6 +1179,19 @@ static int cmd_events(int argc, char **argv)
 	 * string as the per-example validity gate, which made the gate blind to
 	 * every whole-array property. Run the same pass when the input is seekable;
 	 * say so plainly when it is not, rather than overclaiming. */
+	/* A recovered error is still an error. Under -c the read returns true once
+	 * it has resynchronised, so a document with a broken assignment reached
+	 * the "All tokens validated successfully" line -- printed directly under
+	 * "N byte(s) of input were discarded and never parsed" -- and, from stdin,
+	 * exit status 0. From a file the same document exited 1, but only because
+	 * the document-tier pass below does not resync; the verdict depended on
+	 * where the bytes came from. -c decides how far the listing goes, not
+	 * whether the document was valid. */
+	if (ok && recoveries > 0) {
+		cwe("\n  ✗ %" PRIu64 " error(s) were recovered from; the document is "
+		    "not valid.\n", recoveries);
+		ok = false;
+	}
 	if (ok && !from_stdin) {
 		if (lseek(fd, 0, SEEK_SET) == 0) {
 			bvn_dom_doc_t *hdoc = bvn_dom_parse_fd(fd);
@@ -1265,6 +1296,21 @@ static int cmd_query(const char *path, const char *filename,
 		fprintf(stderr, "query: --text-only is not supported here "
 			"(the DOM path takes no read flags); use "
 			"`bovnar validate --text-only` instead\n");
+		return 2;
+	}
+	/* --base is refused for the same reason, from the other side: it is not
+	 * that the option cannot be put in force, it is that this command has no
+	 * way to SHOW it. `query` prints a number, in decimal, from a tree that
+	 * holds every float as a double -- so "--base 16" printed "2500" exactly
+	 * as without it, and (until the DOM stopped stamping the requested base on
+	 * types that have none) "--base 2" on a float failed the whole document
+	 * with value_out_of_range. An option that is either invisible or fatal is
+	 * not one this command takes; `events` renders a conversion in any base. */
+	if (up && up->policy.base) {
+		fprintf(stderr, "query: --base is not supported here (query prints "
+			"values in decimal); use `bovnar events --base %u` to see "
+			"a conversion rendered in another base\n",
+			(unsigned)up->policy.base);
 		return 2;
 	}
 	/*
@@ -1379,6 +1425,14 @@ static int cmd_pretty(const char *filename, bool canonical)
 	bvnr_sink_t sink;
 	bvnr_sink_to_fd(&sink, STDOUT_FILENO);
 	bvnr_write_flags_t wflags = {0};
+	/* The reader below is opened at the format's hard cap of 255 levels, like
+	 * every other subcommand. The writer was left at its default of 64, so a
+	 * document nested 65..255 deep -- one `validate`, `query`, `convert` and
+	 * `events` all accept -- could be read here and not written back:
+	 * "scanner_callback_failed", then struct_nesting_too_high, and no output.
+	 * The two limits describe the same document and have to agree. */
+	wflags.max_struct_nesting = 255;
+	wflags.max_array_nesting  = 255;
 	if (canonical)
 		wflags.unit_flags = BVN_UNIT_REDUCE | BVN_NUM_CANONICAL;
 	if (!bvnr_open_write_sink(w, &sink, true, &wflags)) {
@@ -1409,11 +1463,38 @@ static int cmd_pretty(const char *filename, bool canonical)
 	bool ok = bvnr_read(r);
 	error_code_t err = bvnr_reader_get_error(r);
 	if (!ok) {
-		fprintf(stderr, "Pretty-print parse error: %s at line %" PRIu64 ", col %" PRIu64 "\n",
-				bvn_error_to_string(err),
-				bvnr_reader_get_error_line(r), bvnr_reader_get_error_column(r));
+		/* Say which half failed. The writer runs inside the reader's callback,
+		 * so a value it refuses stops the READ with scanner_callback_failed --
+		 * and that was all this printed: "Pretty-print parse error:
+		 * scanner_callback_failed", blaming the parse of a document that had
+		 * parsed, with the real reason one line further down under "Writer
+		 * finish failed". Under --canonical that is the documented outcome for
+		 * an integer the rescale cannot keep integral, and it read like a
+		 * broken file. */
+		error_code_t werr = bvnr_writer_get_error(w);
+		if (err == error_scanner_callback_failed && werr != error_none) {
+			fprintf(stderr, "pretty-print: %s: cannot write the value at line %"
+					PRIu64 ", col %" PRIu64 ": %s\n", filename,
+					bvnr_reader_get_error_line(r),
+					bvnr_reader_get_error_column(r),
+					bvn_error_to_string(werr));
+			if (canonical && werr == error_value_out_of_range)
+				fprintf(stderr, "pretty-print: --canonical rescales a value "
+						"with its unit, and this one has no exact "
+						"form in its own type and base (an integer "
+						"that stops being one, or no longer fits its "
+						"width); it is refused rather than rounded\n");
+		} else {
+			fprintf(stderr, "Pretty-print parse error: %s at line %" PRIu64
+					", col %" PRIu64 "\n", bvn_error_to_string(err),
+					bvnr_reader_get_error_line(r),
+					bvnr_reader_get_error_column(r));
+		}
 	}
-	if (!bvnr_write_finish(w)) {
+	/* Still called after a failed read -- it flushes what was written -- but its
+	 * verdict is only news when the read itself succeeded: after an error it
+	 * can only repeat that the stream is incomplete. */
+	if (!bvnr_write_finish(w) && ok) {
 		fprintf(stderr, "Writer finish failed: %s\n",
 				bvn_error_to_string(bvnr_writer_get_error(w)));
 		ok = false;
@@ -1595,6 +1676,21 @@ static char *parse_json_string(const char **p)
 	return str;
 }
 #define JSON_MAX_DEPTH 512
+/*
+ * The object key the converter is currently under, for diagnostics only.
+ *
+ * A JSON value the converter has to refuse -- a number that overflows, a string
+ * holding a byte bovnar has no string for -- is found several calls below the
+ * place that knows its key, and "Bovnar writer error: unexpected_input_byte"
+ * sent the user looking through the whole input for it. An element of an array
+ * is reported under the key of the member that holds the array, which is as
+ * close as a key can get. NULL at the top level.
+ */
+static const char *json_cur_key = NULL;
+static const char *json_key_for_msg(void)
+{
+	return json_cur_key ? json_cur_key : "(top level)";
+}
 static JsonNode *json_parse_value(const char **p);
 static JsonNode *json_parse_value_depth(const char **p, int depth);
 static JsonNode *json_parse_array(const char **p, int depth)
@@ -1645,7 +1741,10 @@ static JsonNode *json_parse_object(const char **p, int depth)
 		if (**p != ':') { free(key); json_free_node(node); return NULL; }
 		(*p)++;
 		skip_ws(p);
+		const char *outer_key = json_cur_key;
+		json_cur_key = key;
 		JsonNode *val = json_parse_value_depth(p, depth);
+		json_cur_key = outer_key;
 		if (!val) { free(key); json_free_node(node); return NULL; }
 		if (node->u.obj.count == cap) {
 			uint32_t nc = cap * 2;
@@ -1767,6 +1866,21 @@ static JsonNode *json_parse_value_depth(const char **p, int depth)
 		if (is_float) {
 			n->type = BVN_JSON_FLOAT;
 			n->u.f = strtod(*p, &end);
+			/* JSON has no infinity, so a number token is finite by
+			 * definition -- and 1e999 was read by strtod as HUGE_VAL and
+			 * written as `inf`, a different value, with exit status 0. (Going
+			 * back, that inf becomes JSON null.) The integer branches below
+			 * already refuse what does not fit; this one did not check.
+			 * Only overflow: a literal too small to tell from zero, and one
+			 * with more digits than a binary64 holds, are rounding -- what
+			 * reading a decimal into a double always is. */
+			if (isinf(n->u.f)) {
+				fprintf(stderr, "convert: the JSON number under key '%s' "
+					"is too large for a 64-bit float (it would become "
+					"infinity)\n", json_key_for_msg());
+				free(n);
+				return NULL;
+			}
 		} else if (**p == '-') {
 			n->type = BVN_JSON_INT;
 			n->u.i = strtoll(*p, &end, 10);
@@ -1842,6 +1956,32 @@ static bool json_number_text_is_float(const char *t, uint32_t n)
 		if (t[i] == '.' || t[i] == 'e' || t[i] == 'E') return true;
 	return false;
 }
+/*
+ * A JSON string may hold any code point; a bovnar string may not hold the C0
+ * controls outside \t \n \v \f \r, nor DEL (the same set the writer's
+ * bvn_validate_string_content refuses). The writer does refuse them, but as
+ * "Bovnar writer error: unexpected_input_byte" -- no key, no byte, and nothing
+ * to say the JSON was fine and the limit is the target format's. Check first
+ * and say all three.
+ */
+static bool json_string_fits_bvnr(const char *str)
+{
+	for (const unsigned char *c = (const unsigned char *)str; *c; c++) {
+		if (*c <= 0x08 || (*c >= 0x0E && *c <= 0x1F) || *c == 0x7F) {
+			fprintf(stderr, "convert: the JSON string under key '%s' "
+				"contains the control character U+%04X, which a "
+				"bovnar string cannot carry\n",
+				json_key_for_msg(), (unsigned)*c);
+			return false;
+		}
+	}
+	if (!bvn_validate_string((const uint8_t *)str, strlen(str))) {
+		fprintf(stderr, "convert: the JSON string under key '%s' is not "
+			"valid UTF-8\n", json_key_for_msg());
+		return false;
+	}
+	return true;
+}
 static bool write_bvn_array_elem(bvnr_writer_t *w, const JsonNode *e)
 {
 	bvnr_data_t d = {0};
@@ -1886,6 +2026,7 @@ static bool write_bvn_array_elem(bvnr_writer_t *w, const JsonNode *e)
 				return false;
 		}
 	} else if (e->type == BVN_JSON_STRING) {
+		if (!json_string_fits_bvnr(e->u.s)) return false;
 		d.type   = token_is_array_string;
 		d.data   = e->u.s;
 		d.length = (uint32_t)strlen(e->u.s);
@@ -1948,31 +2089,42 @@ static bool write_bvn_value(bvnr_writer_t *w, const char *key, const JsonNode *n
 		return false;
 	}
 	if (!node) return bvnr_write_null(w, key);
+	/* For the diagnostics below this point (see json_cur_key). Restored on the
+	 * way out so a sibling written after a nested object is reported under
+	 * its own parent again. */
+	const char *outer_key = json_cur_key;
+	bool ok = false;
+	json_cur_key = key;
 	switch (node->type) {
-	case BVN_JSON_NULL:   return bvnr_write_null(w, key);
-	case BVN_JSON_BOOL:   return bvnr_write_bool(w, key, node->u.b);
-	case BVN_JSON_UINT:   return bvnr_write_uint(w, key, 0, node->u.u);
-	case BVN_JSON_INT:    return bvnr_write_sint(w, key, 0, node->u.i);
-	case BVN_JSON_FLOAT:  return bvnr_write_float(w, key, 0, node->u.f);
-	case BVN_JSON_STRING: return bvnr_write_string(w, key, node->u.s);
+	case BVN_JSON_NULL:   ok = bvnr_write_null(w, key); break;
+	case BVN_JSON_BOOL:   ok = bvnr_write_bool(w, key, node->u.b); break;
+	case BVN_JSON_UINT:   ok = bvnr_write_uint(w, key, 0, node->u.u); break;
+	case BVN_JSON_INT:    ok = bvnr_write_sint(w, key, 0, node->u.i); break;
+	case BVN_JSON_FLOAT:  ok = bvnr_write_float(w, key, 0, node->u.f); break;
+	case BVN_JSON_STRING:
+		ok = json_string_fits_bvnr(node->u.s) &&
+		     bvnr_write_string(w, key, node->u.s);
+		break;
 	case BVN_JSON_ARRAY: {
 		bvnr_data_t d = {0};
 		d.type   = token_is_identifier;
 		d.data   = key;
 		d.length = (uint32_t)strlen(key);
-		if (!bvnr_write_event(w, ev_assignment_start, &d)) return false;
-		return write_bvn_array_body(w, node);
+		ok = bvnr_write_event(w, ev_assignment_start, &d) &&
+		     write_bvn_array_body(w, node);
+		break;
 	}
 	case BVN_JSON_OBJECT: {
-		if (!bvnr_write_struct_start(w, key)) return false;
-		for (uint32_t i = 0; i < node->u.obj.count; i++) {
-			if (!write_bvn_value(w, node->u.obj.keys[i], node->u.obj.values[i]))
-				return false;
-		}
-		return bvnr_write_struct_end(w);
+		ok = bvnr_write_struct_start(w, key);
+		for (uint32_t i = 0; ok && i < node->u.obj.count; i++)
+			ok = write_bvn_value(w, node->u.obj.keys[i],
+					     node->u.obj.values[i]);
+		ok = ok && bvnr_write_struct_end(w);
+		break;
 	}
 	}
-	return false;
+	json_cur_key = outer_key;
+	return ok;
 }
 static int cmd_convert_json_to_bvnr(const char *file)
 {
@@ -2015,8 +2167,14 @@ static int cmd_convert_json_to_bvnr(const char *file)
 		return 1;
 	}
 	skip_ws(&p);
-	if (*p != '\0') {
-		fprintf(stderr, "convert: trailing content after JSON value\n");
+	/* Measured against the FILE's length, not against the first NUL. The
+	 * buffer is NUL-terminated for the parser's benefit, so `*p != 0` could
+	 * not see anything behind a NUL byte in the file itself: `{"a":1}` followed
+	 * by a NUL and any amount of anything converted cleanly, and whatever came
+	 * after was dropped without a word. */
+	if ((size_t)(p - buf) != size) {
+		fprintf(stderr, "convert: trailing content after JSON value%s\n",
+			*p == '\0' ? " (a NUL byte)" : "");
 		json_free_node(root);
 		free(buf);
 		return 1;
@@ -2044,6 +2202,12 @@ static int cmd_convert_json_to_bvnr(const char *file)
 	bvnr_sink_t sink;
 	bvnr_sink_to_mem(&sink, out, out_cap);
 	bvnr_write_flags_t wflags = {0};
+	/* As in cmd_pretty: the format nests to 255 and bvn_dom_parse, which checks
+	 * the result below, reads to 255. At the writer's default of 64 a JSON
+	 * document 65 levels deep was refused as array_nesting_too_high although
+	 * its bovnar form is perfectly legal. */
+	wflags.max_struct_nesting = 255;
+	wflags.max_array_nesting  = 255;
 	if (!bvnr_open_write_sink(w, &sink, true, &wflags)) {
 		bvnr_writer_destroy(w); free(out);
 		json_free_node(root); free(buf); return 1;
@@ -2317,8 +2481,16 @@ static const bvn_dom_node_t *find_fractional_datetime(const bvn_dom_node_t *node
  */
 typedef struct {
 	uint32_t n_unit, n_symbol, n_reference, n_octet, n_wide, n_typed, n_dims;
+	/* Three the first survey missed, each of which exited 0 over a value that
+	 * does not come back: a non-finite float (JSON has none, so it is written
+	 * as null and returns as a null), a float declared wider or more exact
+	 * than the binary64 a JSON number is read into, and a datetime, which
+	 * leaves as its bare epoch-second count and returns as an integer with no
+	 * epoch and no type. */
+	uint32_t n_nonfinite, n_float, n_datetime;
 	char     ex_unit[160], ex_symbol[128], ex_reference[128];
 	char     ex_octet[128], ex_wide[128], ex_typed[160], ex_dims[160];
+	char     ex_nonfinite[128], ex_float[160], ex_datetime[160];
 } json_loss_t;
 
 static void json_loss_note(char *dst, size_t cap, const char *path,
@@ -2361,9 +2533,43 @@ static void json_loss_scan(const bvn_dom_node_t *node, const char *path,
 		L->n_octet++;
 		json_loss_note(L->ex_octet, sizeof L->ex_octet, path, NULL);
 		break;
+	case BVN_DOM_FLOAT: {
+		value_type_spec_t vt = bvn_dom_get_value_type(node);
+		double v = 0.0;
+		bvn_dom_get_float(node, &v);
+		if (!isfinite(v)) {
+			L->n_nonfinite++;
+			json_loss_note(L->ex_nonfinite, sizeof L->ex_nonfinite, path,
+				       isnan(v) ? "nan" : v > 0 ? "inf" : "ninf");
+		} else if ((vt.family == vt_float && vt.width > 64u) ||
+			   ((vt.family == vt_float_dec ||
+			     vt.family == vt_float_fix) &&
+			    bvn_effective_width(vt) >= 64u)) {
+			/* What the TYPE promises and a binary64 cannot keep: more than
+			 * 53 significand bits (a float:128, a 64-bit fixed-point), or
+			 * 16+ exact decimal digits (float_dec:64 and up). A narrower
+			 * one survives the trip through a double digit for digit, and
+			 * a plain float:64 is a double already. */
+			char d[48];
+			snprintf(d, sizeof d, "<%s:%u>",
+				 vt.family == vt_float ? "float" :
+				 vt.family == vt_float_dec ? "float_dec" : "float_fix",
+				 bvn_effective_width(vt));
+			L->n_float++;
+			json_loss_note(L->ex_float, sizeof L->ex_float, path, d);
+		}
+		break;
+	}
 	case BVN_DOM_INT: {
 		value_type_spec_t vt = bvn_dom_get_value_type(node);
-		if (vt.width > 64u) {
+		if (vt.family == vt_datetime) {
+			const char *ep = bvnr_datetime_epoch_name(vt);
+			char d[48];
+			snprintf(d, sizeof d, "seconds since the %s epoch",
+				 ep ? ep : "unix");
+			L->n_datetime++;
+			json_loss_note(L->ex_datetime, sizeof L->ex_datetime, path, d);
+		} else if (vt.width > 64u) {
 			L->n_wide++;
 			json_loss_note(L->ex_wide, sizeof L->ex_wide, path,
 				       "emitted as a JSON string");
@@ -2421,7 +2627,8 @@ static void json_loss_scan(const bvn_dom_node_t *node, const char *path,
 static bool json_loss_report(const json_loss_t *L, const char *file)
 {
 	uint32_t total = L->n_unit + L->n_symbol + L->n_reference +
-			 L->n_octet + L->n_wide + L->n_typed + L->n_dims;
+			 L->n_octet + L->n_wide + L->n_typed + L->n_dims +
+			 L->n_nonfinite + L->n_float + L->n_datetime;
 	if (!total) return false;
 	fprintf(stderr, "convert: %s: JSON cannot carry everything in this "
 			"document; the output above is LOSSY:\n", file);
@@ -2434,6 +2641,16 @@ static bool json_loss_report(const json_loss_t *L, const char *file)
 	if (L->n_typed)
 		fprintf(stderr, "  %u integer(s) lose their numeric base, e.g. %s\n",
 			L->n_typed, L->ex_typed);
+	if (L->n_nonfinite)
+		fprintf(stderr, "  %u non-finite float(s) become null, e.g. %s\n",
+			L->n_nonfinite, L->ex_nonfinite);
+	if (L->n_float)
+		fprintf(stderr, "  %u float(s) wider or more exact than a 64-bit "
+				"binary float are rounded to one, e.g. %s\n",
+			L->n_float, L->ex_float);
+	if (L->n_datetime)
+		fprintf(stderr, "  %u datetime(s) become bare integers, e.g. %s\n",
+			L->n_datetime, L->ex_datetime);
 	if (L->n_symbol)
 		fprintf(stderr, "  %u symbol(s) become plain strings, e.g. %s\n",
 			L->n_symbol, L->ex_symbol);
@@ -2525,20 +2742,38 @@ static const char *convert_format_from_ext(const char *file)
 
 static int cmd_convert(const char *from, const char *to, const char *file)
 {
-	/* Auto-detect direction from the file extension when not given
-	 * explicitly: a .json input converts to bvnr, a .bvnr input to json.
-	 * --from/--to still override this. */
-	if (!from || !to) {
+	/* There are two formats, so naming EITHER end names the direction: with
+	 * --from json the target is bvnr, with --to json the source is. The
+	 * extension is consulted only when neither was given.
+	 *
+	 * It used to be consulted whenever one was missing, and the missing end
+	 * was then derived from the EXTENSION rather than from the end that had
+	 * been given -- so `convert --from json data.bvnr` reported "Unsupported
+	 * conversion: json -> json", a direction nobody asked for, and
+	 * `convert --from json data.txt` said to "pass --from/--to explicitly" to
+	 * someone who just had. */
+	static const char *const fmts[] = { "json", "bvnr" };
+	for (int k = 0; k < 2; k++) {
+		const char *given = k == 0 ? from : to;
+		if (given && strcmp(given, fmts[0]) != 0 &&
+			     strcmp(given, fmts[1]) != 0) {
+			fprintf(stderr, "convert: %s '%s' is not a format "
+				"(json, bvnr)\n", k == 0 ? "--from" : "--to", given);
+			return 2;
+		}
+	}
+	if (!from && !to) {
 		const char *fmt = convert_format_from_ext(file);
 		if (!fmt) {
 			fprintf(stderr,
 					"convert: cannot detect format of '%s' from its "
-					"extension; pass --from/--to explicitly\n", file);
-			return 1;
+					"extension; pass --from <fmt> or --to <fmt>\n", file);
+			return 2;
 		}
-		if (!from) from = fmt;
-		if (!to)   to   = (strcmp(fmt, "json") == 0) ? "bvnr" : "json";
+		from = fmt;
 	}
+	if (!from) from = (strcmp(to,   "json") == 0) ? "bvnr" : "json";
+	if (!to)   to   = (strcmp(from, "json") == 0) ? "bvnr" : "json";
 	if (strcmp(from, "json") == 0 && strcmp(to, "bvnr") == 0)
 		return cmd_convert_json_to_bvnr(file);
 	if (strcmp(from, "bvnr") == 0 && strcmp(to, "json") == 0)
@@ -2547,7 +2782,7 @@ static int cmd_convert(const char *from, const char *to, const char *file)
 			"Unsupported conversion: %s -> %s\n"
 			"Supported: json -> bvnr,  bvnr -> json\n",
 			from, to);
-	return 1;
+	return 2;
 }
 typedef enum {
 	BMARK_PROFILE_SCALARS,
@@ -2892,8 +3127,16 @@ static bmark_result_t bmark_run(bmark_profile_t profile,
 		fprintf(stderr, "  ERROR: malloc(%zu) failed\n", target_size + 1280);
 		return result;
 	}
+	/* The generator is given --size itself as its limit. It used to be given
+	 * size + 1024, and since each generator fills its limit with whole
+	 * assignments, "--size 1024" benchmarked a 2040-byte payload and
+	 * "--size 1" a 1015-byte one -- the Bytes column said so, and the option
+	 * that asked for it did not mean what its help said. The slack stays in
+	 * the ALLOCATION only. A size too small for one whole assignment of the
+	 * profile now generates nothing, which the caller reports as a failed
+	 * cell rather than quietly measuring a kilobyte instead. */
 	size_t assign_count = 0;
-	size_t actual_len = bmark_builders[profile].gen(buf, target_size + 1024,
+	size_t actual_len = bmark_builders[profile].gen(buf, target_size,
 	                                                &assign_count);
 	if (actual_len == 0) {
 		free(buf);
@@ -2917,7 +3160,9 @@ static bmark_result_t bmark_run(bmark_profile_t profile,
 	if (!ok) {
 		fprintf(stderr, "  ERROR: count-parse failed for profile=%s size=%zu\n",
 		        bmark_profile_names[profile], target_size);
-		result.payload_size = actual_len;
+		/* payload_size stays 0: that is what tells cmd_bench the cell
+		 * failed. Setting it here printed a row of zeros and infinities
+		 * under the error and let the run exit 0. */
 		free(buf);
 		return result;
 	}
@@ -3009,47 +3254,75 @@ static bool bmark_any_profile(void)
 		if (bmark_cfg.profiles[i]) return true;
 	return false;
 }
-static void bmark_parse_profile_list(const char *list)
+/*
+ * Both list parsers return false, having said why, on the first entry they do
+ * not understand. They used to skip it: "--profile scalars,bogus" ran scalars
+ * and never mentioned bogus, "--size 12abc" benchmarked 12 bytes, and an
+ * out-of-range size was "ignored" on stderr while the run carried on with the
+ * rest -- three ways to get a table for a command line the user did not write.
+ */
+static bool bmark_parse_profile_list(const char *list)
 {
 	for (int i = 0; i < BMARK_PROFILE_COUNT; i++)
 		bmark_cfg.profiles[i] = false;
 	if (strcmp(list, "all") == 0) {
 		for (int i = 0; i < BMARK_PROFILE_COUNT; i++)
 			bmark_cfg.profiles[i] = true;
-		return;
+		return true;
 	}
 	char *copy = strdup(list);
-	if (!copy) return;
+	if (!copy) return false;
+	bool ok = true;
 	char *token = strtok(copy, ",");
-	while (token) {
-		for (int i = 0; i < BMARK_PROFILE_COUNT; i++) {
+	while (token && ok) {
+		int i = 0;
+		for (; i < BMARK_PROFILE_COUNT; i++) {
 			if (strcmp(token, bmark_profile_names[i]) == 0) {
 				bmark_cfg.profiles[i] = true;
 				break;
 			}
 		}
+		if (i == BMARK_PROFILE_COUNT) {
+			fprintf(stderr, "bench: --profile '%s' is not a known profile "
+				"(all, scalars, typed, structs, arrays, units, mixed)\n",
+				token);
+			ok = false;
+		}
 		token = strtok(NULL, ",");
 	}
 	free(copy);
+	return ok;
 }
-static void bmark_parse_size_list(const char *list)
+static bool bmark_parse_size_list(const char *list)
 {
 	bmark_cfg.num_sizes = 0;
 	char *copy = strdup(list);
-	if (!copy) return;
+	if (!copy) return false;
+	bool ok = true;
 	char *token = strtok(copy, ",");
-	while (token && bmark_cfg.num_sizes < 64) {
-		unsigned long long v = strtoull(token, NULL, 10);
+	while (token && ok) {
+		char *end = NULL;
+		errno = 0;
+		unsigned long long v = (token[0] >= '0' && token[0] <= '9')
+				     ? strtoull(token, &end, 10) : 0ull;
 		/* bmark_run allocates size + 1280; reject 0 and any value that would
 		 * wrap that addition (or overflow size_t on a 32-bit host) so the
 		 * generator can never be handed a buffer smaller than it writes. */
-		if (v != 0 && v <= (unsigned long long)(SIZE_MAX - 4096u))
+		if (!end || *end != '\0' || errno != 0 || v == 0 ||
+		    v > (unsigned long long)(SIZE_MAX - 4096u)) {
+			fprintf(stderr, "bench: --size '%s' is not a payload size "
+				"(want a plain positive number of bytes)\n", token);
+			ok = false;
+		} else if (bmark_cfg.num_sizes >= 64) {
+			fprintf(stderr, "bench: at most 64 --size values\n");
+			ok = false;
+		} else {
 			bmark_cfg.sizes[bmark_cfg.num_sizes++] = (size_t)v;
-		else
-			fprintf(stderr, "bench: ignoring out-of-range --size '%s'\n", token);
+		}
 		token = strtok(NULL, ",");
 	}
 	free(copy);
+	return ok;
 }
 /* Parse a bounded count for a bench option. strtoul wraps a leading '-' into a
  * huge positive value, and neither errno nor the end pointer reports it, so
@@ -3082,33 +3355,70 @@ static bool bench_parse_count(const char *opt, const char *arg,
 	*out = (uint32_t)v;
 	return true;
 }
+static void bench_usage(FILE *f)
+{
+	fprintf(f,
+	    "Usage: bovnar bench [options]\n"
+	    "\n"
+	    "Options:\n"
+	    "  --profile <list>   Comma-separated profile names:\n"
+	    "                     all,scalars,typed,structs,arrays,units,mixed\n"
+	    "                     (default: all)\n"
+	    "  --size <list>      Comma-separated payload sizes in bytes; each\n"
+	    "                     payload is whole assignments up to that size\n"
+	    "                     (default: 1024,4096,16384,65536)\n"
+	    "  --iterations <N>   Parse rounds per size×profile (default: 100)\n"
+	    "  --warmup <N>       Warm-up iterations (default: 10)\n"
+	    "  --verbose          Print per-run details\n"
+	    "  --json             Machine-readable JSON output\n"
+	    "  --min-overhead     Drop the on_unverified (lexer) callback and keep\n"
+	    "                     only on_verified, halving the callback work\n"
+	    "  -h, --help         Show this help and exit\n"
+	    "\n"
+	    "Examples:\n"
+	    "  bovnar bench --profile scalars --size 4096\n"
+	    "  bovnar bench --profile all --size 1024,65536 --iterations 200 --json\n"
+	    "  bovnar bench --min-overhead --profile scalars,units --size 4096\n");
+}
 static int cmd_bench(int argc, char **argv)
 {
 	for (int i = 0; i < argc; i++) {
-		if (strcmp(argv[i], "--profile") == 0 && i + 1 < argc) {
-			/* Both list parsers clear the defaults before parsing, so a
-			 * value that names nothing left an empty selection and the
-			 * benchmark printed an empty table and exited 0 -- "bench
-			 * --profile bogus" looked like a successful run of nothing. */
-			bmark_parse_profile_list(argv[++i]);
+		/* An option that takes a value, given last on the line, used to fall
+		 * through every `&& i + 1 < argc` below to the final else and be
+		 * reported as "unknown option: --profile" -- for an option the help
+		 * lists. Name what is actually missing. */
+		if ((strcmp(argv[i], "--profile") == 0 ||
+		     strcmp(argv[i], "--size") == 0 ||
+		     strcmp(argv[i], "--iterations") == 0 ||
+		     strcmp(argv[i], "--warmup") == 0) && i + 1 >= argc) {
+			fprintf(stderr, "bench: %s needs a value\n", argv[i]);
+			return 2;
+		}
+		if (strcmp(argv[i], "--profile") == 0) {
+			if (!bmark_parse_profile_list(argv[++i]))
+				return 2;
+			/* The list parser clears the defaults before parsing, so a
+			 * value that names nothing ("--profile ,") left an empty
+			 * selection and the benchmark printed an empty table. */
 			if (!bmark_any_profile()) {
 				fprintf(stderr, "bench: --profile '%s' selects no "
 					"known profile\n", argv[i]);
 				return 2;
 			}
-		} else if (strcmp(argv[i], "--size") == 0 && i + 1 < argc) {
-			bmark_parse_size_list(argv[++i]);
+		} else if (strcmp(argv[i], "--size") == 0) {
+			if (!bmark_parse_size_list(argv[++i]))
+				return 2;
 			if (bmark_cfg.num_sizes == 0) {
 				fprintf(stderr, "bench: --size '%s' selects no "
 					"payload size\n", argv[i]);
 				return 2;
 			}
-		} else if (strcmp(argv[i], "--iterations") == 0 && i + 1 < argc) {
+		} else if (strcmp(argv[i], "--iterations") == 0) {
 			if (!bench_parse_count("--iterations", argv[++i],
 					       10000000ul, &bmark_cfg.iterations))
 				return 2;
 			if (bmark_cfg.iterations < 1) bmark_cfg.iterations = 1;
-		} else if (strcmp(argv[i], "--warmup") == 0 && i + 1 < argc) {
+		} else if (strcmp(argv[i], "--warmup") == 0) {
 			if (!bench_parse_count("--warmup", argv[++i],
 					       10000000ul, &bmark_cfg.warmup))
 				return 2;
@@ -3120,30 +3430,13 @@ static int cmd_bench(int argc, char **argv)
 			bmark_cfg.min_overhead = true;
 		} else if (strcmp(argv[i], "-h") == 0 ||
 		           strcmp(argv[i], "--help") == 0) {
-			fprintf(stderr,
-			    "Usage: bovnar bench [options]\n"
-			    "\n"
-			    "Options:\n"
-			    "  --profile <list>   Comma-separated profile names:\n"
-			    "                     all,scalars,typed,structs,arrays,units,mixed\n"
-			    "                     (default: all)\n"
-			    "  --size <list>      Comma-separated payload sizes in bytes\n"
-			    "                     (default: 1024,4096,16384,65536)\n"
-			    "  --iterations <N>   Parse rounds per size×profile (default: 100)\n"
-			    "  --warmup <N>       Warm-up iterations (default: 10)\n"
-			    "  --verbose          Print per-run details\n"
-			    "  --json             Machine-readable JSON output\n"
-			    "  --min-overhead     Skip on_verified callback for pure lexer throughput\n"
-			    "  -h, --help         Show this help and exit\n"
-			    "\n"
-			    "Examples:\n"
-			    "  bovnar bench --profile scalars --size 4096\n"
-			    "  bovnar bench --profile all --size 1024,65536 --iterations 200 --json\n"
-			    "  bovnar bench --min-overhead --profile scalars,units --size 4096\n");
+			/* Asked-for help is output, not a diagnostic: stdout, so that
+			 * `bovnar bench --help | less` shows something. */
+			bench_usage(stdout);
 			return 0;
 		} else {
 			fprintf(stderr, "bench: unknown option: %s\n", argv[i]);
-			return 1;
+			return 2;
 		}
 	}
 	if (bmark_cfg.json) {
@@ -3161,6 +3454,10 @@ static int cmd_bench(int argc, char **argv)
 		bmark_print_header();
 	}
 	bool first = true;
+	/* A cell that could not be measured is a failed run. It was a line on
+	 * stderr and exit status 0, so `bench --size 99999999999999999` -- every
+	 * cell a malloc failure -- printed an empty table and reported success. */
+	uint32_t failed = 0;
 	for (int p = 0; p < BMARK_PROFILE_COUNT; p++) {
 		if (!bmark_cfg.profiles[p]) continue;
 		for (uint32_t s = 0; s < bmark_cfg.num_sizes; s++) {
@@ -3168,8 +3465,11 @@ static int cmd_bench(int argc, char **argv)
 			                             bmark_cfg.sizes[s],
 			                             bmark_cfg.iterations);
 			if (r.payload_size == 0) {
-				fprintf(stderr, "  SKIP: %s/%zu (generation or parse failed)\n",
+				fprintf(stderr, "  FAILED: %s/%zu (the size holds no whole "
+					"assignment of this profile, or generation or "
+					"the parse failed)\n",
 				        bmark_profile_names[p], bmark_cfg.sizes[s]);
+				failed++;
 				continue;
 			}
 			if (bmark_cfg.json && !first)
@@ -3190,6 +3490,10 @@ static int cmd_bench(int argc, char **argv)
 	if (bmark_cfg.json)
 		printf("\n]}\n");
 	printf("\n");
+	if (failed) {
+		fprintf(stderr, "bench: %u cell(s) could not be measured\n", failed);
+		return 1;
+	}
 	return 0;
 }
 /*
@@ -3347,6 +3651,11 @@ static int cmd_frames(int argc, char **argv)
 		return cmd_frames_pack(argc - 1, argv + 1);
 	if (strcmp(argv[0], "list") == 0) {
 		if (argc < 2) { fprintf(stderr, "frames list: need a file or -\n"); return 2; }
+		if (argc > 2) {
+			fprintf(stderr, "frames list: takes exactly one file (or -), "
+					"got %d\n", argc - 1);
+			return 2;
+		}
 		return cmd_frames_list(argv[1]);
 	}
 	fprintf(stderr, "frames: unknown action '%s' (use pack|list)\n", argv[0]);
@@ -3359,6 +3668,39 @@ static int cmd_mux_pack(int argc, char **argv)
 		fprintf(stderr, "mux pack: need at least one channel:file argument\n");
 		return 2;
 	}
+	/* The command line is checked as a whole BEFORE the first byte is written.
+	 * Each argument used to be examined as its turn came, so `mux pack 1:a.bvnr
+	 * oops` had already put the stream header and channel 1 on stdout when it
+	 * discovered the second argument was not one -- half a stream for a typo,
+	 * and exit status 1, the code for a document that failed, where every
+	 * other malformed command line exits 2. */
+	for (int i = 0; i < argc; i++) {
+		const char *colon = strchr(argv[i], ':');
+		if (!colon) {
+			fprintf(stderr, "mux pack: expected channel:file, got '%s'\n", argv[i]);
+			return 2;
+		}
+		size_t clen = (size_t)(colon - argv[i]);
+		/* strtoull wraps a leading '-' into a huge positive value and skips
+		 * leading whitespace, neither of which endp or errno reports: "-1"
+		 * packed cleanly onto channel 18446744073709551615. Digits only, so
+		 * a typo is an error, not a surprise channel. */
+		bool digits = clen > 0;
+		for (size_t k = 0; k < clen; k++)
+			if (argv[i][k] < '0' || argv[i][k] > '9') digits = false;
+		errno = 0;
+		if (digits) (void)strtoull(argv[i], NULL, 10);
+		if (!digits || errno != 0) {
+			fprintf(stderr, "mux pack: invalid channel '%.*s' (want a "
+					"plain non-negative number below 2^64)\n",
+				(int)clen, argv[i]);
+			return 2;
+		}
+		if (!colon[1]) {
+			fprintf(stderr, "mux pack: no file after '%s'\n", argv[i]);
+			return 2;
+		}
+	}
 	bvnr_writer_t *w = bvnr_writer_create();
 	if (!w) return 1;
 	bvnr_sink_t sink;
@@ -3369,30 +3711,8 @@ static int cmd_mux_pack(int argc, char **argv)
 	if (!bvnr_write_event(w, ev_stream_start, &hdr))   goto done;
 	if (!bvnr_mux_begin(w, "mux"))                     goto done;
 	for (int i = 0; i < argc; i++) {
-		char *colon = strchr(argv[i], ':');
-		if (!colon) {
-			fprintf(stderr, "mux pack: expected channel:file, got '%s'\n", argv[i]);
-			goto done;
-		}
-		*colon = '\0';
-		char *endp = NULL;
-		errno = 0;
-		/* strtoull wraps a leading '-' into a huge positive value and skips
-		 * leading whitespace, neither of which endp or errno reports: "-1"
-		 * packed cleanly onto channel 18446744073709551615. Screen the sign
-		 * and space first so a typo is an error, not a surprise channel. */
-		if (argv[i][0] == '-' || argv[i][0] == '+' ||
-		    argv[i][0] == ' ' || argv[i][0] == '\t') {
-			fprintf(stderr, "mux pack: invalid channel '%s' (want a "
-					"plain non-negative number)\n", argv[i]);
-			goto done;
-		}
-		uint64_t channel = strtoull(argv[i], &endp, 10);
-		if (endp == argv[i] || *endp != '\0' || errno != 0) {
-			fprintf(stderr, "mux pack: invalid channel '%s' (want a number)\n",
-					argv[i]);
-			goto done;
-		}
+		const char *colon = strchr(argv[i], ':');
+		uint64_t channel = strtoull(argv[i], NULL, 10);
 		const char *path = colon + 1;
 		uint8_t *buf = NULL; uint64_t len = 0;
 		if (slurp(path, &buf, &len) != 0) goto done;
@@ -3477,15 +3797,20 @@ static int cmd_mux(int argc, char **argv)
 		return cmd_mux_pack(argc - 1, argv + 1);
 	if (strcmp(argv[0], "list") == 0) {
 		if (argc < 2) { fprintf(stderr, "mux list: need a file or -\n"); return 2; }
+		if (argc > 2) {
+			fprintf(stderr, "mux list: takes exactly one file (or -), "
+					"got %d\n", argc - 1);
+			return 2;
+		}
 		return cmd_mux_list(argv[1]);
 	}
 	fprintf(stderr, "mux: unknown action '%s' (use pack|list)\n", argv[0]);
 	return 2;
 }
 
-static void usage(const char *prog)
+static void usage(FILE *out, const char *prog)
 {
-	fprintf(stderr,
+	fprintf(out,
 		"Usage: %s <command> [options] [file]\n"
 		"Commands:\n"
 		"  validate [opts] <file>\n"
@@ -3513,20 +3838,36 @@ static void usage(const char *prog)
 		"  query [opts] <path> <file>\n"
 		"                  Query a value by path (e.g. .sensor.temperature).\n"
 		"                  Prints the VALUE only -- no unit -- so it pipes cleanly.\n"
-		"                  Takes the same unit-policy options as events, so a\n"
-		"                  query can assert what it expects and ask for the unit\n"
-		"                  it wants back: --field .a.b=m --require-unit ...\n"
-		"  pretty-print  Pretty-print a .bvnr file (--canonical: also reduce\n"
-		"                every unit to canonical form, rescaling values to match,\n"
-		"                so two spellings of one unit produce equal bytes)\n"
+		"                  Takes the unit-policy options of events, so a query can\n"
+		"                  assert what it expects and ask for the unit it wants\n"
+		"                  back: --field .a.b=m --require-unit ... Two it does\n"
+		"                  not take: --base (the value is printed in decimal) and\n"
+		"                  --text-only (use validate).\n"
+		"  pretty-print [--canonical] <file>\n"
+		"                Pretty-print a .bvnr file. Comments are not part of a\n"
+		"                document's data and are NOT preserved. --canonical: also\n"
+		"                reduce every unit to canonical form, rescaling values to\n"
+		"                match, so two spellings of one unit produce equal bytes\n"
 		"  convert <file>  Convert json<->bvnr (direction from .json/.bvnr ext)\n"
-		"                  Override with --from <fmt> --to <fmt> if needed\n"
+		"                  Override with --from <fmt> and/or --to <fmt>\n"
 		"                  Supported: json -> bvnr,  bvnr -> json\n"
+		"                  bvnr -> json is LOSSY for most documents: JSON has no\n"
+		"                  units, types, symbols, references or octet streams.\n"
+		"                  The JSON is still written; what was lost is listed on\n"
+		"                  stderr and the exit status is 1, so 0 means the JSON\n"
+		"                  converts back to the same document.\n",
+		prog);
+	/* Split here: one string literal for the whole of usage() grew past the
+	 * 4095 characters C99 requires a compiler to support, which -Wpedantic
+	 * reports. Separate calls cost nothing and keep the text strictly
+	 * conforming. */
+	fprintf(out,
 		"  events [opts] <file|->\n"
 		"                  Print lexer and validator events side by side.\n"
 		"                  Pass '-' to read from stdin.\n"
 		"                  Options:\n"
-		"                    -c  Continue parsing on errors (resync mode)\n"
+		"                    -c  Continue parsing on errors (resync mode); the\n"
+		"                        exit status is still non-zero if any occurred\n"
 		"                    -d  Enable debug re-serialisation output to stderr\n"
 		"                    -p  Pretty-print debug output (requires -d)\n"
 		"                    --unit <unit>       convert values to this unit,\n"
@@ -3545,12 +3886,8 @@ static void usage(const char *prog)
 		"                                        an octet stream\n"
 		"                    --require-unit, --require-dimension <unit>,\n"
 		"                    --require-field <path>=<unit>\n"
-		"                                        as for validate, above\n",
-		prog);
-	/* Split here: one string literal for the whole of usage() grew past the
-	 * 4095 characters C99 requires a compiler to support, which -Wpedantic
-	 * reports. Two calls cost nothing and keep the text strictly conforming. */
-	fprintf(stderr,
+		"                                        as for validate, above\n");
+	fprintf(out,
 		"  frames pack <file>...\n"
 		"                  Wrap each document in a length-prefixed frame (stdout).\n"
 		"  frames list <file|->\n"
@@ -3569,7 +3906,10 @@ static void usage(const char *prog)
 		"                    --warmup <N>       warm-up rounds (default: 10)\n"
 		"                    --verbose          per-run detail\n"
 		"                    --json             machine-readable JSON output\n"
-		"                    --min-overhead     skip on_verified callback\n"
+		"                    --min-overhead     drop the on_unverified callback\n"
+		"\n"
+		"Exit status: 0 success; 1 the document, the input or the output failed;\n"
+		"2 the command line was wrong.\n"
 		"\n"
 		"Examples:\n"
 		"  %s validate config.bvnr\n"
@@ -3589,16 +3929,33 @@ static void usage(const char *prog)
 		prog, prog, prog, prog, prog, prog, prog, prog,
 		prog, prog, prog, prog, prog, prog, prog);
 }
-int main(int argc, char **argv)
+/*
+ * The dispatcher. Its exit status is one of three, and which one is decided by
+ * WHO was wrong:
+ *
+ *   0  it worked;
+ *   1  the document, the input or the output failed -- a parse error, a file
+ *      that cannot be read, a lossy conversion, a full disk;
+ *   2  the command line was wrong -- nothing was read, and the same arguments
+ *      will fail the same way on any file.
+ *
+ * That split existed, but not consistently: `validate` with no file exited 1
+ * and with an unknown option 2, `query .a` 1 and `query .a f x` 2, a `bench`
+ * typo 1 and a `bench` bad number 2, and no arguments at all 1. A script cannot
+ * tell "this document is bad" from "I called it wrong" unless every usage error
+ * says 2.
+ */
+static int cli_main(int argc, char **argv)
 {
-	/* A binary format must not be mangled by the Windows CRT's CRLF text
-	 * translation on stdin/stdout/stderr; no-op on POSIX. */
-	bvn_set_binary_stdio();
-	if (argc < 2) { usage(argv[0]); return 1; }
+	if (argc < 2) { usage(stderr, argv[0]); return 2; }
 	const char *cmd = argv[1];
 	/* Extra positional arguments were silently ignored, so a typo or a shell
 	 * glob that matched more than intended ("validate *.bvnr") checked only the
-	 * first file and still exited 0. Refuse instead of half-doing the job. */
+	 * first file and still exited 0. Refuse instead of half-doing the job. That
+	 * holds for EVERY subcommand now; it was written for validate, query and
+	 * pretty-print, and `events a b`, `frames list a b`, `mux list a b`,
+	 * `convert a.json b.json` (which converted b) and `version x` all took
+	 * the stray argument without a word. */
 	if (strcmp(cmd, "validate") == 0) {
 		cli_unit_policy_t up;
 		memset(&up, 0, sizeof up);
@@ -3610,31 +3967,27 @@ int main(int argc, char **argv)
 			fprintf(stderr, "validate: unknown option: %s\n", argv[argi]);
 			return 2;
 		}
-		if (argi >= argc) { fprintf(stderr, "Usage: %s validate [--text-only] [--require-unit] "
-					"[--require-dimension <unit>] <file>\n", argv[0]); return 1; }
+		if (argi >= argc) { fprintf(stderr, "Usage: %s validate [opts] <file>\n",
+					argv[0]); return 2; }
 		if (argc - argi > 1) { fprintf(stderr, "validate: takes exactly one file, "
 					"got %d\n", argc - argi); return 2; }
 		return cmd_validate(argv[argi], &up);
 	} else if (strcmp(cmd, "query") == 0) {
-		if (argc < 4) { fprintf(stderr, "Usage: %s query [opts] <path> <file>\n",
-					argv[0]); return 1; }
-		{
-			cli_unit_policy_t up;
-			memset(&up, 0, sizeof up);
-			int argi = 2;
-			while (argi < argc && argv[argi][0] == '-' && argv[argi][1] != '\0') {
-				int rc = cli_parse_unit_opts("query", argc, argv, &argi, &up);
-				if (rc == 0) continue;
-				if (rc > 0)  return rc;
-				fprintf(stderr, "query: unknown option: %s\n", argv[argi]);
-				return 2;
-			}
-			if (argc - argi != 2) {
-				fprintf(stderr, "Usage: %s query [opts] <path> <file>\n", argv[0]);
-				return 2;
-			}
-			return cmd_query(argv[argi], argv[argi + 1], &up);
+		cli_unit_policy_t up;
+		memset(&up, 0, sizeof up);
+		int argi = 2;
+		while (argi < argc && argv[argi][0] == '-' && argv[argi][1] != '\0') {
+			int rc = cli_parse_unit_opts("query", argc, argv, &argi, &up);
+			if (rc == 0) continue;
+			if (rc > 0)  return rc;
+			fprintf(stderr, "query: unknown option: %s\n", argv[argi]);
+			return 2;
 		}
+		if (argc - argi != 2) {
+			fprintf(stderr, "Usage: %s query [opts] <path> <file>\n", argv[0]);
+			return 2;
+		}
+		return cmd_query(argv[argi], argv[argi + 1], &up);
 	} else if (strcmp(cmd, "pretty-print") == 0) {
 		bool canonical = false;
 		const char *pp_file = NULL;
@@ -3653,26 +4006,44 @@ int main(int argc, char **argv)
 		}
 		if (!pp_file) {
 			fprintf(stderr, "Usage: %s pretty-print [--canonical] <file>\n", argv[0]);
-			return 1;
+			return 2;
 		}
 		return cmd_pretty(pp_file, canonical);
 	} else if (strcmp(cmd, "convert") == 0) {
 		const char *from = NULL, *to = NULL, *file = NULL;
-		for (int i = 2; i < argc; i++) {
-			if (strcmp(argv[i], "--from") == 0) {
-				if (i+1 >= argc) {
-					fprintf(stderr, "convert: --from needs a value\n");
-					return 1;
+		/* The unit-policy flags are accepted here and IGNORED, which is what
+		 * doc/06 7.3 records and check_doc_policy.py pins: JSON has no units to
+		 * apply a policy to. They are parsed with the same routine as
+		 * everywhere else so that a flag's ARGUMENT is consumed as one --
+		 * "convert --unit m x.json" used to treat `m` as a file name that the
+		 * next argument happened to overwrite. Anything else beginning with
+		 * '-' is refused: "every argument that is not --from/--to is the
+		 * file" meant a typo was silently a file name, and two files were
+		 * silently one. */
+		cli_unit_policy_t ignored;
+		memset(&ignored, 0, sizeof ignored);
+		for (int i = 2; i < argc; ) {
+			if (strcmp(argv[i], "--from") == 0 ||
+			    strcmp(argv[i], "--to") == 0) {
+				if (i + 1 >= argc) {
+					fprintf(stderr, "convert: %s needs a value\n", argv[i]);
+					return 2;
 				}
-				from = argv[++i];
-			} else if (strcmp(argv[i], "--to") == 0) {
-				if (i+1 >= argc) {
-					fprintf(stderr, "convert: --to needs a value\n");
-					return 1;
-				}
-				to = argv[++i];
+				if (argv[i][2] == 'f') from = argv[i + 1];
+				else                   to   = argv[i + 1];
+				i += 2;
+			} else if (argv[i][0] == '-' && argv[i][1] != '\0') {
+				int rc = cli_parse_unit_opts("convert", argc, argv, &i,
+							     &ignored);
+				if (rc == 0) continue;
+				if (rc > 0)  return rc;
+				fprintf(stderr, "convert: unknown option: %s\n", argv[i]);
+				return 2;
+			} else if (file) {
+				fprintf(stderr, "convert: takes exactly one file\n");
+				return 2;
 			} else {
-				file = argv[i];
+				file = argv[i++];
 			}
 		}
 		if (!file) {
@@ -3680,7 +4051,7 @@ int main(int argc, char **argv)
 					"Usage: %s convert <file>            (direction from extension)\n"
 					"       %s convert --from <fmt> --to <fmt> <file>\n",
 					argv[0], argv[0]);
-			return 1;
+			return 2;
 		}
 		return cmd_convert(from, to, file);
 	} else if (strcmp(cmd, "events") == 0) {
@@ -3693,6 +4064,10 @@ int main(int argc, char **argv)
 		return cmd_bench(argc - 2, argv + 2);
 	} else if (strcmp(cmd, "version") == 0 ||
 	           strcmp(cmd, "--version") == 0) {
+		if (argc > 2) {
+			fprintf(stderr, "%s: takes no arguments\n", cmd);
+			return 2;
+		}
 		uint16_t smaj = 0, smin = 0;
 		bvnr_spec_version(&smaj, &smin);
 		/* BVNR_VERSION_STRING_FULL, not bvnr_version_string(): the CLI is
@@ -3718,11 +4093,46 @@ int main(int argc, char **argv)
 		}
 		return 0;
 	} else if (strcmp(cmd, "-h") == 0 || strcmp(cmd, "--help") == 0) {
-		usage(argv[0]);
+		/* Help that was asked for is the command's output, so it goes to
+		 * stdout: `bovnar --help | less` showed an empty pager, and
+		 * `bovnar --help > help.txt` an empty file, because all of it went to
+		 * stderr. Usage printed because the command line was WRONG still goes
+		 * to stderr, with status 2. */
+		usage(stdout, argv[0]);
 		return 0;
 	} else {
 		fprintf(stderr, "Unknown command: %s\n", cmd);
-		usage(argv[0]);
-		return 1;
+		usage(stderr, argv[0]);
+		return 2;
 	}
+}
+int main(int argc, char **argv)
+{
+	/* A binary format must not be mangled by the Windows CRT's CRLF text
+	 * translation on stdin/stdout/stderr; no-op on POSIX. */
+	bvn_set_binary_stdio();
+	int rc = cli_main(argc, argv);
+	/*
+	 * The one place stdout is checked.
+	 *
+	 * Everything the stdio subcommands print -- a query's value, validate's
+	 * "OK", the JSON, the event table, a frame listing -- sits in a buffer
+	 * until exit, and nothing looked at whether it ever left: `bovnar query
+	 * .port cfg > /dev/full` and the same with stdout closed both exited 0
+	 * having written nothing, so `port=$(bovnar query ...) || fail` carried on
+	 * with an empty string. Only the commands that write through an fd sink
+	 * (pretty-print, frames pack, mux pack) noticed, because the writer checks
+	 * its own pushes.
+	 *
+	 * fflush reports the failure of THIS flush; ferror also catches one that
+	 * happened mid-run, when a full buffer was pushed out early.
+	 */
+	errno = 0;
+	if (fflush(stdout) != 0 || ferror(stdout)) {
+		int e = errno;
+		fprintf(stderr, "bovnar: error writing to standard output%s%s\n",
+			e ? ": " : "", e ? strerror(e) : "");
+		if (rc == 0) rc = 1;
+	}
+	return rc;
 }

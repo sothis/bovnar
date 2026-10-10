@@ -159,15 +159,28 @@ int64_t bvn_dt_datetime_to_epoch_seconds(bvn_datetime_t* dt, bvn_epoch_t epoch)
 	 * fast converter is safe here. */
 	dt->mjd = bvn_gregorian_date_to_mjd_fast(&dt->date);
 
-	int64_t r, t;
+	int64_t r, t, bias = 0;
 	bool ov = false;
 	ov |= bvn_ckd_sub(&r, dt->mjd, (int64_t)epoch);
+	/* Before the epoch the day count is negative and the time of day is added
+	 * back on top of it, so days*86400 on its own can lie below INT64_MIN while
+	 * the instant does not: every second of the last partial day above
+	 * INT64_MIN was reported as overflow, although
+	 * bvn_dt_epoch_seconds_to_datetime() had just produced that very datetime.
+	 * Count from the END of the day instead -- (days+1)*86400, plus the time of
+	 * day, minus one day -- and the intermediate never leaves the range the
+	 * result is in. */
+	if (!ov && r < 0) {
+		r   += 1;
+		bias = -(int64_t)86400;
+	}
 	ov |= bvn_ckd_mul(&r, r, (int64_t)86400);
 	ov |= bvn_ckd_mul(&t, dt->hour, (int64_t)3600);
 	ov |= bvn_ckd_add(&r, r, t);
 	ov |= bvn_ckd_mul(&t, dt->minute, (int64_t)60);
 	ov |= bvn_ckd_add(&r, r, t);
 	ov |= bvn_ckd_add(&r, r, dt->second);
+	ov |= bvn_ckd_add(&r, r, bias);
 	/* INT64_MIN is reserved as the error sentinel; report the one
 	 * (absurd-input) computation that lands on it exactly as overflow so
 	 * a successful return can never collide with BVN_GDATE_OVF. */

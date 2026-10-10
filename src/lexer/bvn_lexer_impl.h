@@ -313,6 +313,13 @@ typedef struct bvnr_lexer_s {
 	bvn_array_frame_t	*arr_frames;
 	uint64_t		processed_bytes;
 	uint64_t		text_bytes;
+	/* Bytes consumed by the octet-stream reader -- tags, lengths and payload,
+	 * everything between an opening 0x00 and the byte after its closing tag.
+	 * text_bytes + octet_bytes is the stream offset the scanner has reached,
+	 * which is what an error position has to be (see bvn_last_text_offset). */
+	uint64_t		octet_bytes;
+	/* bvn_lex_run met max_file_size and is reading the last bytes it allows. */
+	bool			file_cap_hit;
 	uint8_t			utf8_need;
 	uint8_t			utf8_lo;
 	uint8_t			utf8_hi;
@@ -335,6 +342,9 @@ typedef struct bvnr_lexer_s {
 	 */
 	bool			type_family_colon;
 	bool			type_param_ns;
+	/* text_bytes when the "float" keyword completed: "_fix" / "_dec" belong to
+	 * the keyword only if they follow it with nothing in between. */
+	uint64_t		type_kw_end;
 	uint16_t		str_len;
 	uint8_t			bom[2];
 	uint8_t			*type_data;

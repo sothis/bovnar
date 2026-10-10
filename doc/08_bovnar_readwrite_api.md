@@ -40,6 +40,7 @@ The writer uses the same event/data model as the reader — `bvnr_event_t` and `
     - 2.13 [`bvnr_write_bvni` / `bvnr_write_bvni_unit`](#213-bvnr_write_bvni--bvnr_write_bvni_unit)
     - 2.14 [`BVN_TYPE_FLOAT_BASE`](#214-bvn_type_float_base)
     - 2.15 [Writer-side unit policy (`bvnr_writer_set_unit_policy`)](#215-writer-side-unit-policy-bvnr_writer_set_unit_policy)
+    - 2.16 [Value helpers](#216-value-helpers)
 3. [Shared](#3-shared)
     - 3.1 [`bvnr_write_type_annotation`](#31-bvnr_write_type_annotation)
     - 3.2 [`bvn_parse_unit` / `bvn_parse_unit_n`](#32-bvn_parse_unit--bvn_parse_unit_n)
@@ -267,9 +268,12 @@ caret needs the right one:
 | `..._column` | **characters** | 1 | a multi-byte UTF-8 sequence advances it by one; a tab advances to the next multiple of 4 |
 | `..._offset` | **bytes** | 0 | use this to index the input buffer |
 
-In `.x = "café"; .y = @;` the `@` is byte 20 but column 19. This matters here
-more than in most formats: unit symbols are routinely non-ASCII (`µ~m`, `°C`,
-`Ω`), so the two disagree often.
+In `.x = "café"; .y = @;` the `@` is reported at column 19 and offset 19 — the
+19th character, and the 20th byte, because `é` is two bytes: a 1-based character
+count and a 0-based byte count that happen to land on the same number. One more
+non-ASCII character pulls them apart: in `.x = "çafé"; .y = @;` the `@` is at
+column 19 and offset 20. This matters here more than in most formats: unit
+symbols are routinely non-ASCII (`µ~m`, `°C`, `Ω`), so the two disagree often.
 
 All five error/location getters above (everything except `bvnr_reader_get_recovery_count`) are only meaningful when `bvnr_read` returned `false` (or after a recoverable error when `continue_on_error` is set). `bvnr_reader_get_error_byte` returns the raw byte value that triggered the error. `bvnr_reader_get_recovery_count` is the exception: it returns how many errors triggered entry into resync mode in `continue_on_error` mode (and so is meaningful even when `bvnr_read` ultimately returned `true`). This count is incremented at error entry, not when resync completes at `";". `bvnr_reader_get_skipped_bytes` is the same kind of thing and answers the question the count cannot: how much of the input recovery threw away. One skipped assignment and a whole discarded struct both report a single recovery, and the skipped bytes were never parsed, so nothing else in the API mentions them — a non-zero total means the document your callbacks saw is not the whole document.
 
@@ -954,7 +958,7 @@ typedef struct bvnr_write_flags_s {
 ```
 
 > **Writer limits.** Only `max_struct_nesting`, `max_array_nesting`, `on_event`, `userdata`,
-> and `unit_flags` have any effect on the writer. All other fields are present solely to keep
+> `unit_flags` and `emit_version` have any effect on the writer. All other fields are present solely to keep
 > `bvnr_write_flags_t` structurally parallel to `bvnr_read_flags_t`; they are silently
 > ignored. In particular, `continue_on_error`, `on_error`, and all per-token-length fields
 > have no effect. The writer never internally limits array items, text bytes, or file size.
@@ -1012,7 +1016,7 @@ if (!bvnr_open_write_mem(w, out, sizeof(out), false, &opts))
 bool bvnr_write_event(bvnr_writer_t *w, bvnr_event_t ev, bvnr_data_t *data);
 ```
 
-Emit one event to the writer. This is the only function used to produce output. It serialises the event and the data it describes directly into the configured sink.
+Emit one event to the writer. Every value in the output goes through this function: the helpers in [§2.16](#216-value-helpers) and the multiprecision writers in §2.12–2.13 are sequences of these events, and a caller replaying a reader's stream calls it directly. It serialises the event and the data it describes directly into the configured sink.
 
 Returns `true` on success, `false` on any serialisation error.
 
@@ -1104,6 +1108,7 @@ static bool write_string(bvnr_writer_t *w,
     if (!bvnr_write_event(w, ev_type_annotation_end, &d)) return false;
 
     d = (bvnr_data_t){
+        .type       = token_is_string,   /* required: says how the value is spelled */
         .value_type = vt,
         .data       = (void*)value,
         .length     = (uint32_t)strlen(value),
@@ -1111,6 +1116,10 @@ static bool write_string(bvnr_writer_t *w,
     return bvnr_write_event(w, ev_data, &d);
 }
 ```
+
+The `ev_data` event's `type` is not optional. Left at zero it is
+`token_is_identifier`, which is not a value, and the write fails with
+`error_type_value_mismatch` after the annotation has already gone out.
 
 **Example: open and close a struct**
 
@@ -1382,6 +1391,78 @@ survives re-opening the writer on another document, and is cleared with `NULL`.
 
 ---
 
+### 2.16 Value helpers
+
+One call per assignment: the key, its type annotation and its value, for the
+common scalar types. Each is the event sequence of §2.7 written out for you, and
+is what most producers should use.
+
+```c
+bool bvnr_write_string(bvnr_writer_t *w, const char *key, const char *value);
+bool bvnr_write_plain (bvnr_writer_t *w, const char *key, const char *value);
+bool bvnr_write_null  (bvnr_writer_t *w, const char *key);
+bool bvnr_write_bool  (bvnr_writer_t *w, const char *key, bool value);
+bool bvnr_write_uint(bvnr_writer_t *w, const char *key,
+                     uint32_t width, uint64_t value);
+bool bvnr_write_sint(bvnr_writer_t *w, const char *key,
+                     uint32_t width, int64_t value);
+bool bvnr_write_float(bvnr_writer_t *w, const char *key,
+                      uint32_t width, double value);
+bool bvnr_write_float_fix(bvnr_writer_t *w, const char *key,
+                          uint32_t width, uint32_t q, double value);
+bool bvnr_write_float_dec(bvnr_writer_t *w, const char *key,
+                          uint32_t width, double value);
+
+bool bvnr_write_uint_unit(bvnr_writer_t *w, const char *key,
+                          uint32_t width, uint64_t value, value_unit_t unit);
+bool bvnr_write_sint_unit(bvnr_writer_t *w, const char *key,
+                          uint32_t width, int64_t value, value_unit_t unit);
+bool bvnr_write_float_unit(bvnr_writer_t *w, const char *key,
+                           uint32_t width, double value, value_unit_t unit);
+bool bvnr_write_float_fix_unit(bvnr_writer_t *w, const char *key,
+                               uint32_t width, uint32_t q,
+                               double value, value_unit_t unit);
+bool bvnr_write_float_dec_unit(bvnr_writer_t *w, const char *key,
+                               uint32_t width,
+                               double value, value_unit_t unit);
+
+bool bvnr_write_struct_start(bvnr_writer_t *w, const char *key);
+bool bvnr_write_struct_end  (bvnr_writer_t *w);
+```
+
+| Helper | Writes | Notes |
+|--------|--------|-------|
+| `bvnr_write_string` | `.key = "value";` | `value` is escaped for you. It must be valid UTF-8 and may not hold a C0 control other than `\t` `\n` `\v` `\f` `\r`, nor DEL (`error_unexpected_input_byte`, `error_invalid_utf8_byte`) |
+| `bvnr_write_plain` | `.key = value;` | a bare **symbol** — `value` must be a valid symbol, it is not quoted |
+| `bvnr_write_null` | `.key = ;` | the null value |
+| `bvnr_write_bool` | `.key = true;` / `false` | |
+| `bvnr_write_uint` / `_sint` | `.key = <uint:16> 443;` | `width` 0 writes `<uint>` / `<sint>` (64 bits); a value that does not fit `width` is `error_value_out_of_range` |
+| `bvnr_write_float` | `.key = <float:64> 1e-1;` | `width` 0 writes `<float>`; `nan`, `inf` and `ninf` are written as those words; formatted as by `bvn_format_double` (§2.11) |
+| `bvnr_write_float_fix` | `.key = <float_fix:32,q16> 1.5e+0;` | `q` is the number of fractional bits |
+| `bvnr_write_float_dec` | `.key = <float_dec:64> 1.25e+0;` | |
+| `…_unit` | `.key = <float:64,k~m> 1e+0;` | the same, with `unit` as the annotation's unit parameter; honours `bvnr_writer_set_unit_source` (§3.1) and the writer's unit policy (§2.15) |
+| `bvnr_write_struct_start` / `_end` | `.key = {` … `};` | every helper called between the two writes a member |
+
+All return `false` on failure with the reason latched in the writer
+(`bvnr_writer_get_error`); once a write has failed, every later one fails too.
+A `double` carries 53 significant bits whatever `width` says — for the full
+precision of a wider `float`, `float_dec` or `float_fix`, or an integer past 64
+bits, use `bvnr_write_bvnf_base` (§2.12) and `bvnr_write_bvni` (§2.13). A
+timestamp has its own helper, `bvnr_write_datetime` (§1.9). There is no array
+helper: an array is written as events (`ev_array_row_start`, one `ev_data` per
+element, `ev_array_row_end`).
+
+```c
+bvnr_write_string(w, "host", "localhost");       /* .host = "localhost";      */
+bvnr_write_uint  (w, "port", 16, 443);           /* .port = <uint:16> 443;    */
+bvnr_write_struct_start(w, "limits");            /* .limits = {               */
+bvnr_write_bool  (w, "strict", true);            /*     .strict = true;       */
+bvnr_write_null  (w, "owner");                   /*     .owner = ;            */
+bvnr_write_struct_end(w);                        /* };                        */
+```
+
+---
+
 ## 3. Shared
 
 ---
@@ -1587,14 +1668,16 @@ bool bvn_unit_convert_value(double value, value_unit_t from,
 
 Convert one numeric quantity from unit `from` into unit `to`, writing the result
 to `*out`. Handles both the simple multiplicative case (`5 k~m → 5000 m`) and the
-affine case (`25 °C → 298.15 K`), routing the latter through SI base units. This
-is the same routine the reader's `want_unit` hook (§1.10) uses, and the C
-equivalent of the Python `convert_value`.
+affine case (`25 °C → 298.15 K`), routing the latter through SI base units. It
+answers the same question the reader's `want_unit` hook (§1.10) does — may this
+value be delivered in that unit, and what is it there — in `double`, and is the
+C equivalent of the Python `convert_value`. It is **not** the routine the hook
+runs: the hook works in exact rationals (`bvn_unit_convert_rational`, below).
 
 Returns `false` — leaving `*out` untouched — when the two units are
 dimensionally **incompatible** or have no SI mapping. That boolean is the
-"validly convert only" guard: the reader turns a `false` here into
-`error_unit_mismatch`.
+"validly convert only" guard; the same verdict from the exact engine is what
+the reader reports as `error_unit_mismatch`.
 
 ```c
 double m;
@@ -1682,7 +1765,9 @@ fprintf(stderr, "error: %s\n", bvn_error_to_string(bvnr_reader_get_error(r)));
 An adapter that lets a reader's event stream drive the serializer directly, without
 constructing a `bvnr_writer_t`. Installed as a reader callback it re-emits every event
 to a sink, producing a canonical — or pretty-printed — copy of the input. This is what
-the command-line pretty-printer and canonicaliser are built on.
+`bovnar events -d` prints its re-serialisation with. (`bovnar pretty-print` is the other
+way to do the same job: a `bvnr_writer_t` fed from `on_verified`, which is what lets
+`--canonical` set `unit_flags`.)
 
 ```c
 typedef struct bvnr_canon_observer_s bvnr_canon_observer_t;
@@ -1801,8 +1886,20 @@ document still returns a non-NULL doc, so check `bvn_dom_doc_get_parse_error()`
 The `bvn_dom_parse_fd*` variants instead return NULL on **any** failure
 (allocation, I/O, or exceeding the size cap). `bvn_dom_parse_fd_ex` caps the
 accumulated input at `max_bytes`, but only *downward*: `0` or any value above the
-built-in hard cap `BVN_DOM_FD_MAX_BYTES` (256 MiB) is clamped to that cap — there
-is no unlimited mode. Free every returned doc with `bvn_dom_doc_destroy`.
+built-in hard cap of 256 MiB is clamped to that cap — there is no unlimited mode.
+(The cap is a build-time constant of the library, `BVN_DOM_FD_MAX_BYTES` in
+`src/dom/bovnar_dom_builder.c`; it is not in the public headers.) Free every
+returned doc with `bvn_dom_doc_destroy`.
+
+**The DOM reads at the format's nesting limit, not the reader's default.** A
+`bvnr_reader_t` opened with zeroed flags stops at 64 levels of struct and 64 of
+array nesting (§1.4); every `bvn_dom_parse*` function sets both to the hard
+maximum of **255**. A document nested 65 to 255 deep therefore parses through
+the DOM and is `error_struct_nesting_too_high` / `error_array_nesting_too_high`
+from a default streaming reader — set `max_struct_nesting` and
+`max_array_nesting` to 255 on the reader to make the two agree, which is what
+the `bovnar` CLI does in every subcommand. The DOM's other limits are the
+reader's defaults.
 
 ### 4.2 Navigation
 
@@ -1853,7 +1950,11 @@ double            bvn_dom_get_value_in_base_units(const bvn_dom_node_t *node);
 
 Each accessor returns `false` (leaving the out-param **unchanged** — no clamping
 or truncation) when the node is NULL, not of the requested kind, or does not fit
-the target type. Pointer results are **borrowed** — valid only until the owning
+the target type. "Kind" is strict with one deliberate exception:
+`bvn_dom_get_float` also succeeds on an **integer** node and returns its value
+as a `double` (a wide integer is rounded) — a caller asking for "the number"
+does not have to know whether the document wrote `5` or `5.0`. The reverse does
+not hold: the integer accessors fail on a float node. Pointer results are **borrowed** — valid only until the owning
 document is destroyed; do not free them.
 
 ```c
@@ -1917,7 +2018,15 @@ char *bvn_dom_strdup(const char *s, uint32_t len);
 **Ownership.** `bvn_dom_struct_add` / `bvn_dom_doc_add` / `bvn_dom_array_append`
 **always** take ownership of the value node: on success the container owns it, and
 on **every** failure path the node is destroyed internally — so never destroy it
-yourself after the call (doing so double-frees). `bvn_dom_node_from_bigint` is the
+yourself after the call (doing so double-frees).
+
+**What they refuse.** Each returns `false` — having destroyed the value — when
+the container is NULL or of the wrong kind (`bvn_dom_array_append` on anything
+but a `BVN_DOM_ARRAY`, `bvn_dom_struct_add` on anything but a `BVN_DOM_STRUCT`),
+when the value is NULL, and, for the two keyed ones, when the scope **already
+has that key**: a hand-built tree cannot hold the duplicate a parsed document is
+refused for (`error_duplicate_struct_key`). The duplicate test is a linear scan
+of the scope. `bvn_dom_node_from_bigint` is the
 one exception with *asymmetric* ownership: on success it takes ownership of the
 `bvn_int_t`; on failure (NULL return) it does not, and you still own it.
 
@@ -2139,7 +2248,7 @@ static bool on_verified(void *ud, bvnr_event_t ev, bvnr_data_t *d)
 #include <unistd.h>
 #include "bovnar.h"
 
-/* Emit: .velocity = <float:64,m/s²> 9.81; */
+/* Emit: .velocity = <float:64,m/s²> 9.81e+0; */
 static bool write_velocity(bvnr_writer_t *w)
 {
     value_type_spec_t vt = BVN_TYPE_FLOAT(64);
@@ -2191,7 +2300,8 @@ int main(void)
     bvnr_writer_destroy(w);
     return ret;
 }
-/* Output: .velocity = <float:64,m/s²> 9.81; */
+/* Output: .velocity = <float:64,m/s²> 9.81e+0;
+ * (bvn_format_double writes an exponent on every non-zero float -- see 2.11) */
 ```
 
 ---

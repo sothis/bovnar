@@ -24,6 +24,7 @@
     - 6.1 [Communication model](#61-communication-model)
     - 6.2 [Success response](#62-success-response)
     - 6.3 [Error response](#63-error-response)
+    - 6.4 [Arguments](#64-arguments)
 7. [Writing a Compliant IUT Adapter](#7-writing-a-compliant-iut-adapter)
     - 7.1 [Event log format reference](#71-event-log-format-reference)
     - 7.2 [Field details](#72-field-details)
@@ -263,6 +264,29 @@ The IUT must:
 Where `<code_name>` is the value returned by `bvn_error_to_string()` for
 the first error encountered, e.g. `value_out_of_range`.
 
+### 6.4 Arguments
+
+The Bovnar text arrives on stdin, but a case that overrides a reader limit
+passes the override on the adapter's **command line**. Each option is followed
+by one decimal value, and is present only when the case overrides that limit:
+
+| Option | Limit (`bvnr_read_flags_t`) |
+|--------|-----------------------------|
+| `--max-id <N>` | `max_identifier_length` |
+| `--max-str <N>` | `max_string_length` |
+| `--max-num <N>` | `max_number_length` |
+| `--max-sym <N>` | `max_symbol_length` |
+| `--max-ref <N>` | `max_reference_length` |
+| `--max-snest <N>` | `max_struct_nesting` |
+| `--max-anest <N>` | `max_array_nesting` |
+| `--max-aitems <N>` | `max_array_items` |
+
+An adapter MUST apply every option it is given and MUST ignore an option it
+does not know. An adapter that reads stdin and ignores its arguments fails the
+eight cases that pin a limit (`ID-011`, `STR-015`, `NUM-015`, `SYM-006`,
+`REF-004`, `STU-007`, `ARR-012`, `ARR-013`). No other state is passed: every
+case runs with recovery off and with the default, lenient version handling.
+
 ---
 
 ## 7. Writing a Compliant IUT Adapter
@@ -274,27 +298,29 @@ as a template for third-party implementors.
 A minimal conforming adapter must:
 
 1. **Read all of stdin** into a buffer.
-2. **Parse the buffer** using the implementation under test.
-3. **Collect events** from the `on_verified` callback.
-4. **Emit the event log** to stdout on success.
-5. **Emit** `ERROR <code_name>\n` to stdout and exit non-zero on failure.
+2. **Apply the limit options** on its command line (§6.4).
+3. **Parse the buffer** using the implementation under test.
+4. **Collect events** from the `on_verified` callback.
+5. **Emit the event log** to stdout on success.
+6. **Emit** `ERROR <code_name>\n` to stdout and exit non-zero on failure.
 
 ### 7.1 Event log format reference
 
 Each event maps to one line.  Text fields use `\xNN` escaping for any
 byte outside the printable ASCII range `0x20–0x7E` or for the backslash
-character `0x5C`.
+character `0x5C`.  The two hex digits are **lowercase** (`\x09`, `\xc3`,
+`\x5c`) — the comparison is byte for byte, so `\xC3` does not match.
 
 ```
 STREAM_START
 ASSIGNMENT_START <key>
-TYPE_ANN_START <family>
-TYPE_FAMILY <family>
+TYPE_ANN_START <ann>
+TYPE_FAMILY <ann>
 TYPE_PARAM_WIDTH <N>
 TYPE_PARAM_BASE <N>
 TYPE_PARAM_Q <N>
 TYPE_PARAM_UNIT <unit>
-TYPE_ANN_END <family>
+TYPE_ANN_END <ann>
 DATA <token_type> <value>
 STRUCT_START
 STRUCT_END
@@ -318,7 +344,7 @@ OCTET_STREAM_END
 | `TYPE_PARAM_Q <N>` | N: Q parameter | Only for `float_fix` |
 | `TYPE_PARAM_UNIT <unit>` | unit: unit string, safe-escaped | Emitted when the annotation carries a unit — and also for a `datetime`, whose **epoch name** travels in this line (`TYPE_PARAM_UNIT tai`). A datetime is not a numeric type; the epoch shares the unit parameter slot because it occupies the same position in the grammar |
 | `TYPE_ANN_END <ann>` | Same bytes as TYPE_ANN_START | |
-| `DATA <token_type> <value>` | token_type: see below; value: safe-escaped | |
+| `DATA <token_type> <value>` | token_type: see below; value: safe-escaped | The single space after the token type is always written, also when the value is empty: a null is the line `DATA null ` — with its trailing space — and an empty string is `DATA string ` |
 | `STRUCT_START` | — | |
 | `STRUCT_END` | — | |
 | `ARRAY_ROW_START` | — | |
@@ -442,9 +468,12 @@ DATA array_number 2
 ARRAY_ROW_END
 ```
 
-The element annotation is emitted **once per row**, not once per element: the
-array's element type is established at the first element and the rest inherit
-it.
+Inside an array a synthesised annotation is emitted only when the element's
+synthesised type differs from the type currently in force — at the first
+element, and again at each change. It is not repeated per element or per row
+(the second row of `[1, 2]/[3, 4]` carries no annotation lines at all, while
+`[1, 2.5, 3]` carries three blocks); an explicit element annotation is always
+emitted.
 
 **Input:** `.x = <uint:8> 999;` (error — value out of range)
 
@@ -462,7 +491,7 @@ specifies:
 
 | Field | Description |
 |-------|-------------|
-| `id` | Unique identifier, e.g. `TYP-019` |
+| `id` | Unique identifier, e.g. `TYP-019` (`ENC-001`…`ENC-014` for the `encoding` group) |
 | `group` | Group name for `--filter` |
 | `description` | Human-readable description |
 | `input` | Bovnar text (or binary) to parse |
@@ -519,7 +548,7 @@ TAP version 14
     ok 2 - [ENC-002] UTF-8 BOM at byte 0
     not ok 3 - [ENC-003] UTF-8 BOM after first comment
       ---
-      message: expected error invalid_byte_order_mark but parse succeeded
+      message: expected error unexpected_input_byte but parse succeeded
       ...
     1..14
 not ok 1 - encoding

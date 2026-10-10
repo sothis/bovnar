@@ -48,8 +48,9 @@ def shallow_clone():
     schema.org graph, which --check then reports as ten stale pages and a plain
     run would write out for real. Callers refuse instead of guessing.
 
-    Not a git repo at all is a different case and stays supported: git_date()
-    falls back to file mtimes, which is the best a source tarball can offer."""
+    Not a git repo at all is a different case and stays supported: the dates
+    already in the generated pages are kept (page_date()), and only a page that
+    does not exist yet falls back to the file mtime."""
     try:
         out = subprocess.run(
             ["git", "-C", ROOT, "rev-parse", "--is-shallow-repository"],
@@ -57,6 +58,46 @@ def shallow_clone():
         return out.stdout.strip() == "true"
     except Exception:
         return False
+
+
+def has_history():
+    """True when ROOT is the top of a git checkout, so `git log` can date a file.
+
+    Asked of the toplevel rather than "am I inside a work tree": a source
+    tarball unpacked somewhere under an unrelated repository is inside THAT
+    repository's work tree, and `git log -- doc/x.md` there answers with
+    nothing, or with somebody else's dates."""
+    try:
+        out = subprocess.run(
+            ["git", "-C", ROOT, "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, check=True)
+        return os.path.realpath(out.stdout.strip()) == os.path.realpath(ROOT)
+    except Exception:
+        return False
+
+
+_PAGE_DATE_RE = {
+    True:  re.compile(r'article:published_time" content="(\d{4}-\d\d-\d\d)"'),
+    False: re.compile(r'article:modified_time" content="(\d{4}-\d\d-\d\d)"'),
+}
+
+
+def page_date(slug, first):
+    """The date the page already generated for `slug` carries, or None.
+
+    The source tarball and the sdist are `git archive` output: every file has
+    the commit's mtime and there is no log to ask. Falling back to that mtime
+    stamped all the pages with one date, so `--check` -- which CTest runs --
+    reported thirteen of fourteen committed pages stale in the release's own
+    tarball. Without history the date a page was generated with is the only
+    record there is of when its source was written, so it is kept."""
+    try:
+        with open(os.path.join(OUT_DIR, slug, "index.html"),
+                  encoding="utf-8") as fh:
+            m = _PAGE_DATE_RE[first].search(fh.read())
+        return m.group(1) if m else None
+    except OSError:
+        return None
 
 
 def dirty(relpath):
@@ -718,8 +759,11 @@ def build_doc_page(src, slug, pdf, title, desc):
         rendered = rewrite_links(render_markdown(text_wo_h1))
     canonical = f"{SITE}/docs/{slug}/"
     faqs = faq_items(text) if slug == "faq" else None
-    published = git_date(f"doc/{src}", first=True)
-    modified = git_date(f"doc/{src}")
+    published = modified = None
+    if not has_history():
+        published, modified = page_date(slug, True), page_date(slug, False)
+    published = published or git_date(f"doc/{src}", first=True)
+    modified = modified or git_date(f"doc/{src}")
     # Advertise this doc's raw-source counterpart for LLM/agent tools (RFC 7763
     # for Markdown; the grammar ships as EBNF/plain text, so label + media type
     # follow the actual format rather than claiming Markdown).

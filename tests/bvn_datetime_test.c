@@ -918,9 +918,48 @@ static void test_german_calendar_history(void)
 	}
 }
 
+/*
+ * The last partial day above INT64_MIN.
+ *
+ * Before the epoch the conversion computed days*86400 and then added the time
+ * of day back; for the lowest day that product is below INT64_MIN although the
+ * instant is not, so every second of it converted to a datetime and then
+ * failed to convert back -- against the header's "mutual inverses".
+ */
+static void test_lowest_partial_day(void)
+{
+	static const int64_t S[] = {
+		INT64_MIN + 1, INT64_MIN + 254, INT64_MIN + 43200,
+		INT64_MIN + 86399, INT64_MIN + 86400, INT64_MIN + 86401,
+		-86401, -86400, -86399, -1, 0, 1, INT64_MAX - 1, INT64_MAX,
+	};
+	static const bvn_epoch_t E[] = {
+		bvn_epoch_unix, bvn_epoch_mjd, bvn_epoch_beidou, bvn_epoch_tai,
+	};
+	for (size_t i = 0; i < sizeof S / sizeof S[0]; i++) {
+		for (size_t e = 0; e < sizeof E / sizeof E[0]; e++) {
+			bvn_datetime_t dt;
+			memset(&dt, 0, sizeof dt);
+			bvn_dt_epoch_seconds_to_datetime(&dt, E[e], S[i]);
+			CHECK(bvn_dt_datetime_to_epoch_seconds(&dt, E[e]) == S[i],
+			      "epoch %d: %lld does not survive the round trip",
+			      (int)E[e], (long long)S[i]);
+		}
+	}
+	/* The UTC<->TAI pair, a little inside the margin its header reserves. */
+	for (int64_t t = INT64_MIN + 200; t < INT64_MIN + 400; t += 37) {
+		bvn_datetime_t dt;
+		memset(&dt, 0, sizeof dt);
+		bvn_dt_tai_seconds_to_utc(&dt, t);
+		CHECK(bvn_dt_utc_to_tai_seconds(&dt) == t,
+		      "tai %lld does not survive the round trip", (long long)t);
+	}
+}
+
 int main(void)
 {
 	test_walk();
+	test_lowest_partial_day();
 	test_anchors();
 	test_boundaries();
 	test_normalize();

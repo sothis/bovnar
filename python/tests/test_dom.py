@@ -566,3 +566,33 @@ class TestDomDocGcSafety:
         nodes = [doc[k] for k in ('x', 'y', 'z')]
         values = [n.as_i64() for n in nodes]
         assert values == [1, 2, 3]
+
+
+@needs_lib
+class TestDomSmallEdges:
+    def test_null_pointer_leaves_nothing_for_del_to_trip_on(self):
+        import gc
+        import sys
+        seen = []
+        old = sys.unraisablehook
+        sys.unraisablehook = lambda u: seen.append(u)
+        try:
+            with pytest.raises(MemoryError):
+                DomDoc(0)
+            gc.collect()
+        finally:
+            sys.unraisablehook = old
+        assert seen == []
+
+    def test_non_str_key_is_simply_absent(self):
+        doc = DomDoc.parse(b'.s={.a=1;};')
+        assert 5 not in doc['s']
+        assert 5 not in doc
+        assert 'a' in doc['s']
+
+    def test_empty_rows_keep_their_count(self):
+        # The streaming tier gives [[], []]; the split was skipped for an empty
+        # flat list and the DOM gave [].
+        src = b'.a=[]/[];.b=[];.c=[]/[]/[];'
+        assert DomDoc.parse(src).to_dict() == bovnar.loads(src)
+        assert bovnar.loads(src) == {'a': [[], []], 'b': [], 'c': [[], [], []]}

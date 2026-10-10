@@ -69,6 +69,7 @@
 <li>6.1 <a href="#61-communication-model">Communication model</a></li>
 <li>6.2 <a href="#62-success-response">Success response</a></li>
 <li>6.3 <a href="#63-error-response">Error response</a></li>
+<li>6.4 <a href="#64-arguments">Arguments</a></li>
 </ul>
 </li>
 <li><a href="#7-writing-a-compliant-iut-adapter">Writing a Compliant IUT Adapter</a><ul>
@@ -380,6 +381,57 @@ the events were received from the <code>on_verified</code> callback.</p>
 </ol>
 <p>Where <code>&lt;code_name&gt;</code> is the value returned by <code>bvn_error_to_string()</code> for
 the first error encountered, e.g. <code>value_out_of_range</code>.</p>
+<h3 id="64-arguments">6.4 Arguments</h3>
+<p>The Bovnar text arrives on stdin, but a case that overrides a reader limit
+passes the override on the adapter's <strong>command line</strong>. Each option is followed
+by one decimal value, and is present only when the case overrides that limit:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Limit (<code>bvnr_read_flags_t</code>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--max-id &lt;N&gt;</code></td>
+<td><code>max_identifier_length</code></td>
+</tr>
+<tr>
+<td><code>--max-str &lt;N&gt;</code></td>
+<td><code>max_string_length</code></td>
+</tr>
+<tr>
+<td><code>--max-num &lt;N&gt;</code></td>
+<td><code>max_number_length</code></td>
+</tr>
+<tr>
+<td><code>--max-sym &lt;N&gt;</code></td>
+<td><code>max_symbol_length</code></td>
+</tr>
+<tr>
+<td><code>--max-ref &lt;N&gt;</code></td>
+<td><code>max_reference_length</code></td>
+</tr>
+<tr>
+<td><code>--max-snest &lt;N&gt;</code></td>
+<td><code>max_struct_nesting</code></td>
+</tr>
+<tr>
+<td><code>--max-anest &lt;N&gt;</code></td>
+<td><code>max_array_nesting</code></td>
+</tr>
+<tr>
+<td><code>--max-aitems &lt;N&gt;</code></td>
+<td><code>max_array_items</code></td>
+</tr>
+</tbody>
+</table>
+<p>An adapter MUST apply every option it is given and MUST ignore an option it
+does not know. An adapter that reads stdin and ignores its arguments fails the
+eight cases that pin a limit (<code>ID-011</code>, <code>STR-015</code>, <code>NUM-015</code>, <code>SYM-006</code>,
+<code>REF-004</code>, <code>STU-007</code>, <code>ARR-012</code>, <code>ARR-013</code>). No other state is passed: every
+case runs with recovery off and with the default, lenient version handling.</p>
 <hr />
 <h2 id="7-writing-a-compliant-iut-adapter">7. Writing a Compliant IUT Adapter</h2>
 <p>The file <code>tests/bvnr_conformance_iut.c</code> is the reference IUT adapter.
@@ -388,6 +440,7 @@ as a template for third-party implementors.</p>
 <p>A minimal conforming adapter must:</p>
 <ol>
 <li><strong>Read all of stdin</strong> into a buffer.</li>
+<li><strong>Apply the limit options</strong> on its command line (§6.4).</li>
 <li><strong>Parse the buffer</strong> using the implementation under test.</li>
 <li><strong>Collect events</strong> from the <code>on_verified</code> callback.</li>
 <li><strong>Emit the event log</strong> to stdout on success.</li>
@@ -396,16 +449,17 @@ as a template for third-party implementors.</p>
 <h3 id="71-event-log-format-reference">7.1 Event log format reference</h3>
 <p>Each event maps to one line.  Text fields use <code>\xNN</code> escaping for any
 byte outside the printable ASCII range <code>0x20–0x7E</code> or for the backslash
-character <code>0x5C</code>.</p>
+character <code>0x5C</code>.  The two hex digits are <strong>lowercase</strong> (<code>\x09</code>, <code>\xc3</code>,
+<code>\x5c</code>) — the comparison is byte for byte, so <code>\xC3</code> does not match.</p>
 <div class="codehilite"><pre><span></span><code>STREAM_START
 ASSIGNMENT_START &lt;key&gt;
-TYPE_ANN_START &lt;family&gt;
-TYPE_FAMILY &lt;family&gt;
+TYPE_ANN_START &lt;ann&gt;
+TYPE_FAMILY &lt;ann&gt;
 TYPE_PARAM_WIDTH &lt;N&gt;
 TYPE_PARAM_BASE &lt;N&gt;
 TYPE_PARAM_Q &lt;N&gt;
 TYPE_PARAM_UNIT &lt;unit&gt;
-TYPE_ANN_END &lt;family&gt;
+TYPE_ANN_END &lt;ann&gt;
 DATA &lt;token_type&gt; &lt;value&gt;
 STRUCT_START
 STRUCT_END
@@ -474,7 +528,7 @@ OCTET_STREAM_END
 <tr>
 <td><code>DATA &lt;token_type&gt; &lt;value&gt;</code></td>
 <td>token_type: see below; value: safe-escaped</td>
-<td></td>
+<td>The single space after the token type is always written, also when the value is empty: a null is the line <code>DATA null</code> — with its trailing space — and an empty string is <code>DATA string</code></td>
 </tr>
 <tr>
 <td><code>STRUCT_START</code></td>
@@ -644,9 +698,12 @@ DATA array_number 2
 ARRAY_ROW_END
 </code></pre></div>
 
-<p>The element annotation is emitted <strong>once per row</strong>, not once per element: the
-array's element type is established at the first element and the rest inherit
-it.</p>
+<p>Inside an array a synthesised annotation is emitted only when the element's
+synthesised type differs from the type currently in force — at the first
+element, and again at each change. It is not repeated per element or per row
+(the second row of <code>[1, 2]/[3, 4]</code> carries no annotation lines at all, while
+<code>[1, 2.5, 3]</code> carries three blocks); an explicit element annotation is always
+emitted.</p>
 <p><strong>Input:</strong> <code>.x = &lt;uint:8&gt; 999;</code> (error — value out of range)</p>
 <div class="codehilite"><pre><span></span><code>ERROR value_out_of_range
 </code></pre></div>
@@ -666,7 +723,7 @@ specifies:</p>
 <tbody>
 <tr>
 <td><code>id</code></td>
-<td>Unique identifier, e.g. <code>TYP-019</code></td>
+<td>Unique identifier, e.g. <code>TYP-019</code> (<code>ENC-001</code>…<code>ENC-014</code> for the <code>encoding</code> group)</td>
 </tr>
 <tr>
 <td><code>group</code></td>
@@ -848,7 +905,7 @@ parent plan therefore counts the groups (currently 23), not the 470 cases.</p>
     ok 2 - [ENC-002] UTF-8 BOM at byte 0
     not ok 3 - [ENC-003] UTF-8 BOM after first comment
       ---
-      message: expected error invalid_byte_order_mark but parse succeeded
+      message: expected error unexpected_input_byte but parse succeeded
       ...
     1..14
 not ok 1 - encoding

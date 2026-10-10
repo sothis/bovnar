@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <ctype.h>
 #include <math.h>
 #include "bovnar.h"
 #include "bvn_internal_dims.h"
@@ -2282,6 +2283,12 @@ bool bvn_validate_reference(const char* link)
 				while (*p >= '0' && *p <= '9') p++;
 				if (*p != ']') return false;
 				p++;
+				/* After an index the path continues with a member, another
+				 * index, or ends. The reader refuses anything else
+				 * (`&.a[0]b` is error_unexpected_input_byte), and this
+				 * accepted it, so the writer could emit a reference its
+				 * own reader would not take. */
+				if (*p && *p != '.' && *p != '[') return false;
 				continue;
 			}
 			if (c <= 0x20 || c == 0x7f || c == 0xc2) return false;
@@ -2548,10 +2555,53 @@ bool bvn_parse_uint64(const char* s, value_type_spec_t vt, uint64_t* out)
  * bvn_format_double is the inverse, going double -> bvn_float -> text so the
  * rendered precision matches the declared width.
  */
+/* What a floating value token can look like, and nothing else. The rounding
+ * engine below returns no verdict -- text it cannot read comes back as zero --
+ * so without this every string was a number: "", "abc" and "1x" parsed as 0.0
+ * and reported success, where the integer helpers beside this one refuse. */
+static bool bvn_float_text_ok(const char* s, uint32_t base)
+{
+	if (strcmp(s, "inf") == 0 || strcmp(s, "ninf") == 0 ||
+	    strcmp(s, "nan") == 0)
+		return true;
+	/* Either sign. The reader takes a QUOTED float literal with a leading '+'
+	 * (bvn_validate_number_in_base does, in every base), so `<float:64> "+5"`
+	 * reaches the DOM builder through here and has to keep parsing as 5. */
+	if (*s == '-' || *s == '+') s++;
+	if (strcmp(s, "inf") == 0 || strcmp(s, "nan") == 0)
+		return true;
+	bool hex = (base == 16u);
+	if (hex && s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) s += 2;
+	size_t digits = 0;
+	for (; *s; s++) {
+		if (hex ? isxdigit((unsigned char)*s) : (*s >= '0' && *s <= '9'))
+			digits++;
+		else
+			break;
+	}
+	if (*s == '.') {
+		for (s++; *s; s++) {
+			if (hex ? isxdigit((unsigned char)*s)
+			        : (*s >= '0' && *s <= '9'))
+				digits++;
+			else
+				break;
+		}
+	}
+	if (digits == 0) return false;
+	if (hex ? (*s == 'p' || *s == 'P') : (*s == 'e' || *s == 'E')) {
+		s++;
+		if (*s == '+' || *s == '-') s++;
+		if (!(*s >= '0' && *s <= '9')) return false;
+		while (*s >= '0' && *s <= '9') s++;
+	}
+	return *s == '\0';
+}
 bool bvn_parse_double_in_base(const char* s, uint32_t base, double* out)
 {
 	if (!s || !out) return false;
 	if (base == 10u || base == 16u) {
+		if (!bvn_float_text_ok(s, base)) return false;
 		uint32_t b[2] = { 0u, 0u };
 		bvn_float_strtoieee_bin(s, base, 11u, 52u, 1023, b, 2);
 		uint64_t u = (uint64_t)b[0] | ((uint64_t)b[1] << 32);

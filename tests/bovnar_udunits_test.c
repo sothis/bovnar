@@ -535,6 +535,49 @@ static void test_round_trip(void)
 
 /* ── other refusals ─────────────────────────────────────────────────────── */
 
+/*
+ * Regular plurals, and the hectare's symbol.
+ *
+ * UDUNITS-2 takes the plural of every unit NAME unless the database says
+ * <noplural/>, forming it by rule; its XML lists only the irregular ones, and
+ * those were all this table had. "meters", "seconds" and "days" -- the way a CF
+ * file routinely writes a unit -- were error_unit_illegal. `ha` was too: UDUNITS
+ * reads it as hecto + `a` (the are), and the are was marked as taking no prefix.
+ */
+static void test_regular_plurals(void)
+{
+	printf("  regular plurals and ha...\n");
+	chk_str("udunits:meters",     "m");
+	chk_str("udunits:metres",     "m");
+	chk_str("udunits:seconds",    "s");
+	chk_str("udunits:days",       "d");
+	chk_str("udunits:hours",      "h");
+	chk_str("udunits:minutes",    "min");
+	chk_str("udunits:kelvins",    "K");
+	chk_str("udunits:pascals",    "Pa");
+	chk_str("udunits:inches",     "in");        /* ch -> es */
+	chk_str("udunits:henries",    "H");         /* consonant + y -> ies */
+	chk_str("udunits:days",       "d");         /* vowel + y -> s */
+	chk_str("udunits:luxes",      "lx");        /* x -> es */
+	chk_str("udunits:miles",      "mi");        /* the mile, not mil + es */
+	chk_str("udunits:kilometers", "k~m");       /* a prefix on a plural name */
+	chk_str("udunits:meters s-1", "m/s");
+	chk_factor("udunits:days", 86400.0);
+	/* A symbol has no plural, and neither does a name marked <noplural/>. */
+	chk_error("udunits:kgs",      error_unit_illegal);
+	chk_error("udunits:Pas",      error_unit_illegal);
+	chk_error("udunits:amus",     error_unit_illegal);
+	/* A plural of a name bovnar refuses is refused the same way. */
+	chk_error("udunits:months",   error_unit_profile_unsupported);
+	/* Written back under the singular. */
+	chk_to_profile("udunits", "m", "m");
+
+	chk_str("udunits:ha",  "ha");
+	chk_factor("udunits:ha", 10000.0);
+	chk_factor("udunits:a",  100.0);
+	chk_str("udunits:hectare", "ha");
+}
+
 static void test_refusals(void)
 {
 	printf("  the rest of the refusals...\n");
@@ -578,6 +621,7 @@ int main(void)
 	test_cross_vocabulary();
 	test_to_udunits();
 	test_round_trip();
+	test_regular_plurals();
 	test_refusals();
 
 	printf("\n%d tests, %d failures\n", tests, failures);

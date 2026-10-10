@@ -252,3 +252,86 @@ def test_unit_and_valueunit_hash_alike_across_the_catalogue():
         assert u == vu and vu == u
         assert hash(u) == hash(vu), spelling
         assert {u: 1}[vu] == 1
+
+
+class TestAffineIsNotAFactor:
+    """°C -> K has no multiplicative factor. The module-level function says so
+    in `requires_affine`; these two shortcuts returned the bare number and so
+    handed back 0.0 and 1.0 as if they were answers."""
+
+    def test_convert_factor_raises_for_an_affine_pair(self):
+        with pytest.raises(BovnarArgumentError, match="convert_value"):
+            Unit.parse("°C").convert_factor("K")
+
+    def test_factor_raises_for_an_affine_unit(self):
+        with pytest.raises(BovnarArgumentError, match="unit_to_si_factor"):
+            Unit.parse("°C").factor
+
+    def test_multiplicative_ones_still_answer(self):
+        assert Unit.parse("k~m").convert_factor("m") == 1000.0
+        assert Unit.parse("in").factor == 0.0254
+        assert Unit.parse("K").factor == 1.0
+
+
+class TestHashFollowsEquality:
+    def test_prefix_system_is_not_identity_without_a_prefix(self):
+        """`B` from the parser is SI-system/no-prefix, `make_unit_iec(BYTE)` is
+        IEC-system/no-prefix; bvn_unit_equal calls them equal and the hash
+        keyed on the system, so one unit was two dict keys."""
+        from bovnar import make_unit_iec, parse_unit, BaseUnit
+        a, b = parse_unit("B"), make_unit_iec(BaseUnit.BYTE)
+        assert a == b
+        assert hash(a) == hash(b)
+        assert len({Unit(a), Unit(b)}) == 1
+        assert {Unit(a): 1}[Unit(b)] == 1
+        assert a.components[0].prefix == b.components[0].prefix
+        assert hash(a.components[0]) == hash(b.components[0])
+
+    def test_a_real_iec_prefix_still_differs(self):
+        from bovnar import parse_unit
+        assert parse_unit("Ki~B") != parse_unit("k~B")
+        assert hash(parse_unit("Ki~B")) != hash(parse_unit("k~B"))
+
+
+class TestUnitIsAcceptedWhereAValueUnitIs:
+    """Quantity.unit became a Unit in 2.0 and nothing that takes a unit took
+    one: unit_to_str(q.unit) was a ctypes.ArgumentError."""
+
+    def test_module_level_functions(self):
+        q = _q(b".x = <float:64,k~m> 5.0;")
+        m = Unit.parse("m")
+        assert bovnar.unit_to_str(q.unit) == "k~m"
+        assert bovnar.unit_to_str_ex(q.unit) == "k~m"
+        assert bovnar.unit_valid(q.unit)
+        assert bovnar.units_compatible(q.unit, m)
+        assert bovnar.units_convertible(q.unit, m)
+        assert not bovnar.units_equal(q.unit, m)
+        assert bovnar.convert_value(1.0, q.unit, m) == 1000.0
+        assert bovnar.unit_convert_factor(q.unit, m).factor == 1000.0
+        assert bovnar.unit_to_si_factor(q.unit).factor == 1000.0
+        assert bovnar.unit_prefix_factor(q.unit) == 1000.0
+        assert bovnar.unit_prefix_exponent(q.unit) == 3
+        assert bovnar.unit_dimension_vector(q.unit)[0] == 1
+        assert bovnar.unit_reduce(q.unit).scale == 1000.0
+        assert bovnar.unit_to_str(bovnar.unit_si_normal_form(q.unit)) == "m"
+        assert bovnar.unit_to_profile("ucum", q.unit) == "km"
+        assert bovnar.unit_to_ucum(q.unit) == "km"
+        assert not bovnar.unit_is_profile_only(q.unit)
+
+    def test_want_unit_may_return_one(self):
+        out = []
+        bovnar.Reader().read_mem(
+            b".x = <uint:8,k~m> 5;",
+            on_verified=lambda ev, d: out.append(d.converted_str())
+            if ev == bovnar.Event.DATA else None,
+            want_unit=lambda d: Unit.parse("m"))
+        assert out == ["5000"]
+
+
+def test_repr_of_a_profile_only_unit_does_not_raise():
+    """BaseUnit has no member for a profile's opaque atoms, and __repr__ went
+    through BaseUnit(...): printing such a unit was a ValueError."""
+    vu = bovnar.parse_unit("ucum:[IU]/mL")
+    assert "200000" in repr(vu)
+    assert "LITER" in repr(vu)
+    assert "200000" in repr(vu.active_components()[0])

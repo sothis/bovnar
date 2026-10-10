@@ -252,6 +252,43 @@ def exact_rational(u, key):
     return Fraction(Decimal(c_double_literal(u[key])))
 
 
+def pi_form(u):
+    """The three trailing columns of a conversion row: the factor of a π-defined
+    unit as (pi_num / pi_den) · π^pi_power, or NULL, NULL, 0.
+
+    A unit whose factor is irrational carries .exact = false, and that is all a
+    conversion to SI needs to know. A conversion between TWO such units needs
+    more: 1 rev is 360° exactly, because the π on each side cancels, and only the
+    rational parts can show that. So a π-based unit states them, and
+    bvn_unit_convert_rational is exact wherever the powers agree.
+
+    Checked against .factor here, because the two are written by hand side by
+    side and a row whose rational part disagreed with its own double would make
+    the exact path and the approximate one answer differently."""
+    import math
+    from fractions import Fraction
+    has = [k in u for k in ("pi_num", "pi_den", "pi_power")]
+    if not any(has):
+        return "NULL, NULL, 0"
+    if not all(has):
+        raise SystemExit("unit %r: .pi_num, .pi_den and .pi_power go together"
+                         % u["name"])
+    if bool(u.get("exact", True)) or u["affine"]:
+        raise SystemExit("unit %r: a π form belongs to a non-affine unit with "
+                         ".exact = false" % u["name"])
+    fr = Fraction(int(u["pi_num"]), int(u["pi_den"]))
+    power = int(u["pi_power"])
+    if fr <= 0 or power == 0:
+        raise SystemExit("unit %r: a π form needs a positive rational and a "
+                         "non-zero power" % u["name"])
+    want = float(c_double_literal(u["factor"]))
+    got = float(fr) * math.pi ** power
+    if abs(got - want) > 4e-16 * abs(want):
+        raise SystemExit("unit %r: (%s)·π^%d = %r but .factor says %r"
+                         % (u["name"], fr, power, got, want))
+    return '"%d", "%d", %d' % (fr.numerator, fr.denominator, power)
+
+
 def gen_conv_table(units):
     check_exactness(units)
     out = [BANNER]
@@ -263,7 +300,7 @@ def gen_conv_table(units):
         exact = bool(u.get("exact", True))
         out.append(
             "\t[BVN_SLOT_NATIVE(%-14s] = { %-14s %-22s {%s}, %-6s %-14s "
-            "\"%d\", \"%d\", \"%d\", \"%d\", %s },\n" % (
+            "\"%d\", \"%d\", \"%d\", \"%d\", %s, %s },\n" % (
                 nm + ")", nm + ",",
                 c_double_literal(u["factor"]) + ",",
                 dims,
@@ -271,6 +308,7 @@ def gen_conv_table(units):
                 c_double_literal(u["offset"]) + ",",
                 fr.numerator, fr.denominator, of.numerator, of.denominator,
                 ("true" if exact else "false"),
+                pi_form(u),
             ))
     return "".join(out)
 

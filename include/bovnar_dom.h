@@ -56,7 +56,13 @@ BVN_API bvn_dom_doc_t *bvn_dom_doc_create(void);
  * leak its lower levels rather than crash if an internal work-stack allocation
  * fails under memory pressure — correctness is never traded for a crash.) */
 BVN_API void           bvn_dom_doc_destroy(bvn_dom_doc_t *doc);
-/* Parse an in-memory document. Returns NULL ONLY on allocation failure. A
+/* Every bvn_dom_parse* function reads at the format's hard nesting limit -- 255
+ * levels of struct and 255 of array -- not at the reader's default of 64, so a
+ * document nested 65..255 deep parses here and is refused by a bvnr_reader_t
+ * opened with zeroed flags; set max_struct_nesting / max_array_nesting to 255
+ * there to make the two agree.
+ *
+ * Parse an in-memory document. Returns NULL ONLY on allocation failure. A
  * malformed document still returns a non-NULL doc whose error is retrieved with
  * bvn_dom_doc_get_parse_error() (error_none means it parsed cleanly) — so check
  * that, not the pointer, to detect a parse error. Free with bvn_dom_doc_destroy. */

@@ -231,7 +231,7 @@ jobs:
       # web/docs pages are generated with this version; bump the pin and
       # regenerate them in the same commit.
       - name: Install Python test dependencies
-        run: python3 -m pip install --quiet pytest numpy markdown 'pygments==2.19.2'
+        run: python3 -m pip install --quiet pytest numpy 'markdown==3.10.2' 'pygments==2.19.2'
 
       # -DPython3_EXECUTABLE pins the resolution to the interpreter just
       # provisioned instead of leaving FindPython3 to choose among the several on
@@ -394,7 +394,11 @@ jobs:
         os:
           - ubuntu-latest      # manylinux x86_64
           - ubuntu-24.04-arm   # manylinux aarch64 (native runner)
-          - macos-14           # arm64 native + x86_64 cross-compiled
+          # macos-15, not -14: GitHub retires the macOS 14 images on
+          # 2026-11-02 and fails jobs on them in announced brownout windows
+          # through October (actions/runner-images#13518). cibuildwheel sets
+          # the deployment target itself, so the wheel tags do not move.
+          - macos-15           # arm64 native + x86_64 cross-compiled
     steps:
       - uses: actions/checkout@v5
 
@@ -477,7 +481,24 @@ jobs:
     # `tests` is in here alongside the four packaging jobs on purpose: a release
     # asset is permanent and public, so it must not be able to ship from a tag
     # whose C/Python/conformance suite went red.
-    needs: [msvc, mingw, linux, source, tests]
+    #
+    # The wheel and sdist jobs are here for the same reason from the other side.
+    # `publish` waits for them, but this job used not to: a wheel leg that
+    # failed on the tag -- only those legs run the suite on aarch64 and macOS --
+    # left an immutable GitHub release published with nothing on PyPI behind it.
+    # They are skipped on a release-* push, which must not skip the rehearsal,
+    # hence the explicit `if:`: every need succeeded, or was one of the two
+    # that may be skipped.
+    needs: [msvc, mingw, linux, source, tests, build_wheels, build_sdist]
+    if: >-
+      !cancelled() &&
+      needs.msvc.result == 'success' &&
+      needs.mingw.result == 'success' &&
+      needs.linux.result == 'success' &&
+      needs.source.result == 'success' &&
+      needs.tests.result == 'success' &&
+      (needs.build_wheels.result == 'success' || needs.build_wheels.result == 'skipped') &&
+      (needs.build_sdist.result == 'success' || needs.build_sdist.result == 'skipped')
     runs-on: ubuntu-latest
     # The JOB runs on every push; only its last step is gated on a tag. This job
     # is irreversible the one time it matters, and gated as a whole it had never

@@ -54,6 +54,13 @@
 #   .prefix   prefix policy: default | info | german | ratio | none
 #   .aliases  every accepted INPUT spelling, real UTF-8 (matched exactly);
 #             include the canonical symbol when it is itself parseable
+#   .pi_num / .pi_den / .pi_power
+#             OPTIONAL, and only beside .exact = false: the factor of a unit
+#             defined through π, as (pi_num / pi_den) · π^pi_power with the
+#             rational part exact. The unit stays inexact against SI; what this
+#             buys is a lossless conversion to another π-based unit wherever
+#             the powers cancel (1 rev = 360°, 1 Lmb = 10000 asb). gen_units.py
+#             checks the three against .factor.
 #
 # COMPACT PREFIX FORM
 #   A prefixed unit may be written with the '~' separator ("k~g") or compactly,
@@ -431,6 +438,9 @@
     .offset  = 0.0;
     .prefix  = default;
     .exact   = false;        # π-based: 1° = π/180 rad is irrational
+    .pi_num  = 1;
+    .pi_den  = 180;
+    .pi_power = 1;
     .aliases = ["degrees", "degree", "degr", "deg", "°"];
   },
   {
@@ -650,6 +660,9 @@
     .affine  = false;
     .offset  = 0.0;
     .exact   = false;       # π-based: 1 pc = 648000/π au is irrational
+    .pi_num  = 96939420213600000;
+    .pi_den  = 1;
+    .pi_power = -1;
     .prefix  = default;
     .aliases = ["parsecs", "parsec", "pc"];
   },
@@ -1069,6 +1082,9 @@
     .offset  = 0.0;
     .prefix  = default;
     .exact   = false;        # π-based (1/60 degree): irrational in SI radian
+    .pi_num  = 1;
+    .pi_den  = 10800;
+    .pi_power = 1;
     .aliases = ["arcminutes", "arcminute", "arcmin"];
   },
   {
@@ -1081,6 +1097,9 @@
     .offset  = 0.0;
     .prefix  = default;
     .exact   = false;        # π-based (1/3600 degree): irrational in SI radian
+    .pi_num  = 1;
+    .pi_den  = 648000;
+    .pi_power = 1;
     .aliases = ["arcseconds", "arcsecond", "arcsec"];
   },
   {
@@ -1093,6 +1112,9 @@
     .offset  = 0.0;
     .prefix  = default;
     .exact   = false;        # π-based: 1 grad = π/200 rad is irrational
+    .pi_num  = 1;
+    .pi_den  = 200;
+    .pi_power = 1;
     .aliases = ["gradians", "gradian", "grad", "gon"];
   },
   {
@@ -1148,6 +1170,9 @@
     .affine  = false;
     .offset  = 0.0;
     .exact   = false;       # π-based: 1 Oe = 1000/(4π) A/m is irrational
+    .pi_num  = 250;
+    .pi_den  = 1;
+    .pi_power = -1;
     .prefix  = default;
     .aliases = ["oersteds", "oersted", "Oe"];
   },
@@ -1495,6 +1520,9 @@
     .offset  = 0.0;
     .prefix  = default;
     .exact   = false;        # π-based: 1 rev = 2π rad is irrational
+    .pi_num  = 2;
+    .pi_den  = 1;
+    .pi_power = 1;
     .aliases = ["revolutions", "revolution", "turns", "turn", "rev"];
   },
   {
@@ -3277,6 +3305,9 @@
     .affine  = false;
     .offset  = 0.0;
     .exact   = false;
+    .pi_num  = 10000;
+    .pi_den  = 1;
+    .pi_power = -1;
     .prefix  = default;
     .aliases = ["lambert", "Lmb"];
   },
@@ -3289,6 +3320,9 @@
     .affine  = false;
     .offset  = 0.0;
     .exact   = false;
+    .pi_num  = 1;
+    .pi_den  = 1;
+    .pi_power = -1;
     .prefix  = default;
     .aliases = ["blondel", "apostilb"];
   },
@@ -3301,6 +3335,9 @@
     .affine  = false;
     .offset  = 0.0;
     .exact   = false;
+    .pi_num  = 1562500;
+    .pi_den  = 145161;
+    .pi_power = -1;
     .prefix  = default;
     .aliases = ["foot_lambert", "footlambert"];
   },
@@ -3423,6 +3460,9 @@
     .affine  = false;
     .offset  = 0.0;
     .exact   = false;
+    .pi_num  = 4;
+    .pi_den  = 1;
+    .pi_power = 1;
     .prefix  = default;
     .aliases = ["spere", "spat", "sph"];
   },
@@ -3435,6 +3475,9 @@
     .affine  = false;
     .offset  = 0.0;
     .exact   = false;
+    .pi_num  = 16129;
+    .pi_den  = 100000000000000;
+    .pi_power = 1;
     .prefix  = default;
     .aliases = ["circular_mil", "cml"];
   },
@@ -3447,6 +3490,9 @@
     .affine  = false;
     .offset  = 0.0;
     .exact   = false;
+    .pi_num  = 1;
+    .pi_den  = 25000000;
+    .pi_power = 1;
     .prefix  = default;
     .aliases = ["unitpole", "unit_pole"];
   },

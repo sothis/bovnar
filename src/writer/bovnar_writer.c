@@ -890,6 +890,35 @@ static bool bvn_writer_check_inline_unit(bvnr_writer_t* w, const bvnr_data_t* d)
 	return bvn_writer_check_unit_text(w, d->unit_source,
 			d->unit_source_length, d->value_unit, true);
 }
+static bool bvn_w_family_takes_unit(value_type_family_t f)
+{
+	return f == vt_sint || f == vt_uint || f == vt_float ||
+	       f == vt_float_fix || f == vt_float_dec;
+}
+/* A value (scalar, struct, octet stream) starts at a direct element position
+ * of the innermost open row: count it. */
+static void bvn_w_element_begins(bvnr_writer_t* w)
+{
+	const bvnr_serializer_t* s = &w->ser;
+	if (s->array_depth > 0u &&
+	    bvn_ser_is_direct_array_element(s, s->array_depth - 1u))
+		w->arr_count[s->array_depth - 1u]++;
+}
+/* ...and it is complete: the next sibling is governed by the row's annotation
+ * again (bvn_ser_mark_value_done does the same to emitted_unit). `struct_depth`
+ * is the depth once the event has been applied. */
+static void bvn_w_element_done(bvnr_writer_t* w, uint32_t struct_depth)
+{
+	const bvnr_serializer_t* s = &w->ser;
+	if (s->array_depth > 0u && s->array_depth <= s->max_array_nesting &&
+	    struct_depth == s->struct_depth_at_array_start[s->array_depth - 1u]) {
+		w->gov_unit  = w->arr_gov_unit[s->array_depth - 1u];
+		w->gov_typed = w->arr_gov_typed[s->array_depth - 1u];
+	} else if (s->array_depth == 0u) {
+		w->gov_unit  = BVN_UNIT_NONE;
+		w->gov_typed = false;
+	}
+}
 static bool bvn_writer_validate_event(bvnr_writer_t* w,
 	bvnr_event_t ev, bvnr_data_t* data)
 {
@@ -945,7 +974,11 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 			     !s->in_octet_stream;
 			break;
 		case ev_array_row_end:
-			ok = !s->w_in_annotation && s->array_depth > 0;
+			/* The row can only close where one of its elements could stand:
+			 * with a struct opened inside it still open this wrote "[{]". */
+			ok = !s->w_in_annotation && !s->in_octet_stream &&
+			     s->array_depth > 0 &&
+			     bvn_ser_is_direct_array_element(s, s->array_depth - 1u);
 			break;
 		case ev_array_dim_start:
 			/* The row separator sits BETWEEN two closed rows — [1,2]/[3,4] — so
@@ -960,6 +993,10 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 			/* A struct may legitimately close inside an array element. */
 			ok = !s->w_in_annotation && !s->w_awaiting_value &&
 			     s->struct_depth > 0 && !s->in_octet_stream;
+			/* ...but not across an array opened inside that struct. */
+			if (ok && s->array_depth > 0 &&
+			    bvn_ser_is_direct_array_element(s, s->array_depth - 1u))
+				ok = false;
 			break;
 		case ev_stream_end:
 			ok = !s->w_in_annotation && !s->w_awaiting_value &&
@@ -973,6 +1010,13 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		/* Once the stream has been closed nothing more may be written; the
 		 * serializer would happily append past the end. */
 		if (s->w_stream_ended)
+			ok = false;
+		/* A closed annotation is waiting for the value it types, and only a
+		 * value may follow it: "[<uint:8>]" with no element behind it, or
+		 * "[1]<uint:8>/[2]", is an annotation left dangling. */
+		if (s->had_type_annotation && !s->w_in_annotation &&
+		    ev != ev_data && ev != ev_struct_start &&
+		    ev != ev_array_row_start && ev != ev_octet_stream_start)
 			ok = false;
 		/* A "/" promises another ROW, not a scalar: "[[]/null]" is not a thing. */
 		if (s->w_after_dim && ev != ev_array_row_start)
@@ -995,7 +1039,14 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		return true;
 	case ev_assignment_start:
 		w->ser.stream_begun = true;
-		w->ann_pending = false;
+		w->gov_unit  = BVN_UNIT_NONE;
+		w->gov_typed = false;
+		/* A member of a struct that stands under a type annotation is what
+		 * the reader refuses (error_type_value_mismatch). */
+		if (w->ser.struct_depth > 0u &&
+		    w->ser.struct_depth <= UINT8_MAX + 1u &&
+		    w->struct_typed[w->ser.struct_depth - 1u])
+			return bvn_writer_set_error(w, error_type_value_mismatch);
 		if (!bvn_validate_id_for_writer(w, data->data, data->length))
 			return false;
 		/* A spelling set by bvnr_writer_set_unit_source is for the NEXT value.
@@ -1023,7 +1074,9 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		w->val.value_type  = data->value_type;
 		w->val.parsed_unit = data->value_unit;
 		w->ann_unit        = data->value_unit;
-		w->ann_pending     = false;
+		w->ann_family      = data->value_type.family;
+		w->gov_unit        = BVN_UNIT_NONE;
+		w->gov_typed       = false;
 		/*
 		 * A unit with no native spelling — one carrying a UCUM arbitrary atom —
 		 * can only be written in the spec-1.2 profile notation, which the reader
@@ -1049,20 +1102,51 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 			 * this one, or both. A caller who sets it only at the start --
 			 * the parameter events need nothing but their `type` -- is
 			 * checked against that. */
-			if (BVN_UNIT_IS_REAL(data->value_unit) &&
-			    BVN_UNIT_IS_UNITLESS(w->ann_unit))
-				w->ann_unit = data->value_unit;
+			/* One unit (or epoch) per annotation: a second one wrote
+			 * "<float:64,m,k~g>", which nothing reads. */
+			if (w->ser.emitted_unit)
+				return bvn_writer_set_error(w, error_illegal_value_type);
+			if (BVN_UNIT_IS_REAL(data->value_unit)) {
+				if (BVN_UNIT_IS_UNITLESS(w->ann_unit))
+					w->ann_unit = data->value_unit;
+				else if (!bvn_unit_equal(data->value_unit, w->ann_unit))
+					/* The start event said one unit and this says
+					 * another; the value is then held to the first
+					 * while the second is what gets written. */
+					return bvn_writer_set_error(w, error_unit_mismatch);
+			}
+			/* Only a numeric family takes a unit (a datetime's parameter
+			 * is its epoch and is handled by the check below). */
+			if (BVN_UNIT_IS_REAL(w->ann_unit) &&
+			    !bvn_w_family_takes_unit(w->ann_family))
+				return bvn_writer_set_error(w, error_illegal_value_type);
+			/* The start event is not the only place the unit can first
+			 * appear, so the spec-1.2 gate is repeated where it does. */
+			if (bvni_unit_has_opaque(w->ann_unit) &&
+			    !bvn_w_declares_1_2(&w->ser))
+				return bvn_writer_set_error(w,
+					error_unsupported_spec_version);
 			if (!bvn_writer_check_unit_param(w, data))
 				return false;
 		}
 		/* fallthrough */
 	case ev_type_annotation_type_family:
+		if (ev == ev_type_annotation_type_family)
+			w->ann_family = data->value_type.family;
 		w->val.value_type  = data->value_type;
 		w->val.parsed_unit = data->value_unit;
 		break;
 	case ev_type_annotation_end:
 		w->ser.w_in_annotation = false;
-		w->ann_pending         = true;
+		/* A unit named on the start event that no parameter wrote is written
+		 * by bvnr_write_event before the ">" -- for a numeric family. Any
+		 * other family has no unit parameter (`<utf8> "x" m` carries its unit
+		 * inline, and the Python binding puts `m` on that start event), so
+		 * there the annotation governs no unit at all. */
+		w->gov_unit = (w->ser.emitted_unit ||
+		               bvn_w_family_takes_unit(w->ann_family))
+		              ? w->ann_unit : BVN_UNIT_NONE;
+		w->gov_typed           = true;
 		break;
 	case ev_data: {
 		w->ser.stream_begun = true;
@@ -1076,16 +1160,16 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 			return false;
 		bool carries = tt == token_is_number || tt == token_is_array_number ||
 		               tt == token_is_string || tt == token_is_array_string;
-		bool own_ann = w->ann_pending;
-		w->ann_pending = false;
-		/* A value directly under an annotation that names a unit is written
-		 * with THAT unit -- the serialiser never looks at the value's. So the
-		 * two must agree, or five metres go out as five kilograms. */
-		if (carries && own_ann && BVN_UNIT_IS_REAL(w->ann_unit)) {
-			if (BVN_UNIT_IS_REAL(data->value_unit) &&
-			    !bvn_unit_equal(data->value_unit, w->ann_unit))
-				return bvn_writer_set_error(w, error_unit_mismatch);
-		}
+		/* Where the governing annotation wrote a unit parameter (a unit,
+		 * `no_unit` or an epoch) the serialiser never looks at the value's
+		 * unit. So the two must agree -- under its own annotation, as an
+		 * element of an annotated array, or under `no_unit` -- or five metres
+		 * go out as five kilograms. */
+		if (carries && w->ser.emitted_unit &&
+		    BVN_UNIT_IS_REAL(data->value_unit) &&
+		    (BVN_UNIT_IS_UNITLESS(w->gov_unit) ||
+		     !bvn_unit_equal(data->value_unit, w->gov_unit)))
+			return bvn_writer_set_error(w, error_unit_mismatch);
 		/* A unit the annotation did not carry is written as an inline suffix.
 		 * That exists for a scalar only: inside "[...]" the reader takes no
 		 * inline unit at all, so one there is a document nobody can read. */
@@ -1095,6 +1179,12 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 			    bvn_ser_is_direct_array_element(&w->ser,
 					w->ser.array_depth - 1u))
 				return bvn_writer_set_error(w, error_unit_illegal);
+			/* The inline slot is the other place a profile-only unit can
+			 * reach the document; the annotation's gate does not see it. */
+			if (bvni_unit_has_opaque(data->value_unit) &&
+			    !bvn_w_declares_1_2(&w->ser))
+				return bvn_writer_set_error(w,
+					error_unsupported_spec_version);
 			if (!bvn_writer_check_inline_unit(w, data))
 				return false;
 		}
@@ -1170,6 +1260,22 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 						return bvn_writer_set_error(w,
 							error_base_requires_string_literal);
 					}
+					/* ...and those bytes have to form a number TOKEN. 'e' is a
+					 * digit above base 14, so "3e" and "310EE" passed the
+					 * loop above and went out bare. */
+					char  nbuf[64];
+					char *nb = nbuf;
+					if (data->length >= sizeof nbuf)
+						nb = malloc((size_t)data->length + 1u);
+					if (!nb)
+						return bvn_writer_set_error(w, error_number_too_long);
+					memcpy(nb, data->data, data->length);
+					nb[data->length] = '\0';
+					bool lexes = bvn_validate_number(nb);
+					if (nb != nbuf) free(nb);
+					if (!lexes)
+						return bvn_writer_set_error(w,
+							error_base_requires_string_literal);
 				}
 			}
 			if (!bvn_validate_number_for_writer(w,
@@ -1217,6 +1323,10 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 				return bvn_writer_set_error(w,
 					error_invalid_argument);
 		}
+		if (tt != token_is_octet_stream) {
+			bvn_w_element_begins(w);
+			bvn_w_element_done(w, w->ser.struct_depth);
+		}
 		break;
 	}
 	case ev_struct_end:
@@ -1225,37 +1335,76 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 			return bvn_writer_set_error(w, error_illegal_struct_close);
 		if (w->val.policy.num_rules)
 			bvn_path_pop(&w->val.path);
+		bvn_w_element_done(w, w->ser.struct_depth - 1u);
 		break;
 	case ev_octet_stream_end:
 		w->ser.stream_begun     = true;
 		w->ser.w_awaiting_value = false;   /* the stream WAS the value */
+		bvn_w_element_done(w, w->ser.struct_depth);
+		break;
+	case ev_octet_stream_start:
+		w->ser.stream_begun = true;
+		bvn_w_element_begins(w);
 		break;
 	case ev_struct_start:
-		w->ann_pending = false;
 		w->ser.stream_begun = true;
 		if (w->ser.struct_depth >= (uint32_t)w->ser.max_struct_nesting)
 			return bvn_writer_set_error(w, error_struct_nesting_too_high);
+		bvn_w_element_begins(w);
+		w->struct_typed[w->ser.struct_depth] = w->gov_typed;
+		w->gov_unit  = BVN_UNIT_NONE;
+		w->gov_typed = false;
 		if (w->val.policy.num_rules)
 			bvn_path_push(&w->val.path);
 		w->ser.w_awaiting_value = false;   /* the struct IS the value */
 		break;
-	case ev_array_row_start:
-		w->ann_pending = false;
+	case ev_array_row_start: {
 		w->ser.stream_begun = true;
 		if (w->ser.array_depth >= w->ser.max_array_nesting)
 			return bvn_writer_set_error(w, error_array_nesting_too_high);
+		/* A row's width as the READER measures it (bvn_action_array_intro /
+		 * _outro): one per element position, and one more per nested row,
+		 * a "/"-continued one included. The two sides have to count alike or
+		 * this refuses what the reader takes. */
+		uint32_t d = w->ser.array_depth;
+		if (d > 0u && bvn_ser_is_direct_array_element(&w->ser, d - 1u))
+			w->arr_count[d - 1u] += w->ser.w_after_dim ? 1u : 2u;
+		w->arr_gov_unit[d]  = w->gov_unit;
+		w->arr_gov_typed[d] = w->gov_typed;
+		w->arr_count[d]     = 0;
+		if (!w->ser.w_after_dim)
+			w->arr_dim_set[d] = false;
 		w->ser.w_awaiting_value = false;   /* the array IS the value */
 		w->ser.w_after_row_end  = false;
 		w->ser.w_after_dim      = false;
 		break;
-	case ev_array_row_end:
+	}
+	case ev_array_row_end: {
+		uint32_t d = w->ser.array_depth - 1u;   /* > 0: the gate checked */
+		/* Rows joined by "/" have one width, and the first to close sets it. */
+		if (w->arr_dim_set[d] && w->arr_dim_count[d] != w->arr_count[d])
+			return bvn_writer_set_error(w, error_array_row_size_mismatch);
+		w->arr_dim_set[d]   = true;
+		w->arr_dim_count[d] = w->arr_count[d];
 		w->ser.stream_begun    = true;
 		w->ser.w_after_row_end = true;
+		/* What the serialiser does to emitted_unit, done to the unit. */
+		w->gov_unit  = w->arr_gov_unit[d];
+		w->gov_typed = w->arr_gov_typed[d];
+		if (d > 0u && bvn_ser_is_direct_array_element(&w->ser, d - 1u)) {
+			w->gov_unit  = w->arr_gov_unit[d - 1u];
+			w->gov_typed = w->arr_gov_typed[d - 1u];
+		}
 		break;
+	}
 	case ev_array_dim_start:
 		w->ser.stream_begun    = true;
 		w->ser.w_after_row_end = false;
 		w->ser.w_after_dim     = true;
+		if (w->ser.array_depth < w->ser.max_array_nesting) {
+			w->gov_unit  = w->arr_gov_unit[w->ser.array_depth];
+			w->gov_typed = w->arr_gov_typed[w->ser.array_depth];
+		}
 		break;
 	default:
 		w->ser.stream_begun = true;
@@ -1449,6 +1598,11 @@ static bool bvn_ser_append_inline_unit(bvnr_serializer_t *s,
 		s->ser_error = error_unit_illegal;
 		return false;
 	}
+	/* BVN_UNIT_REDUCE cancelled the unit altogether (m/m, eV/eV). "No unit"
+	 * as a suffix is "4 no_unit", which the next pass rewrites to "4": not a
+	 * fixed point. Dimensionless is written as nothing. */
+	if (un == 7 && memcmp(ubuf, "no_unit", 7) == 0)
+		return true;
 	if (!bvn_ser_push_byte(s, ' ')) return false;
 	return bvn_ser_push(s, ubuf, (uint32_t)un);
 }
@@ -2027,7 +2181,17 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 				if (rr < 0)
 					return false;
 				if (rr > 0) {
-					bool okp = bvn_ser_push(s, rtext, (uint32_t)rlen);
+					/* The rescaled digits are new text, and above base ten
+					 * they can be letters where the original had none:
+					 * "<uint:64,_16,k~m> 3" is bb8 metres, and "bb8" bare is
+					 * not a number token. Quote it, as §4.6 requires. */
+					bool bare = bvn_effective_base(d->value_type) <= 10u ||
+						    bvn_is_special_number_string(rtext) ||
+						    bvn_validate_number(rtext);
+					bool okp = bare
+						? bvn_ser_push(s, rtext, (uint32_t)rlen)
+						: bvn_ser_serialize_string(s,
+							(const uint8_t*)rtext, (uint32_t)rlen);
 					/* Hand it to bvnr_write_event rather than dropping it:
 					 * an observer told the pre-rescale digits is out of
 					 * sync with the bytes it is meant to mirror. */
@@ -2214,12 +2378,47 @@ bool bvnr_write_event(
 		return false;
 	if (w->ser.finished)
 		return bvn_writer_set_error(w, error_invalid_argument);
+	/* The unit in force for a value, before validation moves it on. */
+	const bool         governed = w->ser.emitted_unit;
+	const value_unit_t gov      = w->gov_unit;
 	if (!bvn_writer_validate_event(w, ev, data))
 		return false;
 	w->ser.ser_error = error_none;
 	free(w->ser.ser_value_text);
 	w->ser.ser_value_text = NULL;
 	w->ser.ser_value_len  = 0;
+	bvnr_data_t local;
+	if (ev == ev_type_annotation_end && BVN_UNIT_IS_REAL(w->ann_unit) &&
+	    !w->ser.emitted_unit && bvn_w_family_takes_unit(w->ann_family)) {
+		/* The unit was named on the start event and no parameter event wrote
+		 * it (none came, or it carried neither text nor unit). The contract
+		 * allows that, and without this the annotation went out bare and the
+		 * unit with it. */
+		local = *data;
+		local.type               = token_is_unit;
+		local.value_unit         = w->ann_unit;
+		local.data               = NULL;
+		local.length             = 0;
+		local.unit_source        = NULL;
+		local.unit_source_length = 0;
+		if (!bvn_ser_serialize_event(&w->ser,
+				ev_type_annotation_type_family_parameter, &local))
+			return bvn_writer_set_error(w,
+				w->ser.ser_error != error_none ? w->ser.ser_error
+				: bvn_sink_impl(&w->ser.sink)->is_mem
+					? error_sink_buffer_exhausted
+					: error_writing_to_sink);
+	}
+	if (ev == ev_data && governed && BVN_UNIT_IS_REAL(gov) &&
+	    BVN_UNIT_IS_UNITLESS(data->value_unit) &&
+	    (data->type == token_is_number || data->type == token_is_array_number ||
+	     data->type == token_is_string || data->type == token_is_array_string)) {
+		/* "That unit or none": a value that leaves it to the annotation still
+		 * HAS the annotation's unit, and BVN_UNIT_REDUCE has to rescale it. */
+		local = *data;
+		local.value_unit = gov;
+		data = &local;
+	}
 	if (!bvn_ser_serialize_event(&w->ser, ev, data)) {
 		if (w->ser.ser_error != error_none)
 			return bvn_writer_set_error(w, w->ser.ser_error);
@@ -2313,7 +2512,7 @@ bool bvnr_write_finish(bvnr_writer_t* w)
 	 * the same thing. */
 	if (w->ser.struct_depth > 0 || w->ser.array_depth > 0 ||
 	    w->ser.w_awaiting_value || w->ser.w_in_annotation ||
-	    w->ser.in_octet_stream)
+	    w->ser.in_octet_stream || w->ser.w_after_dim)
 		return bvn_writer_set_error(w, error_got_incomplete_bvnr_stream);
 	w->ser.ser_error = error_none;
 	if (!bvn_ser_finish_stream(&w->ser)) {

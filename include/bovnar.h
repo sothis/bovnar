@@ -560,9 +560,12 @@ typedef struct bvnr_data_s {
 	 * caller before 2.0 used -- is held to the same contract; where both are
 	 * set they must agree. "The unit" is the event's own value_unit, or, where
 	 * a parameter event carries none, the one given on the annotation's start
-	 * event. And a VALUE written directly under an annotation that names a
-	 * unit must carry that unit or none: the serialiser writes the
-	 * annotation's, so a value saying otherwise is error_unit_mismatch.
+	 * event -- which is written as the annotation's unit parameter if no
+	 * parameter event follows, and which a parameter event may not contradict.
+	 * And a VALUE under an annotation that names a unit must carry that unit
+	 * or none: the serialiser writes the annotation's, so a value saying
+	 * otherwise is error_unit_mismatch. That holds for every element of an
+	 * annotated array, in every row of it, and for `no_unit` as for a unit.
 	 *
 	 * One document can be read and not written back: a bare value with an
 	 * inline unit of some 243 bytes or more. The reader hands it over inside

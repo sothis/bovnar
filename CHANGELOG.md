@@ -45,6 +45,53 @@ rebuild consumers against the new headers. **SOVERSION is bumped 1 → 2**
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
 
+### Fixed — a third review round, with a differential fuzzer
+
+Reader against writer, writer against reader, this tree against 1.1.0, and
+Python `dumps` against `loads`, each on generated input.
+
+- **The reader took two malformed shapes of a struct inside an array**, and so
+  did every release before it. `.f = [{.x = 7, 1;}];` validated — the `,`
+  belongs to the array, not to the member — and `.x` read as `71`. And
+  `.p = {.s = [{.a = [1];}; .q = {.a = [1];}];};` validated with `.q` as the
+  array's second element: closing the inner `[1]` wiped the outer array's
+  record of the struct level it was opened at, which disarmed the
+  unterminated-array check. They are `error_unexpected_input_byte` and
+  `error_got_incomplete_bvnr_stream`. Both are in doc/03 §17 and the release
+  notes' *Compatibility*.
+- **The writer wrote values under a unit they did not have.** A value under an
+  annotation is written without its own unit, on the understanding that it is
+  the annotation's — and that was checked for a scalar directly under its own
+  annotation and nowhere else. `.k = <float:64,m>[1, 2]` with the `2` in
+  seconds was written as two metres; so was a value in metres under
+  `<float:64,no_unit>`. Every element of an annotated array, in every row, is
+  held to the annotation now (`error_unit_mismatch`). The unit an annotation's
+  start event names is written when no parameter event follows (it was
+  dropped: `<float:64> 1` for one metre); a parameter that contradicts it, and
+  a second unit parameter, are refused.
+- **The writer accepted event streams no reader produces**: rows of different
+  widths joined by `/` (`error_array_row_size_mismatch`, as the reader has it),
+  a struct closed across an open array, an annotation or a row separator with
+  nothing behind it at finish, a member inside an annotated struct, an opaque
+  inline unit without `#!bovnar 1.2`, and a bare number in a base above ten.
+- **`BVN_UNIT_REDUCE` was not a fixed point.** `4.0 N/c~m²` reduced to
+  `40000 N/m²`, and that, fed back, to `40000 Pa`. A unit whose factor has no
+  SI prefix of its own now takes its named form in the first pass. Rescaled
+  digits that are no longer a number token are quoted, and `no_unit` is no
+  longer appended as an inline suffix.
+- **A bare ISO datetime after a `<datetime:64,tai>` element was replayed under
+  `tai`.** A datetime's `base` is its epoch, and the "same type as the element
+  before" test read it as a number base. `pretty-print` now writes the second
+  element's `<datetime:64>`.
+- `bvn_float_from_str` did not read `ninf`, the format's own spelling of
+  negative infinity and what `bvn_float_to_str` writes.
+- **Python `dumps`:** a ragged list of lists (`[[1], [2, 3]]`) was written as
+  `[1]/[2,3]`, which nothing reads; `[[[1]]]` lost a dimension; a typed array
+  whose elements share a unit but not a type was refused as "units do not
+  agree"; `<uint:64>` beside `<uint:64,_10>`, or `m*s` beside `s*m`, were
+  taken for different types; a reference or symbol in a typed array was
+  written as a string; a quoted non-decimal element lost its quotes.
+
 ### Fixed — what running 1.1.0 beside this release turned up
 
 The release documents said this release changes what happens to a document
@@ -333,7 +380,7 @@ shape does change**: a unit written only as an inline suffix beside an
 annotation that names no unit — `<float:64> 1.0 km` — used to come back in
 canonical form (`1.0 k~m`) and now keeps its spelling (`1.0 km`), like every
 other unit in the document. `--canonical` is unaffected. Pinned by
-`tests/bovnar_unit_source_test.c` (214 assertions) and
+`tests/bovnar_unit_source_test.c` (242 assertions) and
 `python/tests/test_unit_source.py`.
 
 ### Fixed — a long unit text under a unit flag overran a stack buffer in the writer

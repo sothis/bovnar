@@ -4210,8 +4210,9 @@ version it declares.<a href="#section-11.4-5" class="pilcrow">¶</a></p>
 <p id="section-11.4-6">The 1.2 reference consumer also fixed defects that had let through, or
 misread, input this format already excluded: a byte-order mark not at
 offset 0, a malformed version declaration ended by end-of-input, an array
-left open at its <code>;</code>, and a fractional <code>datetime</code> literal whose UTC year
-leaves 0000-9999 are now errors; an element annotation without a unit no
+left open at its <code>;</code>, a <code>,</code> after the value of a struct member inside an
+array (<code>[{.x = 7, 1;}]</code>, which had been read as <code>71</code>), and a fractional
+<code>datetime</code> literal whose UTC year leaves 0000-9999 are now errors; an element annotation without a unit no
 longer strips the unit from the array elements after it; and a <code>tai</code>
 literal spelling a known leap second (<code>2016-12-31T23:59:60Z</code>) decodes one
 second lower than it did, having previously collapsed onto the second

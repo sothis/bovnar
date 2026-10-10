@@ -1029,6 +1029,12 @@ static inline uint32_t bvn_effective_base_or_10(value_type_spec_t vt)
 static inline bool bvn_default_type_equiv(
 	value_type_spec_t a, value_type_spec_t b)
 {
+	/* A datetime's `base` field is its EPOCH, and bvn_effective_base reports 10
+	 * for every one of them -- so without this a bare ISO literal (unix) after
+	 * a `<datetime:64,tai>` element was "the same type", its annotation was
+	 * suppressed, and a re-serialisation put it under the tai annotation. */
+	if (a.family == vt_datetime && b.family == vt_datetime && a.base != b.base)
+		return false;
 	return a.family == b.family &&
 	       bvn_effective_width(a) == bvn_effective_width(b) &&
 	       bvn_effective_base(a)  == bvn_effective_base(b)  &&

@@ -925,6 +925,242 @@ static void test_dom(void)
 	bvn_dom_doc_destroy(dd);
 }
 
+/* ── the event stream as a whole ────────────────────────────────────── */
+
+static bool ev(bvnr_writer_t* w, bvnr_event_t e, token_type_t t,
+               value_type_spec_t vt, const char* unit, const char* text)
+{
+	bvnr_data_t d;
+	memset(&d, 0, sizeof d);
+	d.type = t;
+	d.value_type = vt;
+	if (unit) d.value_unit = U(unit);
+	if (text) { d.data = text; d.length = (uint32_t)strlen(text); }
+	return bvnr_write_event(w, e, &d);
+}
+#define KEY(w)        ev(w, ev_assignment_start, token_is_identifier, BVN_TYPE_PLAIN, NULL, "k")
+#define ROW(w)        ev(w, ev_array_row_start, token_is_number, BVN_TYPE_PLAIN, NULL, NULL)
+#define ROW_END(w)    ev(w, ev_array_row_end, token_is_number, BVN_TYPE_PLAIN, NULL, NULL)
+#define DIM(w)        ev(w, ev_array_dim_start, token_is_number, BVN_TYPE_PLAIN, NULL, NULL)
+#define ELEM(w, u, t) ev(w, ev_data, token_is_array_number, BVN_TYPE_FLOAT(64), u, t)
+
+/* `<float:64[,PARAM...]>` with START as the unit the start event names. */
+static bool ann(bvnr_writer_t* w, const char* start, const char* p1,
+                const char* p2)
+{
+	value_type_spec_t f = BVN_TYPE_FLOAT(64);
+	bool ok = ev(w, ev_type_annotation_start, token_is_type, f, start, NULL) &&
+	          ev(w, ev_type_annotation_type_family, token_is_type, f, start, NULL) &&
+	          ev(w, ev_type_annotation_type_family_parameter,
+	             token_is_type_width, f, start, NULL);
+	if (ok && p1)
+		ok = ev(w, ev_type_annotation_type_family_parameter, token_is_unit,
+		        f, p1, p1);
+	if (ok && p2)
+		ok = ev(w, ev_type_annotation_type_family_parameter, token_is_unit,
+		        f, p2, p2);
+	return ok && ev(w, ev_type_annotation_end, token_is_type, f, NULL, NULL);
+}
+
+static bool rereads(void)
+{
+	seen_t s;
+	bvnr_read_flags_t f;
+	memset(&f, 0, sizeof f);
+	char copy[sizeof wbuf];
+	memcpy(copy, wbuf, sizeof copy);
+	return read_doc(copy, &s, &f);
+}
+
+static void test_writer_annotation_governs(void)
+{
+	printf("  an annotation's unit governs what follows it, and is written...\n");
+	bvnr_writer_t* w;
+
+	/* The start event names a unit and no parameter event follows: the
+	 * annotation was written as <float:64>, the value under it was then held
+	 * to "the annotation's unit", and 1 m came out as a bare 1. */
+	w = open_writer(false, 0);
+	if (!w) { failures++; return; }
+	ASSERT_TRUE(KEY(w) && ann(w, "m", NULL, NULL) &&
+	            ev(w, ev_data, token_is_number, BVN_TYPE_FLOAT(64), "m", "1") &&
+	            bvnr_write_finish(w), "a unit named only by the start event writes");
+	ASSERT_TRUE(strstr(wbuf, "<float:64,m>") != NULL, wbuf);
+	bvnr_writer_destroy(w);
+
+	/* ...and one the parameter contradicts is refused, as is a second one:
+	 * <float:64,m,s> is not an annotation any reader takes. */
+	w = open_writer(false, 0);
+	if (!w) { failures++; return; }
+	ASSERT_TRUE(KEY(w) && !ann(w, "m", "s", NULL) &&
+	            bvnr_writer_get_error(w) == error_unit_mismatch,
+	            "the start event and the parameter must name one unit");
+	bvnr_writer_destroy(w);
+	w = open_writer(false, 0);
+	if (!w) { failures++; return; }
+	ASSERT_TRUE(KEY(w) && !ann(w, "m", "m", "m"),
+	            "a second unit parameter is refused");
+	bvnr_writer_destroy(w);
+
+	/* An array element is held to the annotation over the array exactly as a
+	 * scalar is to its own: .k=<float:64,m>[1,2] with the 2 in seconds used to
+	 * be written, silently, as two metres. */
+	w = open_writer(false, 0);
+	if (!w) { failures++; return; }
+	ASSERT_TRUE(KEY(w) && ann(w, "m", "m", NULL) && ROW(w) && ELEM(w, "m", "1"),
+	            "an element in the array's unit is taken");
+	ASSERT_TRUE(!ELEM(w, "s", "2") &&
+	            bvnr_writer_get_error(w) == error_unit_mismatch,
+	            "an element in another unit is refused");
+	bvnr_writer_destroy(w);
+	w = open_writer(false, 0);
+	if (!w) { failures++; return; }
+	ASSERT_TRUE(KEY(w) && ann(w, "m", "m", NULL) && ROW(w) && ELEM(w, "m", "1") &&
+	            ROW_END(w) && DIM(w) && ROW(w) && !ELEM(w, "s", "2"),
+	            "...in a continuation row as well");
+	bvnr_writer_destroy(w);
+	/* The same under an annotation that says no_unit. */
+	w = open_writer(false, 0);
+	if (!w) { failures++; return; }
+	ASSERT_TRUE(KEY(w) && ann(w, "no_unit", "no_unit", NULL) &&
+	            !ev(w, ev_data, token_is_number, BVN_TYPE_FLOAT(64), "m", "1") &&
+	            bvnr_writer_get_error(w) == error_unit_mismatch,
+	            "a value in metres under <float:64,no_unit> is refused");
+	bvnr_writer_destroy(w);
+	/* A unit-less element takes the array's unit and is fine. */
+	w = open_writer(false, 0);
+	if (!w) { failures++; return; }
+	ASSERT_TRUE(KEY(w) && ann(w, "m", "m", NULL) && ROW(w) && ELEM(w, NULL, "1") &&
+	            ELEM(w, "m", "2") && ROW_END(w) && bvnr_write_finish(w) &&
+	            strstr(wbuf, ".k=<float:64,m>[1,2];") != NULL && rereads(), wbuf);
+	bvnr_writer_destroy(w);
+}
+
+static void test_writer_stream_shape(void)
+{
+	printf("  ...and a stream no reader would produce is refused...\n");
+	bvnr_writer_t* w;
+
+	/* [1,2]/[3] -- the reader's error_array_row_size_mismatch. */
+	w = open_writer(false, 0);
+	if (!w) { failures++; return; }
+	ASSERT_TRUE(KEY(w) && ROW(w) && ELEM(w, NULL, "1") && ELEM(w, NULL, "2") &&
+	            ROW_END(w) && DIM(w) && ROW(w) && ELEM(w, NULL, "3"),
+	            "a shorter second row is taken element by element");
+	ASSERT_TRUE(!ROW_END(w) &&
+	            bvnr_writer_get_error(w) == error_array_row_size_mismatch,
+	            "...and refused where it closes short");
+	bvnr_writer_destroy(w);
+	w = open_writer(false, 0);
+	if (!w) { failures++; return; }
+	ASSERT_TRUE(KEY(w) && ROW(w) && ELEM(w, NULL, "1") && ROW_END(w) && DIM(w) &&
+	            ROW(w) && ELEM(w, NULL, "2") && ELEM(w, NULL, "3") && !ROW_END(w) &&
+	            bvnr_writer_get_error(w) == error_array_row_size_mismatch,
+	            "a longer second row is refused the same way");
+	bvnr_writer_destroy(w);
+
+	/* A struct closed across an array that is still open: .k={.k=[1}; */
+	w = open_writer(false, 0);
+	if (!w) { failures++; return; }
+	ASSERT_TRUE(KEY(w) &&
+	            ev(w, ev_struct_start, token_is_type, BVN_TYPE_PLAIN, NULL, NULL) &&
+	            KEY(w) && ROW(w) && ELEM(w, NULL, "1") &&
+	            !ev(w, ev_struct_end, token_is_type, BVN_TYPE_PLAIN, NULL, NULL),
+	            "a struct does not close across an open array");
+	bvnr_writer_destroy(w);
+
+	/* An annotation with nothing after it: .k=<float:64,m>; */
+	w = open_writer(false, 0);
+	if (!w) { failures++; return; }
+	ASSERT_TRUE(KEY(w) && ann(w, "m", "m", NULL) && !bvnr_write_finish(w),
+	            "an annotation left without its value is not a finished stream");
+	bvnr_writer_destroy(w);
+
+	/* A row separator with no row after it: .k=[1]/; */
+	w = open_writer(false, 0);
+	if (!w) { failures++; return; }
+	ASSERT_TRUE(KEY(w) && ROW(w) && ELEM(w, NULL, "1") && ROW_END(w) && DIM(w) &&
+	            !bvnr_write_finish(w),
+	            "nor is a row separator with no row behind it");
+	bvnr_writer_destroy(w);
+
+	/* A struct is not a number: .k=<float:64,m>{.k=1;} */
+	w = open_writer(false, 0);
+	if (!w) { failures++; return; }
+	bool opened = KEY(w) && ann(w, "m", "m", NULL) &&
+	              ev(w, ev_struct_start, token_is_type, BVN_TYPE_PLAIN, NULL, NULL);
+	ASSERT_TRUE(!opened || !KEY(w),
+	            "an annotated struct takes no members");
+	bvnr_writer_destroy(w);
+}
+
+static void test_reduce_is_a_fixed_point(void)
+{
+	printf("  a reduced document reduces to itself...\n");
+	/* 4.0 N/c~m² reduced to 40000 N/m² and stopped there; fed back, N/m²
+	 * became Pa. One normalisation, two runs, two documents -- so the first
+	 * was never the normal form. */
+	static const char* const docs[] = {
+		".a=<float:64,N/c~m\xc2\xb2>4.0;",
+		".a=<float:64,k~N/m\xc2\xb2>4.0;",
+		".a=<float:64,k~g*m/s\xc2\xb2>2.5;",
+		".a=<float:64,J/m~s>[1.0,2.0];",
+		".a=4.0 N/c~m\xc2\xb2;",
+	};
+	for (size_t i = 0; i < sizeof docs / sizeof docs[0]; i++) {
+		char pass[2][sizeof wbuf];
+		const char* in = docs[i];
+		bool ok = true;
+		for (int k = 0; k < 2 && ok; k++) {
+			bvnr_writer_t* w = open_writer(false, BVN_UNIT_REDUCE);
+			bvnr_reader_t* r = bvnr_reader_create();
+			if (!w || !r) { failures++; return; }
+			bvnr_read_flags_t f;
+			memset(&f, 0, sizeof f);
+			f.userdata = w;
+			f.on_verified = replay_cb;
+			ok = bvnr_open_read_mem(r, in, strlen(in), NULL, 0, &f) &&
+			     bvnr_read(r) && bvnr_write_finish(w);
+			bvnr_reader_destroy(r);
+			bvnr_writer_destroy(w);
+			memcpy(pass[k], wbuf, sizeof wbuf);
+			in = pass[k];
+		}
+		ASSERT_TRUE(ok, docs[i]);
+		tests++;
+		if (ok && strcmp(pass[0], pass[1]) != 0) {
+			fprintf(stderr, "FAIL: %s reduces to %s and that to %s\n",
+			        docs[i], pass[0], pass[1]);
+			failures++;
+		}
+	}
+}
+
+static void test_replay_keeps_each_epoch(void)
+{
+	printf("  a datetime element keeps its own epoch...\n");
+	/* `base` is a datetime's epoch, and the "same type as the element before"
+	 * test read it as a number base -- 10 for every one. So the bare ISO
+	 * literal (unix) was replayed with no annotation of its own, under tai. */
+	static const char doc[] =
+		"#!bovnar 1.1\n"
+		".a=[<datetime:64,tai>2020-01-01T00:00:00,2020-01-01T00:00:00];";
+	bvnr_writer_t* w = open_writer(false, 0);
+	bvnr_reader_t* r = bvnr_reader_create();
+	if (!w || !r) { failures++; return; }
+	bvnr_read_flags_t f;
+	memset(&f, 0, sizeof f);
+	f.userdata = w;
+	f.on_verified = replay_cb;
+	ASSERT_TRUE(bvnr_write_version(w, 1, 1) &&
+	            bvnr_open_read_mem(r, doc, sizeof doc - 1, NULL, 0, &f) &&
+	            bvnr_read(r) && bvnr_write_finish(w), "replay");
+	ASSERT_TRUE(strstr(wbuf, "<datetime:64,tai>") != NULL &&
+	            strstr(wbuf, ",<datetime:64>") != NULL, wbuf);
+	bvnr_reader_destroy(r);
+	bvnr_writer_destroy(w);
+}
+
 int main(void)
 {
 	printf("══════════════════════════════════════\n");
@@ -946,6 +1182,10 @@ int main(void)
 	test_replay();
 	test_writer_arrays();
 	test_long_unit_text_under_flags();
+	test_writer_annotation_governs();
+	test_writer_stream_shape();
+	test_reduce_is_a_fixed_point();
+	test_replay_keeps_each_epoch();
 	test_dom();
 
 	printf("\n%d tests, %d failures\n", tests, failures);

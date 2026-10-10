@@ -973,6 +973,22 @@ static void test_bvnf_audit_regressions(void)
 	CHECK(bvn_float_from_str(&f, "inf", 10) && bvn_float_is_inf(&f),
 		"exact 'inf' still accepted");
 	CHECK(bvn_float_from_str(&f, "1.5", 10), "a clean literal still parses");
+
+	/* "ninf" is the format's own spelling of negative infinity -- what an
+	 * ev_data token carries and what bvn_float_to_str writes -- and the parser
+	 * that reads every other literal back refused it. */
+	bvn_float_init_buf(&f, 64u, buf, BVN_FLOAT_NLIMBS(64u));
+	CHECK(bvn_float_from_str(&f, "ninf", 10) && bvn_float_is_inf(&f) &&
+	      bvn_float_is_neg(&f), "ninf parses as negative infinity");
+	{
+		char txt[16];
+		int32_t n = bvn_float_to_str(&f, txt, sizeof txt, 10);
+		CHECK(n == 4 && strcmp(txt, "ninf") == 0, "...and writes back as ninf");
+	}
+	CHECK(bvn_float_from_str(&f, "inf", 10) && bvn_float_is_inf(&f) &&
+	      !bvn_float_is_neg(&f), "inf is still positive");
+	CHECK(!bvn_float_from_str(&f, "-ninf", 10) || !bvn_float_is_inf(&f),
+	      "a signed ninf is not a spelling of anything");
 }
 
 /*

@@ -1159,7 +1159,7 @@ bvnr_write_finish(w);
 bool bvnr_write_finish(bvnr_writer_t *w);
 ```
 
-Flush any buffered output and finalise the stream. Must be called after all `bvnr_write_event` calls and before `bvnr_writer_destroy`. Returns `false` if any struct is still open (`error_got_incomplete_bvnr_stream`), if writing the trailing semicolon fails, or if flushing the write buffer to the sink fails.
+Flush any buffered output and finalise the stream. Must be called after all `bvnr_write_event` calls and before `bvnr_writer_destroy`. Returns `false` if any struct or array is still open, or an assignment, a type annotation or a `/` row separator was left with nothing after it (`error_got_incomplete_bvnr_stream`), if writing the trailing semicolon fails, or if flushing the write buffer to the sink fails.
 
 **64 KiB write buffer.** The writer accumulates output into an internal 64 KiB buffer. Individual `bvnr_write_event` calls do not push bytes to the sink immediately; instead bytes accumulate in the buffer and are forwarded to the sink only when the buffer is full or when `bvnr_write_finish` is called. This means the sink receives large contiguous writes rather than one tiny push per token, which is important for fd-based sinks. `bvnr_writer_bytes_written` always reflects the true total of bytes handed off to the sink plus bytes still in the buffer, so the count is accurate at any point during writing.
 
@@ -1468,13 +1468,18 @@ writer emits it when there is no `unit_source` — so it has to name
 parameter is its epoch, and there the one text accepted is the epoch's name.)
 "`value_unit`" here is the parameter event's own, or — for a caller that sets
 the unit only on `ev_type_annotation_start` and nothing but `type` on the
-parameter events — the one given there.
+parameter events — the one given there. A unit named only on the start event
+is written as the annotation's unit parameter; a parameter event naming a
+different one, and a second unit parameter, are refused.
 
 **A value agrees with its annotation.** The serialiser writes the unit the
 annotation names and never the value's, so a data event that follows an
 annotation naming a unit must carry that unit or none. `<float:64,k~g>`
 followed by a value whose `value_unit` is metres is `error_unit_mismatch`; it
-used to be written, as kilograms.
+used to be written, as kilograms. The annotation governs everything written
+under it: each element of an annotated array, in each `/`-joined row, is held
+to it in the same way, and `<float:64,no_unit>` refuses a value that has a
+unit.
 
 **One document can be read and not written back:** a bare value with an inline
 unit of some 243 bytes or more. The reader delivers an inline unit inside a

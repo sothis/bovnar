@@ -2880,6 +2880,11 @@ case in which an accepted document now decodes to a different value:
 - *An array left open at the `;`* (`.a = [1;`) is
   `error_got_incomplete_bvnr_stream`; it was accepted, and absorbed the next
   assignment.
+- *A struct inside an array is a scope of its own.* A `,` after a member's
+  value (`.f = [{.x = 7, 1;}];`) is `error_unexpected_input_byte`; it was
+  accepted, and the member read as `71`. And an array left open at a `;` is
+  detected inside a struct as well, after an array nested in it has closed
+  (`.p = {.s = [{.a = [1];}; .q = 1;];};`).
 - *A datetime literal with a fraction whose UTC year falls outside 0000–9999*
   (reachable only through a timezone offset) is
   `error_invalid_datetime_literal`.

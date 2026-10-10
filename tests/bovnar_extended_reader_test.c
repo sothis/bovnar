@@ -703,6 +703,43 @@ static void test_parse_inline_unit_array_rejected(void)
 		"inline compound unit inside array must produce an error");
 }
 
+/*
+ * A struct opened inside an array is a scope of its own: the array's ',' and
+ * ']' do not reach into it, and a ';' inside it does not close the array.
+ * Both of these validated up to 2.0.0's last review round (and the second one
+ * in every release before it).
+ */
+static void test_parse_struct_inside_array_is_a_scope(void)
+{
+	parse_ctx_t ctx;
+
+	/* The array .s is never closed: its ']' is the one after .q's struct, so
+	 * .q became the array's second element and the document "validated". The
+	 * inner [1] wiped the enclosing array's record of the struct level it was
+	 * opened at. */
+	parse_payload(".p={.s=[{.a=[1];};.q={.a=[1];}];};", false, &ctx);
+	ASSERT_TRUE(ctx.has_errors,
+		"';' inside an open array, after a nested array, is refused");
+	ASSERT_EQ_INT(ctx.last_error, error_got_incomplete_bvnr_stream,
+		"...as the unterminated array it is");
+
+	/* Two values for one key. */
+	parse_payload(".f=[{.x=7,1;}];", false, &ctx);
+	ASSERT_TRUE(ctx.has_errors,
+		"',' after a struct member's value is refused");
+	ASSERT_EQ_INT(ctx.last_error, error_unexpected_input_byte,
+		"...at the comma");
+
+	/* The legal neighbours of both. */
+	parse_payload(".p={.s=[{.a=[1];},{.q=[1,2];}];};", false, &ctx);
+	ASSERT_TRUE(!ctx.has_errors, "structs as array elements still parse");
+	parse_payload(".f=[{.x=[7,1];},2];", false, &ctx);
+	ASSERT_TRUE(!ctx.has_errors,
+		"a comma inside a member's own array, and after the struct, still parses");
+	parse_payload(".f=[{.x={.y=[1,2]/[3,4];};},[{.z=1;},2]];", false, &ctx);
+	ASSERT_TRUE(!ctx.has_errors, "and so does the nested mix");
+}
+
 static void test_parse_identifier_edge_cases(void)
 {
 	printf("  test_parse_identifier_edge_cases...\n");
@@ -932,6 +969,7 @@ int main(void)
 	test_parse_inline_unit_annotation_match();
 	test_parse_inline_unit_annotation_mismatch();
 	test_parse_inline_unit_array_rejected();
+	test_parse_struct_inside_array_is_a_scope();
 	test_parse_identifier_edge_cases();
 	test_parse_error_recovery_multiple();
 	test_parse_error_recovery_in_string();

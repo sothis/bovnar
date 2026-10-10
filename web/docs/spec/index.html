@@ -3813,6 +3813,11 @@ case in which an accepted document now decodes to a different value:</p>
 <li><em>An array left open at the <code>;</code></em> (<code>.a = [1;</code>) is
   <code>error_got_incomplete_bvnr_stream</code>; it was accepted, and absorbed the next
   assignment.</li>
+<li><em>A struct inside an array is a scope of its own.</em> A <code>,</code> after a member's
+  value (<code>.f = [{.x = 7, 1;}];</code>) is <code>error_unexpected_input_byte</code>; it was
+  accepted, and the member read as <code>71</code>. And an array left open at a <code>;</code> is
+  detected inside a struct as well, after an array nested in it has closed
+  (<code>.p = {.s = [{.a = [1];}; .q = 1;];};</code>).</li>
 <li><em>A datetime literal with a fraction whose UTC year falls outside 0000–9999</em>
   (reachable only through a timezone offset) is
   <code>error_invalid_datetime_literal</code>.</li>

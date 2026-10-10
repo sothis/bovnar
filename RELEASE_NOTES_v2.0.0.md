@@ -147,8 +147,9 @@ else. What does differ:
 - **Reader fixes that refuse, or re-read, input 1.1 let through:** a byte-order
   mark that is not at offset 0; a malformed `#!bovnar` directive with no
   trailing newline; an array left open at its `;` (`.a = [1;`), which used to
-  absorb the next assignment; a fractional datetime literal whose UTC year
-  leaves 0000–9999. And in `<float:64,s>[<float:64> 1, 3]` the `3` keeps the
+  absorb the next assignment — also inside a struct; a `,` after the value of
+  a struct member inside an array (`.f = [{.x = 7, 1;}];`, which 1.1 read as
+  `.x = 71`); a fractional datetime literal whose UTC year leaves 0000–9999. And in `<float:64,s>[<float:64> 1, 3]` the `3` keeps the
   array's unit, where 1.1 delivered it with none.
 - **Eight unit factors were corrected** — `elle` by 3.3×10⁻⁴,
   `klafter`/`rute`/`morgen` by about 10⁻⁶, and `inHg`, `Da`, `slug`, `ft_lb`

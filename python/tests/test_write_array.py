@@ -412,3 +412,89 @@ class TestBoolRoundtrip:
         assert result['status'] == 'ok'
         assert not isinstance(result['status'], bool)
 
+
+
+# ---------------------------------------------------------------------------
+# What dumps() does with a list that is not a rectangle of plain numbers
+# ---------------------------------------------------------------------------
+
+@needs_lib
+class TestArrayShapesSurviveDumps:
+    """dumps() used to pick the array's text from the OUTER list alone."""
+
+    @pytest.mark.parametrize('rows', [
+        [[1], [2, 3]],              # was `[1]/[2,3]`: error_array_row_size_mismatch
+        [[1, 2, 3], [4]],
+        [[[1]]],                    # was `[[1]]`: one dimension short
+        [[[1.5]]],
+        [[[[7]]]],
+        [[0, 1, 2, 3]],             # one row: nested, or it reads as shape (4,)
+        [[1, 2], [3, 4]],
+        [[[1, 2], [3, 4]], [[5, 6], [7, 8]]],
+        [[[1], [2, 3]], [[4]]],
+        [[], [1]],
+    ])
+    def test_nested_lists_round_trip(self, rows):
+        out = bovnar.dumps({'a': rows}, pretty=False)
+        assert bovnar.loads(out) == {'a': rows}, out
+
+    def test_a_rectangle_is_still_written_as_rows(self):
+        assert bovnar.dumps({'a': [[1, 2], [3, 4]]},
+                            pretty=False) == b'.a=[1,2]/[3,4];'
+
+    def test_ragged_rows_are_nested_not_slash_separated(self):
+        assert bovnar.dumps({'a': [[1], [2, 3]]},
+                            pretty=False) == b'.a=[[1],[2,3]];'
+
+
+@needs_lib
+class TestTypedArraysSurviveDumps:
+    """loads(typed=True) -> dumps() on arrays the format takes."""
+
+    @staticmethod
+    def _again(src):
+        doc = bovnar.loads(src, typed=True)
+        out = bovnar.dumps(doc, pretty=False)
+        back = bovnar.loads(out, typed=True)
+        return doc, out, back
+
+    def test_one_unit_several_types_keeps_each_annotation(self):
+        # Homogeneity is about the unit. This raised "elements carry units but
+        # do not agree" although every element is in metres.
+        src = b'.a=[<uint:8,m>1,<float:64,m>2.5];'
+        doc, out, back = self._again(src)
+        assert out == src
+        assert back == doc
+
+    def test_one_type_under_two_spellings_is_one_annotation(self):
+        # <uint:64> and <uint:64,_10> are one type; m*s and s*m one unit.
+        _, out, back = self._again(b'.a=[<uint:64,m>1,<uint:64,_10,m>2];')
+        assert out == b'.a=<uint:64,m>[1,2];'
+        assert [q.value for q in back['a']] == [1, 2]
+        _, out, back = self._again(b'.a=[<float:64,m*s>1.5,<float:64,s*m>2.5];')
+        assert out.count(b'<float:64') == 1
+        assert back['a'][0].unit == back['a'][1].unit
+
+    def test_two_units_are_still_refused(self):
+        doc = bovnar.loads(b'.a=[<float:64,s>1,<float:64,m>3];', typed=True)
+        with pytest.raises(bovnar.BovnarArgumentError):
+            bovnar.dumps(doc)
+
+    def test_a_reference_stays_a_reference(self):
+        # It was written as the string "&.k0".
+        src = b'.a=[&.k0,&.k1];.k0=1;.k1=2;'
+        doc, out, back = self._again(src)
+        assert out == src
+        assert back == doc
+
+    def test_a_symbol_stays_a_symbol(self):
+        src = b'.a=[sym,abc];'
+        _, out, _ = self._again(src)
+        assert out == src
+
+    def test_a_quoted_literal_stays_quoted(self):
+        # Every base above ten requires the quotes; ff unquoted is a symbol.
+        src = b'.a=<uint:64,_16>["ff","10"];'
+        doc, out, back = self._again(src)
+        assert out == src
+        assert [q.value for q in back['a']] == [255, 16]

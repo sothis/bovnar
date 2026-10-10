@@ -1813,8 +1813,9 @@ version it declares.
 The 1.2 reference consumer also fixed defects that had let through, or
 misread, input this format already excluded: a byte-order mark not at
 offset 0, a malformed version declaration ended by end-of-input, an array
-left open at its `;`, and a fractional `datetime` literal whose UTC year
-leaves 0000-9999 are now errors; an element annotation without a unit no
+left open at its `;`, a `,` after the value of a struct member inside an
+array (`[{.x = 7, 1;}]`, which had been read as `71`), and a fractional
+`datetime` literal whose UTC year leaves 0000-9999 are now errors; an element annotation without a unit no
 longer strips the unit from the array elements after it; and a `tai`
 literal spelling a known leap second (`2016-12-31T23:59:60Z`) decodes one
 second lower than it did, having previously collapsed onto the second

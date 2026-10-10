@@ -1471,6 +1471,17 @@ static int32_t bvni_pexp_to_si_prefix_id(int32_t pexp)
 	}
 	return -1;
 }
+/* The SI prefix for `v` where it is a power of ten that has one, else -1.
+ * Matched against the exact power-of-ten ladder rather than by a logarithm. */
+static int32_t bvni_p10_si_prefix_id(double v)
+{
+	for (int32_t e = -30; e <= 30; e++) {
+		double p = bvni_pow10(e);
+		if (fabs(v - p) <= 1e-6 * p)
+			return bvni_pexp_to_si_prefix_id(e);
+	}
+	return -1;
+}
 /*
  * Try to collapse a reduced unit back into a single named SI derived unit with
  * the right prefix (e.g. kg·m/s² -> N, or 1000 of those -> kN). It computes the
@@ -1556,19 +1567,18 @@ static value_unit_t bvni_reduce_to_named_si(value_unit_t u, double scale)
 		 * else is off by orders of magnitude. The 1e-6 relative window
 		 * mirrors the old fabs(log10(net_si) - pexp) > 1e-6 gate.
 		 */
-		int32_t pexp  = 0;
-		bool    is_p10 = false;
-		for (int32_t e = -30; e <= 30; e++) {
-			double p = bvni_pow10(e);
-			if (fabs(net_si - p) <= 1e-6 * p) {
-				pexp   = e;
-				is_p10 = true;
-				break;
-			}
-		}
-		if (!is_p10)
-			continue;
-		int32_t pfx_id = bvni_pexp_to_si_prefix_id(pexp);
+		int32_t pfx_id = bvni_p10_si_prefix_id(net_si);
+		/* No prefix spells the whole factor (N/c~m² is 10^4 Pa; d~J·ppm is
+		 * 10^-7 J). This used to leave the compound as it was -- and the NEXT
+		 * pass, with the folded scale now gone from the unit, collapsed it
+		 * after all: the reduced form was not a fixed point. Take the prefix
+		 * the next pass would find, the one for the reduced unit's own SI
+		 * factor; the folded scale then stays in the value, which the caller
+		 * moves by the factor between the unit it had and the unit it is given
+		 * back (`scale` is not 1 here, or the first lookup would have matched,
+		 * so bvn_ser_reduced_number's scale==1 shortcut is not taken). */
+		if (pfx_id < 0)
+			pfx_id = bvni_p10_si_prefix_id(base_si);
 		if (pfx_id < 0)
 			continue;
 		value_unit_t result;

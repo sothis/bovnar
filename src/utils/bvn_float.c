@@ -811,6 +811,13 @@ static bvnf_rkind bvnf_parse_rational(const char *s, uint32_t base,
 		if (c0 == 'i' && ((uint8_t)(p[1]|0x20)) == 'n' &&
 		    ((uint8_t)(p[2]|0x20)) == 'f' && p[3] == '\0')
 			return BVNF_RK_INF;
+		/* The format's own spelling of negative infinity, which is what an
+		 * ev_data token carries and what bvn_float_to_str writes. */
+		if (!neg && p[0] == 'n' && p[1] == 'i' && p[2] == 'n' &&
+		    p[3] == 'f' && p[4] == '\0') {
+			*neg_out = true;
+			return BVNF_RK_INF;
+		}
 	}
 	bvn_int_zero(num);
 	bvn_int_from_uint64(den, 1u);

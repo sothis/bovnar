@@ -725,8 +725,17 @@ bool bvn_action_value_outro(bvnr_reader_t* p)
 	uint32_t base = p->lex.array_nesting_level;
 	uint32_t hwm  = p->lex.arr_used_max;
 	if (hwm > base) {
+		/* arr_frames[base] is two things: scratch for an array nested inside
+		 * the innermost open one (dead now, hence the wipe) and that open
+		 * array's OWN open_struct_level, which is very much alive. Wiping it
+		 * disarmed the unterminated-array check above for the rest of the
+		 * array -- but only inside a struct, where the level is not 0 anyway:
+		 * ".p = {.s = [{.a = [1];}; .q = {.a = [1];}];};" validated, and .q
+		 * became the array's second element. */
+		uint8_t open_level = p->lex.arr_frames[base].open_struct_level;
 		memset(p->lex.arr_frames + base, 0,
 		       (hwm - base) * sizeof(bvn_array_frame_t));
+		p->lex.arr_frames[base].open_struct_level = open_level;
 	}
 	p->lex.arr_used_max = (uint16_t)base;
 	if (!p->lex.struct_nesting_level) {
@@ -1088,6 +1097,14 @@ bool bvn_action_array_outro_empty(bvnr_reader_t* p)
 bool bvn_action_new_array_value(bvnr_reader_t* p)
 {
 	if (!p->lex.array_nesting_level) {
+		bvn_lexer_set_error(p, error_unexpected_input_byte);
+		return false;
+	}
+	/* A ',' separates the elements of the innermost '[' -- and only where no
+	 * struct has been opened inside it since. "[{.x = 7, 1;}]" used to read as
+	 * two values for the one key. Same test bvn_action_value_outro makes. */
+	if (p->lex.arr_frames[p->lex.array_nesting_level].open_struct_level !=
+	    p->lex.struct_nesting_level) {
 		bvn_lexer_set_error(p, error_unexpected_input_byte);
 		return false;
 	}

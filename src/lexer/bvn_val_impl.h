@@ -299,7 +299,25 @@ struct bvnr_writer_s {
 	 * unit and never looks at the value's, so `<float:64,k~g>` followed by a
 	 * value saying metres used to be written as kilograms. */
 	value_unit_t		ann_unit;
-	bool			ann_pending;
+	/* The unit of the annotation that GOVERNS the next value -- ann_unit once
+	 * its annotation has closed, carried through "[...]" exactly the way the
+	 * serialiser carries emitted_unit (saved per row, restored after every
+	 * element), and "none" where no annotation with a unit is in force. */
+	value_unit_t		gov_unit;
+	/* The family that annotation declares. */
+	value_type_family_t	ann_family;
+	value_unit_t		arr_gov_unit[UINT8_MAX+1];
+	/* Whether ANY annotation governs the next value, scoped the same way,
+	 * and whether each open struct was opened under one: the reader takes
+	 * `<uint:8> {}` and refuses the first member of `<uint:8> {.a = 1;}`. */
+	bool			gov_typed;
+	bool			arr_gov_typed[UINT8_MAX+1];
+	bool			struct_typed[UINT8_MAX+1];
+	/* Elements written into the row open at each depth, and the width the
+	 * "/"-sequence that row belongs to has established. */
+	uint64_t		arr_count[UINT8_MAX+1];
+	uint64_t		arr_dim_count[UINT8_MAX+1];
+	bool			arr_dim_set[UINT8_MAX+1];
 	bool			usrc_ok_inline;
 	uint8_t			usrc_ok_len;
 	uint8_t			usrc_ok[BVNR_UNIT_SOURCE_MAX + 1u];

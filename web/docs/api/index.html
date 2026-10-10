@@ -1146,7 +1146,7 @@ spec version right after open.</p>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_finish</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">);</span>
 </code></pre></div>
 
-<p>Flush any buffered output and finalise the stream. Must be called after all <code>bvnr_write_event</code> calls and before <code>bvnr_writer_destroy</code>. Returns <code>false</code> if any struct is still open (<code>error_got_incomplete_bvnr_stream</code>), if writing the trailing semicolon fails, or if flushing the write buffer to the sink fails.</p>
+<p>Flush any buffered output and finalise the stream. Must be called after all <code>bvnr_write_event</code> calls and before <code>bvnr_writer_destroy</code>. Returns <code>false</code> if any struct or array is still open, or an assignment, a type annotation or a <code>/</code> row separator was left with nothing after it (<code>error_got_incomplete_bvnr_stream</code>), if writing the trailing semicolon fails, or if flushing the write buffer to the sink fails.</p>
 <p><strong>64 KiB write buffer.</strong> The writer accumulates output into an internal 64 KiB buffer. Individual <code>bvnr_write_event</code> calls do not push bytes to the sink immediately; instead bytes accumulate in the buffer and are forwarded to the sink only when the buffer is full or when <code>bvnr_write_finish</code> is called. This means the sink receives large contiguous writes rather than one tiny push per token, which is important for fd-based sinks. <code>bvnr_writer_bytes_written</code> always reflects the true total of bytes handed off to the sink plus bytes still in the buffer, so the count is accurate at any point during writing.</p>
 <div class="codehilite"><pre><span></span><code><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">bvnr_write_finish</span><span class="p">(</span><span class="n">w</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stderr</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;write finish failed: %s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
@@ -1425,12 +1425,17 @@ writer emits it when there is no <code>unit_source</code> — so it has to name
 parameter is its epoch, and there the one text accepted is the epoch's name.)
 "<code>value_unit</code>" here is the parameter event's own, or — for a caller that sets
 the unit only on <code>ev_type_annotation_start</code> and nothing but <code>type</code> on the
-parameter events — the one given there.</p>
+parameter events — the one given there. A unit named only on the start event
+is written as the annotation's unit parameter; a parameter event naming a
+different one, and a second unit parameter, are refused.</p>
 <p><strong>A value agrees with its annotation.</strong> The serialiser writes the unit the
 annotation names and never the value's, so a data event that follows an
 annotation naming a unit must carry that unit or none. <code>&lt;float:64,k~g&gt;</code>
 followed by a value whose <code>value_unit</code> is metres is <code>error_unit_mismatch</code>; it
-used to be written, as kilograms.</p>
+used to be written, as kilograms. The annotation governs everything written
+under it: each element of an annotated array, in each <code>/</code>-joined row, is held
+to it in the same way, and <code>&lt;float:64,no_unit&gt;</code> refuses a value that has a
+unit.</p>
 <p><strong>One document can be read and not written back:</strong> a bare value with an inline
 unit of some 243 bytes or more. The reader delivers an inline unit inside a
 synthesised annotation (<code>&lt;float:64,_10,…&gt;</code>), which is a dozen bytes longer than

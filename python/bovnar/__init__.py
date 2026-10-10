@@ -440,7 +440,8 @@ def write_array(w: Writer,
                 *,
                 vt: ValueTypeSpec | None = None,
                 vu: ValueUnit | None = None,
-                unit_source: str | None = None) -> None:
+                unit_source: str | None = None,
+                _annotate_elements: bool = False) -> None:
     """
     High-level typed array writer.
 
@@ -472,33 +473,35 @@ def write_array(w: Writer,
         w._emit_annotation(name, vt, vu if vu is not None else make_unit_none(),
                            unit_source if vu is not None else None)
 
-    if rows and all(isinstance(r, (list, tuple)) for r in rows):
-        row_list = rows
-    else:
-        row_list = [rows]
+    _emit_rows(w, rows, _annotate_elements)
 
-    # A single explicit row is NESTED, not flattened. The outer list maps to
-    # /-separated rows here, but the reader maps NESTING to dimensions, and with
-    # exactly one row the two disagree: [[0,1,2,3]] was written as [0,1,2,3] and
-    # read back with shape (4,) instead of (1,4). The format can express it --
-    # ".x = [[0, 1, 2, 3]];" reads back as (1,4) -- so this is a writer collapse,
-    # not a format limit. Two or more rows are unaffected: [[1,2],[3,4]] stays
-    # [1,2]/[3,4], which already reads back as (2,2).
-    if len(row_list) == 1 and row_list is rows:
-        w.begin_array_row()
-        _emit_array_element(w, row_list[0])
-        w.end_array_row()
+
+def _emit_rows(w: Writer, rows, annotate: bool = False) -> None:
+    """One list as array text: ``[..]/[..]`` rows for a rectangular
+    list-of-lists, a nested ``[[..]]`` otherwise.
+
+    The outer list maps to /-separated rows, but the reader maps NESTING to
+    dimensions, and with exactly one row the two disagree: [[0,1,2,3]] written
+    as [0,1,2,3] read back with shape (4,) instead of (1,4). So a single row is
+    nested -- at EVERY depth ([[[1.5]]] came back as [[1.5]]) -- and rows of
+    different lengths are nested too: [[1],[2,3]] written as [1]/[2,3] is
+    error_array_row_size_mismatch, a document nothing reads."""
+    is_rows = bool(rows) and all(isinstance(r, (list, tuple)) for r in rows)
+    if is_rows and len(rows) > 1 and len({len(r) for r in rows}) == 1:
+        first = True
+        for row in rows:
+            if not first:
+                w.new_array_dim()
+            first = False
+            w.begin_array_row()
+            for elem in row:
+                _emit_array_element(w, elem, annotate)
+            w.end_array_row()
         return
-
-    first = True
-    for row in row_list:
-        if not first:
-            w.new_array_dim()
-        first = False
-        w.begin_array_row()
-        for elem in row:
-            _emit_array_element(w, elem)
-        w.end_array_row()
+    w.begin_array_row()
+    for elem in rows:
+        _emit_array_element(w, elem, annotate)
+    w.end_array_row()
 
 
 class _ArrScope:
@@ -929,8 +932,18 @@ def _array_quantity_annotation(rows):
                 return None, None
             if int(e.vtype.family) == int(ValueTypeFamily.DATETIME):
                 return None, None             # handled by the datetime path
-            key = (int(e.vtype.family), int(e.vtype.width), int(e.vtype.base),
-                   e.unit_str)
+            # The EFFECTIVE type and the unit itself, not their spellings:
+            # `<uint:64>` and `<uint:64,_10>` are one type, and `m*s` and `s*m`
+            # one unit (bvn_unit_equal is order-insensitive, unit_str is not).
+            fam = int(e.vtype.family)
+            base = int(e.vtype.base)
+            if base == 0 and fam in (int(ValueTypeFamily.UINT),
+                                     int(ValueTypeFamily.SINT),
+                                     int(ValueTypeFamily.FLOAT)):
+                base = 10
+            key = (fam, int(e.vtype.width) or 64, base)
+            if first is not None and e.unit != first[1].unit:
+                return None, None
             # Ask EVERY leaf, not just the first. A sint array of mixed sign
             # needs the annotation because its non-negative elements would
             # otherwise re-read as uint, but the first element it happened to see
@@ -943,7 +956,8 @@ def _array_quantity_annotation(rows):
                 return None, None             # mixed: no single annotation fits
     if first is None:
         return None, None
-    (fam, width, base, _us), sample = first
+    (fam, _width, _base), sample = first
+    width, base = int(sample.vtype.width), int(sample.vtype.base)
     if fam == int(ValueTypeFamily.PLAIN):
         return None, None
     vt = ValueTypeSpec()
@@ -970,6 +984,32 @@ def _array_has_unit(rows) -> bool:
             elif isinstance(e, Quantity) and _has_real_unit(e.unit.raw):
                 return True
     return False
+
+
+def _array_one_unit(rows) -> bool:
+    """True if every non-null leaf is a numeric Quantity with a literal and
+    they all carry the SAME real unit (whatever their types)."""
+    first = None
+    stack = [rows]
+    numeric = (int(ValueTypeFamily.FLOAT), int(ValueTypeFamily.FLOAT_DEC),
+               int(ValueTypeFamily.FLOAT_FIX), int(ValueTypeFamily.UINT),
+               int(ValueTypeFamily.SINT))
+    while stack:
+        cur = stack.pop()
+        for e in cur:
+            if isinstance(e, (list, tuple)):
+                stack.append(e)
+            elif e is None:
+                continue
+            elif not (isinstance(e, Quantity) and e.raw
+                      and int(e.vtype.family) in numeric
+                      and _has_real_unit(e.unit.raw)):
+                return False
+            elif first is None:
+                first = e.unit
+            elif e.unit != first:
+                return False
+    return first is not None
 
 
 def _array_unit_source(rows):
@@ -1115,6 +1155,12 @@ def _emit_value(w: Writer, key: str, value) -> None:
         vu = None
         if vt is None:
             vt, vu = _array_quantity_annotation(value)
+        if vu is None and _array_has_unit(value) and _array_one_unit(value):
+            # One unit, several numeric types -- [<uint:8,m> 1, <float:64,m>
+            # 2.5]. The format takes that (homogeneity is about the unit), so
+            # each element is written under its own annotation.
+            write_array(w, key, value, _annotate_elements=True)
+            return
         if vu is None and _array_has_unit(value):
             # An array has ONE annotation, and its elements are written bare.
             # Leaves that agree on type and unit get that annotation (above);
@@ -1139,7 +1185,7 @@ def _emit_value(w: Writer, key: str, value) -> None:
             f"for key {key!r}")
 
 
-def _emit_array_element(w: Writer, elem) -> None:
+def _emit_array_element(w: Writer, elem, annotate: bool = False) -> None:
     import ctypes as _ct
 
     _TOKEN_IS_ARRAY_NUMBER = TokenType.ARRAY_NUMBER
@@ -1178,12 +1224,29 @@ def _emit_array_element(w: Writer, elem) -> None:
                 int(ValueTypeFamily.FLOAT_FIX), int(ValueTypeFamily.UINT),
                 int(ValueTypeFamily.SINT)):
             raw = elem.raw.encode('utf-8')
+            if annotate:
+                w._emit_annotation(_FAM_NAMES[int(elem.vtype.family)],
+                                   elem.vtype, elem.unit.raw, elem.unit_source)
             d = BvnrData()
-            d.type       = _TOKEN_IS_ARRAY_NUMBER
+            # A quoted literal stays quoted: every base above ten REQUIRES it.
+            d.type       = (_TOKEN_IS_ARRAY_STRING
+                            if elem._tok_type in (TokenType.STRING,
+                                                  TokenType.ARRAY_STRING)
+                            else _TOKEN_IS_ARRAY_NUMBER)
             d.value_type = elem.vtype
             d.value_unit = make_unit_none()
             d.data       = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p)
             d.length     = len(raw)
+            _write_event_data(w, d)
+            return
+        # A symbol or a reference is not its text as a string.
+        if elem.raw and elem._tok_type in (TokenType.SYMBOL,
+                                           TokenType.REFERENCE):
+            raw = elem.raw.encode('utf-8')
+            d = BvnrData()
+            d.type   = elem._tok_type
+            d.data   = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p)
+            d.length = len(raw)
             _write_event_data(w, d)
             return
         _emit_array_element(w, elem.value)
@@ -1273,19 +1336,7 @@ def _emit_array_element(w: Writer, elem) -> None:
         w.emit(Event.STRUCT_END)
 
     elif isinstance(elem, (list, tuple)):
-        if elem and all(isinstance(r, (list, tuple)) for r in elem):
-            inner_rows = elem
-        else:
-            inner_rows = [elem]
-        first = True
-        for row in inner_rows:
-            if not first:
-                w.new_array_dim()
-            first = False
-            w.begin_array_row()
-            for sub in row:
-                _emit_array_element(w, sub)
-            w.end_array_row()
+        _emit_rows(w, elem, annotate)
 
     else:
         import numbers

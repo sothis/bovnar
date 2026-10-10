@@ -87,6 +87,27 @@ beside this tree over the 1.1.0 examples, documentation and conformance inputs,
   not exist. The published doc pages and PDFs were stamped "v1.1". The site's
   Python sample called a property. Python `read_file` lacked `text_only`.
 
+**The release job, again.** It has never run on GitHub — v1.1.0's assets were
+attached by hand — and it was gated as a whole on a tag, so its first execution
+would have been the irreversible one. Exercised step by step against a fake
+`gh` in eighteen states:
+
+- The job now runs on every push and only its last step is gated on a tag, so
+  each push to `main` rehearses the artifact hand-off, the rename and the
+  checksums.
+- A published, immutable release holding only some of its assets was reported
+  as complete, and PyPI would then have published. Assets are compared by
+  name.
+- Any failure of the "does a release exist" probe — a 403, a rate limit, a
+  network error — was read as "there is none", and could leave a second draft
+  behind. Only a 404 means absence now; anything else stops the job.
+- A missing release-notes file fell back to generated notes on a release that
+  cannot be edited away. The tag must also name the project version.
+- A second run on the tag ref cancelled the run that was publishing. Runs on a
+  tag are never cancelled.
+- The tag filter `v*` matched `vnext` and `v2`; it is `vMAJOR.MINOR.PATCH`.
+- A PyPI upload that failed partway could not be re-run (`skip-existing`).
+
 ### Fixed — what a second review round turned up, three of them in the first round's fixes
 
 The fixes below this entry were themselves reviewed, and differentially fuzzed:

@@ -519,16 +519,22 @@ TAP version 14
     ok 2 - [ENC-002] UTF-8 BOM at byte 0
     not ok 3 - [ENC-003] UTF-8 BOM after first comment
       ---
-      message: expected error invalid_byte_order_mark but got none
+      message: expected error invalid_byte_order_mark but parse succeeded
       ...
     1..14
 not ok 1 - encoding
+# Subtest: limits
+    ...
+ok 2 - limits
 # Subtest: version
     ok 1 - [VER-001] directive declaring the current spec version
     ...
     1..13
-ok 2 - version
+ok 3 - version
 ```
+
+The closing summary line (`# All 470 conformance tests passed`, or the count of
+failures) goes to standard error, so it is not part of the TAP stream.
 
 A group's parent point is `not ok` if any of its cases failed. Exit code is **0**
 when all tests pass, **1** when any test fails. (`--filter <group>` restricts the

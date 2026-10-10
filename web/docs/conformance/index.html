@@ -848,17 +848,22 @@ parent plan therefore counts the groups (currently 23), not the 470 cases.</p>
     ok 2 - [ENC-002] UTF-8 BOM at byte 0
     not ok 3 - [ENC-003] UTF-8 BOM after first comment
       ---
-      message: expected error invalid_byte_order_mark but got none
+      message: expected error invalid_byte_order_mark but parse succeeded
       ...
     1..14
 not ok 1 - encoding
+# Subtest: limits
+    ...
+ok 2 - limits
 # Subtest: version
     ok 1 - [VER-001] directive declaring the current spec version
     ...
     1..13
-ok 2 - version
+ok 3 - version
 </code></pre></div>
 
+<p>The closing summary line (<code># All 470 conformance tests passed</code>, or the count of
+failures) goes to standard error, so it is not part of the TAP stream.</p>
 <p>A group's parent point is <code>not ok</code> if any of its cases failed. Exit code is <strong>0</strong>
 when all tests pass, <strong>1</strong> when any test fails. (<code>--filter &lt;group&gt;</code> restricts the
 run to a single group; the parent plan is then <code>1..1</code>.)</p>

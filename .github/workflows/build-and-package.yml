@@ -3,13 +3,18 @@ name: Build & Package
 on:
   push:
     branches: [main, 'release-*']
-    tags: ['v*']
+    # Exactly vMAJOR.MINOR.PATCH. 'v*' also matched vnext, v2 and v2.0.0-rc1,
+    # and a tag here publishes to PyPI -- of whatever version CMakeLists says.
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
   pull_request:
   workflow_dispatch:
 
+# Never cancel a run on a TAG. That run publishes, and a second run on the same
+# ref -- "Run workflow" with the tag selected, or the tag re-pushed -- would stop
+# it midway: half a PyPI upload cannot be taken back.
 concurrency:
   group: build-package-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 # Builds the library (static + shared) and the CLI on the supported 64-bit
 # targets and publishes each as a downloadable release artifact:
@@ -458,7 +463,13 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # skip-existing: an upload that fails partway leaves some of the ~20 files
+      # on PyPI for good, and without this a re-run stops at the first of them
+      # with "File already exists" -- by which time the GitHub release is
+      # already published and cannot be withdrawn either.
       - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
 
   # ── GitHub Release assets ────────────────────────────────────────────────
   release:
@@ -468,8 +479,11 @@ jobs:
     # whose C/Python/conformance suite went red.
     needs: [msvc, mingw, linux, source, tests]
     runs-on: ubuntu-latest
-    # Only on a version tag (e.g. v1.1.0) — the same gate the PyPI publish uses.
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    # The JOB runs on every push; only its last step is gated on a tag. This job
+    # is irreversible the one time it matters, and gated as a whole it had never
+    # run at all -- the artifact hand-off, the rename and the checksums would
+    # have been executed for the first time on the release itself. Now every
+    # push to main rehearses everything but the publication.
     permissions:
       contents: write   # create the release and upload its assets
     steps:
@@ -521,43 +535,66 @@ jobs:
           cd assets && sha256sum -- * > SHA256SUMS && cat SHA256SUMS
 
       - name: Publish to the GitHub release
+        # Only on a version tag (e.g. v2.0.0) -- the same gate the PyPI publish uses.
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           tag="$GITHUB_REF_NAME"
           # Pushing the tag alone is the supported way to cut a release: this
-          # step creates it, preferring the repo's hand-written notes. Do NOT
-          # create the release in the GitHub UI first -- see below for why a
-          # release published before its assets are attached cannot be repaired.
-          notes=(--generate-notes)
-          if [ -f "RELEASE_NOTES_${tag}.md" ]; then
-            notes=(--notes-file "RELEASE_NOTES_${tag}.md")
-          fi
+          # step creates it. Do NOT create the release in the GitHub UI first.
+          #
           # The repository has release immutability switched on: a PUBLISHED
-          # release accepts no further assets. So nothing is published until
-          # every asset is attached -- create a draft, upload, then publish.
-          # releases/tags/<tag> answers only for a published release.
-          # (v1.0.0 is what the other order leaves behind: published, immutable,
-          # no assets, and a tag name that can never be reused.)
-          if state=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" --jq '"\(.immutable) \(.assets | length)"' 2>/dev/null); then
+          # release accepts no further assets and its tag name can never be
+          # reused (v1.0.0 is what publishing first leaves behind: immutable,
+          # no assets). So nothing is published until every asset is attached
+          # -- create a draft, upload, publish last -- and everything that can
+          # be checked is checked before the first call that changes anything.
+          version=$(grep -oP 'project\(bovnar VERSION \K[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt)
+          if [ "$tag" != "v$version" ]; then
+            echo "::error::tag ${tag} does not name project version ${version} (expected v${version})"
+            exit 1
+          fi
+          notes="RELEASE_NOTES_${tag}.md"
+          if [ ! -f "$notes" ]; then
+            echo "::error::${notes} is missing -- refusing to publish a permanent release with generated notes"
+            exit 1
+          fi
+          want=$(cd assets && ls | LC_ALL=C sort | paste -sd,)
+          err=$(mktemp)
+          # releases/tags/<tag> answers only for a PUBLISHED release. Its
+          # failing is "there is none" only when it failed with a 404: a 403, a
+          # rate limit or a network error must not be read as permission to
+          # create one.
+          if state=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" --jq '"\(.immutable) \([.assets[].name] | sort | join(","))"' 2>"$err"); then
             immutable="${state%% *}"
-            nassets="${state##* }"
-            if [ "$immutable" = "true" ] && [ "$nassets" = "0" ]; then
-              # Published by hand before this job ran. Nothing can be attached
-              # any more, and saying "fine" here would let PyPI publish a
-              # version whose GitHub release is empty.
-              echo "::error::release ${tag} is published, immutable and has no assets -- it cannot be completed. Delete it and cut the next version."
+            have="${state#* }"
+            if [ "$have" = "$want" ]; then
+              # A re-run after a completed release.
+              echo "::notice::release ${tag} is already published with exactly the expected assets -- nothing to do"
+            elif [ "$immutable" != "false" ]; then
+              # Published by hand, or from a half-filled draft. Nothing can be
+              # attached any more, and saying "fine" here would let PyPI
+              # publish a version whose GitHub release is incomplete.
+              echo "::error::release ${tag} is published and immutable but its assets [${have}] are not [${want}] -- it cannot be completed. Delete it and cut the next version."
               exit 1
-            elif [ "$immutable" = "true" ]; then
-              # A re-run after a completed release: nothing can or should change.
-              echo "::notice::release ${tag} is already published and immutable -- leaving its assets as they are"
             else
               gh release upload "$tag" assets/* --clobber
             fi
+          elif ! grep -q 'HTTP 404' "$err"; then
+            cat "$err" >&2
+            echo "::error::could not ask GitHub whether release ${tag} exists -- re-run this job"
+            exit 1
           else
-            if ! gh release view "$tag" >/dev/null 2>&1; then
-              gh release create "$tag" --draft --verify-tag --title "$tag" "${notes[@]}"
+            if gh release view "$tag" >/dev/null 2>"$err"; then
+              :   # a draft left by an earlier attempt of this job
+            elif grep -q 'release not found' "$err"; then
+              gh release create "$tag" --draft --verify-tag --title "$tag" --notes-file "$notes"
+            else
+              cat "$err" >&2
+              echo "::error::could not ask GitHub whether a draft of ${tag} exists -- re-run this job"
+              exit 1
             fi
             gh release upload "$tag" assets/* --clobber
             gh release edit "$tag" --draft=false

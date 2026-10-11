@@ -1498,6 +1498,15 @@ bool bvn_action_struct_intro(bvnr_reader_t* p)
 		bvn_lexer_set_error(p, error_struct_nesting_too_high);
 		return false;
 	}
+	/* A struct takes no type annotation -- its members carry their own. An
+	 * annotation in force here (written before the struct, or inherited from
+	 * the array the struct is an element of) used to survive until the first
+	 * member's key and fail there, which let it through before an EMPTY
+	 * struct: <utf8> {} was accepted and <utf8> {.x = "s";} was not. */
+	if (p->val.value_type.family != vt_plain) {
+		bvn_lexer_set_error(p, error_type_value_mismatch);
+		return false;
+	}
 	if (!bvn_val_receive_event(p, ev_struct_start))
 		return false;
 	++l->struct_nesting_level;

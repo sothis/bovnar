@@ -27,3 +27,12 @@ examples/*.bvnr linguist-language=Bovnar
 # Windows runners, where core.autocrlf=true would otherwise check them out CRLF
 # and bash stops at the first $'\r'.
 *.sh text eol=lf
+
+# The Internet-Draft is written in doc/ietf/draft-*.md; the three files beside it
+# are renderings (kramdown-rfc, then xml2rfc). The .xml ends in a compressed copy
+# of the source, so one changed sentence rewrites some two thousand lines of it,
+# and the .txt repaginates. Review the .md; check_ietf_draft.py holds the
+# renderings to it.
+doc/ietf/draft-*.xml linguist-generated=true
+doc/ietf/draft-*.txt linguist-generated=true
+doc/ietf/draft-*.html linguist-generated=true

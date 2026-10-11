@@ -113,7 +113,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 | Struct | `{ .key = val; … }` | `{.x = 1; .y = 2;}` |
 | Null | empty slot or `null` keyword | `.x = ;`, `.x = null;` |
 | Octet stream | `\x00 … binary … \x00` | raw bytes |
-| Version directive (spec 1.1) | `#!bovnar <major>.<minor>` (first line) | `#!bovnar 1.1` |
+| Version directive (spec 1.1) | `#!bovnar <major>.<minor>` (first comment) | `#!bovnar 1.1` |
 | Datetime (spec 1.1) | `<datetime:width,epoch>` signed epoch seconds | `<datetime:64,unix> 1750000000` |
 | Datetime literal (spec 1.1) | ISO-8601 (`Z` or `±HH:MM` offset, optional fraction); bare form infers `<datetime:64,unix>` | `2026-06-15T12:00:00+02:00` |
 

@@ -3341,6 +3341,49 @@ static void test_r4_float_fix_and_float_dec_are_one_word(void)
 	}
 }
 
+static void test_r5_a_parameterless_family_refuses_a_zero_width(void)
+{
+	/* The check tested the parameter's VALUE, so a width of 0 -- "the
+	 * default" for a family that has one -- passed under two that have none. */
+	static const char *const bad[] = {
+		".a = <utf8:0> \"x\";", ".a = <bool:0> true;",
+		".a = <utf8:00> \"x\";", ".a = <utf8:_0> \"x\";",
+		".a = <utf8:8> \"x\";", ".a = <bool:m> true;",
+	};
+	for (size_t i = 0; i < sizeof bad / sizeof *bad; i++) {
+		r4_t c = r4_str(bad[i], false);
+		ASSERT_FALSE(c.ok, bad[i]);
+		ASSERT_EQ_INT(c.err, error_illegal_value_type, bad[i]);
+	}
+	ASSERT_TRUE(r4_str(".a = <utf8> \"x\";", false).ok, "utf8 alone");
+	ASSERT_TRUE(r4_str(".a = <bool> on;", false).ok, "bool alone");
+}
+
+static void test_r5_a_struct_takes_no_annotation(void)
+{
+	/* The annotation used to survive until the first member's key and fail
+	 * there, so it was refused before every struct but an empty one. */
+	static const char *const bad[] = {
+		".a = <utf8> {};", ".a = <uint:8> {};",
+		".a = <uint:8> {.x = 1;};", ".a = <utf8> {.x = \"s\";};",
+		".a = <uint:8> [{}];", ".a = <uint:8> [[{}]];",
+		".a = [<uint:8> {}];", ".a = <float:64,m> [{.x = 1.0;}];",
+	};
+	for (size_t i = 0; i < sizeof bad / sizeof *bad; i++) {
+		r4_t c = r4_str(bad[i], false);
+		ASSERT_FALSE(c.ok, bad[i]);
+		ASSERT_EQ_INT(c.err, error_type_value_mismatch, bad[i]);
+	}
+	static const char *const good[] = {
+		".a = {};", ".a = {.x = <uint:8> 1;};", ".a = [{}, {}];",
+		".a = <uint:8> [1, 2]; .b = {.c = 1;};",
+		".a = {.b = <uint:8> 1; .c = {.d = 2;};};",
+		".a = [{.x = <uint:8> 1;}, {.x = <uint:8> 2;}];",
+	};
+	for (size_t i = 0; i < sizeof good / sizeof *good; i++)
+		ASSERT_TRUE(r4_str(good[i], false).ok, good[i]);
+}
+
 static void test_r4_nothing_but_a_dot_or_an_index_after_an_index(void)
 {
 	static const char *const bad[] = {
@@ -3502,6 +3545,8 @@ int main(void)
 	test_r4_eof_inside_a_utf8_sequence();
 	test_r4_directive_padding_and_peek();
 	test_r4_float_fix_and_float_dec_are_one_word();
+	test_r5_a_parameterless_family_refuses_a_zero_width();
+	test_r5_a_struct_takes_no_annotation();
 	test_r4_nothing_but_a_dot_or_an_index_after_an_index();
 	test_r4_bracket_cannot_close_across_a_struct();
 

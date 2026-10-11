@@ -2,8 +2,8 @@
 
 **The 2 is the library's, not the format's.** Bovnar 2.0.0 implements **spec
 1.2**, which is additive over 1.1, and the version directive stays in the 1.x
-line. (One accepted spelling decodes differently — a `tai` leap-second literal —
-and a handful of malformed inputs are no longer let through; see
+line. (A few accepted inputs read differently — a `tai` leap-second literal
+above all — and a handful of malformed ones are no longer let through; see
 *Compatibility*.) The major moved because programs built against
 1.1 have to change — the C ABI breaks and so does the Python API. From this
 release on, the library version and the spec version are separate numbers.
@@ -24,7 +24,8 @@ translated, at parse time, into the same unit a native spelling produces.
 
 Like every construct added after 1.0 it is **opt-in per document**: it needs the
 `#!bovnar 1.2` directive, and without one `ucum:mm[Hg]` is simply not a unit.
-Native units are unaffected in every version. What a 1.1 reader accepted and
+Native units are unaffected in every version — the registry is not gated, so a
+new unit or the compact `km` reads in any document. What a 1.1 reader accepted and
 this one treats differently is listed, in full, under *Compatibility* below.
 
 For C consumers: rebuild against the new headers. `libbvnr.so` moves to
@@ -153,10 +154,13 @@ else. What does differ:
     still deliver such an array element by element). A consumer that read such
     an array as one block, which the specification said it could, was computing
     wrong numbers.
-- **One accepted document decodes to a different value.** A `tai` datetime
+- **A few accepted documents read as a different value.** A `tai` datetime
   literal spelling a known leap second — `2016-12-31T23:59:60Z` — now has its
   own value, one second lower than before; 1.1 collapsed it onto the second
-  after it.
+  after it. `0e999999999999999999999` is 0, where the number helpers (and so
+  `query` and `convert`) delivered +infinity. And a path into a nested
+  `/`-matrix resolved to the wrong element: in `[[1]/[2]] / [[3]/[4]]`,
+  `[1][0][0][0]` answered 1 and answers 3.
 - **Reader fixes that refuse, or re-read, input 1.1 let through:** a byte-order
   mark after leading whitespace; a malformed `#!bovnar` directive with no
   trailing newline; an array left open at its `;` (`.a = [1;`), which used to
@@ -168,15 +172,24 @@ else. What does differ:
   index (`&.a[0]b`); a comment cut off inside a UTF-8 sequence at end-of-input;
   quoted digits that spell a special number and exceed their width
   (`<uint:8,_36> "inf"` is 24171); a fractional datetime literal whose UTC
-  year leaves 0000–9999. And in `<float:64,s>[<float:64> 1, 3]` the `3` keeps
+  year leaves 0000–9999; a width of zero on `utf8` or `bool` (`<utf8:0>`,
+  `error_illegal_value_type` like any other parameter there); a type annotation
+  before an empty struct (`<utf8> {}`, `<uint:8> [{}]` — before a struct with
+  members it was always `error_type_value_mismatch`). And in `<float:64,s>[<float:64> 1, 3]` the `3` keeps
   the array's unit, where 1.1 delivered it with none.
 - **Two array rules are now applied as written.** The width of a `/`-row
   counted a nested array twice: `[[1]]/[null, null]` was accepted and is
   `error_array_row_size_mismatch`, while `[[1], [2]]/[null, null]` was refused
-  and is valid — the one fix here that also *accepts* documents 1.1 refused.
-  And the document tier judged homogeneity against the first non-null element
-  only, so a `null` there hid a mismatch behind it (`[[null], [1], ["x"]]`);
-  the verdict no longer depends on element order.
+  and is valid. And the document tier judged homogeneity against the first
+  non-null element only, so a `null` there hid a mismatch behind it
+  (`[[null], [1], ["x"]]`); the verdict no longer depends on element order.
+- **Three fixes also *accept* documents 1.1 refused:** the row width above;
+  rectangular nestings of `/`-matrices such as
+  `[[[1,1]/[2,2], null], [null, null]]`, which were refused as ragged; and a
+  `#!bovnar` directive with more than 21 spaces before its version.
+- **Two limits now hold where they did not**, for a reader that sets them:
+  `max_array_items` never limited an array of structs, and `max_file_size`
+  depended on how the source was chunked.
 - **Eight unit factors were corrected** — `elle` by 3.3×10⁻⁴,
   `klafter`/`rute`/`morgen` by about 10⁻⁶, and `inHg`, `Da`, `slug`, `ft_lb`
   below 2×10⁻⁹. A document's digits are unchanged; what they convert to is not.

@@ -2225,8 +2225,11 @@ value_type_spec_t bvn_parse_type_annotation(
 	if (r.family == vt_bool || r.family == vt_utf8) {
 		/* bool and utf8 are parameterless families: a width, base, q, or
 		 * unit parameter is error_illegal_value_type. (q is already
-		 * rejected above for any non-float_fix family.) */
-		if (r.width != 0u || r.base != 0u || *unit_buf_len != 0u) {
+		 * rejected above for any non-float_fix family.) The test is on a
+		 * parameter being PRESENT, not on its value: <utf8:0> and <bool:0>
+		 * state a width and are refused like <utf8:8>. */
+		if (have_width || have_base || r.width != 0u || r.base != 0u ||
+		    *unit_buf_len != 0u) {
 			*type_ok = false;
 			return r;
 		}

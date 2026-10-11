@@ -22,7 +22,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <meta property="article:published_time" content="2026-05-14">
-<meta property="article:modified_time" content="2026-10-10">
+<meta property="article:modified_time" content="2026-10-11">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar EBNF Grammar">
@@ -32,7 +32,7 @@
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
 <link rel="alternate" type="text/plain" href="/doc/12_bovnar.ebnf">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar EBNF Grammar", "description": "The formal EBNF grammar of the Bovnar format, annotated against the reference lexer and validator.", "url": "https://www.bovnar.io/docs/grammar/", "mainEntityOfPage": "https://www.bovnar.io/docs/grammar/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-10-10", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar EBNF Grammar", "item": "https://www.bovnar.io/docs/grammar/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar EBNF Grammar", "description": "The formal EBNF grammar of the Bovnar format, annotated against the reference lexer and validator.", "url": "https://www.bovnar.io/docs/grammar/", "mainEntityOfPage": "https://www.bovnar.io/docs/grammar/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-10-11", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar EBNF Grammar", "item": "https://www.bovnar.io/docs/grammar/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
@@ -46,6 +46,17 @@
 (*    ( )  = grouping           |  = alternation                      *)
 (*    ,    = concatenation      ;  = rule terminator                  *)
 (*    &quot;…&quot;  = literal terminal   (*…*) = comment                       *)
+(*  TWO EXTENSIONS to that notation, used throughout: inside a         *)
+(*  terminal &quot;\xNN&quot; denotes the single byte NN, not four characters;   *)
+(*  and a rule whose body is only a comment (unit-char, byte, the      *)
+(*  UTF-8 classes of §12) is a BYTE CLASS defined by that comment --   *)
+(*  the role ISO 14977 gives a ? special sequence ?. It is not the     *)
+(*  empty production.                                                  *)
+(*  Updated: 2026-10-11 — review pass: a struct takes no annotation,  *)
+(*    utf8/bool refuse a zero width too, digit alphabets, the default  *)
+(*    Q, eight reserved words in the symbol section, 0xC2 in a         *)
+(*    comment, ws-mandatory after a comment, the comment exception to  *)
+(*    resync, DIGIT in profile-name.                                   *)
 (*  Updated: 2026-10-10 — spec 1.2: the unit-profile notation        *)
 (*    (profile-unit), whitespace inside a type parameter as an error,  *)
 (*    array homogeneity by unit; consistency pass vs the reader -- a   *)
@@ -145,14 +156,17 @@ utf8-bom     = &quot;\xEF\xBB\xBF&quot; ;
 (* Version directive (spec 1.1): an OPTIONAL leading comment of the    *)
 (* form &quot;#!bovnar &lt;major&gt;.&lt;minor&gt;&quot; declaring the spec version the      *)
 (* document targets. It is recognised only as the very first comment   *)
-(* (after the optional BOM and whitespace); a &quot;#!bovnar …&quot; on any       *)
-(* later line is an ordinary comment. Lexically it IS a comment, so a   *)
+(* (after the optional BOM and whitespace); a &quot;#!bovnar …&quot; after any    *)
+(* other comment or any content is an ordinary comment. Lexically it IS a comment, so a   *)
 (* spec-1.0 reader skips it transparently — the declaration is purely   *)
 (* additive. A 1.1+ reader parses it, exposes the version, and (in      *)
 (* strict mode) rejects a version it does not support. Each component   *)
 (* is a decimal integer with no leading zero (a bare &quot;0&quot; excepted).     *)
 (* A malformed version after the &quot;!bovnar&quot; prefix is                    *)
-(* error_invalid_spec_version.                                          *)
+(* error_invalid_spec_version -- it is NOT re-read as a comment, though *)
+(* the optional below and `comment` would together derive it: once     *)
+(* &quot;#!bovnar&quot; and an hspace open the first comment, the line is a       *)
+(* directive or an error.                                               *)
 (* The directive accepts ONLY horizontal whitespace (HT or SP) around   *)
 (* its components — not the LF/CR/VT/FF that &quot;ws-char&quot; also covers.      *)
 version-directive = &quot;#&quot; , &quot;!bovnar&quot; , hspace , {hspace} ,
@@ -175,8 +189,10 @@ ws           = {ws-char | comment} ;
 
 (* At least one whitespace character, followed by optional further    *)
 (* whitespace and comments.  Used as the mandatory separator before   *)
-(* an inline unit suffix.                                             *)
-ws-mandatory = ws-char , {ws-char | comment} ;
+(* an inline unit suffix.  A comment&#39;s own line end is a ws-char for   *)
+(* this purpose, so after a STRING (where &quot;#&quot; may follow directly) a   *)
+(* comment alone separates: &quot;text&quot;# c&lt;LF&gt;m carries the unit m.         *)
+ws-mandatory = ( ws-char | comment ) , {ws-char | comment} ;
 ws-char      = &quot;\x09&quot;             (* HT  *)
              | &quot;\x0A&quot;             (* LF  *)
              | &quot;\x0B&quot;             (* VT  *)
@@ -219,8 +235,8 @@ id-start     = ALPHA | &quot;_&quot; | utf8-leader ;
 (* Accepted: &quot;+&quot;, &quot;-&quot;, digits, alpha, &quot;_&quot;,                            *)
 (*   UTF-8 leader bytes 0xC3–0xF4, UTF-8 continuation bytes 0x80–0xBF.*)
 (* Hard-error bytes: 0x00–0x08, 0x0E–0x1F, 0x7F, 0xC2, punct:       *)
-(*   &quot; # , . / ; &lt; &gt; [ ] { } = ! $ % &amp; &#39; ( ) * : ? @ \ ^ ` | ~    *)
-(* &quot;=&quot; terminates the body (ACT_value_intro).                         *)
+(*   &quot; # , . / ; &lt; &gt; [ ] { } ! $ % &amp; &#39; ( ) * : ? @ \ ^ ` | ~      *)
+(* &quot;=&quot; is not one of them: it terminates the body (ACT_value_intro).  *)
 (* Whitespace terminates the body (ACT_to_identifier_outro), after    *)
 (* which only &quot;=&quot; is accepted (with comments permitted between).      *)
 id-body-char = &quot;+&quot; | &quot;-&quot;
@@ -245,6 +261,11 @@ id-body-char = &quot;+&quot; | &quot;-&quot;
 (* handled by ACT_type_null_then_new_array_value,                     *)
 (* ACT_type_null_then_array_outro, and ACT_type_null_then_value_outro  *)
 (* from the type_outro state.                                         *)
+(*                                                                    *)
+(* ONE VALUE FORM TAKES NO ANNOTATION: a struct. An annotation in     *)
+(* force where its &quot;{&quot; opens -- written before it, or inherited from  *)
+(* the array it is an element of -- is error_type_value_mismatch.     *)
+(* The production below is wider than that; the constraint is here.   *)
 
 value        = [type-annotation , ws] , ( scalar-with-unit | raw-value ) ;
 
@@ -366,7 +387,8 @@ type-annotation = &quot;&lt;&quot; , ws , param-type , ws , &quot;&gt;&quot; ;
 (* (&quot;float&quot;, &quot;float_fix&quot;, or &quot;float_dec&quot;) is dispatched in           *)
 (* bvn_parse_type_annotation.                                         *)
 (* &quot;bool&quot; and &quot;utf8&quot; are parameterless families: any width, base, q,  *)
-(* or unit parameter is error_illegal_value_type.  bool&#39;s only valid   *)
+(* or unit parameter is error_illegal_value_type -- a width of 0      *)
+(* included; the test is on presence.  bool&#39;s only valid               *)
 (* values are the bool keywords (see bool-value, §3).                  *)
 (* &quot;datetime&quot; (spec 1.1) is a timestamp: a signed integer seconds count    *)
 (* validated like sint.  It accepts an optional width parameter (as sint)   *)
@@ -413,9 +435,11 @@ param-type   = (&quot;uint&quot; | &quot;sint&quot; | &quot;float&quot; | &quot;
 (* the implementation was leniently wrong and now matches what is      *)
 (* written here.                                                      *)
 (*                                                                     *)
-(* A &quot;,&quot; or &quot;:&quot; nested inside a UCUM annotation or bracketed atom is   *)
-(* part of profile-code and NOT a separator, so &quot;ucum:mL{cells,tot}&quot;   *)
-(* is one parameter and not two.                                       *)
+(* A &quot;,&quot; or &quot;:&quot; nested inside a UCUM annotation (&quot;{…}&quot;) or bracketed   *)
+(* atom (&quot;[…]&quot;) is part of profile-code and NOT a separator, so        *)
+(* &quot;ucum:mL{cells,tot}&quot; is one parameter and not two, and a stray      *)
+(* comma in &quot;ucum:[IU,]&quot; is a malformed unit (error_unit_illegal), not *)
+(* a malformed parameter list.                                         *)
 (*                                                                     *)
 (* ONE EXCEPTION, AND IT IS A PROFILE&#39;S: inside a parameter that       *)
 (* carries a profile NAMESPACE, whitespace is neither deleted nor      *)
@@ -452,8 +476,12 @@ width-param  = DIGIT , {DIGIT} ;
 
 (* Base: underscore followed by one or more decimal digits.           *)
 (* Valid values: 2–62, 64 (standard Base64), 85 (Ascii85).           *)
-(* Bases 64 and 85 are uint-only: their alphabets use &#39;+&#39;/&#39;-&#39; as       *)
-(*   digits, leaving no sign character, so sint+64/85 is illegal.      *)
+(* Digits, lowest first: 0-9 a-z for 2–36, case-INSENSITIVE; 0-9 a-z  *)
+(*   A-Z for 37–62, case-sensitive (a = 10, A = 36); A-Z a-z 0-9 + /  *)
+(*   for 64 (RFC 4648, no padding); &quot;!&quot; (0x21) .. &quot;u&quot; (0x75) for 85.  *)
+(* Bases 64 and 85 are uint-only: their alphabets take sign           *)
+(*   characters as digits (&quot;+&quot; in both, &quot;-&quot; in 85), so sint+64/85 is   *)
+(*   illegal.                                                          *)
 (* &quot;float&quot; accepts only base 10 (or absent, → 10) or base 16;        *)
 (*   other bases → error_illegal_value_type.                          *)
 (* &quot;float_fix&quot; and &quot;float_dec&quot; reject the base parameter entirely:   *)
@@ -472,6 +500,7 @@ base-param   = &quot;_&quot; , DIGIT , {DIGIT} ;
 (*   Value = raw_signed_integer × 2^(-Q).                             *)
 (* Valid only for &quot;float_fix&quot;; rejected for all other families.       *)
 (* Valid range: 0 ≤ Q &lt; effective_width (width 0 → effective 64).    *)
+(* Omitted, Q is 0: &lt;float_fix:32&gt; is &lt;float_fix:32,q0&gt;.              *)
 (* Q is stored in value_type_spec_t.base and retrieved via            *)
 (* bvn_effective_q; bvn_effective_base always returns 10 for          *)
 (* float_fix and float_dec.                                           *)
@@ -534,13 +563,14 @@ unit-char    = (* any byte accepted by copy_type_byte that is not     *)
 profile-unit = profile-name , ws , &quot;:&quot; , ws , profile-code ;
 profile-name = name-head , {name-tail} ;   (* &quot;ucum&quot;, &quot;qudt-qk&quot;       *)
 name-head    = lower-alpha ;   (* a digit-led parameter is a width *)
-name-tail    = lower-alpha | digit | &quot;-&quot; ;
+name-tail    = lower-alpha | DIGIT | &quot;-&quot; ;
 lower-alpha  = &quot;a&quot;|&quot;b&quot;|&quot;c&quot;|&quot;d&quot;|&quot;e&quot;|&quot;f&quot;|&quot;g&quot;|&quot;h&quot;|&quot;i&quot;|&quot;j&quot;|&quot;k&quot;|&quot;l&quot;|&quot;m&quot;
              | &quot;n&quot;|&quot;o&quot;|&quot;p&quot;|&quot;q&quot;|&quot;r&quot;|&quot;s&quot;|&quot;t&quot;|&quot;u&quot;|&quot;v&quot;|&quot;w&quot;|&quot;x&quot;|&quot;y&quot;|&quot;z&quot; ;
 (* NOTE: after a profile-code the ws before &quot;,&quot; or &quot;&gt;&quot; may not contain *)
 (* a comment -- the reader refuses &quot;#&quot; there.                          *)
 profile-code = profile-char , {profile-char} ;
-profile-char = (* any unit-char, plus &quot;,&quot; at brace depth &gt;= 1 -- a    *)
+profile-char = (* any unit-char, plus &quot;,&quot; at brace or bracket depth    *)
+               (* &gt;= 1 (&quot;{&quot; or &quot;[&quot; open) -- a                        *)
                (* UCUM annotation may contain a comma (&quot;{cells,tot}&quot;) *)
                (* and the type-parameter scanner tracks brace and     *)
                (* bracket depth so that one does not end the          *)
@@ -631,8 +661,8 @@ profile-char = (* any unit-char, plus &quot;,&quot; at brace depth &gt;= 1 -- a 
 (*   &quot;G&quot; = gauss vs giga.  (Ω = U+2126: 0xE2 0x84 0xA6; ° = U+00B0: 0xC2    *)
 (*   0xB0)                                                                  *)
 (*                                                                     *)
-(* unit-exponent = [exp-sign] exp-digit , { exp-digit }               *)
-(*               | &quot;^&quot; [&quot;-&quot;|&quot;+&quot;] ASCII-digit , { ASCII-digit } ;      *)
+(* unit-exponent = [exp-sign] exp-digit , [exp-digit] , [exp-digit]   *)
+(*               | &quot;^&quot; [&quot;-&quot;|&quot;+&quot;] DIGIT , [DIGIT] , [DIGIT] ;          *)
 (*                                                                     *)
 (* exp-sign  = &quot;⁺&quot; (* U+207A: 0xE2 0x81 0xBA, positive / no-op *)    *)
 (*           | &quot;⁻&quot; ; (* U+207B: 0xE2 0x81 0xBB, negate exponent *)   *)
@@ -641,7 +671,7 @@ profile-char = (* any unit-char, plus &quot;,&quot; at brace depth &gt;= 1 -- a 
 (*   (U+2070 / 00B9 / 00B2 / 00B3 / 2074–2079)                       *)
 (*                                                                     *)
 (* &quot;⁺&quot; is accepted but has no effect (same as absent).               *)
-(* The ASCII form &quot;^[+-]?[0-9]+&quot; maps to the same internal values as  *)
+(* The ASCII form &quot;^[+-]?[0-9]{1,3}&quot; maps to the same internal values as *)
 (* the Unicode superscript form.                                      *)
 (*                                                                     *)
 (* An exponent is an INTEGER in [BVN_EXPONENT_MIN, BVN_EXPONENT_MAX]  *)
@@ -652,8 +682,9 @@ profile-char = (* any unit-char, plus &quot;,&quot; at brace depth &gt;= 1 -- a 
 (* string fails to resolve as a base symbol. A value that scans but   *)
 (* lands outside the range (&quot;m^200&quot;) is refused on the range check.   *)
 (*                                                                     *)
-(* ⁰ is a digit here only in a MULTI-digit exponent: it exists so     *)
-(* &quot;m¹⁰⁰&quot; can be written, and a leading &quot;m⁰&quot; is still no unit.       *)
+(* ⁰ is a digit like the others, leading or not (&quot;m⁰⁰⁷&quot; and &quot;m^007&quot;  *)
+(* are m⁷); it exists so &quot;m¹⁰⁰&quot; can be written. An exponent that      *)
+(* comes to zero, however spelled, is still no unit.                  *)
 
 
 (* ─────────────────────────────────────────────────────────────────  *)
@@ -740,7 +771,8 @@ unicode-escape = &quot;u&quot; , &quot;{&quot; , hex-digit ,
 (* (D800..DFFF) or above 10FFFF is error_invalid_codepoint; otherwise the   *)
 (* scalar is UTF-8 encoded.  A \x byte must leave the whole string valid     *)
 (* UTF-8 (else error_invalid_utf8_byte).                                    *)
-hex-digit      = DIGIT | &quot;a&quot;..&quot;f&quot; | &quot;A&quot;..&quot;F&quot; ;
+hex-digit      = DIGIT | &quot;a&quot; | &quot;b&quot; | &quot;c&quot; | &quot;d&quot; | &quot;e&quot; | &quot;f&quot;
+               | &quot;A&quot; | &quot;B&quot; | &quot;C&quot; | &quot;D&quot; | &quot;E&quot; | &quot;F&quot; ;
 
 
 (* ─────────────────────────────────────────────────────────────────  *)
@@ -830,8 +862,9 @@ unit-lead-byte    = (* byte in [0xC2, 0xF4] *) ;
 (*   &quot;.&quot; is a hard error (same as in identifier body)                *)
 
 (* Reserved keywords: a symbol token whose text is exactly &quot;null&quot;,   *)
-(* &quot;true&quot;, &quot;false&quot;, &quot;on&quot;, or &quot;off&quot; is reclassified by the validator   *)
-(* (see null-value / bool-value, §3) and is NOT delivered as a symbol.*)
+(* &quot;true&quot;, &quot;false&quot;, &quot;on&quot;, &quot;off&quot;, &quot;nan&quot;, &quot;inf&quot; or &quot;ninf&quot; is            *)
+(* reclassified by the validator (see null-value / bool-value, §3,    *)
+(* and special-number, §5) and is NOT delivered as a symbol.          *)
 (* Any other bare word — including one that merely begins with a      *)
 (* keyword, like &quot;ontology&quot; or &quot;nullish&quot; — remains a symbol.          *)
 symbol        = id-start , {sym-body-char} ;
@@ -1027,11 +1060,11 @@ utf8-continuation = (* byte in [0x80, 0xBF] *) ;
 (* Printable ASCII: 0x20–0x7E *)
 printable-byte = (* byte in [0x20, 0x7E] *) ;
 
-(* High byte: any byte 0x80–0xFF.  0xC0, 0xC1, 0xF5–0xFF are         *)
-(* structurally in this range but rejected by the parallel UTF-8      *)
-(* validator (error_invalid_utf8_byte).                               *)
-high-byte    = utf8-continuation | utf8-leader
-             | (* 0xC0 | 0xC1 | 0xF5–0xFF – rejected by UTF-8 check *) ;
+(* High byte: any byte 0x80–0xFF, 0xC2 included -- a comment may hold *)
+(* U+0080–U+00BF (&quot;25 °C&quot;) though a key may not.  0xC0, 0xC1 and      *)
+(* 0xF5–0xFF are structurally in this range but rejected by the       *)
+(* parallel UTF-8 validator (error_invalid_utf8_byte).                *)
+high-byte    = (* byte in [0x80, 0xFF] *) ;
 
 byte         = (* any single byte 0x00–0xFF *) ;
 
@@ -1129,7 +1162,9 @@ byte         = (* any single byte 0x00–0xFF *) ;
      Digit characters in the value must be valid for the declared base
        (error_digit_not_in_base).
      The numeric value must fit in the declared bit-width
-       (error_value_out_of_range).
+       (error_value_out_of_range) -- for uint, sint, datetime and
+       float_fix; the bare keywords nan / inf / ninf are exempt under
+       every family.
      For &quot;float&quot;: accepted widths are 0, 16, or any multiple of 32 up to
        BVN_FLOAT_MAX_PREC (32768); accepted bases are 10 (or absent) and
        16; any other base → error_illegal_value_type.
@@ -1174,9 +1209,12 @@ byte         = (* any single byte 0x00–0xFF *) ;
 
   n) Error recovery (continue_on_error mode)
      When bvnr_read_flags_t.continue_on_error is set, any parse error
-     invokes the on_error callback and then enters the resync state
-     machine (states: resync, resync_dot, resync_string,
-     resync_string_escape, resync_comment).  The resync machine skips
+     but one INSIDE A COMMENT invokes the on_error callback and then
+     enters the resync state machine (an invalid UTF-8 sequence or a
+     control byte in a comment is reported and counted, and the comment
+     runs on to its line end: nothing is unwound and nothing is lost).
+     The resync machine (states: resync, resync_dot, resync_string,
+     resync_string_escape, resync_comment) skips
      bytes while tracking bracket and brace nesting depths, and resumes
      at whichever comes first: a &quot;;&quot; at the saved nesting depth, or the
      start of the next assignment -- a &quot;.&quot; at that depth followed by a

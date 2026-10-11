@@ -65,6 +65,56 @@ reading the grown by-value structs at the wrong size.
   `bvn_dom_node_from_i64` gives `BVN_UNIT_NONE`. The node's size is pinned by a
   compile-time assertion, and a test parses the megabyte and fails past 64 MB.
 
+### Fixed — a review of the specification, with three other readers
+
+The specification read in full beside the grammar and about four hundred
+minimal documents put to the reader, with outside models reading the same
+text independently. Two findings were the reader's; the rest were the text's.
+
+- **`<utf8:0>` and `<bool:0>` were accepted.** Both families take no
+  parameter (doc/03 §5.1), and the check tested the width's value rather
+  than its presence, so the one width that means "the default" passed under
+  two families that have none. `error_illegal_value_type`, as `<utf8:8>` was.
+- **An annotation before an empty struct was accepted.** A struct takes no
+  annotation. Before one with members the annotation survived until the first
+  member's key and failed there, as `error_type_value_mismatch` at the wrong
+  column; before `{}` there was no key to fail at, so `<utf8> {}`,
+  `<uint:8> {}` and `<uint:8> [{}]` validated. Every struct under an
+  annotation — written or inherited from its array — is
+  `error_type_value_mismatch` at its `{`. Both are in doc/03 §17 and the
+  release notes' *Compatibility*.
+- **doc/03 said things the reader does not do, or did not say what it does.**
+  §3.4 gated "any syntax introduced after 1.0" while the compact prefix form,
+  new in this release, reads in every document: the gate is on constructs, and
+  the unit registry is not one. §4.2 listed `=` among the bytes that are an
+  error in a key. §11.5 forbade a leading `⁰` that `m⁰⁰⁷` has. §11.7 gave a
+  profile expression over 32 components the native error code. §6.2 stated the
+  `float_fix` range as an interval a rounded literal can sit outside. §15.4's
+  octet stream declared 16 bytes over 20 and a 65536-byte chunk of two. §5.2
+  called `float_dec` "not BID" where three of its five widths are.
+- **doc/03 now states what an implementer could not derive.** The digit
+  alphabets of bases 11–62, 64 and 85; that an omitted Q is 0; what makes an
+  inline unit *match* its annotation; that a bare integer after a `datetime`
+  element inherits its type and a bare literal does not; the 255-byte cap on
+  an annotation; why a datetime literal with a fraction is held to a
+  four-digit UTC year and one without is not; that U+FEFF inside an assignment
+  is a character of a key or a symbol.
+- **§17 and the release notes were short.** Both called the `tai` leap second
+  the one accepted input that reads differently, beside `0e999…` and the
+  nested-matrix path below; both called the row-width fix the one that also
+  accepts, beside two others; neither listed the padded directive or the two
+  limits. §17 said `[[1],[2]]/[null,null]` changed and, a sentence later, that
+  such arrays had not.
+- **The grammar, the profile reference, the draft and the conformance
+  document.** doc/12 referenced an undefined `digit`, left `0xC2` out of a
+  comment, reserved five words in its symbol section, sent every error to
+  resync and could not derive a unit after `"text"# comment`. doc/11 let a
+  namespace begin with a digit. The IETF draft gave `<uint:32> "hello"` the
+  wrong error, a currency no exponent, a profile no opaque outcome and a
+  recovery count that always meant a dropped value. doc/13 said one line per
+  event and has none for the end of the stream; doc/03 Appendix A showed the
+  family event carrying `"float"` where it carries the annotation.
+
 ### Fixed — three things the fourth round listed and left
 
 - **`BVN_UNIT_REDUCE` refused a legal unit whose folded scale no `double`

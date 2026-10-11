@@ -1235,7 +1235,7 @@ li > p:last-of-type:only-child {
 </tr></thead>
 <tfoot><tr>
 <td class="left">Sonntag</td>
-<td class="center">Expires 13 April 2027</td>
+<td class="center">Expires 14 April 2027</td>
 <td class="right">[Page]</td>
 </tr></tfoot>
 </table>
@@ -1248,12 +1248,12 @@ li > p:last-of-type:only-child {
 <dd class="internet-draft">draft-sonntag-bovnar-00</dd>
 <dt class="label-published">Published:</dt>
 <dd class="published">
-<time datetime="2026-10-10" class="published">10 October 2026</time>
+<time datetime="2026-10-11" class="published">11 October 2026</time>
     </dd>
 <dt class="label-intended-status">Intended Status:</dt>
 <dd class="intended-status">Informational</dd>
 <dt class="label-expires">Expires:</dt>
-<dd class="expires"><time datetime="2027-04-13">13 April 2027</time></dd>
+<dd class="expires"><time datetime="2027-04-14">14 April 2027</time></dd>
 <dt class="label-authors">Author:</dt>
 <dd class="authors">
 <div class="author">
@@ -1308,7 +1308,7 @@ error model, and the media type registration for the format.<a href="#section-ab
         time. It is inappropriate to use Internet-Drafts as reference
         material or to cite them other than as "work in progress."<a href="#section-boilerplate.1-3" class="pilcrow">¶</a></p>
 <p id="section-boilerplate.1-4">
-        This Internet-Draft will expire on 13 April 2027.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
+        This Internet-Draft will expire on 14 April 2027.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="copyright">
@@ -2052,8 +2052,10 @@ unit, whether or not the document states them.<a href="#section-3-6" class="pilc
 <p id="section-3-7">A value's <em>kind</em> is determined by the value token alone and is not
 affected by the annotation. An annotation whose family is incompatible
 with the kind of the value that follows it is an error; it never
-reinterprets the token. <code>&lt;uint:32&gt; "hello"</code> is not the integer zero, it
-is <code>error_type_value_mismatch</code>.<a href="#section-3-7" class="pilcrow">¶</a></p>
+reinterprets the token. <code>&lt;uint:32&gt; hello</code> is not the integer zero, it
+is <code>error_type_value_mismatch</code>. (A <em>quoted</em> string is a carrier <code>uint</code>
+does accept, so <code>&lt;uint:32&gt; "hello"</code> is refused one step later, for its
+digits: <code>error_digit_not_in_base</code>.)<a href="#section-3-7" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="encoding">
@@ -2233,8 +2235,8 @@ and reference array indexing) are invalid exactly as they would be to a
 <ul class="normal">
 <li class="normal" id="section-5-6.1">
           <p id="section-5-6.1.1">The directive is recognized only as the <strong>very first comment</strong>, after
-an optional BOM and leading blanks. <code>#!bovnar 1.1</code> on any later line,
-or after any earlier comment, is an ordinary comment.<a href="#section-5-6.1.1" class="pilcrow">¶</a></p>
+an optional BOM and leading blanks, blank lines included. <code>#!bovnar 1.1</code>
+after any earlier comment, or after any content, is an ordinary comment.<a href="#section-5-6.1.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-5-6.2">
           <p id="section-5-6.2.1"><code>#!bovnar</code> not followed by horizontal whitespace, such as
@@ -2279,7 +2281,7 @@ restriction on where a comment may start, stated below.<a href="#section-6.1-1" 
 <div class="lang-abnf sourcecode" id="section-6.1-2">
 <pre>
 ws           = *( blank / comment )
-ws-req       = blank *( blank / comment )
+ws-req       = ( blank / comment ) *( blank / comment )
 comment      = "#" *comment-char [ CR / LF ]
 comment-char = HTAB / VT / FF / %x20-7E / %x80-FF
 </pre><a href="#section-6.1-2" class="pilcrow">¶</a>
@@ -2301,7 +2303,9 @@ forbidden placements; this prose forbids them.<a href="#section-6.1-4" class="pi
 # .bad = 42# directly after a number: error_unexpected_input_byte
 ~~~ `ws-req`
 denotes a mandatory separator, required in exactly one place: before an
-inline unit suffix ({{inline-units}}).
+inline unit suffix ({{inline-units}}). A comment's own line end serves as
+the blank, so after a string - where `#` may follow directly - a comment
+alone separates the value from its unit.
 
 ## Keys
 
@@ -2701,8 +2705,17 @@ annotation</strong> inherited by every element that does not carry its own:
         </ol>
 <p id="section-7.1-5">An annotation attached to the key rather than the value, as in
 <code>.k&lt;uint:32&gt; = 42;</code>, is an error.<a href="#section-7.1-5" class="pilcrow">¶</a></p>
-<p id="section-7.1-6">A wholly empty annotation, <code>&lt;&gt;</code> or <code>&lt; &gt;</code>, is
-<code>error_unexpected_input_byte</code>.<a href="#section-7.1-6" class="pilcrow">¶</a></p>
+<p id="section-7.1-6">An element annotation describes that element only: in <code>[&lt;uint:8&gt; 1, 300]</code>
+the <code>300</code> is an unannotated integer. The one exception is <code>datetime</code>,
+after which a following bare integer is a <code>datetime</code> of the same width
+and epoch (<a href="#synthesis" class="auto internal xref">Section 7.4</a>).<a href="#section-7.1-6" class="pilcrow">¶</a></p>
+<p id="section-7.1-7">A struct takes no annotation - its members carry their own. An annotation
+in force where a <code>{</code> opens, whether written before the struct or
+inherited from the array it is an element of, is
+<code>error_type_value_mismatch</code>: <code>&lt;utf8&gt; {}</code> and <code>&lt;uint:8&gt; [{.x = 1;}]</code> are
+both refused.<a href="#section-7.1-7" class="pilcrow">¶</a></p>
+<p id="section-7.1-8">A wholly empty annotation, <code>&lt;&gt;</code> or <code>&lt; &gt;</code>, is
+<code>error_unexpected_input_byte</code>.<a href="#section-7.1-8" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="type-families">
@@ -2782,7 +2795,8 @@ annotation</strong> inherited by every element that does not carry its own:
           </tbody>
         </table>
 <p id="section-7.2-2"><code>utf8</code> and <code>bool</code> are parameterless; any parameter is
-<code>error_illegal_value_type</code>.<a href="#section-7.2-2" class="pilcrow">¶</a></p>
+<code>error_illegal_value_type</code>, a width of zero (<code>&lt;utf8:0&gt;</code>) included. For
+<code>float_fix</code> an omitted <code>qN</code> is <code>q0</code>.<a href="#section-7.2-2" class="pilcrow">¶</a></p>
 <p id="section-7.2-3"><code>datetime</code> is a version 1.1 family and is <code>error_illegal_value_type</code> in a
 1.0 or undeclared document.<a href="#section-7.2-3" class="pilcrow">¶</a></p>
 <div id="value-compatibility">
@@ -2860,8 +2874,9 @@ annotation</strong> inherited by every element that does not carry its own:
 <p id="section-7.2.1-2">A value whose kind is incompatible with the annotated family is
 <code>error_type_value_mismatch</code>. A dot or exponent in an integer-typed value
 is likewise <code>error_type_value_mismatch</code>.<a href="#section-7.2.1-2" class="pilcrow">¶</a></p>
-<p id="section-7.2.1-3">Two value kinds stand outside this table. A null takes any annotation and
-carries its type (<a href="#null" class="auto internal xref">Section 6.7</a>). An <strong>octet stream</strong> under an annotation is
+<p id="section-7.2.1-3">Three value kinds stand outside this table. A null takes any annotation
+and carries its type (<a href="#null" class="auto internal xref">Section 6.7</a>). A struct takes none
+(<code>error_type_value_mismatch</code>, above). An <strong>octet stream</strong> under an annotation is
 accepted under <em>every</em> family: the annotation is carried with the stream
 and is <strong>not checked</strong> against it, so <code>&lt;uint:8&gt;</code>, <code>&lt;utf8&gt;</code> or <code>&lt;bool&gt;</code> in
 front of an octet stream is not <code>error_type_value_mismatch</code>. It says
@@ -2980,20 +2995,63 @@ base-param   = "_" 1*DIGIT
               <p id="section-7.3.2-3.1.1"><code>uint</code> and <code>sint</code> accept bases 2 through 62.<a href="#section-7.3.2-3.1.1" class="pilcrow">¶</a></p>
 </li>
             <li class="normal" id="section-7.3.2-3.2">
-              <p id="section-7.3.2-3.2.1">Bases 64 and 85 are <strong><code>uint</code> only</strong>. Their Base64 and Ascii85 alphabets
-use <code>+</code> and <code>-</code> as digits, so a sign cannot be distinguished; a signed
-value in these bases is <code>error_illegal_value_type</code>.<a href="#section-7.3.2-3.2.1" class="pilcrow">¶</a></p>
+              <p id="section-7.3.2-3.2.1">Bases 64 and 85 are <strong><code>uint</code> only</strong>. Their alphabets take the sign
+characters as digits - <code>+</code> in both, <code>-</code> in Ascii85 - so a sign cannot be
+distinguished; a signed value in these bases is
+<code>error_illegal_value_type</code>.<a href="#section-7.3.2-3.2.1" class="pilcrow">¶</a></p>
 </li>
             <li class="normal" id="section-7.3.2-3.3">
-              <p id="section-7.3.2-3.3.1"><code>float</code> accepts only base 10 or 16. Any other base is
-<code>error_illegal_value_type</code>.<a href="#section-7.3.2-3.3.1" class="pilcrow">¶</a></p>
+              <p id="section-7.3.2-3.3.1">Any other base (<code>_0</code>, <code>_1</code>, <code>_63</code>, <code>_99</code>) is <code>error_illegal_value_type</code>.<a href="#section-7.3.2-3.3.1" class="pilcrow">¶</a></p>
 </li>
             <li class="normal" id="section-7.3.2-3.4">
-              <p id="section-7.3.2-3.4.1"><code>float_fix</code> and <code>float_dec</code> forbid the base parameter entirely; decimal
-is implicit. A base parameter on either is <code>error_illegal_value_type</code>.<a href="#section-7.3.2-3.4.1" class="pilcrow">¶</a></p>
+              <p id="section-7.3.2-3.4.1"><code>float</code> accepts only base 10 or 16. Any other base is
+<code>error_illegal_value_type</code>.<a href="#section-7.3.2-3.4.1" class="pilcrow">¶</a></p>
+</li>
+            <li class="normal" id="section-7.3.2-3.5">
+              <p id="section-7.3.2-3.5.1"><code>float_fix</code> and <code>float_dec</code> forbid the base parameter entirely; decimal
+is implicit. A base parameter on either is <code>error_illegal_value_type</code>.<a href="#section-7.3.2-3.5.1" class="pilcrow">¶</a></p>
 </li>
           </ul>
-<p id="section-7.3.2-4">A digit outside the declared base is <code>error_digit_not_in_base</code>.<a href="#section-7.3.2-4" class="pilcrow">¶</a></p>
+<p id="section-7.3.2-4">The digits of a base, lowest value first, are:<a href="#section-7.3.2-4" class="pilcrow">¶</a></p>
+<span id="name-digit-alphabets"></span><table class="center" id="table-6">
+            <caption>
+<a href="#table-6" class="selfRef">Table 6</a>:
+<a href="#name-digit-alphabets" class="selfRef">Digit alphabets</a>
+            </caption>
+<thead>
+              <tr>
+                <th class="text-left" rowspan="1" colspan="1">Base</th>
+                <th class="text-left" rowspan="1" colspan="1">Digits</th>
+                <th class="text-left" rowspan="1" colspan="1">Case</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="text-left" rowspan="1" colspan="1">2 to 36</td>
+                <td class="text-left" rowspan="1" colspan="1">
+                  <code>0</code>-<code>9</code>, then <code>a</code>-<code>z</code> (10 to 35)</td>
+                <td class="text-left" rowspan="1" colspan="1">insensitive</td>
+              </tr>
+              <tr>
+                <td class="text-left" rowspan="1" colspan="1">37 to 62</td>
+                <td class="text-left" rowspan="1" colspan="1">
+                  <code>0</code>-<code>9</code>, <code>a</code>-<code>z</code> (10 to 35), <code>A</code>-<code>Z</code> (36 to 61)</td>
+                <td class="text-left" rowspan="1" colspan="1">sensitive</td>
+              </tr>
+              <tr>
+                <td class="text-left" rowspan="1" colspan="1">64</td>
+                <td class="text-left" rowspan="1" colspan="1">
+                  <code>A</code>-<code>Z</code>, <code>a</code>-<code>z</code>, <code>0</code>-<code>9</code>, <code>+</code>, <code>/</code> (<span>[<a href="#RFC4648" class="cite xref">RFC4648</a>]</span>, no padding)</td>
+                <td class="text-left" rowspan="1" colspan="1">sensitive</td>
+              </tr>
+              <tr>
+                <td class="text-left" rowspan="1" colspan="1">85</td>
+                <td class="text-left" rowspan="1" colspan="1">the 85 characters <code>!</code> (%x21, value 0) to <code>u</code> (%x75, value 84)</td>
+                <td class="text-left" rowspan="1" colspan="1">sensitive</td>
+              </tr>
+            </tbody>
+          </table>
+<p id="section-7.3.2-6">A digit outside the declared base is <code>error_digit_not_in_base</code>.<a href="#section-7.3.2-6" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="q-fractional-bits">
@@ -3005,10 +3063,13 @@ is implicit. A base parameter on either is <code>error_illegal_value_type</code>
 in a signed Q-format integer of the declared width. The mathematical
 value is <code>raw x 2^-Q</code>. <code>q</code> on any other family, or <code>N</code> not less than the
 effective width, is <code>error_illegal_value_type</code>.<a href="#section-7.3.3-1" class="pilcrow">¶</a></p>
-<p id="section-7.3.3-2">A <code>float_fix</code> value <span class="bcp14">MUST</span> lie within the declared format's signed range:
-<code>round(value x 2^Q)</code> <span class="bcp14">MUST</span> fit a signed field of <code>width</code> bits, that is,
-<code>value</code> in <code>[-2^(width-1-Q), 2^(width-1-Q) - 2^-Q]</code>. A value outside that
-range is <code>error_value_out_of_range</code>. Special numbers are exempt.<a href="#section-7.3.3-2" class="pilcrow">¶</a></p>
+<p id="section-7.3.3-2">A <code>float_fix</code> value <span class="bcp14">MUST</span> be representable in the declared format:
+<code>round(value x 2^Q)</code>, rounded once to nearest with ties to even, <span class="bcp14">MUST</span> fit
+a signed field of <code>width</code> bits. The representable values are
+<code>[-2^(width-1-Q), 2^(width-1-Q) - 2^-Q]</code>, and the test is made after
+rounding, so a literal just past either end that rounds back onto it is
+valid. A value whose rounded integer does not fit is
+<code>error_value_out_of_range</code>. Special numbers are exempt.<a href="#section-7.3.3-2" class="pilcrow">¶</a></p>
 <div class="alignLeft art-text artwork" id="section-7.3.3-3">
 <pre>
 .a = &lt;float_fix:16,q8&gt; 3.14;      # Q8/16 range [-128, 127.99609375]
@@ -3033,9 +3094,9 @@ values are not held in a binary float.<a href="#section-7.3.4-1" class="pilcrow"
 <p id="section-7.3.4-2">The number of significant decimal digits available at each width is
 given below. It is what the width can hold, not a limit a consumer
 enforces (<a href="#types" class="auto internal xref">Section 7</a>): a literal with more digits is valid.<a href="#section-7.3.4-2" class="pilcrow">¶</a></p>
-<span id="name-float_dec-precision-by-widt"></span><table class="center" id="table-6">
+<span id="name-float_dec-precision-by-widt"></span><table class="center" id="table-7">
             <caption>
-<a href="#table-6" class="selfRef">Table 6</a>:
+<a href="#table-7" class="selfRef">Table 7</a>:
 <a href="#name-float_dec-precision-by-widt" class="selfRef">float_dec precision by width</a>
             </caption>
 <thead>
@@ -3108,9 +3169,9 @@ round-trippable civil-to-seconds inverse here; supply an integer carrier.<a href
         </h3>
 <p id="section-7.4-1">An unannotated value acquires a type by synthesis. The synthesised type
 is indistinguishable from the same type written explicitly.<a href="#section-7.4-1" class="pilcrow">¶</a></p>
-<span id="name-default-type-synthesis-2"></span><table class="center" id="table-7">
+<span id="name-default-type-synthesis-2"></span><table class="center" id="table-8">
           <caption>
-<a href="#table-7" class="selfRef">Table 7</a>:
+<a href="#table-8" class="selfRef">Table 8</a>:
 <a href="#name-default-type-synthesis-2" class="selfRef">Default type synthesis</a>
           </caption>
 <thead>
@@ -3246,7 +3307,7 @@ unit-expr     = unit-factor *( unit-sep unit-factor )
 unit-factor   = unit-component / "(" unit-expr ")"
 unit-sep      = "*" / "/" / %xC2.B7        ; "*" or U+00B7 or "/"
 unit-component = [ prefix [ "~" ] ] base-unit [ unit-exp ]
-               / [ prefix [ "~" ] ] "$" currency-code
+               / [ prefix [ "~" ] ] "$" currency-code [ unit-exp ]
 unit-exp      = ( "^" [ "+" / "-" ] 1*3DIGIT )
               / ( [ sup-sign ] 1*3sup-digit )
 </pre><a href="#section-8.2-1" class="pilcrow">¶</a>
@@ -3277,9 +3338,9 @@ not <code>m(s)</code> - a group takes no exponent of its own, and parentheses <s
 balance and <span class="bcp14">MUST NOT</span> nest more than 16 deep.<a href="#section-8.2-6" class="pilcrow">¶</a></p>
 <p id="section-8.2-7"><strong>Exponents</strong> are written either as Unicode superscripts or in ASCII
 caret form:<a href="#section-8.2-7" class="pilcrow">¶</a></p>
-<span id="name-unit-exponent-forms"></span><table class="center" id="table-8">
+<span id="name-unit-exponent-forms"></span><table class="center" id="table-9">
           <caption>
-<a href="#table-8" class="selfRef">Table 8</a>:
+<a href="#table-9" class="selfRef">Table 9</a>:
 <a href="#name-unit-exponent-forms" class="selfRef">Unit exponent forms</a>
           </caption>
 <thead>
@@ -3346,9 +3407,9 @@ that unit: <code>pH</code>, <code>mph</code>, and <code>kph</code> are registry 
 as pico-henry, milli-phot, or kilo-phot. Exactly three compact spellings
 are refused by name, because for them the longest-suffix rule would
 silently pick one of two defensible readings:<a href="#section-8.3-5" class="pilcrow">¶</a></p>
-<span id="name-compact-spellings-refused-b"></span><table class="center" id="table-9">
+<span id="name-compact-spellings-refused-b"></span><table class="center" id="table-10">
           <caption>
-<a href="#table-9" class="selfRef">Table 9</a>:
+<a href="#table-10" class="selfRef">Table 10</a>:
 <a href="#name-compact-spellings-refused-b" class="selfRef">Compact spellings refused by name</a>
           </caption>
 <thead>
@@ -3495,9 +3556,9 @@ construction rather than by check.<a href="#section-8.5-5" class="pilcrow">¶</a
           <h4 id="name-interaction-with-the-annota">
 <a href="#section-8.5.1" class="section-number selfRef">8.5.1. </a><a href="#name-interaction-with-the-annota" class="section-name selfRef">Interaction With the Annotation</a>
           </h4>
-<span id="name-annotation-and-inline-unit"></span><table class="center" id="table-10">
+<span id="name-annotation-and-inline-unit"></span><table class="center" id="table-11">
             <caption>
-<a href="#table-10" class="selfRef">Table 10</a>:
+<a href="#table-11" class="selfRef">Table 11</a>:
 <a href="#name-annotation-and-inline-unit" class="selfRef">Annotation and inline unit</a>
             </caption>
 <thead>
@@ -3527,25 +3588,29 @@ construction rather than by check.<a href="#section-8.5-5" class="pilcrow">¶</a
               </tr>
             </tbody>
           </table>
-<div class="alignLeft art-text artwork" id="section-8.5.1-2">
+<p id="section-8.5.1-2">Two units are identical here when they resolve to the same set of
+components - the same base unit, prefix and exponent in each. Order and
+spelling are free (<code>m/s</code> and <code>m*s^-1</code>, <code>km</code> and <code>k~m</code>); algebra is not
+(<code>N</code> is not <code>k~g*m/s^2</code>).<a href="#section-8.5.1-2" class="pilcrow">¶</a></p>
+<div class="alignLeft art-text artwork" id="section-8.5.1-3">
 <pre>
 .a = &lt;float:64,m&gt; 1.5;        # unit from the annotation
 .b = &lt;float:64&gt; 1.5 m;        # unit from the suffix
 .c = &lt;float:64,m&gt; 1.5 m;      # valid, redundant
 
 # .d = &lt;float:64,m&gt; 1.5 s;    # error_unit_mismatch
-</pre><a href="#section-8.5.1-2" class="pilcrow">¶</a>
+</pre><a href="#section-8.5.1-3" class="pilcrow">¶</a>
 </div>
-<p id="section-8.5.1-3">This last row is the format's central guarantee in its smallest form. The
+<p id="section-8.5.1-4">This last row is the format's central guarantee in its smallest form. The
 comparison is structural and order-insensitive, since multiplication
-commutes: <code>N·m</code> and <code>m·N</code> are the same unit and do not mismatch.<a href="#section-8.5.1-3" class="pilcrow">¶</a></p>
-<p id="section-8.5.1-4">An unrecognized unit in either position is <code>error_unit_illegal</code>.<a href="#section-8.5.1-4" class="pilcrow">¶</a></p>
-<p id="section-8.5.1-5">An inline unit after a <code>utf8</code> string is accepted. The suffix path does
+commutes: <code>N·m</code> and <code>m·N</code> are the same unit and do not mismatch.<a href="#section-8.5.1-4" class="pilcrow">¶</a></p>
+<p id="section-8.5.1-5">An unrecognized unit in either position is <code>error_unit_illegal</code>.<a href="#section-8.5.1-5" class="pilcrow">¶</a></p>
+<p id="section-8.5.1-6">An inline unit after a <code>utf8</code> string is accepted. The suffix path does
 not consult the type family: <code>&lt;utf8&gt; "text" m</code> and a bare <code>"text" m</code> are
 valid and the unit is carried with the value, although the same unit as
 an annotation parameter (<code>&lt;utf8,m&gt;</code>) is <code>error_illegal_value_type</code>. The
 suffix exists for quoted <em>numeric</em> literals such as <code>&lt;uint:_16&gt; "ff" m</code>;
-producers <span class="bcp14">SHOULD NOT</span> attach one to text.<a href="#section-8.5.1-5" class="pilcrow">¶</a></p>
+producers <span class="bcp14">SHOULD NOT</span> attach one to text.<a href="#section-8.5.1-6" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
@@ -3588,12 +3653,16 @@ implement a namespace <span class="bcp14">MUST</span> reject it as <code>error_u
 implements none of them rejects every such unit that way.<a href="#section-8.6-5.2.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-8.6-5.3">
-            <p id="section-8.6-5.3.1">A consumer that does implement a namespace either translates the code
-into a unit of <a href="#units" class="auto internal xref">Section 8</a> or rejects it: <code>error_unit_illegal</code> for a code
-the vocabulary does not define, <code>error_unit_profile_unsupported</code> (50)
-for one it defines and this unit system cannot represent. There is no
-third outcome in which a value carries a unit the consumer cannot
-reason about.<a href="#section-8.6-5.3.1" class="pilcrow">¶</a></p>
+            <p id="section-8.6-5.3.1">A consumer that does implement a namespace translates the code into a
+unit of <a href="#units" class="auto internal xref">Section 8</a>, carries it as an <strong>opaque</strong> unit, or rejects it. An
+opaque unit is one the vocabulary defines with no dimension - a UCUM
+arbitrary unit, a UN/ECE package or count code: it equals itself, is
+convertible to nothing, and is distinct from every other unit under
+every rule of this document. Rejection is <code>error_unit_illegal</code> for a
+code the vocabulary does not define and
+<code>error_unit_profile_unsupported</code> (50) for one it defines and this unit
+system cannot represent. There is no further outcome in which a value
+carries a unit the consumer cannot reason about.<a href="#section-8.6-5.3.1" class="pilcrow">¶</a></p>
 </li>
         </ul>
 </section>
@@ -3763,9 +3832,9 @@ enforce each of them and <span class="bcp14">SHOULD</span> allow an application 
 values below are the defaults of the reference implementation; they are
 not part of the format, and a document is not invalid merely because some
 other consumer is configured more tightly.<a href="#section-10.1-2" class="pilcrow">¶</a></p>
-<span id="name-configurable-limits-and-the"></span><table class="center" id="table-11">
+<span id="name-configurable-limits-and-the"></span><table class="center" id="table-12">
           <caption>
-<a href="#table-11" class="selfRef">Table 11</a>:
+<a href="#table-12" class="selfRef">Table 12</a>:
 <a href="#name-configurable-limits-and-the" class="selfRef">Configurable limits and their default values</a>
           </caption>
 <thead>
@@ -3853,9 +3922,9 @@ other consumer is configured more tightly.<a href="#section-10.1-2" class="pilcr
 <p id="section-10.1-4"><strong>Fixed maxima</strong> are part of the format. They are the same for every
 consumer, are not configurable, and a document exceeding one is invalid
 everywhere.<a href="#section-10.1-4" class="pilcrow">¶</a></p>
-<span id="name-fixed-maxima"></span><table class="center" id="table-12">
+<span id="name-fixed-maxima"></span><table class="center" id="table-13">
           <caption>
-<a href="#table-12" class="selfRef">Table 12</a>:
+<a href="#table-13" class="selfRef">Table 13</a>:
 <a href="#name-fixed-maxima" class="selfRef">Fixed maxima</a>
           </caption>
 <thead>
@@ -3978,28 +4047,32 @@ saved when recovery began, or the <strong>start of the next assignment</strong> 
 be maintained and <span class="bcp14">MUST</span> be readable by the application.<a href="#section-10.3-2.4.1" class="pilcrow">¶</a></p>
 </li>
         </ol>
-<p id="section-10.3-3">Both resumption boundaries are needed, and for different errors. When the
+<p id="section-10.3-3">An error <strong>inside a comment</strong> - an invalid UTF-8 sequence or a rejected
+control octet - is the exception to steps 2 and 3. It is reported and
+counted, one recovery event and one skipped octet, and the comment runs
+on to its line end; nothing is unwound and no value is lost.<a href="#section-10.3-3" class="pilcrow">¶</a></p>
+<p id="section-10.3-4">Both resumption boundaries are needed, and for different errors. When the
 error is <em>inside</em> a statement, that statement's own <code>;</code> is the next one,
 so the <code>;</code> rule discards exactly the broken statement. When the error is
 <em>between</em> statements - a stray octet in the whitespace separating two
 assignments - the next <code>;</code> belongs to the following, perfectly good
 statement, and resuming only there would discard it whole however large
 it is. The assignment boundary stops recovery at the first point the
-document plausibly becomes readable again.<a href="#section-10.3-3" class="pilcrow">¶</a></p>
-<p id="section-10.3-4">The <code>.</code> must be followed by an octet that can begin a key, so a <code>.</code>
+document plausibly becomes readable again.<a href="#section-10.3-4" class="pilcrow">¶</a></p>
+<p id="section-10.3-5">The <code>.</code> must be followed by an octet that can begin a key, so a <code>.</code>
 inside skipped junk - in <code>1.5</code>, in <code>.5</code>, in binary corruption - is just
 another skipped octet. A <code>.</code> inside a bracket opened since recovery began
-opens no assignment either.<a href="#section-10.3-4" class="pilcrow">¶</a></p>
-<p id="section-10.3-5">If end of input is reached while recovering,
+opens no assignment either.<a href="#section-10.3-5" class="pilcrow">¶</a></p>
+<p id="section-10.3-6">If end of input is reached while recovering,
 <code>error_got_incomplete_bvnr_stream</code> is reported <strong>in addition to</strong> the
-original error, in that order.<a href="#section-10.3-5" class="pilcrow">¶</a></p>
-<p id="section-10.3-6">The converse case is worth stating because it is easy to misread: if the
+original error, in that order.<a href="#section-10.3-6" class="pilcrow">¶</a></p>
+<p id="section-10.3-7">The converse case is worth stating because it is easy to misread: if the
 input simply ends part-way through a value, with no earlier error, only
 the truncation is reported. A value that would have been rejected had it
 been terminated is never checked, because the check happens at the
 terminator. Truncating a document can therefore <em>hide</em> a defect rather
 than add one, and a consumer <span class="bcp14">MUST NOT</span> infer from a lone truncation error
-that the rest of the document was well-formed.<a href="#section-10.3-6" class="pilcrow">¶</a></p>
+that the rest of the document was well-formed.<a href="#section-10.3-7" class="pilcrow">¶</a></p>
 <div id="recovery-counters">
 <section id="section-10.3.1">
           <h4 id="name-what-the-two-counters-mean">
@@ -4013,7 +4086,8 @@ intact</strong>:<a href="#section-10.3.1-1" class="pilcrow">¶</a></p>
               <p id="section-10.3.1-2.1.1"><strong>Recovery count</strong> is the number of times an error put the parser into
 recovery. It is the signal that <em>something was dropped</em>. Whenever it is
 non-zero, at least one value or assignment was rejected and is absent
-from what the consumer received.<a href="#section-10.3.1-2.1.1" class="pilcrow">¶</a></p>
+from what the consumer received - or, the one case that drops nothing,
+an octet inside a comment was.<a href="#section-10.3.1-2.1.1" class="pilcrow">¶</a></p>
 </li>
             <li class="normal" id="section-10.3.1-2.2">
               <p id="section-10.3.1-2.2.1"><strong>Skipped octets</strong> is how much raw input was discarded unparsed. It
@@ -4027,7 +4101,7 @@ is rejected and the very next octet is the statement's own <code>;</code>, there
 nothing to skip - yet the assignment is delivered with no value attached,
 and a consumer watching only the skipped total would conclude that
 nothing was lost. Applications <span class="bcp14">MUST</span> therefore treat a non-zero recovery
-count as authoritative for "data is missing", and read the skipped total
+count as authoritative for "the document did not arrive intact", and read the skipped total
 only to learn how much text that cost. See <a href="#security-recovery" class="auto internal xref">Section 15.3</a>.<a href="#section-10.3.1-3" class="pilcrow">¶</a></p>
 <p id="section-10.3.1-4">Recovery mode <span class="bcp14">MUST NOT</span> be the default.<a href="#section-10.3.1-4" class="pilcrow">¶</a></p>
 </section>
@@ -4112,9 +4186,9 @@ memory. The format therefore defines two conformance tiers.<a href="#section-11.
 <span class="bcp14">MUST</span> enforce every rule in this document except the four listed below.<a href="#section-11.2-2" class="pilcrow">¶</a></p>
 <p id="section-11.2-3">A <strong>materializing consumer</strong> constructs a tree of the whole document. It
 <span class="bcp14">MUST</span> additionally enforce:<a href="#section-11.2-3" class="pilcrow">¶</a></p>
-<span id="name-materializing-tier-rules"></span><table class="center" id="table-13">
+<span id="name-materializing-tier-rules"></span><table class="center" id="table-14">
           <caption>
-<a href="#table-13" class="selfRef">Table 13</a>:
+<a href="#table-14" class="selfRef">Table 14</a>:
 <a href="#name-materializing-tier-rules" class="selfRef">Materializing-tier rules</a>
           </caption>
 <thead>
@@ -4164,9 +4238,9 @@ streaming consumer accepts documents a materializing consumer rejects.</strong>
 See <a href="#security-differential" class="auto internal xref">Section 15.2</a>.<a href="#section-11.2-7" class="pilcrow">¶</a></p>
 <p id="section-11.2-8">Concretely, each document below is accepted in full by a streaming
 consumer and rejected by a materializing one.<a href="#section-11.2-8" class="pilcrow">¶</a></p>
-<span id="name-documents-the-two-tiers-jud"></span><table class="center" id="table-14">
+<span id="name-documents-the-two-tiers-jud"></span><table class="center" id="table-15">
           <caption>
-<a href="#table-14" class="selfRef">Table 14</a>:
+<a href="#table-15" class="selfRef">Table 15</a>:
 <a href="#name-documents-the-two-tiers-jud" class="selfRef">Documents the two tiers judge differently</a>
           </caption>
 <thead>
@@ -4278,17 +4352,26 @@ a comment inside the <code>float_fix</code> or <code>float_dec</code> keyword, o
 after a reference index (<code>&amp;.a[0]b</code>), a comment cut off inside a UTF-8
 sequence at end-of-input, quoted digits that spell <code>nan</code>, <code>inf</code> or
 <code>ninf</code> in a base of 24 or more and exceed their width, and a fractional
-<code>datetime</code> literal whose UTC year leaves 0000-9999 are now errors. The
+<code>datetime</code> literal whose UTC year leaves 0000-9999 are now errors, as are
+a zero width on <code>utf8</code> or <code>bool</code> (<code>&lt;utf8:0&gt;</code>) and an annotation before
+an empty struct (<code>&lt;utf8&gt; {}</code>; before a struct with members it always
+was). The
 width of a <code>/</code>-separated row counted a nested array twice, which
 accepted some ragged arrays (<code>[[1]]/[null,null]</code>) and refused some
 rectangular ones (<code>[[1],[2]]/[null,null]</code>); and a consumer that checks
 homogeneity compared each element with the first non-null one only, so
-that a <code>null</code> there hid a mismatch behind it. An element annotation without a unit no
+that a <code>null</code> there hid a mismatch behind it, while some rectangular
+nestings of <code>/</code>-matrices (<code>[[[1,1]/[2,2], null], [null, null]]</code>) were
+refused as ragged and a path into one resolved to the wrong element. A
+version declaration padded with more than 21 blanks was refused and is
+accepted. An element annotation without a unit no
 longer strips the unit from the array elements after it; and a <code>tai</code>
 literal spelling a known leap second (<code>2016-12-31T23:59:60Z</code>) decodes one
 second lower than it did, having previously collapsed onto the second
-after it. That last is the one case in which an accepted document decodes
-to a different value. In the registry <span>[<a href="#BOVNAR-UNITS" class="cite xref">BOVNAR-UNITS</a>]</span>, eight conversion
+after it. That, the element that keeps its unit, and a zero mantissa
+under an exponent too long to count (<code>0e999999999999999999999</code>, which
+had been delivered as infinity) are the cases in which an accepted
+document decodes to a different value. In the registry <span>[<a href="#BOVNAR-UNITS" class="cite xref">BOVNAR-UNITS</a>]</span>, eight conversion
 factors were corrected in the same release (<code>elle</code>, <code>klafter</code>, <code>rute</code>,
 <code>morgen</code>, <code>inHg</code>, <code>Da</code>, <code>slug</code>, <code>ft_lb</code>): a document's digits are
 unchanged, and what they convert to is not. Conversion is outside this
@@ -5127,6 +5210,10 @@ may reveal more about a system than the value does.<a href="#section-15.12-2" cl
         <dd>
 <span class="refAuthor">Berners-Lee, T.</span>, <span class="refAuthor">Fielding, R.</span>, and <span class="refAuthor">L. Masinter</span>, <span class="refTitle">"Uniform Resource Identifier (URI): Generic Syntax"</span>, <span class="seriesInfo">STD 66</span>, <span class="seriesInfo">RFC 3986</span>, <span class="seriesInfo">DOI 10.17487/RFC3986</span>, <time datetime="2005-01" class="refDate">January 2005</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc3986">https://www.rfc-editor.org/rfc/rfc3986</a>&gt;</span>. </dd>
 <dd class="break"></dd>
+<dt id="RFC4648">[RFC4648]</dt>
+        <dd>
+<span class="refAuthor">Josefsson, S.</span>, <span class="refTitle">"The Base16, Base32, and Base64 Data Encodings"</span>, <span class="seriesInfo">RFC 4648</span>, <span class="seriesInfo">DOI 10.17487/RFC4648</span>, <time datetime="2006-10" class="refDate">October 2006</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc4648">https://www.rfc-editor.org/rfc/rfc4648</a>&gt;</span>. </dd>
+<dd class="break"></dd>
 <dt id="RFC5198">[RFC5198]</dt>
         <dd>
 <span class="refAuthor">Klensin, J.</span> and <span class="refAuthor">M. Padlipsky</span>, <span class="refTitle">"Unicode Format for Network Interchange"</span>, <span class="seriesInfo">RFC 5198</span>, <span class="seriesInfo">DOI 10.17487/RFC5198</span>, <time datetime="2008-03" class="refDate">March 2008</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc5198">https://www.rfc-editor.org/rfc/rfc5198</a>&gt;</span>. </dd>
@@ -5191,7 +5278,7 @@ version-int  = "0" / ( %x31-39 *DIGIT )
 ; ---- whitespace and comments -----------------------------------
 
 ws           = *( blank / comment )
-ws-req       = blank *( blank / comment )
+ws-req       = ( blank / comment ) *( blank / comment )
 blank        = HTAB / LF / VT / FF / CR / SP
 VT           = %x0B
 FF           = %x0C
@@ -5335,7 +5422,7 @@ unit-expr     = unit-factor *( unit-sep unit-factor )
 unit-factor   = unit-component / "(" unit-expr ")"
 unit-sep      = "*" / "/" / %xC2.B7
 unit-component = [ prefix [ "~" ] ] base-unit [ unit-exp ]
-              / [ prefix [ "~" ] ] "$" currency-code
+              / [ prefix [ "~" ] ] "$" currency-code [ unit-exp ]
 
 ; base-unit and currency-code bound the SHAPE of a token only; whether a
 ; token so shaped names anything is a registry lookup, per the paragraph
@@ -5453,9 +5540,9 @@ specify (<a href="#unit-profiles" class="auto internal xref">Section 8.6</a>).<a
 </dd>
       <dd class="break"></dd>
 </dl>
-<span id="name-error-codes-2"></span><table class="center" id="table-15">
+<span id="name-error-codes-2"></span><table class="center" id="table-16">
         <caption>
-<a href="#table-15" class="selfRef">Table 15</a>:
+<a href="#table-16" class="selfRef">Table 16</a>:
 <a href="#name-error-codes-2" class="selfRef">Error codes</a>
         </caption>
 <thead>

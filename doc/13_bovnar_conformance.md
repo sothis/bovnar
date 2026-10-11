@@ -252,7 +252,9 @@ The IUT must:
 2. Write the conformance event log to stdout with **no trailing garbage**.
 
 The event log is a sequence of lines, one event per line, in the order
-the events were received from the `on_verified` callback.
+the events were received from the `on_verified` callback. One event has no
+line: `ev_stream_end`, which closes every successful parse and so
+distinguishes nothing — the exit code already says the stream ended cleanly.
 
 ### 6.3 Error response
 

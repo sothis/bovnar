@@ -5,6 +5,17 @@
 (*    ( )  = grouping           |  = alternation                      *)
 (*    ,    = concatenation      ;  = rule terminator                  *)
 (*    "…"  = literal terminal   (*…*) = comment                       *)
+(*  TWO EXTENSIONS to that notation, used throughout: inside a         *)
+(*  terminal "\xNN" denotes the single byte NN, not four characters;   *)
+(*  and a rule whose body is only a comment (unit-char, byte, the      *)
+(*  UTF-8 classes of §12) is a BYTE CLASS defined by that comment --   *)
+(*  the role ISO 14977 gives a ? special sequence ?. It is not the     *)
+(*  empty production.                                                  *)
+(*  Updated: 2026-10-11 — review pass: a struct takes no annotation,  *)
+(*    utf8/bool refuse a zero width too, digit alphabets, the default  *)
+(*    Q, eight reserved words in the symbol section, 0xC2 in a         *)
+(*    comment, ws-mandatory after a comment, the comment exception to  *)
+(*    resync, DIGIT in profile-name.                                   *)
 (*  Updated: 2026-10-10 — spec 1.2: the unit-profile notation        *)
 (*    (profile-unit), whitespace inside a type parameter as an error,  *)
 (*    array homogeneity by unit; consistency pass vs the reader -- a   *)
@@ -104,14 +115,17 @@ utf8-bom     = "\xEF\xBB\xBF" ;
 (* Version directive (spec 1.1): an OPTIONAL leading comment of the    *)
 (* form "#!bovnar <major>.<minor>" declaring the spec version the      *)
 (* document targets. It is recognised only as the very first comment   *)
-(* (after the optional BOM and whitespace); a "#!bovnar …" on any       *)
-(* later line is an ordinary comment. Lexically it IS a comment, so a   *)
+(* (after the optional BOM and whitespace); a "#!bovnar …" after any    *)
+(* other comment or any content is an ordinary comment. Lexically it IS a comment, so a   *)
 (* spec-1.0 reader skips it transparently — the declaration is purely   *)
 (* additive. A 1.1+ reader parses it, exposes the version, and (in      *)
 (* strict mode) rejects a version it does not support. Each component   *)
 (* is a decimal integer with no leading zero (a bare "0" excepted).     *)
 (* A malformed version after the "!bovnar" prefix is                    *)
-(* error_invalid_spec_version.                                          *)
+(* error_invalid_spec_version -- it is NOT re-read as a comment, though *)
+(* the optional below and `comment` would together derive it: once     *)
+(* "#!bovnar" and an hspace open the first comment, the line is a       *)
+(* directive or an error.                                               *)
 (* The directive accepts ONLY horizontal whitespace (HT or SP) around   *)
 (* its components — not the LF/CR/VT/FF that "ws-char" also covers.      *)
 version-directive = "#" , "!bovnar" , hspace , {hspace} ,
@@ -134,8 +148,10 @@ ws           = {ws-char | comment} ;
 
 (* At least one whitespace character, followed by optional further    *)
 (* whitespace and comments.  Used as the mandatory separator before   *)
-(* an inline unit suffix.                                             *)
-ws-mandatory = ws-char , {ws-char | comment} ;
+(* an inline unit suffix.  A comment's own line end is a ws-char for   *)
+(* this purpose, so after a STRING (where "#" may follow directly) a   *)
+(* comment alone separates: "text"# c<LF>m carries the unit m.         *)
+ws-mandatory = ( ws-char | comment ) , {ws-char | comment} ;
 ws-char      = "\x09"             (* HT  *)
              | "\x0A"             (* LF  *)
              | "\x0B"             (* VT  *)
@@ -178,8 +194,8 @@ id-start     = ALPHA | "_" | utf8-leader ;
 (* Accepted: "+", "-", digits, alpha, "_",                            *)
 (*   UTF-8 leader bytes 0xC3–0xF4, UTF-8 continuation bytes 0x80–0xBF.*)
 (* Hard-error bytes: 0x00–0x08, 0x0E–0x1F, 0x7F, 0xC2, punct:       *)
-(*   " # , . / ; < > [ ] { } = ! $ % & ' ( ) * : ? @ \ ^ ` | ~    *)
-(* "=" terminates the body (ACT_value_intro).                         *)
+(*   " # , . / ; < > [ ] { } ! $ % & ' ( ) * : ? @ \ ^ ` | ~      *)
+(* "=" is not one of them: it terminates the body (ACT_value_intro).  *)
 (* Whitespace terminates the body (ACT_to_identifier_outro), after    *)
 (* which only "=" is accepted (with comments permitted between).      *)
 id-body-char = "+" | "-"
@@ -204,6 +220,11 @@ id-body-char = "+" | "-"
 (* handled by ACT_type_null_then_new_array_value,                     *)
 (* ACT_type_null_then_array_outro, and ACT_type_null_then_value_outro  *)
 (* from the type_outro state.                                         *)
+(*                                                                    *)
+(* ONE VALUE FORM TAKES NO ANNOTATION: a struct. An annotation in     *)
+(* force where its "{" opens -- written before it, or inherited from  *)
+(* the array it is an element of -- is error_type_value_mismatch.     *)
+(* The production below is wider than that; the constraint is here.   *)
 
 value        = [type-annotation , ws] , ( scalar-with-unit | raw-value ) ;
 
@@ -325,7 +346,8 @@ type-annotation = "<" , ws , param-type , ws , ">" ;
 (* ("float", "float_fix", or "float_dec") is dispatched in           *)
 (* bvn_parse_type_annotation.                                         *)
 (* "bool" and "utf8" are parameterless families: any width, base, q,  *)
-(* or unit parameter is error_illegal_value_type.  bool's only valid   *)
+(* or unit parameter is error_illegal_value_type -- a width of 0      *)
+(* included; the test is on presence.  bool's only valid               *)
 (* values are the bool keywords (see bool-value, §3).                  *)
 (* "datetime" (spec 1.1) is a timestamp: a signed integer seconds count    *)
 (* validated like sint.  It accepts an optional width parameter (as sint)   *)
@@ -372,9 +394,11 @@ param-type   = ("uint" | "sint" | "float" | "float_fix" | "float_dec" | "utf8"
 (* the implementation was leniently wrong and now matches what is      *)
 (* written here.                                                      *)
 (*                                                                     *)
-(* A "," or ":" nested inside a UCUM annotation or bracketed atom is   *)
-(* part of profile-code and NOT a separator, so "ucum:mL{cells,tot}"   *)
-(* is one parameter and not two.                                       *)
+(* A "," or ":" nested inside a UCUM annotation ("{…}") or bracketed   *)
+(* atom ("[…]") is part of profile-code and NOT a separator, so        *)
+(* "ucum:mL{cells,tot}" is one parameter and not two, and a stray      *)
+(* comma in "ucum:[IU,]" is a malformed unit (error_unit_illegal), not *)
+(* a malformed parameter list.                                         *)
 (*                                                                     *)
 (* ONE EXCEPTION, AND IT IS A PROFILE'S: inside a parameter that       *)
 (* carries a profile NAMESPACE, whitespace is neither deleted nor      *)
@@ -411,8 +435,12 @@ width-param  = DIGIT , {DIGIT} ;
 
 (* Base: underscore followed by one or more decimal digits.           *)
 (* Valid values: 2–62, 64 (standard Base64), 85 (Ascii85).           *)
-(* Bases 64 and 85 are uint-only: their alphabets use '+'/'-' as       *)
-(*   digits, leaving no sign character, so sint+64/85 is illegal.      *)
+(* Digits, lowest first: 0-9 a-z for 2–36, case-INSENSITIVE; 0-9 a-z  *)
+(*   A-Z for 37–62, case-sensitive (a = 10, A = 36); A-Z a-z 0-9 + /  *)
+(*   for 64 (RFC 4648, no padding); "!" (0x21) .. "u" (0x75) for 85.  *)
+(* Bases 64 and 85 are uint-only: their alphabets take sign           *)
+(*   characters as digits ("+" in both, "-" in 85), so sint+64/85 is   *)
+(*   illegal.                                                          *)
 (* "float" accepts only base 10 (or absent, → 10) or base 16;        *)
 (*   other bases → error_illegal_value_type.                          *)
 (* "float_fix" and "float_dec" reject the base parameter entirely:   *)
@@ -431,6 +459,7 @@ base-param   = "_" , DIGIT , {DIGIT} ;
 (*   Value = raw_signed_integer × 2^(-Q).                             *)
 (* Valid only for "float_fix"; rejected for all other families.       *)
 (* Valid range: 0 ≤ Q < effective_width (width 0 → effective 64).    *)
+(* Omitted, Q is 0: <float_fix:32> is <float_fix:32,q0>.              *)
 (* Q is stored in value_type_spec_t.base and retrieved via            *)
 (* bvn_effective_q; bvn_effective_base always returns 10 for          *)
 (* float_fix and float_dec.                                           *)
@@ -493,13 +522,14 @@ unit-char    = (* any byte accepted by copy_type_byte that is not     *)
 profile-unit = profile-name , ws , ":" , ws , profile-code ;
 profile-name = name-head , {name-tail} ;   (* "ucum", "qudt-qk"       *)
 name-head    = lower-alpha ;   (* a digit-led parameter is a width *)
-name-tail    = lower-alpha | digit | "-" ;
+name-tail    = lower-alpha | DIGIT | "-" ;
 lower-alpha  = "a"|"b"|"c"|"d"|"e"|"f"|"g"|"h"|"i"|"j"|"k"|"l"|"m"
              | "n"|"o"|"p"|"q"|"r"|"s"|"t"|"u"|"v"|"w"|"x"|"y"|"z" ;
 (* NOTE: after a profile-code the ws before "," or ">" may not contain *)
 (* a comment -- the reader refuses "#" there.                          *)
 profile-code = profile-char , {profile-char} ;
-profile-char = (* any unit-char, plus "," at brace depth >= 1 -- a    *)
+profile-char = (* any unit-char, plus "," at brace or bracket depth    *)
+               (* >= 1 ("{" or "[" open) -- a                        *)
                (* UCUM annotation may contain a comma ("{cells,tot}") *)
                (* and the type-parameter scanner tracks brace and     *)
                (* bracket depth so that one does not end the          *)
@@ -590,8 +620,8 @@ profile-char = (* any unit-char, plus "," at brace depth >= 1 -- a    *)
 (*   "G" = gauss vs giga.  (Ω = U+2126: 0xE2 0x84 0xA6; ° = U+00B0: 0xC2    *)
 (*   0xB0)                                                                  *)
 (*                                                                     *)
-(* unit-exponent = [exp-sign] exp-digit , { exp-digit }               *)
-(*               | "^" ["-"|"+"] ASCII-digit , { ASCII-digit } ;      *)
+(* unit-exponent = [exp-sign] exp-digit , [exp-digit] , [exp-digit]   *)
+(*               | "^" ["-"|"+"] DIGIT , [DIGIT] , [DIGIT] ;          *)
 (*                                                                     *)
 (* exp-sign  = "⁺" (* U+207A: 0xE2 0x81 0xBA, positive / no-op *)    *)
 (*           | "⁻" ; (* U+207B: 0xE2 0x81 0xBB, negate exponent *)   *)
@@ -600,7 +630,7 @@ profile-char = (* any unit-char, plus "," at brace depth >= 1 -- a    *)
 (*   (U+2070 / 00B9 / 00B2 / 00B3 / 2074–2079)                       *)
 (*                                                                     *)
 (* "⁺" is accepted but has no effect (same as absent).               *)
-(* The ASCII form "^[+-]?[0-9]+" maps to the same internal values as  *)
+(* The ASCII form "^[+-]?[0-9]{1,3}" maps to the same internal values as *)
 (* the Unicode superscript form.                                      *)
 (*                                                                     *)
 (* An exponent is an INTEGER in [BVN_EXPONENT_MIN, BVN_EXPONENT_MAX]  *)
@@ -611,8 +641,9 @@ profile-char = (* any unit-char, plus "," at brace depth >= 1 -- a    *)
 (* string fails to resolve as a base symbol. A value that scans but   *)
 (* lands outside the range ("m^200") is refused on the range check.   *)
 (*                                                                     *)
-(* ⁰ is a digit here only in a MULTI-digit exponent: it exists so     *)
-(* "m¹⁰⁰" can be written, and a leading "m⁰" is still no unit.       *)
+(* ⁰ is a digit like the others, leading or not ("m⁰⁰⁷" and "m^007"  *)
+(* are m⁷); it exists so "m¹⁰⁰" can be written. An exponent that      *)
+(* comes to zero, however spelled, is still no unit.                  *)
 
 
 (* ─────────────────────────────────────────────────────────────────  *)
@@ -699,7 +730,8 @@ unicode-escape = "u" , "{" , hex-digit ,
 (* (D800..DFFF) or above 10FFFF is error_invalid_codepoint; otherwise the   *)
 (* scalar is UTF-8 encoded.  A \x byte must leave the whole string valid     *)
 (* UTF-8 (else error_invalid_utf8_byte).                                    *)
-hex-digit      = DIGIT | "a".."f" | "A".."F" ;
+hex-digit      = DIGIT | "a" | "b" | "c" | "d" | "e" | "f"
+               | "A" | "B" | "C" | "D" | "E" | "F" ;
 
 
 (* ─────────────────────────────────────────────────────────────────  *)
@@ -789,8 +821,9 @@ unit-lead-byte    = (* byte in [0xC2, 0xF4] *) ;
 (*   "." is a hard error (same as in identifier body)                *)
 
 (* Reserved keywords: a symbol token whose text is exactly "null",   *)
-(* "true", "false", "on", or "off" is reclassified by the validator   *)
-(* (see null-value / bool-value, §3) and is NOT delivered as a symbol.*)
+(* "true", "false", "on", "off", "nan", "inf" or "ninf" is            *)
+(* reclassified by the validator (see null-value / bool-value, §3,    *)
+(* and special-number, §5) and is NOT delivered as a symbol.          *)
 (* Any other bare word — including one that merely begins with a      *)
 (* keyword, like "ontology" or "nullish" — remains a symbol.          *)
 symbol        = id-start , {sym-body-char} ;
@@ -986,11 +1019,11 @@ utf8-continuation = (* byte in [0x80, 0xBF] *) ;
 (* Printable ASCII: 0x20–0x7E *)
 printable-byte = (* byte in [0x20, 0x7E] *) ;
 
-(* High byte: any byte 0x80–0xFF.  0xC0, 0xC1, 0xF5–0xFF are         *)
-(* structurally in this range but rejected by the parallel UTF-8      *)
-(* validator (error_invalid_utf8_byte).                               *)
-high-byte    = utf8-continuation | utf8-leader
-             | (* 0xC0 | 0xC1 | 0xF5–0xFF – rejected by UTF-8 check *) ;
+(* High byte: any byte 0x80–0xFF, 0xC2 included -- a comment may hold *)
+(* U+0080–U+00BF ("25 °C") though a key may not.  0xC0, 0xC1 and      *)
+(* 0xF5–0xFF are structurally in this range but rejected by the       *)
+(* parallel UTF-8 validator (error_invalid_utf8_byte).                *)
+high-byte    = (* byte in [0x80, 0xFF] *) ;
 
 byte         = (* any single byte 0x00–0xFF *) ;
 
@@ -1088,7 +1121,9 @@ byte         = (* any single byte 0x00–0xFF *) ;
      Digit characters in the value must be valid for the declared base
        (error_digit_not_in_base).
      The numeric value must fit in the declared bit-width
-       (error_value_out_of_range).
+       (error_value_out_of_range) -- for uint, sint, datetime and
+       float_fix; the bare keywords nan / inf / ninf are exempt under
+       every family.
      For "float": accepted widths are 0, 16, or any multiple of 32 up to
        BVN_FLOAT_MAX_PREC (32768); accepted bases are 10 (or absent) and
        16; any other base → error_illegal_value_type.
@@ -1133,9 +1168,12 @@ byte         = (* any single byte 0x00–0xFF *) ;
 
   n) Error recovery (continue_on_error mode)
      When bvnr_read_flags_t.continue_on_error is set, any parse error
-     invokes the on_error callback and then enters the resync state
-     machine (states: resync, resync_dot, resync_string,
-     resync_string_escape, resync_comment).  The resync machine skips
+     but one INSIDE A COMMENT invokes the on_error callback and then
+     enters the resync state machine (an invalid UTF-8 sequence or a
+     control byte in a comment is reported and counted, and the comment
+     runs on to its line end: nothing is unwound and nothing is lost).
+     The resync machine (states: resync, resync_dot, resync_string,
+     resync_string_escape, resync_comment) skips
      bytes while tracking bracket and brace nesting depths, and resumes
      at whichever comes first: a ";" at the saved nesting depth, or the
      start of the next assignment -- a "." at that depth followed by a

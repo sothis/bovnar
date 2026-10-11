@@ -436,12 +436,12 @@ where the byte classes of §2.3 are also recorded:
 
 ```ebnf
 unit-param   = profile-unit | native-unit ;
-profile-unit = profile-name , ":" , profile-code ;
+profile-unit = profile-name , ws , ":" , ws , profile-code ;
 profile-name = name-head , {name-tail} ;         (* "ucum", "qudt-qk" *)
-name-head    = lower-alpha | digit ;
-name-tail    = lower-alpha | digit | "-" ;
+name-head    = lower-alpha ;                     (* a digit-led parameter is a width *)
+name-tail    = lower-alpha | DIGIT | "-" ;
 profile-code = profile-char , {profile-char} ;
-profile-char = (* any unit-char, plus "," at brace depth >= 1 *) ;
+profile-char = (* any unit-char, plus "," at brace or bracket depth >= 1 *) ;
 ```
 
 `profile-code` is deliberately not given a grammar beyond its byte class. The sub-grammar is

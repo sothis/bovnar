@@ -447,8 +447,10 @@ unit, whether or not the document states them.
 A value's *kind* is determined by the value token alone and is not
 affected by the annotation. An annotation whose family is incompatible
 with the kind of the value that follows it is an error; it never
-reinterprets the token. `<uint:32> "hello"` is not the integer zero, it
-is `error_type_value_mismatch`.
+reinterprets the token. `<uint:32> hello` is not the integer zero, it
+is `error_type_value_mismatch`. (A *quoted* string is a carrier `uint`
+does accept, so `<uint:32> "hello"` is refused one step later, for its
+digits: `error_digit_not_in_base`.)
 
 # Character Encoding {#encoding}
 
@@ -570,8 +572,8 @@ and reference array indexing) are invalid exactly as they would be to a
 Recognition is strict:
 
 * The directive is recognized only as the **very first comment**, after
-  an optional BOM and leading blanks. `#!bovnar 1.1` on any later line,
-  or after any earlier comment, is an ordinary comment.
+  an optional BOM and leading blanks, blank lines included. `#!bovnar 1.1`
+  after any earlier comment, or after any content, is an ordinary comment.
 * `#!bovnar` not followed by horizontal whitespace, such as
   `#!bovnarish`, is an ordinary comment.
 * Only HTAB and SP separate the directive's components. A line break
@@ -601,7 +603,7 @@ restriction on where a comment may start, stated below.
 
 ~~~ abnf
 ws           = *( blank / comment )
-ws-req       = blank *( blank / comment )
+ws-req       = ( blank / comment ) *( blank / comment )
 comment      = "#" *comment-char [ CR / LF ]
 comment-char = HTAB / VT / FF / %x20-7E / %x80-FF
 ~~~
@@ -624,7 +626,9 @@ forbidden placements; this prose forbids them.
 # .bad = 42# directly after a number: error_unexpected_input_byte
 ~~~ `ws-req`
 denotes a mandatory separator, required in exactly one place: before an
-inline unit suffix ({{inline-units}}).
+inline unit suffix ({{inline-units}}). A comment's own line end serves as
+the blank, so after a string - where `#` may follow directly - a comment
+alone separates the value from its unit.
 
 ## Keys
 
@@ -934,6 +938,17 @@ value it describes:
 An annotation attached to the key rather than the value, as in
 `.k<uint:32> = 42;`, is an error.
 
+An element annotation describes that element only: in `[<uint:8> 1, 300]`
+the `300` is an unannotated integer. The one exception is `datetime`,
+after which a following bare integer is a `datetime` of the same width
+and epoch ({{synthesis}}).
+
+A struct takes no annotation - its members carry their own. An annotation
+in force where a `{` opens, whether written before the struct or
+inherited from the array it is an element of, is
+`error_type_value_mismatch`: `<utf8> {}` and `<uint:8> [{.x = 1;}]` are
+both refused.
+
 A wholly empty annotation, `<>` or `< >`, is
 `error_unexpected_input_byte`.
 
@@ -952,7 +967,8 @@ A wholly empty annotation, `<>` or `< >`, is
 {: title="Type families and their parameters"}
 
 `utf8` and `bool` are parameterless; any parameter is
-`error_illegal_value_type`.
+`error_illegal_value_type`, a width of zero (`<utf8:0>`) included. For
+`float_fix` an omitted `qN` is `q0`.
 
 `datetime` is a version 1.1 family and is `error_illegal_value_type` in a
 1.0 or undeclared document.
@@ -976,8 +992,9 @@ A value whose kind is incompatible with the annotated family is
 `error_type_value_mismatch`. A dot or exponent in an integer-typed value
 is likewise `error_type_value_mismatch`.
 
-Two value kinds stand outside this table. A null takes any annotation and
-carries its type ({{null}}). An **octet stream** under an annotation is
+Three value kinds stand outside this table. A null takes any annotation
+and carries its type ({{null}}). A struct takes none
+(`error_type_value_mismatch`, above). An **octet stream** under an annotation is
 accepted under *every* family: the annotation is carried with the stream
 and is **not checked** against it, so `<uint:8>`, `<utf8>` or `<bool>` in
 front of an octet stream is not `error_type_value_mismatch`. It says
@@ -1051,13 +1068,25 @@ base-param   = "_" 1*DIGIT
 The base applies to the digits of the value, not to its storage.
 
 * `uint` and `sint` accept bases 2 through 62.
-* Bases 64 and 85 are **`uint` only**. Their Base64 and Ascii85 alphabets
-  use `+` and `-` as digits, so a sign cannot be distinguished; a signed
-  value in these bases is `error_illegal_value_type`.
+* Bases 64 and 85 are **`uint` only**. Their alphabets take the sign
+  characters as digits - `+` in both, `-` in Ascii85 - so a sign cannot be
+  distinguished; a signed value in these bases is
+  `error_illegal_value_type`.
+* Any other base (`_0`, `_1`, `_63`, `_99`) is `error_illegal_value_type`.
 * `float` accepts only base 10 or 16. Any other base is
   `error_illegal_value_type`.
 * `float_fix` and `float_dec` forbid the base parameter entirely; decimal
   is implicit. A base parameter on either is `error_illegal_value_type`.
+
+The digits of a base, lowest value first, are:
+
+| Base | Digits | Case |
+|---|---|---|
+| 2 to 36 | `0`-`9`, then `a`-`z` (10 to 35) | insensitive |
+| 37 to 62 | `0`-`9`, `a`-`z` (10 to 35), `A`-`Z` (36 to 61) | sensitive |
+| 64 | `A`-`Z`, `a`-`z`, `0`-`9`, `+`, `/` ({{?RFC4648}}, no padding) | sensitive |
+| 85 | the 85 characters `!` (%x21, value 0) to `u` (%x75, value 84) | sensitive |
+{: title="Digit alphabets"}
 
 A digit outside the declared base is `error_digit_not_in_base`.
 
@@ -1068,10 +1097,13 @@ in a signed Q-format integer of the declared width. The mathematical
 value is `raw x 2^-Q`. `q` on any other family, or `N` not less than the
 effective width, is `error_illegal_value_type`.
 
-A `float_fix` value MUST lie within the declared format's signed range:
-`round(value x 2^Q)` MUST fit a signed field of `width` bits, that is,
-`value` in `[-2^(width-1-Q), 2^(width-1-Q) - 2^-Q]`. A value outside that
-range is `error_value_out_of_range`. Special numbers are exempt.
+A `float_fix` value MUST be representable in the declared format:
+`round(value x 2^Q)`, rounded once to nearest with ties to even, MUST fit
+a signed field of `width` bits. The representable values are
+`[-2^(width-1-Q), 2^(width-1-Q) - 2^-Q]`, and the test is made after
+rounding, so a literal just past either end that rounds back onto it is
+valid. A value whose rounded integer does not fit is
+`error_value_out_of_range`. Special numbers are exempt.
 
 ~~~
 .a = <float_fix:16,q8> 3.14;      # Q8/16 range [-128, 127.99609375]
@@ -1210,7 +1242,7 @@ unit-expr     = unit-factor *( unit-sep unit-factor )
 unit-factor   = unit-component / "(" unit-expr ")"
 unit-sep      = "*" / "/" / %xC2.B7        ; "*" or U+00B7 or "/"
 unit-component = [ prefix [ "~" ] ] base-unit [ unit-exp ]
-               / [ prefix [ "~" ] ] "$" currency-code
+               / [ prefix [ "~" ] ] "$" currency-code [ unit-exp ]
 unit-exp      = ( "^" [ "+" / "-" ] 1*3DIGIT )
               / ( [ sup-sign ] 1*3sup-digit )
 ~~~
@@ -1417,6 +1449,11 @@ construction rather than by check.
 | Both present, different | `error_unit_mismatch` |
 {: title="Annotation and inline unit"}
 
+Two units are identical here when they resolve to the same set of
+components - the same base unit, prefix and exponent in each. Order and
+spelling are free (`m/s` and `m*s^-1`, `km` and `k~m`); algebra is not
+(`N` is not `k~g*m/s^2`).
+
 ~~~
 .a = <float:64,m> 1.5;        # unit from the annotation
 .b = <float:64> 1.5 m;        # unit from the suffix
@@ -1469,12 +1506,16 @@ alone behaves predictably:
   implement a namespace MUST reject it as `error_unit_profile_unknown`
   (49), and MUST NOT pass the code through uninterpreted. A consumer that
   implements none of them rejects every such unit that way.
-* A consumer that does implement a namespace either translates the code
-  into a unit of {{units}} or rejects it: `error_unit_illegal` for a code
-  the vocabulary does not define, `error_unit_profile_unsupported` (50)
-  for one it defines and this unit system cannot represent. There is no
-  third outcome in which a value carries a unit the consumer cannot
-  reason about.
+* A consumer that does implement a namespace translates the code into a
+  unit of {{units}}, carries it as an **opaque** unit, or rejects it. An
+  opaque unit is one the vocabulary defines with no dimension - a UCUM
+  arbitrary unit, a UN/ECE package or count code: it equals itself, is
+  convertible to nothing, and is distinct from every other unit under
+  every rule of this document. Rejection is `error_unit_illegal` for a
+  code the vocabulary does not define and
+  `error_unit_profile_unsupported` (50) for one it defines and this unit
+  system cannot represent. There is no further outcome in which a value
+  carries a unit the consumer cannot reason about.
 
 # Composite Values {#composites}
 
@@ -1693,6 +1734,11 @@ an error rather than halting. When it does:
 4. A count of recovery events and a running total of skipped octets MUST
    be maintained and MUST be readable by the application.
 
+An error **inside a comment** - an invalid UTF-8 sequence or a rejected
+control octet - is the exception to steps 2 and 3. It is reported and
+counted, one recovery event and one skipped octet, and the comment runs
+on to its line end; nothing is unwound and no value is lost.
+
 Both resumption boundaries are needed, and for different errors. When the
 error is *inside* a statement, that statement's own `;` is the next one,
 so the `;` rule discards exactly the broken statement. When the error is
@@ -1728,7 +1774,8 @@ intact**:
 * **Recovery count** is the number of times an error put the parser into
   recovery. It is the signal that *something was dropped*. Whenever it is
   non-zero, at least one value or assignment was rejected and is absent
-  from what the consumer received.
+  from what the consumer received - or, the one case that drops nothing,
+  an octet inside a comment was.
 
 * **Skipped octets** is how much raw input was discarded unparsed. It
   says what recovery *cost in text*, and it is the only way to learn
@@ -1740,7 +1787,7 @@ is rejected and the very next octet is the statement's own `;`, there is
 nothing to skip - yet the assignment is delivered with no value attached,
 and a consumer watching only the skipped total would conclude that
 nothing was lost. Applications MUST therefore treat a non-zero recovery
-count as authoritative for "data is missing", and read the skipped total
+count as authoritative for "the document did not arrive intact", and read the skipped total
 only to learn how much text that cost. See {{security-recovery}}.
 
 Recovery mode MUST NOT be the default.
@@ -1889,17 +1936,26 @@ a comment inside the `float_fix` or `float_dec` keyword, octets directly
 after a reference index (`&.a[0]b`), a comment cut off inside a UTF-8
 sequence at end-of-input, quoted digits that spell `nan`, `inf` or
 `ninf` in a base of 24 or more and exceed their width, and a fractional
-`datetime` literal whose UTC year leaves 0000-9999 are now errors. The
+`datetime` literal whose UTC year leaves 0000-9999 are now errors, as are
+a zero width on `utf8` or `bool` (`<utf8:0>`) and an annotation before
+an empty struct (`<utf8> {}`; before a struct with members it always
+was). The
 width of a `/`-separated row counted a nested array twice, which
 accepted some ragged arrays (`[[1]]/[null,null]`) and refused some
 rectangular ones (`[[1],[2]]/[null,null]`); and a consumer that checks
 homogeneity compared each element with the first non-null one only, so
-that a `null` there hid a mismatch behind it. An element annotation without a unit no
+that a `null` there hid a mismatch behind it, while some rectangular
+nestings of `/`-matrices (`[[[1,1]/[2,2], null], [null, null]]`) were
+refused as ragged and a path into one resolved to the wrong element. A
+version declaration padded with more than 21 blanks was refused and is
+accepted. An element annotation without a unit no
 longer strips the unit from the array elements after it; and a `tai`
 literal spelling a known leap second (`2016-12-31T23:59:60Z`) decodes one
 second lower than it did, having previously collapsed onto the second
-after it. That last is the one case in which an accepted document decodes
-to a different value. In the registry {{BOVNAR-UNITS}}, eight conversion
+after it. That, the element that keeps its unit, and a zero mantissa
+under an exponent too long to count (`0e999999999999999999999`, which
+had been delivered as infinity) are the cases in which an accepted
+document decodes to a different value. In the registry {{BOVNAR-UNITS}}, eight conversion
 factors were corrected in the same release (`elle`, `klafter`, `rute`,
 `morgen`, `inHg`, `Da`, `slug`, `ft_lb`): a document's digits are
 unchanged, and what they convert to is not. Conversion is outside this
@@ -2480,7 +2536,7 @@ version-int  = "0" / ( %x31-39 *DIGIT )
 ; ---- whitespace and comments -----------------------------------
 
 ws           = *( blank / comment )
-ws-req       = blank *( blank / comment )
+ws-req       = ( blank / comment ) *( blank / comment )
 blank        = HTAB / LF / VT / FF / CR / SP
 VT           = %x0B
 FF           = %x0C
@@ -2625,7 +2681,7 @@ unit-expr     = unit-factor *( unit-sep unit-factor )
 unit-factor   = unit-component / "(" unit-expr ")"
 unit-sep      = "*" / "/" / %xC2.B7
 unit-component = [ prefix [ "~" ] ] base-unit [ unit-exp ]
-              / [ prefix [ "~" ] ] "$" currency-code
+              / [ prefix [ "~" ] ] "$" currency-code [ unit-exp ]
 
 ; base-unit and currency-code bound the SHAPE of a token only; whether a
 ; token so shaped names anything is a registry lookup, per the paragraph

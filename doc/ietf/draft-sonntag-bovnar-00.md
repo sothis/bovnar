@@ -843,9 +843,12 @@ dt-zone      = %s"Z" / ( "+" / "-" ) 2DIGIT ":" 2DIGIT
 
 Fields are strictly range-checked: month 01-12, a day valid for that
 month and year, hour 00-23, minute 00-59, second 00-60, and a two-digit
-offset. A literal with an out-of-range field, a field of the wrong
-width (`2026-6-15`), or an empty fraction is
-`error_invalid_datetime_literal`; one that breaks off part-way - a
+offset. Which of two errors a malformed literal gets is decided by its
+skeleton: the grammar above with every `4DIGIT` and `2DIGIT` read as
+`1*DIGIT` and the fraction as `*DIGIT`. A literal that matches the
+skeleton but not the grammar or the ranges - an out-of-range field, a
+field of the wrong width (`2026-6-15`), or an empty fraction - is
+`error_invalid_datetime_literal`. One that departs from the skeleton - a
 missing seconds field, an offset without its colon - is
 `error_unexpected_input_byte`.
 
@@ -872,11 +875,14 @@ What it stores depends on the epoch:
   have no second to spend on the insertion.
 * On `tai`, it does not. TAI is a continuous atomic count, the inserted
   second is a distinct instant on it, and the two literals above store
-  values differing by one. This makes the UTC-to-TAI mapping injective,
+  values differing by one. Over the insertions the implementation's
+  leap-second table records, this makes the UTC-to-TAI mapping injective,
   so a `tai` value survives any number of read/write cycles unchanged.
 
 A `:60` at an instant that the implementation's leap-second table does
-not record as an insertion collapses on `tai` as well. The table is a
+not record as an insertion collapses on `tai` as well: it stores the
+value of the following second, and that is the one case in which two
+civil spellings share a `tai` value. The table is a
 static snapshot, and an implementation built before an IERS announcement
 MUST NOT reject a document spelling a genuine future leap second. See
 {{security-leap}}.

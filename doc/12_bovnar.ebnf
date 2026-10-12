@@ -729,7 +729,10 @@ unicode-escape = "u" , "{" , hex-digit ,
 (* check made before the value is examined.  A value that is a surrogate    *)
 (* (D800..DFFF) or above 10FFFF is error_invalid_codepoint; otherwise the   *)
 (* scalar is UTF-8 encoded.  A \x byte must leave the whole string valid     *)
-(* UTF-8 (else error_invalid_utf8_byte).                                    *)
+(* UTF-8 (else error_invalid_utf8_byte).  A \x or \u{} escape that resolves  *)
+(* to a control byte 0x00–0x08, 0x0E–0x1F or 0x7F is                        *)
+(* error_unexpected_input_byte, as the raw byte is: neither production      *)
+(* excludes those values, this rule does.                                   *)
 hex-digit      = DIGIT | "a" | "b" | "c" | "d" | "e" | "f"
                | "A" | "B" | "C" | "D" | "E" | "F" ;
 

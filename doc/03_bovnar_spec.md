@@ -777,12 +777,17 @@ with no annotation infers `<datetime:64,unix>`, so `.t = 2026-06-15;` is a
 timestamp without any annotation. Fields are strictly validated (month `01`–`12`,
 a valid day-of-month, hour `00`–`23`, minute `00`–`59`, second `00`–`60`, offset
 `±HH:MM` with two-digit components, its hour `00`–`23` and its minute
-`00`–`59`). The year is four digits, `0000`–`9999`. A literal with an
-out-of-range field, a field of the wrong width (`2026-6-15`) or an empty
-fraction is `error_invalid_datetime_literal`; one that stops being a literal
-part-way (a
-missing seconds field, `+0200` without its colon, a lowercase `t` or `z`) is a
-lexical error, `error_unexpected_input_byte`; and a literal in a document that
+`00`–`59`). The year is four digits, `0000`–`9999`. Which of two errors a
+malformed literal gets is decided by its **skeleton**: the fields each taken as
+a run of one or more digits, with every separator in its place —
+`D-D-D`, optionally followed by `TD:D:D`, then optionally `.` and zero or more
+digits, then optionally `Z` or `±D:D`, where `D` is one or more digits. A
+literal that has the skeleton but is otherwise wrong — an out-of-range field, a
+field of the wrong width (`2026-6-15`, `12:00:0Z`, `+2:00`) or an empty
+fraction — is `error_invalid_datetime_literal`. One that departs from the
+skeleton (a missing seconds field, `+0200` without its colon, a lowercase `t`
+or `z`) is a lexical error, `error_unexpected_input_byte`, reported at the
+first byte that does not fit. A literal in a document that
 declares less than 1.1 is `error_illegal_value_type`. A second of `60` is a **UTC leap second** and
 is accepted. What it stores depends on the epoch:
 
@@ -792,12 +797,15 @@ is accepted. What it stores depends on the epoch:
   to spend on the insertion; collapsing is the correct POSIX reading.
 * On **`tai`** it does not. TAI is a continuous atomic count, the inserted second
   is a real instant on it, and the two literals above store `1861920036` and
-  `1861920037` respectively. This makes UTC⇄TAI **injective**: every TAI second
+  `1861920037` respectively. Over the insertions the implementation's
+  leap-second table records, this makes UTC⇄TAI **injective**: every TAI second
   has exactly one civil spelling and every civil spelling one TAI second, so a
   `tai` value survives any number of write/read cycles unchanged.
 
 A `:60` at an instant the implementation's leap-second table does not record as
-an insertion collapses on `tai` too. The table is a static snapshot, and a build
+an insertion collapses on `tai` too: it stores the value of the following
+second, as on a civil epoch, and that is the one case in which two civil
+spellings share a `tai` value. The table is a static snapshot, and a build
 that predates an IERS announcement must not reject a document spelling a genuine
 future leap second.
 
@@ -2624,11 +2632,11 @@ typedef struct bvnr_data_s {
 
 ```c
 typedef struct bvnr_read_flags_s {
-    uint16_t  max_identifier_length;  // default 255
-    uint16_t  max_string_length;      // default 65535
-    uint16_t  max_number_length;      // default 65535
-    uint16_t  max_symbol_length;      // default 255
-    uint16_t  max_reference_length;   // default 65535
+    uint16_t  max_identifier_length;  // 0 → 255 default
+    uint16_t  max_string_length;      // 0 → 65535 default
+    uint16_t  max_number_length;      // 0 → 65535 default
+    uint16_t  max_symbol_length;      // 0 → 255 default
+    uint16_t  max_reference_length;   // 0 → 65535 default
     uint64_t  max_array_items;        // 0 → 2 147 483 647 internal default
     uint64_t  max_text_bytes;         // 0 → 2 147 483 647 internal default
     uint64_t  max_file_size;          // 0 → unlimited / endless (default); 16 777 216 recommended for a cap

@@ -3,9 +3,9 @@
 
 
 Independent Submission                                        J. Sonntag
-Internet-Draft                                           11 October 2026
+Internet-Draft                                           12 October 2026
 Intended status: Informational                                          
-Expires: 14 April 2027
+Expires: 15 April 2027
 
 
             The Bovnar (BVNR) Unit-Safe Serialization Format
@@ -53,7 +53,7 @@ Status of This Memo
 
 
 
-Sonntag                   Expires 14 April 2027                 [Page 1]
+Sonntag                   Expires 15 April 2027                 [Page 1]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -63,7 +63,7 @@ Internet-Draft              The Bovnar Format               October 2026
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 14 April 2027.
+   This Internet-Draft will expire on 15 April 2027.
 
 Copyright Notice
 
@@ -105,11 +105,11 @@ Table of Contents
      6.7.  Null  . . . . . . . . . . . . . . . . . . . . . . . . . .  20
    7.  Type Annotations  . . . . . . . . . . . . . . . . . . . . . .  20
      7.1.  Syntax and Placement  . . . . . . . . . . . . . . . . . .  20
-     7.2.  Type Families . . . . . . . . . . . . . . . . . . . . . .  21
+     7.2.  Type Families . . . . . . . . . . . . . . . . . . . . . .  22
 
 
 
-Sonntag                   Expires 14 April 2027                 [Page 2]
+Sonntag                   Expires 15 April 2027                 [Page 2]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -117,7 +117,7 @@ Internet-Draft              The Bovnar Format               October 2026
        7.2.1.  Value Compatibility . . . . . . . . . . . . . . . . .  22
        7.2.2.  Special Numbers . . . . . . . . . . . . . . . . . . .  23
      7.3.  Parameters  . . . . . . . . . . . . . . . . . . . . . . .  23
-       7.3.1.  Width . . . . . . . . . . . . . . . . . . . . . . . .  23
+       7.3.1.  Width . . . . . . . . . . . . . . . . . . . . . . . .  24
        7.3.2.  Base  . . . . . . . . . . . . . . . . . . . . . . . .  24
        7.3.3.  Q (Fractional Bits) . . . . . . . . . . . . . . . . .  25
        7.3.4.  Decimal Floating Point  . . . . . . . . . . . . . . .  26
@@ -125,7 +125,7 @@ Internet-Draft              The Bovnar Format               October 2026
      7.4.  Default Type Synthesis  . . . . . . . . . . . . . . . . .  27
    8.  The Unit System . . . . . . . . . . . . . . . . . . . . . . .  28
      8.1.  Model . . . . . . . . . . . . . . . . . . . . . . . . . .  28
-     8.2.  Notation  . . . . . . . . . . . . . . . . . . . . . . . .  28
+     8.2.  Notation  . . . . . . . . . . . . . . . . . . . . . . . .  29
      8.3.  Prefixes  . . . . . . . . . . . . . . . . . . . . . . . .  30
      8.4.  Currency  . . . . . . . . . . . . . . . . . . . . . . . .  32
      8.5.  Inline Unit Suffix  . . . . . . . . . . . . . . . . . . .  33
@@ -165,7 +165,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                 [Page 3]
+Sonntag                   Expires 15 April 2027                 [Page 3]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -221,7 +221,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                 [Page 4]
+Sonntag                   Expires 15 April 2027                 [Page 4]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -277,7 +277,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                 [Page 5]
+Sonntag                   Expires 15 April 2027                 [Page 5]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -333,7 +333,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                 [Page 6]
+Sonntag                   Expires 15 April 2027                 [Page 6]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -389,7 +389,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                 [Page 7]
+Sonntag                   Expires 15 April 2027                 [Page 7]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -445,7 +445,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                 [Page 8]
+Sonntag                   Expires 15 April 2027                 [Page 8]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -501,7 +501,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                 [Page 9]
+Sonntag                   Expires 15 April 2027                 [Page 9]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -557,7 +557,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 10]
+Sonntag                   Expires 15 April 2027                [Page 10]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -613,7 +613,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 11]
+Sonntag                   Expires 15 April 2027                [Page 11]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -669,7 +669,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 12]
+Sonntag                   Expires 15 April 2027                [Page 12]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -725,7 +725,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 13]
+Sonntag                   Expires 15 April 2027                [Page 13]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -781,7 +781,7 @@ id-body      = id-start / "+" / "-" / DIGIT / utf8-cont
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 14]
+Sonntag                   Expires 15 April 2027                [Page 14]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -837,7 +837,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 15]
+Sonntag                   Expires 15 April 2027                [Page 15]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -893,7 +893,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 16]
+Sonntag                   Expires 15 April 2027                [Page 16]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -949,7 +949,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 17]
+Sonntag                   Expires 15 April 2027                [Page 17]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -1005,7 +1005,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 18]
+Sonntag                   Expires 15 April 2027                [Page 18]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -1025,11 +1025,14 @@ Internet-Draft              The Bovnar Format               October 2026
 
    Fields are strictly range-checked: month 01-12, a day valid for that
    month and year, hour 00-23, minute 00-59, second 00-60, and a two-
-   digit offset.  A literal with an out-of-range field, a field of the
-   wrong width (2026-6-15), or an empty fraction is
-   error_invalid_datetime_literal; one that breaks off part-way - a
-   missing seconds field, an offset without its colon - is
-   error_unexpected_input_byte.
+   digit offset.  Which of two errors a malformed literal gets is
+   decided by its skeleton: the grammar above with every 4DIGIT and
+   2DIGIT read as 1*DIGIT and the fraction as *DIGIT.  A literal that
+   matches the skeleton but not the grammar or the ranges - an out-of-
+   range field, a field of the wrong width (2026-6-15), or an empty
+   fraction - is error_invalid_datetime_literal.  One that departs from
+   the skeleton - a missing seconds field, an offset without its colon -
+   is error_unexpected_input_byte.
 
    A date with no time part denotes 00:00:00Z.  A date-time with no zone
    is UTC.  An offset shifts the written civil time to UTC before
@@ -1053,24 +1056,30 @@ Internet-Draft              The Bovnar Format               October 2026
       uniform 86400-second day and have no second to spend on the
       insertion.
 
-   *  On tai, it does not.  TAI is a continuous atomic count, the
-      inserted second is a distinct instant on it, and the two literals
-      above store values differing by one.  This makes the UTC-to-TAI
-      mapping injective, so a tai value survives any number of read/
-      write cycles unchanged.
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 19]
+
+
+Sonntag                   Expires 15 April 2027                [Page 19]
 
 Internet-Draft              The Bovnar Format               October 2026
 
 
+   *  On tai, it does not.  TAI is a continuous atomic count, the
+      inserted second is a distinct instant on it, and the two literals
+      above store values differing by one.  Over the insertions the
+      implementation's leap-second table records, this makes the UTC-to-
+      TAI mapping injective, so a tai value survives any number of read/
+      write cycles unchanged.
+
    A :60 at an instant that the implementation's leap-second table does
-   not record as an insertion collapses on tai as well.  The table is a
-   static snapshot, and an implementation built before an IERS
-   announcement MUST NOT reject a document spelling a genuine future
-   leap second.  See Section 15.9.
+   not record as an insertion collapses on tai as well: it stores the
+   value of the following second, and that is the one case in which two
+   civil spellings share a tai value.  The table is a static snapshot,
+   and an implementation built before an IERS announcement MUST NOT
+   reject a document spelling a genuine future leap second.  See
+   Section 15.9.
 
 6.6.2.  Fractional Seconds
 
@@ -1099,6 +1108,20 @@ Internet-Draft              The Bovnar Format               October 2026
 
 7.1.  Syntax and Placement
 
+
+
+
+
+
+
+
+
+
+Sonntag                   Expires 15 April 2027                [Page 20]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
    type-ann     = "<" ws type-spec ws ">"
    type-spec    = family [ ws ":" ws param-list ]
    family       = %s"uint" / %s"sint" / %s"float_fix" / %s"float_dec"
@@ -1112,15 +1135,6 @@ Internet-Draft              The Bovnar Format               October 2026
 
    The family alternatives are matched longest-first; float_fix and
    float_dec are distinct families and are not float with a parameter.
-
-
-
-
-
-Sonntag                   Expires 14 April 2027                [Page 20]
-
-Internet-Draft              The Bovnar Format               October 2026
-
 
    An annotation MUST appear in one of four positions, always before the
    value it describes:
@@ -1151,6 +1165,19 @@ Internet-Draft              The Bovnar Format               October 2026
 
    A wholly empty annotation, <> or < >, is error_unexpected_input_byte.
 
+
+
+
+
+
+
+
+
+Sonntag                   Expires 15 April 2027                [Page 21]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
 7.2.  Type Families
 
      +===========+===================================+===============+
@@ -1170,14 +1197,6 @@ Internet-Draft              The Bovnar Format               October 2026
      +-----------+-----------------------------------+---------------+
      | bool      | none                              | -             |
      +-----------+-----------------------------------+---------------+
-
-
-
-Sonntag                   Expires 14 April 2027                [Page 21]
-
-Internet-Draft              The Bovnar Format               October 2026
-
-
      | datetime  | width, epoch                      | 64            |
      +-----------+-----------------------------------+---------------+
 
@@ -1207,6 +1226,14 @@ Internet-Draft              The Bovnar Format               October 2026
      +-------------+------------------------------------------------+
      | float       | number or string, base 10 or 16                |
      +-------------+------------------------------------------------+
+
+
+
+Sonntag                   Expires 15 April 2027                [Page 22]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
      | float_fix   | number or string, base 10                      |
      +-------------+------------------------------------------------+
      | float_dec   | number or string, base 10                      |
@@ -1219,20 +1246,6 @@ Internet-Draft              The Bovnar Format               October 2026
    A value whose kind is incompatible with the annotated family is
    error_type_value_mismatch.  A dot or exponent in an integer-typed
    value is likewise error_type_value_mismatch.
-
-
-
-
-
-
-
-
-
-
-Sonntag                   Expires 14 April 2027                [Page 22]
-
-Internet-Draft              The Bovnar Format               October 2026
-
 
    Three value kinds stand outside this table.  A null takes any
    annotation and carries its type (Section 6.7).  A struct takes none
@@ -1267,6 +1280,16 @@ Internet-Draft              The Bovnar Format               October 2026
 
    <uint:32,_10,no_unit>   <uint:_10,no_unit,32>   <uint:no_unit,_10,32>
 
+
+
+
+
+
+Sonntag                   Expires 15 April 2027                [Page 23]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
    Because no positional slot is ever empty, the parameter list is
    parsed strictly.  Empty, trailing, or doubled components - <uint:8,>,
    <uint:8,,>, <uint:,_16>, and the bare <uint:> - are
@@ -1280,15 +1303,6 @@ Internet-Draft              The Bovnar Format               October 2026
 7.3.1.  Width
 
    Width is a count of bits.
-
-
-
-
-
-Sonntag                   Expires 14 April 2027                [Page 23]
-
-Internet-Draft              The Bovnar Format               October 2026
-
 
     +======================+==========================================+
     | Family               | Valid widths                             |
@@ -1325,6 +1339,13 @@ Internet-Draft              The Bovnar Format               October 2026
 
    *  uint and sint accept bases 2 through 62.
 
+
+
+Sonntag                   Expires 15 April 2027                [Page 24]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
    *  Bases 64 and 85 are *uint only*. Their alphabets take the sign
       characters as digits - + in both, - in Ascii85 - so a sign cannot
       be distinguished; a signed value in these bases is
@@ -1338,13 +1359,6 @@ Internet-Draft              The Bovnar Format               October 2026
    *  float_fix and float_dec forbid the base parameter entirely;
       decimal is implicit.  A base parameter on either is
       error_illegal_value_type.
-
-
-
-Sonntag                   Expires 14 April 2027                [Page 24]
-
-Internet-Draft              The Bovnar Format               October 2026
-
 
    The digits of a base, lowest value first, are:
 
@@ -1381,6 +1395,13 @@ Internet-Draft              The Bovnar Format               October 2026
    is valid.  A value whose rounded integer does not fit is
    error_value_out_of_range.  Special numbers are exempt.
 
+
+
+Sonntag                   Expires 15 April 2027                [Page 25]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
    .a = <float_fix:16,q8> 3.14;      # Q8/16 range [-128, 127.99609375]
 
    # .b = <float_fix:16,q8> 128;     # error_value_out_of_range
@@ -1388,19 +1409,6 @@ Internet-Draft              The Bovnar Format               October 2026
 
    float_fix is never synthesised (Section 7.4), because Q cannot be
    inferred from a literal.
-
-
-
-
-
-
-
-
-
-Sonntag                   Expires 14 April 2027                [Page 25]
-
-Internet-Draft              The Bovnar Format               October 2026
-
 
 7.3.4.  Decimal Floating Point
 
@@ -1442,21 +1450,19 @@ Internet-Draft              The Bovnar Format               October 2026
    epoch-param  = %s"unix" / %s"tai" / %s"gps" / %s"mjd" / %s"ntp"
                 / %s"galileo" / %s"glonass" / %s"y2000" / %s"beidou"
 
+
+
+
+Sonntag                   Expires 15 April 2027                [Page 26]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
    A datetime value is a *signed integer count of seconds* since the
    named epoch, and denotes an instant.  This is deliberately distinct
    from a _duration_, which is an ordinary number carrying a time unit,
    such as <float:64,s>.  Negative values denote instants before the
    epoch.
-
-
-
-
-
-
-Sonntag                   Expires 14 April 2027                [Page 26]
-
-Internet-Draft              The Bovnar Format               October 2026
-
 
    A numeric base, q, or unit parameter on datetime is
    error_illegal_value_type.  A fractional or exponent numeric carrier -
@@ -1500,19 +1506,19 @@ Internet-Draft              The Bovnar Format               October 2026
    synthesises float_dec, so money is never held as a binary float:
    .price = 5 $USD; is <float_dec:64,$USD>, not <uint:64>.
 
+
+
+
+Sonntag                   Expires 15 April 2027                [Page 27]
+
+Internet-Draft              The Bovnar Format               October 2026
+
+
    A bare integer inside an array whose whole-array annotation is
    datetime inherits that family, width, and epoch rather than
    synthesising uint or sint, so the canonical form of a datetime array
    - annotation on the first element, bare integers thereafter - remains
    homogeneous under Section 9.1.1.
-
-
-
-
-Sonntag                   Expires 14 April 2027                [Page 27]
-
-Internet-Draft              The Bovnar Format               October 2026
-
 
 8.  The Unit System
 
@@ -1556,19 +1562,15 @@ Internet-Draft              The Bovnar Format               October 2026
       not recognize a unit added in a newer one, which is the expected
       direction of forward compatibility.
 
-8.2.  Notation
 
 
 
-
-
-
-
-
-Sonntag                   Expires 14 April 2027                [Page 28]
+Sonntag                   Expires 15 April 2027                [Page 28]
 
 Internet-Draft              The Bovnar Format               October 2026
 
+
+8.2.  Notation
 
    resolved-unit = "no_unit" / unit-expr
    unit-expr     = unit-factor *( unit-sep unit-factor )
@@ -1619,9 +1621,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-
-
-Sonntag                   Expires 14 April 2027                [Page 29]
+Sonntag                   Expires 15 April 2027                [Page 29]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -1677,7 +1677,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 30]
+Sonntag                   Expires 15 April 2027                [Page 30]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -1733,7 +1733,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 31]
+Sonntag                   Expires 15 April 2027                [Page 31]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -1789,7 +1789,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 32]
+Sonntag                   Expires 15 April 2027                [Page 32]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -1845,7 +1845,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 33]
+Sonntag                   Expires 15 April 2027                [Page 33]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -1901,7 +1901,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 34]
+Sonntag                   Expires 15 April 2027                [Page 34]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -1957,7 +1957,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 35]
+Sonntag                   Expires 15 April 2027                [Page 35]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -2013,7 +2013,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 36]
+Sonntag                   Expires 15 April 2027                [Page 36]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -2069,7 +2069,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 37]
+Sonntag                   Expires 15 April 2027                [Page 37]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -2125,7 +2125,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 38]
+Sonntag                   Expires 15 April 2027                [Page 38]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -2181,7 +2181,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 39]
+Sonntag                   Expires 15 April 2027                [Page 39]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -2237,7 +2237,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 40]
+Sonntag                   Expires 15 April 2027                [Page 40]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -2293,7 +2293,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 41]
+Sonntag                   Expires 15 April 2027                [Page 41]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -2349,7 +2349,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 42]
+Sonntag                   Expires 15 April 2027                [Page 42]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -2405,7 +2405,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 43]
+Sonntag                   Expires 15 April 2027                [Page 43]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -2461,7 +2461,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 44]
+Sonntag                   Expires 15 April 2027                [Page 44]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -2517,7 +2517,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 45]
+Sonntag                   Expires 15 April 2027                [Page 45]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -2573,7 +2573,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 46]
+Sonntag                   Expires 15 April 2027                [Page 46]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -2629,7 +2629,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 47]
+Sonntag                   Expires 15 April 2027                [Page 47]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -2685,7 +2685,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 48]
+Sonntag                   Expires 15 April 2027                [Page 48]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -2741,7 +2741,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 49]
+Sonntag                   Expires 15 April 2027                [Page 49]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -2797,7 +2797,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 50]
+Sonntag                   Expires 15 April 2027                [Page 50]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -2853,7 +2853,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 51]
+Sonntag                   Expires 15 April 2027                [Page 51]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -2909,7 +2909,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 52]
+Sonntag                   Expires 15 April 2027                [Page 52]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -2965,7 +2965,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 53]
+Sonntag                   Expires 15 April 2027                [Page 53]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -3021,7 +3021,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 54]
+Sonntag                   Expires 15 April 2027                [Page 54]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -3077,7 +3077,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 55]
+Sonntag                   Expires 15 April 2027                [Page 55]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -3133,7 +3133,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 56]
+Sonntag                   Expires 15 April 2027                [Page 56]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -3189,7 +3189,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 57]
+Sonntag                   Expires 15 April 2027                [Page 57]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -3245,7 +3245,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 58]
+Sonntag                   Expires 15 April 2027                [Page 58]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -3301,7 +3301,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 59]
+Sonntag                   Expires 15 April 2027                [Page 59]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -3357,7 +3357,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 60]
+Sonntag                   Expires 15 April 2027                [Page 60]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -3413,7 +3413,7 @@ Appendix A.  Collected ABNF
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 61]
+Sonntag                   Expires 15 April 2027                [Page 61]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -3469,7 +3469,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 62]
+Sonntag                   Expires 15 April 2027                [Page 62]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -3525,7 +3525,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 63]
+Sonntag                   Expires 15 April 2027                [Page 63]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -3581,7 +3581,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 64]
+Sonntag                   Expires 15 April 2027                [Page 64]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -3637,7 +3637,7 @@ Appendix B.  Error Codes
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 65]
+Sonntag                   Expires 15 April 2027                [Page 65]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -3693,7 +3693,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 66]
+Sonntag                   Expires 15 April 2027                [Page 66]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -3749,7 +3749,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 67]
+Sonntag                   Expires 15 April 2027                [Page 67]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -3805,7 +3805,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 68]
+Sonntag                   Expires 15 April 2027                [Page 68]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -3861,7 +3861,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 69]
+Sonntag                   Expires 15 April 2027                [Page 69]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -3917,7 +3917,7 @@ C.3.  Unit Safety
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 70]
+Sonntag                   Expires 15 April 2027                [Page 70]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -3973,7 +3973,7 @@ Appendix D.  Design Rationale
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 71]
+Sonntag                   Expires 15 April 2027                [Page 71]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -4029,7 +4029,7 @@ Internet-Draft              The Bovnar Format               October 2026
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 72]
+Sonntag                   Expires 15 April 2027                [Page 72]
 
 Internet-Draft              The Bovnar Format               October 2026
 
@@ -4085,4 +4085,4 @@ Author's Address
 
 
 
-Sonntag                   Expires 14 April 2027                [Page 73]
+Sonntag                   Expires 15 April 2027                [Page 73]

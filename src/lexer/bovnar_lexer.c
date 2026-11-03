@@ -365,6 +365,37 @@ static bool bvn_recover_in_comment(bvnr_reader_t* p, bool ends_line)
 	}
 	return true;
 }
+/* True in the states bvn_enter_resync maps to resync_string by state rather
+ * than by the offending byte: inside a string body or one of its escapes. */
+static inline bool bvn_in_string_body(const bvnr_lexer_t* l)
+{
+	switch (l->next_state) {
+	case string_intro:
+	case copy_string_byte:
+	case escape_from_copy:
+	case esc_x1:
+	case esc_x2:
+	case esc_u_open:
+	case esc_u_hex:
+		return true;
+	default:
+		return false;
+	}
+}
+/* True while recovery is skipping input: every byte there is discarded. */
+static inline bool bvn_in_resync_state(const bvnr_lexer_t* l)
+{
+	switch (l->next_state) {
+	case resync:
+	case resync_dot:
+	case resync_string:
+	case resync_string_escape:
+	case resync_comment:
+		return true;
+	default:
+		return false;
+	}
+}
 static bool bvn_enter_resync(bvnr_reader_t* p)
 {
 	bvnr_lexer_t* l = &p->lex;
@@ -2628,11 +2659,40 @@ static bool bvn_interpret_input_buffer(
 		l->prev_byte = b;
 		uint8_t saved_need = l->utf8_need;
 		bool line_advanced = false;
-		if (b < 0x80u && saved_need == 0u) {
-		} else if (!bvn_utf8_feed(l, (uint32_t)b)) {
+		bool utf8_bad = !(b < 0x80u && saved_need == 0u) &&
+				!bvn_utf8_feed(l, (uint32_t)b);
+		if (!utf8_bad) {
+		} else if (bvn_in_resync_state(l)) {
+			/* Malformed UTF-8 inside a region recovery is already skipping
+			 * is skipped like any other byte there (doc/03 §13.2): no second
+			 * error, and above all no second bvn_enter_resync, which forgot
+			 * that the skip was inside a string -- the string's closing quote
+			 * then opened a new skip and swallowed the rest of the document
+			 * (".a = \"caf\xe9 cr\xe8me\"; .b = 2;" lost .b). A byte that cut
+			 * a sequence short is an ordinary character of the skipped text
+			 * (it may be that closing quote), so it is fed and dispatched. */
+			l->utf8_need = 0;
+			l->utf8_lo = 0;
+			l->utf8_hi = 0;
+			if (l->next_state == resync_dot)
+				l->next_state = resync;
+			if (saved_need == 0 || !bvn_utf8_feed(l, (uint32_t)b)) {
+				l->utf8_need = 0;
+				++l->column;
+				continue;
+			}
+			/* A new character begins at the cutting byte; a tab's stop is
+			 * set below. */
+			if (l->byte != 0x09)
+				++l->column;
+		} else {
+			/* A byte that is not a continuation byte cuts the pending
+			 * sequence short and begins a character of its own: the error's
+			 * column is that character's, which is the byte offset names. */
+			bool starts_char = saved_need == 0 || b < 0x80u || b >= 0xc0u;
 			if (l->byte == 0x09)
 				l->column = ((l->column >> 2u) + 1u) << 2u;
-			else if (saved_need == 0)
+			else if (starts_char)
 				++l->column;
 			p->val.last_error = error_invalid_utf8_byte;
 			bvn_set_error_pos(p, (uint32_t)l->byte & 0xffu,
@@ -2642,6 +2702,7 @@ static bool bvn_interpret_input_buffer(
 			line_advanced = true;
 			if (l->continue_on_error) {
 				bool was_continuation = (saved_need > 0);
+				bool in_string_body = bvn_in_string_body(l);
 				if (bvn_recover_in_comment(p,
 					l->byte == 0x0a || l->byte == 0x0d)) {
 					if (!was_continuation || l->byte == 0x0a ||
@@ -2651,16 +2712,29 @@ static bool bvn_interpret_input_buffer(
 					 * character of the comment; fall through to it */
 				} else if (!bvn_enter_resync(p)) {
 					return false;
+				} else if (was_continuation && !in_string_body &&
+					   (l->byte == '"' || l->byte == '#')) {
+					/* bvn_enter_resync took this quote or '#' as the
+					 * opener of the string or comment to skip. Dispatching
+					 * it again in that state closed the skip it had just
+					 * opened, so the real closing quote opened another and
+					 * the rest of the document was lost
+					 * (".a = sym\xe2\x82\"s\"; .b = 2;" lost .b). */
+					continue;
 				}
 				if (!was_continuation || l->byte == 0x09 ||
 					l->byte == 0x0a || l->byte == 0x0d) {
 					continue;
 				}
+				/* The column of a byte that began a character was counted
+				 * above; a stray continuation byte begins one only now. */
 				if (!bvn_utf8_feed(l, (uint32_t)l->byte)) {
-					++l->column;
+					if (!starts_char)
+						++l->column;
 					continue;
 				}
-				++l->column;
+				if (!starts_char)
+					++l->column;
 			} else {
 				return false;
 			}
@@ -3047,6 +3121,12 @@ bool bvn_lex_run(bvnr_reader_t* r)
 		}
 		if (over_cap) {
 			bvn_set_eof_error(r, error_file_too_long);
+			/* The offset names the first byte over the cap, which is the
+			 * NEXT character (unless it continues one already begun), so the
+			 * column is that character's -- as error_text_data_too_long
+			 * reports it -- not the last one read. */
+			if (l->utf8_need == 0)
+				r->val.error_column = l->column + 1u;
 			bvn_notify_error(r);
 			return false;
 		}

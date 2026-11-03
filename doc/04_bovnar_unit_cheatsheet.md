@@ -136,11 +136,17 @@ Used **only** on `b` (bit) and `B` (byte). Written as `prefix~base` or compactly
 
 | Unit category | SI prefixes | IEC prefixes |
 |---------------|-------------|--------------|
-| All physical units (default) | All 24 allowed | Forbidden |
+| Physical units not listed below (default) | All 24 allowed | Forbidden |
 | `b` (bit) and `B` (byte) | Only ≥ kilo (`k`, `M`, `G`, …, `Q`) | All 10 allowed |
 | `b` and `B` with sub-kilo SI (`d`, `c`, `m`, `µ`, `n`, `p`, `f`, `a`, `z`, `y`, `r`, `q`, `da`, `h`) | **Forbidden** | — |
 | Currency codes | All 24 allowed | **Forbidden** |
 | Old German units (`bu_pfund` … `bu_scheffel`) | **None** (`si_none` only) | **Forbidden** |
+| Ratio units (`%`, `‰`, `‱`, `pcm`, `ppm`, `ppb`, `pptr`, `ppq`) | **None** — `k~%` is `error_unit_illegal` | **Forbidden** |
+| Scales that are already a scale: `pH`, `mph`, `kph`, the five water-hardness degrees (`°dH`, `°e`, `°fH`, `°rH`, `°aH`), `gpg`, `CF`, `PSU`, `JTU` | **None** | **Forbidden** |
+
+The turbidity units `NTU`, `FNU`, `FTU` and `FAU` are not in that last row: they take any SI
+prefix, because a milli-NTU is a real ultrapure-water measurement. The full rule, with its reasons, is in
+[Unit System §4.2](05_bovnar_unit_system.md#42-iec-binary-prefixes).
 
 ---
 
@@ -656,7 +662,7 @@ ones; the gallon, quart and pint were only the liquid ones.
 | `shake` | `shake`, `shakes` | shake | `bu_shake` | 10⁻⁸ s (exact) |
 
 > `darcy` takes prefixes, so the millidarcy every reservoir report is written in is `m~darcy`.
-> `thm_ec` is the European gas-billing therm; native `thm` is the US therm, 0.24 % away.
+> `thm_ec` is the European gas-billing therm; native `thm` is the US therm, 0.024 % away.
 
 #### Nine more the unit profiles needed
 
@@ -679,12 +685,12 @@ every factor below is one **two or three publishers state independently**, agree
 > alias: `pnt_pr` is 0.37 % off `pnt`, `hp_E` 0.04 % off `hp`, `bsh_uk` 3.2 % off `bsh`, and `hp_B`
 > thirteen times any horsepower. `abV` needed a unit because no decade prefix reaches 10⁻⁸ and
 > prefixes do not stack. `AT` and `debye` are exact rationals — 175/6 g, and 10⁻²¹/c C·m, exact
-> since the 2019 SI fixed c — of which their publishers state 7- and 6-digit roundings.
+> since the 1983 definition of the metre fixed c — of which their publishers state 7- and 6-digit roundings.
 
 #### And the thirty-five the same sweep found next
 
 The rest of the refusals **two or more vocabularies define**. Where publishers disagree the exact
-definition decides: the CGS-ESU units are built on `c`, exact since 2019, so their five- to
+definition decides: the CGS-ESU units are built on `c`, exact since 1983, so their five- to
 seven-digit decimals are roundings of the rational stated here. The π-based rows carry
 `.exact = false`. `yr` is still the Julian year — naming the other calendars is what lets a UDUNITS
 or CF document that says `year` be read at all.
@@ -743,7 +749,7 @@ or CF document that says `year` be read at all.
 | `cal_m` | `mean_calorie` | mean calorie | `bu_calorie_mean` | 4.19002 J (exact) |
 | `cal_15` | `calorie_15C` | 15 °C calorie | `bu_calorie_15c` | 4.1858 J (exact) |
 | `cal_20` | `calorie_20C` | 20 °C calorie | `bu_calorie_20c` | 4.1819 J (exact) |
-| `Btu_59` | `btu_59F` | 59 °F BTU | `bu_btu_59f` | 1054.8 J (exact) |
+| `Btu_59` | `btu_59F` | 59 °F BTU | `bu_btu_59f` | 1054.804 J |
 | `Btu_60` | `btu_60F` | 60 °F BTU | `bu_btu_60f` | 1054.68 J (exact) |
 | `Btu_m` | `mean_btu` | mean BTU | `bu_btu_mean` | 1055.87 J (exact) |
 

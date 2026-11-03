@@ -51,6 +51,12 @@ def _library_name() -> str:
 _LIBRARY_NAME = _library_name()
 
 def _candidate_paths() -> list[str]:
+    """Every place the loader looks, in order, whether or not a file is there.
+
+    load_library() skips the missing ones, but reports all of them: a
+    BovnarLibraryNotFound that said "Searched: (none)" gave no hint where the
+    library was expected to be.
+    """
     paths: list[str] = []
 
     # 1. Explicit override always wins (developer pointing at a custom build).
@@ -65,11 +71,10 @@ def _candidate_paths() -> list[str]:
     # 2. Bundled-in-wheel case: CMake installs the shared library directly into
     #    the package directory, next to this file.  This is the normal path for
     #    a `pip install bovnar`.
-    bundled = Path(__file__).parent / _LIBRARY_NAME
-    if bundled.exists():
-        paths.append(str(bundled))
+    paths.append(str(Path(__file__).parent / _LIBRARY_NAME))
 
-    # 3. A system-wide install (e.g. distro package).
+    # 3. A system-wide install (e.g. distro package). find_library() returns a
+    #    soname for the dynamic loader rather than a path, or None.
     found = ctypes.util.find_library(_LIBRARY_BASE)
     if found:
         paths.append(found)
@@ -78,9 +83,9 @@ def _candidate_paths() -> list[str]:
     #    repo root (python/bovnar/_ffi.py -> ../../build).
     script_dir = Path(__file__).parent
     for rel in ('../../build', '../../build/release', '../..', '.'):
-        p = (script_dir / rel / _LIBRARY_NAME).resolve()
-        if p.exists():
-            paths.append(str(p))
+        p = str((script_dir / rel / _LIBRARY_NAME).resolve())
+        if p not in paths:
+            paths.append(p)
 
     return paths
 
@@ -90,19 +95,29 @@ def load_library() -> ctypes.CDLL:
         return _lib
 
     candidates = _candidate_paths()
+    tried: list[str] = []
     last_error: Exception | None = None
 
     for path in candidates:
+        # A bare soname (from find_library) is the dynamic loader's to resolve;
+        # anything with a directory part is a file that must exist.
+        if os.sep in path or (os.altsep and os.altsep in path):
+            if not os.path.exists(path):
+                tried.append(f"{path} (not found)")
+                continue
         try:
             candidate = ctypes.CDLL(path, use_errno=True)
             _declare_functions(candidate)
         except (OSError, AttributeError) as exc:
+            tried.append(f"{path} ({exc})")
             last_error = exc
             continue
         _lib = candidate
         return _lib
 
-    raise BovnarLibraryNotFound(candidates) from last_error
+    if ctypes.util.find_library(_LIBRARY_BASE) is None:
+        tried.append(f"system library search for '{_LIBRARY_BASE}' (not found)")
+    raise BovnarLibraryNotFound(tried) from last_error
 
 def get_library() -> ctypes.CDLL:
     return load_library()
@@ -419,6 +434,9 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
 
     lib.bvn_validate_sint_range.restype  = c_bool
     lib.bvn_validate_sint_range.argtypes = [c_char_p, c_uint32, c_uint32]
+
+    lib.bvn_validate_number.restype  = c_bool
+    lib.bvn_validate_number.argtypes = [c_char_p]
 
     lib.bvn_is_special_number_string.restype  = c_bool
     lib.bvn_is_special_number_string.argtypes = [c_char_p]

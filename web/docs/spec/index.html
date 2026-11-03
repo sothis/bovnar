@@ -2279,7 +2279,7 @@ ev_data
 </tr>
 <tr>
 <td>micro</td>
-<td><code>µ</code> (or <code>u</code>)</td>
+<td><code>µ</code> (or <code>μ</code>, <code>u</code>)</td>
 <td>10⁻⁶</td>
 <td><code>si_micro</code></td>
 </tr>
@@ -2334,7 +2334,7 @@ ev_data
 </tbody>
 </table>
 <blockquote>
-<p><strong>Note:</strong> <code>µ</code> = U+00B5 (MICRO SIGN), encoded as <code>0xC2 0xB5</code> in UTF-8. ASCII <code>u</code> is accepted as an input-only alias for the micro prefix (<code>u~m</code> = <code>µ~m</code>); <code>bvn_unit_to_string</code> and the <code>bvnr_write_*</code> helpers always render it as <code>µ</code>, though the pretty-print / canonicalize path preserves the input <code>u</code> at default <code>unit_flags</code>.</p>
+<p><strong>Note:</strong> <code>µ</code> = U+00B5 (MICRO SIGN), encoded as <code>0xC2 0xB5</code> in UTF-8. Two input-only aliases are accepted for the micro prefix: <code>μ</code> = U+03BC (GREEK SMALL LETTER MU, <code>0xCE 0xBC</code>) and ASCII <code>u</code> (<code>μ~m</code> = <code>u~m</code> = <code>µ~m</code>). <code>bvn_unit_to_string</code> and the <code>bvnr_write_*</code> helpers always render the prefix as <code>µ</code> (U+00B5), though the pretty-print / canonicalize path preserves the input spelling at default <code>unit_flags</code>.</p>
 </blockquote>
 <h3 id="113-iec-binary-prefixes">11.3 IEC Binary Prefixes</h3>
 <table>
@@ -2691,7 +2691,7 @@ for anything genuinely out of range.</p>
 </tr>
 <tr>
 <td>An <strong>opaque</strong> unit — a UCUM <em>arbitrary</em> atom (<code>[IU]</code>, <code>[PFU]</code>, …) or a UNECE package/count code (<code>XBX</code>, <code>C62</code>, …)</td>
-<td>A unit with no native spelling and no dimension: comparable with itself, never convertible to anything else. Two different opaque units are two different units — <code>error_unit_mismatch</code> between an annotation and an inline suffix (§6.5), <code>error_array_element_type_mismatch</code> in a bare array (§7.4). It serialises back in the notation of the namespace that owns it</td>
+<td>A unit with no native spelling and no dimension: comparable with itself, and convertible to no other unit — only across a change of prefix (<code>ucum:[IU]/L</code> to <code>ucum:[IU]/mL</code> is a factor of 1000). Two different opaque units are two different units — <code>error_unit_mismatch</code> between an annotation and an inline suffix (§6.5), <code>error_array_element_type_mismatch</code> in a bare array (§7.4). It serialises back in the notation of the namespace that owns it</td>
 </tr>
 <tr>
 <td>Not a valid expression in the profile, or an atom it does not define</td>
@@ -3189,7 +3189,7 @@ of the comment is never read as document text.</p>
 <tbody>
 <tr>
 <td><code>0x00–0xFF</code> (most)</td>
-<td>Skip (consume and continue)</td>
+<td>Skip (consume and continue) — malformed UTF-8 included: it raises no error of its own while recovery is skipping</td>
 </tr>
 <tr>
 <td><code>"</code></td>

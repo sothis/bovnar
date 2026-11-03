@@ -297,8 +297,10 @@ bool bvn_dom_struct_add(bvn_dom_node_t *s,
 						const char *key, uint32_t klen,
 						bvn_dom_node_t *val)
 {
+	/* A key is an identifier, never empty: a NULL key went on to memcmp
+	 * and strdup through a null pointer. */
 	if (!s || s->type != BVN_DOM_STRUCT || !val || val == s ||
-	    (!key && klen) ||
+	    !key || klen == 0 ||
 	    bvn_dom_entries_have_key(s->val.members.entries, s->val.members.count,
 				     key, klen)) {
 		bvn_dom_node_destroy(val);
@@ -340,7 +342,7 @@ bool bvn_dom_doc_add(bvn_dom_doc_t *d,
 					 const char *key, uint32_t klen,
 					 bvn_dom_node_t *val)
 {
-	if (!d || !val || (!key && klen) ||
+	if (!d || !val || !key || klen == 0 ||
 	    bvn_dom_entries_have_key(d->entries, d->count, key, klen)) {
 		bvn_dom_node_destroy(val);
 		return false;
@@ -640,7 +642,9 @@ bool bvn_dom_get_string(const bvn_dom_node_t *node,
 						const char **out, uint32_t *len)
 {
 	if (!node || node->type != BVN_DOM_STRING || !out) return false;
-	*out = node->val.str.data;
+	/* A node made by bvn_dom_node_alloc has no data yet: it is the empty
+	 * text, and the contract is a NUL-terminated pointer, never NULL. */
+	*out = node->val.str.data ? node->val.str.data : "";
 	if (len) *len = node->val.str.len;
 	return true;
 }
@@ -648,7 +652,9 @@ bool bvn_dom_get_symbol(const bvn_dom_node_t *node,
 						const char **out, uint32_t *len)
 {
 	if (!node || node->type != BVN_DOM_SYMBOL || !out) return false;
-	*out = node->val.str.data;
+	/* A node made by bvn_dom_node_alloc has no data yet: it is the empty
+	 * text, and the contract is a NUL-terminated pointer, never NULL. */
+	*out = node->val.str.data ? node->val.str.data : "";
 	if (len) *len = node->val.str.len;
 	return true;
 }
@@ -656,7 +662,9 @@ bool bvn_dom_get_reference(const bvn_dom_node_t *node,
 						   const char **out, uint32_t *len)
 {
 	if (!node || node->type != BVN_DOM_REFERENCE || !out) return false;
-	*out = node->val.str.data;
+	/* A node made by bvn_dom_node_alloc has no data yet: it is the empty
+	 * text, and the contract is a NUL-terminated pointer, never NULL. */
+	*out = node->val.str.data ? node->val.str.data : "";
 	if (len) *len = node->val.str.len;
 	return true;
 }

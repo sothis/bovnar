@@ -418,7 +418,7 @@
 <hr />
 <h2 id="7-fixed-point-numbers-float_fix">7. Fixed-Point Numbers: <code>float_fix</code></h2>
 <p>Fixed-point (Q-format) numbers store a value as a signed integer, with the binary point shifted by a declared number of fractional bits. The wire representation is an integer; the mathematical value is <code>raw_integer × 2⁻Q</code>.</p>
-<p>The annotation requires a <code>qN</code> parameter specifying fractional bits, in addition to the width:</p>
+<p>The annotation takes a <code>qN</code> parameter giving the number of fractional bits, beside the width. An omitted <code>qN</code> is <code>q0</code>, so <code>&lt;float_fix:32&gt;</code> is <code>&lt;float_fix:32,q0&gt;</code> — no fractional bits at all — and a fixed-point value that has any fractional bits must say how many:</p>
 <div class="codehilite"><pre><code class="language-bovnar">.adc = &lt;float_fix:16,q8&gt;  3.14;    # 16-bit, 8 fractional bits
                                     # range: [-128, 127.996], resolution ≈ 0.0039
 .pid = &lt;float_fix:32,q16&gt; -1.5;    # 32-bit Q16: 15 integer bits + sign + 16 fractional

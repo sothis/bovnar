@@ -297,26 +297,31 @@
   { .code = "B51"; .bovnar = "kgf";    },   # kilopond, the same unit
   { .code = "M75"; .bovnar = "kip";    },   # kip
   { .code = "DU";  .bovnar = "dyn";    },   # dyne
-  { .code = "A58"; .bovnar = "dyn";    },   # erg per centimetre, the same unit
-  { .code = "M77"; .bovnar = "N";      },   # kilogram metre per second squared
-  { .code = "B12"; .bovnar = "N";      },   # joule per metre
+  { .code = "A58"; .bovnar = "erg/c~m"; },   # erg per centimetre -- a linear stopping power, not the dyne
+  # Rec 20 names these units by their definition, and the row spells that
+  # definition out, as QUDT does: M77 is the kilogram metre per second
+  # squared, not a second code for the newton (NEW is that), so a value
+  # written unece:M77 keeps the spelling its producer chose and N is still
+  # written as unece:NEW. Equal in value, convertible with factor 1.
+  { .code = "M77"; .bovnar = "k~g·m/s^2"; },   # kilogram metre per second squared
+  { .code = "B12"; .bovnar = "J/m";    },   # joule per metre -- a linear energy transfer, not the newton
   { .code = "PS";  .bovnar = "psi";    },   # pound-force per square inch
   { .code = "ATT"; .bovnar = "at";     },   # technical atmosphere
   { .code = "E42"; .bovnar = "at";     },   # kilogram-force per square centimetre
   { .code = "HN";  .bovnar = "mmHg";   },   # millimetre of mercury
   { .code = "F79"; .bovnar = "inHg";   },   # inch of mercury
-  { .code = "C55"; .bovnar = "Pa";     },   # newton per square metre
+  { .code = "C55"; .bovnar = "N/m^2";  },   # newton per square metre (PAL is the pascal)
 
   # Energy, power
   { .code = "A53"; .bovnar = "eV";     },   # electronvolt
   { .code = "A57"; .bovnar = "erg";    },   # erg
-  { .code = "J94"; .bovnar = "erg";    },   # dyne centimetre, the same unit
+  { .code = "J94"; .bovnar = "dyn·c~m"; },   # dyne centimetre -- a torque, as NU is, not the erg
   { .code = "D35"; .bovnar = "cal";    },   # thermochemical calorie, which native cal is
   { .code = "N72"; .bovnar = "thm";    },   # therm (US), which native thm is
-  { .code = "J55"; .bovnar = "J";      },   # watt second
+  { .code = "J55"; .bovnar = "W·s";    },   # watt second (JOU is the joule)
   { .code = "85";  .bovnar = "ft_lb";  },   # foot pound-force
   { .code = "M92"; .bovnar = "ft_lb";  },   # pound-force foot, the same unit
-  { .code = "P14"; .bovnar = "W";      },   # joule per second
+  { .code = "P14"; .bovnar = "J/s";    },   # joule per second (WTT is the watt)
   { .code = "HJ";  .bovnar = "PS";     },   # metric horsepower
   # NOT the joule: a newton metre is a torque, and doc/07 §12 keeps the two
   # apart although they share a dimension.
@@ -324,9 +329,9 @@
 
   # Electricity and magnetism
   { .code = "81";  .bovnar = "H";      },   # henry
-  { .code = "A8";  .bovnar = "C";      },   # ampere second
+  { .code = "A8";  .bovnar = "A·s";    },   # ampere second (COU is the coulomb)
   { .code = "D33"; .bovnar = "T";      },   # tesla
-  { .code = "F90"; .bovnar = "Wb";     },   # newton metre per ampere
+  { .code = "F90"; .bovnar = "N·m/A";  },   # newton metre per ampere (WEB is the weber)
   { .code = "NQ";  .bovnar = "S";      },   # mho
   { .code = "B65"; .bovnar = "Mx";     },   # maxwell
   { .code = "76";  .bovnar = "G";      },   # gauss
@@ -346,7 +351,7 @@
   # Amount, catalytic activity, photometry
   { .code = "C34"; .bovnar = "mol";    },   # mole
   { .code = "KAT"; .bovnar = "kat";    },   # katal
-  { .code = "E95"; .bovnar = "kat";    },   # mole per second, the same unit
+  { .code = "E95"; .bovnar = "mol/s";  },   # mole per second -- a molar flow rate, not the katal
   { .code = "B60"; .bovnar = "lx";     },   # lumen per square metre
   { .code = "A24"; .bovnar = "cd/m^2"; },   # candela per square metre -- a
                                             # LUMINANCE, not the lux
@@ -700,7 +705,7 @@
   { .code = "B36";   .bovnar = "cal/g";               .reverse = false; },  # via qudt:CAL_TH-PER-GM
   { .code = "B38";   .bovnar = "g·gn·k~m";            .reverse = false; },  # via qudt:KiloGM_F-M
   { .code = "B39";   .bovnar = "g·gn·k~m/s";          .reverse = false; },  # via qudt:KiloGM_F-M-PER-SEC
-  { .code = "B40";   .bovnar = "d~g·gn/c~m^2";        .reverse = false; },  # via qudt:KiloGM_F-PER-M2
+  { .code = "B40";   .bovnar = "kgf/m^2";             .reverse = false; },  # via qudt:KiloGM_F-PER-M2
   { .code = "B41";   .bovnar = "k~J/K";               .reverse = false; },  # via qudt:KiloJ-PER-K
   { .code = "B42";   .bovnar = "k~J/k~g";             .reverse = false; },  # via qudt:KiloJ-PER-KiloGM
   { .code = "B43";   .bovnar = "k~J·k~g^-1·K^-1";     .reverse = false; },  # via qudt:KiloJ-PER-KiloGM-K
@@ -776,7 +781,7 @@
   { .code = "C46";   .bovnar = "n~Ω·m";               .reverse = false; },  # via qudt:NanoOHM-M
   { .code = "C48";   .bovnar = "n~T";                 },  # via qudt:NanoT
   { .code = "C49";   .bovnar = "n~W";                 },  # via qudt:NanoW
-  { .code = "C51";   .bovnar = "s^-1";                .reverse = false; },  # via qudt:NP-PER-SEC
+  { .code = "C51";   .bovnar = "Np/s";                .reverse = false; },  # via qudt:NP-PER-SEC
   { .code = "C53";   .bovnar = "N·m·s";               .reverse = false; },  # via qudt:N-M-SEC
   { .code = "C54";   .bovnar = "N·m^2/k~g^2";         .reverse = false; },  # via qudt:N-M2-PER-KiloGM2
   { .code = "C56";   .bovnar = "N/m~m^2";             .reverse = false; },  # via qudt:N-PER-MilliM2
@@ -854,7 +859,7 @@
   { .code = "D69";   .bovnar = "in^4";                .reverse = false; },  # via qudt:IN4
   { .code = "D73";   .bovnar = "J·m^2";               .reverse = false; },  # via qudt:J-M2
   { .code = "D74";   .bovnar = "k~g/mol";             .reverse = false; },  # via qudt:KiloGM-PER-MOL
-  { .code = "D76";   .bovnar = "Btu/lb·°Ra";          .reverse = false; },  # via qudt:CAL_IT-PER-GM-K
+  { .code = "D76";   .bovnar = "cal_IT/(g·K)";        .reverse = false; },  # via qudt:CAL_IT-PER-GM-K
   { .code = "D77";   .bovnar = "M~C";                 },  # via qudt:MegaC
   { .code = "D78";   .bovnar = "M~J/s";               .reverse = false; },  # via qudt:MegaJ-PER-SEC
   { .code = "D80";   .bovnar = "µ~W";                 },  # via qudt:MicroW
@@ -944,7 +949,7 @@
   { .code = "F14";   .bovnar = "g/K";                 .reverse = false; },  # via qudt:GM-PER-K
   { .code = "F15";   .bovnar = "k~g/K";               .reverse = false; },  # via qudt:KiloGM-PER-K
   { .code = "F16";   .bovnar = "m~g/K";               .reverse = false; },  # via qudt:MilliGM-PER-K
-  { .code = "F17";   .bovnar = "k~ft·lbf/ft^2";       .reverse = false; },  # via qudt:KiloLB_F-PER-FT
+  { .code = "F17";   .bovnar = "k~lbf/ft";            .reverse = false; },  # via qudt:KiloLB_F-PER-FT
   { .code = "F18";   .bovnar = "k~g·c~m^2";           .reverse = false; },  # via qudt:KiloGM-CentiM2
   { .code = "F19";   .bovnar = "k~g·m~m^2";           .reverse = false; },  # via qudt:KiloGM-MilliM2
   { .code = "F20";   .bovnar = "lb·in^2";             .reverse = false; },  # via qudt:LB-IN2
@@ -1157,7 +1162,6 @@
   { .code = "H36";   .bovnar = "M~Ω/k~m";             .reverse = false; },  # via qudt:MegaOHM-PER-KiloM
   { .code = "H37";   .bovnar = "M~Ω/m";               .reverse = false; },  # via qudt:MegaOHM-PER-M
   { .code = "H38";   .bovnar = "M~A";                 },  # via qudt:MegaA
-  { .code = "H39";   .bovnar = "M~Hz·m";              .reverse = false; },  # via qudt:MegaHZ-KiloM
   { .code = "H40";   .bovnar = "N/A";                 .reverse = false; },  # via qudt:N-PER-A
   { .code = "H41";   .bovnar = "m";                   .reverse = false; },  # via qudt:N-M-PER-W0dot5
   { .code = "H42";   .bovnar = "Pa/m";                .reverse = false; },  # via qudt:PA-PER-M
@@ -1204,15 +1208,15 @@
   { .code = "H99";   .bovnar = "%/m";                 .reverse = false; },  # via qudt:PERCENT-PER-M
   { .code = "HBA";   .bovnar = "h~bar";               },  # via qudt:HectoBAR
   { .code = "HGM";   .bovnar = "h~g";                 },  # via qudt:HectoGM
-  { .code = "HP";    .bovnar = "d~g·gn/c~m^2";        .reverse = false; },  # via qudt:MilliM_H2O
+  { .code = "HP";    .bovnar = "m~mH2O";                                },  # via qudt:MilliM_H2O
   { .code = "IA";    .bovnar = "lb·in";               .reverse = false; },  # via qudt:LB-IN
   { .code = "IU";    .bovnar = "in/s";                .reverse = false; },  # via qudt:IN-PER-SEC
   { .code = "IV";    .bovnar = "in/s^2";              .reverse = false; },  # via qudt:IN-PER-SEC2
   { .code = "J10";   .bovnar = "%/m~m";               .reverse = false; },  # via qudt:PERCENT-PER-MilliM
   { .code = "J2";    .bovnar = "J/k~g";               .reverse = false; },  # via qudt:J-PER-KiloGM
-  { .code = "J23";   .bovnar = "°Ra/h";               .reverse = false; },  # via qudt:DEG_F-PER-HR
-  { .code = "J24";   .bovnar = "°Ra/min";             .reverse = false; },  # via qudt:DEG_F-PER-MIN
-  { .code = "J25";   .bovnar = "°Ra/s";               .reverse = false; },  # via qudt:DEG_F-PER-SEC
+  { .code = "J23";   .bovnar = "Δ°F/h";               .reverse = false; },  # via qudt:DEG_F-PER-HR
+  { .code = "J24";   .bovnar = "Δ°F/min";             .reverse = false; },  # via qudt:DEG_F-PER-MIN
+  { .code = "J25";   .bovnar = "Δ°F/s";               .reverse = false; },  # via qudt:DEG_F-PER-SEC
   { .code = "J28";   .bovnar = "°Ra/h";               .reverse = false; },  # via qudt:DEG_R-PER-HR
   { .code = "J29";   .bovnar = "°Ra/min";             .reverse = false; },  # via qudt:DEG_R-PER-MIN
   { .code = "J30";   .bovnar = "°Ra/s";               .reverse = false; },  # via qudt:DEG_R-PER-SEC
@@ -1221,16 +1225,15 @@
   { .code = "J34";   .bovnar = "µ~g/m^3·K";           .reverse = false; },  # via qudt:MicroGM-PER-M3-K
   { .code = "J35";   .bovnar = "µ~g/m^3·bar";         .reverse = false; },  # via qudt:MicroGM-PER-M3-BAR
   { .code = "J36";   .bovnar = "µ~L/L";               .reverse = false; },  # via qudt:MicroL-PER-L
-  { .code = "J39";   .bovnar = "Btu";                 .reverse = false; },  # via qudt:BTU_MEAN
   { .code = "J45";   .bovnar = "Btu/s";               .reverse = false; },  # via qudt:BTU_IT-PER-SEC
-  { .code = "J50";   .bovnar = "cal/g·K";             .reverse = false; },  # via qudt:BTU_TH-PER-LB-DEG_F
+  { .code = "J50";   .bovnar = "Btu_th/(lb·Δ°F)";     .reverse = false; },  # via qudt:BTU_TH-PER-LB-DEG_F
   { .code = "J53";   .bovnar = "C·m^2/k~g";           .reverse = false; },  # via qudt:C-M2-PER-KiloGM
   { .code = "J56";   .bovnar = "bar/bar";             .reverse = false; },  # via qudt:BAR-PER-BAR
   { .code = "J71";   .bovnar = "bsh/s";               .reverse = false; },  # via qudt:BU_US_DRY-PER-SEC
   { .code = "J72";   .bovnar = "c~N·m";               .reverse = false; },  # via qudt:CentiN-M
   { .code = "J73";   .bovnar = "c~P/K";               .reverse = false; },  # via qudt:CentiPOISE-PER-K
   { .code = "J74";   .bovnar = "c~P/bar";             .reverse = false; },  # via qudt:CentiPOISE-PER-BAR
-  { .code = "J76";   .bovnar = "Btu/lb·°Ra";          .reverse = false; },  # via qudt:CAL_IT-PER-GM-DEG_C
+  { .code = "J76";   .bovnar = "cal_IT/(g·K)";        .reverse = false; },  # via qudt:CAL_IT-PER-GM-DEG_C
   { .code = "J78";   .bovnar = "cal/s·c~m·K";         .reverse = false; },  # via qudt:CAL_TH-PER-CentiM-SEC-DEG_C
   { .code = "J79";   .bovnar = "cal/g·K";             .reverse = false; },  # via qudt:CAL_TH-PER-GM-DEG_C
   { .code = "J82";   .bovnar = "cal/s";               .reverse = false; },  # via qudt:CAL_TH-PER-SEC
@@ -1261,7 +1264,7 @@
   { .code = "K26";   .bovnar = "gal_uk/d";            .reverse = false; },  # via qudt:GAL_UK-PER-DAY
   { .code = "K27";   .bovnar = "gal_uk/h";            .reverse = false; },  # via qudt:GAL_UK-PER-HR
   { .code = "K28";   .bovnar = "gal_uk/s";            .reverse = false; },  # via qudt:GAL_UK-PER-SEC
-  { .code = "K3";    .bovnar = "k~W·h";               .reverse = false; },  # via qudt:KiloV-A_Reactive-HR
+  { .code = "K3";    .bovnar = "k~var·h";             .reverse = false; },  # via qudt:KiloV-A_Reactive-HR
   { .code = "K30";   .bovnar = "gal/s";               .reverse = false; },  # via qudt:GAL_US-PER-SEC
   { .code = "K31";   .bovnar = "g·gn/c~m^2";          .reverse = false; },  # via qudt:GM_F-PER-CentiM2
   { .code = "K32";   .bovnar = "gi_uk/d";             .reverse = false; },  # via qudt:GI_UK-PER-DAY
@@ -1272,7 +1275,7 @@
   { .code = "K37";   .bovnar = "gi/h";                .reverse = false; },  # via qudt:GI_US-PER-HR
   { .code = "K38";   .bovnar = "gi/min";              .reverse = false; },  # via qudt:GI_US-PER-MIN
   { .code = "K39";   .bovnar = "gi/s";                .reverse = false; },  # via qudt:GI_US-PER-SEC
-  { .code = "K41";   .bovnar = "gr/gal";              .reverse = false; },  # via qudt:GRAIN-PER-GAL
+  { .code = "K41";   .bovnar = "gr/gal";              .reverse = false; },  # via qudt:GRAIN-PER-GAL_US
   { .code = "K46";   .bovnar = "in/psi";              .reverse = false; },  # via qudt:IN-PER-PSI
   { .code = "K48";   .bovnar = "in/s·psi";            .reverse = false; },  # via qudt:IN-PER-SEC-PSI
   { .code = "K55";   .bovnar = "k~cal/s";             .reverse = false; },  # via qudt:KiloCAL-PER-SEC
@@ -1357,7 +1360,7 @@
   { .code = "L58";   .bovnar = "pt/h";                .reverse = false; },  # via qudt:PINT_US-PER-HR
   { .code = "L59";   .bovnar = "pt/min";              .reverse = false; },  # via qudt:PINT_US-PER-MIN
   { .code = "L60";   .bovnar = "pt/s";                .reverse = false; },  # via qudt:PINT_US-PER-SEC
-  { .code = "L64";   .bovnar = "lbf·s/ft^2";          .reverse = false; },  # via qudt:SLUG-PER-FT-SEC
+  { .code = "L64";   .bovnar = "slug/(ft·s)";         .reverse = false; },  # via qudt:SLUG-PER-FT-SEC
   { .code = "L69";   .bovnar = "t/K";                 .reverse = false; },  # via qudt:TONNE-PER-K
   { .code = "L70";   .bovnar = "t/bar";               .reverse = false; },  # via qudt:TONNE-PER-BAR
   { .code = "L71";   .bovnar = "t/d";                 .reverse = false; },  # via qudt:TONNE-PER-DAY
@@ -1401,7 +1404,7 @@
   { .code = "M5";    .bovnar = "µ~Ci";                },  # via qudt:MicroCi
   { .code = "M53";   .bovnar = "m/Pa";                .reverse = false; },  # via qudt:M-PER-PA
   { .code = "M55";   .bovnar = "m/rad";               .reverse = false; },  # via qudt:M-PER-RAD
-  { .code = "M56";   .bovnar = "c~P/bar";             .reverse = false; },  # via qudt:SH
+  { .code = "M56";   .bovnar = "shake";                                 },  # via qudt:SH
   { .code = "M57";   .bovnar = "mi/min";              .reverse = false; },  # via qudt:MI-PER-MIN
   { .code = "M59";   .bovnar = "m/s·Pa";              .reverse = false; },  # via qudt:M-PER-SEC-PA
   { .code = "M60";   .bovnar = "m/h";                 .reverse = false; },  # via qudt:M-PER-HR
@@ -1431,7 +1434,7 @@
   { .code = "M97";   .bovnar = "dyn·m";               .reverse = false; },  # via qudt:DYN-M
   { .code = "M98";   .bovnar = "k~g·c~m/s";           .reverse = false; },  # via qudt:KiloGM-CentiM-PER-SEC
   { .code = "M99";   .bovnar = "g·c~m/s";             .reverse = false; },  # via qudt:GM-CentiM-PER-SEC
-  { .code = "MAH";   .bovnar = "M~W·h";               .reverse = false; },  # via qudt:MegaV-A_Reactive-HR
+  { .code = "MAH";   .bovnar = "M~var·h";             .reverse = false; },  # via qudt:MegaV-A_Reactive-HR
   { .code = "MAL";   .bovnar = "M~L";                 },  # via qudt:MegaL
   { .code = "MCU";   .bovnar = "m~Ci";                },  # via qudt:MilliCi
   { .code = "MQH";   .bovnar = "m^3/h";               .reverse = false; },  # via qudt:M3-PER-HR
@@ -1446,7 +1449,6 @@
   { .code = "N26";   .bovnar = "lb·ft/s^2·in^2";      .reverse = false; },  # via qudt:PDL-PER-IN2
   { .code = "N28";   .bovnar = "d~m^3/k~g";           .reverse = false; },  # via qudt:DeciM3-PER-KiloGM
   { .code = "N29";   .bovnar = "ft^3/lb";             .reverse = false; },  # via qudt:FT3-PER-LB
-  { .code = "N3";    .bovnar = "thou";                .reverse = false; },  # via qudt:PT
   { .code = "N30";   .bovnar = "in^3/lb";             .reverse = false; },  # via qudt:IN3-PER-LB
   { .code = "N31";   .bovnar = "k~N/m";               .reverse = false; },  # via qudt:KiloN-PER-M
   { .code = "N32";   .bovnar = "lb·ft/s^2·in";        .reverse = false; },  # via qudt:PDL-PER-IN
@@ -1471,17 +1473,17 @@
   { .code = "N56";   .bovnar = "cal/c~m^2·min";       .reverse = false; },  # via qudt:CAL_TH-PER-CentiM2-MIN
   { .code = "N57";   .bovnar = "cal/c~m^2·s";         .reverse = false; },  # via qudt:CAL_TH-PER-CentiM2-SEC
   { .code = "N58";   .bovnar = "Btu/ft^3";            .reverse = false; },  # via qudt:BTU_IT-PER-FT3
-  { .code = "N60";   .bovnar = "Btu/°Ra";             .reverse = false; },  # via qudt:BTU_IT-PER-DEG_F
+  { .code = "N60";   .bovnar = "Btu/Δ°F";             .reverse = false; },  # via qudt:BTU_IT-PER-DEG_F
   { .code = "N62";   .bovnar = "Btu/°Ra";             .reverse = false; },  # via qudt:BTU_IT-PER-DEG_R
-  { .code = "N65";   .bovnar = "k~Btu/lb·°Ra";        .reverse = false; },  # via qudt:KiloCAL_IT-PER-GM-K
-  { .code = "N74";   .bovnar = "Btu/h·ft^2·°Ra";      .reverse = false; },  # via qudt:BTU_IT-PER-HR-FT2-DEG_F
-  { .code = "N76";   .bovnar = "Btu/s·ft^2·°Ra";      .reverse = false; },  # via qudt:BTU_IT-PER-FT2-SEC-DEG_F
+  { .code = "N65";   .bovnar = "k~cal_IT/(g·K)";      .reverse = false; },  # via qudt:KiloCAL_IT-PER-GM-K
+  { .code = "N74";   .bovnar = "Btu/(h·ft^2·Δ°F)";    .reverse = false; },  # via qudt:BTU_IT-PER-HR-FT2-DEG_F
+  { .code = "N76";   .bovnar = "Btu/(ft^2·s·Δ°F)";    .reverse = false; },  # via qudt:BTU_IT-PER-FT2-SEC-DEG_F
   { .code = "N78";   .bovnar = "k~W/m^2·K";           .reverse = false; },  # via qudt:KiloW-PER-M2-K
   { .code = "N79";   .bovnar = "K/Pa";                .reverse = false; },  # via qudt:K-PER-PA
   { .code = "N80";   .bovnar = "W·m^-1·K^-1";         .reverse = false; },  # via qudt:W-PER-M-DEG_C
   { .code = "N81";   .bovnar = "k~W/m·K";             .reverse = false; },  # via qudt:KiloW-PER-M-K
   { .code = "N82";   .bovnar = "m·k~g/s^3·m~K";       .reverse = false; },  # via qudt:KiloW-PER-M-DEG_C
-  { .code = "N83";   .bovnar = "K^-1";                .reverse = false; },  # via qudt:M-PER-DEG_C-M
+  { .code = "N83";   .bovnar = "m/(K·m)";             .reverse = false; },  # via qudt:M-PER-DEG_C-M
   { .code = "N90";   .bovnar = "k~F";                 },  # via qudt:KiloFARAD
   { .code = "N91";   .bovnar = "J^-1";                .reverse = false; },  # via qudt:PER-J
   { .code = "N92";   .bovnar = "p~S";                 },  # via qudt:PicoS
@@ -1767,6 +1769,9 @@
   { .code = "N88";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (6.933471799)"; },
   { .code = "P27";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (10.764)"; },
   { .code = "P30";   .why = "QUDT's only claimant, LA, contradicts itself — labelled \"Lambert\" with a multiplier of 0.3183098862, which is the APOSTILB (1/pi); the lambert is 1e4/pi, four decades away"; },
+  { .code = "N3";    .why = "QUDT's only claimant, PT, contradicts itself — labelled \"Point\" with ucumCode [pnt], the typographic point (1/72 in), but a multiplier of 2.54e-5 m, the THOU; qudt:PT is refused for the same reason"; },
+  { .code = "J39";   .why = "QUDT's only claimant, BTU_MEAN, contradicts itself — labelled \"British Thermal Unit (mean)\" with ucumCode [Btu_m] (1055.87 J), but a multiplier of 1055.05585262, the IT BTU; qudt:BTU_MEAN is refused for the same reason"; },
+  { .code = "H39";   .why = "QUDT's cross-reference disagrees with itself about this code: MegaHZ-KiloM, the megahertz kilometre, states no value, and MegaHZ-M, the megahertz metre, states 1e6 -- a thousand apart, so this repository cannot say what Rec 20 means by it"; },
   { .code = "P45";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (453.59237)"; },
   { .code = "P46";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (7.559872833)"; },
   { .code = "P72";   .why = "no native unit is a decade away from what QUDT's cross-reference makes this worth (2.77778e-10)"; },

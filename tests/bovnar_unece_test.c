@@ -254,6 +254,15 @@ static void test_equivalence(void)
 	ASSERT_TRUE(bvn_unit_equal(U("unece:LTR"), U("ucum:L")),
 	            "unece:LTR should equal ucum:L");
 
+	/* A Rec 20 code named by its definition is that definition, not a second
+	 * code for the named unit: equal in value, not the same spelling. */
+	ASSERT_TRUE(bvn_unit_equal(U("unece:A8"), U("A·s")),
+	            "unece:A8 should equal A·s");
+	ASSERT_TRUE(!bvn_unit_equal(U("unece:A8"), U("unece:COU")),
+	            "unece:A8 should not be the coulomb's spelling");
+	ASSERT_TRUE(bvn_unit_equal(U("unece:PS"), U("psi")),
+	            "unece:PS, Rec 20's only psi code, should equal psi");
+
 	/* Factors come out of the native registry unchanged. */
 	chk_factor("unece:KGM", 1.0);          /* the SI base unit of mass */
 	chk_factor("unece:GRM", 1e-3);
@@ -535,6 +544,9 @@ static void test_to_unece(void)
 	CHK_UNECE("N",   "NEW");   /* not B12/M77                            */
 	CHK_UNECE("W",   "WTT");   /* not P14, the joule per second          */
 	CHK_UNECE("C",   "COU");   /* not A8, the ampere second              */
+	/* The six definition codes (A8, J55, P14, M77, F90, C55) read as the
+	 * compound they spell, which -- like every compound, m/s included -- has
+	 * no flat code to be written as; the named units keep theirs, above. */
 	CHK_UNECE("H",   "HEN");   /* not 81                                 */
 	CHK_UNECE("Wb",  "WEB");   /* not F90                                */
 	CHK_UNECE("lx",  "LUX");   /* not B60, the lumen per square metre    */
@@ -575,6 +587,64 @@ static void test_to_unece(void)
 	            "an unknown namespace has no spelling");
 }
 
+/* ── rows re-read against the QUDT row they came through ─────────────────── */
+
+/*
+ * Every "via qudt:X" row was compared with the qudt row it names, and every
+ * QUDT uneceCommonCode with the unece row for the code (check_profile_factors,
+ * check_cross_reference). Some had been fitted to a value by any spelling worth
+ * it -- the shake as a centipoise per bar, a kilogram-force per square metre as
+ * a decigram-gn per square centimetre -- and some had followed a QUDT row that
+ * was itself wrong.
+ */
+static void test_rows_resynced_with_qudt(void)
+{
+	printf("  rows re-read against the QUDT row they came through...\n");
+
+	ASSERT_TRUE(bvn_unit_equal(U("unece:C51"), U("Np/s")),
+	            "C51 is the neper per second, not a reciprocal second");
+	ASSERT_FALSE(bvn_units_convertible(U("unece:C51"), U("s^-1")),
+	             "a neper per second does not convert into a frequency");
+	ASSERT_TRUE(bvn_unit_equal(U("unece:M56"), U("shake")),
+	            "M56 is the shake");
+	ASSERT_TRUE(bvn_unit_equal(U("unece:M56"), U("qudt:SH")),
+	            "unece:M56 == qudt:SH");
+	ASSERT_TRUE(bvn_unit_equal(U("unece:B40"), U("kgf/m^2")),
+	            "B40 is the kilogram-force per square metre");
+	ASSERT_TRUE(bvn_unit_equal(U("unece:HP"), U("m~mH2O")),
+	            "HP is the millimetre of water");
+	ASSERT_TRUE(bvn_unit_equal(U("unece:J23"), U("Δ°F/h")),
+	            "J23 is a Fahrenheit interval per hour, not a Rankine one");
+	ASSERT_TRUE(bvn_unit_equal(U("unece:K3"), U("k~var·h")),
+	            "K3 is the kilovar hour, reactive energy");
+	ASSERT_TRUE(bvn_unit_equal(U("unece:K3"), U("qudt:KiloVAR-HR")),
+	            "unece:K3 == qudt:KiloVAR-HR");
+
+	/* Hand rows that named another quantity of the same dimension. */
+	ASSERT_TRUE(bvn_unit_equal(U("unece:J94"), U("dyn·c~m")),
+	            "J94 is a dyne centimetre, a torque as NU is, not the erg");
+	ASSERT_TRUE(bvn_unit_equal(U("unece:B12"), U("J/m")),
+	            "B12 is the joule per metre, not the newton");
+	ASSERT_TRUE(bvn_unit_equal(U("unece:A58"), U("erg/c~m")),
+	            "A58 is the erg per centimetre, not the dyne");
+	ASSERT_TRUE(bvn_unit_equal(U("unece:E95"), U("mol/s")),
+	            "E95 is the mole per second, not the katal");
+
+	/* Refused, because the one QUDT unit claiming each contradicts itself, or
+	 * the claimants contradict each other. */
+	chk_error("unece:N3",  error_unit_profile_unsupported);   /* qudt:PT       */
+	chk_error("unece:J39", error_unit_profile_unsupported);   /* qudt:BTU_MEAN */
+	chk_error("unece:H39", error_unit_profile_unsupported);   /* MHz km / MHz m */
+	/* DRI follows the dram QUDT's label and multiplier state, not its ucumCode. */
+	ASSERT_TRUE(bvn_unit_equal(U("unece:DRI"), U("dr")),
+	            "DRI is the avoirdupois dram");
+
+	char buf[BVNR_UNIT_STRING_MAX];
+	ASSERT_TRUE(bvn_unit_to_profile("unece", U("shake"), buf, sizeof(buf)) > 0 &&
+	            strcmp(buf, "M56") == 0,
+	            "the shake is written back as M56");
+}
+
 /* ── policy strings ─────────────────────────────────────────────────────── */
 
 static void test_policy_strings(void)
@@ -604,6 +674,7 @@ int main(void)
 	test_units_with_no_spelling();
 	test_round_trip();
 	test_to_unece();
+	test_rows_resynced_with_qudt();
 	test_policy_strings();
 
 	printf("\n%d tests, %d failures\n", tests, failures);

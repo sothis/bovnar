@@ -575,10 +575,12 @@ The `data` pointer inside `bvnr_data_t` is **not NUL-terminated**, and for null/
   includes exceeding `vt.width`, so `<uint:8>` rejects `"256"`. A width above 64
   is not checked: the 64-bit out parameter is the binding limit there.
 - Returns `false` for anything a value token cannot look like: an empty string,
-  leading whitespace, a leading `+`, or a sign on an unsigned carrier. (The C
-  standard library's `strtoull` accepts all four — the last by wrapping `-1` into
+  leading whitespace, a sign on an unsigned carrier, or — for the integer
+  helpers `bvn_parse_uint64` and `bvn_parse_int64` — a leading `+`. (The C
+  standard library's `strtoull` accepts all four — the sign by wrapping `-1` into
   `18446744073709551615` — which is why these helpers do not simply forward to
-  it.)
+  it.) `bvn_parse_double` does accept a leading `+` (`"+5"` is 5), because a
+  quoted float may carry one ([spec §6.3](03_bovnar_spec.md#63-digit-validation)).
 - Acceptance matches the reader exactly: anything these accept, a document can
   carry, and vice versa.
 
@@ -839,6 +841,17 @@ worse than none.
 
 ## 2. Writer
 
+**The writer enforces the streaming tier only.** Each of its checks judges the
+event in front of it — a key, a value against its type and width, a struct or
+array closed that was open — as the streaming reader's do. The rules the specification assigns to the *DOM* tier
+([spec §12.4–§12.5](03_bovnar_spec.md#125-struct-validation)) compare siblings
+the writer emits one at a time, and it does not hold them to compare: a key
+repeated within one scope, array elements of mixed kind or unit, ragged sibling
+sub-arrays, and struct elements of an array with differing key sets. Those are
+the **producer's** responsibility. Calling `bvnr_write_bool(w, "b", true)` twice
+writes `.b=true;.b=true;` and both calls succeed, and that output is a document
+`bovnar validate` and `bvn_dom_parse` refuse with `error_duplicate_struct_key`.
+
 ---
 
 ### 2.1 `bvnr_writer_create` / `bvnr_writer_destroy`
@@ -924,7 +937,7 @@ bool bvnr_open_write_sink(bvnr_writer_t        *w,
                             bvnr_write_flags_t   *options);
 ```
 
-Attach `sink` to the writer and configure it. Must be called before any `bvnr_write_event`. Returns `false` on invalid arguments.
+Attach `sink` to the writer and configure it. Must be called before any `bvnr_write_event`. Returns `false` on invalid arguments. A writer with no sink — never opened, or whose open failed — refuses `bvnr_write_event`, `bvnr_write_version` and every helper with `error_invalid_argument` on the first call.
 
 - `pretty` — when `true`, the serialiser emits newlines and indentation. When `false`, output is compact (single line per assignment, no extra whitespace).
 - `options` — configuration struct. Zero-initialise for defaults.
@@ -974,7 +987,7 @@ typedef struct bvnr_write_flags_s {
 | `BVN_UNIT_FLAGS_NONE` | `0` | Default: Unicode superscript exponents, no reduction |
 | `BVN_UNIT_REDUCE` | `1 << 0` | Reduce compound units to canonical form before serialising |
 | `BVN_UNIT_ASCII_EXP` | `1 << 1` | Use `^N` ASCII caret notation instead of Unicode superscripts |
-| `BVN_NUM_CANONICAL` | `1 << 2` | Render a *rescaled* float in float shape (`5000.0`, not `5000`), so a value that took the rescale lands on the same spelling as one that did not. What `bovnar pretty-print --canonical` sets beside `BVN_UNIT_REDUCE` |
+| `BVN_NUM_CANONICAL` | `1 << 2` | Render a *rescaled* float in float shape (`5000.0`, not `5000`), so a value that took the rescale lands on the same spelling as one that did not; and write every annotation in one form — the width written out (`<uint>` as `<uint:64>`), a default base `_10` and `no_unit` left out — so `1.0 km` and `<float:64,k~m> 1.0` produce the same bytes. What `bovnar pretty-print --canonical` sets beside `BVN_UNIT_REDUCE` |
 
 `BVN_UNIT_REDUCE` folds every prefix out of the unit, and the **writer scales the value to match**: `5` with unit `k~m` is written as `5000 m`, not `5 m`. The rescale runs in exact rational arithmetic, so a value far wider than a double keeps every digit; where the scaled value cannot be written exactly in the value's own base the write fails with `error_value_out_of_range` rather than rounding. The rescaled value must also still satisfy the type it was declared with: an `uint`/`sint` that is no longer integral or no longer fits its width, and a `float_fix` that no longer fits its Q format (`<float_fix:32,q16>` leaves 15 integer bits, so 30000 km in metres does not fit), are refused the same way — the writer must not emit a document this library's own reader rejects. (A direct caller of `bvn_unit_to_string_ex` gets no such help — see the note on that function in §3.3.)
 
@@ -1171,6 +1184,8 @@ bool bvnr_write_finish(bvnr_writer_t *w);
 ```
 
 Flush any buffered output and finalise the stream. Must be called after all `bvnr_write_event` calls and before `bvnr_writer_destroy`. Returns `false` if any struct or array is still open, or an assignment, a type annotation or a `/` row separator was left with nothing after it (`error_got_incomplete_bvnr_stream`), if writing the trailing semicolon fails, or if flushing the write buffer to the sink fails.
+
+**After an earlier error** it returns `false` at once, and still hands the sink everything written up to that error — the same bytes a memory sink already holds — so an fd sink ends with the document up to the failing value, not with whatever part of it the 64 KiB buffer happened to have pushed. (A sink that has itself failed, `error_writing_to_sink` or `error_sink_buffer_exhausted`, is not pushed again.) That output is not a document: discard it, or keep it only to see where the error fell.
 
 **64 KiB write buffer.** For an fd or a custom sink the writer accumulates output into an internal 64 KiB buffer. Individual `bvnr_write_event` calls do not push bytes to the sink immediately; instead bytes accumulate in the buffer and are forwarded to the sink only when the buffer is full or when `bvnr_write_finish` is called. A memory sink (`bvnr_open_write_mem`) is written through directly — there is no point buffering a buffer — so its bytes are in the caller's buffer as soon as each event returns. This means the sink receives large contiguous writes rather than one tiny push per token, which is important for fd-based sinks. `bvnr_writer_bytes_written` always reflects the true total of bytes handed off to the sink plus bytes still in the buffer, so the count is accurate at any point during writing.
 
@@ -2007,11 +2022,23 @@ converted — the document's spelling describes a unit that node no longer has.
 
 ### 4.5 Building a tree
 
-The DOM is also writable, e.g. to construct a document programmatically and hand
-it to a serialiser. `bvn_dom_node_alloc` / the `bvn_dom_node_from_*` constructors
-make nodes; the `*_add`/`*_append` functions attach them.
+A tree can also be assembled by hand, within narrow limits — enough to build a
+document of structs, arrays, nulls and integers for code that consumes a DOM, a
+test fixture say. `bvn_dom_doc_create` makes an empty document;
+`bvn_dom_node_alloc` makes an empty node of a given type, which is a complete
+value only for the types that carry no payload (`BVN_DOM_STRUCT`, `BVN_DOM_ARRAY`,
+`BVN_DOM_NULL`); the `bvn_dom_node_from_*` constructors make integer nodes, and
+`bvn_dom_node_from_bigint` one wider than 64 bits with a type and a unit. The
+`*_add`/`*_append` functions attach them.
+
+What the API does **not** have: a constructor or setter for a float, string,
+symbol, reference, bool or octet-stream node (a node allocated as one of those
+holds no value and cannot be given one), and **any DOM serialiser** — there is no
+function that writes a tree out as bovnar text. To produce a document, use the
+writer (§2) directly; a built tree can only be navigated and read with §4.2–§4.4.
 
 ```c
+bvn_dom_doc_t  *bvn_dom_doc_create(void);
 bvn_dom_node_t *bvn_dom_node_alloc(bvn_dom_type_t t);
 void            bvn_dom_node_destroy(bvn_dom_node_t *n);
 bvn_dom_node_t *bvn_dom_node_from_i64/u64/i32/u32/i16/u16/i8/u8(/* value */);

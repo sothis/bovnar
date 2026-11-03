@@ -470,8 +470,16 @@ that appears to work has not normalised anything.
 | `--unit <unit>` | a target (repeatable, first match wins) |
 | `--field <path>=<unit>` | a `bvnr_rule_convert` rule |
 | `--si` | `bvnr_normalise_si` |
-| `--base <N>` | `base` |
+| `--base <N>` | `base`, and the output base of every `--unit` target and `--field` rule |
 | `--leave-inexact` | `bvnr_inexact_leave` |
+
+**`--base` is stamped everywhere a base can apply**, not only on the policy's `base`: the CLI
+copies it onto every `--unit` target and every `--field` rule, whatever order the flags came in.
+That has a consequence §2.2 predicts: a target that asks for an output base restates a value
+*already* in its unit, so with `--unit m --base 16` a value in `m` is converted too — `2.0 m`
+becomes `2` in base 16 — where `--unit m` alone leaves it untouched. `--si --base 16`, with no
+target, leaves a value already in coherent SI units alone, because normalisation only catches what
+it would change.
 
 `query` takes all of them except `--base`, which it refuses by name (exit 2):
 it prints the value it found in decimal, and a base would change nothing it

@@ -35,6 +35,9 @@ import bovnar
 from bovnar import Quantity, Reader, Event
 from bovnar.exceptions import BovnarArgumentError, BovnarWriteError
 
+# Every test here reads or writes through the C library.
+pytestmark = pytest.mark.needs_lib
+
 DOC = (b'#!bovnar 1.2\n'
        b'.a = <float:64,ucum:mL{total}> 1.0;\n'
        b'.b = <float:64,ucum:{RBC}/uL> 2.0;\n'

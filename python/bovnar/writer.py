@@ -46,8 +46,10 @@ class Writer:
 
 
     def __init__(self) -> None:
-        self._lib      = get_library()
+        # _ptr before get_library(): that call can raise
+        # BovnarLibraryNotFound, and __del__ then runs on a half-built object.
         self._ptr      = None
+        self._lib      = get_library()
         self._sink     = None
         self._buf      = None
         self._buf_cap  = 0
@@ -508,9 +510,24 @@ class Writer:
         if not ok:
             self._raise_error()
 
-    def write_version(self, major: int = 1, minor: int = 1) -> None:
+    def write_version(self, major: int | None = None,
+                      minor: int | None = None) -> None:
         """Emit a leading ``#!bovnar <major>.<minor>`` directive. Must be called
-        before any value is written (else error_invalid_argument)."""
+        before any value is written (else error_invalid_argument).
+
+        With no arguments it names the spec version this build implements
+        (:func:`bovnar.spec_version`), the same directive ``emit_version=True``
+        writes. Pass both to declare an older version explicitly; giving only
+        one raises BovnarArgumentError."""
+        if self._ptr is None:
+            raise BovnarArgumentError("Writer has been destroyed")
+        if major is None and minor is None:
+            maj, mn = ctypes.c_uint16(0), ctypes.c_uint16(0)
+            self._lib.bvnr_spec_version(ctypes.byref(maj), ctypes.byref(mn))
+            major, minor = maj.value, mn.value
+        elif major is None or minor is None:
+            raise BovnarArgumentError(
+                "write_version() takes both major and minor, or neither")
         if not self._lib.bvnr_write_version(self._ptr, major, minor):
             self._raise_error()
 

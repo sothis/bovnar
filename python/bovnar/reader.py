@@ -171,8 +171,11 @@ class Reader:
 
 
     def __init__(self) -> None:
-        self._lib  = get_library()
+        # _ptr and _busy first: get_library() can raise BovnarLibraryNotFound,
+        # and __del__ then runs on a half-built object.
         self._ptr  = None
+        self._busy = False
+        self._lib  = get_library()
         self._open()
 
     def _open(self) -> None:
@@ -183,6 +186,11 @@ class Reader:
 
     def close(self) -> None:
 
+        # Destroying the reader while C is still inside bvnr_read() -- i.e.
+        # from one of this reader's own callbacks -- frees the state the parse
+        # is running on. Refuse; the callback's exception aborts the read and
+        # the caller can close once read_*() has returned.
+        self._check_not_busy()
         if self._ptr is not None:
             self._lib.bvnr_reader_destroy(self._ptr)
             self._ptr = None
@@ -194,11 +202,34 @@ class Reader:
         self.close()
 
     def __del__(self):
-        self.close()
+        # Never destroy mid-read (cannot normally happen: the running read
+        # holds a reference to self), and never raise from a finaliser.
+        if getattr(self, '_busy', False):
+            return
+        ptr = getattr(self, '_ptr', None)
+        if ptr is not None:
+            self._lib.bvnr_reader_destroy(ptr)
+            self._ptr = None
 
     def _check_open(self) -> None:
         if self._ptr is None:
             raise BovnarArgumentError("Reader has been closed")
+
+    def _check_not_busy(self) -> None:
+        if getattr(self, '_busy', False):
+            raise BovnarArgumentError("Reader is in use by its own callback")
+
+    def _run_read(self, open_fn) -> bool:
+        # Open and parse with the busy flag held, so a callback cannot close
+        # the reader, re-open it on another input, or swap its unit policy
+        # while bvnr_read() is still walking the current one.
+        self._busy = True
+        try:
+            if not open_fn():
+                self._raise_error()
+            return bool(self._lib.bvnr_read(self._ptr))
+        finally:
+            self._busy = False
 
     def _build_flags(self,
                      on_verified,
@@ -399,6 +430,7 @@ class Reader:
                  max_conversion_length: int = 0) -> None:
 
         self._check_open()
+        self._check_not_busy()
         if isinstance(data, memoryview):
             data = bytes(data)
         if not isinstance(data, (bytes, bytearray)):
@@ -411,16 +443,12 @@ class Reader:
         )
 
         buf = (ctypes.c_char * len(data)).from_buffer_copy(data)
-        ok  = self._lib.bvnr_open_read_mem(
+        ok = self._run_read(lambda: self._lib.bvnr_open_read_mem(
             self._ptr,
             buf, len(data),
             None, 0,
             ctypes.byref(flags),
-        )
-        if not ok:
-            self._raise_error()
-
-        ok = self._lib.bvnr_read(self._ptr)
+        ))
 
         cb_exc = None
         for cb in cb_refs:
@@ -449,6 +477,7 @@ class Reader:
                 max_conversion_length: int = 0) -> None:
 
         self._check_open()
+        self._check_not_busy()
         if not isinstance(fd, int) or fd < 0:
             raise BovnarArgumentError(f"Invalid file descriptor: {fd!r}")
 
@@ -461,16 +490,12 @@ class Reader:
         src = BvnrSource()
         self._lib.bvnr_source_from_fd(ctypes.byref(src), fd)
 
-        ok = self._lib.bvnr_open_read_source(
+        ok = self._run_read(lambda: self._lib.bvnr_open_read_source(
             self._ptr,
             ctypes.byref(src),
             None,
             ctypes.byref(flags),
-        )
-        if not ok:
-            self._raise_error()
-
-        ok = self._lib.bvnr_read(self._ptr)
+        ))
 
         cb_exc = None
         for cb in cb_refs:
@@ -587,6 +612,7 @@ class Reader:
             r.read_file("sensors.bvnr", on_verified=handler)
         """
         self._check_open()
+        self._check_not_busy()
         if policy is None:
             if not self._lib.bvnr_reader_set_unit_policy(self._ptr, None):
                 raise BovnarArgumentError("bvnr_reader_set_unit_policy failed")

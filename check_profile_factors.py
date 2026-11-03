@@ -319,6 +319,10 @@ WAIVED_UPSTREAM = {
         "UCUM defines the phot as 1e-4 lx. A phot is one lumen per square "
         "centimetre, i.e. 1e4 lx — the value is inverted. Native ph is correct "
         "and the profile keeps mapping to it.",
+    ("ucum", "[Btu_59]"):
+        "UCUM states the 59 °F BTU as 1.05480 kJ (6 digits); native Btu_59 is "
+        "NIST SP 811's 1054.804 J, the value the US therm is 1e5 of. 3.8 ppm, "
+        "publisher rounding of the same unit.",
     ("ucum", "m[Hg]"):
         "UCUM rounds the mercury column to 133.3220 kPa (7 digits); native mmHg "
         "is the exact conventional 133.322387415 Pa. 2.9 ppm, publisher "
@@ -387,7 +391,7 @@ WAIVED_UPSTREAM = {
     # 2.9979e8 rather than the exact 2.99792458e8. OM's own statvolt, statampere
     # and statcoulomb are exact, so this is two coarse rows rather than a
     # different definition; native statWb and statT are statV·s and statV·s/cm²,
-    # built on the c the 2019 SI fixed.
+    # built on c, a defined constant since the 1983 metre.
     ("om", "statweber"):
         "OM states the statweber as 299.79 (5 digits); native statWb is the "
         "exact statV·s = 299.792458 Wb. 8.2 ppm, OM rounding c to 2.9979e8 -- "
@@ -534,8 +538,15 @@ REVIEWED_STALE = {
     ("qudt", "IU-PER-MilliGM"):
         "an international unit is assay-defined, not an amount of substance",
     **{("qudt", c): _R_CONTRADICTS for c in (
-        "HP_Brake", "LA", "MI2", "MicroM-PER-MilliL")},
-    **{("unece", c): _R_CONTRADICTS for c in ("M48", "MIK", "P30")},
+        "BTU_MEAN", "GRAIN-PER-GAL", "HP_Brake", "LA", "MI2",
+        "MicroM-PER-MilliL", "NanoKAT-PER-L", "PT")},
+    **{("unece", c): _R_CONTRADICTS for c in ("J39", "M48", "MIK", "N3", "P30")},
+    ("unece", "H39"):
+        "QUDT's two claimants name units a thousand apart and only one states "
+        "a value; the match follows that one",
+    ("qudt", "MilliRAD_R"):
+        "the match is the millirem, a dose equivalent; a millirad is an "
+        "absorbed dose (ucum:mRAD is refused for the same reason)",
     **{(ns, c): _R_LOG_RATE for ns, c in (
         ("qudt", "NAT-PER-SEC"), ("unece", "Q19"),
         ("qudt-qk", "InformationFlowRate"),
@@ -645,6 +656,80 @@ WAIVED_XREF = {
         "listed so the pair keeps being compared rather than falling silent.",
     ("NP-PER-SEC", "Np/s"):
         "As the other spelling: the evidence for the fix, kept under comparison.",
+    # Found once the factor was compared as well as the dimension. In each the
+    # QUDT row's label and multiplier agree and only the cross-referenced code
+    # names another unit, so the row stands and the code is what is waived. The
+    # rows where the MULTIPLIER is the odd one out (the katal-per-litre family,
+    # PT, BTU_MEAN, GRAIN-PER-GAL) are refused in qudt.bvnr instead.
+    ("DRAM_UK", "[dr_ap]"):
+        "QUDT crosses its two drams' ucumCodes. DRAM_UK states 1.7718451953 g, "
+        "the avoirdupois dram ([dr_av]), and points at the apothecary [dr_ap] "
+        "(3.8879346 g); DRAM_US states the apothecary value and points at "
+        "[dr_av]. Label and multiplier agree in both, so the rows follow them.",
+    ("DRAM_US", "[dr_av]"):
+        "The other half of the crossed dram ucumCodes: DRAM_US states the "
+        "apothecary 3.8879346 g (native dr_ap) and points at the avoirdupois "
+        "[dr_av]. See DRAM_UK ~ [dr_ap].",
+    ("DRAM_US", "dr"):
+        "UDUNITS' dr is the avoirdupois dram, 1.7718 g; DRAM_US states the "
+        "apothecary 3.8879346 g. The same crossing as its ucumCode.",
+    ("FUR", "[fur_us]"):
+        "QUDT's FUR states exactly 201.168 m, the international furlong (660 "
+        "international feet), under the label Furlong, and points at UCUM's "
+        "SURVEY furlong [fur_us], 2.0e-6 longer. Label and multiplier agree; "
+        "native fur is the international one.",
+    ("MilliMOL-PER-M2", "DU"):
+        "UDUNITS' DU is the Dobson unit, 0.4462 mmol/m^2 (2.687e20 molecules "
+        "per square metre); the row is the plain millimole per square metre "
+        "QUDT's label, symbol and multiplier (1e-3) all state.",
+    ("TON", "t"):
+        "UDUNITS' t is the TONNE. QUDT's TON is the short ton -- label Ton, "
+        "symbol tn, ucumCode ston_av, multiplier 907.18474 -- so only the "
+        "udunitsCode names the other unit.",
+    ("YR", "yr"):
+        "UDUNITS' yr is the TROPICAL year (365.242198781 d). QUDT's YR states "
+        "the Julian 31557600 s with ucumCode a, the Julian year, so the "
+        "udunitsCode is the one that names another year (doc/11 §13.3).",
+    ("MO", "mo"):
+        "UCUM's mo is the mean Julian month (2629800 s). QUDT's MO states the "
+        "synodic month, 2551442.976 s, and its description says so; the row "
+        "follows the multiplier and the description (see unece:MON in "
+        "WAIVED_UPSTREAM for the other side of the same claim).",
+}
+
+# A Rec 20 row that names, by definition, the named unit a compound IS. Six such
+# rows (A8, J55, P14, M77, F90, C55) now spell the definition out, as qudt.bvnr
+# does, and the named unit keeps its own code (COU, JOU, WTT, NEW, WEB, PAL).
+# PS stays the psi -- the only code Rec 20 has for it -- so for it only the
+# spelling differs, which is what QUDT's kind for it says. Where QUDT's kind names a DIFFERENT
+# quantity of the same dimension -- a dyne centimetre is a torque, a joule per
+# metre a linear energy transfer, a mole per second a molar flow rate -- the
+# unece row was wrong and now spells the compound out too (J94, B12, A58, E95).
+_X_ALIAS = ("Rec 20 names this unit by its definition and unece.bvnr writes "
+            "the named unit it is; QUDT's kind for it is that unit's quantity, "
+            "so only the spelling differs")
+
+# QUDT uneceCommonCode links where the qudt row and the unece row for the code
+# rightly differ, checked by check_cross_reference. Keyed on (QUDT local name,
+# the Rec 20 code). Same standing as WAIVED_XREF.
+WAIVED_XREF_UNECE = {
+    # PS is Rec 20's only code for the psi: spelt out as lbf/in^2 it would
+    # leave native psi with no unece code to be written as. A8, J55, P14, M77,
+    # F90 and C55 spell their definitions out, as the qudt rows do.
+    ("LB_F-PER-IN2", "PS"): _X_ALIAS,  # lbf/in^2 = psi, which qudt:PSI reads
+    ("MO", "MON"):
+        "QUDT attaches MON to its synodic month; Rec 20's MON is a commercial "
+        "month and unece.bvnr keeps the Julian twelfth. Waived upstream for "
+        "unece:MON already; this is the same claim seen from the qudt row.",
+    ("MO_MeanGREGORIAN", "MON"):
+        "QUDT attaches MON to a second, different month as well as to MO: "
+        "MO_MeanGREGORIAN, ucumCode mo_g, the mean Gregorian month (native "
+        "mo_greg). The claimants disagree with each other, and unece:MON keeps "
+        "the Julian twelfth (WAIVED_UPSTREAM).",
+    ("TON", "TNE"):
+        "QUDT attaches TNE, Rec 20's TONNE, to its short ton (907.18474 kg) "
+        "as well as to TONNE and TON_Metric. unece:TNE is the tonne, and the "
+        "qudt row is the short ton its label, symbol and ucumCode say.",
 }
 
 WAIVED_KIND = {
@@ -1959,10 +2044,19 @@ def load_native_convertible():
         cache[key] = r
         return r
 
+    def equal(a, b):
+        """bvn_unit_equal: the SAME unit, not merely one worth the same."""
+        try:
+            return bool(bovnar.units_equal(bovnar.parse_unit(a),
+                                           bovnar.parse_unit(b)))
+        except Exception:
+            return None
+
+    convertible.equal = equal
     return convertible
 
 
-def check_cross_reference(cache, convertible, verbose):
+def check_cross_reference(cache, convertible, verbose, native=None):
     """QUDT's ucumCode/udunitsCode links, as a check of one table against another.
 
     WHAT THIS SEES THAT NOTHING ELSE DOES. Every other comparison here is one
@@ -1999,15 +2093,65 @@ def check_cross_reference(cache, convertible, verbose):
     wrong, never which. Seventeen of them are QUDT's own (a code that reads
     "TW/h" for the terawatt-hour, "d/Cel" for the gram per degree Celsius, a
     thermal conductivity whose UCUM form has lost its foot), and each is waived
-    by name in WAIVED_XREF with what the evidence was."""
+    by name in WAIVED_XREF with what the evidence was.
+
+    CONVERTIBLE IS NOT THE SAME AS EQUAL, and the check used to stop there. A
+    row fitted to a wrong QUDT multiplier stays convertible with the code QUDT
+    cross-references for it -- qudt:MicroKAT-PER-L read 1e-9 mol/(m^3·s) while
+    ucum:ukat/L, the code QUDT itself gives, reads 1e-3 -- so the FACTOR is
+    compared too, at the same tolerance as the publisher comparison.
+
+    AND THE UNECE TABLE IS A THIRD READING OF THE SAME CLAIM. A QUDT unit's
+    uneceCommonCode says that qudt:X and unece:<code> are one unit, and both are
+    bovnar tables. Where both map, they must be the SAME unit (bvn_unit_equal),
+    not merely one worth the same: qudt:KiloVAR read k~VA, the kilovolt-ampere,
+    while unece:KVR -- the code QUDT gives for it -- read k~var, and nothing
+    else here could see it, because the two are equal in SI. Waived by name in
+    WAIVED_XREF_UNECE. A code several QUDT units claim is compared against each
+    claimant, so claimants that disagree with each other show up here too."""
     units = parse_ttl(os.path.join(cache, "qudt-units.ttl"), "unit")
     doc = bvnr_data.load(open(os.path.join(GENDATA, "qudt.bvnr"), "rb").read())
     tgt = {m["code"]: m["bovnar"] for m in doc.get("mapped", [])}
+    udoc = bvnr_data.load(open(os.path.join(GENDATA, "unece.bvnr"),
+                               "rb").read())
+    unece_tgt = {m["code"]: m["bovnar"] for m in udoc.get("mapped", [])}
+    equal = getattr(convertible, "equal", None)
     bad, notes, checked, unreachable = [], [], 0, 0
+
+    def factor(expr):
+        try:
+            r = native(expr) if native else None
+        except Unresolved:
+            return None
+        return r[0] if r else None
+
     for local in sorted(units):
         mine = tgt.get(local)
         if mine is None:
             continue
+        for raw in units[local].get("uneceCommonCode", []):
+            code = raw.split("^^")[0].strip().strip('"')
+            theirs = unece_tgt.get(code)
+            if theirs is None:
+                continue
+            if (local, code) in WAIVED_XREF_UNECE:
+                notes.append("  %-26s ~ unece:%-23s %s"
+                             % (local, code, WAIVED_XREF_UNECE[(local, code)]))
+                continue
+            checked += 1
+            same = equal(mine, theirs) if equal else None
+            if same:
+                continue
+            if not convertible(mine, theirs):
+                why = "is not convertible with"
+            elif not close(factor(mine) or 0.0, factor(theirs) or 0.0):
+                why = "is not worth"
+            elif same is None:
+                continue
+            else:
+                why = "is worth, but is not the unit,"
+            bad.append("  %-26s -> %-20s %s unece:%s -> %s"
+                       % (local, mine, why, code, theirs))
         for pred, ns in (("ucumCode", "ucum"), ("udunitsCode", "udunits")):
             for raw in units[local].get(pred, []):
                 code = raw.split("^^")[0].strip().strip('"')
@@ -2026,9 +2170,14 @@ def check_cross_reference(cache, convertible, verbose):
                     unreachable += 1
                     continue
                 checked += 1
+                fm, ft = factor(mine), factor("%s:%s" % (ns, code))
                 if not ok:
                     bad.append("  %-26s -> %-20s is not convertible with "
                                "%s:%s" % (local, mine, ns, code))
+                elif fm is not None and ft is not None and not close(fm, ft):
+                    bad.append("  %-26s -> %-20s is worth %.10g, but %s:%s "
+                               "is worth %.10g" % (local, mine, fm, ns, code,
+                                                   ft))
                 elif verbose:
                     print("    xref ok %-24s -> %-14s ~ %s:%s"
                           % (local, mine, ns, code))
@@ -2355,6 +2504,9 @@ def have_cache(cache, ns):
 DOC_ROW_CLAIMS = (
     ("om", r"is worth: \*\*(\d+) rows compared, no mismatch\*\*"),
     ("cf", r"reading of the target\. (\d+) rows compared, no mismatch"),
+    # §9.5's total across every vocabulary, which said 10663 against 10925.
+    # Compared against the whole run, so only when every vocabulary ran.
+    ("*", r"it compares \*\*(\d+) rows across the seven vocabularies\*\*"),
 )
 
 
@@ -2548,7 +2700,8 @@ def main(argv):
                 for line in kind_bad:
                     print(line)
             xref_bad, xref_notes, xref_checked, xref_skipped = \
-                check_cross_reference(args.cache, convertible, args.verbose)
+                check_cross_reference(args.cache, convertible, args.verbose,
+                                      native)
             if xref_notes:
                 print("\nCROSS-REFERENCE — waived, QUDT's own code does not "
                       "describe the unit it is attached to (%d):"
@@ -2594,8 +2747,16 @@ def main(argv):
               "for quantity kind; %d disagree" % (kind_checked, len(kind_bad)))
     if xref_checked:
         print("check_profile_factors: %d QUDT cross-reference(s) compared "
-              "against the ucum/udunits tables; %d disagree (%d not reachable)"
+              "against the ucum/udunits/unece tables; %d disagree (%d not "
+              "reachable)"
               % (xref_checked, len(xref_bad), xref_skipped))
+    if "*" in doc_rows and set(available) == set(VOCABS):
+        stated, line = doc_rows["*"]
+        if stated != total_checked:
+            doc_row_bad.append(
+                "doc/11_bovnar_unit_profiles.md:%d: says %d rows compared "
+                "across the seven vocabularies; this run compared %d"
+                % (line, stated, total_checked))
     if doc_row_bad:
         print("\ncheck_profile_factors: %d documented row count(s) disagree "
               "with this run:" % len(doc_row_bad))

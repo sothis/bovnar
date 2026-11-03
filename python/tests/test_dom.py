@@ -610,3 +610,51 @@ class TestDomSmallEdges:
         src = b'.a=[]/[];.b=[];.c=[]/[]/[];'
         assert DomDoc.parse(src).to_dict() == bovnar.loads(src)
         assert bovnar.loads(src) == {'a': [[], []], 'b': [], 'c': [[], [], []]}
+
+
+@needs_lib
+class TestFdParseFailures:
+    """bvn_dom_parse_fd* return NULL for an I/O error and for input over the
+    256 MiB cap as well as for an allocation failure; every one of them used
+    to surface as MemoryError("DomDoc received a NULL pointer")."""
+
+    def test_a_directory_is_an_oserror(self):
+        d = tempfile.mkdtemp()
+        try:
+            with pytest.raises(IsADirectoryError) as ei:
+                DomDoc.parse_file(d)
+            assert ei.value.filename == d
+        finally:
+            os.rmdir(d)
+
+    def test_a_bad_fd_is_an_oserror(self):
+        import errno
+        with pytest.raises(OSError) as ei:
+            DomDoc.parse_fd(9999)
+        assert ei.value.errno == errno.EBADF
+        assert not isinstance(ei.value, MemoryError)
+
+    def test_a_bad_fd_with_a_policy_is_an_oserror(self):
+        from bovnar.reader import UnitPolicy
+        with pytest.raises(OSError):
+            DomDoc.parse_fd(9999, UnitPolicy(targets=["m"]))
+
+    def test_no_errno_means_over_the_cap(self):
+        exc = DomDoc._fd_failure(3, 0)
+        assert isinstance(exc, BovnarParseError)
+        assert exc.code == ErrorCode.FILE_TOO_LONG
+        assert "256 MiB" in str(exc)
+
+    def test_enomem_is_still_a_memoryerror(self):
+        import errno
+        assert isinstance(DomDoc._fd_failure(3, errno.ENOMEM), MemoryError)
+
+    def test_a_readable_fd_still_parses(self):
+        rfd, wfd = os.pipe()
+        os.write(wfd, b".a = 1;\n")
+        os.close(wfd)
+        try:
+            doc = DomDoc.parse_fd(rfd)
+        finally:
+            os.close(rfd)
+        assert doc["a"].as_i64() == 1

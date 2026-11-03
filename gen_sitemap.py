@@ -10,7 +10,13 @@ mtime and then today. It also lists the new HTML doc pages (/docs/<slug>/) as th
 canonical, indexable form of each document.
 
 publish_web.sh runs this after the doc/LLM generators. Run: python3 gen_sitemap.py
+
+--check compares the URLs and their priorities, which must match. It does not
+fail on <lastmod>: those are commit dates, so any commit that touches a document
+moves them, and the committed copy can only be current as of the last publish,
+which rewrites them. A drift in them is reported, not refused.
 """
+import re
 import datetime
 import os
 import subprocess
@@ -89,10 +95,19 @@ def main():
     path = os.path.join(ROOT, "web", "sitemap.xml")
     if check:
         cur = open(path, encoding="utf-8").read() if os.path.exists(path) else None
-        if cur != out:
-            print("gen_sitemap.py --check: web/sitemap.xml is stale", file=sys.stderr)
+        if cur is None:
+            print("gen_sitemap.py --check: web/sitemap.xml is missing", file=sys.stderr)
             return 1
-        print("gen_sitemap.py --check: web/sitemap.xml is current")
+        undated = lambda t: re.sub(r"<lastmod>[^<]*</lastmod>", "", t)
+        if undated(cur) != undated(out):
+            print("gen_sitemap.py --check: web/sitemap.xml lists other URLs than "
+                  "the doc set; run python3 gen_sitemap.py", file=sys.stderr)
+            return 1
+        if cur != out:
+            print("gen_sitemap.py --check: web/sitemap.xml lists the right URLs; "
+                  "its <lastmod> dates will be refreshed on publish")
+        else:
+            print("gen_sitemap.py --check: web/sitemap.xml is current")
         return 0
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(out)

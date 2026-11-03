@@ -99,6 +99,39 @@ bool bvn_writer_set_error(bvnr_writer_t* w, error_code_t err)
 	                    + (uint64_t)w->ser.wbuf_pos;
 	return false;
 }
+/*
+ * BVN_NUM_CANONICAL writes an annotation in ONE form, so that two annotations
+ * that mean the same type produce the same bytes: the width always written
+ * out (<uint> is <uint:64>), and a parameter that only restates the default
+ * left out -- base 10, and no_unit (handled where the unit is written). The
+ * reader gives an inline-unit or unannotated value an explicit "_10" and
+ * "no_unit", so without this "1.0 km" and "<float:64,k~m> 1.0" canonicalised
+ * to two documents. q0 was already dropped (bvn_effective_q).
+ */
+static bool bvn_ser_push_str(bvnr_serializer_t* s, const char* str);
+static bool bvn_ser_family_has_width(value_type_family_t f)
+{
+	return f == vt_uint || f == vt_sint || f == vt_float ||
+	       f == vt_float_fix || f == vt_float_dec || f == vt_datetime;
+}
+static bool bvn_ser_canon_width(bvnr_serializer_t* s)
+{
+	if (!(s->unit_flags & BVN_NUM_CANONICAL) || s->emitted_type_param ||
+	    !bvn_ser_family_has_width(s->ann_family))
+		return true;
+	if (!bvn_ser_push_str(s, ":64"))
+		return false;
+	s->emitted_type_param = true;
+	return true;
+}
+static bool bvn_ser_canon_default_base(const bvnr_serializer_t* s,
+				       const bvnr_data_t* d)
+{
+	return (s->unit_flags & BVN_NUM_CANONICAL) &&
+	       (s->ann_family == vt_uint || s->ann_family == vt_sint ||
+		s->ann_family == vt_float) &&
+	       bvn_effective_base(d->value_type) == 10u;
+}
 bool bvn_ser_flush_wbuf(bvnr_serializer_t* s)
 {
 	if (!s->wbuf_pos) return true;
@@ -239,6 +272,44 @@ static bool bvn_validate_id_for_writer(bvnr_writer_t* w,
 		ok = bvn_writer_set_error(w, error_invalid_argument);
 	if (need_free) free(buf);
 	return ok;
+}
+/*
+ * Does this bare number token read back as the value it is, under `vt`? The
+ * reader lexes a bare token by the number grammar FIRST and applies the base
+ * after, so a token can be all digits of its base and still not be a number:
+ *   - an empty token is not a value at all -- "<uint:8>;" reads as a typed
+ *     null, so writing it turned a number into null;
+ *   - '+' never begins a bare literal in any base (doc/03 §4.6), only in base
+ *     10 was that checked;
+ *   - under an integer family a '.' makes the token a float, even in base 85
+ *     where '.' is a digit, and an 'e' does unless the base has it as a digit
+ *     (15 and up).
+ * nan/inf/ninf are keywords and are left to bvn_validate_number_for_writer.
+ */
+static bool bvn_w_bare_number_lexes(const void* data, uint32_t length,
+	value_type_spec_t vt)
+{
+	if (!data || length == 0)
+		return false;
+	const char* t = (const char*)data;
+	char sb[8] = {0};
+	if (length < sizeof sb) {
+		memcpy(sb, t, length);
+		if (bvn_is_special_number_string(sb))
+			return true;
+	}
+	if (t[0] == '+')
+		return false;
+	if (vt.family == vt_uint || vt.family == vt_sint) {
+		uint32_t base = bvn_effective_base(vt);
+		for (uint32_t i = 0; i < length; i++) {
+			if (t[i] == '.')
+				return false;
+			if ((t[i] == 'e' || t[i] == 'E') && base < 15u)
+				return false;
+		}
+	}
+	return true;
 }
 /*
  * Validate a numeric literal the caller wants to emit against its declared
@@ -471,6 +542,15 @@ static bool bvn_validate_symbol_for_writer(bvnr_writer_t* w,
 	if (need_free) free(buf);
 	return ok;
 }
+/* Has this document declared spec 1.1, the version datetime and the "[N]"
+ * reference index are gated on? A directive alone is not enough: under
+ * "#!bovnar 1.0" the reader refuses both, exactly as with none. */
+static bool bvn_w_declares_1_1(const bvnr_serializer_t* s)
+{
+	return s->version_emitted &&
+	       (s->version_major > 1u ||
+	        (s->version_major == 1u && s->version_minor >= 1u));
+}
 static bool bvn_validate_reference_for_writer(bvnr_writer_t* w,
 	const void* data, uint32_t length)
 {
@@ -498,7 +578,7 @@ static bool bvn_validate_reference_for_writer(bvnr_writer_t* w,
 	 * refuse here for the same reason and with the same error the datetime gate
 	 * in bvn_validate_type_spec_for_writer uses -- the directive cannot be added
 	 * retroactively, it has to precede every value. */
-	if (ok && !w->ser.version_emitted && memchr(buf, '[', length) != NULL)
+	if (ok && !bvn_w_declares_1_1(&w->ser) && memchr(buf, '[', length) != NULL)
 		ok = bvn_writer_set_error(w, error_unsupported_spec_version);
 	if (need_free) free(buf);
 	return ok;
@@ -520,12 +600,12 @@ static bool bvn_validate_type_spec_for_writer(bvnr_writer_t* w,
 	if (vt.family == vt_plain || vt.family >= vt_illegal)
 		return bvn_writer_set_error(w, error_illegal_value_type);
 	/* datetime is a spec-1.1 construct, and the reader gates the family on a
-	 * DECLARED version. Writing one into a document with no "#!bovnar 1.1"
-	 * directive produced something the library cannot read back, reported as
+	 * DECLARED version of 1.1 or later. Writing one into a document with no
+	 * such directive (none, or "#!bovnar 1.0") produced something the library cannot read back, reported as
 	 * success. There is no way to add the directive retroactively — it has to
 	 * precede every value — so refuse instead, and point the caller at the flag
 	 * that fixes it. */
-	if (vt.family == vt_datetime && !w->ser.version_emitted)
+	if (vt.family == vt_datetime && !bvn_w_declares_1_1(&w->ser))
 		return bvn_writer_set_error(w, error_unsupported_spec_version);
 	if (vt.family == vt_uint || vt.family == vt_sint) {
 		if (vt.width > BVN_MAX_INT_WIDTH)
@@ -1492,6 +1572,9 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 							error_base_requires_string_literal);
 				}
 			}
+			if (bvn_type_is_numeric(vt) &&
+			    !bvn_w_bare_number_lexes(data->data, data->length, vt))
+				return bvn_writer_set_error(w, error_type_value_mismatch);
 			if (!bvn_validate_number_for_writer(w,
 					data->data, data->length, vt))
 				return false;
@@ -1515,6 +1598,11 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 					(const uint8_t*)data->data, data->length))
 				return false;
 			if (bvn_type_is_numeric(vt)) {
+				/* An empty string is no number: the reader answers
+				 * <uint:8> "" with error_digit_not_in_base. */
+				if (data->length == 0)
+					return bvn_writer_set_error(w,
+						error_type_value_mismatch);
 				if (!bvn_validate_string_as_number(w,
 						data->data, data->length, vt))
 					return false;
@@ -2164,6 +2252,7 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 		break;
 	case ev_type_annotation_type_family: {
 		const char* fname;
+		s->ann_family = d->value_type.family;
 		switch (d->value_type.family) {
 		case vt_uint:      fname = "uint";      break;
 		case vt_sint:      fname = "sint";      break;
@@ -2180,7 +2269,11 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 		break;
 	}
 	case ev_type_annotation_type_family_parameter: {
+		if (d->type != token_is_type_width && !bvn_ser_canon_width(s))
+			return false;
 		bool use_colon = !s->emitted_type_param;
+		if (d->type == token_is_type_base && bvn_ser_canon_default_base(s, d))
+			break;
 		if (d->type == token_is_type_width) {
 			char buf[12];
 			if (!bvn_ser_push_byte(s, ':')) return false;
@@ -2289,6 +2382,14 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 						elen = (uint32_t)un;
 					}
 				}
+				/* BVN_NUM_CANONICAL: "no_unit" says what an absent unit
+				 * parameter says (doc/03 §11.8), so the normal form leaves
+				 * it out. The annotation still stated its unit. */
+				if ((s->unit_flags & BVN_NUM_CANONICAL) && elen == 7u &&
+				    memcmp(emit, "no_unit", 7) == 0) {
+					s->emitted_unit = true;
+					break;
+				}
 				if (!bvn_ser_push_byte(s, use_colon ? ':' : ','))
 					return false;
 				if (!bvn_ser_push(s, emit, elen))
@@ -2304,6 +2405,8 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 		break;
 	}
 	case ev_type_annotation_end:
+		if (!bvn_ser_canon_width(s))
+			return false;
 		/* The reader holds an annotation's body in a fixed buffer. Longer
 		 * than that and this document cannot be read back, by anyone. */
 		if (bvn_ser_position(s) - s->ann_start > BVN_TYPE_BUF_CAP - 1u) {
@@ -2678,6 +2781,11 @@ bool bvnr_write_event(
 		return false;
 	if (w->ser.finished)
 		return bvn_writer_set_error(w, error_invalid_argument);
+	/* No bvnr_open_write_* has attached a sink (or it failed). The event
+	 * would only fill the write buffer and "succeed" until the first flush
+	 * -- after 64 KiB, or at finish -- so refuse it now. */
+	if (!bvn_sink_impl(&w->ser.sink)->push)
+		return bvn_writer_set_error(w, error_invalid_argument);
 	/* The unit in force for a value, before validation moves it on. */
 	const bool         governed = w->ser.emitted_unit;
 	const value_unit_t gov      = w->gov_unit;
@@ -2799,7 +2907,8 @@ bool bvnr_write_version(bvnr_writer_t* w, uint16_t major, uint16_t minor)
 	if (!w) return false;
 	if (w->val.last_error != error_none)
 		return false;
-	if (w->ser.finished || w->ser.stream_begun || w->ser.version_emitted)
+	if (w->ser.finished || w->ser.stream_begun || w->ser.version_emitted ||
+	    !bvn_sink_impl(&w->ser.sink)->push)
 		return bvn_writer_set_error(w, error_invalid_argument);
 	if (!bvn_ser_emit_version(&w->ser, major, minor))
 		return bvn_writer_set_error(w, bvn_sink_impl(&w->ser.sink)->is_mem
@@ -2813,12 +2922,27 @@ bool bvnr_write_version(bvnr_writer_t* w, uint16_t major, uint16_t minor)
  * write buffer and the sink, and latch finished so no further events are
  * accepted. Must be called for output to be complete — the final separator and
  * any buffered bytes are only guaranteed on disk after this returns true.
+ *
+ * After an error it returns false and still hands the sink what was written up
+ * to the error: a memory sink holds those bytes already, and an fd sink used to
+ * keep whatever its 64 KiB buffer happened to hold back, so the same document
+ * left an arbitrary block-aligned prefix of it -- or nothing -- depending on
+ * where the error fell. A sink that has itself failed is not pushed again.
  */
 bool bvnr_write_finish(bvnr_writer_t* w)
 {
 	if (!w) return false;
-	if (w->val.last_error != error_none)
+	if (w->val.last_error != error_none) {
+		if (w->val.last_error != error_writing_to_sink &&
+		    w->val.last_error != error_sink_buffer_exhausted &&
+		    bvn_sink_impl(&w->ser.sink)->push &&
+		    bvn_ser_flush_wbuf(&w->ser)) {
+			bvn_sink_impl_t* si = bvn_sink_impl(&w->ser.sink);
+			if (si->flush)
+				(void)si->flush(&w->ser.sink);
+		}
 		return false;
+	}
 	/* A spelling handed over and never used: the value it was meant for took
 	 * no unit, and it was the last one. */
 	if (w->val.unit_src_len) {

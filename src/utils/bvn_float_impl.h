@@ -173,10 +173,15 @@ static inline bool bvn_float_parse(bvn_float_ctx_t *ctx, const char *s, PNum *r)
 		if      (*s == '+') s++;
 		else if (*s == '-') { eneg = true; s++; }
 		int eabs = 0; bool has_e = false; bool eabs_ovf = false;
+		/* Saturate far below INT_MAX. The widest decimal format (256 bits)
+		 * has an exponent range of about +-1.6e6, so past 1e8 the value is
+		 * inf or 0 in every one of them -- and stopping at INT_MAX instead
+		 * let r->dex + eabs and, later, E + bias overflow (undefined
+		 * behaviour, and "1e2147483647" came back as +0). */
 		while (*s >= '0' && *s <= '9') {
 			if (!eabs_ovf) {
-				if (eabs > (INT_MAX - (*s - '0')) / 10) eabs_ovf = true;
-				else eabs = eabs * 10 + (*s - '0');
+				eabs = eabs * 10 + (*s - '0');
+				if (eabs > 100000000) eabs_ovf = true;
 			}
 			has_e = true; s++;
 		}
@@ -327,10 +332,15 @@ static inline bool bvn_float_parse_ro(bvn_float_ctx_t *ctx, const char *s, PNum 
 		if      (*s == '+') s++;
 		else if (*s == '-') { eneg = true; s++; }
 		int eabs = 0; bool has_e = false; bool eabs_ovf = false;
+		/* Saturate far below INT_MAX. The widest decimal format (256 bits)
+		 * has an exponent range of about +-1.6e6, so past 1e8 the value is
+		 * inf or 0 in every one of them -- and stopping at INT_MAX instead
+		 * let r->dex + eabs and, later, E + bias overflow (undefined
+		 * behaviour, and "1e2147483647" came back as +0). */
 		while (*s >= '0' && *s <= '9') {
 			if (!eabs_ovf) {
-				if (eabs > (INT_MAX - (*s - '0')) / 10) eabs_ovf = true;
-				else eabs = eabs * 10 + (*s - '0');
+				eabs = eabs * 10 + (*s - '0');
+				if (eabs > 100000000) eabs_ovf = true;
 			}
 			has_e = true; s++;
 		}

@@ -63,6 +63,35 @@ static int tests    = 0;
 	}                                                             \
 } while (0)
 
+/* A refused parse returns BVN_UNIT_NONE (bovnar.h), so a caller that passes
+ * no `ok` and tests num_components is told the truth. The expression parser
+ * used to hand back what it had built when it stopped. And no_unit is the whole
+ * unit or nothing: the grammar has no factor that is no_unit. */
+static void test_refused_unit_parse_is_none(void)
+{
+	static const char *const refused[] = {
+		"m//s", "m/s/", "k~g·m/xyz", "(m·s)²", "m*()", "m(s)",
+		"m*(no_unit)", "m/(no_unit)", "(no_unit)", "((no_unit))·m",
+		"udunits:m s-1 bogus", "ucum:m/[foo]",
+	};
+	for (size_t i = 0; i < sizeof refused / sizeof *refused; i++) {
+		char msg[96];
+		bool ok = true;
+		value_unit_t u = bvn_parse_unit((const uint8_t *)refused[i], &ok);
+		snprintf(msg, sizeof msg, "'%s' is refused", refused[i]);
+		ASSERT_TRUE(!ok, msg);
+		snprintf(msg, sizeof msg, "'%s' returns no components", refused[i]);
+		ASSERT_EQ_INT(u.num_components, 0, msg);
+		u = bvn_parse_unit((const uint8_t *)refused[i], NULL);
+		snprintf(msg, sizeof msg, "'%s' with ok = NULL returns no components",
+			 refused[i]);
+		ASSERT_EQ_INT(u.num_components, 0, msg);
+	}
+	bool ok = false;
+	value_unit_t u = bvn_parse_unit((const uint8_t *)"no_unit", &ok);
+	ASSERT_TRUE(ok && u.num_components == 0, "no_unit alone is the empty unit");
+}
+
 static void test_exponent_to_int(void)
 {
 	printf("  exponent_to_int...\n");
@@ -3432,6 +3461,7 @@ int main(void)
 	test_neg_exp_round_trip();
 	test_prefix_unit_valid_out_of_range();
 	test_si_prefix_info_unit_restrictions();
+	test_refused_unit_parse_is_none();
 
 	printf("\n──────────────────────────────────────\n");
 	printf("  Results: %d tests, %d failures\n", tests, failures);

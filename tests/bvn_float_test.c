@@ -1111,7 +1111,7 @@ static void test_bvnf_strtodec_ties(void)
 		      (w[1] & 0x80000000u) != 0u &&
 		      (w[1] & 0x7c000000u) != 0x78000000u,
 		      "decimal: -0, not -inf");
-		CHECK(bvn_parse_double_in_base("0x0p99999999999999999999", 16u, &d) &&
+		CHECK(bvn_parse_double_in_base("0p99999999999999999999", 16u, &d) &&
 		      d == 0.0, "hex: zero mantissa is zero");
 		/* A non-zero mantissa still saturates, either way. */
 		CHECK(bvn_parse_double_in_base("1e999999999999999999999", 10u, &d) &&
@@ -1130,6 +1130,98 @@ static void test_bvnf_strtodec_ties(void)
 		memset(b, 0, sizeof b);
 		CHECK(bvn_float_strtodec("2.5", W[i].w, b, (int)W[i].words),
 			"every supported width is accepted");
+	}
+}
+
+/*
+ * A mantissa's LENGTH is not a limit for a rounding parse. The digits used to
+ * be built into one exact integer, so about 9865 decimal or 8192 hex digits
+ * passed BVN_INT_MAX_BITS and the value came back as +inf or 0 -- even in a
+ * document, through the DOM and the base-16 path. The exact rational parse
+ * still refuses what it cannot hold.
+ */
+static char *long_lit(const char *head, char digit, size_t n, const char *tail)
+{
+	size_t hl = strlen(head), tl = strlen(tail);
+	char *s = malloc(hl + n + tl + 1);
+	if (!s) return NULL;
+	memcpy(s, head, hl);
+	memset(s + hl, digit, n);
+	memcpy(s + hl + n, tail, tl + 1);
+	return s;
+}
+static void test_bvnf_long_mantissa(void)
+{
+	static const size_t lens[] = { 9864, 9865, 9866, 20000, 60000 };
+	for (size_t i = 0; i < sizeof lens / sizeof *lens; i++) {
+		char *s = long_lit("0.", '1', lens[i], "");
+		double d = 0.0;
+		CHECK(s && bvn_parse_double_in_base(s, 10u, &d) &&
+		      d == 0.1111111111111111, "0.111...1 of any length is 1/9");
+		bvn_float_t *f = bvn_float_alloc(64);
+		double g = 0.0;
+		CHECK(f && s && bvn_float_from_str(f, s, 10) &&
+		      bvn_float_to_double(f, &g) && fabs(g - 1.0 / 9.0) < 1e-15,
+		      "from_str: 0.111...1 of any length is 1/9");
+		bvn_float_free(f);
+		free(s);
+	}
+	/* Integer digits past the budget still scale the value. */
+	char *big = long_lit("", '9', 400, "e-400");
+	double d = 0.0;
+	CHECK(big && bvn_parse_double_in_base(big, 10u, &d) && d == 1.0,
+	      "400 nines e-400 rounds to 1");
+	free(big);
+	/* Hex: 1.888...8p0 is 1 + 8/15. */
+	char *hx = long_lit("1.", '8', 9000, "p0");
+	CHECK(hx && bvn_parse_double_in_base(hx, 16u, &d) &&
+	      d == 1.5333333333333334, "hex 1.888...8p0 of 9000 digits");
+	free(hx);
+	/* A dropped non-zero tail decides a tie: 0.5 + tiny above the midpoint
+	 * between 1 and 1+2^-52 rounds up, the midpoint itself to even. */
+	char *tie = long_lit("1.00000000000000011102230246251565404236316680908203125",
+			     '0', 20000, "1");
+	CHECK(tie && bvn_parse_double_in_base(tie, 10u, &d) &&
+	      d == 1.0000000000000002, "midpoint plus a tail 20000 digits down rounds up");
+	free(tie);
+	CHECK(bvn_parse_double_in_base(
+		      "1.00000000000000011102230246251565404236316680908203125",
+		      10u, &d) && d == 1.0, "the exact midpoint rounds to even");
+	/* The exact path keeps every digit, and refuses what it cannot hold. */
+	char *ex = long_lit("0.", '1', 12000, "");
+	bvn_int_t *num = bvn_int_alloc();
+	bvn_int_t *den = bvn_int_alloc();
+	CHECK(ex && num && den && !bvn_float_parse_rational(ex, 10u, num, den),
+	      "parse_rational refuses a literal too long to be exact");
+	CHECK(num && den && bvn_float_parse_rational("0.25", 10u, num, den),
+	      "parse_rational still takes a short one");
+	bvn_int_free(num);
+	bvn_int_free(den);
+	free(ex);
+
+	/* float_fix range: ONE rounding, ties to even (doc/03 §6.2). Parsing
+	 * into an intermediate float first moved a literal near a tie onto it. */
+	static const struct { const char *v; bool fits; } fx[] = {
+		{ "127.998046874999999999999999999999", true  },  /* raw 32767   */
+		{ "-128.001953125000000000000000000001", false }, /* raw -32769  */
+		{ "127.998046875",                      false },  /* tie -> 32768 */
+		{ "-128.001953125",                     true  },  /* tie -> -32768 */
+		{ "-128",                               true  },
+		{ "1e9862",                             false },
+	};
+	for (size_t i = 0; i < sizeof fx / sizeof *fx; i++)
+		CHECK(bvn_float_str_fits_fix(fx[i].v, 10u, 16u, 8u) == fx[i].fits,
+		      "float_fix:16,q8 range is decided with one rounding");
+
+	/* Decimal interchange: an exponent near INT_MAX overflowed int (UB) and
+	 * the value "underflowed" to +0 where +inf is right. */
+	static const char *const huge[] = { "1e2147483647", "1e2147483646",
+					    "1e100000001" };
+	for (size_t i = 0; i < sizeof huge / sizeof *huge; i++) {
+		uint32_t w[2] = { 0, 0 };
+		CHECK(bvn_float_strtodec(huge[i], 64u, w, 2) &&
+		      w[1] == 0x78000000u && w[0] == 0u,
+		      "decimal64: 1e<near INT_MAX> is +inf");
 	}
 }
 
@@ -1156,6 +1248,7 @@ int main(void)
 	RUN(test_bvnf_ieee_roundtrip);
 	RUN(test_bvnf_audit_regressions);
 	RUN(test_bvnf_strtodec_ties);
+	RUN(test_bvnf_long_mantissa);
 
 	printf("\n%s  %d passed, %d failed\n",
 		   g_fails ? "FAIL" : "PASS", g_pass, g_fails);

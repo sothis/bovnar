@@ -674,9 +674,12 @@ and always emits one canonical form.</p>
 </tr>
 </tbody>
 </table>
-<p>A document that has been through Unicode normalisation (NFC/NFD/NFKC/NFKD) still parses: every
+<p>A document that has been through canonical Unicode normalisation (NFC or NFD) still parses: every
 variant above maps to the same unit, which the normalisation test sweep enforces over the whole
-table.</p>
+table. <strong>Compatibility normalisation (NFKC or NFKD) is different: it destroys superscript
+exponents.</strong> It folds <code>²</code> to <code>2</code> and <code>⁻</code> to U+2212 MINUS SIGN, so <code>m/s²</code> becomes <code>m/s2</code>, which is
+<code>error_unit_illegal</code>. A document that may pass through NFKC or NFKD should write its exponents in
+the caret form — <code>m/s^2</code>, <code>m*s^-1</code> — which is plain ASCII and survives every normalisation form.</p>
 <blockquote>
 <p><strong>The canonical output is deliberately not NFC.</strong> U+2126 (ohm) and U+212B (ångström) both have
 <em>singleton</em> NFC decompositions — to U+03A9 and U+00C5 — so a document this library writes is not
@@ -735,7 +738,7 @@ warning, resolved the same way — <code>delta_degC</code>, <code>delta_degF</co
 <code>delta_C</code> or <code>delta_F</code>: those read as a delta coulomb and a delta farad, exactly as the table above
 warns for <code>C</code> and <code>F</code>, so they are <code>error_unit_illegal</code> rather than aliases. <code>delta_K</code> is the one
 bare-letter form, and it is unambiguous because <code>K</code> is the kelvin and nothing else.</p>
-<p>The water-hardness degrees carry the same warning, and one of them is genuinely dangerous:</p>
+<p>The water-hardness degrees carry the same warning, and two of them are genuinely dangerous:</p>
 <table>
 <thead>
 <tr>
@@ -756,7 +759,7 @@ bare-letter form, and it is unambiguous because <code>K</code> is the kelvin and
 <td><code>°e</code></td>
 <td>English (Clark) hardness degree</td>
 <td><code>e</code></td>
-<td><code>error_unit_illegal</code></td>
+<td><strong>elementary charge</strong> — a valid unit, so this misreads silently too</td>
 </tr>
 <tr>
 <td><code>°fH</code></td>
@@ -1812,7 +1815,7 @@ sometimes being wrong.</p>
 <td><code>a</code></td>
 <td><em>(not a unit)</em></td>
 <td><code>ucum:a</code> → <code>yr</code>, the <strong>Julian year</strong></td>
-<td>The one letter that means a <strong>different unit in each profile</strong>: <code>udunits:a</code> is the <strong>are</strong>, <code>c~ha</code>. In UDUNITS <code>a</code> is also the atto prefix, and the atom wins — a whole atom outranks a prefixed reading (§16)</td>
+<td>The one letter that means a <strong>different unit in each profile</strong>: <code>udunits:a</code> is the <strong>are</strong>, <code>c~ha</code>. In UDUNITS <code>a</code> is also the atto prefix, and the atom wins — a whole atom outranks a prefixed reading (§1, §2)</td>
 </tr>
 <tr>
 <td><code>MI</code></td>
@@ -1847,7 +1850,7 @@ sometimes being wrong.</p>
   and <code>qudt:M/SEC</code> are <code>error_unit_illegal</code>, not compounds.</li>
 <li><strong>A whole atom beats a prefix in an expression vocabulary</strong>, exactly as it does natively.
   <code>ucum:min</code> is the minute rather than milli-inch, and <code>udunits:cal</code> the calorie rather than
-  centi-<code>al</code> — the same longest-alias rule §6 describes for the native registry.</li>
+  centi-<code>al</code> — the same longest-alias rule §1 and §2 describe for the native registry.</li>
 </ul>
 <p>Where two vocabularies genuinely name the same quantity they land on the same unit, and that is
 checked: <code>ucum:kg</code>, <code>unece:KGM</code>, <code>qudt:KiloGM</code>, <code>udunits:kg</code> and <code>qudt-qk:Mass</code> all compare equal.

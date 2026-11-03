@@ -19,6 +19,12 @@ and the only way to see the break was to compile something against an install.
 So: start at the headers the install list ships, follow every #include "..."
 transitively, and require the closure to be a subset of what is installed.
 
+The closure alone cannot see a top-level header that nothing else includes
+(bovnar_dom.h, bovnar_stream.h, ...) dropped from the list, nor a misspelt
+entry. So the list must also name exactly the headers in include/ -- every
+file there is public (the release archives ship include/*.h), and every name
+it lists must exist.
+
 Usage:  python3 check_install_headers.py [repo-root]
 Exit 0 when the list is complete, 1 (with the missing names) when it is not.
 """
@@ -67,6 +73,18 @@ def main(argv):
     root = argv[1] if len(argv) > 1 else os.path.dirname(os.path.abspath(__file__))
     cmakelists = os.path.join(root, "CMakeLists.txt")
     shipped = installed_headers(cmakelists)
+    public = {n for n in os.listdir(os.path.join(root, "include"))
+              if n.endswith(".h")}
+    absent = sorted(shipped - public)
+    unlisted = sorted(public - shipped)
+    if absent or unlisted:
+        for name in absent:
+            print("check_install_headers: the install list names include/%s, "
+                  "which does not exist" % name, file=sys.stderr)
+        for name in unlisted:
+            print("check_install_headers: include/%s is not in the "
+                  "install(FILES ...) block" % name, file=sys.stderr)
+        return 1
     needed = closure(root, shipped)
     missing = sorted(needed - shipped)
     if missing:

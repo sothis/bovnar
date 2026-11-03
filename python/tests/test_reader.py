@@ -541,3 +541,153 @@ def test_a_kept_payload_outlives_the_reader():
     assert after[4][0] == b'x' * 300
     assert [(d.raw_bytes(), d.unit_source_str()) for d, _, _ in wanted] == \
         [(raw, src) for _, raw, src in wanted]
+
+
+@needs_lib
+class TestReaderIsNotReentrant:
+    """A callback runs while C is inside bvnr_read(). Closing the reader there
+    freed the parse state under it (heap corruption), and a nested read_mem
+    re-opened it mid-parse so the outer read returned success after one key.
+    Each is refused now; the refusal aborts the running read and surfaces."""
+
+    DOC = b".a = 1;\n.b = 2;\n.c = 3;\n"
+
+    def _run(self, action):
+        seen = []
+
+        def cb(ev, d):
+            if ev == Event.DATA:
+                seen.append(d.raw_bytes())
+                action(r)
+            return True
+
+        r = Reader()
+        with pytest.raises(BovnarArgumentError, match="in use by its own callback"):
+            r.read_mem(self.DOC, on_verified=cb)
+        return r, seen
+
+    def test_close_from_callback_is_refused(self):
+        r, seen = self._run(lambda r: r.close())
+        assert seen == [b"1"]
+        # the reader survived and is still usable
+        out = []
+        r.read_mem(self.DOC, on_verified=lambda ev, d: out.append(ev) or True)
+        assert Event.DATA in out
+        r.close()
+
+    def test_exit_from_callback_is_refused(self):
+        r, _ = self._run(lambda r: r.__exit__(None, None, None))
+        r.close()
+
+    def test_nested_read_mem_is_refused(self):
+        r, seen = self._run(lambda r: r.read_mem(b".x = 9;\n"))
+        assert seen == [b"1"]
+        r.close()
+
+    def test_nested_read_fd_is_refused(self):
+        rfd, wfd = os.pipe()
+        os.close(wfd)
+        try:
+            r, _ = self._run(lambda r: r.read_fd(rfd))
+        finally:
+            os.close(rfd)
+        r.close()
+
+    def test_nested_iter_mem_is_refused(self):
+        r, _ = self._run(lambda r: list(r.iter_mem(b".x = 9;\n")))
+        r.close()
+
+    def test_set_unit_policy_from_callback_is_refused(self):
+        from bovnar.reader import UnitPolicy
+        r, _ = self._run(lambda r: r.set_unit_policy(UnitPolicy(targets=["m"])))
+        r.close()
+
+    def test_read_fd_callback_close_is_refused(self):
+        rfd, wfd = os.pipe()
+        os.write(wfd, self.DOC)
+        os.close(wfd)
+        r = Reader()
+
+        def cb(ev, d):
+            if ev == Event.DATA:
+                r.close()
+            return True
+        try:
+            with pytest.raises(BovnarArgumentError, match="in use"):
+                r.read_fd(rfd, on_verified=cb)
+        finally:
+            os.close(rfd)
+        r.close()
+
+    def test_a_second_reader_may_parse_inside_a_callback(self):
+        inner = []
+
+        def cb(ev, d):
+            if ev == Event.DATA and not inner:
+                with Reader() as r2:
+                    r2.read_mem(b".x = 9;\n",
+                                on_verified=lambda e, dd: inner.append(e) or True)
+            return True
+
+        keys = []
+        with Reader() as r:
+            r.read_mem(self.DOC, on_verified=lambda ev, d: (
+                keys.append(ev) if ev == Event.DATA else None) or cb(ev, d))
+        assert keys.count(Event.DATA) == 3
+        assert Event.DATA in inner
+
+    def test_busy_flag_clears_after_a_failed_read(self):
+        r = Reader()
+        with pytest.raises(BovnarParseError):
+            r.read_mem(b".x = <uint:8> 256;\n")
+        r.read_mem(self.DOC)
+        r.close()
+
+
+class TestHalfBuiltObjects:
+    """get_library() raising in a constructor left `_ptr` unset, so the
+    finaliser printed "Exception ignored in ... __del__" after the real error."""
+
+    @pytest.mark.parametrize("make", ["Reader", "Writer"])
+    def test_no_finaliser_noise_when_the_library_is_missing(self, make, monkeypatch):
+        import gc
+        import sys
+        from bovnar import reader as reader_mod, writer as writer_mod
+        from bovnar.exceptions import BovnarLibraryNotFound
+
+        def boom():
+            raise BovnarLibraryNotFound(["/nowhere/libbvnr.so (not found)"])
+
+        mod = reader_mod if make == "Reader" else writer_mod
+        monkeypatch.setattr(mod, "get_library", boom)
+        hooked = []
+        monkeypatch.setattr(sys, "unraisablehook", lambda u: hooked.append(u))
+        with pytest.raises(BovnarLibraryNotFound):
+            getattr(mod, make)()
+        gc.collect()
+        assert hooked == []
+
+
+class TestLibraryNotFoundMessage:
+    def test_every_candidate_is_listed(self, monkeypatch):
+        """The error used to list only paths that existed -- "Searched: (none)"."""
+        from bovnar import _ffi
+        from bovnar.exceptions import BovnarLibraryNotFound
+        monkeypatch.setattr(_ffi, "_lib", None)
+        monkeypatch.setattr(_ffi, "_candidate_paths",
+                            lambda: ["/nonexistent-a/libbvnr.so",
+                                     "/nonexistent-b/libbvnr.so"])
+        with pytest.raises(BovnarLibraryNotFound) as ei:
+            _ffi.load_library()
+        msg = str(ei.value)
+        assert "/nonexistent-a/libbvnr.so (not found)" in msg
+        assert "/nonexistent-b/libbvnr.so (not found)" in msg
+        assert "(none)" not in msg
+
+    def test_candidates_include_paths_that_do_not_exist(self, monkeypatch):
+        from bovnar import _ffi
+        monkeypatch.setenv("LIBBOVNAR_PATH", "/nonexistent-c/libbvnr.so")
+        paths = _ffi._candidate_paths()
+        assert paths[0] == "/nonexistent-c/libbvnr.so"
+        assert any(p.endswith(os.path.join("bovnar", _ffi._LIBRARY_NAME))
+                   for p in paths)

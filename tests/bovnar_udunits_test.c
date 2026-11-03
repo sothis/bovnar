@@ -32,8 +32,8 @@
  * The second EXPR profile, so what this file mostly defends is that the shared
  * parser really is shared: that UDUNITS' extra operators work, that its division
  * means what UCUM's division means, and that neither vocabulary's syntax leaked
- * into the other. Plus the two refusals that carry the most weight -- reference
- * time, and the space-separated spelling.
+ * into the other. Plus the refusal that carries the most weight -- reference
+ * time and the other SHIFT forms -- and the space-separated spelling.
  *
  * What this file does NOT check, and cannot: that "hPa" is really UDUNITS'
  * hectopascal. See the provenance note at the top of src/gendata/udunits.bvnr.
@@ -394,38 +394,90 @@ static void test_reference_time(void)
 	chk_error("udunits:since", error_unit_profile_unsupported);
 
 	/*
-	 * And it holds after the lexer has eaten the whitespace, which is the form
-	 * that actually reaches the parser from a document. This is why the refusal
-	 * is a substring test rather than an atom lookup: there are no atoms left to
-	 * look up by then.
+	 * SINCE IS ONE OF FIVE. UDUNITS' scanner (lib/scanner.l) spells its SHIFT
+	 * operator {space}*(@|after|from|ref|since){space}*, every keyword in either
+	 * case, and the same operator with a number after it is an OFFSET ("K @
+	 * 273.15" is the Celsius scale). Each is valid UDUNITS that bovnar cannot
+	 * carry, so each is unsupported -- this used to catch only a lower-case
+	 * "since" and called the rest typos.
+	 */
+	chk_error("udunits:days after 1970-01-01", error_unit_profile_unsupported);
+	chk_error("udunits:days from 1970-01-01",  error_unit_profile_unsupported);
+	chk_error("udunits:days ref 1970-01-01",   error_unit_profile_unsupported);
+	chk_error("udunits:hours SINCE 2000-01-01", error_unit_profile_unsupported);
+	chk_error("udunits:Hours Since 2000-01-01", error_unit_profile_unsupported);
+	chk_error("udunits:K from 273.15",         error_unit_profile_unsupported);
+	chk_error("udunits:K @ 273.15",            error_unit_profile_unsupported);
+	chk_error("udunits:K@273.15",              error_unit_profile_unsupported);
+
+	/*
+	 * A keyword is the operator only where the scanner would not read it as
+	 * part of a longer name, and UDUNITS has names that hold one: these are
+	 * units, not shifts.
+	 */
+	chk_str("udunits:refrigeration_ton",   "ton_ref");
+	chk_str("udunits:ton_of_refrigeration", "ton_ref");
+
+	/*
+	 * Run together it is not strictly UDUNITS -- the scanner reads one unknown
+	 * name -- but it is the reference-time construct with its spaces taken out,
+	 * which is what the lexer used to deliver, and no UDUNITS name contains
+	 * "since". So it keeps the answer it had: cannot carry, not "not a code"
+	 * (conformance case UPR-043b).
 	 */
 	chk_error("udunits:dayssince1970-01-01", error_unit_profile_unsupported);
+	chk_error("udunits:hoursSince2000-01-01", error_unit_profile_unsupported);
 }
 
-static void test_space_is_not_an_operator(void)
+static void test_space_operators(void)
 {
-	printf("  space does not multiply...\n");
+	printf("  space multiplies, and divides around / and per...\n");
 
 	/*
 	 * UDUNITS multiplies with a space and CF's commonest spelling is
-	 * "kg m-2 s-1", but a space cannot survive into a unit slot: the lexer
-	 * deletes whitespace inside a type annotation, so "m s-1" arrives as
-	 * "ms-1". That string is itself valid UDUNITS -- RECIPROCAL MILLISECONDS --
-	 * so the parser is right to accept it and right to read it that way.
-	 *
-	 * This test pins the reading, so that anyone tempted to add ' ' to the
-	 * profile's multiplication set sees what it would actually mean.
+	 * "kg m-2 s-1". The lexer carries whitespace inside a namespaced type
+	 * parameter in verbatim (spec section 5.3), so the space arrives as a space
+	 * and means here what it means in UDUNITS (doc/11 section 13.2).
+	 */
+	chk_str("udunits:kg m-2 s-1", "k~g/m²·s");
+	ASSERT_TRUE(bvn_unit_equal(U("udunits:kg m-2 s-1"),
+	                           U("udunits:kg*m-2*s-1")),
+	            "kg m-2 s-1 == kg*m-2*s-1");
+	chk_str("udunits:m s-1", "m/s");
+
+	/*
+	 * Without the space it is a different, equally valid, UDUNITS unit:
+	 * RECIPROCAL MILLISECONDS. The space is what tells the two apart.
 	 */
 	chk_str("udunits:ms-1", "m~s⁻¹");
 	ASSERT_TRUE(!bvn_unit_equal(U("udunits:ms-1"), U("udunits:m/s")),
 	            "ms-1 is reciprocal milliseconds, NOT metres per second");
 	ASSERT_TRUE(bvn_units_compatible(U("udunits:ms-1"), U("Hz")),
 	            "reciprocal milliseconds is a frequency");
-
-	/* Written with a real operator, it means what CF meant. */
 	chk_str("udunits:m*s-1", "m/s");
-	ASSERT_TRUE(bvn_unit_equal(U("udunits:m*s-1"), U("m/s")),
-	            "m*s-1 is metres per second");
+
+	/*
+	 * The scanner's MULTIPLY is {space}+, so a run of spaces is ONE operator,
+	 * and its DIVIDE is {space}*"/"{space}* or {space}+per{space}+ -- the
+	 * word in either case. All of these are metres per second.
+	 */
+	chk_str("udunits:kg  m-2", "k~g/m²");
+	chk_str("udunits:m / s",   "m/s");
+	chk_str("udunits:m /s",    "m/s");
+	chk_str("udunits:m/ s",    "m/s");
+	chk_str("udunits:m per s", "m/s");
+	chk_str("udunits:m PER s", "m/s");
+	ASSERT_TRUE(bvn_unit_equal(U("udunits:kg / (m s)"), U("udunits:kg/m/s")),
+	            "kg / (m s) == kg/m/s");
+
+	/* "per" divides only as a word: "perch" is a unit, and a trailing operator
+	 * or a trailing space is still malformed. */
+	ASSERT_TRUE(bvn_unit_equal(U("udunits:m perch"),
+	                           U("udunits:m*perch")),
+	            "m perch is a metre times a perch");
+	chk_error("udunits:m per",  error_unit_illegal);
+	chk_error("udunits:m /",    error_unit_illegal);
+	chk_error("udunits:m ",     error_unit_illegal);
 }
 
 /* ── agreement with the other vocabularies ──────────────────────────────── */
@@ -617,7 +669,7 @@ int main(void)
 	test_operators();
 	test_no_syntax_leak();
 	test_reference_time();
-	test_space_is_not_an_operator();
+	test_space_operators();
 	test_cross_vocabulary();
 	test_to_udunits();
 	test_round_trip();

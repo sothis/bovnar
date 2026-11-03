@@ -780,7 +780,14 @@ typedef uint32_t bvn_unit_flags_t;
  * no rescale touched is passed through untouched, so this does not make every
  * float in a document converge -- writing "5000" where another document wrote
  * "5000.0" still differs. Full number-shape canonicalisation is a larger change
- * and is not this flag. */
+ * and is not this flag.
+ *
+ * It also writes every type annotation in one form: the width always written
+ * out (<uint> as <uint:64>), and a parameter that only restates the default left
+ * out -- base 10 on uint/sint/float, and no_unit. So "1.0 km", which the reader
+ * hands over as <float:64,_10,km>, and "<float:64,k~m> 1.0" canonicalise to the
+ * same bytes. Where an annotation sits is not changed: [1, 2] and
+ * <uint:64> [1, 2] stay two documents. */
 #define BVN_NUM_CANONICAL   ((bvn_unit_flags_t)(1u << 2))
 /*
  * Write options. The fields mirror bvnr_read_flags_t for symmetry, but the

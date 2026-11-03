@@ -771,6 +771,20 @@ static bool bvnf_pow2_base(uint32_t base, uint32_t *log2base)
  * rounds to). A caller that wants the EXACT value must not: reporting such a
  * literal as "exactly 0" is wrong by every digit, which is why it is a kind of
  * its own rather than folded into ZERO. It mirrors INF on the overflow side.
+ *
+ * `sig_bits` is the precision the caller ROUNDS to (0: the caller wants the
+ * exact value). A rounding caller needs no more of the mantissa than that plus
+ * guard bits, and building all of it is what broke long literals: the digits
+ * alone passed BVN_INT_MAX_BITS at about 9865 decimal / 8192 hex digits, and
+ * "0.111...1" came back as +inf or 0 whatever its magnitude. Past the budget
+ * the digits are dropped -- an integer digit still scales the value, so it is
+ * counted into the exponent -- and a non-zero one leaves a sticky digit, which
+ * keeps every rounding decision what the full literal would give as long as
+ * the kept digits hold the rounding boundaries exactly: then a dropped tail
+ * moves the value off a boundary in the right direction and never across one.
+ * The budget below guarantees that for every format up to binary64; wider ones
+ * get the target's bits plus 64 guard bits, which is correct except within
+ * 2^-64 ulp of a boundary whose decimal expansion is longer than that.
  */
 typedef enum {
 	BVNF_RK_OK = 0,
@@ -781,7 +795,8 @@ typedef enum {
 	BVNF_RK_FAIL
 } bvnf_rkind;
 static bvnf_rkind bvnf_parse_rational(const char *s, uint32_t base,
-									  bool *neg_out, bvn_int_t *num, bvn_int_t *den)
+									  bool *neg_out, bvn_int_t *num, bvn_int_t *den,
+									  uint32_t sig_bits)
 {
 	*neg_out = false;
 	if (!s || (base != 10u && base != 16u)) return BVNF_RK_FAIL;
@@ -826,6 +841,24 @@ static bvnf_rkind bvnf_parse_rational(const char *s, uint32_t base,
 	int frac_digits = 0;
 	bool has_int  = false;
 	bool has_frac = false;
+	/* The significand budget (see above), and what dropping past it does:
+	 * `dropped_int` integer digits scale the value, `sticky` marks a non-zero
+	 * digit lost. `full` latches once num has reached the budget. */
+	uint32_t budget = 0;
+	if (sig_bits) {
+		/* Not just the target's bits plus guard bits: in base 10 a binary
+		 * rounding MIDPOINT can itself need many digits -- up to 768 for a
+		 * double (k * 5^1075, about 2551 bits) -- and a budget that cut into
+		 * them could put a value just above a midpoint below it. So at least
+		 * enough for every binary64 midpoint is kept exactly. */
+		budget = sig_bits + 64u;
+		if (budget < 2624u)
+			budget = 2624u;
+		if (budget > BVN_INT_MAX_BITS - 128u)
+			budget = BVN_INT_MAX_BITS - 128u;
+	}
+	bool full = false, sticky = false;
+	long dropped_int = 0;
 #define FLUSH_CHUNK() \
 	do { \
 		if (acc_d > 0 && !overflow) { \
@@ -834,12 +867,20 @@ static bvnf_rkind bvnf_parse_rational(const char *s, uint32_t base,
 			if (!bvn_int_mul_u32(num, _mul)) { overflow = true; break; } \
 			if (!bvn_int_add_u32(num, acc))  { overflow = true; break; } \
 			acc = 0; acc_d = 0; \
+			if (budget && (uint32_t)bvn_int_bitlen(num) >= budget) \
+				full = true; \
 		} \
 	} while (0)
 	while (!overflow) {
 		uint32_t d = bvnf_digit((uint8_t)*s, base);
 		if (d >= base) break;
 		has_int = true;
+		if (full) {                 /* past the budget: scale, keep sticky */
+			dropped_int++;
+			if (d) sticky = true;
+			s++;
+			continue;
+		}
 		acc = acc * base + d; acc_d++;
 		uint32_t cap = (base <= 10) ? 9u :
 					   (base <= 16) ? 7u :
@@ -854,6 +895,11 @@ static bvnf_rkind bvnf_parse_rational(const char *s, uint32_t base,
 			uint32_t d = bvnf_digit((uint8_t)*s, base);
 			if (d >= base) break;
 			has_frac = true;
+			if (full) {             /* past the budget: only sticky */
+				if (d) sticky = true;
+				s++;
+				continue;
+			}
 			acc = acc * base + d; acc_d++;
 			frac_digits++;
 			uint32_t cap = (base <= 10) ? 9u :
@@ -865,6 +911,15 @@ static bvnf_rkind bvnf_parse_rational(const char *s, uint32_t base,
 		FLUSH_CHUNK();
 	}
 	if (!has_int && !has_frac) return BVNF_RK_FAIL;
+	/* A dropped non-zero tail becomes one more digit, 1, just past the kept
+	 * ones: strictly between the truncated value and the next one up. */
+	if (sticky && !overflow) {
+		if (!bvn_int_mul_u32(num, base) || !bvn_int_add_u32(num, 1u))
+			overflow = true;
+		frac_digits++;
+	}
+	/* Dropped integer digits scale the value as fractional ones divide it. */
+	long frac_eff = (long)frac_digits - dropped_int;
 	long exp_val = 0;
 	bool use_bin_exp = false;
 	bool eneg = false;
@@ -917,7 +972,7 @@ static bvnf_rkind bvnf_parse_rational(const char *s, uint32_t base,
 	if (use_bin_exp || b_is_pow2) {
 		long net_shift;
 		if (b_is_pow2) {
-			net_shift = exp_val - (long)frac_digits * (long)log2b;
+			net_shift = exp_val - frac_eff * (long)log2b;
 		} else {
 			net_shift = exp_val;
 			goto rational_path;
@@ -932,7 +987,7 @@ static bvnf_rkind bvnf_parse_rational(const char *s, uint32_t base,
 		}
 	} else {
 rational_path:;
-		long net_b_exp = exp_val - (long)frac_digits;
+		long net_b_exp = exp_val - frac_eff;
 		if (!use_bin_exp) {
 			if (net_b_exp >= 0) {
 				for (long i = 0; i < net_b_exp; i++)
@@ -942,8 +997,10 @@ rational_path:;
 					if (!bvn_int_mul_u32(den, base)) return BVNF_RK_UNDERFLOW;
 			}
 		} else {
-			for (int i = 0; i < frac_digits; i++)
+			for (long i = 0; i < frac_eff; i++)
 				if (!bvn_int_mul_u32(den, base)) return BVNF_RK_UNDERFLOW;
+			for (long i = 0; i < -frac_eff; i++)
+				if (!bvn_int_mul_u32(num, base)) return BVNF_RK_INF;
 			if (exp_val >= 0) {
 				if (exp_val > (long)INT_MAX || !bvn_int_shl(num, (int)exp_val))
 					return BVNF_RK_INF;
@@ -967,7 +1024,7 @@ bool bvn_float_parse_rational(const char *s, uint32_t base,
 {
 	if (!s || !num || !den || (base != 10u && base != 16u)) return false;
 	bool neg = false;
-	bvnf_rkind k = bvnf_parse_rational(s, base, &neg, num, den);
+	bvnf_rkind k = bvnf_parse_rational(s, base, &neg, num, den, 0u);
 	if (k == BVNF_RK_ZERO) {               /* the literal really is zero */
 		bvn_int_zero(num);
 		return bvn_int_from_uint64(den, 1u);
@@ -997,7 +1054,8 @@ bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base)
 	if (!bvnf_scratch(&num, hint)) return false;
 	if (!bvnf_scratch(&den, hint)) { bvnf_scratch_free(&num); return false; }
 	bool neg = false;
-	bvnf_rkind k = bvnf_parse_rational(s, base, &neg, &num, &den);
+	bvnf_rkind k = bvnf_parse_rational(s, base, &neg, &num, &den,
+					   f->_prec ? f->_prec : 1u);
 	bool rc;
 	switch (k) {
 		case BVNF_RK_OK:   rc = bvnf_rational_to_float(f, neg, &num, &den); break;
@@ -1050,7 +1108,8 @@ void bvn_float_strtoieee_bin(const char *s, uint32_t base,
 	if (!bvnf_scratch(&num, hint)) return;
 	if (!bvnf_scratch(&den, hint)) { bvnf_scratch_free(&num); return; }
 	bool neg = false;
-	bvnf_rkind k = bvnf_parse_rational(s, base, &neg, &num, &den);
+	bvnf_rkind k = bvnf_parse_rational(s, base, &neg, &num, &den,
+					   man_bits + 1u);
 	switch (k) {
 	case BVNF_RK_OK:
 		bvnf_rational_to_ieee_bin(neg, &num, &den, exp_bits, man_bits, bias, bits, bits32);
@@ -2183,6 +2242,73 @@ static int bvnf_dec_magnitude(const char *s, long *dexp)
 	*dexp = ndig_int - first_nz + e;
 	return 1;
 }
+/*
+ * The exact range decision of bvn_float_str_fits_fix: 1 fits, 0 does not, -1
+ * when it cannot be decided this way (the caller falls back to the float path).
+ */
+static int bvnf_fix_fits_exact(const char *s, uint32_t base,
+				uint32_t total_bits, uint32_t frac_bits)
+{
+	if (base != 10u && base != 16u) return -1;
+	if (total_bits == 0 || total_bits > 4096u || frac_bits >= total_bits)
+		return -1;
+	bvn_int_t num, den, q, r;
+	uint32_t hint = bvnf_hint_limbs(total_bits + frac_bits);
+	if (!bvnf_scratch(&num, hint)) return -1;
+	if (!bvnf_scratch(&den, hint)) { bvnf_scratch_free(&num); return -1; }
+	if (!bvnf_scratch(&q, hint)) {
+		bvnf_scratch_free(&num); bvnf_scratch_free(&den); return -1;
+	}
+	if (!bvnf_scratch(&r, hint)) {
+		bvnf_scratch_free(&num); bvnf_scratch_free(&den);
+		bvnf_scratch_free(&q); return -1;
+	}
+	int res = -1;
+	bool neg = false;
+	switch (bvnf_parse_rational(s, base, &neg, &num, &den, 0u)) {
+	case BVNF_RK_ZERO:
+	case BVNF_RK_NAN:          /* range-exempt (§6.4); callers pass none */
+		res = 1; break;
+	case BVNF_RK_UNDERFLOW:    /* below 1e-9865: rounds to raw 0 */
+		res = 1; break;
+	case BVNF_RK_INF:          /* a finite literal beyond every field */
+		res = 0; break;
+	case BVNF_RK_OK: {
+		num.negative = false;
+		den.negative = false;
+		if (!bvn_int_shl(&num, (int)frac_bits)) { res = 0; break; }
+		if (!bvn_int_divrem(&q, &r, &num, &den)) break;
+		/* Round half to even, once: compare 2r with den. */
+		if (!bvn_int_shl(&r, 1)) break;
+		int c = bvn_int_cmp(&r, &den);
+		if (c > 0 || (c == 0 && bvn_int_getbit(&q, 0) == 1))
+			if (!bvn_int_add_u32(&q, 1u)) { res = 0; break; }
+		/* Signed total_bits: |raw| <= 2^(w-1) when negative, < when not. */
+		int qb = bvn_int_bitlen(&q);
+		int lim = (int)total_bits - 1;
+		if (qb <= lim) {
+			res = 1;
+		} else if (qb == lim + 1 && neg) {
+			/* q >= 2^(w-1): fits only as exactly -2^(w-1). */
+			bool only_top = true;
+			for (int i = 0; i < lim; i++)
+				if (bvn_int_getbit(&q, i)) { only_top = false; break; }
+			res = only_top ? 1 : 0;
+		} else {
+			res = 0;
+		}
+		break;
+	}
+	case BVNF_RK_FAIL:
+	default:
+		break;
+	}
+	bvnf_scratch_free(&num);
+	bvnf_scratch_free(&den);
+	bvnf_scratch_free(&q);
+	bvnf_scratch_free(&r);
+	return res;
+}
 bool bvn_float_str_fits_fix(const char *s, uint32_t base,
 							uint32_t total_bits, uint32_t frac_bits)
 {
@@ -2202,6 +2328,16 @@ bool bvn_float_str_fits_fix(const char *s, uint32_t base,
 			if (D > 1 && (D - 1) * 3 > (long)total_bits + 4L) return false;
 		}
 	}
+	/* The rest decides it exactly, with ONE rounding, as doc/03 §6.2 says:
+	 * raw = round(value * 2^Q), ties to even, then the signed total_bits
+	 * range. It used to parse into a float of total+frac+64 bits first and
+	 * round again from there, so a literal within one intermediate ulp of a
+	 * grid tie was moved onto the tie and decided by ties-to-even:
+	 * <float_fix:16,q8> 127.998046874999999999999999999999 (raw 32767) was
+	 * refused and -128.001953125000000000000000000001 (raw -32769) accepted. */
+	int exact = bvnf_fix_fits_exact(s, base, total_bits, frac_bits);
+	if (exact >= 0)
+		return exact == 1;
 	uint32_t prec = total_bits + frac_bits + 64u;
 	if (prec > BVN_FLOAT_MAX_PREC) prec = BVN_FLOAT_MAX_PREC;
 	bvn_float_t *f = bvn_float_alloc(prec);

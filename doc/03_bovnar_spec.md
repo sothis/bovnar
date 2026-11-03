@@ -1757,7 +1757,7 @@ The unit system supports **264 named base units** across SI, IEC-binary, Imperia
 | deci | `d` | 10⁻¹ | `si_deci` |
 | centi | `c` | 10⁻² | `si_centi` |
 | milli | `m` | 10⁻³ | `si_milli` |
-| micro | `µ` (or `u`) | 10⁻⁶ | `si_micro` |
+| micro | `µ` (or `μ`, `u`) | 10⁻⁶ | `si_micro` |
 | nano | `n` | 10⁻⁹ | `si_nano` |
 | pico | `p` | 10⁻¹² | `si_pico` |
 | femto | `f` | 10⁻¹⁵ | `si_femto` |
@@ -1767,7 +1767,7 @@ The unit system supports **264 named base units** across SI, IEC-binary, Imperia
 | ronto | `r` | 10⁻²⁷ | `si_ronto` |
 | quecto | `q` | 10⁻³⁰ | `si_quecto` |
 
-> **Note:** `µ` = U+00B5 (MICRO SIGN), encoded as `0xC2 0xB5` in UTF-8. ASCII `u` is accepted as an input-only alias for the micro prefix (`u~m` = `µ~m`); `bvn_unit_to_string` and the `bvnr_write_*` helpers always render it as `µ`, though the pretty-print / canonicalize path preserves the input `u` at default `unit_flags`.
+> **Note:** `µ` = U+00B5 (MICRO SIGN), encoded as `0xC2 0xB5` in UTF-8. Two input-only aliases are accepted for the micro prefix: `μ` = U+03BC (GREEK SMALL LETTER MU, `0xCE 0xBC`) and ASCII `u` (`μ~m` = `u~m` = `µ~m`). `bvn_unit_to_string` and the `bvnr_write_*` helpers always render the prefix as `µ` (U+00B5), though the pretty-print / canonicalize path preserves the input spelling at default `unit_flags`.
 
 ### 11.3 IEC Binary Prefixes
 
@@ -1955,7 +1955,7 @@ A code that is one whole token is **never decomposed**: `unece:KGM` is the kilog
 | Outcome | Result |
 |---------|--------|
 | Translates onto the unit registry | An ordinary unit; indistinguishable from the native spelling |
-| An **opaque** unit — a UCUM *arbitrary* atom (`[IU]`, `[PFU]`, …) or a UNECE package/count code (`XBX`, `C62`, …) | A unit with no native spelling and no dimension: comparable with itself, never convertible to anything else. Two different opaque units are two different units — `error_unit_mismatch` between an annotation and an inline suffix (§6.5), `error_array_element_type_mismatch` in a bare array (§7.4). It serialises back in the notation of the namespace that owns it |
+| An **opaque** unit — a UCUM *arbitrary* atom (`[IU]`, `[PFU]`, …) or a UNECE package/count code (`XBX`, `C62`, …) | A unit with no native spelling and no dimension: comparable with itself, and convertible to no other unit — only across a change of prefix (`ucum:[IU]/L` to `ucum:[IU]/mL` is a factor of 1000). Two different opaque units are two different units — `error_unit_mismatch` between an annotation and an inline suffix (§6.5), `error_array_element_type_mismatch` in a bare array (§7.4). It serialises back in the notation of the namespace that owns it |
 | Not a valid expression in the profile, or an atom it does not define | `error_unit_illegal` |
 | Valid in the profile, with no representation in this unit system | `error_unit_profile_unsupported` |
 | The namespace is not a profile this implementation supports | `error_unit_profile_unknown` |
@@ -2160,7 +2160,7 @@ of the comment is never read as document text.
 
 | Byte(s) | Action |
 |---------|--------|
-| `0x00–0xFF` (most) | Skip (consume and continue) |
+| `0x00–0xFF` (most) | Skip (consume and continue) — malformed UTF-8 included: it raises no error of its own while recovery is skipping |
 | `"` | Enter `resync_string`: skip until matching `"` |
 | `#` | Enter `resync_comment`: skip until newline |
 | `[`, `{` | Increment its own counter — `resync_array_depth` or `resync_struct_depth` — for brackets opened since recovery began |

@@ -957,8 +957,12 @@ static value_unit_t bvn_parse_unit_expr(
 	*ok = true;
 	if (!s || !slen)                    { *ok = false; return result; }
 	if (depth > BVN_UNIT_GROUP_MAX_DEPTH) { *ok = false; return result; }
-	if (slen == 7 && memcmp(s, "no_unit", 7) == 0)
-		return result;                  /* the empty (dimensionless) unit */
+	/* The empty (dimensionless) unit -- as the WHOLE unit only. The grammar
+	 * (doc/03 §11.4, resolved-unit = "no_unit" | unit-expr) has no factor
+	 * that is no_unit, and matching it at every depth let m*(no_unit) and
+	 * m/(no_unit) through as m. */
+	if (depth == 0 && slen == 7 && memcmp(s, "no_unit", 7) == 0)
+		return result;
 
 	bool     in_denominator = false;
 	uint32_t i              = 0;
@@ -1058,9 +1062,14 @@ value_unit_t bvn_parse_unit_n(const uint8_t* unit, uint32_t len, bool* ok)
 		bvni_profile_status_t st = bvni_profile_ok;
 		value_unit_t u = bvni_parse_profile_unit((const char*)unit, len, &st);
 		*ok = (st == bvni_profile_ok);
-		return u;
+		return *ok ? u : (value_unit_t){ .num_components = 0 };
 	}
-	return bvn_parse_unit_expr((const char*)unit, len, 0, ok);
+	/* The expression parser hands back what it had built when it stopped --
+	 * "m//s" as m, "(m·s)²" as m·s -- and bvn_unit_valid() calls that valid.
+	 * A caller relying on the contract above (ok = NULL, test
+	 * num_components) took the fragment for the unit. */
+	value_unit_t u = bvn_parse_unit_expr((const char*)unit, len, 0, ok);
+	return *ok ? u : (value_unit_t){ .num_components = 0 };
 }
 /*
  * Which error a rejected unit string deserves. Re-parses, deliberately: this is
@@ -2578,12 +2587,13 @@ static bool bvn_float_text_ok(const char* s, uint32_t base)
 		return true;
 	/* Either sign. The reader takes a QUOTED float literal with a leading '+'
 	 * (bvn_validate_number_in_base does, in every base), so `<float:64> "+5"`
-	 * reaches the DOM builder through here and has to keep parsing as 5. */
+	 * reaches the DOM builder through here and has to keep parsing as 5.
+	 * A sign is for digits only: "-inf", "+inf" and "-nan" are no document
+	 * text (the keywords are inf, ninf and nan, and a quoted "-inf" is
+	 * error_digit_not_in_base), and neither is a "0x" prefix, so these refuse
+	 * them too -- doc/08 §1.11: what these accept, a document can carry. */
 	if (*s == '-' || *s == '+') s++;
-	if (strcmp(s, "inf") == 0 || strcmp(s, "nan") == 0)
-		return true;
 	bool hex = (base == 16u);
-	if (hex && s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) s += 2;
 	size_t digits = 0;
 	for (; *s; s++) {
 		if (hex ? isxdigit((unsigned char)*s) : (*s >= '0' && *s <= '9'))

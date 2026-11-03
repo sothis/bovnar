@@ -185,10 +185,16 @@ add_executable(bvnr_float_fix_dec_test tests/bvn_float_fix_dec_test.c)
 target_compile_options(bvnr_float_fix_dec_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_float_fix_dec_test PRIVATE bvnr_static)
 
-# NOTE on gating: these four binaries return non-zero when a case fails, so the
-# exit code is the reliable signal. They used to carry a PASS_REGULAR_EXPRESSION
-# instead -- which CTest treats as a REPLACEMENT for the exit code, not an
-# addition -- and the patterns were substrings of their own failure output:
+# NOTE on gating: no test in this file carries a PASS_REGULAR_EXPRESSION. Every
+# test binary returns non-zero when a case fails, so the exit code is the
+# reliable signal -- and CTest treats PASS_REGULAR_EXPRESSION as a REPLACEMENT
+# for the exit code, not an addition. 72 tests once matched their success line
+# and nothing else, so a sanitizer report or a leak at teardown, printed after
+# that line, was a pass under the CI ASan/UBSan run. A test that must check the
+# output as well goes through cmake/cli_expect.cmake, which requires both.
+#
+# These four binaries were worse: their patterns were substrings of their own
+# failure output:
 # "0 failed" matches "10 failed", and "Results:.*0 failures" matches
 # "Results: 641 tests, 10 failures". A run with 10, 20 or 100 failures was
 # reported green. The counters accumulate without aborting, so that is reachable.
@@ -207,13 +213,11 @@ add_executable(bvnr_wasm_native_shape_test wasm/test/native_shape_test.c)
 target_link_libraries(bvnr_wasm_native_shape_test PRIVATE bvnr_static)
 add_test(NAME bvnr_wasm_native_shape COMMAND bvnr_wasm_native_shape_test)
 set_tests_properties(bvnr_wasm_native_shape PROPERTIES
-    LABELS "unit;wasm"
-    PASS_REGULAR_EXPRESSION "PASSED")
+    LABELS "unit;wasm")
 
 add_test(NAME bvnr_dom_test COMMAND bvnr_dom_test)
 set_tests_properties(bvnr_dom_test PROPERTIES
-    LABELS "unit;dom"
-    PASS_REGULAR_EXPRESSION "PASSED")
+    LABELS "unit;dom")
 
 add_test(NAME bvnr_si_test COMMAND bvnr_si_test)
 set_tests_properties(bvnr_si_test PROPERTIES
@@ -222,8 +226,7 @@ set_tests_properties(bvnr_si_test PROPERTIES
 
 add_test(NAME bvnr_unit_policy_test COMMAND bvnr_unit_policy_test)
 set_tests_properties(bvnr_unit_policy_test PROPERTIES
-    LABELS "unit;si;reader;policy"
-    PASS_REGULAR_EXPRESSION "PASSED")
+    LABELS "unit;si;reader;policy")
 
 add_test(NAME bvnr_unit_ext_test COMMAND bvnr_unit_ext_test)
 set_tests_properties(bvnr_unit_ext_test PROPERTIES
@@ -305,49 +308,41 @@ endif()
 
 add_test(NAME bvnr_reader_test COMMAND bvnr_reader_test)
 set_tests_properties(bvnr_reader_test PROPERTIES
-    LABELS "unit;reader"
-    PASS_REGULAR_EXPRESSION "PASSED")
+    LABELS "unit;reader")
 
 add_test(NAME bvnr_writer_test COMMAND bvnr_writer_test)
 set_tests_properties(bvnr_writer_test PROPERTIES
-    LABELS "unit;writer"
-    PASS_REGULAR_EXPRESSION "PASSED")
+    LABELS "unit;writer")
 
 # Built since the want_unit hook landed but never registered, so neither CI nor
 # run_tests.sh ran it: the read-time conversion suite (exactness, output bases,
 # refusals) could have regressed without a red test.
 add_test(NAME bvnr_want_unit_test COMMAND bvnr_want_unit_test)
 set_tests_properties(bvnr_want_unit_test PROPERTIES
-    LABELS "unit;reader;policy"
-    PASS_REGULAR_EXPRESSION "PASSED")
+    LABELS "unit;reader;policy")
 
 add_test(NAME bvnr_extended_reader_test COMMAND bvnr_extended_reader_test)
 set_tests_properties(bvnr_extended_reader_test PROPERTIES
-    LABELS "unit;reader"
-    PASS_REGULAR_EXPRESSION "PASSED")
+    LABELS "unit;reader")
 
 add_test(NAME bvnr_utils_test COMMAND bvnr_utils_test)
 set_tests_properties(bvnr_utils_test PROPERTIES
-    LABELS "unit;utils"
-    PASS_REGULAR_EXPRESSION "PASSED")
+    LABELS "unit;utils")
 
 if(NOT WIN32)
 add_test(NAME bvnr_socketpair_roundtrip_test
     COMMAND bvnr_socketpair_roundtrip_test)
 set_tests_properties(bvnr_socketpair_roundtrip_test PROPERTIES
-    LABELS "unit;roundtrip"
-    PASS_REGULAR_EXPRESSION "PASSED")
+    LABELS "unit;roundtrip")
 endif()
 
 add_test(NAME bvnr_stream_test COMMAND bvnr_stream_test)
 set_tests_properties(bvnr_stream_test PROPERTIES
-    LABELS "unit;stream"
-    PASS_REGULAR_EXPRESSION "PASSED")
+    LABELS "unit;stream")
 
 add_test(NAME bvnr_high_severity_test COMMAND bvnr_high_severity_test)
 set_tests_properties(bvnr_high_severity_test PROPERTIES
-    LABELS "unit;high_severity"
-    PASS_REGULAR_EXPRESSION "PASSED")
+    LABELS "unit;high_severity")
 
 add_test(NAME bvnr_currency_test COMMAND bvnr_currency_test)
 set_tests_properties(bvnr_currency_test PROPERTIES
@@ -357,19 +352,19 @@ set_tests_properties(bvnr_currency_test PROPERTIES
 add_test(NAME bvnr_int_test COMMAND bvnr_int_test)
 set_tests_properties(bvnr_int_test PROPERTIES
     LABELS "unit;int"
-    PASS_REGULAR_EXPRESSION "PASS  [0-9]+ passed, 0 failed"
+    FAIL_REGULAR_EXPRESSION "passed, [1-9][0-9]* failed"
     FAIL_REGULAR_EXPRESSION "FAIL")
 
 add_test(NAME bvnr_float_test COMMAND bvnr_float_test)
 set_tests_properties(bvnr_float_test PROPERTIES
     LABELS "unit;float"
-    PASS_REGULAR_EXPRESSION "PASS  [0-9]+ passed, 0 failed"
+    FAIL_REGULAR_EXPRESSION "passed, [1-9][0-9]* failed"
     FAIL_REGULAR_EXPRESSION "FAIL")
 
 add_test(NAME bvnr_datetime_test COMMAND bvnr_datetime_test)
 set_tests_properties(bvnr_datetime_test PROPERTIES
     LABELS "unit;datetime;calendar"
-    PASS_REGULAR_EXPRESSION "PASS  [0-9]+ passed, 0 failed"
+    FAIL_REGULAR_EXPRESSION "passed, [1-9][0-9]* failed"
     FAIL_REGULAR_EXPRESSION "FAIL")
 
 # ── Conformance tests ────────────────────────────────────────────────────────
@@ -403,7 +398,6 @@ add_test(NAME bvnr_conformance_self
 set_tests_properties(bvnr_conformance_self PROPERTIES
     LABELS   "conformance;self"
     TIMEOUT  60
-    PASS_REGULAR_EXPRESSION "# All [0-9]+ conformance tests passed"
     FAIL_REGULAR_EXPRESSION "not ok|conformance tests FAILED")
 
 # IUT self-test: conformance suite driven through the reference IUT adapter.
@@ -417,7 +411,6 @@ set_tests_properties(bvnr_conformance_iut_self PROPERTIES
     LABELS   "conformance;iut;self"
     TIMEOUT  60
     DEPENDS  bvnr_conformance_iut
-    PASS_REGULAR_EXPRESSION "# All [0-9]+ conformance tests passed"
     FAIL_REGULAR_EXPRESSION "not ok|conformance tests FAILED")
 endif()
 endif()   # BVNR_ALL_PROFILES
@@ -467,7 +460,6 @@ if (BVNR_FUZZ_TEST)
         set_tests_properties(${name} PROPERTIES
             TIMEOUT ${timeout}
             LABELS  "${label}"
-            PASS_REGULAR_EXPRESSION "\\[bvnr_fuzz\\] PASS"
             FAIL_REGULAR_EXPRESSION "CRASH"
         )
     endmacro()
@@ -543,24 +535,21 @@ if (BVNR_FUZZ_TEST)
                 "${_bvnr_writer_seed_min}")
     set_tests_properties(bvnr_fuzz_writer PROPERTIES
         TIMEOUT 60
-        LABELS  "fuzz;fuzz_smoke"
-        PASS_REGULAR_EXPRESSION "\\[bvnr_fuzz_writer\\] PASS")
+        LABELS  "fuzz;fuzz_smoke")
 
     add_test(NAME bvnr_fuzz_writer_deep
         COMMAND bvnr_fuzz_writer_test --iterations 200000 --seed 999
                 "${_bvnr_writer_seed_min}")
     set_tests_properties(bvnr_fuzz_writer_deep PROPERTIES
         TIMEOUT 600
-        LABELS  "fuzz_deep"
-        PASS_REGULAR_EXPRESSION "\\[bvnr_fuzz_writer\\] PASS")
+        LABELS  "fuzz_deep")
 
     add_test(NAME bvnr_fuzz_writer_thorough
         COMMAND bvnr_fuzz_writer_test --iterations 100000 --seed 7
                 "${_bvnr_writer_seed_min}")
     set_tests_properties(bvnr_fuzz_writer_thorough PROPERTIES
         TIMEOUT 300
-        LABELS  "fuzz_thorough"
-        PASS_REGULAR_EXPRESSION "\\[bvnr_fuzz_writer\\] PASS")
+        LABELS  "fuzz_thorough")
 
     # The document seed, over its own distribution.
     add_test(NAME bvnr_fuzz_writer_doc
@@ -568,8 +557,7 @@ if (BVNR_FUZZ_TEST)
                 "${_bvnr_writer_seed}")
     set_tests_properties(bvnr_fuzz_writer_doc PROPERTIES
         TIMEOUT 300
-        LABELS  "fuzz;fuzz_thorough"
-        PASS_REGULAR_EXPRESSION "\\[bvnr_fuzz_writer\\] PASS")
+        LABELS  "fuzz;fuzz_thorough")
 
 endif()
 
@@ -940,8 +928,8 @@ if(_bvnr_have_pytest AND BVNR_ALL_PROFILES)
     # ── aggregate gates ──────────────────────────────────────────────────────
 
     # Run the full Python suite in a single pytest invocation.
-    # Skipped-only tests (missing lib) still satisfy PASS_REGULAR_EXPRESSION
-    # because pytest prints "X passed, Y skipped".
+    # pytest's exit status gates it: 0 when everything passed or was skipped
+    # (a missing library skips), non-zero on any failure.
     add_test(
         NAME    bvnr_py_all
         COMMAND ${Python3_EXECUTABLE} -m pytest "${_py_tests}"
@@ -1028,7 +1016,6 @@ macro(_bvnr_cli_example stem)
     set_tests_properties(bvnr_cli_events_${stem} PROPERTIES
         LABELS                "cli;examples;events"
         TIMEOUT               30
-        PASS_REGULAR_EXPRESSION "All tokens validated successfully"
     )
 
     add_test(
@@ -1038,7 +1025,6 @@ macro(_bvnr_cli_example stem)
     set_tests_properties(bvnr_cli_validate_${stem} PROPERTIES
         LABELS  "cli;examples;validate"
         TIMEOUT 30
-        PASS_REGULAR_EXPRESSION ": OK"
         FAIL_REGULAR_EXPRESSION "Validation failed|error|Error")
 
     # Assert the canonical serialiser is idempotent: pretty-printing the
@@ -1062,30 +1048,35 @@ endmacro()
 # the --si fallback, which made it order-dependent until it was stamped after
 # the whole line had been read. Both orders are asserted, because one of them
 # passing proves nothing about the other.
-add_test(NAME bvnr_cli_policy_si
-         COMMAND bovnar events --si --leave-inexact
-                 ${CMAKE_CURRENT_SOURCE_DIR}/examples/units.bvnr)
-set_tests_properties(bvnr_cli_policy_si PROPERTIES
-    LABELS  "cli;units;policy"
-    TIMEOUT 30
-    # 1 g normalises to the SI base unit for mass, which is the KILOgram.
-    PASS_REGULAR_EXPRESSION "→ \"0.001\" k~g")
+# _bvnr_cli_expect(name labels rc pass_rx fail_rx <cli args...>) runs the CLI
+# through cmake/cli_expect.cmake: the exit status must be exactly <rc> AND the
+# output must match <pass_rx> (and not <fail_rx>). See the gating note above.
+function(_bvnr_cli_expect name labels rc pass_rx fail_rx)
+    string(JOIN "@@" _args ${ARGN})
+    add_test(NAME ${name}
+             COMMAND "${CMAKE_COMMAND}"
+                     -DBOVNAR=$<TARGET_FILE:bovnar>
+                     "-DEMULATOR=${CMAKE_CROSSCOMPILING_EMULATOR}"
+                     "-DARGS=${_args}" -DEXPECT_RC=${rc}
+                     "-DPASS_RX=${pass_rx}" "-DFAIL_RX=${fail_rx}"
+                     -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cli_expect.cmake)
+    set_tests_properties(${name} PROPERTIES LABELS "${labels}" TIMEOUT 30)
+endfunction()
 
-add_test(NAME bvnr_cli_policy_unit_then_base
-         COMMAND bovnar events --unit m --base 16
-                 ${CMAKE_CURRENT_SOURCE_DIR}/examples/units.bvnr)
-set_tests_properties(bvnr_cli_policy_unit_then_base PROPERTIES
-    LABELS  "cli;units;policy"
-    TIMEOUT 30
-    PASS_REGULAR_EXPRESSION "→ \"5dc\" m _16")
+set(_bvnr_units_ex ${CMAKE_CURRENT_SOURCE_DIR}/examples/units.bvnr)
 
-add_test(NAME bvnr_cli_policy_base_then_unit
-         COMMAND bovnar events --base 16 --unit m
-                 ${CMAKE_CURRENT_SOURCE_DIR}/examples/units.bvnr)
-set_tests_properties(bvnr_cli_policy_base_then_unit PROPERTIES
-    LABELS  "cli;units;policy"
-    TIMEOUT 30
-    PASS_REGULAR_EXPRESSION "→ \"5dc\" m _16")
+# 1 g normalises to the SI base unit for mass, which is the KILOgram.
+_bvnr_cli_expect(bvnr_cli_policy_si "cli;units;policy" 0 "→ \"0.001\" k~g" ""
+                 events --si --leave-inexact ${_bvnr_units_ex})
+# units.bvnr holds a length that has no exact base-16 metre value, so without
+# --leave-inexact the run ends in unit_inexact (exit 1) after the line matched
+# here -- which the old match-only test reported as a pass.
+_bvnr_cli_expect(bvnr_cli_policy_unit_then_base "cli;units;policy" 0
+                 "→ \"5dc\" m _16" ""
+                 events --unit m --base 16 --leave-inexact ${_bvnr_units_ex})
+_bvnr_cli_expect(bvnr_cli_policy_base_then_unit "cli;units;policy" 0
+                 "→ \"5dc\" m _16" ""
+                 events --base 16 --unit m --leave-inexact ${_bvnr_units_ex})
 
 # units.bvnr deliberately contains no_unit values, so --require-unit must reject
 # it -- and reject it as a unit error, not as a generic failure.
@@ -1099,14 +1090,10 @@ set_tests_properties(bvnr_cli_policy_require_unit_rejects PROPERTIES
 
 # Per-field rules, and the DOM tier taking the same policy: `query` converts the
 # field it was asked about, at a path two levels down.
-add_test(NAME bvnr_cli_policy_query_field
-         COMMAND bovnar query --field .portfolio.snapshot_epoch=m~s
-                 .portfolio.snapshot_epoch
+_bvnr_cli_expect(bvnr_cli_policy_query_field "cli;units;policy;dom" 0
+                 "1716400000000" ""
+                 query --field .portfolio.snapshot_epoch=m~s .portfolio.snapshot_epoch
                  ${CMAKE_CURRENT_SOURCE_DIR}/examples/crypto_portfolio.bvnr)
-set_tests_properties(bvnr_cli_policy_query_field PROPERTIES
-    LABELS  "cli;units;policy;dom"
-    TIMEOUT 30
-    PASS_REGULAR_EXPRESSION "1716400000000")
 
 # ...and a rule naming a field of the wrong quantity is an error, not silence:
 # that epoch is a time, so requiring a length of it must fail.
@@ -1151,13 +1138,9 @@ foreach(_case
     list(GET _case 1 _a)
     list(GET _case 2 _rx)
     string(REPLACE "@@" ";" _a "${_a}")
-    add_test(NAME bvnr_cli_policy_names_arg_${_n}
-             COMMAND bovnar validate ${_a}
-                     ${CMAKE_CURRENT_SOURCE_DIR}/examples/units.bvnr)
-    set_tests_properties(bvnr_cli_policy_names_arg_${_n} PROPERTIES
-        LABELS  "cli;units;policy"
-        TIMEOUT 30
-        PASS_REGULAR_EXPRESSION "${_rx}")
+    # A bad argument exits 2, a document that fails exits 1.
+    _bvnr_cli_expect(bvnr_cli_policy_names_arg_${_n} "cli;units;policy" 2
+                     "${_rx}" "" validate ${_a} ${_bvnr_units_ex})
 endforeach()
 
 # `query` reaches the setter through the DOM builder, which surfaces a refused
@@ -1165,7 +1148,7 @@ endforeach()
 # came back as "Parse error in <file>: invalid_argument". The document was
 # blamed, by name, for a fault in the command line, and was read before anyone
 # noticed. It now checks the policy before opening the file and reports it the
-# way validate and events do; FAIL_REGULAR_EXPRESSION is what pins that.
+# way validate and events do; the "Parse error in" refusal regex pins that.
 foreach(_case
         "unit;--unit@@nosuchunitxyz;--unit 'nosuchunitxyz'"
         "rule_path;--require-field@@a=m;--require-field path 'a' is unusable")
@@ -1173,26 +1156,16 @@ foreach(_case
     list(GET _case 1 _a)
     list(GET _case 2 _rx)
     string(REPLACE "@@" ";" _a "${_a}")
-    add_test(NAME bvnr_cli_policy_query_names_arg_${_n}
-             COMMAND bovnar query ${_a} .si_second
-                     ${CMAKE_CURRENT_SOURCE_DIR}/examples/units.bvnr)
-    set_tests_properties(bvnr_cli_policy_query_names_arg_${_n} PROPERTIES
-        LABELS  "cli;units;policy;dom"
-        TIMEOUT 30
-        PASS_REGULAR_EXPRESSION "${_rx}"
-        FAIL_REGULAR_EXPRESSION "Parse error in")
+    _bvnr_cli_expect(bvnr_cli_policy_query_names_arg_${_n} "cli;units;policy;dom" 2
+                     "${_rx}" "Parse error in" query ${_a} .si_second ${_bvnr_units_ex})
 endforeach()
 
 # The other half of that distinction, which must NOT change: a policy the
 # arguments state correctly but the DOCUMENT cannot satisfy is still reported
 # against the file. Requiring a length of a time is a document-tier failure.
-add_test(NAME bvnr_cli_policy_query_document_still_blamed
-         COMMAND bovnar query --require-field .si_second=m .si_second
-                 ${CMAKE_CURRENT_SOURCE_DIR}/examples/units.bvnr)
-set_tests_properties(bvnr_cli_policy_query_document_still_blamed PROPERTIES
-    LABELS  "cli;units;policy;dom"
-    TIMEOUT 30
-    PASS_REGULAR_EXPRESSION "Parse error in.*unit_mismatch")
+_bvnr_cli_expect(bvnr_cli_policy_query_document_still_blamed "cli;units;policy;dom" 1
+                 "Parse error in.*unit_mismatch" ""
+                 query --require-field .si_second=m .si_second ${_bvnr_units_ex})
 
 # An inline unit on an un-annotated value must survive canonicalisation by being
 # folded into the synthesised annotation (e.g. "9.81 m/s" -> "<float:64,_10,m/s>").
@@ -1326,11 +1299,16 @@ set_tests_properties(bvnr_cli_regressions PROPERTIES
     LABELS "cli" TIMEOUT 120)
 
 _bvnr_convert_fail(bad_key          bad_key.json              "not a valid bovnar identifier")
-_bvnr_convert_fail(int_overflow     bad_overflow.json         "out of range")
+# A JSON integer wider than 64 bits is written at a wider width -- except in an
+# array, whose elements share one type.
+_bvnr_convert_fail(int_overflow     bad_overflow.json         "wider than 64 bits")
 _bvnr_convert_fail(trailing         bad_trailing.json         "trailing content")
 _bvnr_convert_fail(nul_in_string    bad_nul.json              "NUL")
 _bvnr_convert_fail(dup_key          bad_dupkey.json           "duplicate key")
 _bvnr_convert_fail(diff_key_records bad_diffkeys.json         "differing key sets")
+_bvnr_cli_expect(bvnr_cli_convert_wide_int "cli;convert" 0
+                 ".n = <uint:128> 99999999999999999999;.*.m = <sint:128> -99999999999999999999;" ""
+                 convert ${CMAKE_CURRENT_SOURCE_DIR}/tests/json/wide_int.json)
 
 # bvnr -> json must refuse a datetime with sub-second digits rather than
 # silently truncate the fraction the integer carrier cannot hold.
@@ -1452,7 +1430,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 183)   # 129 base + unit_source + 3 for examples/unit_profiles.bvnr + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier) + cli_regressions + wasm_native_shape
+set(BVNR_EXPECTED_TEST_COUNT 185)   # 129 base + sitemap + convert_wide_int + unit_source + 3 for examples/unit_profiles.bvnr + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier) + cli_regressions + wasm_native_shape
                                     #             + citation
                                     #         + profiles_off_build
                                     # + om_test + cf_test
@@ -1672,6 +1650,13 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/gen_html_doc
                  COMMAND ${Python3_EXECUTABLE}
                          ${CMAKE_CURRENT_SOURCE_DIR}/gen_html_docs.py --check)
         set_tests_properties(bvnr_html_docs PROPERTIES LABELS "web;docs" TIMEOUT 120)
+        # web/sitemap.xml is committed and lists every document page; it needs
+        # gen_html_docs' doc set, hence markdown. Its <lastmod> dates are commit
+        # dates refreshed on publish, so --check compares the URLs only.
+        add_test(NAME bvnr_sitemap
+                 COMMAND ${Python3_EXECUTABLE}
+                         ${CMAKE_CURRENT_SOURCE_DIR}/gen_sitemap.py --check)
+        set_tests_properties(bvnr_sitemap PROPERTIES LABELS "web;docs" TIMEOUT 60)
     else()
         message(STATUS
             "markdown not importable by ${Python3_EXECUTABLE} -- skipping the "
@@ -2052,7 +2037,7 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/web/index.html)
         NAME    bvnr_cache_stamps
         COMMAND "${CMAKE_COMMAND}"
                 -DPAGE=${CMAKE_CURRENT_SOURCE_DIR}/web/index.html
-                "-DPAIRS=${CMAKE_CURRENT_SOURCE_DIR}/web/bovnar_parser_wasm.js:bovnar_parser_wasm\\.js;${CMAKE_CURRENT_SOURCE_DIR}/web/bovnar_wasm.js:bovnar_wasm\\.js;${CMAKE_CURRENT_SOURCE_DIR}/web/bovnar_wasm_core.js:bovnar_wasm_core\\.js;${CMAKE_CURRENT_SOURCE_DIR}/web/bovnar_highlight.js:bovnar_highlight\\.js;${CMAKE_CURRENT_SOURCE_DIR}/web/fonts/fonts.css:fonts/fonts\\.css"
+                "-DPAIRS=${CMAKE_CURRENT_SOURCE_DIR}/web/bovnar_parser_wasm.js:bovnar_parser_wasm\\.js;${CMAKE_CURRENT_SOURCE_DIR}/web/bovnar_wasm.js:bovnar_wasm\\.js;${CMAKE_CURRENT_SOURCE_DIR}/web/bovnar_wasm_core.js:bovnar_wasm_core\\.js;${CMAKE_CURRENT_SOURCE_DIR}/web/bovnar_highlight.js:bovnar_highlight\\.js;${CMAKE_CURRENT_SOURCE_DIR}/web/fonts/fonts.css:fonts/fonts\\.css;${CMAKE_CURRENT_SOURCE_DIR}/web/bovnar_wasm.js:bovnar_wasm\\.js:${CMAKE_CURRENT_SOURCE_DIR}/web/bovnar_parser_wasm.js;${CMAKE_CURRENT_SOURCE_DIR}/web/bovnar_wasm_core.js:bovnar_wasm_core\\.js:${CMAKE_CURRENT_SOURCE_DIR}/web/bovnar_wasm.js"
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cache_stamps.cmake)
     set_tests_properties(bvnr_cache_stamps PROPERTIES LABELS "wasm;web" TIMEOUT 60)
 endif()

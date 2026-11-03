@@ -341,10 +341,10 @@ OCTET_STREAM_END
 | `ASSIGNMENT_START <key>` | key: raw key bytes, safe-escaped | |
 | `TYPE_ANN_START <ann>` | ann: the **whole annotation body**, safe-escaped — the text between `<` and `>` verbatim, e.g. `float:64,m/s`, not `float`. It is the bare family keyword only when the annotation was *synthesised* for an untyped value (see below) | |
 | `TYPE_FAMILY <ann>` | Same bytes as TYPE_ANN_START | |
-| `TYPE_PARAM_WIDTH <N>` | N: effective width (0 → 64) | Emitted when the annotation carries a width, and for a synthesised one |
-| `TYPE_PARAM_BASE <N>` | N: effective base (0 → 10) | Emitted only when the annotation **states** a base (`_16`), or was synthesised. `<float:64,m/s>` names no base and produces no such line — the events mirror the parameters actually present |
+| `TYPE_PARAM_WIDTH <N>` | N: effective width (0 → 64) | Emitted when the annotation carries a width, and for every synthesised annotation except `utf8` and `bool` (table below). `<float>` names no width and produces no such line |
+| `TYPE_PARAM_BASE <N>` | N: effective base (0 → 10) | Emitted only when the annotation **states** a base (`_16`), or was synthesised for a `uint`, `sint` or `float` — not for a synthesised `datetime` or currency `float_dec`. `<float:64,m/s>` names no base and produces no such line — the events mirror the parameters actually present |
 | `TYPE_PARAM_Q <N>` | N: Q parameter | Only for `float_fix` |
-| `TYPE_PARAM_UNIT <unit>` | unit: unit string, safe-escaped | Emitted when the annotation carries a unit — and also for a `datetime`, whose **epoch name** travels in this line (`TYPE_PARAM_UNIT tai`). A datetime is not a numeric type; the epoch shares the unit parameter slot because it occupies the same position in the grammar |
+| `TYPE_PARAM_UNIT <unit>` | unit: unit string, safe-escaped | Emitted when the annotation carries a unit (a written `no_unit` included), and for a synthesised `uint`, `sint`, `float` or currency `float_dec` (table below). A `datetime`'s **epoch name** travels in this line too (`TYPE_PARAM_UNIT tai`) — but only an epoch other than `unix`. The unix epoch is the implicit one: written (`<datetime:64,unix>`) or defaulted (`<datetime:64>`, or a synthesised datetime) it produces **no** `TYPE_PARAM_UNIT` line. A datetime is not a numeric type; the epoch shares the unit parameter slot because it occupies the same position in the grammar |
 | `TYPE_ANN_END <ann>` | Same bytes as TYPE_ANN_START | |
 | `DATA <token_type> <value>` | token_type: see below; value: safe-escaped | The single space after the token type is always written, also when the value is empty: a null is the line `DATA null ` — with its trailing space — and an empty string is `DATA string ` |
 | `STRUCT_START` | — | |
@@ -354,6 +354,23 @@ OCTET_STREAM_END
 | `ARRAY_DIM_START` | — | Emitted between `/`-separated rows |
 | `OCTET_STREAM_START` | — | |
 | `OCTET_STREAM_END` | — | |
+
+**Synthesised annotations.** A value written without an annotation gets one
+synthesised for it (doc/03 §10). Its `TYPE_ANN_START`, `TYPE_FAMILY` and
+`TYPE_ANN_END` lines carry the bare family keyword, and the lines between them
+depend on the family:
+
+| Untyped value | Annotation body | Lines between `TYPE_FAMILY` and `TYPE_ANN_END` |
+|---------------|-----------------|--------------------------------------------------|
+| `42` | `uint` | `TYPE_PARAM_WIDTH 64`, `TYPE_PARAM_BASE 10`, `TYPE_PARAM_UNIT no_unit` |
+| `-5` | `sint` | `TYPE_PARAM_WIDTH 64`, `TYPE_PARAM_BASE 10`, `TYPE_PARAM_UNIT no_unit` |
+| `2.5` | `float` | `TYPE_PARAM_WIDTH 64`, `TYPE_PARAM_BASE 10`, `TYPE_PARAM_UNIT no_unit` |
+| `5 m` (inline unit) | `uint` | `TYPE_PARAM_WIDTH 64`, `TYPE_PARAM_BASE 10`, `TYPE_PARAM_UNIT m` |
+| `5 $USD` (inline currency) | `float_dec` | `TYPE_PARAM_WIDTH 64`, `TYPE_PARAM_UNIT $USD` — no base line |
+| `2026-06-15` (ISO-8601 literal, spec 1.1) | `datetime` | `TYPE_PARAM_WIDTH 64` only — the unix epoch is implicit |
+| `"hello"` | `utf8` | none |
+| `true`, `false` | `bool` | none |
+| `null`, a symbol, a reference | — | no annotation lines at all: the `DATA` line follows `ASSIGNMENT_START` directly |
 
 ### 7.3 TOKEN_TYPE values for DATA lines
 
@@ -444,6 +461,23 @@ DATA number 1000
 ```
 
 The epoch arrives as `TYPE_PARAM_UNIT`, not as a parameter of its own.
+
+**Input:** `#!bovnar 1.1` + `.t = <datetime:64,unix> 1000;` (the unix epoch, written out)
+
+```
+STREAM_START
+ASSIGNMENT_START t
+TYPE_ANN_START datetime:64,unix
+TYPE_FAMILY datetime:64,unix
+TYPE_PARAM_WIDTH 64
+TYPE_ANN_END datetime:64,unix
+DATA number 1000
+```
+
+The unix epoch is the implicit one, so it produces no `TYPE_PARAM_UNIT` line
+even when the annotation names it. The annotation body still carries it
+verbatim; an adapter that emits `TYPE_PARAM_UNIT unix` here fails the byte
+comparison.
 
 **Input:** `.x = ok;` (symbol)
 

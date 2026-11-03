@@ -141,7 +141,8 @@ BVN_API void            bvn_dom_node_destroy(bvn_dom_node_t *n);
  * path (return false) it is destroyed internally. So never destroy it yourself
  * after the call; in particular do NOT write
  *     if (!bvn_dom_struct_add(s, k, n, v)) bvn_dom_node_destroy(v); // DOUBLE FREE
- * The container pointer (s/d/a) must be non-NULL. The key is copied. */
+ * The container pointer (s/d/a) must be non-NULL. The key is copied; a NULL or
+ * empty key is refused (a key is an identifier). */
 BVN_API bool bvn_dom_struct_add(bvn_dom_node_t *s,
 						const char *key, uint32_t klen,
 						bvn_dom_node_t *val);

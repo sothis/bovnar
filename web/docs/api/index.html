@@ -591,10 +591,12 @@ no exact rational to hand over in the first place.</p>
   includes exceeding <code>vt.width</code>, so <code>&lt;uint:8&gt;</code> rejects <code>"256"</code>. A width above 64
   is not checked: the 64-bit out parameter is the binding limit there.</li>
 <li>Returns <code>false</code> for anything a value token cannot look like: an empty string,
-  leading whitespace, a leading <code>+</code>, or a sign on an unsigned carrier. (The C
-  standard library's <code>strtoull</code> accepts all four — the last by wrapping <code>-1</code> into
+  leading whitespace, a sign on an unsigned carrier, or — for the integer
+  helpers <code>bvn_parse_uint64</code> and <code>bvn_parse_int64</code> — a leading <code>+</code>. (The C
+  standard library's <code>strtoull</code> accepts all four — the sign by wrapping <code>-1</code> into
   <code>18446744073709551615</code> — which is why these helpers do not simply forward to
-  it.)</li>
+  it.) <code>bvn_parse_double</code> does accept a leading <code>+</code> (<code>"+5"</code> is 5), because a
+  quoted float may carry one (<a href="https://www.bovnar.io/docs/spec/#63-digit-validation">spec §6.3</a>).</li>
 <li>Acceptance matches the reader exactly: anything these accept, a document can
   carry, and vice versa.</li>
 </ul>
@@ -859,6 +861,16 @@ a unit policy but not the read flags — an assertion silently not in force is
 worse than none.</p>
 <hr />
 <h2 id="2-writer">2. Writer</h2>
+<p><strong>The writer enforces the streaming tier only.</strong> Each of its checks judges the
+event in front of it — a key, a value against its type and width, a struct or
+array closed that was open — as the streaming reader's do. The rules the specification assigns to the <em>DOM</em> tier
+(<a href="https://www.bovnar.io/docs/spec/#125-struct-validation">spec §12.4–§12.5</a>) compare siblings
+the writer emits one at a time, and it does not hold them to compare: a key
+repeated within one scope, array elements of mixed kind or unit, ragged sibling
+sub-arrays, and struct elements of an array with differing key sets. Those are
+the <strong>producer's</strong> responsibility. Calling <code>bvnr_write_bool(w, "b", true)</code> twice
+writes <code>.b=true;.b=true;</code> and both calls succeed, and that output is a document
+<code>bovnar validate</code> and <code>bvn_dom_parse</code> refuse with <code>error_duplicate_struct_key</code>.</p>
 <hr />
 <h3 id="21-bvnr_writer_create--bvnr_writer_destroy">2.1 <code>bvnr_writer_create</code> / <code>bvnr_writer_destroy</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="nf">bvnr_writer_create</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
@@ -920,7 +932,7 @@ into the sink yourself. To size writer output, ask the writer:</p>
 <span class="w">                            </span><span class="n">bvnr_write_flags_t</span><span class="w">   </span><span class="o">*</span><span class="n">options</span><span class="p">);</span>
 </code></pre></div>
 
-<p>Attach <code>sink</code> to the writer and configure it. Must be called before any <code>bvnr_write_event</code>. Returns <code>false</code> on invalid arguments.</p>
+<p>Attach <code>sink</code> to the writer and configure it. Must be called before any <code>bvnr_write_event</code>. Returns <code>false</code> on invalid arguments. A writer with no sink — never opened, or whose open failed — refuses <code>bvnr_write_event</code>, <code>bvnr_write_version</code> and every helper with <code>error_invalid_argument</code> on the first call.</p>
 <ul>
 <li><code>pretty</code> — when <code>true</code>, the serialiser emits newlines and indentation. When <code>false</code>, output is compact (single line per assignment, no extra whitespace).</li>
 <li><code>options</code> — configuration struct. Zero-initialise for defaults.</li>
@@ -990,7 +1002,7 @@ have no effect. The writer never internally limits array items, text bytes, or f
 <tr>
 <td><code>BVN_NUM_CANONICAL</code></td>
 <td><code>1 &lt;&lt; 2</code></td>
-<td>Render a <em>rescaled</em> float in float shape (<code>5000.0</code>, not <code>5000</code>), so a value that took the rescale lands on the same spelling as one that did not. What <code>bovnar pretty-print --canonical</code> sets beside <code>BVN_UNIT_REDUCE</code></td>
+<td>Render a <em>rescaled</em> float in float shape (<code>5000.0</code>, not <code>5000</code>), so a value that took the rescale lands on the same spelling as one that did not; and write every annotation in one form — the width written out (<code>&lt;uint&gt;</code> as <code>&lt;uint:64&gt;</code>), a default base <code>_10</code> and <code>no_unit</code> left out — so <code>1.0 km</code> and <code>&lt;float:64,k~m&gt; 1.0</code> produce the same bytes. What <code>bovnar pretty-print --canonical</code> sets beside <code>BVN_UNIT_REDUCE</code></td>
 </tr>
 </tbody>
 </table>
@@ -1157,6 +1169,7 @@ spec version right after open.</p>
 </code></pre></div>
 
 <p>Flush any buffered output and finalise the stream. Must be called after all <code>bvnr_write_event</code> calls and before <code>bvnr_writer_destroy</code>. Returns <code>false</code> if any struct or array is still open, or an assignment, a type annotation or a <code>/</code> row separator was left with nothing after it (<code>error_got_incomplete_bvnr_stream</code>), if writing the trailing semicolon fails, or if flushing the write buffer to the sink fails.</p>
+<p><strong>After an earlier error</strong> it returns <code>false</code> at once, and still hands the sink everything written up to that error — the same bytes a memory sink already holds — so an fd sink ends with the document up to the failing value, not with whatever part of it the 64 KiB buffer happened to have pushed. (A sink that has itself failed, <code>error_writing_to_sink</code> or <code>error_sink_buffer_exhausted</code>, is not pushed again.) That output is not a document: discard it, or keep it only to see where the error fell.</p>
 <p><strong>64 KiB write buffer.</strong> For an fd or a custom sink the writer accumulates output into an internal 64 KiB buffer. Individual <code>bvnr_write_event</code> calls do not push bytes to the sink immediately; instead bytes accumulate in the buffer and are forwarded to the sink only when the buffer is full or when <code>bvnr_write_finish</code> is called. A memory sink (<code>bvnr_open_write_mem</code>) is written through directly — there is no point buffering a buffer — so its bytes are in the caller's buffer as soon as each event returns. This means the sink receives large contiguous writes rather than one tiny push per token, which is important for fd-based sinks. <code>bvnr_writer_bytes_written</code> always reflects the true total of bytes handed off to the sink plus bytes still in the buffer, so the count is accurate at any point during writing.</p>
 <div class="codehilite"><pre><span></span><code><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">bvnr_write_finish</span><span class="p">(</span><span class="n">w</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stderr</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;write finish failed: %s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
@@ -2003,10 +2016,21 @@ no unit, for one the document already wrote in canonical form (so
 canonical units stores nothing extra), and for one whose value a unit policy
 converted — the document's spelling describes a unit that node no longer has.</p>
 <h3 id="45-building-a-tree">4.5 Building a tree</h3>
-<p>The DOM is also writable, e.g. to construct a document programmatically and hand
-it to a serialiser. <code>bvn_dom_node_alloc</code> / the <code>bvn_dom_node_from_*</code> constructors
-make nodes; the <code>*_add</code>/<code>*_append</code> functions attach them.</p>
-<div class="codehilite"><pre><span></span><code><span class="n">bvn_dom_node_t</span><span class="w"> </span><span class="o">*</span><span class="nf">bvn_dom_node_alloc</span><span class="p">(</span><span class="n">bvn_dom_type_t</span><span class="w"> </span><span class="n">t</span><span class="p">);</span>
+<p>A tree can also be assembled by hand, within narrow limits — enough to build a
+document of structs, arrays, nulls and integers for code that consumes a DOM, a
+test fixture say. <code>bvn_dom_doc_create</code> makes an empty document;
+<code>bvn_dom_node_alloc</code> makes an empty node of a given type, which is a complete
+value only for the types that carry no payload (<code>BVN_DOM_STRUCT</code>, <code>BVN_DOM_ARRAY</code>,
+<code>BVN_DOM_NULL</code>); the <code>bvn_dom_node_from_*</code> constructors make integer nodes, and
+<code>bvn_dom_node_from_bigint</code> one wider than 64 bits with a type and a unit. The
+<code>*_add</code>/<code>*_append</code> functions attach them.</p>
+<p>What the API does <strong>not</strong> have: a constructor or setter for a float, string,
+symbol, reference, bool or octet-stream node (a node allocated as one of those
+holds no value and cannot be given one), and <strong>any DOM serialiser</strong> — there is no
+function that writes a tree out as bovnar text. To produce a document, use the
+writer (§2) directly; a built tree can only be navigated and read with §4.2–§4.4.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">bvn_dom_doc_t</span><span class="w">  </span><span class="o">*</span><span class="nf">bvn_dom_doc_create</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+<span class="n">bvn_dom_node_t</span><span class="w"> </span><span class="o">*</span><span class="nf">bvn_dom_node_alloc</span><span class="p">(</span><span class="n">bvn_dom_type_t</span><span class="w"> </span><span class="n">t</span><span class="p">);</span>
 <span class="kt">void</span><span class="w">            </span><span class="nf">bvn_dom_node_destroy</span><span class="p">(</span><span class="n">bvn_dom_node_t</span><span class="w"> </span><span class="o">*</span><span class="n">n</span><span class="p">);</span>
 <span class="n">bvn_dom_node_t</span><span class="w"> </span><span class="o">*</span><span class="n">bvn_dom_node_from_i64</span><span class="o">/</span><span class="n">u64</span><span class="o">/</span><span class="n">i32</span><span class="o">/</span><span class="n">u32</span><span class="o">/</span><span class="n">i16</span><span class="o">/</span><span class="n">u16</span><span class="o">/</span><span class="n">i8</span><span class="o">/</span><span class="n">u8</span><span class="p">(</span><span class="cm">/* value */</span><span class="p">);</span>
 <span class="n">bvn_dom_node_t</span><span class="w"> </span><span class="o">*</span><span class="nf">bvn_dom_node_from_bigint</span><span class="p">(</span><span class="n">bvn_int_t</span><span class="w"> </span><span class="o">*</span><span class="n">bigint</span><span class="p">,</span><span class="w"> </span><span class="n">value_type_spec_t</span><span class="w"> </span><span class="n">vt</span><span class="p">,</span><span class="w"> </span><span class="n">value_unit_t</span><span class="w"> </span><span class="n">vu</span><span class="p">);</span>

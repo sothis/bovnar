@@ -19,6 +19,9 @@
 #
 # Required: SRC_DIR BIN_DIR VERSION
 # Optional: PYTHON  NATIVE_KIND(linux|msvc|mingw)  CROSS_DIR
+#           ARTIFACT_DIR (where the native libraries and CLI were built;
+#                         defaults to BIN_DIR, which is right only for a
+#                         single-config generator)
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -39,6 +42,9 @@ if(_git)
     endif()
 endif()
 set(TAG "${VERSION}-${COUNT}")
+if(NOT ARTIFACT_DIR)
+    set(ARTIFACT_DIR "${BIN_DIR}")
+endif()
 
 file(MAKE_DIRECTORY "${BIN_DIR}")
 set(STAGE "${BIN_DIR}/.pkgstage")
@@ -95,34 +101,46 @@ function(_stage_common top)
 endfunction()
 
 # Stage one platform's built artifacts (libs under lib/, runtime under bin/).
+#
+# Every artifact is required. file(COPY) of an empty glob is not an error, so a
+# packer looking in the wrong directory used to produce an archive of headers
+# and docs with no library and no CLI in it, and say nothing.
+function(_bvnr_require what files)
+    if(NOT files)
+        message(FATAL_ERROR "pack_artifacts: no ${what} found for ${top} -- "
+                            "is ARTIFACT_DIR right?")
+    endif()
+endfunction()
+
 function(_stage_bin top kind dir)
     _stage_common("${top}")
     file(MAKE_DIRECTORY "${STAGE}/${top}/lib" "${STAGE}/${top}/bin")
     if(kind STREQUAL "linux")
         file(GLOB _libs "${dir}/libbvnr.a" "${dir}/libbvnr.so*")
-        file(COPY ${_libs} DESTINATION "${STAGE}/${top}/lib")
-        if(EXISTS "${dir}/bovnar")
-            file(COPY "${dir}/bovnar" DESTINATION "${STAGE}/${top}/bin")
-        endif()
+        set(_exe "${dir}/bovnar")
     elseif(kind STREQUAL "msvc")
         # Runtime (.dll, .exe) under bin/; import + static libs under lib/.
         file(GLOB _dll "${dir}/bvnr.dll")
-        file(GLOB _imp "${dir}/bvnr.lib" "${dir}/bvnr_static.lib")
-        file(COPY ${_imp} DESTINATION "${STAGE}/${top}/lib")
-        file(COPY ${_dll} DESTINATION "${STAGE}/${top}/bin")
-        if(EXISTS "${dir}/bovnar.exe")
-            file(COPY "${dir}/bovnar.exe" DESTINATION "${STAGE}/${top}/bin")
-        endif()
+        file(GLOB _libs "${dir}/bvnr.lib" "${dir}/bvnr_static.lib")
+        set(_exe "${dir}/bovnar.exe")
     elseif(kind STREQUAL "mingw")
         # Runtime (.dll, .exe) under bin/; import + static libs under lib/.
         file(GLOB _dll "${dir}/libbvnr.dll")
-        file(GLOB _imp "${dir}/libbvnr.dll.a" "${dir}/libbvnr.a")
-        file(COPY ${_imp} DESTINATION "${STAGE}/${top}/lib")
-        file(COPY ${_dll} DESTINATION "${STAGE}/${top}/bin")
-        if(EXISTS "${dir}/bovnar.exe")
-            file(COPY "${dir}/bovnar.exe" DESTINATION "${STAGE}/${top}/bin")
-        endif()
+        file(GLOB _libs "${dir}/libbvnr.dll.a" "${dir}/libbvnr.a")
+        set(_exe "${dir}/bovnar.exe")
+    else()
+        message(FATAL_ERROR "pack_artifacts: unknown kind '${kind}'")
     endif()
+    _bvnr_require("library in ${dir}" "${_libs}")
+    file(COPY ${_libs} DESTINATION "${STAGE}/${top}/lib")
+    if(NOT kind STREQUAL "linux")
+        _bvnr_require("DLL in ${dir}" "${_dll}")
+        file(COPY ${_dll} DESTINATION "${STAGE}/${top}/bin")
+    endif()
+    if(NOT EXISTS "${_exe}")
+        message(FATAL_ERROR "pack_artifacts: ${_exe} not found for ${top}")
+    endif()
+    file(COPY "${_exe}" DESTINATION "${STAGE}/${top}/bin")
 endfunction()
 
 # --- 1) amalgamation: regenerate into BIN_DIR/amalgamate, then pack ---------
@@ -165,13 +183,13 @@ endif()
 # by renaming the file, so the msvc and mingw assets of one release unpacked
 # onto each other -- import libraries of one ABI beside the DLL of the other.
 if(NATIVE_KIND STREQUAL "linux")
-    _stage_bin("bovnar-linux-${TAG}" linux "${BIN_DIR}")
+    _stage_bin("bovnar-linux-${TAG}" linux "${ARTIFACT_DIR}")
     _pack("bovnar-linux-${TAG}" xz)
 elseif(NATIVE_KIND STREQUAL "msvc")
-    _stage_bin("bovnar-windows-msvc-${TAG}" msvc "${BIN_DIR}")
+    _stage_bin("bovnar-windows-msvc-${TAG}" msvc "${ARTIFACT_DIR}")
     _pack("bovnar-windows-msvc-${TAG}" zip)
 elseif(NATIVE_KIND STREQUAL "mingw")
-    _stage_bin("bovnar-windows-mingw-${TAG}" mingw "${BIN_DIR}")
+    _stage_bin("bovnar-windows-mingw-${TAG}" mingw "${ARTIFACT_DIR}")
     _pack("bovnar-windows-mingw-${TAG}" zip)
 endif()
 

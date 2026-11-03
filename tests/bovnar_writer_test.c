@@ -2731,6 +2731,206 @@ static void test_writer_review_2026_11(void)
 }
 
 /*
+ * The second 2026-11-03 review: what the writer still wrote and the reader
+ * refused. Each emitted document is read back, and a refusal must leave the
+ * output untouched or a readable document.
+ */
+static bool rv2_reads(const char *out, uint64_t n)
+{
+	bvnr_read_flags_t rf;
+	memset(&rf, 0, sizeof rf);
+	bvnr_reader_t *r = bvnr_reader_create();
+	bool ok = r && bvnr_open_read_mem(r, out, n, NULL, 0, &rf) && bvnr_read(r);
+	bvnr_reader_destroy(r);
+	return ok;
+}
+/* One annotated value, written as events: `<family:width,_base> text`. */
+static bool rv2_write_value(char *out, size_t cap, uint64_t *n,
+			    value_type_spec_t vt, token_type_t tt,
+			    const char *text)
+{
+	bvnr_writer_t *w = bvnr_writer_create();
+	bvnr_open_write_mem(w, out, cap, false, NULL);
+	bvnr_data_t d;
+	memset(&d, 0, sizeof d);
+	bool ok = bvnr_write_event(w, ev_stream_start, &d);
+	d.type = token_is_identifier; d.data = "a"; d.length = 1;
+	ok = ok && bvnr_write_event(w, ev_assignment_start, &d);
+	/* The annotation, so the value is read in the base it is written in. */
+	memset(&d, 0, sizeof d);
+	d.type = token_is_type; d.value_type = vt;
+	ok = ok && bvnr_write_event(w, ev_type_annotation_start, &d) &&
+	     bvnr_write_event(w, ev_type_annotation_type_family, &d);
+	if (vt.width) {
+		d.type = token_is_type_width;
+		ok = ok && bvnr_write_event(w, ev_type_annotation_type_family_parameter, &d);
+	}
+	if (vt.base) {
+		d.type = token_is_type_base;
+		ok = ok && bvnr_write_event(w, ev_type_annotation_type_family_parameter, &d);
+	}
+	d.type = token_is_type;
+	ok = ok && bvnr_write_event(w, ev_type_annotation_end, &d);
+	memset(&d, 0, sizeof d);
+	d.type = tt; d.value_type = vt;
+	d.data = text; d.length = (uint32_t)strlen(text);
+	ok = ok && bvnr_write_event(w, ev_data, &d) && bvnr_write_finish(w);
+	*n = bvnr_writer_bytes_written(w);
+	bvnr_writer_destroy(w);
+	return ok;
+}
+static bool rv_pipe(void *ud, bvnr_event_t ev, bvnr_data_t *d);
+/* Read `doc` and write it under the canonical flags into out; bytes or -1. */
+static int64_t rv2_canon(const char *doc, uint8_t *out, size_t cap)
+{
+	bvnr_writer_t *w = r4_open(out, cap, BVN_UNIT_REDUCE | BVN_NUM_CANONICAL,
+				   false);
+	if (!w) return -1;
+	bvnr_reader_t *r = bvnr_reader_create();
+	bvnr_read_flags_t rf;
+	memset(&rf, 0, sizeof rf);
+	rf.on_verified = rv_pipe;
+	rf.userdata    = w;
+	bool ok = r && bvnr_open_read_mem(r, doc, strlen(doc), NULL, 0, &rf) &&
+		  bvnr_read(r) && bvnr_write_finish(w);
+	int64_t n = ok ? (int64_t)bvnr_writer_bytes_written(w) : -1;
+	bvnr_reader_destroy(r);
+	bvnr_writer_destroy(w);
+	return n;
+}
+/* BVN_NUM_CANONICAL writes an annotation in one form: equivalent spellings of
+ * one typed value -- an inline unit the reader annotates <...,_10,...>, an
+ * unannotated value it annotates <...,_10,no_unit>, an implicit width --
+ * produce the same bytes. */
+static void test_canonical_annotation_form(void)
+{
+	static const char *const groups[][3] = {
+		{ ".a = 1.0 km;", ".a = <float:64,k~m> 1.0;",
+		  ".a = <float:64,_10,k~m> 1.0;" },
+		{ ".a = 5;", ".a = <uint> 5;", ".a = <uint:64,_10,no_unit> 5;" },
+		{ ".a = 1.5;", ".a = <float> 1.5;", ".a = <float:64,no_unit> 1.5;" },
+	};
+	/* r4_open writes compact output. */
+	static const char *const want[] = {
+		".a=<float:64,m>1000.0;", ".a=<uint:64>5;", ".a=<float:64>1.5;",
+	};
+	for (size_t g = 0; g < sizeof groups / sizeof *groups; g++) {
+		for (size_t k = 0; k < 3; k++) {
+			uint8_t out[512];
+			int64_t n = rv2_canon(groups[g][k], out, sizeof out);
+			char msg[128];
+			snprintf(msg, sizeof msg, "canonical '%s' is '%s'",
+				 groups[g][k], want[g]);
+			ASSERT_TRUE(n > 0 && strstr((const char *)out, want[g]) != NULL,
+				    msg);
+			if (n > 0 && !strstr((const char *)out, want[g]))
+				fprintf(stderr, "    got: %s\n", (const char *)out);
+		}
+	}
+	/* A base that is not the default stays. */
+	uint8_t out[512];
+	int64_t n = rv2_canon(".a = <uint:8,_16> \"ff\";", out, sizeof out);
+	ASSERT_TRUE(n > 0 && strstr((const char *)out, "<uint:8,_16>") != NULL,
+		    "canonical keeps a non-default base");
+}
+static void test_writer_review_2026_11b(void)
+{
+	char out[8192];
+	uint64_t n;
+
+	/* "#!bovnar 1.0" declares no 1.1 construct: the datetime and "[N]"
+	 * reference gates tested only that SOME directive had been written. */
+	bvnr_writer_t *w = bvnr_writer_create();
+	bvnr_open_write_mem(w, out, sizeof out, false, NULL);
+	ASSERT_TRUE(bvnr_write_version(w, 1, 0), "a 1.0 directive is written");
+	ASSERT_FALSE(bvnr_write_datetime(w, "a", 64, NULL, 5),
+		     "a datetime under #!bovnar 1.0 is refused");
+	ASSERT_EQ_INT((int)bvnr_writer_get_error(w),
+		      (int)error_unsupported_spec_version,
+		      "...as error_unsupported_spec_version");
+	bvnr_writer_destroy(w);
+	w = bvnr_writer_create();
+	bvnr_open_write_mem(w, out, sizeof out, false, NULL);
+	ASSERT_TRUE(bvnr_write_version(w, 1, 1), "a 1.1 directive is written");
+	ASSERT_TRUE(bvnr_write_datetime(w, "a", 64, NULL, 5),
+		    "a datetime under #!bovnar 1.1 is written");
+	ASSERT_TRUE(bvnr_write_finish(w), "and finished");
+	n = bvnr_writer_bytes_written(w);
+	ASSERT_TRUE(rv2_reads(out, n), "and read back");
+	bvnr_writer_destroy(w);
+
+	/* Bare tokens the reader does not read as the number they spell. */
+	static const struct { uint32_t fam, width, base; const char *text; } bad[] = {
+		{ vt_uint, 64, 8,  "+5"  },   /* no '+' on a bare literal, any base */
+		{ vt_uint, 8,  2,  "+0"  },
+		{ vt_sint, 64, 16, "+5"  },
+		{ vt_uint, 64, 85, "1.0" },   /* '.' is a digit, the token a float  */
+		{ vt_uint, 64, 85, ".5"  },
+		{ vt_uint, 64, 85, "-0.0"},
+		{ vt_uint, 64, 85, "0.1e1"},
+		{ vt_uint, 8,  0,  ""    },   /* an empty token reads as a null     */
+		{ vt_float,64, 0,  ""    },
+	};
+	for (size_t i = 0; i < sizeof bad / sizeof *bad; i++) {
+		value_type_spec_t vt = { .family = (value_type_family_t)bad[i].fam,
+					 .width = bad[i].width, .base = bad[i].base };
+		char msg[96];
+		snprintf(msg, sizeof msg, "bare '%s' in base %u is refused",
+			 bad[i].text, bad[i].base);
+		ASSERT_FALSE(rv2_write_value(out, sizeof out, &n, vt,
+					     token_is_number, bad[i].text), msg);
+	}
+	/* ...while the ones that do lex still go out bare and read back. */
+	static const struct { uint32_t fam, width, base; const char *text; } good[] = {
+		{ vt_uint, 64, 16, "1e3" },   /* 'e' is a hex digit                */
+		{ vt_sint, 64, 8,  "-5"  },
+		{ vt_uint, 64, 85, "10"  },
+	};
+	for (size_t i = 0; i < sizeof good / sizeof *good; i++) {
+		value_type_spec_t vt = { .family = (value_type_family_t)good[i].fam,
+					 .width = good[i].width, .base = good[i].base };
+		char msg[96];
+		snprintf(msg, sizeof msg, "bare '%s' in base %u is written and read",
+			 good[i].text, good[i].base);
+		ASSERT_TRUE(rv2_write_value(out, sizeof out, &n, vt,
+					    token_is_number, good[i].text) &&
+			    rv2_reads(out, n), msg);
+	}
+	/* An empty string under a numeric annotation is not a number either. */
+	{
+		value_type_spec_t vt = { .family = vt_uint, .width = 8 };
+		ASSERT_FALSE(rv2_write_value(out, sizeof out, &n, vt,
+					     token_is_string, ""),
+			     "<uint:8> \"\" is refused");
+	}
+
+	/* A bvn_float_t more precise than the width it is written at: legal (the
+	 * excess is the reader's to round), and the buffer used to be sized by
+	 * the width, so the call failed and left ".a=" behind. */
+	bvn_float_t *f = bvn_float_alloc(256);
+	ASSERT_TRUE(f != NULL, "bvn_float_alloc(256)");
+	if (f) {
+		bvn_float_from_str(f, "0.3333333333333333333333333333333333333333333", 10);
+		static const uint32_t widths[] = { 16, 32, 64 };
+		for (size_t k = 0; k < sizeof widths / sizeof *widths; k++) {
+			uint32_t width = widths[k];
+			w = bvnr_writer_create();
+			bvnr_open_write_mem(w, out, sizeof out, false, NULL);
+			char msg[96];
+			snprintf(msg, sizeof msg, "256-bit 1/3 at width %u is written",
+				 width);
+			ASSERT_TRUE(bvnr_write_bvnf_base(w, "a", f, width, 10) &&
+				    bvnr_write_finish(w), msg);
+			n = bvnr_writer_bytes_written(w);
+			snprintf(msg, sizeof msg, "...and read back (width %u)", width);
+			ASSERT_TRUE(rv2_reads(out, n), msg);
+			bvnr_writer_destroy(w);
+		}
+		bvn_float_free(f);
+	}
+}
+
+/*
  * The 2026-11-03 whole-project review: five places where the writer and the
  * reader disagreed about what a document is, and the helpers' double rounding.
  */
@@ -2940,27 +3140,28 @@ static void test_writer_refuses_unreadable_output(void)
 		bvnr_writer_destroy(w);
 	}
 
-	/* A writer whose open failed has no sink. Events still "succeed" because
-	 * they only fill the internal buffer, so checking their return value does
-	 * not save the caller — the first flush used to jump through a NULL
-	 * function pointer. */
+	/* A writer whose open failed has no sink. The first flush used to jump
+	 * through a NULL function pointer; then events "succeeded" by filling the
+	 * internal buffer and failed only at the first flush, 64 KiB or the finish
+	 * later. The first event is refused now, and so is the version. */
 	{
 		bvnr_writer_t *w = bvnr_writer_create();
 		ASSERT_FALSE(bvnr_open_write_mem(w, NULL, 0, false, NULL),
 			     "opening with no buffer fails");
 		bvnr_data_t d;
 		memset(&d, 0, sizeof d);
-		bvnr_write_event(w, ev_stream_start, &d);
-		d.type = token_is_identifier; d.data = "key"; d.length = 3;
-		bvnr_write_event(w, ev_assignment_start, &d);
-		memset(&d, 0, sizeof d);
-		d.type = token_is_number;
-		d.value_type = (value_type_spec_t){ .family = vt_uint, .width = 64 };
-		d.data = "42"; d.length = 2;
-		bvnr_write_event(w, ev_data, &d);
+		ASSERT_FALSE(bvnr_write_event(w, ev_stream_start, &d),
+			     "the first event to a sinkless writer is refused");
+		ASSERT_EQ_INT((int)bvnr_writer_get_error(w), (int)error_invalid_argument,
+			      "...as error_invalid_argument");
 		ASSERT_FALSE(bvnr_write_finish(w), "finishing a sinkless writer fails");
-		ASSERT_EQ_INT((int)bvnr_writer_get_error(w), (int)error_writing_to_sink,
-			      "...and says why, rather than crashing");
+		bvnr_writer_destroy(w);
+
+		w = bvnr_writer_create();
+		ASSERT_FALSE(bvnr_write_version(w, 1, 2),
+			     "a version on a never-opened writer is refused");
+		ASSERT_FALSE(bvnr_write_uint(w, "a", 8, 1),
+			     "and so is a helper");
 		bvnr_writer_destroy(w);
 	}
 }
@@ -3265,6 +3466,8 @@ int main(void)
 	test_writer_refuses_unreadable_output();
 	test_writer_review_2026_11();
 	test_writer_review_2026_11_whole();
+	test_writer_review_2026_11b();
+	test_canonical_annotation_form();
 	test_every_unit_writer_round_trips();
 	test_writer_event_grammar();
 	test_writer_accepts_only_readable_streams();

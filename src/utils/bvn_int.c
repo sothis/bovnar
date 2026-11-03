@@ -378,6 +378,7 @@ bool bvn_int_to_int64(const bvn_int_t *n, int64_t *out)
 bool bvn_int_to_uint32(const bvn_int_t *n, uint32_t *out)
 {
 	uint64_t v;
+	if (!out) return false;   /* bvn_int.h: a NULL argument reports failure */
 	if (!bvn_int_to_uint64(n, &v)) return false;
 	if (v > (uint64_t)UINT32_MAX)  return false;
 	*out = (uint32_t)v;
@@ -386,6 +387,7 @@ bool bvn_int_to_uint32(const bvn_int_t *n, uint32_t *out)
 bool bvn_int_to_int32(const bvn_int_t *n, int32_t *out)
 {
 	int64_t v;
+	if (!out) return false;   /* bvn_int.h: a NULL argument reports failure */
 	if (!bvn_int_to_int64(n, &v)) return false;
 	if (v < (int64_t)INT32_MIN || v > (int64_t)INT32_MAX) return false;
 	*out = (int32_t)v;
@@ -394,6 +396,7 @@ bool bvn_int_to_int32(const bvn_int_t *n, int32_t *out)
 bool bvn_int_to_uint16(const bvn_int_t *n, uint16_t *out)
 {
 	uint64_t v;
+	if (!out) return false;   /* bvn_int.h: a NULL argument reports failure */
 	if (!bvn_int_to_uint64(n, &v)) return false;
 	if (v > (uint64_t)UINT16_MAX)  return false;
 	*out = (uint16_t)v;
@@ -402,6 +405,7 @@ bool bvn_int_to_uint16(const bvn_int_t *n, uint16_t *out)
 bool bvn_int_to_int16(const bvn_int_t *n, int16_t *out)
 {
 	int64_t v;
+	if (!out) return false;   /* bvn_int.h: a NULL argument reports failure */
 	if (!bvn_int_to_int64(n, &v)) return false;
 	if (v < (int64_t)INT16_MIN || v > (int64_t)INT16_MAX) return false;
 	*out = (int16_t)v;
@@ -410,6 +414,7 @@ bool bvn_int_to_int16(const bvn_int_t *n, int16_t *out)
 bool bvn_int_to_uint8(const bvn_int_t *n, uint8_t *out)
 {
 	uint64_t v;
+	if (!out) return false;   /* bvn_int.h: a NULL argument reports failure */
 	if (!bvn_int_to_uint64(n, &v)) return false;
 	if (v > (uint64_t)UINT8_MAX)   return false;
 	*out = (uint8_t)v;
@@ -418,6 +423,7 @@ bool bvn_int_to_uint8(const bvn_int_t *n, uint8_t *out)
 bool bvn_int_to_int8(const bvn_int_t *n, int8_t *out)
 {
 	int64_t v;
+	if (!out) return false;   /* bvn_int.h: a NULL argument reports failure */
 	if (!bvn_int_to_int64(n, &v)) return false;
 	if (v < (int64_t)INT8_MIN || v > (int64_t)INT8_MAX) return false;
 	*out = (int8_t)v;

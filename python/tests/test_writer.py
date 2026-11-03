@@ -1119,3 +1119,51 @@ class TestSignedHighBaseRefusedByName:
         w = Writer.to_mem(pretty=False)
         with pytest.raises(BovnarArgumentError, match='unsigned'):
             w.write_bvni('a', -255, base=base)
+
+
+@needs_lib
+class TestWriteVersionDefault:
+    """write_version() defaulted to 1.1 in a spec-1.2 library, so it disagreed
+    with emit_version=True and a profile unit written after it was refused."""
+
+    def test_default_is_the_build_spec_version(self):
+        w = Writer.to_mem()
+        w.write_version()
+        w.write_null("a")
+        w.finish()
+        maj, mn = bovnar.spec_version()
+        assert w.get_output().startswith(f"#!bovnar {maj}.{mn}\n".encode())
+
+    def test_default_agrees_with_emit_version(self):
+        w1 = Writer.to_mem()
+        w1.write_version()
+        w1.write_null("a")
+        w1.finish()
+        w2 = Writer.to_mem(emit_version=True)
+        w2.write_null("a")
+        w2.finish()
+        assert w1.get_output() == w2.get_output()
+
+    def test_explicit_version_still_works(self):
+        w = Writer.to_mem()
+        w.write_version(1, 1)
+        w.write_null("a")
+        w.finish()
+        assert w.get_output().startswith(b"#!bovnar 1.1\n")
+
+    def test_one_of_two_is_refused(self):
+        w = Writer.to_mem()
+        with pytest.raises(BovnarArgumentError, match="both major and minor"):
+            w.write_version(1)
+        with pytest.raises(BovnarArgumentError, match="both major and minor"):
+            w.write_version(minor=2)
+        w.destroy()
+
+    def test_a_profile_unit_after_the_default_directive(self):
+        w = Writer.to_mem()
+        w.write_version()
+        w.write_float("a", 1.0, unit_str="ucum:[IU]")
+        w.finish()
+        out = w.get_output()
+        assert b"ucum:[IU]" in out
+        assert bovnar.loads(out)["a"] == 1.0

@@ -119,6 +119,10 @@ BVN_API int  bvn_int_bitlen(const bvn_int_t *n);
 BVN_API int  bvn_int_getbit(const bvn_int_t *n, int i);
 BVN_API bool bvn_int_setbit(bvn_int_t *n, int i);
 BVN_API int  bvn_int_cmp(const bvn_int_t *a, const bvn_int_t *b);
+/* MAGNITUDE subtraction, unlike bvn_int_add/bvn_int_mul: |a| -= |b|, and a
+ * keeps its own sign; b's sign is ignored. Requires |a| >= |b| -- otherwise it
+ * returns false and a is garbage. For signed subtraction negate b and use
+ * bvn_int_add. */
 BVN_API bool bvn_int_sub_inplace(bvn_int_t *a, const bvn_int_t *b);
 BVN_API bool bvn_int_divrem(bvn_int_t *q, bvn_int_t *r,
 					const bvn_int_t *a, const bvn_int_t *b);

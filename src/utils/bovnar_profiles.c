@@ -172,26 +172,20 @@ typedef struct {
 	const char*             mul;
 	bool                    caret_exp;
 	/*
-	 * A substring whose presence anywhere in a code refuses it outright, as
-	 * "known and not carryable" rather than "not a code", or NULL.
+	 * Does this vocabulary have UDUNITS' SHIFT operator? If so, a code that
+	 * contains one is refused outright, as "known and not carryable" rather
+	 * than "not a code" -- see has_shift.
 	 *
-	 * This exists for UDUNITS' reference-time construct, "<unit> since
-	 * <timestamp>". The construct cannot be caught as an ATOM: it is three
-	 * tokens in UDUNITS and one string here, so there is nothing to look up.
-	 * The outcome must be error_unit_profile_unsupported rather than
-	 * error_unit_illegal, because a producer who writes it has written valid
-	 * UDUNITS and deserves to be told bovnar cannot carry it -- not that they
-	 * made a typo.
-	 *
-	 * Note what it can and cannot reach since the lexer stopped deleting
-	 * whitespace inside a type annotation. The spelling UDUNITS actually uses,
-	 * "days since 1970-01-01", now fails one layer earlier as
-	 * error_type_param_whitespace and never arrives here; what this test still
-	 * catches is the concatenated "dayssince1970-01-01", which is the form a
-	 * producer reaches for after being told the spaces are illegal, and the form
-	 * that must not come back as "not a code".
+	 * This exists for the reference-time construct, "<unit> since
+	 * <timestamp>", and the offset construct, "K @ 273.15". Neither can be
+	 * caught as an ATOM: the operator is a keyword between two operands, and
+	 * the operand after it is a timestamp or a number, not a unit. The outcome
+	 * must be error_unit_profile_unsupported rather than error_unit_illegal,
+	 * because a producer who writes it has written valid UDUNITS and deserves
+	 * to be told bovnar cannot carry it -- not that they made a typo (doc/11
+	 * section 3.1, and section 13.4 for why it cannot be carried).
 	 */
-	const char*             refuse_substr;
+	bool                    shift_ops;
 	/* Does this vocabulary have UCUM's "{...}" annotations? They carry no
 	 * meaning, but they are UCUM syntax and admitting them everywhere would let
 	 * a UDUNITS code that is simply wrong look like a valid annotated one. */
@@ -201,17 +195,69 @@ typedef struct {
 	bool                    binary_pfx;
 } bvn_profile_t;
 
-/* Does `s` contain `needle`? Plain scan: the strings are at most 255 bytes and
- * this runs once per profile parse, on a path that is about to do far more
- * work. */
-static bool contains(const char* s, uint32_t len, const char* needle)
+/* An ASCII letter or '_', the bytes UDUNITS' scanner lets an identifier end
+ * in ({letter} in lib/scanner.l; its Latin-1 and UTF-8 letters are not in the
+ * profile's tables, so no code can continue with one). */
+static bool ud_letter(char c)
 {
-	size_t n = strlen(needle);
-	if (n == 0 || (size_t)len < n)
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+}
+
+/* Does s[i..) start with `word` (lower case), in either case? */
+static bool ud_word_at(const char* s, uint32_t len, uint32_t i,
+                       const char* word)
+{
+	size_t n = strlen(word);
+	if ((size_t)(len - i) < n)
 		return false;
-	for (uint32_t i = 0; i + n <= len; i++) {
-		if (memcmp(s + i, needle, n) == 0)
+	for (size_t k = 0; k < n; k++) {
+		char c = s[i + k];
+		if (c >= 'A' && c <= 'Z')
+			c = (char)(c - 'A' + 'a');
+		if (c != word[k])
+			return false;
+	}
+	return true;
+}
+
+/*
+ * Does the code contain a UDUNITS SHIFT operator? lib/scanner.l spells it
+ *
+ *     {space}*(@|{after}|{from}|{ref}|{since}){space}*
+ *
+ * with each keyword case-insensitive ([Ss][Ii][Nn][Cc][Ee]). A keyword is the
+ * operator only where the scanner would not read it as part of a longer
+ * identifier: an identifier is a letter, then letters and digits, ending in a
+ * letter, so the byte before the keyword must not be a letter or a digit and
+ * the byte after it must not be a letter. "ton_of_refrigeration" and
+ * "refrigeration_ton" hold "ref" and are names; "days since 1970-01-01",
+ * "hours SINCE 2000-01-01", "K from 273.15" and "K @ 273.15" are shifts.
+ *
+ * "since" alone is also caught run together with its operands, as
+ * "dayssince1970-01-01". That is not UDUNITS -- its scanner reads one unknown
+ * name -- but it is plainly the reference-time construct with the spaces
+ * taken out, which is the form the lexer used to deliver, and no UDUNITS name
+ * contains "since", so answering "cannot carry" rather than "not a code" costs
+ * nothing (conformance case UPR-043b). The other keywords are not: "ref" and
+ * "from" sit inside real names.
+ *
+ * Plain scans: a code is at most 255 bytes.
+ */
+static bool has_shift(const char* s, uint32_t len)
+{
+	static const char* const kw[] = { "after", "from", "ref", "since" };
+	for (uint32_t i = 0; i < len; i++) {
+		if (s[i] == '@' || ud_word_at(s, len, i, "since"))
 			return true;
+		if (i > 0 && (ud_letter(s[i - 1]) ||
+		              (s[i - 1] >= '0' && s[i - 1] <= '9')))
+			continue;
+		for (size_t k = 0; k < sizeof(kw) / sizeof(kw[0]); k++) {
+			size_t n = strlen(kw[k]);
+			if (ud_word_at(s, len, i, kw[k]) &&
+			    (i + n == len || !ud_letter(s[i + n])))
+				return true;
+		}
 	}
 	return false;
 }
@@ -413,62 +459,58 @@ static const bvn_profile_t bvn_profiles[] = {
 	{ "ucum", 4, bvn_prof_grammar_expr,
 	  ucum_pfx_table, ucum_atom_table, ucum_unsup_table, ucum_rev_table,
 	  BVN_PROFILE_UCUM_OPAQUE_FIRST, BVN_PROFILE_UCUM_OPAQUE_LAST,
-	  "", false, NULL, true, true },
+	  "", false, false, true, true },
 #endif
 #if BVNR_WITH_UNECE_PROFILE
 	{ "unece", 5, bvn_prof_grammar_flat,
 	  NULL, unece_atom_table, unece_unsup_table, unece_rev_table,
 	  BVN_PROFILE_UNECE_OPAQUE_FIRST, BVN_PROFILE_UNECE_OPAQUE_LAST,
-	  NULL, false, NULL, false, false },
+	  NULL, false, false, false, false },
 #endif
 #if BVNR_WITH_QUDT_PROFILE
 	{ "qudt", 4, bvn_prof_grammar_flat,
 	  NULL, qudt_atom_table, qudt_unsup_table, qudt_rev_table,
 	  BVN_PROFILE_QUDT_OPAQUE_FIRST, BVN_PROFILE_QUDT_OPAQUE_LAST,
-	  NULL, false, NULL, false, false },
+	  NULL, false, false, false, false },
 #endif
 #if BVNR_WITH_QUDT_QK_PROFILE
 	{ "qudt-qk", 7, bvn_prof_grammar_flat,
 	  NULL, qudt_qk_atom_table, qudt_qk_unsup_table, qudt_qk_rev_table,
 	  BVN_PROFILE_QUDT_QK_OPAQUE_FIRST, BVN_PROFILE_QUDT_QK_OPAQUE_LAST,
-	  NULL, false, NULL, false, false },
+	  NULL, false, false, false, false },
 #endif
 	/*
-	 * '*' multiplies beside '.', and '^' introduces an exponent, so "kg*m-2"
-	 * and "m^2" parse.
+	 * '*' and ' ' multiply beside '.', and '^' introduces an exponent, so
+	 * "kg*m-2", "kg m-2 s-1" and "m^2" parse.
 	 *
-	 * SPACE IS NOT IN THIS SET, although UDUNITS itself multiplies with it and
-	 * CF's commonest spelling is "kg m-2 s-1". A space cannot reach this parser
-	 * at all: the lexer now refuses whitespace inside a type parameter
-	 * (error_type_param_whitespace), so "m s-1" is a parse error rather than the
-	 * "ms-1" -- reciprocal milliseconds -- it used to silently become. Adding
-	 * ' ' here would mean admitting the space-separated form into the type
-	 * grammar, which is a different and much larger decision than a
-	 * multiplication character; until it is made, a producer writes
-	 * "kg*m-2*s-1" or "kg.m-2.s-1", both of which UDUNITS also accepts. Section
-	 * 13.2 of doc/11_bovnar_unit_profiles.md records why.
+	 * The space reaches this parser because the lexer carries whitespace inside
+	 * a NAMESPACED type parameter in verbatim (spec section 5.3); it used to
+	 * delete it, which turned "m s-1" into "ms-1", reciprocal milliseconds. As
+	 * in UDUNITS' scanner a run of spaces is one operator, and spaces around
+	 * '/' or around the word "per" make a division (see parse_expr). Section
+	 * 13.2 of doc/11_bovnar_unit_profiles.md records the boundary.
 	 */
 #if BVNR_WITH_UDUNITS_PROFILE
 	{ "udunits", 7, bvn_prof_grammar_expr,
 	  udunits_pfx_table, udunits_atom_table, udunits_unsup_table,
 	  udunits_rev_table,
 	  BVN_PROFILE_UDUNITS_OPAQUE_FIRST, BVN_PROFILE_UDUNITS_OPAQUE_LAST,
-	  "* ", true, "since", false, false },
+	  "* ", true, true, false, false },
 #endif
 #if BVNR_WITH_OM_PROFILE
 	{ "om", 2, bvn_prof_grammar_flat,
 	  NULL, om_atom_table, om_unsup_table, om_rev_table,
 	  BVN_PROFILE_OM_OPAQUE_FIRST, BVN_PROFILE_OM_OPAQUE_LAST,
-	  NULL, false, NULL, false, false },
+	  NULL, false, false, false, false },
 #endif
 #if BVNR_WITH_CF_PROFILE
 	{ "cf", 2, bvn_prof_grammar_flat,
 	  NULL, cf_atom_table, cf_unsup_table, cf_rev_table,
 	  BVN_PROFILE_CF_OPAQUE_FIRST, BVN_PROFILE_CF_OPAQUE_LAST,
-	  NULL, false, NULL, false, false },
+	  NULL, false, false, false, false },
 #endif
 	{ NULL, 0, bvn_prof_grammar_flat, NULL, NULL, NULL, NULL, 0, -1,
-	  NULL, false, NULL, false, false },
+	  NULL, false, false, false, false },
 };
 #define BVN_PROFILE_COUNT \
 	(sizeof(bvn_profiles) / sizeof(bvn_profiles[0]))
@@ -1246,6 +1288,31 @@ static bool parse_expr(const bvn_profile_t* p, const char* s, uint32_t len,
 		}
 		if (i >= len)
 			break;
+		if (s[i] == ' ' && is_mul(p, ' ')) {
+			/*
+			 * UDUNITS' scanner: MULTIPLY is {space}+, and DIVIDE is
+			 * {space}+[Pp][Ee][Rr]{space}+ or {space}*"/"{space}*. So a run of
+			 * spaces is ONE operator, and it is a division when what follows the
+			 * run is a '/' or the word "per" with a space after it ("m perch" is
+			 * a metre times a perch).
+			 */
+			while (i < len && s[i] == ' ')
+				i++;
+			if (i < len && s[i] == '/') {
+				sign = -1;
+				i++;
+			} else if (ud_word_at(s, len, i, "per") && i + 3 < len &&
+			           s[i + 3] == ' ') {
+				sign = -1;
+				i += 3;
+			} else {
+				sign = 1;
+				continue;               /* the run was the operator */
+			}
+			while (i < len && s[i] == ' ')
+				i++;
+			continue;
+		}
 		if (is_mul(p, s[i]))  sign =  1;
 		else if (s[i] == '/') sign = -1;
 		else {
@@ -1253,6 +1320,10 @@ static bool parse_expr(const bvn_profile_t* p, const char* s, uint32_t len,
 			return false;
 		}
 		i++;
+		if (sign < 0 && is_mul(p, ' ')) {
+			while (i < len && s[i] == ' ')   /* "m/ s" */
+				i++;
+		}
 	}
 	return true;
 }
@@ -1305,7 +1376,7 @@ value_unit_t bvni_parse_profile_unit(const char* s, uint32_t len,
 		*status = bvni_profile_illegal;
 		return none;
 	}
-	if (p->refuse_substr && contains(code, clen, p->refuse_substr)) {
+	if (p->shift_ops && has_shift(code, clen)) {
 		*status = bvni_profile_unsupported;
 		return none;
 	}

@@ -7,8 +7,9 @@
 Pure-`ctypes` Python bindings for the **Bovnar (BVNR)** typed serialisation
 library (library 2.0.0, format spec 1.2).
 
-No compiled extension module is needed — the bindings load `libbvnr.so` at
-import time via the standard `ctypes.CDLL` machinery.
+No compiled extension module is needed — the bindings load `libbvnr.so`
+through the standard `ctypes.CDLL` machinery the first time something needs
+the C library; `import bovnar` itself never loads it.
 
 ---
 
@@ -154,8 +155,11 @@ The bindings search for `libbvnr.so` in this order:
    `.` (resolved relative to the `_ffi.py` file; useful when building Bovnar
    alongside the bindings from a mono-repo).
 
-If the library cannot be found a `BovnarLibraryNotFound` exception is raised
-with the list of searched paths.
+The search runs on first use, not at import: `import bovnar` succeeds without
+the library, and the first call that needs it (`loads`, `Reader()`,
+`parse_unit`, …) raises `BovnarLibraryNotFound` if none of the candidates
+loads. The message lists every candidate tried, in order, with why each one
+failed (`not found`, or the loader's error).
 
 ---
 
@@ -290,7 +294,15 @@ with Reader() as r:
 ```python
 import bovnar
 
-doc = bovnar.dom_parse(bvnr_bytes)
+dom_bytes = b"""
+.sensor_id = <uint:64> 42;
+.config = {
+    .host = "localhost";
+    .port = <uint:16> 8080;
+};
+.values = [1.5, 2.5, 4.0];
+"""
+doc = bovnar.dom_parse(dom_bytes)
 
 # Top-level key lookup
 node = doc["sensor_id"]
@@ -300,14 +312,16 @@ print(node.value_type)      # ValueTypeSpec(family=UINT, width=64, base=0)
 # Struct traversal
 cfg = doc["config"]
 host = cfg["host"].as_str()
+host                        # → "localhost"
 
 # Array access
 arr = doc["values"]
 for i in range(len(arr)):
-    print(arr[i].as_float())
+    print(arr[i].as_float())    # 1.5, 2.5, 4.0
 
 # Convert entire document to a plain Python dict (drops type/unit info)
 d = doc.to_dict()
+d["config"]["port"]         # → 8080
 ```
 
 ### 4.5 Low-level writer
@@ -526,7 +540,9 @@ The same flags configure a **writer**: `Writer.to_mem(unit_flags=UnitFlags.REDUC
 (and `to_fd` / `to_file`) rewrites each unit as it is written *and* rescales the
 value with it — `2.5 k~g` goes out as `<float:64,g> 2500`. `NUM_CANONICAL` is
 meaningful only there: it appends `.0` to a rescaled float that came out as an
-integer string, so the canonical document mode lands on one spelling.
+integer string, and writes each annotation in one form (the width written out,
+a default `_10` base and `no_unit` left out), so the canonical document mode
+lands on one spelling.
 
 > **`UnitFlags.REDUCE` returns the reduced unit, not a rescaled value.** Reduction
 > folds every prefix out, so `unit_to_str_ex(parse_unit("k~g"), UnitFlags.REDUCE)`
@@ -845,7 +861,11 @@ Quantity.from_number(Fraction(837, 256),
 
 It accepts a `Decimal`, `Fraction` (must be a terminating decimal), `int`,
 `str` (a verbatim literal), or `float` (only as precise as the double), and
-validates the width for the chosen family. For `float_dec` it also refuses a
+validates the width for the chosen family. A `str` must be a decimal number
+literal in the format's own grammar — digits with an optional leading `-`,
+`.` and exponent (`1.5`, `-2e-3`, `.5`), or `nan`, `inf`, `ninf` — so `''`,
+`'abc'`, `' 1'` and `'+1'` raise `BovnarArgumentError` here rather than
+failing later in `dumps`. For `float_dec` it also refuses a
 finite value past the width's range — `Decimal('1e400')` does not fit
 `float_dec:64` and would materialise to infinity — and a non-finite `float`
 is stored under the format's own spelling (`inf`, `ninf`, `nan`).
@@ -1163,8 +1183,8 @@ an **object array of exact `decimal.Decimal`** on the typed
 (`loads(..., typed=True)`) path, which is lossless; pass `dtype='float64'` for
 the lossy native conversion. The DOM (`dom_parse`) path only has a C `double`
 for these, so it raises and points you at the typed path or `dtype='float64'`.
-Integers wider than 64 bits likewise come back as an object array of Python
-ints (`dtype=object`), which is exact.
+Integers wider than 64 bits need `dtype=object`, which gives an exact object
+array of Python ints; without it `to_numpy` raises `BovnarArgumentError`.
 
 A **`datetime`** array on the **unix** epoch (spec 1.1) maps to/from
 `datetime64[s]` — the integer epoch-seconds carrier is unix-relative, so it
@@ -1172,7 +1192,8 @@ round-trips losslessly. A non-unix epoch (`tai`, `gps`, …) is *not*
 unix-relative, so `to_numpy` refuses it (mapping it to `datetime64` would
 mis-date every value) and points you at `dtype='int64'` for the raw seconds.
 On the write side a `datetime64[*]` array is coarsened to whole seconds and
-written as `<datetime:64,unix>`; `NaT` has no bovnar representation and is
+written as `<datetime:64>` (the unix epoch is the default and is not
+spelled out); `NaT` has no bovnar representation and is
 rejected, and `array_to_bvnr` prepends the `#!bovnar 1.1` directive so its
 output re-parses.
 
@@ -1216,6 +1237,10 @@ bovnar.array_to_bvnr("a", prices, float_format=("float", 128))   # binary128
 
 * `from_numpy` requires a 1-D-or-higher array; write a 0-D scalar with the
   scalar `Writer` API instead.
+* An empty axis is written as empty brackets, which keep no length for any axis
+  after it, so only the **last** axis may be zero-length: shape `(2, 0)` is
+  `[] / []` and reads back as `(2, 0)`, while `(0, 3)` would be written as `[]`
+  and read back as `(0,)` — it raises `BovnarArgumentError` instead.
 * *unit* may be a bovnar unit string, a `Unit`, a `ValueUnit`, or a pint
   `Unit`/`Quantity` (anything else raises `BovnarArgumentError`).
 * Units apply to **numeric** arrays only — a unit on a `bool` or string array
@@ -1299,6 +1324,13 @@ with Reader() as r:
 
 `Reader.__init__` calls `bvnr_reader_create` immediately.  Use as a context
 manager or call `r.close()` explicitly to release the C object.
+
+A reader is not re-entrant. While `read_mem`, `read_fd`, `read_file` or
+`iter_mem` is running, the reader's own callbacks must not call `close()`,
+start another read on it, or `set_unit_policy()`: each raises
+`BovnarArgumentError("Reader is in use by its own callback")`, which aborts the
+running parse and is re-raised from the read. Use a second `Reader` for a
+nested parse, and close the first one after its read returns.
 
 ### 11.2 `read_mem`
 
@@ -1400,7 +1432,7 @@ the context manager calls `finish()` automatically.
 
 `unit_flags` takes [`UnitFlags`](#53-unitflags) — `REDUCE` rewrites each unit
 and rescales its value, `ASCII_EXP` writes `^N` exponents, `NUM_CANONICAL`
-keeps a rescaled float in float shape. `emit_version=True` writes a leading
+keeps a rescaled float in float shape and writes annotations in one form. `emit_version=True` writes a leading
 `#!bovnar M.N` naming the spec version this build implements, as
 `write_version()` would. Every writer accepts structs and arrays nested up to
 **255** deep, the same limit `Reader` and `loads()` read at.
@@ -1488,14 +1520,18 @@ w.end_struct()        # emit STRUCT_END, decrement depth
 ### 12.6 Version directive
 
 ```python
-w.write_version(major=1, minor=1)   # emit a leading "#!bovnar 1.1" directive
+w.write_version()                   # "#!bovnar 1.2": the spec this build implements
+w.write_version(major=1, minor=1)   # or declare an older version explicitly
 ```
 
-Emits a leading `#!bovnar <major>.<minor>` directive. Must be called before any
-value is written; calling it after output has begun raises
-`BovnarWriteError(INVALID_ARGUMENT)`. Use it to self-declare the spec version a
-document targets (spec-1.1 constructs such as datetime literals need it to
-re-read).
+Emits a leading `#!bovnar <major>.<minor>` directive. With no arguments it
+names the spec version this build implements (`bovnar.spec_version()`, 1.2) —
+the same directive `emit_version=True` writes; pass `major` and `minor`
+together to declare an older one. Must be called before any value is written;
+calling it after output has begun raises `BovnarWriteError(INVALID_ARGUMENT)`.
+Use it to self-declare the spec version a document targets (spec-1.1
+constructs such as datetime literals need at least 1.1 to re-read, a
+profile-notation unit such as `ucum:[IU]` needs 1.2).
 
 ### 12.7 Array helpers
 
@@ -1539,15 +1575,8 @@ tree; any `DomNode` derived from it becomes invalid after that point.
 | Method / property | Description |
 |---|---|
 | `DomDoc.parse(data)` | Class method. Parse `bytes \| bytearray \| memoryview`. |
-| `DomDoc.parse_fd(fd)` | Class method. Parse from an open file descriptor. |
-
-> **File-size limits:** `DomDoc.parse_fd` and `DomDoc.parse_file` apply an internal
-> ceiling of `BVN_DOM_FD_MAX_BYTES` (256 MiB). This is 16× larger than
-> `Reader.read_file`'s `MAX_FILESIZE_BYTES` (16 MiB). The C library's
-> `bvn_dom_parse_fd_ex` can lower that ceiling (never raise it), but it is
-> C-only — the binding does not wrap it. From Python, to bound the input
-> yourself, read at most the bytes you allow and pass them to `DomDoc.parse`.
-| `DomDoc.parse_file(path)` | Class method. Open path and parse (fd closed in `finally`). Applies an internal hard cap of `BVN_DOM_FD_MAX_BYTES` (256 MiB) via the C function `bvn_dom_parse_fd`. This ceiling is distinct from `Reader.read_file`'s `MAX_FILESIZE_BYTES` (16 MiB). |
+| `DomDoc.parse_fd(fd)` | Class method. Parse from an open file descriptor. A read error raises the matching `OSError` (`EBADF` for a bad descriptor, `IsADirectoryError` for a directory, …), input over the 256 MiB cap `BovnarParseError(FILE_TOO_LONG)`. |
+| `DomDoc.parse_file(path)` | Class method. Open path and parse (fd closed in `finally`). Applies an internal hard cap of `BVN_DOM_FD_MAX_BYTES` (256 MiB) via the C function `bvn_dom_parse_fd`. This ceiling is distinct from `Reader.read_file`'s `MAX_FILESIZE_BYTES` (16 MiB). Raises as `parse_fd` does, with the path on the `OSError`. |
 | `doc.parse_error` | `ErrorCode` — `NONE` on success. |
 | `doc[key]` | Return a `DomNode` by key; raises `KeyError` when absent. `key` goes to the path lookup, so `doc["server"]` is a top-level entry and a dotted or indexed path reaches below it: `doc["server.tls"]` is `doc["server"]["tls"]`, `doc["matrix[1][0]"]` an element. A key cannot contain `.` or `[`, so the two readings never collide. |
 | `key in doc` | `True` when `doc[key]` would succeed — the same path rule. A non-`str` is never in a document. |
@@ -1556,6 +1585,20 @@ tree; any `DomNode` derived from it becomes invalid after that point.
 | `doc.entries()` | Return all top-level `(key, DomNode)` pairs as a list. |
 | `doc.lookup(path)` | Dot-separated path lookup, e.g. `'server.tls.cert'`. Returns `None` when absent. |
 | `doc.to_dict()` | Convert entire document to a plain Python dict, dropping type and unit info. |
+
+> **File-size limits:** `DomDoc.parse_fd` and `DomDoc.parse_file` apply an internal
+> ceiling of `BVN_DOM_FD_MAX_BYTES` (256 MiB). This is 16× larger than
+> `Reader.read_file`'s `MAX_FILESIZE_BYTES` (16 MiB). The C library's
+> `bvn_dom_parse_fd_ex` can lower that ceiling (never raise it), but it is
+> C-only — the binding does not wrap it. From Python, to bound the input
+> yourself, read at most the bytes you allow and pass them to `DomDoc.parse`.
+>
+> **Errors:** the C fd functions return `NULL` for an allocation failure, a read
+> error and input over the cap alike; the binding tells them apart by `errno`.
+> A read error is the matching `OSError`, input over the cap is
+> `BovnarParseError(FILE_TOO_LONG)`, and only an allocation failure is
+> `MemoryError` — the one `DomDoc.parse` can raise, since the in-memory parse
+> returns `NULL` for nothing else.
 
 ### 13.3 `DomNode`
 
@@ -1601,7 +1644,7 @@ REFERENCE=5  STRUCT=6  ARRAY=7  OCTET_STREAM=8  BOOL=9
 ## 14. Running the test suite
 
 ```bash
-# Run everything (library-dependent tests are skipped when libbvnr.so is absent)
+# Run everything (tests marked needs_lib are skipped when libbvnr.so cannot be loaded)
 pytest
 
 # Run only the pure-Python tests (no library required)
@@ -1610,9 +1653,14 @@ pytest -m "not needs_lib"
 # Run only integration tests (requires libbvnr.so)
 pytest -m needs_lib
 
-# Verbose with short tracebacks (already the default via pyproject.toml)
+# Verbose with short tracebacks
 pytest -v --tb=short
 ```
+
+`needs_lib` is a registered marker (`pyproject.toml`); `conftest.py` turns it
+into a skip when the library cannot be loaded, so a run without `libbvnr.so`
+skips those tests rather than failing them. A test module whose every test
+calls into the library sets `pytestmark = pytest.mark.needs_lib`.
 
 The NumPy- and pint-bridge tests `pytest.importorskip` their dependency, so they
 are skipped automatically when `numpy` / `pint` is not installed. Install
@@ -1674,10 +1722,12 @@ All errors surface as subclasses of `BovnarError`:
 
 | Exception | When raised |
 |---|---|
-| `BovnarLibraryNotFound` | `libbvnr.so` not found at import |
+| `BovnarLibraryNotFound` | `libbvnr.so` could not be loaded — raised on first use of the C library, not at `import bovnar`; the message lists every path tried |
 | `BovnarParseError` | Parse error in `Reader` (carries `code`, `line`, `column`, `offset`, `byte`) |
 | `BovnarWriteError` | Write error in `Writer` (carries `code`, `offset`) |
 | `BovnarArgumentError` | Invalid argument passed to a helper (e.g. bad unit string, closed reader/writer) |
+| `OSError` | `DomDoc.parse_fd` / `parse_file` could not read the input (the `errno` subclass: `IsADirectoryError`, …); an over-cap input is `BovnarParseError(FILE_TOO_LONG)` instead |
+| `MemoryError` | The C library could not allocate (a reader, writer, or DOM tree) |
 
 **`unit_convert_factor` error semantics:** The C function uses the
 `(ok, requires_affine)` pair to signal four distinct outcomes:
@@ -1751,7 +1801,7 @@ its `unit_flags` field (`bvn_unit_flags_t`, a `uint32_t`) and the
 | `BVN_UNIT_FLAGS_NONE` | `0` | Default: full Unicode exponent characters |
 | `BVN_UNIT_REDUCE` | `1 << 0` | Reduce compound units before serialising |
 | `BVN_UNIT_ASCII_EXP` | `1 << 1` | Use `^N` ASCII exponent notation instead of Unicode superscripts |
-| `BVN_NUM_CANONICAL` | `1 << 2` | Write a float that `BVN_UNIT_REDUCE` rescaled in float shape (`5000.0`, not `5000`) |
+| `BVN_NUM_CANONICAL` | `1 << 2` | Write a float that `BVN_UNIT_REDUCE` rescaled in float shape (`5000.0`, not `5000`), and every annotation in one form (width written out, default `_10` and `no_unit` left out) |
 
 They are set from Python with the `unit_flags=` keyword of `Writer.to_mem` /
 `to_fd` / `to_file`, as `UnitFlags` values; `emit_version=` sets the struct's
@@ -1790,7 +1840,7 @@ caller explicitly constructs a dimensionless `ValueUnit` with `BaseUnit.NONE`.
 
 The `BaseUnit` enum mirrors the C `value_base_unit_e` for the two blocks of
 the id space that have Python names: the native units (block 10) and the
-currencies (block 90). See doc/05 §12.1 for the block layout — an id's leading
+currencies (block 90). See [doc/05 §11.1](05_bovnar_unit_system.md#111-enumerations) for the block layout — an id's leading
 two digits name the vocabulary it comes from.
 
 | Range | Members |
@@ -1848,7 +1898,7 @@ two digits name the vocabulary it comes from.
 | 100201–100203 | Typographic lengths (`POINT`, `PICA`, `LINE`) |
 | 100204–100209 | US dry volumes and the trade measures (`DRY_GALLON`, `DRY_QUART`, `DRY_PINT`, `BOARD_FOOT`, `CORD`, `SURVEY_ACRE_FOOT`) |
 | 100210–100214 | `DARCY`, `THERM_EC`, `REFRIGERATION_TON`, `DOBSON`, `SHAKE` |
-| 100215–100216 | The ratios below ppb (`PPT`, `PPQ`) — spelled `pptr` and `ppq`, see §18's note |
+| 100215–100216 | The ratios below ppb (`PPT`, `PPQ`) — spelled `pptr` and `ppq`; see "Why `pptr` and not `ppt`" in [doc/05 §3.25](05_bovnar_unit_system.md#325-ratio-and-proportion-units) |
 | 100217–100225 | Nine units two or three vocabularies define (`PRINTERS_POINT`, `PRINTERS_PICA`, `HORSEPOWER_ELECTRIC`, `HORSEPOWER_BOILER`, `ABVOLT`, `ASSAY_TON`, `BUSHEL_UK`, `CLO`, `DEBYE`) |
 | 100226–100236 | Calendar and sidereal time (`YEAR_TROPICAL`, `YEAR_GREGORIAN`, `YEAR_SIDEREAL`, `YEAR_COMMON`, `MONTH_SYNODAL`, `MONTH_TROPICAL`, `MONTH_SIDEREAL`, `DAY_SIDEREAL`, `HOUR_SIDEREAL`, `MINUTE_SIDEREAL`, `SECOND_SIDEREAL`) |
 | 100237–100243 | CGS electrostatic (`STATVOLT`, `STATAMPERE`, `STATCOULOMB`, `STATFARAD`, `STATOHM`, `STATHENRY`, `STATSIEMENS`) |

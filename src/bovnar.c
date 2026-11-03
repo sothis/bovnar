@@ -1406,7 +1406,11 @@ static int cmd_query(const char *path, const char *filename,
  * diff needs and what re-spelling alone does not give. It stops short of
  * unifying every pair of equal quantities: the formatter keeps the prefix of a
  * named derived SI unit (bovnar.h, BVN_UNIT_REDUCE), so 2.5 k~N and 2500 N stay
- * two documents.
+ * two documents. BVN_NUM_CANONICAL writes each annotation in one form as well:
+ * an inline unit arrives with the explicit _10 base the reader synthesises for
+ * it, and an unannotated value with no_unit, so without it 1.0 km and
+ * <float:64,k~m> 1.0 reduced to the same unit and still differed by "_10".
+ * Where an annotation sits is kept: [1, 2] and <uint:64> [1, 2] stay two.
  *
  * Everything this needs was already plumbed: bvnr_write_flags_t.unit_flags
  * reaches the serializer, and the serializer applies it on both the annotation
@@ -1538,7 +1542,9 @@ static int cmd_pretty(const char *filename, bool canonical)
 }
 typedef enum {
 	BVN_JSON_NULL, BVN_JSON_BOOL, BVN_JSON_INT, BVN_JSON_UINT, BVN_JSON_FLOAT,
-	BVN_JSON_STRING, BVN_JSON_ARRAY, BVN_JSON_OBJECT
+	BVN_JSON_STRING, BVN_JSON_ARRAY, BVN_JSON_OBJECT,
+	/* An integer outside int64/uint64, kept as its decimal text (u.s). */
+	BVN_JSON_BIGINT
 } JsonNodeType;
 typedef struct JsonNode {
 	JsonNodeType type;
@@ -1557,6 +1563,7 @@ static void json_free_node(JsonNode *node)
 	if (!node) return;
 	switch (node->type) {
 	case BVN_JSON_STRING:
+	case BVN_JSON_BIGINT:
 		free(node->u.s);
 		break;
 	case BVN_JSON_ARRAY:
@@ -1917,19 +1924,29 @@ static JsonNode *json_parse_value_depth(const char **p, int depth)
 			n->type = BVN_JSON_INT;
 			n->u.i = strtoll(*p, &end, 10);
 			if (errno == ERANGE) {
-				fprintf(stderr, "convert: integer literal out of "
-					"range for 64-bit signed\n");
-				free(n);
-				return NULL;
+				/* Wider than 64 bits: a bovnar integer can be
+				 * up to 32768, so keep the digits and let the
+				 * writer pick the width. */
+				size_t len = (size_t)(num_end - *p);
+				n->type = BVN_JSON_BIGINT;
+				n->u.s  = malloc(len + 1u);
+				if (!n->u.s) { free(n); return NULL; }
+				memcpy(n->u.s, *p, len);
+				n->u.s[len] = '\0';
 			}
 		} else {
 			n->type = BVN_JSON_UINT;
 			n->u.u = strtoull(*p, &end, 10);
 			if (errno == ERANGE) {
-				fprintf(stderr, "convert: integer literal out of "
-					"range for 64-bit unsigned\n");
-				free(n);
-				return NULL;
+				/* Wider than 64 bits: a bovnar integer can be
+				 * up to 32768, so keep the digits and let the
+				 * writer pick the width. */
+				size_t len = (size_t)(num_end - *p);
+				n->type = BVN_JSON_BIGINT;
+				n->u.s  = malloc(len + 1u);
+				if (!n->u.s) { free(n); return NULL; }
+				memcpy(n->u.s, *p, len);
+				n->u.s[len] = '\0';
 			}
 		}
 		*p = num_end;
@@ -1976,6 +1993,36 @@ static bool json_key_is_valid_bvnr_id(const char *key)
  * nesting, arrays of objects, and single-row matrices that the older '/'-based
  * 2-D encoding could not. These three helpers are mutually recursive.
  */
+/*
+ * A JSON integer wider than 64 bits, as <uint:N> or <sint:N> with N the
+ * smallest power of two from 128 that holds it (bvnr -> json writes such a
+ * value as a JSON string, so this is for numbers other producers wrote).
+ */
+static bool write_bvn_bigint(bvnr_writer_t *w, const char *key, const char *digits)
+{
+	bvn_int_t *n = bvn_int_alloc();
+	if (!n) return false;
+	bool ok = false;
+	if (!bvn_int_from_str(n, digits, 10u)) {
+		fprintf(stderr, "convert: the JSON integer under key '%s' is wider "
+			"than the %u bits a bovnar integer can hold\n",
+			json_key_for_msg(), (unsigned)BVN_MAX_INT_WIDTH);
+	} else {
+		uint32_t need = (uint32_t)bvn_int_bitlen(n) + (n->negative ? 1u : 0u);
+		uint32_t width = 128u;
+		while (width < need && width < BVN_MAX_INT_WIDTH)
+			width *= 2u;
+		if (width < need) {
+			fprintf(stderr, "convert: the JSON integer under key '%s' is "
+				"wider than the %u bits a bovnar integer can hold\n",
+				json_key_for_msg(), (unsigned)BVN_MAX_INT_WIDTH);
+		} else {
+			ok = bvnr_write_bvni(w, key, n, width, 10u);
+		}
+	}
+	bvn_int_free(n);
+	return ok;
+}
 static bool write_bvn_element(bvnr_writer_t *w, const JsonNode *e);
 static bool write_bvn_array_body(bvnr_writer_t *w, const JsonNode *node);
 static bool write_bvn_struct_body(bvnr_writer_t *w, const JsonNode *node);
@@ -2057,6 +2104,15 @@ static bool write_bvn_array_elem(bvnr_writer_t *w, const JsonNode *e)
 			if (!bvnr_write_event(w, ev_type_annotation_end, &ann))
 				return false;
 		}
+	} else if (e->type == BVN_JSON_BIGINT) {
+		/* An array element is written bare and read at 64 bits, and the
+		 * elements of one array must share a type: a wider integer cannot
+		 * be one of them. */
+		fprintf(stderr, "convert: the JSON array under key '%s' holds the "
+			"integer %s, which is wider than 64 bits; outside an array it "
+			"would be written as a wider <uint>/<sint>, inside one it "
+			"cannot share the elements' type\n", json_key_for_msg(), e->u.s);
+		return false;
 	} else if (e->type == BVN_JSON_STRING) {
 		if (!json_string_fits_bvnr(e->u.s)) return false;
 		d.type   = token_is_array_string;
@@ -2133,6 +2189,7 @@ static bool write_bvn_value(bvnr_writer_t *w, const char *key, const JsonNode *n
 	case BVN_JSON_UINT:   ok = bvnr_write_uint(w, key, 0, node->u.u); break;
 	case BVN_JSON_INT:    ok = bvnr_write_sint(w, key, 0, node->u.i); break;
 	case BVN_JSON_FLOAT:  ok = bvnr_write_float(w, key, 0, node->u.f); break;
+	case BVN_JSON_BIGINT: ok = write_bvn_bigint(w, key, node->u.s); break;
 	case BVN_JSON_STRING:
 		ok = json_string_fits_bvnr(node->u.s) &&
 		     bvnr_write_string(w, key, node->u.s);
@@ -2520,6 +2577,9 @@ typedef struct {
 	 * leaves as its bare epoch-second count and returns as an integer with no
 	 * epoch and no type. */
 	uint32_t n_nonfinite, n_float, n_datetime;
+	/* -0.0: JSON writes "-0", which json -> bvnr reads as the integer 0. */
+	uint32_t n_negzero;
+	char     ex_negzero[128];
 	char     ex_unit[160], ex_symbol[128], ex_reference[128];
 	char     ex_octet[128], ex_wide[128], ex_typed[160], ex_dims[160];
 	char     ex_nonfinite[128], ex_float[160], ex_datetime[160];
@@ -2573,6 +2633,9 @@ static void json_loss_scan(const bvn_dom_node_t *node, const char *path,
 			L->n_nonfinite++;
 			json_loss_note(L->ex_nonfinite, sizeof L->ex_nonfinite, path,
 				       isnan(v) ? "nan" : v > 0 ? "inf" : "ninf");
+		} else if (v == 0.0 && signbit(v)) {
+			L->n_negzero++;
+			json_loss_note(L->ex_negzero, sizeof L->ex_negzero, path, NULL);
 		} else if ((vt.family == vt_float && vt.width > 64u) ||
 			   ((vt.family == vt_float_dec ||
 			     vt.family == vt_float_fix) &&
@@ -2660,7 +2723,8 @@ static bool json_loss_report(const json_loss_t *L, const char *file)
 {
 	uint32_t total = L->n_unit + L->n_symbol + L->n_reference +
 			 L->n_octet + L->n_wide + L->n_typed + L->n_dims +
-			 L->n_nonfinite + L->n_float + L->n_datetime;
+			 L->n_nonfinite + L->n_float + L->n_datetime +
+			 L->n_negzero;
 	if (!total) return false;
 	fprintf(stderr, "convert: %s: JSON cannot carry everything in this "
 			"document; the output above is LOSSY:\n", file);
@@ -2676,6 +2740,9 @@ static bool json_loss_report(const json_loss_t *L, const char *file)
 	if (L->n_nonfinite)
 		fprintf(stderr, "  %u non-finite float(s) become null, e.g. %s\n",
 			L->n_nonfinite, L->ex_nonfinite);
+	if (L->n_negzero)
+		fprintf(stderr, "  %u negative zero(s) lose their sign, e.g. %s\n",
+			L->n_negzero, L->ex_negzero);
 	if (L->n_float)
 		fprintf(stderr, "  %u float(s) wider or more exact than a 64-bit "
 				"binary float are rounded to one, e.g. %s\n",
@@ -3879,15 +3946,20 @@ static void usage(FILE *out, const char *prog)
 		"                Pretty-print a .bvnr file. Comments are not part of a\n"
 		"                document's data and are NOT preserved. --canonical: also\n"
 		"                reduce every unit to canonical form, rescaling values to\n"
-		"                match, so two spellings of one unit produce equal bytes\n"
+		"                match, and write each annotation in one form (width\n"
+		"                written out, default _10 and no_unit left out), so two\n"
+		"                spellings of one value produce equal bytes\n"
 		"  convert <file>  Convert json<->bvnr (direction from .json/.bvnr ext)\n"
 		"                  Override with --from <fmt> and/or --to <fmt>\n"
 		"                  Supported: json -> bvnr,  bvnr -> json\n"
 		"                  bvnr -> json is LOSSY for most documents: JSON has no\n"
 		"                  units, types, symbols, references or octet streams.\n"
 		"                  The JSON is still written; what was lost is listed on\n"
-		"                  stderr and the exit status is 1, so 0 means the JSON\n"
-		"                  converts back to the same document.\n"
+		"                  stderr and the exit status is 1, so 0 means every\n"
+		"                  VALUE converts back. The annotations never do and are\n"
+		"                  not counted: a width or family, or a float such as 1.0\n"
+		"                  that returns as the integer 1, comes back as json ->\n"
+		"                  bvnr infers it.\n"
 		"                  The unit-policy options are accepted and\n"
 		"                  ignored here: JSON carries no units.\n",
 		prog);

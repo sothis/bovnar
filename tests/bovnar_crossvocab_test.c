@@ -260,6 +260,16 @@ static const cv_concept_t g_concepts[] = {
 	                   "udunits:hPa", "om:hectopascal", NULL } },
 	{ "kilowatt hour", { "k~W·h", "unece:KWH", "qudt:KiloW-HR",
 	                     "udunits:kW*h", "om:kilowattHour", NULL } },
+	/* Apparent and reactive power are NOT one unit, and the two QUDT names for
+	 * each disagreed with the Rec 20 code QUDT gives them: KiloVAR and
+	 * KiloV-A_Reactive read k~VA while unece:KVR read k~var. UCUM and OM define
+	 * neither, and UDUNITS' VA takes no prefix. */
+	{ "kilovolt-ampere", { "k~VA", "unece:KVA", "qudt:KiloV-A", "qudt:KiloVA",
+	                       NULL } },
+	{ "kilovar", { "k~var", "unece:KVR", "qudt:KiloV-A_Reactive",
+	               "qudt:KiloVAR", NULL } },
+	{ "megavar", { "M~var", "unece:MAR", "qudt:MegaV-A_Reactive",
+	               "qudt:MegaVAR", NULL } },
 	{ "degree Celsius", { "°C", "ucum:Cel", "unece:CEL", "qudt:DEG_C",
 	                      "udunits:degC", "udunits:celsius", "om:degreeCelsius", NULL } },
 	{ "degree of angle", { "°", "ucum:deg", "unece:DD", "qudt:DEG",
@@ -449,6 +459,9 @@ static const cv_differ_t g_differ[] = {
 	  "apart" },
 	{ "ucum:mo", "ucum:a",
 	  "the month is not the year" },
+	{ "qudt:KiloVAR", "unece:KVA",
+	  "a kilovar is reactive power and a kilovolt-ampere apparent power; "
+	  "equal in SI, and the spelling is all that tells them apart" },
 };
 
 #define N_DIFFER (sizeof(g_differ) / sizeof(g_differ[0]))

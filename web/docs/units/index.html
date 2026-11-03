@@ -1026,7 +1026,7 @@ which the prefix mechanism already spells <code>h~lb</code>, so it has no unit o
 </tbody>
 </table>
 <p><strong>Six rows, eight spellings.</strong> The degree Celsius interval <em>is</em> the kelvin (SI Brochure 9th ed. §2.3.1) and the Rankine degree <em>is</em> the Fahrenheit degree, so <code>Δ°C</code> and <code>Δ°Ra</code> are aliases rather than units of their own — two units that had to compare equal and convert by exactly 1 would be a distinction with no content.</p>
-<p><strong>They are ratio scales.</strong> <code>.affine = false</code>, <code>.offset = 0.0</code>. That is what lets them compose where the scales cannot: <code>Δ°F/k~m</code> is a lapse rate and <code>Δ°Re^-1</code> an expansion coefficient, while <code>°F/k~m</code> and <code>°Re^-1</code> have no SI meaning at all (§9.4 — an affine scale is meaningful only alone at exponent 1).</p>
+<p><strong>They are ratio scales.</strong> <code>.affine = false</code>, <code>.offset = 0.0</code>. That is what lets them compose where the scales cannot: <code>Δ°F/k~m</code> is a lapse rate and <code>Δ°Re^-1</code> an expansion coefficient, while <code>°F/k~m</code> and <code>°Re^-1</code> have no SI meaning at all (§12.4 — an affine scale is meaningful only alone at exponent 1).</p>
 <p><strong>They carry their own quantity kind</strong>, so:</p>
 <div class="codehilite"><pre><span></span><code>ΔK   → K       error_unit_mismatch      the whole point
 °C   → Δ°C     error_unit_mismatch      a reading is not an interval, and only
@@ -1724,7 +1724,7 @@ this format exists to prevent. Convert explicitly in the application if that
 is genuinely what you mean.</p>
 <p>Prefixes still work within each: <code>Ki~B</code> → <code>B</code> is 1024, <code>M~b</code> → <code>k~b</code> is 1000.
 Both units take IEC binary prefixes as well as SI ones, and SI prefixes on them
-are restricted to kilo and above (§6.3).</p>
+are restricted to kilo and above (§4.2).</p>
 </blockquote>
 <h3 id="318-textile-linear-density">3.18 Textile Linear Density</h3>
 <table>
@@ -1952,7 +1952,7 @@ are restricted to kilo and above (§6.3).</p>
 <p>Every Prussian unit here reproduces its historical definition from the 1816 Fuß (0.313853 m):
 Zoll = Fuß/12, Linie = Zoll/12, Rute = 12 Fuß, Klafter = 6 Fuß, Elle = 25½ Zoll, Morgen = 180
 square Ruten. <code>test_unit_factors_derived.py</code> checks each of them against that definition.</p>
-<p>The German units carry ids <strong>100133–100145</strong>, inside the native unit block like every other physical unit — see §12.1 for the block layout. They used to sit at 348–360, appended past the whole currency range, because the id space was one flat counter and the currencies had been dropped into the middle of it. The space is blocked now, so a unit's id no longer says anything about when it was added.</p>
+<p>The German units carry ids <strong>100133–100145</strong>, inside the native unit block like every other physical unit — see §11.1 for the block layout. They used to sit at 348–360, appended past the whole currency range, because the id space was one flat counter and the currencies had been dropped into the middle of it. The space is blocked now, so a unit's id no longer says anything about when it was added.</p>
 </blockquote>
 <h3 id="321-additional-length-units">3.21 Additional Length Units</h3>
 <table>
@@ -2831,7 +2831,7 @@ away, and a different unit rather than a rounding.</p>
 <blockquote>
 <p><code>darcy</code> takes prefixes, so the millidarcy every reservoir report is written in is <code>m~darcy</code> (or
 compactly <code>mdarcy</code>). <code>thm_ec</code> is the therm European gas billing uses; native <code>thm</code> is the US
-therm, 0.24 per cent away, and no SI prefix reaches 10⁵ — which is why it needed a unit of its
+therm, 0.024 per cent away, and no SI prefix reaches 10⁵ — which is why it needed a unit of its
 own rather than a prefixed <code>Btu</code>. <code>shake</code> exists for the same reason at the other end: there is
 no SI prefix at 10⁻⁸.</p>
 </blockquote>
@@ -2927,7 +2927,7 @@ dimensionally perfect, inside anything a later check would notice, and wrong.</p
 <p><code>abV</code> needed a unit rather than a prefix because there is no decade prefix at 10⁻⁸ and prefixes do
 not stack. <code>AT</code> and <code>debye</code> are stated as exact rationals: the assay ton is 175/6 g, chosen so that
 milligrams recovered from one assay ton read as troy ounces per short ton, and the debye has been
-exactly 10⁻²¹/c C·m since the 2019 SI fixed c. Their publishers state 7- and 6-digit roundings of
+exactly 10⁻²¹/c C·m since the 1983 definition of the metre fixed c. Their publishers state 7- and 6-digit roundings of
 those; the rational is what they are rounding.</p>
 </blockquote>
 <h4 id="and-the-thirty-five-the-same-sweep-found-next">And the thirty-five the same sweep found next</h4>
@@ -2936,7 +2936,7 @@ define</strong>. The nine above were the first pass; these are the rest that nam
 out is a <em>constant</em> rather than a unit (UCUM's <code>[pi]</code>), a value only one publisher states, or a
 dimensionless "relative permeability" that is a number.</p>
 <p><strong>Where the publishers disagree, the exact definition decides.</strong> The CGS-ESU units are built on <code>c</code>,
-which the 2019 SI fixed, so every one is an exact rational and the publishers' five- to seven-digit
+exact since the 1983 definition of the metre, so every one is an exact rational and the publishers' five- to seven-digit
 decimals are roundings of it — which is why <code>statΩ</code> is 22468879468420441/25000 here and
 898 755 400 000, 898 755 200 000 and 898 760 000 000 in UDUNITS, OM and QUDT. The sidereal hour,
 minute and second are derived from the sidereal <strong>day</strong> rather than taken from the three slightly
@@ -3229,7 +3229,7 @@ UDUNITS or CF document that says <code>year</code> be read at all. It was refuse
 <td><code>btu_59F</code></td>
 <td>59 °F BTU</td>
 <td><code>bu_btu_59f</code></td>
-<td>1054.8 J (exact)</td>
+<td>1054.804 J</td>
 </tr>
 <tr>
 <td><code>Btu_60</code></td>
@@ -3622,7 +3622,7 @@ UDUNITS or CF document that says <code>year</code> be read at all. It was refuse
 .amount    = &lt;float:64,mmol&gt;   2.5;     # m~mol
 .memory    = &lt;uint:64,MiB&gt;   512;       # Mi~B
 .force     = &lt;float:64,kg·m/s²&gt; 9.81;   # compounds, exponents and groups too</code></pre></div>
-<p>Both spellings produce the same <code>value_unit_t</code>, so they reconcile against each other (<code>&lt;float:64,k~m&gt; 1.5 km</code> is valid) and against a stored annotation. <strong>The canonical output form is unchanged</strong>: <code>bvn_unit_to_string</code> emits <code>k~g</code> for either spelling. What the compact form does survive is a re-serialisation: the reader hands the spelling over beside the unit (<code>unit_source</code>, §12.1), and <code>pretty-print</code> or a typed Python round trip writes <code>km</code> back as <code>km</code>. <code>--canonical</code> is the mode that does not.</p>
+<p>Both spellings produce the same <code>value_unit_t</code>, so they reconcile against each other (<code>&lt;float:64,k~m&gt; 1.5 km</code> is valid) and against a stored annotation. <strong>The canonical output form is unchanged</strong>: <code>bvn_unit_to_string</code> emits <code>k~g</code> for either spelling. What the compact form does survive is a re-serialisation: the reader hands the spelling over beside the unit (<code>unit_source</code>, §11.2), and <code>pretty-print</code> or a typed Python round trip writes <code>km</code> back as <code>km</code>. <code>--canonical</code> is the mode that does not.</p>
 <p>The rules are exactly the rules of the separated form, with one addition:</p>
 <ul>
 <li><strong>A bare unit alias always wins.</strong> The base symbol is the longest alias suffix, so <code>min</code> is the minute (not milli-inch), <code>cd</code> the candela (not centi-day), <code>ft</code> the foot (not femto-tonne), <code>at</code> the technical atmosphere (not atto-tonne), <code>dB</code> the decibel (not deci-byte). The separated form reaches the other reading: <code>m~in</code>, <code>c~d</code>, <code>f~t</code>.</li>
@@ -3685,8 +3685,11 @@ UDUNITS or CF document that says <code>year</code> be read at all. It was refuse
 .altitude    = &lt;float:64,km&gt;     10.5;    # kilometer, compact spelling
 .fund_nav    = &lt;float_dec:64,k~$USD&gt; 250.0; # $250,000</code></pre></div>
 <h3 id="52-compound-units">5.2 Compound Units</h3>
-<div class="codehilite"><pre><span></span><code><span class="k">compound-unit  </span><span class="o">=</span> <span class="s2">&quot;no_unit&quot;</span>
-               <span class="p">|</span> <span class="k">unit-component </span><span class="p">{</span> <span class="k">unit-sep unit-component </span><span class="p">}</span>
+<div class="codehilite"><pre><span></span><code><span class="k">compound-unit  </span><span class="o">=</span> <span class="s2">&quot;no_unit&quot;</span> <span class="p">|</span> <span class="k">unit-expr</span>
+
+<span class="k">unit-expr      </span><span class="err">=</span> <span class="k">unit-factor </span><span class="p">{</span> <span class="k">unit-sep unit-factor </span><span class="p">}</span>
+
+<span class="k">unit-factor    </span><span class="err">=</span> <span class="k">unit-component </span><span class="p">|</span> <span class="s2">&quot;(&quot;</span> <span class="k">unit-expr </span><span class="s2">&quot;)&quot;</span>    <span class="cm">(* grouping: §5.4 *)</span>
 
 <span class="k">unit-sep       </span><span class="err">=</span> <span class="s2">&quot;*&quot;</span> <span class="p">|</span> <span class="s2">&quot;/&quot;</span> <span class="p">|</span> <span class="s2">&quot;·&quot;</span>           <span class="cm">(* · = U+00B7 MIDDLE DOT *)</span>
 
@@ -3988,7 +3991,7 @@ tabulates all three caps beside the profile grammar.</p>
 </ol>
 <p>Because the sigil is mandatory, a bare uppercase code can never collide with a physical-unit symbol — present or future — so the two namespaces are disjoint by construction. The collision cases this resolves are catalogued for reference in §10.</p>
 <h3 id="92-iso-4217-fiat-currencies-and-precious-metals">9.2 ISO 4217 Fiat Currencies and Precious Metals</h3>
-<p>166 ISO 4217 alphabetic codes are supported, including precious-metal X-codes. They occupy the front of <strong>block 90</strong> of the <code>value_base_unit_t</code> id space (§12.1) — ids <strong>900000 … 900165</strong>, alphabetical from <code>AED</code> to <code>ZWL</code> — and, unlike physical units, have <strong>no named <code>bu_*</code> enumerators</strong>: such a currency is resolved from its <code>$</code>-sigil code by <code>bvn_parse_currency_str</code> and carried as the numeric <code>base</code> value. The catalogue in <code>bovnar_currency.c</code> is index-aligned to the block, so a lookup is <code>base - BVN_CURRENCY_FIRST</code>.</p>
+<p>166 ISO 4217 alphabetic codes are supported, including precious-metal X-codes. They occupy the front of <strong>block 90</strong> of the <code>value_base_unit_t</code> id space (§11.1) — ids <strong>900000 … 900165</strong>, alphabetical from <code>AED</code> to <code>ZWL</code> — and, unlike physical units, have <strong>no named <code>bu_*</code> enumerators</strong>: such a currency is resolved from its <code>$</code>-sigil code by <code>bvn_parse_currency_str</code> and carried as the numeric <code>base</code> value. The catalogue in <code>bovnar_currency.c</code> is index-aligned to the block, so a lookup is <code>base - BVN_CURRENCY_FIRST</code>.</p>
 <p>The alphabetical order is a convenience, not a contract. Whether a currency is fiat or crypto is a <strong>column of the catalogue</strong>, read by <code>bvn_unit_is_fiat</code> / <code>bvn_unit_is_crypto</code>, not a sub-range of the ids — so a new currency of either kind appends at the end of <code>currencies.bvnr</code> and renumbers nothing. Before 2.0 it <em>was</em> a sub-range, which is why <code>ZWG</code> and <code>XCG</code> had to be stranded at 378–379 outside the currency range entirely; the block has 10 000 ids and they are ordinary rows now.</p>
 <p>Four codes are historical and retained for compatibility: <code>HRK</code> (Croatian Kuna, retired 2023-01-01 when Croatia adopted the Euro), <code>SLL</code> (Sierra Leonean Leone (old), replaced by <code>SLE</code> in 2022), <code>ZWL</code> (Zimbabwean Dollar, superseded by <code>ZWG</code> Zimbabwe Gold in 2024), and <code>BGN</code> (Bulgarian Lev, retired 2026-01-01 when Bulgaria adopted the Euro); <code>ANG</code> (Netherlands Antillean Guilder) likewise coexists with its successor <code>XCG</code> (Caribbean Guilder, which inherits ANG's numeric code 532).</p>
 <p>The <code>minor_unit</code> field carries the exponent N such that 1 major unit = 10^N minor units (e.g. 1 USD = 100 cents, N=2). Applications reading integer-annotated values (e.g. <code>&lt;uint:64,$KWD&gt;</code>) should call <code>bvn_currency_minor_unit</code> to determine the correct decimal shift. Minor units are <strong>bold</strong> below when they differ from 2. <code>Num</code> is the ISO 4217 numeric identifier.</p>
@@ -5335,7 +5338,7 @@ tabulates all three caps beside the profile grammar.</p>
 .billing_rate = &lt;float_dec:64,$EUR/h&gt;         150.00; # €/h
 .eur_usd      = &lt;float_dec:64,$USD/$EUR&gt;        1.0842; # exchange rate
 .eth_btc      = &lt;float_dec:64,$BTC/$ETH&gt;       0.05610; # cross-crypto rate</code></pre></div>
-<p>Currency × currency compounds (<code>USD·EUR</code>) are syntactically valid and produce no error. Their financial interpretation is the application's responsibility.</p>
+<p>Currency × currency compounds (<code>$USD·$EUR</code>) are syntactically valid and produce no error. Their financial interpretation is the application's responsibility.</p>
 <h4 id="exchange-rate-timestamps">Exchange Rate Timestamps</h4>
 <p>Bovnar annotates denomination; it does not store exchange rates or timestamps. The timestamp belongs in a separate field:</p>
 <div class="codehilite"><pre><code class="language-bovnar">.snapshot = {
@@ -5917,7 +5920,7 @@ ask <code>bvn_int_to_exponent</code>, which returns <code>exp_invalid</code> for
 <span class="p">}</span><span class="w"> </span><span class="n">value_unit_t</span><span class="p">;</span>
 </code></pre></div>
 
-<p>For an explicit <code>no_unit</code> annotation, <code>num_components == 0</code> (<code>BVN_UNIT_NONE</code>). For an absent unit parameter in an explicit annotation (e.g. <code>&lt;float:64&gt;</code>), <code>num_components == 1</code> with <code>base == bu_none</code>.</p>
+<p>For an explicit <code>no_unit</code> annotation, <code>num_components == 0</code> (<code>BVN_UNIT_NONE</code>), and the same for an absent unit parameter in an explicit annotation (e.g. <code>&lt;float:64&gt;</code>). Only a fully unannotated value (<code>1.0</code>) has <code>num_components == 1</code> with <code>base == bu_none</code>, from default type synthesis (§7).</p>
 <h4 id="bvnr_data_t-unit-field"><code>bvnr_data_t</code> (unit field)</h4>
 <div class="codehilite"><pre><span></span><code><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">bvnr_data_s</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="n">token_type_t</span><span class="w">       </span><span class="n">type</span><span class="p">;</span>
@@ -6172,7 +6175,7 @@ does when a caller asks.</p>
 <p><strong><code>bvn_units_convertible</code> is the one to screen a conversion target with</strong>, and it is not <code>bvn_units_compatible</code>. That function answers "do these two carry the same physical dimension", and a currency deliberately carries none — so it reports <code>false</code> for <code>k~$USD → $USD</code> and even for <code>$USD → $USD</code>, both of which the conversion entry points perform correctly. <code>bvn_unit_convert_factor</code> is not the answer either: it reports <code>*ok = false</code> for <code>°F → °C</code>, because an affine conversion has no single multiplicative factor, so screening on it drops every temperature in the format. <code>bvn_units_convertible</code> is "dimensionally compatible, <strong>or</strong> the same unit apart from its prefixes", which is the set <code>bvn_unit_convert_value</code> and <code>bvn_unit_convert_rational</code> draw from — a <strong>superset</strong> of what they accept, not the same set.</p>
 <p>It is a <em>screen</em>, not a guarantee, and the gap is exactly <strong>two</strong> shapes wide. Code that screens with this must still handle a conversion that declines, and the two reasons it can decline are worth telling apart:</p>
 <ul>
-<li><strong>An affine scale outside "alone, at exponent 1".</strong> <code>s/°C</code> is dimensionally compatible with <code>s/K</code> and passes here; the conversion entry points refuse it, because an affine scale means nothing at an exponent other than 1 (§3.12 above; see also <a href="https://www.bovnar.io/docs/ambiguities/">Unit Ambiguities §10</a>). This one is reachable from ordinary units and is the one a policy has to fence.</li>
+<li><strong>An affine scale outside "alone, at exponent 1".</strong> <code>s/°C</code> is dimensionally compatible with <code>s/K</code> and passes here; the conversion entry points refuse it, because an affine scale means nothing at an exponent other than 1 (stated under "An affine unit has an SI value only alone" below, and for the interval units in §3.4; see also <a href="https://www.bovnar.io/docs/ambiguities/">Unit Ambiguities §10</a>). This one is reachable from ordinary units and is the one a policy has to fence.</li>
 <li><strong>Capacity.</strong> The exact factor needs more than <code>BVN_INT_MAX_BITS</code>, as the paragraph above describes: <code>Q~m¹⁰⁰ → q~m¹⁰⁰</code> is 10⁶⁰⁰⁰ and declines, while remaining a perfectly well-defined conversion between compatible units. This is <em>why</em> the screen answers <code>true</code> there — separating "too large to compute" from "these units disagree" is the question it exists to answer, and it is reachable only from deliberately extreme prefixes and exponents.</li>
 </ul>
 <p>Nothing else is in the gap. <code>python/tests/test_convertible_implies_convertible.py</code> sweeps the catalogue and its quotients and squares — a domain that cannot reach the capacity bound — and requires every pair that passes the screen and is then refused to be the affine shape; a companion case pins the capacity shape directly.</p>
@@ -6183,7 +6186,7 @@ does when a caller asks.</p>
 <li>any <strong>dimensionless</strong> unit (<code>%</code>, <code>ppm</code>, <code>dB</code>, <code>pH</code>, <code>rad</code>, <code>°</code>, the turbidity scales). Deliberate: normalising a ratio would silently turn <code>35 %</code> into a bare <code>0.35</code>, and normalising an angle would need the irrational factor between <code>°</code> and <code>rad</code>;</li>
 <li>a unit whose SI form the conversion engine would then refuse. The dimension vector does not determine a unit: <code>lm</code>, <code>lx</code> and <code>ph</code> carry the steradian's quantity kind, which no dimension vector can express, so rebuilding them from dimensions yields <code>cd</code> and <code>cd/m²</code> — a different quantity (§3.2). <code>s/°C</code> has the dimensions of <code>s/K</code> and is unconvertible for the affine reason above.</li>
 </ul>
-<p>The form returned is checked against <code>u</code> with <code>bvn_units_convertible</code> before it is returned, so a form this function gives back is one the conversion entry points accept. A temperature <strong>interval</strong> normalises to <code>ΔK</code> and never to <code>K</code>, which the dimension vector cannot say — both are Θ¹ — so the quantity kind is consulted (§3.12). This is the function <code>bvnr_normalise_si</code> is built on.</p>
+<p>The form returned is checked against <code>u</code> with <code>bvn_units_convertible</code> before it is returned, so a form this function gives back is one the conversion entry points accept. A temperature <strong>interval</strong> normalises to <code>ΔK</code> and never to <code>K</code>, which the dimension vector cannot say — both are Θ¹ — so the quantity kind is consulted (§3.4, <em>Temperature Differences</em>). This is the function <code>bvnr_normalise_si</code> is built on.</p>
 <p>For affine units (<code>bu_celsius</code>, <code>bu_fahrenheit</code>), <code>*is_affine</code> is set to <code>true</code> and <code>*affine_offset</code> receives the additive offset applied after multiplying by the returned factor.</p>
 <p><strong>An affine unit has an SI value only alone, at exponent 1.</strong> <code>°C²</code>, <code>°C·°F</code>, <code>°C/h</code> and <code>°C·m</code> all set <code>*ok = false</code>; <code>bvn_unit_convert_value</code> and <code>bvn_unit_convert_rational</code> refuse them, and the reader turns that into <code>error_unit_mismatch</code> (38). The offset is a number of kelvin, and a product whose SI unit is <code>K·s⁻¹</code> or <code>K·m</code> has nowhere to put it: the earlier code added it unscaled, so <code>20 °C/h</code> converted to <code>K/h</code> as 983360 and <code>20 °C·m</code> to <code>K·m</code> as 293.15 whatever the metres did. Both are arithmetic on a quantity that does not exist. <code>°C/h</code> still <strong>parses</strong> and is still a legal annotation — a consumer that means a temperature <em>difference</em> can read the components itself and apply its own semantics; what the library will not do is hand back a number for it. This matches pint, which forbids an offset unit inside a product outright.</p>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="n">ok</span><span class="p">,</span><span class="w"> </span><span class="n">affine</span><span class="p">;</span>
@@ -6237,13 +6240,14 @@ does when a caller asks.</p>
 <span class="cm">/* ci-&gt;code=&quot;USD&quot;, ci-&gt;numeric_code=840, ci-&gt;minor_unit=2,</span>
 <span class="cm">   ci-&gt;is_crypto=false, ci-&gt;name=&quot;US Dollar&quot; */</span>
 
-<span class="kt">int</span><span class="w"> </span><span class="n">cv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_parse_currency_str</span><span class="p">((</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="s">&quot;EUR&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span><span class="w">  </span><span class="cm">/* cv=177 */</span>
-<span class="kt">int</span><span class="w"> </span><span class="n">cc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_parse_currency_str</span><span class="p">((</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="s">&quot;DOGE&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span><span class="w"> </span><span class="cm">/* cc=326 */</span>
-<span class="kt">int</span><span class="w"> </span><span class="n">cx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_parse_currency_str</span><span class="p">((</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="s">&quot;xyz&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span><span class="w">  </span><span class="cm">/* cx=0   */</span>
+<span class="kt">int</span><span class="w"> </span><span class="n">cv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_parse_currency_str</span><span class="p">((</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="s">&quot;EUR&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span><span class="w">  </span><span class="cm">/* EUR&#39;s id, non-zero */</span>
+<span class="kt">int</span><span class="w"> </span><span class="n">cc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_parse_currency_str</span><span class="p">((</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="s">&quot;DOGE&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span><span class="w"> </span><span class="cm">/* DOGE&#39;s id, non-zero */</span>
+<span class="kt">int</span><span class="w"> </span><span class="n">cx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_parse_currency_str</span><span class="p">((</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="s">&quot;xyz&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span><span class="w">  </span><span class="cm">/* cx=0: not a code */</span>
 
-<span class="cm">/* Distinguishing cup (volume) from CUP (currency) in code: */</span>
+<span class="cm">/* Distinguishing cup (volume) from $CUP (currency) in code. The sigil is</span>
+<span class="cm">   mandatory: a bare &quot;CUP&quot; is not a unit (ok=false, error_unit_illegal). */</span>
 <span class="n">value_unit_t</span><span class="w"> </span><span class="n">volume</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_parse_unit</span><span class="p">((</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="s">&quot;cup&quot;</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ok</span><span class="p">);</span>
-<span class="n">value_unit_t</span><span class="w"> </span><span class="n">currency</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_parse_unit</span><span class="p">((</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="s">&quot;CUP&quot;</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ok</span><span class="p">);</span>
+<span class="n">value_unit_t</span><span class="w"> </span><span class="n">currency</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvn_parse_unit</span><span class="p">((</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="s">&quot;$CUP&quot;</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ok</span><span class="p">);</span>
 <span class="n">assert</span><span class="p">(</span><span class="o">!</span><span class="n">bvn_unit_is_currency</span><span class="p">(</span><span class="n">volume</span><span class="p">.</span><span class="n">components</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">base</span><span class="p">));</span><span class="w">   </span><span class="cm">/* true */</span>
 <span class="n">assert</span><span class="p">(</span><span class="w"> </span><span class="n">bvn_unit_is_currency</span><span class="p">(</span><span class="n">currency</span><span class="p">.</span><span class="n">components</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">base</span><span class="p">));</span><span class="w"> </span><span class="cm">/* true */</span>
 </code></pre></div>
@@ -6406,16 +6410,31 @@ ev_data   data=&quot;1500&quot;
 <tr>
 <td><code>error_unit_mismatch</code></td>
 <td>38</td>
-<td>An inline unit suffix and an explicit type-annotation unit are both present, but parse to different <code>value_unit_t</code> representations</td>
+<td>An inline unit suffix and an explicit type-annotation unit are both present, but parse to different <code>value_unit_t</code> representations. Also raised at read time by a conversion the consumer asked for: a unit policy's assertions (<code>require_unit</code>, <code>require_dimension_of</code>, a per-field rule the value cannot be converted to — <a href="https://www.bovnar.io/docs/policy/">Unit Policy §6.2</a>), and a conversion that a per-field rule or the <code>want_unit</code> hook demands of a unit holding an affine scale anywhere but alone at exponent 1 (<code>°C/h</code>, §12.4; a whole-document target simply does not select it)</td>
 </tr>
 <tr>
 <td><code>error_unexpected_input_byte</code></td>
 <td>15</td>
 <td>An inline unit suffix appears inside an array element</td>
 </tr>
+<tr>
+<td><code>error_unit_inexact</code></td>
+<td>47</td>
+<td>A read-time conversion (a unit policy, or the <code>want_unit</code> hook) cannot be delivered exactly: the factor is irrational, or the result does not terminate in the requested output base. Never raised for a document read without one</td>
+</tr>
+<tr>
+<td><code>error_unit_profile_unknown</code></td>
+<td>49</td>
+<td>A <code>namespace:code</code> unit (spec 1.2) whose namespace is not a profile this build supports</td>
+</tr>
+<tr>
+<td><code>error_unit_profile_unsupported</code></td>
+<td>50</td>
+<td>A profile code that is valid in its vocabulary but has no representation in this unit system (<a href="https://www.bovnar.io/docs/profiles/">Unit Profiles</a>)</td>
+</tr>
 </tbody>
 </table>
-<p>All four errors are raised during the <code>on_unverified</code> → validator phase. In <code>continue_on_error</code> mode the parser invokes <code>on_error</code> and enters the resync state machine, which resumes at the next <code>;</code> at the current nesting depth or at the start of the next assignment, whichever comes first (specification §13.2). <code>bvnr_reader_get_error</code>, <code>…_line</code>, <code>…_column</code>, <code>…_byte</code>, and <code>…_offset</code> all report the location of the offending token.</p>
+<p>The errors that judge the document itself are raised during the <code>on_unverified</code> → validator phase; <code>error_unit_inexact</code>, and <code>error_unit_mismatch</code> from a conversion or a policy, come from the conversion the consumer configured, before the value reaches <code>on_verified</code>. In <code>continue_on_error</code> mode the parser invokes <code>on_error</code> and enters the resync state machine, which resumes at the next <code>;</code> at the current nesting depth or at the start of the next assignment, whichever comes first (specification §13.2). <code>bvnr_reader_get_error</code>, <code>…_line</code>, <code>…_column</code>, <code>…_byte</code>, and <code>…_offset</code> all report the location of the offending token.</p>
 <hr />
 <h2 id="15-annotated-examples">15. Annotated Examples</h2>
 <h3 id="151-physical-quantities">15.1 Physical Quantities</h3>

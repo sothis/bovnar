@@ -33,10 +33,22 @@ def _lib_available() -> bool:
 
 LIB_AVAILABLE = _lib_available()
 
-needs_lib = pytest.mark.skipif(
-    not LIB_AVAILABLE,
+# A real marker, not a skipif alias: `-m needs_lib` / `-m "not needs_lib"`
+# select on it, and pytest_collection_modifyitems below turns it into a skip
+# when the library cannot be loaded. A module whose every test needs the
+# library sets `pytestmark = needs_lib`.
+needs_lib = pytest.mark.needs_lib
+
+_SKIP_NO_LIB = pytest.mark.skip(
     reason="libbvnr.so not found — set LIBBOVNAR_PATH to enable integration tests",
 )
+
+def pytest_collection_modifyitems(config, items):
+    if LIB_AVAILABLE:
+        return
+    for item in items:
+        if item.get_closest_marker("needs_lib") is not None:
+            item.add_marker(_SKIP_NO_LIB)
 
 @pytest.fixture
 def simple_scalar_uint():

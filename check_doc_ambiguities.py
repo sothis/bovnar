@@ -32,6 +32,9 @@ restatement of it:
       means. Everything the example cell offers in backticks must parse, and a
       compact/separated pair in it must agree; that last part is best-effort,
       since the cell is prose and may pair its spellings however it reads best.
+  §8, §14  the degree tables — the spelling with `°` parses, and the bare
+      spelling is what the row says: refused, an alias of the degree, or a
+      DIFFERENT unit (the silent misreading the tables warn about).
   §9  same dimension, different quantity — the accept-list rows are mutually
       convertible and carry the dimension stated beside them; the refuse-list
       rows really are refused; and the five worked conversions return what the
@@ -73,6 +76,7 @@ SURPRISING_HEAD = ("Written", "Bovnar reads", "If you meant…")
 ACCEPTS_HEAD = ("Units", "Shared dimension")
 REFUSES_HEAD = ("Unit", "Kind", "Refused against")
 HAZARD_HEAD = ("Written", "Read as", "Bovnar returns", "What just happened")
+DEGREE_HEAD = ("With `°`", "Means", "Without `°`", "Means")
 
 FAMILY_LINE = re.compile(r"The families, in full, are:(.*?)\(kg·m²·s⁻²\)", re.S)
 FAMILY_GROUP = re.compile(r"((?:`[^`]+`\s*)+)\(([^)]+)\)")
@@ -258,8 +262,40 @@ def check(repo):
             c.checked += 1
             check_hazard_row(c, n, cells)
 
+        elif h == DEGREE_HEAD and len(cells) >= 4:
+            check_degree_row(c, n, cells)
+
     check_families(c, text, catalogue)
     return c.problems, c.checked
+
+
+def check_degree_row(c, n, cells):
+    """§8 and §14: the spelling with `°`, and what it is without one.
+
+    The bare spelling is the column that rots: the hardness table said bare `e`
+    was error_unit_illegal long after `e` became the elementary charge, which is
+    the silent misreading the table exists to warn about. So the bare cell's
+    claim is put to the parser in whichever of its three forms it takes --
+    refused, an alias of the degree, or a different unit."""
+    with_deg = TICK.findall(cells[0])
+    without = TICK.findall(cells[2])
+    if not with_deg or not without:
+        return
+    c.checked += 1
+    u = c.must_parse(n, with_deg[0], "is listed as a degree")
+    if "error_unit_illegal" in cells[3]:
+        c.must_refuse(n, without[0], "is listed as error_unit_illegal")
+        return
+    v = c.must_parse(n, without[0], "is listed as a unit without the `°`")
+    if u is None or v is None:
+        return
+    if "alias of" in cells[3]:
+        if c.key(u) != c.key(v):
+            c.fail(n, "`%s` is listed as an alias of `%s` and parses to `%s`"
+                   % (without[0], with_deg[0], c.key(v)))
+    elif c.key(u) == c.key(v):
+        c.fail(n, "`%s` is listed as a different unit from `%s` and is the "
+                  "same one" % (without[0], with_deg[0]))
 
 
 def dimension_of(bovnar, expr):

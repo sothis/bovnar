@@ -389,6 +389,17 @@ static void test_cross_vocabulary(void)
 	ASSERT_TRUE(bvn_unit_equal(U("om:pascal"), U("qudt-qk:Pressure")),
 	            "om:pascal == the coherent unit of qudt-qk:Pressure");
 
+	/* The bel. OM declares it a SingularUnit, symbol B, and its decibel deci x
+	 * bel; it used to be refused as "an arbitrary unit from an assay". A bel is
+	 * ten decibels, which is what the other three vocabularies that have it say. */
+	ASSERT_TRUE(bvn_unit_equal(U("om:bel"), U("da~dB")),
+	            "om:bel is ten decibels");
+	ASSERT_TRUE(bvn_unit_equal(U("om:bel"), U("ucum:B")),
+	            "om:bel == ucum:B");
+	ASSERT_TRUE(bvn_unit_equal(U("om:bel"), U("qudt:B")),
+	            "om:bel == qudt:B");
+	chk_om("da~dB", "bel");
+
 	/* Convertibility, not just equality: an OM unit is an ordinary unit once
 	 * translated, so it converts against a native one. */
 	{

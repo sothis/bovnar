@@ -217,13 +217,21 @@ source and re-run the generator instead.
 | `include/bovnar_units.gen.h` | `src/gendata/units.bvnr` | `gen_units.py` |
 | `include/bovnar_si_prefix.gen.h`, `include/bovnar_iec_prefix.gen.h` | `src/gendata/prefixes.bvnr` | `gen_prefixes.py` |
 | `include/bovnar_profiles.gen.h` | `src/gendata/ucum.bvnr`, `unece.bvnr`, `qudt.bvnr`, `qudt-qk.bvnr`, `udunits.bvnr`, `om.bvnr`, `cf.bvnr` | `gen_profiles.py` |
-| `build/generated/bovnar_currency_table.gen.inc` | `src/gendata/currencies.bvnr` | `gen_currencies.py` |
-| `python/bovnar/_pint_units.py` | the unit registry | `gen_units.py` |
+| `include/bovnar_currency.gen.h`, `build/generated/bovnar_currency_table.gen.inc` | `src/gendata/currencies.bvnr` | `gen_currencies.py` |
 | `web/docs/*.html` | `doc/*.md` | `gen_html_docs.py` |
 | `web/sitemap.xml`, the LLM views, the translated pages | `web/` sources | `gen_sitemap.py`, `gen_llms.py`, `gen_i18n.py` |
 
 The generated web pages are committed, so an edit to `doc/*.md` that does not go
 through `gen_html_docs.py` leaves the tree inconsistent. CI detects this.
+
+`python/bovnar/_pint_units.py`, the Pint bridge table, is **not** generated: it
+is hand-maintained, and a unit added to the registry needs its row added there
+by hand. The tests in `python/tests/test_pint_bridge.py` (run when Pint is
+installed) are what verify it —
+`TestUnitTableIntegrity` re-derives every unit's dimension and magnitude from
+bovnar and asserts Pint reproduces both, and
+`TestPintAgreesWithBovnarOnWhatConverts` asserts Pint refuses every conversion
+bovnar refuses — so a missing or wrong row fails there.
 
 ## Code Style
 

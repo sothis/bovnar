@@ -59,9 +59,11 @@
 #   * `dBZ`, the radar reflectivity decibel: a logarithm against a reference
 #     (1 mm⁶/m³) that bovnar cannot state, the same argument doc/11 makes for
 #     the neper and pH.
-#   * Anything canonically measured per YEAR. CF's year is UDUNITS', the
-#     tropical 31556925.9747 s; bovnar's `yr` is the Julian 31557600 s, and
-#     doc/11 section 13.3 already refuses the UDUNITS one for the same reason.
+#   Names canonically measured in or per YEAR are NOT in that list any more.
+#   CF's year is UDUNITS', the tropical 31556925.9747 s, not bovnar's Julian
+#   `yr`; they were refused for that until the native tropical year `yr_trop`
+#   arrived, and now map to it (`age_of_sea_ice` -> yr_trop, and the m/yr
+#   sea-level tendencies), as udunits:yr does (doc/11 section 13.3).
 #
 # HOW THIS WORKS
 #   Hand-edited; gen_profiles.py regenerates the C tables. A FLAT profile: a

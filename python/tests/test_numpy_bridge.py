@@ -568,3 +568,33 @@ class TestNumpyScalarsInDumps:
         out = bovnar.dumps({'a': [np.float32('-inf'), np.float32('inf')]},
                            pretty=False)
         assert out == b'.a=[ninf,inf];'
+
+
+@needs_lib
+class TestEmptyRows:
+    """`[] / []` is two empty rows. The DOM path skipped the row split when
+    there were no children and answered shape (0,), while loads() said (2, 0)."""
+
+    SRC = b".a = [] / [];\n"
+
+    def test_dom_and_typed_paths_agree(self):
+        typed = bovnar.to_numpy(bovnar.loads(self.SRC, typed=True)["a"])
+        dom = bovnar.to_numpy(bovnar.dom_parse(self.SRC)["a"])
+        assert typed.shape == (2, 0)
+        assert dom.shape == (2, 0)
+
+    def test_three_empty_rows(self):
+        src = b".a = <sint:64> [] / [] / [];\n"
+        assert bovnar.to_numpy(bovnar.dom_parse(src)["a"]).shape == (3, 0)
+
+    @pytest.mark.parametrize("shape", [(0,), (2, 0), (1, 0), (2, 3, 0)])
+    def test_an_empty_last_axis_round_trips(self, shape):
+        b = bovnar.array_to_bvnr("a", np.zeros(shape, dtype="int64"))
+        assert bovnar.to_numpy(bovnar.loads(b, typed=True)["a"]).shape == shape
+        assert bovnar.to_numpy(bovnar.dom_parse(b)["a"]).shape == shape
+
+    @pytest.mark.parametrize("shape", [(0, 3), (0, 0), (3, 0, 2), (0, 2, 2)])
+    def test_an_empty_inner_axis_is_refused(self, shape):
+        """np.zeros((0, 3)) was written as `[]` and came back as shape (0,)."""
+        with pytest.raises(BovnarArgumentError, match="cannot be written faithfully"):
+            bovnar.array_to_bvnr("a", np.zeros(shape))

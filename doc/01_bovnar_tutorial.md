@@ -430,7 +430,7 @@ The full rules, the tables and the codes that are refused are in [Unit Profiles]
 
 Fixed-point (Q-format) numbers store a value as a signed integer, with the binary point shifted by a declared number of fractional bits. The wire representation is an integer; the mathematical value is `raw_integer × 2⁻Q`.
 
-The annotation requires a `qN` parameter specifying fractional bits, in addition to the width:
+The annotation takes a `qN` parameter giving the number of fractional bits, beside the width. An omitted `qN` is `q0`, so `<float_fix:32>` is `<float_fix:32,q0>` — no fractional bits at all — and a fixed-point value that has any fractional bits must say how many:
 
 ```bovnar
 .adc = <float_fix:16,q8>  3.14;    # 16-bit, 8 fractional bits

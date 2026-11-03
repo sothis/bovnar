@@ -465,24 +465,33 @@ bool bvnr_write_bvnf_base_unit(bvnr_writer_t *w, const char *key,
 	if (prec != 16u && (prec == 0u || prec % 32u != 0u ||
 			    prec > BVN_FLOAT_MAX_PREC))
 		return bvn_writer_set_error(w, error_illegal_value_type);
-	if (!emit_key(w, key)) return false;
 	value_type_spec_t vt = BVN_TYPE_FLOAT_BASE(prec,
 		effective_base == 10u ? 0u : 16u);
-	size_t bufsz = bvn_float_str_bufsize(prec, effective_base);
+	/* bvn_float_to_str prints the float at its OWN precision, which may
+	 * exceed the annotation's width -- legal, the excess is the consumer's to
+	 * round (doc/03 §6.2). Sized by the width alone, the buffer was too small
+	 * for such a value and the call failed with error_value_out_of_range. And
+	 * the text is formatted before the key goes out, so a failure leaves no
+	 * dangling ".a=" behind it. */
+	uint32_t fmt_prec = (uint32_t)f->_prec > prec ? (uint32_t)f->_prec : prec;
+	size_t bufsz = bvn_float_str_bufsize(fmt_prec, effective_base);
 	char *buf = malloc(bufsz);
 	if (!buf) return bvn_writer_set_error(w, error_invalid_argument);
 	int32_t n = bvn_float_to_str(f, buf, bufsz, effective_base);
-	bool ok = false;
-	if (n > 0) {
-		token_type_t tt;
-		if (effective_base == 10u || bvn_is_special_number_string(buf))
-			tt = token_is_number;
-		else
-			tt = token_is_string;
-		ok = emit_numeric_tt(w, vt, unit, buf, tt);
-	} else {
-		bvn_writer_set_error(w, error_value_out_of_range);
+	if (n <= 0) {
+		free(buf);
+		return bvn_writer_set_error(w, error_value_out_of_range);
 	}
+	if (!emit_key(w, key)) {
+		free(buf);
+		return false;
+	}
+	token_type_t tt;
+	if (effective_base == 10u || bvn_is_special_number_string(buf))
+		tt = token_is_number;
+	else
+		tt = token_is_string;
+	bool ok = emit_numeric_tt(w, vt, unit, buf, tt);
 	free(buf);
 	return ok;
 }

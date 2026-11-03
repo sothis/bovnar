@@ -86,7 +86,11 @@ BVN_API bool bvn_float_copy(bvn_float_t *dst, const bvn_float_t *src);
  * exact bound shifts slightly with the number of coefficient digits), such as
  * "1e10000" or "1e-10000" -- saturates to +/-inf or +/-0 and still returns
  * true, rather than failing. The 64-bit stored exponent is not the binding
- * limit here; the exact rational is. Callers parsing untrusted extreme
+ * limit here; the exact rational is. The MANTISSA's length is not a limit: only
+ * the digits the precision needs are kept, and the rest are folded into the
+ * exponent and a sticky digit, so "0." followed by ten thousand 1s rounds
+ * correctly (it used to come back as +inf or 0). bvn_float_parse_rational, which
+ * must be exact, keeps every digit and refuses a literal it cannot hold. Callers parsing untrusted extreme
  * exponents can distinguish saturation from a literal inf/0 via
  * bvn_float_is_inf / bvn_float_is_zero if that matters.
  */

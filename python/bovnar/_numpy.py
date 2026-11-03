@@ -184,10 +184,11 @@ def _dtype_to_family_width(dt):
 def _dom_rows(node: DomNode):
     """Children of an ARRAY DomNode as a nested list, undoing /-row flattening."""
     kids = [node[i] for i in range(len(node))]
-    if not kids:
-        return []
+    # Read the row count even when there are no children: "[] / []" is two
+    # empty rows (shape (2, 0), as loads() gives), not one empty array.
+    # Row sizes are equal by construction, so the split is exact.
     dims = node.array_dims()
-    if dims > 1:                                  # /-multirow: split flat children
+    if dims > 1 and len(kids) % dims == 0:        # /-multirow: split flat children
         rl = len(kids) // dims
         return [kids[r * rl:(r + 1) * rl] for r in range(dims)]
     return kids
@@ -599,6 +600,15 @@ def from_numpy(writer, key: str, arr, *, unit=None, float_format=None) -> None:
     if arr.ndim == 0:
         raise BovnarArgumentError(
             "from_numpy needs a 1-D+ array; write a 0-D value with the scalar API")
+    # An empty axis is written as empty brackets, which keep no length for any
+    # axis after it: np.zeros((0, 3)) would be written as `[]` and read back
+    # with shape (0,). Only a zero-length LAST axis survives ((2, 0) is
+    # `[] / []`), so refuse every other placement rather than drop the shape.
+    if 0 in arr.shape[:-1]:
+        raise BovnarArgumentError(
+            f"an array of shape {arr.shape} cannot be written faithfully: a "
+            f"zero-length axis keeps no length for the axes after it (only "
+            f"the last axis may be empty)")
 
     # Exact decimal/fixed/wide-binary path: explicit float_format always wins;
     # an object array of pure Decimal/Fraction defaults to float_dec:64. Any

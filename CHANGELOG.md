@@ -45,6 +45,175 @@ rebuild consumers against the new headers. **SOVERSION is bumped 1 → 2**
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
 
+### Fixed — a second whole-project review before release
+
+Eight reviews side by side — reader, writer/DOM/stream, native units, unit
+profiles, numerics and CLI, bindings, the documentation set, and build/CI/web —
+each finding reproduced before it was fixed, and each fix pinned by a test.
+
+**Reader.**
+
+- **Malformed UTF-8 met while recovering lost the rest of the document.** It
+  raised a second error and entered recovery again, which forgot that the skip
+  was inside a string, so the string's closing quote opened a new skip: with
+  `continue_on_error`, `.a = "café crème";` in Latin-1 lost every assignment
+  after it. It is skipped like any byte there now (doc/03 §13.2), with one error
+  and the right skipped-byte count. A `"` that cut a multi-byte character short
+  (`.a = sym\xe2\x82"s";`) was dispatched twice and lost the rest the same way.
+- An error column pointed one character early for a byte that cut a UTF-8
+  sequence short, and for `error_file_too_long`.
+
+**Writer and DOM.**
+
+- **`#!bovnar 1.0` admitted 1.1 constructs.** The datetime and `[N]` reference
+  gates tested only that some directive was out; under 1.0 both were written and
+  then refused by the reader.
+- **Bare numbers the reader does not read as numbers were written**: a leading
+  `+` in bases 2–9, a `.` or `e` under an integer family where the base does not
+  make it a digit (`<uint:64,_85> 1.0`), an empty number token (which read back
+  as a null) and an empty string under a numeric annotation. All are
+  `error_type_value_mismatch` now; a sweep of 1760 texts × annotations finds no
+  output the reader refuses.
+- `bvnr_write_bvnf_base` refused a `bvn_float_t` more precise than the width it
+  was written at (legal, doc/03 §6.2) and left a dangling `.a=`; the text is
+  sized by the float's own precision and formatted before the key.
+- A writer that was never opened accepted every event until its 64 KiB buffer
+  first flushed; the first event (or `bvnr_write_version`) is refused with
+  `error_invalid_argument`.
+- After an error, `bvnr_write_finish` left an fd sink with an arbitrary
+  block-aligned prefix of the output, or nothing, while a memory sink held all
+  of it; both now end with everything written up to the error (doc/08 §2.9).
+- `bvn_dom_get_string`/`_symbol`/`_reference` returned true with a NULL pointer
+  for an allocated node; it is `""`. A NULL or empty key is refused by
+  `bvn_dom_struct_add` and `bvn_dom_doc_add` (it reached `memcmp` through NULL).
+
+**Numerics.**
+
+- **A float literal with a long mantissa read as +inf or 0.** The digits were
+  built into one exact integer, so about 9865 decimal or 8192 hex digits passed
+  its 32768-bit budget whatever the value: `0.111…1` was +inf, and in a document
+  a long `<float:64,_16>` mantissa queried as `inf`. A rounding parse now keeps
+  the digits its precision needs — every binary64 rounding midpoint exactly —
+  and folds the rest into the exponent and a sticky digit; the exact parse used
+  for lossless conversion still refuses what it cannot hold.
+- **The `float_fix` range check rounded twice**, so a literal within one
+  intermediate ulp of a grid tie was decided by the tie: `<float_fix:16,q8>
+  127.998046874999999999999999999999` (raw 32767) was refused and
+  `-128.001953125000000000000000000001` (raw −32769) accepted. It rounds the
+  exact rational once, ties to even; 0 of 4000 boundary cases disagree with an
+  exact oracle, against 901 before.
+- The decimal-interchange encoder overflowed `int` on an exponent near
+  `INT_MAX` (undefined behaviour; `1e2147483647` encoded as +0); the exponent
+  saturates at 10⁸, far past every decimal format's range.
+- `bvn_parse_double` accepted `-inf`, `+inf`, `-nan` and a `0x` prefix, none of
+  which a document can carry (doc/08 §1.11); the six narrow
+  `bvn_int_to_{u,}int{32,16,8}` crashed on a NULL out-pointer; and
+  `bvn_int_sub_inplace` is documented as the magnitude subtraction it is.
+
+**Native units.**
+
+- **A refused unit parse returned a partial unit** — `m//s` as `m`, `(m·s)²` as
+  `m·s` — though `bovnar.h` promises `BVN_UNIT_NONE`; and `no_unit` was accepted
+  inside a group (`m*(no_unit)` read as `m`), which the grammar does not allow.
+- `Btu_59` is NIST SP 811's 1054.804 J, of which the US therm is exactly 10⁵; it
+  was UCUM's 6-digit 1054.8, 3.8 ppm low (now a named publisher waiver).
+
+**Unit profiles.**
+
+- **`qudt:MicroKAT-PER-L`, `MilliKAT-PER-L`, `NanoKAT-PER-L` and
+  `PicoKAT-PER-L` read a million times too small**, fitted to QUDT
+  multipliers that contradict its own `ukat/L`-style labels and ucumCodes. They
+  are refused, as `qudt:LA` was; write `ucum:ukat/L` or `µ~kat/L`.
+- Refused for the same reason: `qudt:PT` and `unece:N3` (a typographic point
+  read as a thou), `qudt:BTU_MEAN` and `unece:J39` (the mean BTU read as the IT
+  one), `qudt:MilliRAD_R` (an absorbed dose read as the millirem, as
+  `ucum:mRAD` already was), `qudt:GRAIN-PER-GAL` and `unece:H39`.
+- `qudt:KiloVAR`, `KiloV-A_Reactive`, `MegaVAR` and `MegaV-A_Reactive` read
+  reactive power as apparent power; they are `k~var`/`M~var`, the reactive-hour
+  codes and `unece:K3`/`MAH` are `var·h` (were `W·h`), and `k~VA` is written
+  back as `qudt:KiloV-A`.
+- 18 `unece` rows reached through QUDT had drifted from their QUDT row and agree
+  again (`C51` is `Np/s`, `M56` the shake, `J23`–`J25` Fahrenheit intervals, …);
+  `unece:J94`, `B12`, `A58` and `E95` each named another quantity of the same
+  dimension. `om:bel` maps to `da~dB`.
+- `unece:A8`, `J55`, `P14`, `M77`, `F90` and `C55` — Rec 20 codes that name a
+  unit by its definition (*ampere second*, *watt second*, …) — read as that
+  definition (`A·s`, `W·s`, `J/s`, `k~g·m/s^2`, `N·m/A`, `N/m^2`), as QUDT's rows
+  do, not as second codes for the coulomb, joule, watt, newton, weber and
+  pascal, which keep `COU`, `JOU`, `WTT`, `NEW`, `WEB` and `PAL`. `PS`, Rec 20's
+  only psi code, stays the psi.
+- **UDUNITS**: every SHIFT form (`after`, `from`, `ref`, `since`, `@`, any case)
+  is `error_unit_profile_unsupported` — only lower-case `since` was, the rest
+  `error_unit_illegal` — and a run of spaces is one multiplication, with spaces
+  around `/` or the word `per` dividing, as UDUNITS' scanner reads them
+  (conformance case UPR-043f now expects `kg  m-2` to parse).
+- `check_profile_factors.py` compares QUDT's cross-references by factor and by
+  unit, not just convertibility — which is what surfaced the rows above.
+
+**Bindings.**
+
+- Python: a `Reader` closed, re-read or re-configured from inside its own
+  callback corrupted the heap or cut the outer read short; it raises
+  `BovnarArgumentError`. `Writer.write_version()` defaulted to 1.1 in a spec-1.2
+  library; it writes `spec_version()`, as `emit_version=True` does.
+- Python: `to_numpy` on a DOM node lost empty `/` rows, and `from_numpy` wrote
+  arrays whose shape cannot survive; `DomDoc.parse_fd`/`parse_file` reported an
+  I/O error or the 256 MiB cap as `MemoryError`; `Quantity.from_number(str)`
+  took any text; `BovnarLibraryNotFound` (raised on first use, not at import)
+  lists every path tried, and a failed `Reader()` no longer prints a `__del__`
+  traceback; `needs_lib` is a real marker, so the suite skips rather than fails
+  without the library.
+
+**CLI.**
+
+- `bovnar convert` reports a negative zero's lost sign and exits 1, and its
+  help and the README promise that exit 0 means every *value* converts back —
+  the annotations never do. json → bvnr writes a JSON integer wider than 64 bits
+  as `<uint:N>`/`<sint:N>` (N the smallest power of two from 128 that holds
+  it) instead of refusing it; inside an array, whose elements share a type, it
+  is still refused, now naming the key.
+- **`pretty-print --canonical` gave one value two canonical forms.** The reader
+  hands an inline-unit value over as `<float:64,_10,km>` and an unannotated one
+  with `_10,no_unit`, so `1.0 km` and `<float:64,k~m> 1.0`, or `5` and
+  `<uint> 5`, canonicalised to different bytes. `BVN_NUM_CANONICAL` now writes
+  every annotation in one form: the width written out, a default `_10` and
+  `no_unit` left out. Where an annotation sits is unchanged (`[1, 2]` and
+  `<uint:64> [1, 2]` stay two documents).
+
+**Build, CI and packaging.**
+
+- **72 CTest tests ignored their exit status.** `PASS_REGULAR_EXPRESSION`
+  replaces it, so a sanitizer report or a leak printed after the success line
+  passed the CI ASan/UBSan run. No test carries one now; the CLI tests that also
+  check output go through `cmake/cli_expect.cmake`, which requires both — and
+  which at once showed two policy tests that had never exited 0.
+- The release packer found no binaries under a multi-config generator (the
+  README's own MSVC line) and shipped an archive of headers and docs without
+  saying so; it is told where the artifacts are and fails on a missing one.
+- `bvnr.pc` pointed at `/include` for an absolute `CMAKE_INSTALL_LIBDIR`;
+  `amalgamate.py` dropped an unresolved project include and exited 0 with a
+  `bovnar.c` that did not compile; `check_install_headers.py` could not see a
+  header dropped from the install list; the `?v=` stamps the WASM modules import
+  were checked by nothing; `web/sitemap.xml` had no gate (`bvnr_sitemap` now
+  compares its URLs — its dates are refreshed on publish).
+
+**Documentation.**
+
+- The IETF draft's Keys section had vanished from all three renderings into an
+  unclosed code block; `check_ietf_draft.py` now checks fence balance and that
+  every heading renders. The draft's ABNF lacked Greek `μ` as micro, listed `=`
+  among key errors, and its version-stability list lacked the `float_fix`
+  overflow; doc/13's IUT protocol said a `unix` epoch is emitted as
+  `TYPE_PARAM_UNIT`, which the reference never does.
+- doc/03, doc/11 and the release notes said an opaque unit converts to nothing;
+  it converts across a prefix change. Corrected besides: the directive's
+  position (after blank lines too), `float_fix`'s optional `qN`, doc/05's stale
+  currency example, its unit EBNF and error list, doc/04's prefix table, the
+  water-hardness `e`, NFKC and superscripts, `--base`'s reach, the therm gap
+  (0.024 %, not 0.24 %), when c became exact (1983), a dozen section references,
+  every stale count in doc/11, the wiki citations and the CONTRIBUTING table of
+  generated files.
+
 ### Fixed — a whole-project review before release
 
 Five reviews side by side — reader, writer and DOM, unit system, bindings, and
@@ -2083,7 +2252,7 @@ state and whose value is exactly representable:
 | `AT` | assay ton (short) | 175/6 g | UDUNITS, QUDT, OM |
 | `bsh_uk` | imperial bushel | 0.03636872 m³ (= 8 `gal_uk`) | UCUM, QUDT |
 | `clo` | clo | 0.155 K·m²/W exactly | UDUNITS, QUDT |
-| `debye` | debye | 10⁻²¹/c C·m, exact since 2019 | QUDT, OM |
+| `debye` | debye | 10⁻²¹/c C·m, exact | QUDT, OM |
 
 26 profile codes across four vocabularies now map instead of being refused, and
 `check_profile_factors.py` reports 0 mismatch against the publishers' own files.

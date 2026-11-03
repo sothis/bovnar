@@ -147,14 +147,23 @@ def expand(path, inlined, sys_inc, out, in_platform_cond=False):
                 # An include that resolves to a project file (quote form, or the
                 # <...> form bvn_float.c uses for <bvn_float.h>) is inlined once;
                 # an unconditional <system> header is hoisted; a platform-guarded
-                # <system> header is kept inline (its #if guard must survive); an
-                # unresolved quote include is dropped. Any trailing content (e.g.
-                # a comment opening a multi-line block) is always preserved.
+                # <system> header is kept inline (its #if guard must survive). An
+                # unresolved quote include is an error: it is a project file the
+                # search path does not reach -- in practice the generated *.inc
+                # tables when BVNR_GENERATED_DIR is wrong -- and dropping it
+                # produced a bovnar.c that did not compile, with exit status 0.
+                # Any trailing content (e.g. a comment opening a multi-line
+                # block) is always preserved.
                 tgt = resolve(name)
                 if tgt:
                     if tgt not in inlined:
                         inlined.add(tgt)
                         expand(tgt, inlined, sys_inc, out, platform_ctx)
+                elif mp:
+                    sys.exit("amalgamate.py: %s includes \"%s\", which is in none "
+                             "of the search directories (generated files are "
+                             "looked for in %s; set BVNR_GENERATED_DIR)"
+                             % (os.path.relpath(path, ROOT), name, GEN_DIR))
                 elif ms:
                     if platform_ctx:
                         out.append(line)
@@ -232,7 +241,7 @@ def main():
     with open(os.path.join(out_dir, "bovnar.c"), "w", encoding="utf-8") as f:
         f.write(impl)
     print("wrote %s/bovnar.h (%d bytes) and %s/bovnar.c (%d bytes)"
-          % (out_dir, len(hdr), out_dir, len(impl)))
+          % (out_dir, len(hdr.encode("utf-8")), out_dir, len(impl.encode("utf-8"))))
 
 
 if __name__ == "__main__":

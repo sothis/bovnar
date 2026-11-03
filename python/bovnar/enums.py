@@ -504,7 +504,7 @@ class BaseUnit(IntEnum):
     CNY = 900030   # Chinese Yuan            - minor unit: 2
     COP = 900031   # Colombian Peso          - minor unit: 2
     CRC = 900032   # Costa Rican Colon       - minor unit: 2
-    CUP_ = 900033  # Cuban Peso  - minor unit: 2  (trailing _ : the bare name CUP is the US-cup volume unit = 100080; wire token is still bare uppercase "CUP")
+    CUP_ = 900033  # Cuban Peso  - minor unit: 2  (trailing _ : the bare name CUP is the US-cup volume unit = 100080; the wire token is "$CUP" -- the "$" sigil is mandatory, and bare "CUP" is not this currency)
     CVE = 900034   # Cape Verdean Escudo     - minor unit: 2
     CZK = 900035   # Czech Koruna            - minor unit: 2
     DJF = 900036   # Djiboutian Franc        - minor unit: 0

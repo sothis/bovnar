@@ -252,6 +252,21 @@ class Quantity:
                 "from_number: family must be FLOAT, FLOAT_DEC, or FLOAT_FIX")
         _validate_float_width(family, width)
         text = _exact_number_text(value)
+        if isinstance(value, str):
+            # A str is taken verbatim, so check it is a number at all, with
+            # the library's own grammar for a decimal literal (the writer's):
+            # '' used to become a typed null on dumps(), 'abc' and ' 1' a
+            # BovnarWriteError much later, and .decimal a bare
+            # decimal.InvalidOperation.
+            from ._ffi import get_library
+            lib = get_library()
+            raw = text.encode('utf-8')
+            if not (lib.bvn_validate_number(raw)
+                    or lib.bvn_is_special_number_string(raw)):
+                raise BovnarArgumentError(
+                    f"from_number: {value!r} is not a decimal number literal "
+                    f"(digits with an optional leading '-', '.', and exponent; "
+                    f"or nan, inf, ninf)")
         if fam == int(_F.FLOAT_FIX):
             from ._ffi import get_library
             if not get_library().bvn_float_str_fits_fix(

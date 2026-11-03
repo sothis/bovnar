@@ -46,8 +46,9 @@
 </blockquote>
 <p>Pure-<code>ctypes</code> Python bindings for the <strong>Bovnar (BVNR)</strong> typed serialisation
 library (library 2.0.0, format spec 1.2).</p>
-<p>No compiled extension module is needed — the bindings load <code>libbvnr.so</code> at
-import time via the standard <code>ctypes.CDLL</code> machinery.</p>
+<p>No compiled extension module is needed — the bindings load <code>libbvnr.so</code>
+through the standard <code>ctypes.CDLL</code> machinery the first time something needs
+the C library; <code>import bovnar</code> itself never loads it.</p>
 <hr />
 <h2 id="table-of-contents">Table of Contents</h2>
 <ol>
@@ -218,8 +219,11 @@ pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </s
    <code>.</code> (resolved relative to the <code>_ffi.py</code> file; useful when building Bovnar
    alongside the bindings from a mono-repo).</li>
 </ol>
-<p>If the library cannot be found a <code>BovnarLibraryNotFound</code> exception is raised
-with the list of searched paths.</p>
+<p>The search runs on first use, not at import: <code>import bovnar</code> succeeds without
+the library, and the first call that needs it (<code>loads</code>, <code>Reader()</code>,
+<code>parse_unit</code>, …) raises <code>BovnarLibraryNotFound</code> if none of the candidates
+loads. The message lists every candidate tried, in order, with why each one
+failed (<code>not found</code>, or the loader's error).</p>
 <hr />
 <h2 id="4-quick-start">4. Quick-start</h2>
 <h3 id="41-high-level-api-loads--dumps">4.1 High-level API (<code>loads</code> / <code>dumps</code>)</h3>
@@ -390,7 +394,15 @@ reader is closed.</p>
 <h3 id="44-dom-random-access-api">4.4 DOM (random-access) API</h3>
 <div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">bovnar</span>
 
-<span class="n">doc</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">dom_parse</span><span class="p">(</span><span class="n">bvnr_bytes</span><span class="p">)</span>
+<span class="n">dom_bytes</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">.sensor_id = &lt;uint:64&gt; 42;</span>
+<span class="s2">.config = {</span>
+<span class="s2">    .host = &quot;localhost&quot;;</span>
+<span class="s2">    .port = &lt;uint:16&gt; 8080;</span>
+<span class="s2">};</span>
+<span class="s2">.values = [1.5, 2.5, 4.0];</span>
+<span class="s2">&quot;&quot;&quot;</span>
+<span class="n">doc</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">dom_parse</span><span class="p">(</span><span class="n">dom_bytes</span><span class="p">)</span>
 
 <span class="c1"># Top-level key lookup</span>
 <span class="n">node</span> <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;sensor_id&quot;</span><span class="p">]</span>
@@ -400,14 +412,16 @@ reader is closed.</p>
 <span class="c1"># Struct traversal</span>
 <span class="n">cfg</span> <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;config&quot;</span><span class="p">]</span>
 <span class="n">host</span> <span class="o">=</span> <span class="n">cfg</span><span class="p">[</span><span class="s2">&quot;host&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">as_str</span><span class="p">()</span>
+<span class="n">host</span>                        <span class="c1"># → &quot;localhost&quot;</span>
 
 <span class="c1"># Array access</span>
 <span class="n">arr</span> <span class="o">=</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;values&quot;</span><span class="p">]</span>
 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">arr</span><span class="p">)):</span>
-    <span class="nb">print</span><span class="p">(</span><span class="n">arr</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">as_float</span><span class="p">())</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">arr</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">as_float</span><span class="p">())</span>    <span class="c1"># 1.5, 2.5, 4.0</span>
 
 <span class="c1"># Convert entire document to a plain Python dict (drops type/unit info)</span>
 <span class="n">d</span> <span class="o">=</span> <span class="n">doc</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+<span class="n">d</span><span class="p">[</span><span class="s2">&quot;config&quot;</span><span class="p">][</span><span class="s2">&quot;port&quot;</span><span class="p">]</span>         <span class="c1"># → 8080</span>
 </code></pre></div>
 
 <h3 id="45-low-level-writer">4.5 Low-level writer</h3>
@@ -605,7 +619,9 @@ out) wherever it takes a <code>ValueUnit</code>, so <code>unit_to_str(q.unit)</c
 (and <code>to_fd</code> / <code>to_file</code>) rewrites each unit as it is written <em>and</em> rescales the
 value with it — <code>2.5 k~g</code> goes out as <code>&lt;float:64,g&gt; 2500</code>. <code>NUM_CANONICAL</code> is
 meaningful only there: it appends <code>.0</code> to a rescaled float that came out as an
-integer string, so the canonical document mode lands on one spelling.</p>
+integer string, and writes each annotation in one form (the width written out,
+a default <code>_10</code> base and <code>no_unit</code> left out), so the canonical document mode
+lands on one spelling.</p>
 <blockquote>
 <p><strong><code>UnitFlags.REDUCE</code> returns the reduced unit, not a rescaled value.</strong> Reduction
 folds every prefix out, so <code>unit_to_str_ex(parse_unit("k~g"), UnitFlags.REDUCE)</code>
@@ -865,7 +881,11 @@ is lossless to the format's precision):</p>
 
 <p>It accepts a <code>Decimal</code>, <code>Fraction</code> (must be a terminating decimal), <code>int</code>,
 <code>str</code> (a verbatim literal), or <code>float</code> (only as precise as the double), and
-validates the width for the chosen family. For <code>float_dec</code> it also refuses a
+validates the width for the chosen family. A <code>str</code> must be a decimal number
+literal in the format's own grammar — digits with an optional leading <code>-</code>,
+<code>.</code> and exponent (<code>1.5</code>, <code>-2e-3</code>, <code>.5</code>), or <code>nan</code>, <code>inf</code>, <code>ninf</code> — so <code>''</code>,
+<code>'abc'</code>, <code>' 1'</code> and <code>'+1'</code> raise <code>BovnarArgumentError</code> here rather than
+failing later in <code>dumps</code>. For <code>float_dec</code> it also refuses a
 finite value past the width's range — <code>Decimal('1e400')</code> does not fit
 <code>float_dec:64</code> and would materialise to infinity — and a non-finite <code>float</code>
 is stored under the format's own spelling (<code>inf</code>, <code>ninf</code>, <code>nan</code>).</p>
@@ -1244,15 +1264,16 @@ an <strong>object array of exact <code>decimal.Decimal</code></strong> on the ty
 (<code>loads(..., typed=True)</code>) path, which is lossless; pass <code>dtype='float64'</code> for
 the lossy native conversion. The DOM (<code>dom_parse</code>) path only has a C <code>double</code>
 for these, so it raises and points you at the typed path or <code>dtype='float64'</code>.
-Integers wider than 64 bits likewise come back as an object array of Python
-ints (<code>dtype=object</code>), which is exact.</p>
+Integers wider than 64 bits need <code>dtype=object</code>, which gives an exact object
+array of Python ints; without it <code>to_numpy</code> raises <code>BovnarArgumentError</code>.</p>
 <p>A <strong><code>datetime</code></strong> array on the <strong>unix</strong> epoch (spec 1.1) maps to/from
 <code>datetime64[s]</code> — the integer epoch-seconds carrier is unix-relative, so it
 round-trips losslessly. A non-unix epoch (<code>tai</code>, <code>gps</code>, …) is <em>not</em>
 unix-relative, so <code>to_numpy</code> refuses it (mapping it to <code>datetime64</code> would
 mis-date every value) and points you at <code>dtype='int64'</code> for the raw seconds.
 On the write side a <code>datetime64[*]</code> array is coarsened to whole seconds and
-written as <code>&lt;datetime:64,unix&gt;</code>; <code>NaT</code> has no bovnar representation and is
+written as <code>&lt;datetime:64&gt;</code> (the unix epoch is the default and is not
+spelled out); <code>NaT</code> has no bovnar representation and is
 rejected, and <code>array_to_bvnr</code> prepends the <code>#!bovnar 1.1</code> directive so its
 output re-parses.</p>
 <p><strong>Strict by default:</strong></p>
@@ -1294,6 +1315,10 @@ output re-parses.</p>
 <ul>
 <li><code>from_numpy</code> requires a 1-D-or-higher array; write a 0-D scalar with the
   scalar <code>Writer</code> API instead.</li>
+<li>An empty axis is written as empty brackets, which keep no length for any axis
+  after it, so only the <strong>last</strong> axis may be zero-length: shape <code>(2, 0)</code> is
+  <code>[] / []</code> and reads back as <code>(2, 0)</code>, while <code>(0, 3)</code> would be written as <code>[]</code>
+  and read back as <code>(0,)</code> — it raises <code>BovnarArgumentError</code> instead.</li>
 <li><em>unit</em> may be a bovnar unit string, a <code>Unit</code>, a <code>ValueUnit</code>, or a pint
   <code>Unit</code>/<code>Quantity</code> (anything else raises <code>BovnarArgumentError</code>).</li>
 <li>Units apply to <strong>numeric</strong> arrays only — a unit on a <code>bool</code> or string array
@@ -1364,6 +1389,12 @@ or unknown codes.</p>
 
 <p><code>Reader.__init__</code> calls <code>bvnr_reader_create</code> immediately.  Use as a context
 manager or call <code>r.close()</code> explicitly to release the C object.</p>
+<p>A reader is not re-entrant. While <code>read_mem</code>, <code>read_fd</code>, <code>read_file</code> or
+<code>iter_mem</code> is running, the reader's own callbacks must not call <code>close()</code>,
+start another read on it, or <code>set_unit_policy()</code>: each raises
+<code>BovnarArgumentError("Reader is in use by its own callback")</code>, which aborts the
+running parse and is re-raised from the read. Use a second <code>Reader</code> for a
+nested parse, and close the first one after its read returns.</p>
 <h3 id="112-read_mem">11.2 <code>read_mem</code></h3>
 <p><code>read_mem(data, *, on_verified, on_unverified, max_file_size, continue_on_error,
 strict_version, text_only, want_unit, want_unit_allow_nonterminating,
@@ -1602,7 +1633,7 @@ were recovered, and <code>recovery_count</code> is how to tell that any were (sp
 the context manager calls <code>finish()</code> automatically.</p>
 <p><code>unit_flags</code> takes <a href="#53-unitflags"><code>UnitFlags</code></a> — <code>REDUCE</code> rewrites each unit
 and rescales its value, <code>ASCII_EXP</code> writes <code>^N</code> exponents, <code>NUM_CANONICAL</code>
-keeps a rescaled float in float shape. <code>emit_version=True</code> writes a leading
+keeps a rescaled float in float shape and writes annotations in one form. <code>emit_version=True</code> writes a leading
 <code>#!bovnar M.N</code> naming the spec version this build implements, as
 <code>write_version()</code> would. Every writer accepts structs and arrays nested up to
 <strong>255</strong> deep, the same limit <code>Reader</code> and <code>loads()</code> read at.</p>
@@ -1677,14 +1708,18 @@ big-integer arithmetic and emitted as quoted strings.  <code>signed</code> defau
 <p><code>finish()</code> verifies that the struct depth is zero; an unclosed struct raises
 <code>BovnarWriteError(GOT_INCOMPLETE_BVNR_STREAM)</code>.</p>
 <h3 id="126-version-directive">12.6 Version directive</h3>
-<div class="codehilite"><pre><span></span><code><span class="n">w</span><span class="o">.</span><span class="n">write_version</span><span class="p">(</span><span class="n">major</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">minor</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>   <span class="c1"># emit a leading &quot;#!bovnar 1.1&quot; directive</span>
+<div class="codehilite"><pre><span></span><code><span class="n">w</span><span class="o">.</span><span class="n">write_version</span><span class="p">()</span>                   <span class="c1"># &quot;#!bovnar 1.2&quot;: the spec this build implements</span>
+<span class="n">w</span><span class="o">.</span><span class="n">write_version</span><span class="p">(</span><span class="n">major</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">minor</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>   <span class="c1"># or declare an older version explicitly</span>
 </code></pre></div>
 
-<p>Emits a leading <code>#!bovnar &lt;major&gt;.&lt;minor&gt;</code> directive. Must be called before any
-value is written; calling it after output has begun raises
-<code>BovnarWriteError(INVALID_ARGUMENT)</code>. Use it to self-declare the spec version a
-document targets (spec-1.1 constructs such as datetime literals need it to
-re-read).</p>
+<p>Emits a leading <code>#!bovnar &lt;major&gt;.&lt;minor&gt;</code> directive. With no arguments it
+names the spec version this build implements (<code>bovnar.spec_version()</code>, 1.2) —
+the same directive <code>emit_version=True</code> writes; pass <code>major</code> and <code>minor</code>
+together to declare an older one. Must be called before any value is written;
+calling it after output has begun raises <code>BovnarWriteError(INVALID_ARGUMENT)</code>.
+Use it to self-declare the spec version a document targets (spec-1.1
+constructs such as datetime literals need at least 1.1 to re-read, a
+profile-notation unit such as <code>ucum:[IU]</code> needs 1.2).</p>
 <h3 id="127-array-helpers">12.7 Array helpers</h3>
 <div class="codehilite"><pre><span></span><code><span class="n">w</span><span class="o">.</span><span class="n">begin_array_row</span><span class="p">()</span>   <span class="c1"># emit ARRAY_ROW_START</span>
 <span class="n">w</span><span class="o">.</span><span class="n">end_array_row</span><span class="p">()</span>     <span class="c1"># emit ARRAY_ROW_END</span>
@@ -1725,7 +1760,43 @@ tree; any <code>DomNode</code> derived from it becomes invalid after that point.
 </tr>
 <tr>
 <td><code>DomDoc.parse_fd(fd)</code></td>
-<td>Class method. Parse from an open file descriptor.</td>
+<td>Class method. Parse from an open file descriptor. A read error raises the matching <code>OSError</code> (<code>EBADF</code> for a bad descriptor, <code>IsADirectoryError</code> for a directory, …), input over the 256 MiB cap <code>BovnarParseError(FILE_TOO_LONG)</code>.</td>
+</tr>
+<tr>
+<td><code>DomDoc.parse_file(path)</code></td>
+<td>Class method. Open path and parse (fd closed in <code>finally</code>). Applies an internal hard cap of <code>BVN_DOM_FD_MAX_BYTES</code> (256 MiB) via the C function <code>bvn_dom_parse_fd</code>. This ceiling is distinct from <code>Reader.read_file</code>'s <code>MAX_FILESIZE_BYTES</code> (16 MiB). Raises as <code>parse_fd</code> does, with the path on the <code>OSError</code>.</td>
+</tr>
+<tr>
+<td><code>doc.parse_error</code></td>
+<td><code>ErrorCode</code> — <code>NONE</code> on success.</td>
+</tr>
+<tr>
+<td><code>doc[key]</code></td>
+<td>Return a <code>DomNode</code> by key; raises <code>KeyError</code> when absent. <code>key</code> goes to the path lookup, so <code>doc["server"]</code> is a top-level entry and a dotted or indexed path reaches below it: <code>doc["server.tls"]</code> is <code>doc["server"]["tls"]</code>, <code>doc["matrix[1][0]"]</code> an element. A key cannot contain <code>.</code> or <code>[</code>, so the two readings never collide.</td>
+</tr>
+<tr>
+<td><code>key in doc</code></td>
+<td><code>True</code> when <code>doc[key]</code> would succeed — the same path rule. A non-<code>str</code> is never in a document.</td>
+</tr>
+<tr>
+<td><code>len(doc)</code></td>
+<td>Number of top-level entries.</td>
+</tr>
+<tr>
+<td><code>iter(doc)</code></td>
+<td>Iterate over <code>(key, DomNode)</code> pairs.</td>
+</tr>
+<tr>
+<td><code>doc.entries()</code></td>
+<td>Return all top-level <code>(key, DomNode)</code> pairs as a list.</td>
+</tr>
+<tr>
+<td><code>doc.lookup(path)</code></td>
+<td>Dot-separated path lookup, e.g. <code>'server.tls.cert'</code>. Returns <code>None</code> when absent.</td>
+</tr>
+<tr>
+<td><code>doc.to_dict()</code></td>
+<td>Convert entire document to a plain Python dict, dropping type and unit info.</td>
 </tr>
 </tbody>
 </table>
@@ -1735,16 +1806,13 @@ ceiling of <code>BVN_DOM_FD_MAX_BYTES</code> (256 MiB). This is 16× larger than
 <code>Reader.read_file</code>'s <code>MAX_FILESIZE_BYTES</code> (16 MiB). The C library's
 <code>bvn_dom_parse_fd_ex</code> can lower that ceiling (never raise it), but it is
 C-only — the binding does not wrap it. From Python, to bound the input
-yourself, read at most the bytes you allow and pass them to <code>DomDoc.parse</code>.
-| <code>DomDoc.parse_file(path)</code> | Class method. Open path and parse (fd closed in <code>finally</code>). Applies an internal hard cap of <code>BVN_DOM_FD_MAX_BYTES</code> (256 MiB) via the C function <code>bvn_dom_parse_fd</code>. This ceiling is distinct from <code>Reader.read_file</code>'s <code>MAX_FILESIZE_BYTES</code> (16 MiB). |
-| <code>doc.parse_error</code> | <code>ErrorCode</code> — <code>NONE</code> on success. |
-| <code>doc[key]</code> | Return a <code>DomNode</code> by key; raises <code>KeyError</code> when absent. <code>key</code> goes to the path lookup, so <code>doc["server"]</code> is a top-level entry and a dotted or indexed path reaches below it: <code>doc["server.tls"]</code> is <code>doc["server"]["tls"]</code>, <code>doc["matrix[1][0]"]</code> an element. A key cannot contain <code>.</code> or <code>[</code>, so the two readings never collide. |
-| <code>key in doc</code> | <code>True</code> when <code>doc[key]</code> would succeed — the same path rule. A non-<code>str</code> is never in a document. |
-| <code>len(doc)</code> | Number of top-level entries. |
-| <code>iter(doc)</code> | Iterate over <code>(key, DomNode)</code> pairs. |
-| <code>doc.entries()</code> | Return all top-level <code>(key, DomNode)</code> pairs as a list. |
-| <code>doc.lookup(path)</code> | Dot-separated path lookup, e.g. <code>'server.tls.cert'</code>. Returns <code>None</code> when absent. |
-| <code>doc.to_dict()</code> | Convert entire document to a plain Python dict, dropping type and unit info. |</p>
+yourself, read at most the bytes you allow and pass them to <code>DomDoc.parse</code>.</p>
+<p><strong>Errors:</strong> the C fd functions return <code>NULL</code> for an allocation failure, a read
+error and input over the cap alike; the binding tells them apart by <code>errno</code>.
+A read error is the matching <code>OSError</code>, input over the cap is
+<code>BovnarParseError(FILE_TOO_LONG)</code>, and only an allocation failure is
+<code>MemoryError</code> — the one <code>DomDoc.parse</code> can raise, since the in-memory parse
+returns <code>NULL</code> for nothing else.</p>
 </blockquote>
 <h3 id="133-domnode">13.3 <code>DomNode</code></h3>
 <p>Non-owning view into a <code>bvn_dom_node_t</code>. The parent <code>DomDoc</code> must remain alive
@@ -1862,7 +1930,7 @@ REFERENCE=5  STRUCT=6  ARRAY=7  OCTET_STREAM=8  BOOL=9
 
 <hr />
 <h2 id="14-running-the-test-suite">14. Running the test suite</h2>
-<div class="codehilite"><pre><span></span><code><span class="c1"># Run everything (library-dependent tests are skipped when libbvnr.so is absent)</span>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Run everything (tests marked needs_lib are skipped when libbvnr.so cannot be loaded)</span>
 pytest
 
 <span class="c1"># Run only the pure-Python tests (no library required)</span>
@@ -1871,10 +1939,14 @@ pytest<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;n
 <span class="c1"># Run only integration tests (requires libbvnr.so)</span>
 pytest<span class="w"> </span>-m<span class="w"> </span>needs_lib
 
-<span class="c1"># Verbose with short tracebacks (already the default via pyproject.toml)</span>
+<span class="c1"># Verbose with short tracebacks</span>
 pytest<span class="w"> </span>-v<span class="w"> </span>--tb<span class="o">=</span>short
 </code></pre></div>
 
+<p><code>needs_lib</code> is a registered marker (<code>pyproject.toml</code>); <code>conftest.py</code> turns it
+into a skip when the library cannot be loaded, so a run without <code>libbvnr.so</code>
+skips those tests rather than failing them. A test module whose every test
+calls into the library sets <code>pytestmark = pytest.mark.needs_lib</code>.</p>
 <p>The NumPy- and pint-bridge tests <code>pytest.importorskip</code> their dependency, so they
 are skipped automatically when <code>numpy</code> / <code>pint</code> is not installed. Install
 <code>bovnar[all]</code> to run the full suite.</p>
@@ -1936,7 +2008,7 @@ tests/
 <tbody>
 <tr>
 <td><code>BovnarLibraryNotFound</code></td>
-<td><code>libbvnr.so</code> not found at import</td>
+<td><code>libbvnr.so</code> could not be loaded — raised on first use of the C library, not at <code>import bovnar</code>; the message lists every path tried</td>
 </tr>
 <tr>
 <td><code>BovnarParseError</code></td>
@@ -1949,6 +2021,14 @@ tests/
 <tr>
 <td><code>BovnarArgumentError</code></td>
 <td>Invalid argument passed to a helper (e.g. bad unit string, closed reader/writer)</td>
+</tr>
+<tr>
+<td><code>OSError</code></td>
+<td><code>DomDoc.parse_fd</code> / <code>parse_file</code> could not read the input (the <code>errno</code> subclass: <code>IsADirectoryError</code>, …); an over-cap input is <code>BovnarParseError(FILE_TOO_LONG)</code> instead</td>
+</tr>
+<tr>
+<td><code>MemoryError</code></td>
+<td>The C library could not allocate (a reader, writer, or DOM tree)</td>
 </tr>
 </tbody>
 </table>
@@ -2057,7 +2137,7 @@ its <code>unit_flags</code> field (<code>bvn_unit_flags_t</code>, a <code>uint32
 <tr>
 <td><code>BVN_NUM_CANONICAL</code></td>
 <td><code>1 &lt;&lt; 2</code></td>
-<td>Write a float that <code>BVN_UNIT_REDUCE</code> rescaled in float shape (<code>5000.0</code>, not <code>5000</code>)</td>
+<td>Write a float that <code>BVN_UNIT_REDUCE</code> rescaled in float shape (<code>5000.0</code>, not <code>5000</code>), and every annotation in one form (width written out, default <code>_10</code> and <code>no_unit</code> left out)</td>
 </tr>
 </tbody>
 </table>
@@ -2086,7 +2166,7 @@ caller explicitly constructs a dimensionless <code>ValueUnit</code> with <code>B
 <h2 id="18-baseunit-enum">18. <code>BaseUnit</code> enum</h2>
 <p>The <code>BaseUnit</code> enum mirrors the C <code>value_base_unit_e</code> for the two blocks of
 the id space that have Python names: the native units (block 10) and the
-currencies (block 90). See doc/05 §12.1 for the block layout — an id's leading
+currencies (block 90). See <a href="https://www.bovnar.io/docs/units/#111-enumerations">doc/05 §11.1</a> for the block layout — an id's leading
 two digits name the vocabulary it comes from.</p>
 <table>
 <thead>
@@ -2310,7 +2390,7 @@ two digits name the vocabulary it comes from.</p>
 </tr>
 <tr>
 <td>100215–100216</td>
-<td>The ratios below ppb (<code>PPT</code>, <code>PPQ</code>) — spelled <code>pptr</code> and <code>ppq</code>, see §18's note</td>
+<td>The ratios below ppb (<code>PPT</code>, <code>PPQ</code>) — spelled <code>pptr</code> and <code>ppq</code>; see "Why <code>pptr</code> and not <code>ppt</code>" in <a href="https://www.bovnar.io/docs/units/#325-ratio-and-proportion-units">doc/05 §3.25</a></td>
 </tr>
 <tr>
 <td>100217–100225</td>

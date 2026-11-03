@@ -301,9 +301,11 @@ for (const [label, text] of docTierCases) {
 // events() and parse() named the first error only when the reader's final code
 // had been cleared by a clean EOF. An unterminated string holding a bad byte
 // ends on incomplete_bvnr_stream, and that is what they reported, while
-// errors()[0] and validate() said invalid_utf8_byte.
+// errors()[0] and validate() said invalid_utf8_byte. (The string has no closing
+// quote: '"\xff\xfe";' used to end that way only because recovery lost track of
+// the quote, and is one error now.)
 {
-  const bytes = new Uint8Array([0x2e, 0x61, 0x3d, 0x22, 0xff, 0xfe, 0x22, 0x3b]);
+  const bytes = new Uint8Array([0x2e, 0x61, 0x3d, 0x22, 0xff, 0xfe]);
   const v = b.validate(bytes), r = b.errors(bytes), e = b.events(bytes);
   ok(r.errors.length >= 2, `first error: premise — several errors (${r.errors.length})`);
   ok(e.error_name === v.error_name && e.error_name === r.errors[0].error_name,

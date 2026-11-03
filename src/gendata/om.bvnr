@@ -211,6 +211,10 @@
   { .code = "barye";                                   .bovnar = "d~Pa";                 .reverse = false; },
   { .code = "baud";                                    .bovnar = "Bd";                  },
   { .code = "becquerel";                               .bovnar = "Bq";                  },
+  # OM states the bel as a SingularUnit, symbol B, with no dimension -- which
+  # the derivation once read as "arbitrary" -- and its decibel as deci x bel.
+  # A bel is ten decibels, exactly, as ucum:B, qudt:B and udunits:B say.
+  { .code = "bel";                                     .bovnar = "da~dB";               },
   { .code = "biot";                                    .bovnar = "da~A";                 .reverse = false; },
   { .code = "bit";                                     .bovnar = "bit";                 },
   { .code = "bitPerSecond-Time";                       .bovnar = "bit/s";               },
@@ -1518,7 +1522,6 @@
   { .code = "_25Millilitre";                           .why = "bovnar has no unit of this magnitude"; },
   { .code = "amylaseUnit";                             .why = "an arbitrary unit: its magnitude comes from an assay or a procedure, not from a scale"; },
   { .code = "bar-Food";                                .why = "a household portion whose magnitude OM does not state"; },
-  { .code = "bel";                                     .why = "an arbitrary unit: its magnitude comes from an assay or a procedure, not from a scale"; },
   { .code = "bottle";                                  .why = "a household portion whose magnitude OM does not state"; },
   { .code = "bowl";                                    .why = "a household portion whose magnitude OM does not state"; },
   { .code = "calorie-15C";                             .why = "OM states no factor for this unit, so its magnitude is unknown here"; },

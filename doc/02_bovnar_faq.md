@@ -203,7 +203,8 @@ Once the first assignment has begun, a BOM inside a comment or a string is valid
 
 **Can a document declare which bovnar version it uses?**
 
-Yes, since spec 1.1. Put a directive on the first line:
+Yes, since spec 1.1. Put a directive in the document's first comment — in
+practice its first line:
 
 ```bovnar
 #!bovnar 1.1
@@ -222,7 +223,7 @@ a construct that a conforming reader of its own declared version would have to
 refuse.
 
 It is recognised only as the very first comment (after an optional BOM and
-whitespace). A reader records the declared version
+leading whitespace, blank lines included). A reader records the declared version
 (`bvnr_reader_get_declared_version`, `bovnar validate` reports it, and
 the Python `Reader.declared_version` / `bovnar.peek_version()` expose it), and a
 reader opened with `strict_version` rejects a version it does not support with
@@ -238,9 +239,11 @@ comment is semantically inert. The directive is *shaped* like a comment on
 purpose: that is exactly what makes it backward compatible — a spec-1.0 reader
 (which knows nothing about versions) skips it as a plain comment and parses the
 rest of the document normally, while a 1.1+ reader additionally recognises the
-`#!bovnar` prefix on the first line and acts on it. Nothing else about comment
-semantics changes, and a `#!bovnar …` on any line other than the first is still
-just a comment.
+`#!bovnar` prefix in the first comment and acts on it. Nothing else about comment
+semantics changes, and a `#!bovnar …` after any other comment, or after any
+content, is still just a comment. Blank lines before it do not count: the
+directive may follow an optional BOM and leading whitespace, blank lines
+included.
 
 ---
 
@@ -387,8 +390,9 @@ A non-multiple-of-32 (other than 16) width for `float` is `error_illegal_value_t
 **What is the `float_fix` (Q-format) type and how is it annotated?**
 
 `float_fix` encodes a value as a signed integer with a declared number of
-fractional bits. The mathematical value is `raw_integer × 2⁻Q`. The annotation
-requires a `qN` parameter specifying fractional bits:
+fractional bits. The mathematical value is `raw_integer × 2⁻Q`. The annotation's
+`qN` parameter gives the number of fractional bits; omitted, it is `q0`
+(`<float_fix:32>` is `<float_fix:32,q0>`, no fractional bits):
 
 ```bovnar
 .pid = <float_fix:32,q16> -1.5;    # 32-bit, 16 fractional bits
@@ -689,12 +693,12 @@ a mismatch is `error_unit_mismatch`.
 - **1 conductivity scale** — **CF** (hydroponic conductivity factor, 1 CF = 0.1 mS/cm exactly), which *does* convert, being a rescaled conductivity.
 - **6 units the unit profiles needed** — **metre of water column** (`mH2O`, the conventional 9 806.65 Pa; `c~mH2O` is the centimetre a ventilator is set in), **IT calorie** (`cal_IT`, 4.1868 J — native `cal` is the thermochemical 4.184 J), **thermochemical BTU** (`Btu_th` — native `Btu` is the international-table one), **troy pound** (`lb_t`, twelve troy ounces; also the apothecary pound), **apothecary dram** (`dr_ap`, three scruples — native `dr` is the avoirdupois dram, 2.2× smaller), and the **long hundredweight** (`cwt_l`, 112 lb; the short one is exactly `h~lb` and needs no unit of its own). Each was the sole reason a run of UCUM, UDUNITS-2, QUDT and UN/ECE codes had to be refused.
 - **12 calendar and sidereal time units** — the **tropical** (`yr_trop`), **Gregorian** (`yr_greg`), **sidereal** (`yr_sid`) and **common** (`yr_com`) years; the **synodal** (`mo_syn`), **tropical** (`mo_trop`), **sidereal** (`mo_sid`) and mean **Gregorian** (`mo_greg`, a twelfth of `yr_greg`) months; and the sidereal **day**, **hour**, **minute** and **second** (`d_sid`, `h_sid`, `min_sid`, `s_sid`). `yr` is still the Julian year and `mo` still a twelfth of it — naming the others is what lets a UDUNITS or CF document that says `year` be read at all.
-- **9 CGS electrostatic units** — **statvolt** (`statV`), **statampere** (`statA`), **statcoulomb** (`statC`, the franklin), **statfarad** (`statF`), **statohm** (`statΩ`), **stathenry** (`statH`), **statsiemens** (`statS`), **statweber** (`statWb`) and **stattesla** (`statT`). All are built on `c`, which the 2019 SI fixed, so all are exact rationals.
+- **9 CGS electrostatic units** — **statvolt** (`statV`), **statampere** (`statA`), **statcoulomb** (`statC`, the franklin), **statfarad** (`statF`), **statohm** (`statΩ`), **stathenry** (`statH`), **statsiemens** (`statS`), **statweber** (`statWb`) and **stattesla** (`statT`). All are built on `c`, exact since the 1983 definition of the metre, so all are exact rationals.
 - **3 luminance units** — **lambert** (`Lmb`), **apostilb** (`apostilb`, the blondel) and **foot-lambert** (`footlambert`), each 1/π-based and so marked inexact.
 - **3 water-vapour permeances** — `perm_0C`, `perm_23C` and the metric `perm_m`.
 - **6 heat conventions** — the **mean** (`cal_m`), **15 °C** (`cal_15`) and **20 °C** (`cal_20`) calories, and the **59 °F** (`Btu_59`), **60 °F** (`Btu_60`) and **mean** (`Btu_m`) BTUs, beside the thermochemical and IT ones already here.
 - **5 singles** — the **elementary charge** (`e`, exact since 2019), the **spere** (`sph`, 4π sr, carrying the steradian's quantity kind), the **circular mil** (`cml`), the **unit pole** (`unit_pole`) and the **water horsepower** (`hp_W`).
-- **9 more, corroborated by two and three vocabularies at once** — the **printer's point** (`pnt_pr`, 0.013837 in — `pnt` is the DTP point) and **printer's pica** (`pca_pr`); the **electric** (`hp_E`, 746 W exactly) and **boiler** (`hp_B`, 9809.5 W) horsepowers, beside the mechanical `hp` and metric `PS`; the **abvolt** (`abV`, 10⁻⁸ V, which no decade prefix reaches); the **assay ton** (`AT`, 175/6 g); the **imperial bushel** (`bsh_uk`, 8 `gal_uk` — `bsh` is the US dry one); the **clo** (0.155 K·m²/W); and the **debye** (10⁻²¹/c C·m, exact since the 2019 SI fixed c). Each was refused across UCUM, UDUNITS-2, QUDT and OM for want of a native unit of the magnitude.
+- **9 more, corroborated by two and three vocabularies at once** — the **printer's point** (`pnt_pr`, 0.013837 in — `pnt` is the DTP point) and **printer's pica** (`pca_pr`); the **electric** (`hp_E`, 746 W exactly) and **boiler** (`hp_B`, 9809.5 W) horsepowers, beside the mechanical `hp` and metric `PS`; the **abvolt** (`abV`, 10⁻⁸ V, which no decade prefix reaches); the **assay ton** (`AT`, 175/6 g); the **imperial bushel** (`bsh_uk`, 8 `gal_uk` — `bsh` is the US dry one); the **clo** (0.155 K·m²/W); and the **debye** (10⁻²¹/c C·m, exact since the 1983 definition of the metre fixed c). Each was refused across UCUM, UDUNITS-2, QUDT and OM for want of a native unit of the magnitude.
 - **23 more the unit profiles needed** — the **US survey lengths** built on the survey foot (`inUS`, `ydUS`, `fathUS`, `rdUS`, `chUS`, `lkUS`, `furUS`, `miUS`, `acUS`), which is 2 ppm longer than the international foot; the typographic **point** (`pnt`, ¹⁄₇₂ in), **pica** (`pca`) and **line** (`lne`) — not `pt`, which is the pint; the **US dry** gallon, quart and pint, 16 % larger than the liquid ones; the trade measures **board foot** (`fbm`), **cord** and survey **acre-foot** (`ac_ft`); and the singles **darcy** (permeability, takes prefixes so the millidarcy is `m~darcy`), **EC therm** (`thm_ec`, 10⁵ `Btu`), **ton of refrigeration** (`ton_ref`), **Dobson unit** (`DU`, ozone column) and **shake** (10⁻⁸ s, where no SI prefix reaches).
 
 The `bu_gram` base unit is used for mass so that the `k~` prefix can carry the kilo: `k~g` = kilogram. The Rankine symbol is `°Ra` (also accepted as `Ra`); note `R` alone is reserved for röntgen. Thou accepts `mil` as an alternative spelling. `var` and `VA` share the same SI dimensional signature as watt but are kept distinct for physical clarity. `rpm` has the same SI dimension as `Hz` (s⁻¹) but a distinct base unit for semantic clarity in rotational contexts. `at` (atmosphere technical) must not be confused with `atm` (standard atmosphere): 1 at = 98 066.5 Pa; 1 atm = 101 325 Pa.
@@ -1284,8 +1288,9 @@ apply to `max_struct_nesting`.
 
 **Do the Python bindings require a compiled extension module?**
 
-No. The bindings are pure `ctypes` and load `libbvnr.so` at import time
-via `ctypes.CDLL`. The PyPI wheels bundle that library inside the package, so
+No. The bindings are pure `ctypes` and load `libbvnr.so` through
+`ctypes.CDLL` — not at import: `import bovnar` never loads it, and the library is
+located the first time something needs it (`loads`, `Reader()`, `parse_unit`, …). The PyPI wheels bundle that library inside the package, so
 `pip install bovnar` needs no compilation step at all; building the C library is
 only the source-checkout path.
 
@@ -1300,8 +1305,8 @@ only the source-checkout path.
 4. `ctypes.util.find_library('bvnr')` — standard `ldconfig`/`LD_LIBRARY_PATH` search.
 5. In-tree build paths relative to `_ffi.py` (`../../build/`, etc.).
 
-If none of these resolves the library, `BovnarLibraryNotFound` is raised with
-the list of searched paths.
+If none of these resolves the library, that first call raises
+`BovnarLibraryNotFound`; its message lists every path tried and why each failed.
 
 ---
 
@@ -1366,7 +1371,7 @@ the order `[m, kg, s, A, K, mol, cd]`.
 
 | Exception | Trigger |
 |---|---|
-| `BovnarLibraryNotFound` | `libbvnr.so` not found at import |
+| `BovnarLibraryNotFound` | `libbvnr.so` not found, on first use (not at import) |
 | `BovnarParseError` | Parse error (carries `code`, `line`, `column`, `offset`, `byte`) |
 | `BovnarWriteError` | Write error (carries `code`, `offset`) |
 | `BovnarArgumentError` | Invalid argument to a helper function |

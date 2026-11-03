@@ -12,11 +12,11 @@ admitted after that pass, which is why they sit after it rather than beside thei
 | Namespace | Vocabulary | Grammar | Codes carried | Section |
 |---|---|---|---|---|
 | `ucum:` | UCUM — Unified Code for Units of Measure | expression | 206 mapped + 41 arbitrary, **all 312 UCUM defines** | [2](#2-syntax)–[10](#10-cost-risk-and-what-is-left-out) |
-| `unece:` | UN/ECE Recommendation 20 and 21 | flat | 1302 + 25 opaque | [11](#11-the-unece-profile) |
-| `qudt:` | QUDT unit local names | flat | 2243, **all 2803 QUDT defines** | [12](#12-the-qudt-profiles) |
+| `unece:` | UN/ECE Recommendation 20 and 21 | flat | 1299 + 25 opaque | [11](#11-the-unece-profile) |
+| `qudt:` | QUDT unit local names | flat | 2235, **all 2803 QUDT defines** | [12](#12-the-qudt-profiles) |
 | `qudt-qk:` | QUDT quantity kinds | flat | 908, **all 1164 QUDT defines** | [12.3](#123-quantity-kinds-qudt-qk) |
 | `udunits:` | UDUNITS-2, the CF/netCDF units syntax | expression | 768 (its regular plurals included), **all 580 UDUNITS defines** | [13](#13-the-udunits-profile) |
-| `om:` | OM 2 — Ontology of units of Measure | flat | 1336 + 124 refused, **every unit individual OM states** | [16](#16-the-om-2-profile) |
+| `om:` | OM 2 — Ontology of units of Measure | flat | 1337 + 123 refused, **every unit individual OM states** | [16](#16-the-om-2-profile) |
 | `cf:` | CF standard names | flat, read-only | 4454 + 617 refused, **all 5071 names of table v94** | [17](#17-the-cf-standard-name-profile) |
 
 Companion to [Unit & Currency Reference](05_bovnar_unit_system.md) (the native registry and notation
@@ -34,7 +34,7 @@ pass changed and what it cost.
 
 Every acceptance, refusal and conversion factor quoted below was produced by running the
 reference implementation built from this tree, and the behavioural claims are pinned by the test
-files named above (1335 assertions across the seven profiles, plus 4789 in the cross-vocabulary
+files named above (1433 assertions across the seven profiles, plus 4868 in the cross-vocabulary
 suite). The VOCABULARY side — whether each foreign code is *worth* what the table says — is checked
 too, but not by the same means and not to the same strength: `check_profile_factors.py` (§9.5)
 resolves every mapped code against its publisher's own machine-readable definitions, and `unece`
@@ -462,7 +462,7 @@ Every `ucum:` expression ends in exactly one of three states.
 | Outcome | When | Result |
 |---|---|---|
 | **Translated** | Every atom maps onto the native registry, and the whole expression is representable | A normal `value_unit_t`; indistinguishable from the native spelling |
-| **Profile-only** | The expression is valid UCUM and every atom is known, but one or more atoms are UCUM *arbitrary* units (§3.6) | A `value_unit_t` over UCUM's opaque units: comparable, never convertible |
+| **Profile-only** | The expression is valid UCUM and every atom is known, but one or more atoms are UCUM *arbitrary* units (§3.6) | A `value_unit_t` over UCUM's opaque units: comparable, convertible to no other unit — only across a prefix change |
 | **Refused** | Anything else | An error code, at parse time, from the parser |
 
 Refusal splits three ways by cause, because a producer needs to know which of these happened:
@@ -708,7 +708,8 @@ to every one of them:
 - `ucum:[pH]` does not convert into a plain count, because `pH` has its own logarithmic kind;
 - `ucum:rad/s` does not convert into `ucum:Hz`, because the angle kind separates angular frequency
   from frequency;
-- arbitrary units convert into nothing at all (§7.2).
+- arbitrary units convert into no other unit — only across a prefix change of the same
+  units, which is how `ucum:[IU]/L` converts to `ucum:[IU]/mL` (§7.2).
 
 What the fences do **not** do is separate two named units that share a dimension. `unece:D13` (the
 sievert) and `unece:GRY` (the gray) are dimensionally equal and convert with factor 1, as `Gy` and
@@ -892,12 +893,13 @@ grammar because the competing rows differ with it:
 | Grammar | The rows competing for one unit | Rule |
 |---|---|---|
 | expression (`ucum`, `udunits`) | *spellings of one atom* — `S` and `mho`, `cal` and `cal_th`, `L` and `l`, `mo` and `mo_j` | **shortest wins**, ties alphabetically: the vocabulary's own abbreviation is the short one |
-| flat (`unece`, `qudt`, `qudt-qk`, `om`) | *different codes for one unit* — `JOU` and `J55`, `PAL` and `C55`, `TON_SHORT` and `TON` | **first declared wins**: the data file lists the canonical code first and its aliases after |
+| flat (`unece`, `qudt`, `qudt-qk`, `om`) | *different codes for one unit* — `B37` and `B51`, `85` and `M92`, `TON_SHORT` and `TON` | **first declared wins**: the data file lists the canonical code first and its aliases after |
 
 Applying the expression rule to a flat vocabulary is what made this worth stating. Every Rec 20 code
 is two or three bytes, so "shortest, ties alphabetically" degenerates into "alphabetically first" and
 picked the filler code every time: a joule came out as `J55` (Rec 20's *watt second*), a pascal as
-`C55` (*newton per square metre*), a mole as `C34`, a tonne as `2U` (*megagram*), and QUDT's short ton
+`C55` (*newton per square metre*) — both of which now spell their definitions out, `W·s` and `N/m^2`,
+so the joule and the pascal are written as `JOU` and `PAL` with no competitor — a mole as `C34`, a tonne as `2U` (*megagram*), and QUDT's short ton
 as the bare, ambiguous `TON`. Each is worth the right number and none is the code a reader of that
 vocabulary expects to be handed.
 
@@ -1210,7 +1212,7 @@ about a document that never said it.
 | `cal_m` | `cal_m` | `4.19002` |
 | `cal_[15]` | `cal_15` | `4.1858` |
 | `cal_[20]` | `cal_20` | `4.1819` |
-| `[Btu_59]` | `Btu_59` | `1054.8` |
+| `[Btu_59]` | `Btu_59` | `1054.804` (UCUM states `1054.80`) |
 | `[Btu_60]` | `Btu_60` | `1054.68` |
 | `[Btu_m]` | `Btu_m` | `1055.87` |
 
@@ -1408,7 +1410,7 @@ expected the unit slot to carry the analyte.
 
 | Class | Examples | Outcome |
 |---|---|---|
-| Arbitrary units (41) | `[IU]`, `[iU]`, `[arb'U]`, `[PFU]`, `[CFU]` | **Profile-only** (§3.6) — parsed, comparable, never convertible |
+| Arbitrary units (41) | `[IU]`, `[iU]`, `[arb'U]`, `[PFU]`, `[CFU]` | **Profile-only** (§3.6) — parsed, comparable, convertible only across a prefix change |
 | Special units with a reference | `B[SPL]`, `B[V]`, `B[W]`, `B[kW]`, `B[mV]`, `B[10.nV]` | `error_unit_profile_unsupported` (§3.7) |
 | Other special units | `[p'diop]`, `%[slope]`, `[hp'_X]`, `[m/s2/Hz^(1/2)]` | `error_unit_profile_unsupported` |
 | Scale outside a prefix decade | `10*4`, `10*5`, `10*7`, `10*8` | `error_unit_profile_unsupported` (§3.5) |
@@ -1450,7 +1452,7 @@ conflating them is how a legitimate code gets reported as a typo.
 Profile units with no native spelling get ids of their own. Each profile owns a **block** of the
 `value_base_unit_t` id space — 10 000 ids whose leading two decimal digits identify the vocabulary —
 and its opaque units are numbered from the bottom of that block in declaration order. See
-doc/05 §12.1 for the whole layout; `src/utils/bvn_internal_dims.h` holds the compile-time checks
+doc/05 §11.1 for the whole layout; `src/utils/bvn_internal_dims.h` holds the compile-time checks
 that keep the blocks from overlapping.
 
 **A block per profile, not one shared run.** UCUM's arbitrary atoms are not the only units with no
@@ -1733,11 +1735,11 @@ One hand-edited data file per namespace in `src/gendata/`, in the same shape as 
 | File | Lists |
 |---|---|
 | `ucum.bvnr` | 20 prefixes, 206 mapped, 40 opaque, 1 opaque alias, 65 unsupported |
-| `unece.bvnr` | 1302 mapped, 25 opaque, 152 unsupported |
-| `qudt.bvnr` | 2243 mapped, 565 unsupported |
+| `unece.bvnr` | 1299 mapped, 25 opaque, 155 unsupported |
+| `qudt.bvnr` | 2235 mapped, 573 unsupported |
 | `qudt-qk.bvnr` | 908 mapped, 257 unsupported |
 | `udunits.bvnr` | 41 prefixes, 768 mapped, 98 unsupported |
-| `om.bvnr` | 1336 mapped, 124 unsupported |
+| `om.bvnr` | 1337 mapped, 123 unsupported |
 | `cf.bvnr` | 4454 mapped, 617 unsupported |
 
 Five list kinds, and a code belongs to exactly one of them: the vocabulary's prefix spellings with
@@ -1801,13 +1803,13 @@ them to each other:
 
 | Test | Target | Assertions | Specifies |
 |---|---|---|---|
-| `tests/bovnar_ucum_test.c` | `bvnr_ucum_test` | 197 | §2–§10 |
-| `tests/bovnar_unece_test.c` | `bvnr_unece_test` | 557 | §11 |
-| `tests/bovnar_qudt_test.c` | `bvnr_qudt_test` | 201 | §12 |
-| `tests/bovnar_udunits_test.c` | `bvnr_udunits_test` | 224 | §13 |
-| `tests/bovnar_om_test.c` | `bvnr_om_test` | 110 | §16 |
+| `tests/bovnar_ucum_test.c` | `bvnr_ucum_test` | 209 | §2–§10 |
+| `tests/bovnar_unece_test.c` | `bvnr_unece_test` | 576 | §11 |
+| `tests/bovnar_qudt_test.c` | `bvnr_qudt_test` | 240 | §12 |
+| `tests/bovnar_udunits_test.c` | `bvnr_udunits_test` | 248 | §13 |
+| `tests/bovnar_om_test.c` | `bvnr_om_test` | 114 | §16 |
 | `tests/bovnar_cf_test.c` | `bvnr_cf_test` | 46 | §17 |
-| `tests/bovnar_crossvocab_test.c` | `bvnr_crossvocab_test` | 4789 | §14 |
+| `tests/bovnar_crossvocab_test.c` | `bvnr_crossvocab_test` | 4868 | §14 |
 
 `bvnr_ucum_test` (labels `unit;si;profile;ucum`) carries the behavioural claims of sections 2–10: the three
 outcomes with their exact error codes, equivalence with the native spelling, UCUM's non-latching
@@ -1910,7 +1912,7 @@ native side goes through `bvn_parse_unit` and `bvn_unit_to_si_factor` via the ct
 through a Python reimplementation of the unit grammar — that is exactly how a table starts
 disagreeing with the parser it feeds (§9.1).
 
-As of this tree it compares **10663 rows across the seven vocabularies** and reports **0 mismatches**,
+As of this tree it compares **10913 rows across the seven vocabularies** and reports **0 mismatches**,
 0 dead rows and **0 coverage suggestions** — the tables are closed against their publishers, so
 there is nothing left for the coverage half to propose.
 
@@ -1922,9 +1924,13 @@ there is nothing left for the coverage half to propose.
 | dead | the table accepts a spelling the publisher does not define; unreachable from a conforming producer | no (`--strict-dead`) |
 | unmapped-but-exact | the publisher defines a code worth something this build already spells, and the table does not carry it | no — a coverage suggestion, and carrying a unit is editorial |
 
-All 10 dead rows are `udunits` spellings the UDUNITS XML database does not define — `gramme`, `pc`,
-`degree_Fahrenheit`, `deg`, `nmi`, `dB`, `decibel`, `Np`, `neper`, `pH`. They cost nothing but an
-unverifiable row, and each is a spelling a real CF producer plausibly writes.
+There are no dead rows. The report used to name ten `udunits` spellings the UDUNITS XML database
+does not define as atoms — `gramme`, `pc`, `degree_Fahrenheit`, `deg`, `nmi`, `dB`, `decibel`,
+`Np`, `neper`, `pH` — and lumped together one that is right, five that are deliberate and four that
+were hazards. `dB` is deci + `B`, a decibel in UDUNITS' own language; `nmi` (a nanomile there),
+`pH` (a picohenry), `Np` and `neper` were removed; and `gramme`, `pc`, `degree_Fahrenheit`, `deg`
+and `decibel` are accepted on read and never written (`.reverse = false`). A row is dead now only
+when it is writable, or when the publisher's prefix reading of it is a different unit.
 
 **What the coverage suggestion is matched against decides what it can find.** It began as an index
 of the 180 native *symbols*, which meant a code could only ever be proposed when it was worth a bare
@@ -1980,19 +1986,45 @@ A real disagreement below `6.8e-7` would still pass. That is the honest limit of
 a source that publishes rounded decimals, and no amount of tuning removes it — only tracking each
 publisher's stated precision through its whole definition chain would.
 
-**Waivers are printed on every run** rather than silently skipped, because a waiver nobody sees is
-how a regression hides behind an old excuse. There are two kinds:
+**Waivers are printed** rather than silently skipped, because a waiver nobody sees is how a
+regression hides behind an old excuse. There are two kinds:
 
-- **Modelling (18 rows).** bovnar carries bit and byte as two base units of information with no
+- **Modelling (102 rows, listed under `--verbose`).** bovnar carries bit and byte as two base units of information with no
   factor between them; UCUM and UDUNITS both define the byte as the number 8. QUDT goes further and
   models information as *entropy*, so its bit is `ln 2` and its byte `8·ln 2`, the coherent unit
   being the nat — which is exactly why `qudt-qk.bvnr` already refuses `InformationEntropy`. A
   different model, not a wrong conversion.
-- **The publisher is wrong or rounded (4 rows).** UCUM defines the phot as `1e-4 lx`; a phot is one
-  lumen per square centimetre, i.e. `1e4 lx` — the value is inverted. Native `ph` is correct and the
-  profile keeps mapping to it. UCUM also rounds the mercury column to `133.3220 kPa` (2.9 ppm) and
-  QUDT the torr to `133.322 Pa` (2.8 ppm), both past the tolerance and both against exact
-  conventional values bovnar carries. The fourth is `unece:MON`, below.
+- **The publisher is wrong or rounded (35 rows, printed on every run: OM 7, QUDT 13, UCUM 6,
+  UDUNITS 2, UNECE 7).** UCUM defines the phot as `1e-4 lx`; a phot is one lumen per square
+  centimetre, i.e. `1e4 lx` — the value is inverted. Native `ph` is correct and the profile keeps
+  mapping to it. UCUM also rounds the mercury column to `133.3220 kPa` (2.9 ppm) and QUDT the torr
+  to `133.322 Pa` (2.8 ppm), both past the tolerance and both against exact conventional values
+  bovnar carries. The rest are the same two shapes — a constant stated at five or six digits, or a
+  value that is not the publisher's own model (QUDT's pebibyte) — and `unece:MON`, below.
+
+**A waiver is for a row whose label, symbol and cross-references agree and whose number does not.**
+Where the publisher contradicts *itself* — the label and the ucumCode say one unit and the multiplier
+another — the row is **refused** rather than read by either side, because the producer who wrote the
+code may have meant either. `qudt:LA` (labelled Lambert, worth an apostilb), `HP_Brake` (worth a
+boiler horsepower), `PT` (labelled Point with ucumCode `[pnt]`, worth the thou), `BTU_MEAN` (ucumCode
+`[Btu_m]`, worth the IT BTU), `GRAIN-PER-GAL` (imperial by symbol and ucumCode, US by number) and the
+four prefixed katal-per-litre units (`MicroKAT-PER-L` is labelled, symbolled and ucumCoded `ukat/L`
+and worth a million times less) are refused for it, and so is the one Rec 20 code each was the only
+claimant of (`unece:P30`, `N3`, `J39`). Each used to follow the number; `ucum:ph` follows the name
+only because UCUM states nothing *but* the number and the name, and a phot is not in doubt.
+
+**The cross-reference check compares numbers too.** QUDT's ucumCode and udunitsCode for a unit, and
+its uneceCommonCode, each claim that two bovnar rows in two different tables are one unit. The check
+used to ask only whether the two were convertible — and a row fitted to a wrong multiplier stays
+convertible with the code its publisher gives for it. It now asks for the same factor (to `TOL`)
+against the UCUM and UDUNITS rows and for the **same unit** (`bvn_unit_equal`) against the UNECE row,
+which is the only test here that can see `qudt:KiloVAR` read as `k~VA` beside `unece:KVR` read as
+`k~var`: equal in SI, different in meaning. None disagree; the ones waived by name are those
+where QUDT's code is the one that is wrong (the crossed `[dr_ap]`/`[dr_av]` of its
+two drams, `udunits:t` on the short ton, `udunits:DU` on the millimole per square metre) or where
+Rec 20's only code for a unit is its definition (`PS`, *pound-force per square inch*, read as the
+native `psi`). Six such definition codes (`A8`, `J55`, `P14`, `M77`, `F90`, `C55`) spell the definition
+out — `A·s`, not `C` — as QUDT's rows do, and the named unit keeps its own code (`COU`, `JOU`, …).
 
 **It needs the publications, and a test must not fetch.** The files are cached under
 `<build>/vocab/`; populate it once with `python3 check_profile_factors.py --fetch`. Without a cache
@@ -2021,8 +2053,8 @@ tool implements all three rather than quietly treating the result as primary:
   bovnar's Julian month stays. It is carried as a waiver and printed every run.
 - **A code QUDT does not mention is not thereby absent from Rec 20.** The dead-row check is
   therefore switched off for this vocabulary entirely, and the rows the cross-reference does not
-  reach are counted and named on every run instead. There are 6: `CEL`, `FAH`, `GRY`, `HEN`, `MOL`
-  and `TNE`.
+  reach are counted and named on every run instead. There are 8: `CEL`, `FAH`, `GRY`, `HEN`, `MOL`,
+  `Q12`, `Q13` and `TNE`.
 - **A code several QUDT units claim is usable only when they agree.** The cross-reference covers
   1488 codes; 81 have more than one claimant. Most are aliases of one unit, but `J62` is claimed by
   both a barrels-per-hour and a barrels-per-second unit, which differ by 3600. 11 codes disagree
@@ -2046,9 +2078,13 @@ label for the unit carrying the code, and the ones left out divide into three gr
 | logarithmic and information scales — `phon`, `sone`, `Erlang`, `Nat`, `baud` | no native form, or a modelling difference: QUDT makes `baud` dimensionless where native `Bd` is a rate |
 | a quantity that is not the matched unit — `J/m³` (energy density, matched `Pa`), `J/kg` (specific energy, matched `Gy`), `W/sr` (radiant intensity, matched `W`) | same dimension, different quantity |
 
-`J39` (mean BTU) and `DRI` (UK dram) were left out for the reason §6.3 already gives for their UCUM
-counterparts: native `Btu` is the IT one and native `dr` the avoirdupois, and a code whose label
-says otherwise is a factor trap rather than a coverage gap.
+`J39` (mean BTU) was left out for the reason §6.3 already gives for its UCUM counterpart: native
+`Btu` is the IT one, and a code whose label says otherwise is a factor trap rather than a coverage
+gap. It was later mapped to `Btu` through `qudt:BTU_MEAN`, whose multiplier is the IT value, and is
+now refused with that row, because the label and the ucumCode `[Btu_m]` say the mean BTU (native
+`Btu_m`) and the number does not. `DRI` (UK dram) maps to the avoirdupois `dr`: its one QUDT
+claimant, `DRAM_UK`, states the avoirdupois value under the label "Dram (UK)", and only its
+ucumCode — crossed with `DRAM_US`'s — points at the apothecary dram.
 
 Arbitrary and special units (`isArbitrary`, `isSpecial`, and any QUDT unit with no
 `conversionMultiplier`) have no factor to check — they are exactly the ones carried as opaque or
@@ -2297,9 +2333,9 @@ every writer entry point.
 
 > `unece:` — UN/ECE Recommendation 20, *Codes for Units of Measure Used in International Trade*, and
 > Recommendation 21, *Codes for Passengers, Types of Cargo, Packages and Packaging Materials*.
-> Data file `src/gendata/unece.bvnr` (1302 mapped, 25 opaque, 152 unsupported — every Rec 20 code
+> Data file `src/gendata/unece.bvnr` (1299 mapped, 25 opaque, 155 unsupported — every Rec 20 code
 > QUDT's cross-reference reaches, which is not the same as every Rec 20 code; §11.1);
-> pinned by `tests/bovnar_unece_test.c` (555 assertions).
+> pinned by `tests/bovnar_unece_test.c` (576 assertions).
 
 ### 11.1 Why this vocabulary
 
@@ -2314,7 +2350,7 @@ effort.** The other four publish a machine-readable list of everything they defi
 the publisher states is in one of the three lists" is a condition that can be met and checked. Rec
 20 states its factors in *prose*. There is no artefact to enumerate, and this profile has always
 been reached at one remove, through the `qudt:uneceCommonCode` cross-reference (§9.5). So the table
-is now closed against **what that cross-reference reaches** — 1298 mapped and 156 refused, up from
+is now closed against **what that cross-reference reaches** — 1299 mapped and 155 refused, up from
 252 and 7 — and a Rec 20 code that no QUDT unit claims is still outside it, because nothing in this
 repository can say what it is worth. Where the cross-reference contradicts *itself*, the code is
 refused saying so: 81 codes have more than one QUDT claimant, and `J62` is claimed by both a
@@ -2441,12 +2477,12 @@ that are equal in SI and different in meaning, and `C94`/`M46` is the pair that 
 
 ## 12. The QUDT profiles
 
-> `qudt:` — QUDT unit local names (2243 mapped, 565 unsupported — every one of the 2803 local
+> `qudt:` — QUDT unit local names (2235 mapped, 573 unsupported — every one of the 2803 local
 > names QUDT defines, plus five refusals for names it does not: `USD`, `EUR` and three `DECIBEL_*`).
 > `qudt-qk:` — QUDT quantity kinds (908 mapped, 257 unsupported — every one of the 1164 kinds,
 > plus a refusal for `LogarithmicRatio`, which QUDT 3.1.0 does not define).
 > Data files `src/gendata/qudt.bvnr` and `src/gendata/qudt-qk.bvnr`;
-> pinned by `tests/bovnar_qudt_test.c` (217 assertions).
+> pinned by `tests/bovnar_qudt_test.c` (240 assertions).
 
 ### 12.1 Why this vocabulary
 
@@ -2593,7 +2629,7 @@ same equivalence class.
 > of netCDF and the CF conventions.
 > Data file `src/gendata/udunits.bvnr` (41 prefixes, 768 mapped, 98 unsupported — every one of
 > the 580 spellings the UDUNITS-2 database defines);
-> pinned by `tests/bovnar_udunits_test.c` (224 assertions).
+> pinned by `tests/bovnar_udunits_test.c` (248 assertions).
 
 ### 13.1 An expression profile, sharing the UCUM parser
 
@@ -2614,7 +2650,7 @@ back as `k~g·s/m` — for exactly this reason: getting it backwards turns a vis
 reciprocal and still formats cleanly.
 
 UDUNITS accepts symbols and spelled-out names for units *and* prefixes, which is why the table
-carries 765 codes and 41 prefix spellings for a vocabulary no larger than UCUM's: `m`, `meter` and
+carries 768 codes and 41 prefix spellings for a vocabulary no larger than UCUM's: `m`, `meter` and
 `metre` are three rows, and `kilo` is a prefix beside `k`. `udunits:km`, `udunits:kilometer` and
 `udunits:kilometre` are one unit.
 
@@ -2638,7 +2674,10 @@ udunits:m s-1        →  m/s          a speed
 udunits:ms-1         →  m~s⁻¹        a reciprocal MILLISECOND — also valid UDUNITS,
                                      and a different unit. The space is what
                                      tells the two apart
-udunits:kg  m-2      →  error_unit_illegal   two operators in a row
+udunits:kg  m-2      →  k~g/m²       a run of spaces is ONE operator, as in UDUNITS
+udunits:m / s        →  m/s          spaces around '/' divide
+udunits:m per s      →  m/s          and so does the word per, in either case
+udunits:m perch      →  m·rdUS       ...but only as a word
 ```
 
 **This section used to say the opposite, and the reason it could is the reason it no longer has to.**
@@ -2655,10 +2694,13 @@ So the space now reaches this parser as a space, and means here what it means in
 
 Three limits worth stating plainly:
 
-- **A run of spaces is not collapsed.** `kg  m-2` is two multiplications in a row and fails as
-  `error_unit_illegal`. Collapsing runs in the lexer would have cost a UCUM annotation the spacing
-  §3.4 promises to keep verbatim, and a malformed expression getting the vocabulary's own error is
-  the right outcome anyway.
+- **A run of spaces is one operator, and the profile — not the lexer — says so.** UDUNITS'
+  scanner spells MULTIPLY `{space}+` and DIVIDE `{space}*"/"{space}*` or `{space}+per{space}+`, so
+  `kg  m-2`, `m / s` and `m per s` are valid UDUNITS, and the profile reads them as UDUNITS does.
+  This section used to call `kg  m-2` "the vocabulary's own error"; it is not one. The lexer still
+  does not collapse the run, because that would cost a UCUM annotation the spacing §3.4 promises to
+  keep verbatim. A space that leads or trails the code, or an operator with nothing after it, is
+  still `error_unit_illegal`.
 - **The inline unit form cannot carry a space and never will.** Whitespace is what *terminates* that
   token, so `1.0 udunits:kg m-2` is a value, a unit and a stray token. The space-separated spelling
   is available in a type annotation only.
@@ -2769,18 +2811,29 @@ question. Implementing it would require `bvn_parse_unit` to return a family-and-
 alongside the unit, a precedence rule for when an explicit `<datetime:64,unix>` disagrees with a
 profile-implied one, and a carrier-scaling rule the datetime family does not currently have.
 
-The refusal is driven by a `refuse_substr` hook on the registry row — any `udunits:` code containing
-`since` is refused — rather than by an atom lookup, because by the time the parser sees it the
-whitespace is gone and `days since 1970-01-01` is one unsplittable token. A row for `since` is kept
-in `.unsupported` anyway, so that a bare `udunits:since` refuses identically and so that a
-maintainer finds the reason where they look for it. Refusing costs a producer an error message that
+`since` is one of five spellings of UDUNITS' SHIFT operator — the scanner's
+`{space}*(@|after|from|ref|since){space}*`, each keyword in either case — and the same operator
+with a number after it is an offset (`K @ 273.15` is the Celsius scale). All five are refused the
+same way: `days after 1970-01-01`, `hours SINCE 2000-01-01`, `K from 273.15` and `K @ 273.15` are
+`error_unit_profile_unsupported`, because each is valid UDUNITS that bovnar cannot carry. Until this
+release only a lower-case `since` was caught, and the rest came back as `error_unit_illegal`, which
+told the producer they had made a typo.
+
+The refusal is driven by a check on the registry row (`shift_ops`) rather than by an atom lookup,
+because the operand after the keyword is a timestamp or a number, not a unit, and there is nothing
+to look up. A keyword counts only as a whole word — `refrigeration_ton` holds `ref` and is a unit —
+except that `since` is caught run together too (`dayssince1970-01-01`, conformance case UPR-043b):
+that is the construct with its spaces taken out, which is what the lexer used to deliver, and no
+UDUNITS name contains it. A row for `since` is kept in `.unsupported` anyway, so that a bare
+`udunits:since` refuses identically and so that a maintainer finds the reason where they look for
+it. Refusing costs a producer an error message that
 says exactly this; accepting it would cost them a silently wrong instant.
 
 ---
 
 ## 14. The cross-vocabulary conformance suite
 
-> `tests/bovnar_crossvocab_test.c` — 64 concepts, 6 vocabularies, 4789 assertions.
+> `tests/bovnar_crossvocab_test.c` — 67 concepts, 6 vocabularies, 4868 assertions.
 
 Every other profile test asks *does this vocabulary translate correctly?*. This one asks the
 question that only exists once there are five: **do they agree?**
@@ -2841,7 +2894,7 @@ this suite is what pins it once found. The two are not alternatives.
 
 What it also cannot tell you: it proves the six unit vocabularies agree **with each other**, not that
 they agree with their publishers — that is §9.5's job, and §9.5 reaches `unece` only at one remove
-and reaches `CEL`, `FAH`, `GRY`, `HEN`, `MOL` and `TNE` not at all. **Five tables that are wrong in
+and reaches `CEL`, `FAH`, `GRY`, `HEN`, `MOL`, `Q12`, `Q13` and `TNE` not at all. **Five tables that are wrong in
 the same way agree perfectly.** §10.2 is where what remains uncovered is recorded.
 
 ---
@@ -2946,8 +2999,8 @@ Growing the native registry to reach them is a separate decision, and doc/05 is 
 
 > `om:` — OM 2, the Ontology of units of Measure (Rijgersberg, van Assem, Top; Wageningen), the
 > second unit ontology of the semantic web beside QUDT.
-> Data file `src/gendata/om.bvnr` (1336 mapped, 124 refused — every unit individual OM states);
-> pinned by `tests/bovnar_om_test.c` (110 assertions); id block 70, contributing no opaque units.
+> Data file `src/gendata/om.bvnr` (1337 mapped, 123 refused — every unit individual OM states);
+> pinned by `tests/bovnar_om_test.c` (114 assertions); id block 70, contributing no opaque units.
 
 ### 16.1 Why this vocabulary
 
@@ -3011,15 +3064,20 @@ is worth: **1271 rows compared, no mismatch**. The three shapes of resolver this
 
 ### 16.3 What the derivation refuses
 
-124 local names are carried as refusals rather than mappings, and four groups are worth naming:
+123 local names are carried as refusals rather than mappings, and four groups are worth naming —
+after one that is no longer among them:
 
-- **`om:year`, and everything built on it.** OM's year is the **Gregorian** 31 556 952 s; native
-  `yr` is the Julian 31 557 600 s. Twenty-one parts per million apart, dimensionally identical, and
-  invisible to every test that does not check the number — the same shape as UDUNITS' tropical year
-  (§13.3). `gigayear`, `reciprocalYear` and `cubicMetrePerYear` fall with it.
-- **Units OM names without stating a magnitude.** `calorie-15C`, `BritishThermalUnit-Mean`,
-  `colonyFormingUnit` and `bel` have a dimension or a symbol and no factor. A unit whose value the
-  publisher does not state is not one this table can carry, whatever a reader might guess it to be.
+- **`om:year` is not refused any more, nor is anything built on it.** OM's year is the
+  **Gregorian** 31 556 952 s; native `yr` is the Julian 31 557 600 s, twenty-one parts per million
+  apart and dimensionally identical — the same shape as UDUNITS' tropical year (§13.3). It was
+  refused for that until the registry gained the Gregorian year `yr_greg`, and it maps there now,
+  with `gigayear` (`G~yr_greg`), `reciprocalYear`, `cubicMetrePerYear` and the other compounds OM
+  builds on it.
+- **Units OM names without stating a magnitude.** `calorie-15C`, `BritishThermalUnit-Mean` and
+  `colonyFormingUnit` have a dimension or a symbol and no factor. A unit whose value the publisher
+  does not state is not one this table can carry, whatever a reader might guess it to be. The `bel`
+  used to be listed here; OM declares it a `SingularUnit`, symbol `B`, with the decibel as deci ×
+  bel, so `om:bel` maps to `da~dB` as `ucum:B`, `qudt:B` and `udunits:B` already did (§3.7).
 - **The arbitrary units.** `om:InternationalUnit` is UCUM's `[IU]`, which bovnar already carries as
   an opaque base unit with an identity of its own (§7.1). A second, OM-flavoured identity for the
   same assay unit would make the two **incommensurable with each other** — two units that cannot be
@@ -3028,8 +3086,10 @@ is worth: **1271 rows compared, no mismatch**. The three shapes of resolver this
   currencies in a system of their own (§7.2). `KelvinScale`, `CelsiusScale` and the other three
   `…Scale` individuals are scales, not units: OM relates each to its unit by a factor *and an
   offset*, so mapping one to a unit would read a Celsius-scale 20 as 20 K.
-  `om:one`, `om:metrePerMetre` and `om:dozen` are dimension one, which bovnar spells by omitting the
-  slot — translating them would make a count compare equal to a percentage.
+  `om:one` and `om:dozen` are dimension one, which bovnar spells by omitting the slot — translating
+  them would make a count compare equal to a percentage. `om:metrePerMetre` is not refused: OM
+  composes it as metre ÷ metre, and it maps to the ratio `m/m`, which keeps the length it is a ratio
+  of rather than collapsing to a bare number.
 
 Each is `error_unit_profile_unsupported`, not `error_unit_illegal`: the producer wrote a real OM
 unit and is told bovnar cannot carry it, which is the distinction §3.1 exists for.

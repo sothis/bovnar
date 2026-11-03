@@ -1,24 +1,39 @@
 # TODO
 
-## Handover 2026-11-03 — the whole-project review, moved to another machine
+## State 2026-11-03 — after the second whole-project review
 
-State at handover: everything below is committed on `main` in one commit, not
-pushed, not tagged (2.0.0 waits for the maintainer's word). Verified on that
-tree: a clean rebuild with all 183 CTest tests passing, the ASan+UBSan build
-157/157 (`-LE python`), a clang `BVNR_WERROR` build clean, and a GCC 13
-`BVNR_WERROR` build clean in an Ubuntu 24.04 container (the CI compiler).
-The WASM module, `web/`, the LLM views, the sitemap and the IETF draft
-renderings were regenerated from the committed sources.
+Committed on `main`, not pushed, not tagged (2.0.0 waits for the
+maintainer's word). What the review changed is in CHANGELOG.md under 2.0.0, "Fixed — a second whole-project review before
+release". Verified on that tree: `./run_tests.sh` (full build, all 185 CTest
+tests and the fuzz sweep), the ASan+UBSan build 159/159 (`-LE python`), and
+`BVNR_WERROR` builds clean with GCC 15 and clang 21. GCC 13, the CI compiler,
+was not available here; the CI tests job is where it shows. The WASM module,
+`web/`, the LLM views, `web/de/` and the IETF draft renderings were regenerated
+from the sources.
 
-What the review changed is in CHANGELOG.md under 2.0.0, "Fixed — a
-whole-project review before release". What it left open is the next section.
+## Closed 2026-11-03 — what the second review left to the maintainer
 
-To pick it up on a new machine:
+All four done on the maintainer's word ("do all"):
+
+1. `pretty-print --canonical` (`BVN_NUM_CANONICAL`) writes every annotation in
+   one form: width written out, default `_10` and `no_unit` left out.
+   `test_canonical_annotation_form` in `bvnr_writer_test`.
+2. `unece:A8`, `J55`, `P14`, `M77`, `F90`, `C55` spell their definitions out;
+   `PS` stays the psi. Pinned in `bvnr_unece_test`.
+3. `bovnar convert` json -> bvnr writes integers wider than 64 bits as
+   `<uint:N>`/`<sint:N>` (refused only inside an array).
+   `bvnr_cli_convert_wide_int`.
+4. The IETF draft's front matter carries `date: 2026-11-04`; move it with the
+   release date.
+
+## Setup — picking it up on a new machine
 
 - `build/` and `build-asan/` are git-ignored and do not travel. Configure
   them again: `cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo .` and
   `cmake -B build-asan -DBVNR_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug .`, then
-  `./run_tests.sh` (it builds first; `ctest` alone does not).
+  `./run_tests.sh` (it builds first; `ctest` alone does not). Note that no
+  CTest test may carry PASS_REGULAR_EXPRESSION (it replaces the exit status);
+  a test that checks output goes through `cmake/cli_expect.cmake`.
 - `web/de/` is git-ignored as well; `python3 gen_i18n.py de` recreates it.
 - After any C change, regenerate in this order: `wasm/build_wasm.sh` (needs
   emsdk), `gen_html_docs.py`, `gen_llms.py`, `gen_csp.py` if an inline script
@@ -37,7 +52,7 @@ To pick it up on a new machine:
   runs it on GitHub for real; if a runner's GCC warns where 13 and 15 did
   not, that job is where it shows.
 
-## Open 2026-11-03 — decisions the whole-project review left to the maintainer
+## Closed 2026-11-03 — the decisions the first whole-project review left
 
 1. **The 2.0.0 date.** Set to 2026-11-04 on 2026-11-03 in CHANGELOG,
    CITATION.cff (`date-released`), the JOSS paper and both wiki drafts (was

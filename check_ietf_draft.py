@@ -44,6 +44,13 @@ places that only the header can settle:
     every fact checked above is re-checked in each rendering. This is the check
     that makes "fix the draft" mean all four files.
 
+  * STRUCTURE. Every code fence in the .md is closed by a bare fence line,
+    and every heading of the .md is a section heading of the .txt. A fence
+    line carrying text ("~~~ `ws-req`") does not close a kramdown block: the
+    block ran on and swallowed the Keys section -- its prose, heading and
+    ABNF -- so the renderings had no Keys section at all, and every word was
+    still in the .md for anybody reading the source.
+
 WHAT IT COMPARES, AND WHY THE SET GREW. It began with the error-code enum and
 the component limit -- the two things that had drifted. The EXPONENT RANGE was
 added after doc/03 and all three renderings of the draft were found describing
@@ -386,6 +393,82 @@ def check_families(text, where, facts, problems, verbose):
         print("  ok  %s: all %d type families named" % (where, len(facts["families"])))
 
 
+FENCE_RE = re.compile(r"^ {0,3}(~{3,}|`{3,})(.*)$")
+
+
+def check_fences(text, where, problems, verbose):
+    """Every code block in the .md must close on a bare fence line.
+
+    kramdown closes a fenced block only on a line holding the fence and
+    nothing else. A fence line that carries text inside an open block -- the
+    draft once closed an example with "~~~ `ws-req`" -- does not close it: the
+    block runs on, swallowing the prose, the next heading and the next ABNF,
+    and the renderings simply lose that section. Nothing else notices, because
+    every word is still in the .md. Returns the lines outside any fence, so
+    that the heading check below reads the same structure kramdown does."""
+    outside = []
+    open_fence = None   # (char, length, line number)
+    for n, line in enumerate(text.split("\n"), 1):
+        m = FENCE_RE.match(line)
+        if open_fence is None:
+            if m:
+                open_fence = (m.group(1)[0], len(m.group(1)), n)
+            else:
+                outside.append(line)
+            continue
+        if m and m.group(1)[0] == open_fence[0] \
+                and len(m.group(1)) >= open_fence[1]:
+            if m.group(2).strip():
+                problems.append(
+                    "%s:%d: fence line %r inside the block opened at line %d "
+                    "carries text, so it does not close the block -- the "
+                    "block swallows everything up to the next bare fence. "
+                    "Put the fence on its own line"
+                    % (where, n, line, open_fence[2]))
+            else:
+                open_fence = None
+    if open_fence is not None:
+        problems.append("%s:%d: code block never closed"
+                        % (where, open_fence[2]))
+    elif verbose:
+        print("  ok  %s: every code fence is closed by a bare fence line"
+              % where)
+    return outside
+
+
+def check_headings_rendered(md_outside, txt, where, problems, verbose):
+    """Every heading of the .md must be a section heading of the .txt.
+
+    The direct symptom of a swallowed heading, an unclosed fence or a
+    rendering made from an older .md: the section is simply absent from the
+    rendering and its table of contents."""
+    titles = []
+    for line in md_outside:
+        m = re.match(r"^#{1,6}\s+(.*?)\s*(?:\{#[^}]*\})?\s*$", line)
+        if m:
+            titles.append(re.sub(r"\s+", " ",
+                                 m.group(1).replace("`", "").replace("*", "")))
+    rendered = set()
+    for line in txt.split("\n"):
+        if ". . " in line:      # a table-of-contents line
+            continue
+        m = re.match(r"^\s*(?:\d+|[A-Z]|Appendix [A-Z])(?:\.\d+)*\.\s+"
+                     r"(\S.*?)\s*$", line)
+        if m:
+            rendered.add(re.sub(r"\s+", " ", m.group(1)))
+        elif re.match(r"^\S", line):   # unnumbered: Acknowledgments etc.
+            rendered.add(line.strip())
+    missing = [t for t in titles if t not in rendered]
+    if missing:
+        problems.append(
+            "%s: %d heading(s) of the .md are not section headings of the "
+            "rendering (unclosed fence, or a stale rendering?): %s"
+            % (where, len(missing), "; ".join(missing[:8])))
+    elif verbose:
+        print("  ok  %s: all %d headings of the .md are rendered"
+              % (where, len(titles)))
+
+
 def main(argv):
     verbose = "--verbose" in argv
     facts = header_facts()
@@ -404,6 +487,7 @@ def main(argv):
     check_spec_version(text, where, facts, problems, verbose)
     check_epochs(text, where, problems, verbose)
     check_families(text, where, facts, problems, verbose)
+    md_outside = check_fences(text, where, problems, verbose)
 
     # The three generated renderings must state the same facts as the source.
     for ext in ("txt", "xml", "html"):
@@ -419,6 +503,8 @@ def main(argv):
         # reliably. That is the claim that drifted; the rest is covered by
         # the .md check above plus the fact that all four are one generation.
         check_macro_values(t, w, facts, problems, verbose)
+        if ext == "txt":
+            check_headings_rendered(md_outside, t, w, problems, verbose)
 
     # The documentation set restates the same constants.
     for p, w in ((UNIT_DOC, "doc/05_bovnar_unit_system.md"),

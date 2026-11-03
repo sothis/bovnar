@@ -75,3 +75,42 @@ def test_every_unit_symbol_survives_normalisation(form):
                 sym, " ".join("U+%04X" % ord(c) for c in sym),
                 " ".join("U+%04X" % ord(c) for c in variant)))
     assert not broken, "%s destroys these symbols: %s" % (form, broken)
+
+
+# Exponents are a different matter. A superscript digit has a COMPATIBILITY
+# decomposition only (U+00B2 SUPERSCRIPT TWO -> U+0032 DIGIT TWO), so the
+# canonical forms keep it and the compatibility forms fold it to a plain digit:
+# `m/s²` becomes `m/s2`, which is not a unit (error_unit_illegal). That is not
+# repaired by an alias -- `s2` would be a guess at what was meant -- so a
+# pipeline that applies NFKC/NFKD must write the caret form, which every form
+# leaves alone.
+SUPERSCRIPT_DOC = ".a = <float:64,m/s²> 9.81;\n"
+CARET_DOC = ".a = <float:64,m/s^2> 9.81;\n"
+
+
+@needs_lib
+@pytest.mark.parametrize("form", ("NFC", "NFD"))
+def test_canonical_forms_keep_a_superscript_exponent(form):
+    normalised = unicodedata.normalize(form, SUPERSCRIPT_DOC)
+    assert normalised == SUPERSCRIPT_DOC
+    assert bovnar.loads(normalised.encode())["a"] == 9.81
+
+
+@needs_lib
+@pytest.mark.parametrize("form", ("NFKC", "NFKD"))
+def test_compatibility_forms_destroy_a_superscript_exponent(form):
+    normalised = unicodedata.normalize(form, SUPERSCRIPT_DOC)
+    assert "m/s2" in normalised
+    with pytest.raises(bovnar.BovnarParseError) as ei:
+        bovnar.loads(normalised.encode())
+    assert ei.value.code == bovnar.ErrorCode.UNIT_ILLEGAL
+
+
+@needs_lib
+@pytest.mark.parametrize("form", FORMS)
+def test_caret_exponent_survives_every_form(form):
+    normalised = unicodedata.normalize(form, CARET_DOC)
+    assert normalised == CARET_DOC
+    q = bovnar.loads(normalised.encode(), typed=True)["a"]
+    assert q.value == 9.81
+    assert bovnar.parse_unit("m/s^2") == bovnar.parse_unit("m/s²")

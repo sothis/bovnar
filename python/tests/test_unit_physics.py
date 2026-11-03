@@ -1021,6 +1021,7 @@ class TestNewUnitsConvertValue:
         assert math.isclose(conv.factor, 9.80665e-3, rel_tol=1e-10)
 
 
+@needs_lib
 def test_the_mean_gregorian_month():
     """The last unit two publishers named that nothing here could carry.
 

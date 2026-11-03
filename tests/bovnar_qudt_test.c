@@ -461,6 +461,80 @@ static void test_to_qudt(void)
 	            "the qudt-qk profile owns no opaque range");
 }
 
+/* ── rows the factor-checked cross-reference found ──────────────────────── */
+
+/*
+ * check_profile_factors.py compared each QUDT row with the UCUM and UNECE rows
+ * QUDT itself cross-references, but only for convertibility. Comparing the
+ * factor too, and the unit, found rows that had been fitted to a wrong QUDT
+ * multiplier or had read a reactive power as an apparent one. Each is pinned
+ * here; doc/11 section 9.5 says why the contradictions are refused rather than
+ * read by either side.
+ */
+static void test_cross_reference_rows(void)
+{
+	printf("  rows the factor-checked cross-reference found...\n");
+
+	/* The katal-per-litre family: QUDT's multipliers are a million too small
+	 * against its own labels and ucumCodes. KAT-PER-L itself is right. */
+	chk_error("qudt:MicroKAT-PER-L", error_unit_profile_unsupported);
+	chk_error("qudt:MilliKAT-PER-L", error_unit_profile_unsupported);
+	chk_error("qudt:NanoKAT-PER-L",  error_unit_profile_unsupported);
+	chk_error("qudt:PicoKAT-PER-L",  error_unit_profile_unsupported);
+	ASSERT_TRUE(bvn_unit_equal(U("qudt:KAT-PER-L"), U("ucum:kat/L")),
+	            "qudt:KAT-PER-L is the katal per litre");
+
+	/* PT: "Point", ucumCode [pnt], multiplier the thou. BTU_MEAN: "(mean)",
+	 * ucumCode [Btu_m], multiplier the IT BTU. GRAIN-PER-GAL: symbol and
+	 * ucumCode the imperial gallon, multiplier the US one. */
+	chk_error("qudt:PT",            error_unit_profile_unsupported);
+	chk_error("qudt:BTU_MEAN",      error_unit_profile_unsupported);
+	chk_error("qudt:GRAIN-PER-GAL", error_unit_profile_unsupported);
+	ASSERT_TRUE(bvn_unit_equal(U("qudt:PT_BIG"), U("pnt")),
+	            "PT_BIG is still the typographic point");
+	ASSERT_TRUE(bvn_unit_equal(U("qudt:GRAIN-PER-GAL_US"), U("gr/gal")),
+	            "the US-labelled grain per gallon still maps");
+
+	/* MilliRAD_R is an absorbed dose, not the millirem; and the millirem is
+	 * written back under the name that means it. */
+	chk_error("qudt:MilliRAD_R", error_unit_profile_unsupported);
+
+	char buf[BVNR_UNIT_STRING_MAX];
+#define CHK_QUDT(nat, want) do { \
+	tests++; \
+	if (bvn_unit_to_profile("qudt", U(nat), buf, sizeof(buf)) < 0 || \
+		strcmp(buf, (want)) != 0) { \
+		fprintf(stderr, "FAIL: %s -> QUDT %s, expected %s\n", \
+		        (nat), buf, (want)); \
+		failures++; \
+	} \
+} while (0)
+	CHK_QUDT("m~rem", "MilliR_man");        /* not MilliRAD_R, the millirad */
+
+	/* Reactive power is not apparent power. KiloVAR read k~VA, while
+	 * unece:KVR -- the code QUDT gives it -- read k~var; and the kilovolt-
+	 * ampere was written back as KiloV-A_Reactive. */
+	ASSERT_TRUE(bvn_unit_equal(U("qudt:KiloVAR"), U("k~var")),
+	            "KiloVAR is the kilovar");
+	ASSERT_TRUE(bvn_unit_equal(U("qudt:KiloV-A_Reactive"), U("unece:KVR")),
+	            "KiloV-A_Reactive is unece:KVR");
+	ASSERT_TRUE(bvn_unit_equal(U("qudt:MegaVAR"), U("unece:MAR")),
+	            "MegaVAR is unece:MAR");
+	ASSERT_TRUE(bvn_unit_equal(U("qudt:KiloV-A"), U("unece:KVA")),
+	            "KiloV-A is unece:KVA");
+	ASSERT_TRUE(bvn_unit_equal(U("qudt:VA"), U("unece:D46")),
+	            "VA is unece:D46");
+	ASSERT_FALSE(bvn_unit_equal(U("qudt:KiloVAR"), U("qudt:KiloVA")),
+	             "a kilovar is not a kilovolt-ampere");
+	ASSERT_TRUE(bvn_unit_equal(U("qudt:KiloVAR-HR"), U("k~var·h")),
+	            "a kilovar hour is reactive energy, not a kilowatt hour");
+	CHK_QUDT("k~VA",  "KiloV-A");           /* not KiloV-A_Reactive          */
+	CHK_QUDT("k~var", "KiloV-A_Reactive");
+	CHK_QUDT("M~VA",  "MegaV-A");           /* not MegaV-A_Reactive          */
+	CHK_QUDT("M~var", "MegaV-A_Reactive");
+#undef CHK_QUDT
+}
+
 /* ── round trip ─────────────────────────────────────────────────────────── */
 
 static void test_round_trip(void)
@@ -523,6 +597,7 @@ int main(void)
 	test_kind_refusals();
 	test_namespace_syntax();
 	test_to_qudt();
+	test_cross_reference_rows();
 	test_round_trip();
 
 	printf("\n%d tests, %d failures\n", tests, failures);

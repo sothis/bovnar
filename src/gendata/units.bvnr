@@ -2812,7 +2812,7 @@
     .aliases = ["darcies", "darcys", "darcy"];
   },
     # 100 000 international-table BTU exactly, the therm European gas billing
-    # uses. Native thm is the US therm (1.054804e8 J), 0.24 % away, and no
+    # uses. Native thm is the US therm (1.054804e8 J), 0.024 % away, and no
     # prefix reaches 1e5 -- so this needed a unit of its own.
   {
     .id      = <uint:32> 100211;
@@ -3050,7 +3050,8 @@
   },
   {
     # The debye, the electric dipole moment chemistry is written in: 1e-21/c
-    # C·m, which has been EXACT since the 2019 SI fixed c. Both publishers
+    # C·m, which is EXACT, c having been a defined constant since the 1983
+    # definition of the metre. Both publishers
     # state the 6-digit rounding 3.33564e-30; the rational below is the
     # definition they are rounding.
     .id      = <uint:32> 100225;
@@ -3074,7 +3075,7 @@
   # is a number.
   #
   # WHERE THE PUBLISHERS DISAGREE, the exact definition decides. The CGS-ESU
-  # units are built on c, which the 2019 SI fixed, so every one of them is an
+  # units are built on c, fixed since the 1983 metre, so every one of them is an
   # exact rational and the publishers' 6- and 7-digit decimals are roundings of
   # it -- which is why statΩ is 22468879468420441/25000 here and 898755400000,
   # 898755200000 and 898760000000 in UDUNITS, OM and QUDT. The sidereal hour,
@@ -3413,7 +3414,10 @@
     .id      = <uint:32> 100253;
     .name    = "btu_59f";
     .symbol  = "Btu_59";
-    .factor  = 1054.8;
+    # NIST SP 811 B.8: 1.054 804 E+03 J, the value the US therm (thm, 1e5 of
+    # these) is built on. UCUM's [Btu_59] states 1.05480 kJ, a 6-digit
+    # rounding 3.8 ppm low, waived in check_profile_factors.py.
+    .factor  = 1054.804;
     .dims    = { .length = 2; .mass = 1; .time = -2; };
     .affine  = false;
     .offset  = 0.0;

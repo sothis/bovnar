@@ -52,7 +52,8 @@ amalgamation and the source tarball are attached to the GitHub release, with a
   `om:kilogram` are one and the same unit, and a cross-vocabulary suite checks
   every spelling against every other. Units with no SI definition — UCUM's
   `[IU]`, a UN/ECE package count — are carried as opaque units: equal to
-  themselves, convertible to nothing. `cf:` is read-only. Each vocabulary has
+  themselves, convertible to no other unit — only across a change of prefix
+  (`ucum:[IU]/L` to `ucum:[IU]/mL`). `cf:` is read-only. Each vocabulary has
   its own build switch (`-DBVNR_WITH_<NAME>_PROFILE=OFF`).
 - **A unit keeps its spelling** — `bvnr_data_t.unit_source` hands the reader's
   consumer the unit exactly as it was written, beside what it means, and the

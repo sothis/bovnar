@@ -899,6 +899,38 @@ static void test_recovery_review_2026_11(void)
 			       "skipped bytes: EOF in recovery counts the '@'");
 		bvnr_reader_destroy(p.r);
 	}
+
+	/* Malformed UTF-8 inside a region recovery is already skipping is skipped
+	 * like every other byte there. A second malformed sequence used to raise a
+	 * second error and enter recovery again, which forgot the skip was inside
+	 * a string: the closing quote then opened a new skip, and every assignment
+	 * after it was lost -- a Latin-1 string with two accented letters was
+	 * enough. And a '"' that cuts a multi-byte character short was dispatched
+	 * twice, closing the skip it had just opened. Each case below ends the
+	 * read cleanly (true) with one error, so .b and .c were delivered. */
+	static const struct { const char *src; uint64_t skipped; } u8[] = {
+		{ ".a = \"caf\xe9 cr\xe8me\";\n.b = 2;\n.c = 3;\n", 7 }, /* Latin-1 */
+		{ ".x=\"a\xc0\x80" "b\";.y=1;.z=2;\n",             4 }, /* MUTF-8  */
+		{ ".a = \"\xed\xa0\x80\";\n.b = 2;\n.c = 3;\n",     3 }, /* CESU-8  */
+		{ ".a = sym\xe2\x82\"s\";\n.b = 2;\n.c = 3;\n",     3 }, /* cut by " */
+		{ ".k1 =\xc2\"str\";\n.b = 2;\n.c = 3;\n",          6 },
+		{ ".a = \"a\"\xe2\x82\"b\";\n.b = 2;\n.c = 3;\n",   5 },
+		{ ".a=1 @ \xff\xff\xff;\n.b=2;\n",                  5 }, /* was 1    */
+	};
+	for (size_t i = 0; i < sizeof u8 / sizeof *u8; i++) {
+		ok = probe_read(u8[i].src, true, &p);
+		if (!p.r) continue;
+		char msg[96];
+		snprintf(msg, sizeof msg, "bad UTF-8 in recovery #%zu: read ends cleanly", i);
+		ASSERT_TRUE(ok, msg);
+		snprintf(msg, sizeof msg, "bad UTF-8 in recovery #%zu: one error", i);
+		ASSERT_EQ_INT(p.calls, 1, msg);
+		snprintf(msg, sizeof msg, "bad UTF-8 in recovery #%zu: one recovery", i);
+		ASSERT_EQ_UINT(bvnr_reader_get_recovery_count(p.r), 1, msg);
+		snprintf(msg, sizeof msg, "bad UTF-8 in recovery #%zu: skipped bytes", i);
+		ASSERT_EQ_UINT(bvnr_reader_get_skipped_bytes(p.r), u8[i].skipped, msg);
+		bvnr_reader_destroy(p.r);
+	}
 }
 
 static bool cb_abort_immediately(void *ud, bvnr_event_t ev, bvnr_data_t *d)
@@ -2593,13 +2625,16 @@ static void test_bug_f_bad_continuation_retried_in_resync(void)
 	 * The stream ".x = !!\xc2;\n":
 	 *   - '!!' in value_intro => error_unexpected_input_byte, recovery #1.
 	 *   - '\xc2' in resync => valid 2-byte leader, utf8_need = 1.
-	 *   - ';' (0x3B) arrives: not a valid continuation (not in [0x80,0xBF])
-	 *     => error_invalid_utf8_byte, recovery #2.
+	 *   - ';' (0x3B) arrives: not a valid continuation (not in [0x80,0xBF]).
 	 *     Before fix: ';' dropped, parser stays in resync, hits EOF =>
 	 *       error_got_incomplete_bvnr_stream, bvnr_read returns false.
 	 *     After fix: ';' re-offered to resync scanner =>
 	 *       bvn_action_resync_semicolon fires, recovery exits cleanly,
 	 *       bvnr_read returns true.
+	 *   - The cut-short \xc2 itself is skipped like any byte in resync
+	 *     (doc/03 §13.2): no second error and no second recovery. It used to
+	 *     be both, and entering recovery a second time lost the state of a
+	 *     skip inside a string (test_recovery_review_2026_11).
 	 */
 	static const uint8_t src[] = {
 		'.','x',' ','=',' ','!','!', (uint8_t)0xc2, ';','\n'
@@ -2622,10 +2657,10 @@ static void test_bug_f_bad_continuation_retried_in_resync(void)
 
 	ASSERT_TRUE(ok,
 				"bug_f: parse must succeed when ';' is retried after bad continuation");
-	ASSERT_EQ_UINT(bvnr_reader_get_recovery_count(r), 2,
-				   "bug_f: exactly two recoveries ('!!' error and bad-continuation ';')");
-	ASSERT_EQ_UINT((uint64_t)ctx.error_count, 2,
-				   "bug_f: exactly two on_error callbacks");
+	ASSERT_EQ_UINT(bvnr_reader_get_recovery_count(r), 1,
+				   "bug_f: one recovery (the '!!'); the bad UTF-8 is skipped in it");
+	ASSERT_EQ_UINT((uint64_t)ctx.error_count, 1,
+				   "bug_f: one on_error callback");
 
 	bvnr_reader_destroy(r);
 }
@@ -3016,10 +3051,13 @@ static void test_rb4_advance_line_once_per_byte(void)
 
 	bool ok = bvnr_open_read_mem(r, src, sizeof(src), NULL, 0, &f)
 		   && bvnr_read(r);
-	(void)ok;
 
-	ASSERT_GE_UINT((uint64_t)ctx.error_count, 2,
-				   "rb4: at least two errors must fire (initial !! and bad continuation)");
+	/* The bad continuation is inside the region the first error is already
+	 * skipping, so it raises no error of its own (doc/03 §13.2); 'z' and the
+	 * second '!!' are skipped with it and the ';' ends the recovery. */
+	ASSERT_TRUE(ok, "rb4: recovery ends at the ';'");
+	ASSERT_EQ_UINT((uint64_t)ctx.error_count, 1,
+				   "rb4: one error (the initial !!)");
 	ASSERT_EQ_UINT(ctx.last_error_line, 1,
 				   "rb4: all errors are on line 1");
 

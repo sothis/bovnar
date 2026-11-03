@@ -374,29 +374,62 @@ def check_assertion_counts(repo):
         text = f.read()
     claims = re.findall(r"`tests/(bovnar_(\w+)_test)\.c`\s*\((\d+) assertions\)",
                         text)
+    # §9.3's table states the same figures again, one row per binary:
+    # "| `tests/bovnar_ucum_test.c` | `bvnr_ucum_test` | 197 | §2–§10 |". It
+    # said 197, 557 and 201 while the blockquotes above were kept current.
+    claims += re.findall(r"\|\s*`tests/(bovnar_(\w+)_test)\.c`\s*\|"
+                         r"\s*`bvnr_\w+_test`\s*\|\s*(\d+)\s*\|", text)
+    # ...and the header's total: "(1335 assertions across the seven profiles,
+    # plus 4789 in the cross-vocabulary suite)" -- the sum of every profile
+    # binary but the cross-vocabulary one, and that one.
+    total = re.search(r"\((\d+) assertions across the seven profiles, plus "
+                      r"(\d+) in the cross-vocabulary\s+suite\)", text)
     if not claims:
         return [], 0
     problems, checked = [], 0
     ran = False
-    for _src, vocab, stated in claims:
+    runs = {}
+
+    def run(vocab):
+        if vocab in runs:
+            return runs[vocab]
+        runs[vocab] = None
         exe = os.path.join(bvnr_build_env.tests_dir(repo),
                            "bvnr_%s_test" % vocab)
         if not os.path.exists(exe):
-            continue
+            return None
         try:
             out = subprocess.run([exe], capture_output=True, text=True,
                                  timeout=120)
         except Exception:                                     # noqa: BLE001
-            continue
+            return None
         m = re.search(r"(\d+) tests", (out.stdout or "") + (out.stderr or ""))
-        if not m:
+        if m:
+            runs[vocab] = int(m.group(1))
+        return runs[vocab]
+
+    for _src, vocab, stated in claims:
+        got = run(vocab)
+        if got is None:
             continue
         ran = True
         checked += 1
-        if int(m.group(1)) != int(stated):
+        if got != int(stated):
             problems.append("doc/11_bovnar_unit_profiles.md: says "
                             "tests/bovnar_%s_test.c has %s assertions; it runs "
-                            "%s" % (vocab, stated, m.group(1)))
+                            "%s" % (vocab, stated, got))
+    if total:
+        profiles = ("ucum", "unece", "qudt", "udunits", "om", "cf")
+        got = [run(v) for v in profiles]
+        cross = run("crossvocab")
+        if None not in got and cross is not None:
+            checked += 1
+            if (sum(got), cross) != (int(total.group(1)), int(total.group(2))):
+                problems.append("doc/11_bovnar_unit_profiles.md: says %s "
+                                "assertions across the seven profiles plus %s "
+                                "cross-vocabulary; the binaries run %d and %d"
+                                % (total.group(1), total.group(2), sum(got),
+                                   cross))
     if not ran:
         print("check_doc_counts: no built profile tests; the %d assertion "
               "count(s) in doc/11 were not checked" % len(claims))

@@ -84,6 +84,9 @@ typedef struct bvnr_serializer_s {
 	bool			w_stream_ended;    /* ev_stream_end seen; nothing may follow */
 	bool			had_type_annotation;
 	bool			emitted_type_param;
+	/* The family of the annotation being written, for BVN_NUM_CANONICAL's
+	 * normal form (a width written out, default parameters left out). */
+	value_type_family_t	ann_family;
 	bool			emitted_unit;	/* a unit was emitted in the annotation,
 						 * so an inline unit on the value need
 						 * not (and must not) be re-appended */

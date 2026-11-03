@@ -2,6 +2,7 @@
 title: "The Bovnar (BVNR) Unit-Safe Serialization Format"
 abbrev: "The Bovnar Format"
 docname: draft-sonntag-bovnar-00
+date: 2026-11-04
 category: info
 submissiontype: independent
 ipr: trust200902
@@ -545,8 +546,9 @@ HTAB, LF, VT, FF, and CR are accepted as literal content inside strings.
 
 # Version Declaration {#version}
 
-A document MAY declare the format version it targets with a directive on
-its first line.
+A document MAY declare the format version it targets with a directive as
+its first comment, after an optional BOM and leading blanks (blank lines
+included); in practice, its first line.
 
 ~~~ abnf
 version-decl = "#" %s"!bovnar" 1*hspace version-int "." version-int
@@ -625,7 +627,9 @@ forbidden placements; this prose forbids them.
 .ok2 = "text"# directly after a string: valid
 ;
 # .bad = 42# directly after a number: error_unexpected_input_byte
-~~~ `ws-req`
+~~~
+
+`ws-req`
 denotes a mandatory separator, required in exactly one place: before an
 inline unit suffix ({{inline-units}}). A comment's own line end serves as
 the blank, so after a string - where `#` may follow directly - a comment
@@ -646,7 +650,7 @@ the key.
 The following ASCII punctuation characters are errors inside a key:
 
 ~~~
-! " # $ % & ' ( ) * , . / : ; < = > ? @ [ \ ] ^ ` { | } ~
+! " # $ % & ' ( ) * , . / : ; < > ? @ [ \ ] ^ ` { | } ~
 ~~~
 
 `=` terminates the key and begins the value part. A blank also
@@ -1321,8 +1325,9 @@ is dimensionless by synthesis; all three are compatible.
 ## Prefixes {#prefixes}
 
 The 24 SI prefixes from quetta (`Q`, 10^30) to quecto (`q`, 10^-30) are
-accepted. The micro prefix is `µ` (U+00B5, encoded `C2 B5`); ASCII `u`
-is accepted as an input-only alias, and producers render it as `µ`.
+accepted. The micro prefix is `µ` (U+00B5, encoded `C2 B5`); U+03BC
+GREEK SMALL LETTER MU (encoded `CE BC`) and ASCII `u` are accepted as
+input-only aliases, and producers render the prefix as `µ`.
 
 The IEC binary prefixes `Ki` through `Yi` (2^10 to 2^80) are accepted, as
 are `Ri` (2^90) and `Qi` (2^100). Note that `Ri` and `Qi` are a
@@ -1528,7 +1533,8 @@ alone behaves predictably:
   unit of {{units}}, carries it as an **opaque** unit, or rejects it. An
   opaque unit is one the vocabulary defines with no dimension - a UCUM
   arbitrary unit, a UN/ECE package or count code: it equals itself, is
-  convertible to nothing, and is distinct from every other unit under
+  convertible to no other unit (only across a change of prefix, as from
+  `ucum:[IU]/L` to `ucum:[IU]/mL`), and is distinct from every other unit under
   every rule of this document. Rejection is `error_unit_illegal` for a
   code the vocabulary does not define and
   `error_unit_profile_unsupported` (50) for one it defines and this unit
@@ -1750,7 +1756,9 @@ A consumer MAY offer a **recovery mode** in which parsing continues after
 an error rather than halting. When it does:
 
 1. The error is reported.
-2. Octets are skipped, tracking `[]` and `{}` nesting.
+2. Octets are skipped, tracking `[]` and `{}` nesting. A malformed UTF-8
+   sequence among them is skipped like any other octet and raises no
+   error of its own.
 3. Parsing resumes at whichever comes first: a `;` at the nesting depth
    saved when recovery began, or the **start of the next assignment** - a
    `.` at that depth followed by an octet that can begin a key.
@@ -1957,7 +1965,9 @@ left open at its `;`, a `,` after the value of a struct member inside an
 array (`[{.x = 7, 1;}]`, which had been read as `71`), a `]` that
 closed an array from inside a struct element (`[{.x = 1];}`), blanks or
 a comment inside the `float_fix` or `float_dec` keyword, octets directly
-after a reference index (`&.a[0]b`), a comment cut off inside a UTF-8
+after a reference index (`&.a[0]b`), a `float_fix` literal too large
+for any float (`<float_fix:16,q8> 1e9862`, which had been accepted and
+read as infinity), a comment cut off inside a UTF-8
 sequence at end-of-input, quoted digits that spell `nan`, `inf` or
 `ninf` in a base of 24 or more and exceed their width, and a fractional
 `datetime` literal whose UTC year leaves 0000-9999 are now errors, as are
@@ -2737,7 +2747,8 @@ prefix        = si-prefix / iec-prefix
 si-prefix     = "Q" / "R" / "Y" / "Z" / "E" / "P" / "T" / "G" / "M"
               / "k" / "h" / "da" / "d" / "c" / "m" / micro
               / "n" / "p" / "f" / "a" / "z" / "y" / "r" / "q"
-micro         = %xC2.B5 / "u"   ; U+00B5, or its ASCII alias
+micro         = %xC2.B5 / %xCE.BC / "u"
+                ; U+00B5; U+03BC and ASCII "u" are input-only aliases
 iec-prefix    = "Ki" / "Mi" / "Gi" / "Ti" / "Pi" / "Ei" / "Zi" / "Yi"
               / "Ri" / "Qi"
 

@@ -18,14 +18,15 @@
 #   that follows it, which is ordinary left-to-right arithmetic and is what both
 #   vocabularies mean.
 #
-# SPACE DOES NOT MULTIPLY HERE, AND CANNOT
+# SPACE MULTIPLIES HERE, AS IN UDUNITS
 #   UDUNITS multiplies with a space, and CF's commonest spelling is "kg m-2 s-1".
-#   Bovnar cannot accept it: the lexer deletes whitespace inside a type
-#   annotation, so the slot "udunits:m s-1" arrives as "udunits:ms-1" -- which is
-#   itself valid UDUNITS, meaning RECIPROCAL MILLISECONDS. Treating space as an
-#   operator would not have made the space-separated form work; it would have
-#   made the wrong reading of it look supported. Write "kg*m-2*s-1" or
-#   "kg.m-2.s-1", both of which UDUNITS also accepts.
+#   The lexer carries whitespace inside a NAMESPACED type parameter in verbatim
+#   (spec section 5.3), so the space reaches the profile and ' ' is in its
+#   multiplication set: "udunits:m s-1" is a speed, and "udunits:ms-1" -- also
+#   valid UDUNITS -- is RECIPROCAL MILLISECONDS. As in UDUNITS' scanner a run of
+#   spaces is one operator, and spaces around '/' or the word "per" divide.
+#   Only in a type annotation: an inline unit ends at whitespace. See section
+#   13.2 of doc/11_bovnar_unit_profiles.md.
 #
 # ATOMS, NOT CODES
 #   Every record is an ATOM. "km" is not a row -- "m" is, and "k" is a prefix.
@@ -36,7 +37,7 @@
 # REFERENCE-TIME ("<unit> since <timestamp>") IS NOT HERE
 #   UDUNITS' most distinctive construct is deliberately refused, with its own
 #   reason string, and it is refused for a structural reason rather than a
-#   scheduling one. See section 10.3 of doc/11_bovnar_unit_profiles.md. In short:
+#   scheduling one. See section 13.4 of doc/11_bovnar_unit_profiles.md. In short:
 #   a bovnar timestamp is <datetime:width,epoch>, whose EPOCH lives in the type
 #   spec's base slot -- not in the unit slot -- and whose carrier is defined as a
 #   count of SECONDS. A unit-slot expression can therefore neither select the
@@ -1112,12 +1113,13 @@
   # CARRIER is defined as a count of seconds, which "days since ..." is not.
   # Both would have to change for this to land, and neither is a unit question.
   #
-  # The refusal is NOT driven by this row. A reference-time expression cannot be
-  # split into atoms at all -- the lexer has already deleted its spaces, so
-  # "days since 1970-01-01" arrives as one token -- so bovnar_profiles.c refuses
-  # any udunits code CONTAINING "since", via the refuse_substr hook on the
-  # registry row. The row is kept because this is where a maintainer looks for
-  # the reason, and because it makes a bare "udunits:since" refuse identically.
+  # The refusal is NOT driven by this row. "since" is one of UDUNITS' SHIFT
+  # operators -- @, after, from, ref and since, in either case -- which sit
+  # between a unit and a timestamp or an offset, so there is no atom to look
+  # up; bovnar_profiles.c refuses any udunits code containing one (has_shift,
+  # behind the shift_ops flag on the registry row). The row is kept because
+  # this is where a maintainer looks for the reason, and because it makes a
+  # bare "udunits:since" refuse identically.
   { .code = "since"; .why = "reference time — a bovnar timestamp is <datetime:width,epoch>; the epoch is a type parameter, not a unit, and the carrier counts seconds"; },
 
   # ── Dimensionless placeholders ───────────────────────────────────────────
@@ -1151,12 +1153,14 @@
   # bovnar's yr is the Julian year exactly; these are different lengths and
   # have no native form.
   #
-  # "year", "yr" and "month" belong to this list and not to .mapped, which is
-  # the correction this block exists to record. UDUNITS' unqualified year is
-  # 3.15569259747e7 s -- the TROPICAL year -- not the Julian 3.15576e7 s the
-  # native yr is. Mapping them onto yr was wrong by 674 s per year: the same
-  # shape of error doc/11 §6.3 records for the BTU, and just as invisible.
-  # "Julian_year" is UDUNITS' own spelling for what bovnar means and it maps.
+  # "month" belongs to this list and not to .mapped, which is the correction
+  # this block exists to record. UDUNITS' unqualified year is 3.15569259747e7 s
+  # -- the TROPICAL year -- not the Julian 3.15576e7 s the native yr is, and its
+  # month is a twelfth of that. Mapping them onto yr and mo was wrong by 674 s
+  # per year: the same shape of error doc/11 §6.3 records for the BTU, and just
+  # as invisible. "year" and "yr" now map to the native tropical year, yr_trop;
+  # bovnar has no twelfth of it. "Julian_year" is UDUNITS' own spelling for
+  # what bovnar's yr means and it maps.
   { .code = "month";         .why = "a twelfth of the tropical year; bovnar's mo is a twelfth of the Julian year"; },
   { .code = "leap_year";     .why = "366 days exactly — no native form"; },
 

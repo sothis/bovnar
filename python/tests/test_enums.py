@@ -334,6 +334,7 @@ class TestErrorCode:
     def test_count(self):
         assert len(ErrorCode) == 53
 
+    @pytest.mark.needs_lib
     def test_matches_the_c_enum(self):
         """Every code the LIBRARY recognises must have a Python member.
 

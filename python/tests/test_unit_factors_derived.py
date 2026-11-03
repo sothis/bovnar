@@ -177,6 +177,7 @@ DERIVED = {
     'erg':     (1e-7,               "10⁻⁷ J"),
     'eV':      (1.602176634e-19,    "elementary charge × volt (exact, SI 2019)"),
     'thm':     (1e5 * 1054.804,     "10⁵ BTU(59 °F) — US therm"),
+    'Btu_59':  (1054.804,           "NIST SP 811 B.8 — BTU(59 °F)"),
     'thm_ec':  (1e5 * BTU_IT,       "10⁵ BTU(IT) — EC therm"),
     'hp':      (550 * FT * LB * G0, "550 ft·lbf/s"),
     'PS':      (75 * G0,            "75 kgf·m/s"),

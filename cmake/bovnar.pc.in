@@ -5,10 +5,11 @@
 # that does have an older /usr/local/lib/libbvnr.so, silently compiled and linked
 # against the WRONG library. pcfiledir is where this file actually is, so the
 # prefix is derived at use time; the relative hop back accounts for lib, lib64
-# and multiarch libdirs alike.
-prefix=${pcfiledir}/@BVNR_PC_RELDIR@
-libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
-includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+# and multiarch libdirs alike. An ABSOLUTE libdir or includedir is written as
+# the full path instead (CMakeLists.txt sets the three values).
+prefix=@BVNR_PC_PREFIX@
+libdir=@BVNR_PC_LIBDIR@
+includedir=@BVNR_PC_INCLUDEDIR@
 
 Name: bovnar
 Description: Typed, unit-aware text serialisation format — reference C library (libbvnr)

@@ -66,6 +66,7 @@ def test_uses_spec_1_1_false_for_plain_values():
     assert bovnar._uses_spec_1_1({"a": 1, "b": [1, 2, 3], "c": "x"}) is False
 
 
+@pytest.mark.needs_lib
 class TestUnitOnAStringRoundTrips:
     """`.s = "x" m;` is legal, and dumps() emitted it in a form the reader refused.
 

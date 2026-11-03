@@ -220,9 +220,12 @@ and always emits one canonical form.
 | ångström | `Å` U+212B · `Å` U+00C5 · `Å` U+0041 U+030A (A + combining ring) · `angstrom`, `angstroms` | `Å` U+212B |
 | degree | `°` U+00B0 · `deg` · `degr` · `degree` · `degrees` | `°` U+00B0 |
 
-A document that has been through Unicode normalisation (NFC/NFD/NFKC/NFKD) still parses: every
+A document that has been through canonical Unicode normalisation (NFC or NFD) still parses: every
 variant above maps to the same unit, which the normalisation test sweep enforces over the whole
-table.
+table. **Compatibility normalisation (NFKC or NFKD) is different: it destroys superscript
+exponents.** It folds `²` to `2` and `⁻` to U+2212 MINUS SIGN, so `m/s²` becomes `m/s2`, which is
+`error_unit_illegal`. A document that may pass through NFKC or NFKD should write its exponents in
+the caret form — `m/s^2`, `m*s^-1` — which is plain ASCII and survives every normalisation form.
 
 > **The canonical output is deliberately not NFC.** U+2126 (ohm) and U+212B (ångström) both have
 > *singleton* NFC decompositions — to U+03A9 and U+00C5 — so a document this library writes is not
@@ -258,12 +261,12 @@ warning, resolved the same way — `delta_degC`, `delta_degF`, `delta_degRa`, `d
 warns for `C` and `F`, so they are `error_unit_illegal` rather than aliases. `delta_K` is the one
 bare-letter form, and it is unambiguous because `K` is the kelvin and nothing else.
 
-The water-hardness degrees carry the same warning, and one of them is genuinely dangerous:
+The water-hardness degrees carry the same warning, and two of them are genuinely dangerous:
 
 | With `°` | Means | Without `°` | Means |
 |----------|-------|-------------|-------|
 | `°dH` | German hardness degree | `dH` | **decihenry** — a valid unit, so this misreads silently |
-| `°e` | English (Clark) hardness degree | `e` | `error_unit_illegal` |
+| `°e` | English (Clark) hardness degree | `e` | **elementary charge** — a valid unit, so this misreads silently too |
 | `°fH` | French hardness degree | `fH` | femtohenry |
 | `°rH` | Russian hardness degree | `rH` | rontohenry |
 | `°aH` | American hardness degree | `aH` | attohenry |
@@ -629,7 +632,7 @@ Every row below was produced by the reference implementation.
 | `st` | the **stone**, 6.35 kg | `ucum:st` → `m³`, the **stere** | The sharpest collision of the set: same two letters, different *dimension* |
 | `B` | the **byte** | `ucum:B` → `da~dB`, the **bel** | UCUM writes the byte `By`. `qudt:BYTE` and `udunits:byte` are the byte |
 | `ar` | *(not a unit)* | `ucum:ar` → `c~ha`, the **are** | The hectare is `ucum:har`, not `ucum:ar` — an easy off-by-100 |
-| `a` | *(not a unit)* | `ucum:a` → `yr`, the **Julian year** | The one letter that means a **different unit in each profile**: `udunits:a` is the **are**, `c~ha`. In UDUNITS `a` is also the atto prefix, and the atom wins — a whole atom outranks a prefixed reading (§16) |
+| `a` | *(not a unit)* | `ucum:a` → `yr`, the **Julian year** | The one letter that means a **different unit in each profile**: `udunits:a` is the **are**, `c~ha`. In UDUNITS `a` is also the atto prefix, and the atom wins — a whole atom outranks a prefixed reading (§1, §2) |
 | `MI` | *(case-sensitive; not a unit)* | `qudt:MI` → `mi`, the **mile** | A flat vocabulary never decomposes a code, so this is not milli-anything |
 | `KGM` | *(not a unit)* | `unece:KGM` → `k~g` | Likewise not a `k` prefix on a `GM` that Rec 20 never defined |
 | `MTS` | *(not a unit)* | `unece:MTS` → `m/s` | Not a mega-`TS`; and `unece:MTK` one letter away is the square metre |
@@ -642,7 +645,7 @@ Two rules make this tractable, and both are worth knowing before writing a profi
   and `qudt:M/SEC` are `error_unit_illegal`, not compounds.
 - **A whole atom beats a prefix in an expression vocabulary**, exactly as it does natively.
   `ucum:min` is the minute rather than milli-inch, and `udunits:cal` the calorie rather than
-  centi-`al` — the same longest-alias rule §6 describes for the native registry.
+  centi-`al` — the same longest-alias rule §1 and §2 describe for the native registry.
 
 Where two vocabularies genuinely name the same quantity they land on the same unit, and that is
 checked: `ucum:kg`, `unece:KGM`, `qudt:KiloGM`, `udunits:kg` and `qudt-qk:Mass` all compare equal.

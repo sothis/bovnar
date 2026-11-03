@@ -514,3 +514,31 @@ class TestExactNumberEdges:
         assert q.stored_value is None
         with pytest.raises(BovnarArgumentError):
             q.ieee_bits
+
+
+@needs_lib
+class TestFromNumberValidatesText:
+    """A str is a verbatim literal and used to be taken on trust: '' became a
+    typed null on dumps(), 'abc' and ' 1' a BovnarWriteError later, and
+    .decimal a bare decimal.InvalidOperation."""
+
+    @pytest.mark.parametrize("family", [F.FLOAT_DEC, F.FLOAT, F.FLOAT_FIX])
+    @pytest.mark.parametrize("text", ["", "abc", " 1", "1 ", "+1", "1.2.3",
+                                      "1e", "-inf", "NaN", "1_000", "0x10",
+                                      "١"])
+    def test_non_numbers_are_refused(self, family, text):
+        kw = {"frac": 8} if family == F.FLOAT_FIX else {}
+        with pytest.raises(BovnarArgumentError, match="not a decimal number literal"):
+            Quantity.from_number(text, family=family, **kw)
+
+    @pytest.mark.parametrize("text", ["1", "-1", "1.5", ".5", "5.", "1e5",
+                                      "-2.5E-3", "-0", "nan", "inf", "ninf"])
+    def test_numbers_round_trip(self, text):
+        q = Quantity.from_number(text)
+        assert q.raw == text
+        back = loads(dumps({"a": q}), typed=True)["a"]
+        assert back.raw == text
+
+    def test_fix_still_range_checks(self):
+        with pytest.raises(BovnarArgumentError, match="does not fit"):
+            Quantity.from_number("1e9", family=F.FLOAT_FIX, width=16, frac=8)

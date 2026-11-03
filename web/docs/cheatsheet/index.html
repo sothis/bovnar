@@ -417,7 +417,7 @@
 </thead>
 <tbody>
 <tr>
-<td>All physical units (default)</td>
+<td>Physical units not listed below (default)</td>
 <td>All 24 allowed</td>
 <td>Forbidden</td>
 </tr>
@@ -441,8 +441,21 @@
 <td><strong>None</strong> (<code>si_none</code> only)</td>
 <td><strong>Forbidden</strong></td>
 </tr>
+<tr>
+<td>Ratio units (<code>%</code>, <code>‰</code>, <code>‱</code>, <code>pcm</code>, <code>ppm</code>, <code>ppb</code>, <code>pptr</code>, <code>ppq</code>)</td>
+<td><strong>None</strong> — <code>k~%</code> is <code>error_unit_illegal</code></td>
+<td><strong>Forbidden</strong></td>
+</tr>
+<tr>
+<td>Scales that are already a scale: <code>pH</code>, <code>mph</code>, <code>kph</code>, the five water-hardness degrees (<code>°dH</code>, <code>°e</code>, <code>°fH</code>, <code>°rH</code>, <code>°aH</code>), <code>gpg</code>, <code>CF</code>, <code>PSU</code>, <code>JTU</code></td>
+<td><strong>None</strong></td>
+<td><strong>Forbidden</strong></td>
+</tr>
 </tbody>
 </table>
+<p>The turbidity units <code>NTU</code>, <code>FNU</code>, <code>FTU</code> and <code>FAU</code> are not in that last row: they take any SI
+prefix, because a milli-NTU is a real ultrapure-water measurement. The full rule, with its reasons, is in
+<a href="https://www.bovnar.io/docs/units/#42-iec-binary-prefixes">Unit System §4.2</a>.</p>
 <hr />
 <h2 id="4-physical-units">4. Physical Units</h2>
 <blockquote>
@@ -2605,7 +2618,7 @@ agency mean by an acre-foot. The international one is <code>ac·ft</code> = 1233
 </table>
 <blockquote>
 <p><code>darcy</code> takes prefixes, so the millidarcy every reservoir report is written in is <code>m~darcy</code>.
-<code>thm_ec</code> is the European gas-billing therm; native <code>thm</code> is the US therm, 0.24 % away.</p>
+<code>thm_ec</code> is the European gas-billing therm; native <code>thm</code> is the US therm, 0.024 % away.</p>
 </blockquote>
 <h4 id="nine-more-the-unit-profiles-needed">Nine more the unit profiles needed</h4>
 <p>Each was refused across UCUM, UDUNITS-2, QUDT and OM for want of a native unit of the magnitude, and
@@ -2691,11 +2704,11 @@ every factor below is one <strong>two or three publishers state independently</s
 alias: <code>pnt_pr</code> is 0.37 % off <code>pnt</code>, <code>hp_E</code> 0.04 % off <code>hp</code>, <code>bsh_uk</code> 3.2 % off <code>bsh</code>, and <code>hp_B</code>
 thirteen times any horsepower. <code>abV</code> needed a unit because no decade prefix reaches 10⁻⁸ and
 prefixes do not stack. <code>AT</code> and <code>debye</code> are exact rationals — 175/6 g, and 10⁻²¹/c C·m, exact
-since the 2019 SI fixed c — of which their publishers state 7- and 6-digit roundings.</p>
+since the 1983 definition of the metre fixed c — of which their publishers state 7- and 6-digit roundings.</p>
 </blockquote>
 <h4 id="and-the-thirty-five-the-same-sweep-found-next">And the thirty-five the same sweep found next</h4>
 <p>The rest of the refusals <strong>two or more vocabularies define</strong>. Where publishers disagree the exact
-definition decides: the CGS-ESU units are built on <code>c</code>, exact since 2019, so their five- to
+definition decides: the CGS-ESU units are built on <code>c</code>, exact since 1983, so their five- to
 seven-digit decimals are roundings of the rational stated here. The π-based rows carry
 <code>.exact = false</code>. <code>yr</code> is still the Julian year — naming the other calendars is what lets a UDUNITS
 or CF document that says <code>year</code> be read at all.</p>
@@ -2982,7 +2995,7 @@ or CF document that says <code>year</code> be read at all.</p>
 <td><code>btu_59F</code></td>
 <td>59 °F BTU</td>
 <td><code>bu_btu_59f</code></td>
-<td>1054.8 J (exact)</td>
+<td>1054.804 J</td>
 </tr>
 <tr>
 <td><code>Btu_60</code></td>

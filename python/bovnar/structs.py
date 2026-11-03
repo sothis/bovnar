@@ -315,6 +315,7 @@ class _OwnedBigInt:
 
     def __init__(self, src: int) -> None:
         from ._ffi import get_library
+        self.ptr = None   # set first: __del__ runs even if get_library() raises
         lib = get_library()
         self._free = lib.bvn_int_free
         self.ptr = lib.bvn_int_alloc()
@@ -326,7 +327,7 @@ class _OwnedBigInt:
             raise MemoryError("bvn_int_copy() failed on a conversion result")
 
     def __del__(self) -> None:
-        if self.ptr:
+        if getattr(self, 'ptr', None):
             self._free(self.ptr)
             self.ptr = None
 

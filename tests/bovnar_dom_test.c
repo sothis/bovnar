@@ -1145,6 +1145,23 @@ static void test_dom_attach_refuses_wrong_container(void)
 	ASSERT_TRUE(bvn_dom_struct_add(st, "kk", 2, bvn_dom_node_from_i64(2)),
 		    "a key that merely shares a prefix is a different key");
 	ASSERT_EQ_UINT(bvn_dom_struct_count(st), 2u, "two members, not three");
+	/* A NULL or empty key is refused; a NULL one reached memcmp. */
+	ASSERT_TRUE(!bvn_dom_struct_add(st, NULL, 0, bvn_dom_node_from_i64(3)),
+		    "struct_add with a NULL key is refused");
+	ASSERT_TRUE(!bvn_dom_struct_add(st, "", 0, bvn_dom_node_from_i64(3)),
+		    "struct_add with an empty key is refused");
+	{
+		bvn_dom_doc_t *dd = bvn_dom_doc_create();
+		ASSERT_TRUE(dd && !bvn_dom_doc_add(dd, NULL, 0, bvn_dom_node_from_i64(3)),
+			    "doc_add with a NULL key is refused");
+		bvn_dom_doc_destroy(dd);
+		/* An allocated string node is the empty text, NUL-terminated. */
+		bvn_dom_node_t *sn = bvn_dom_node_alloc(BVN_DOM_STRING);
+		const char *sp = NULL; uint32_t sl = 7;
+		ASSERT_TRUE(bvn_dom_get_string(sn, &sp, &sl) && sp && *sp == '\0' &&
+			    sl == 0, "an allocated string node reads as \"\", not NULL");
+		bvn_dom_node_destroy(sn);
+	}
 	int64_t v = 0;
 	ASSERT_TRUE(bvn_dom_get_i64(bvn_dom_struct_get(st, "k"), &v) && v == 1,
 		    "the first value under the key is the one kept");

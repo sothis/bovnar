@@ -1937,12 +1937,13 @@ static const cf_case_t g_cases[] = {
 	      "#!bovnar 1.2\n.v = <float:64,udunits:m s-1> 9.81 m/s;"),
 	VALID("UPR-043e", "unit_profile", "and the spaceless spelling is still a millisecond",
 	      "#!bovnar 1.2\n.t = <float:64,udunits:ms-1> 1.0 m~s^-1;"),
-	/* A run of spaces is two operators in a row: the vocabulary's own answer to
-	 * a malformed expression, and not something the lexer collapses — collapsing
-	 * would have cost a UCUM annotation the spacing §3.4 keeps verbatim. */
-	ERROR_CASE("UPR-043f", "unit_profile", "two spaces are two multiplications",
-	           "#!bovnar 1.2\n.f = <float:64,udunits:kg  m-2> 1.0;",
-	           error_unit_illegal),
+	/* A run of spaces is ONE multiplication, because UDUNITS' scanner spells
+	 * MULTIPLY {space}+. The lexer still does not collapse the run -- that would
+	 * cost a UCUM annotation the spacing §3.4 keeps verbatim -- the UDUNITS
+	 * profile reads it the way UDUNITS does. This case used to expect
+	 * error_unit_illegal, which told a producer valid UDUNITS was a typo. */
+	VALID("UPR-043f", "unit_profile", "a run of spaces is one multiplication",
+	      "#!bovnar 1.2\n.f = <float:64,udunits:kg  m-2> 1.0 udunits:kg*m-2;"),
 	ERROR_CASE("UPR-044", "unit_profile", "a CF coordinate direction is not a unit",
 	           "#!bovnar 1.2\n.lat = <float:64,udunits:degrees_north> 51.5;",
 	           error_unit_profile_unsupported),

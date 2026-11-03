@@ -348,7 +348,6 @@
   { .code = "LB_T";                            .bovnar = "lb_t";                 },
   { .code = "Hundredweight_UK";                .bovnar = "cwt_l";                },
   { .code = "DeciM3-PER-MIN";                  .bovnar = "L/min";               .reverse = false; },
-  { .code = "GRAIN-PER-GAL";                   .bovnar = "gr/gal";              .reverse = false; },
   { .code = "SLUG-PER-FT-SEC";                 .bovnar = "slug/(ft·s)";         .reverse = false; },
   { .code = "NUM-PER-KiloGM";                  .bovnar = "k~g^-1";              .reverse = false; },
   { .code = "PER-KiloVA-HR";                  .bovnar = "k~VA^-1·h^-1";        .reverse = false; },
@@ -750,7 +749,6 @@
   { .code = "BTU_IT-PER-SEC-FT-DEG_R";       .bovnar = "Btu/s·ft·°Ra";        .reverse = false; },
   { .code = "BTU_IT-PER-SEC-FT2";            .bovnar = "Btu/s·ft^2";          .reverse = false; },
   { .code = "BTU_IT-PER-SEC-FT2-DEG_R";      .bovnar = "Btu/s·ft^2·°Ra";      .reverse = false; },
-  { .code = "BTU_MEAN";                      .bovnar = "Btu";                 .reverse = false; },
   { .code = "BU_US_DRY-PER-SEC";             .bovnar = "bsh/s";               .reverse = false; },
   { .code = "C-M";                           .bovnar = "C·m";                 .reverse = false; },
   { .code = "C-M2";                          .bovnar = "C·m^2";               .reverse = false; },
@@ -1338,17 +1336,17 @@
   { .code = "KiloTONNE";                     .bovnar = "k~t";                 },
   { .code = "KiloTONNE-PER-YR";              .bovnar = "k~t/yr";              .reverse = false; },
   { .code = "KiloTON_Metric";                .bovnar = "k~t";                 .reverse = false; },
-  { .code = "KiloV-A";                       .bovnar = "k~V·A";               .reverse = false; },
+  { .code = "KiloV-A";                       .bovnar = "k~VA";                },
   { .code = "KiloV-A-HR";                    .bovnar = "k~V·A·h";             .reverse = false; },
   { .code = "KiloV-A-PER-K";                 .bovnar = "k~V·A/K";             .reverse = false; },
-  { .code = "KiloV-A_Reactive";              .bovnar = "k~VA";                },
-  { .code = "KiloV-A_Reactive-HR";           .bovnar = "k~W·h";               .reverse = false; },
+  { .code = "KiloV-A_Reactive";              .bovnar = "k~var";               },
+  { .code = "KiloV-A_Reactive-HR";           .bovnar = "k~var·h";             .reverse = false; },
   { .code = "KiloV-PER-M";                   .bovnar = "k~V/m";               .reverse = false; },
-  { .code = "KiloVA";                        .bovnar = "k~V·A";               .reverse = false; },
+  { .code = "KiloVA";                        .bovnar = "k~VA";                .reverse = false; },
   { .code = "KiloVA-HR";                     .bovnar = "k~V·A·h";             .reverse = false; },
   { .code = "KiloVA-PER-K";                  .bovnar = "k~V·A/K";             .reverse = false; },
-  { .code = "KiloVAR";                       .bovnar = "k~VA";                .reverse = false; },
-  { .code = "KiloVAR-HR";                    .bovnar = "k~W·h";               .reverse = false; },
+  { .code = "KiloVAR";                       .bovnar = "k~var";               .reverse = false; },
+  { .code = "KiloVAR-HR";                    .bovnar = "k~var·h";             .reverse = false; },
   { .code = "KiloW-HR-PER-M2";               .bovnar = "k~W·h/m^2";           .reverse = false; },
   { .code = "KiloW-PER-M-DEG_C";             .bovnar = "m·k~g/s^3·m~K";       .reverse = false; },
   { .code = "KiloW-PER-M-K";                 .bovnar = "k~W/m·K";             .reverse = false; },
@@ -1655,15 +1653,15 @@
   { .code = "MegaTONNE";                     .bovnar = "T~g";                 },
   { .code = "MegaTONNE-PER-YR";              .bovnar = "M~t/yr";              .reverse = false; },
   { .code = "MegaV";                         .bovnar = "M~V";                 },
-  { .code = "MegaV-A";                       .bovnar = "M~V·A";               .reverse = false; },
+  { .code = "MegaV-A";                       .bovnar = "M~VA";                },
   { .code = "MegaV-A-HR";                    .bovnar = "M~V·A·h";             .reverse = false; },
-  { .code = "MegaV-A_Reactive";              .bovnar = "M~VA";                },
-  { .code = "MegaV-A_Reactive-HR";           .bovnar = "M~W·h";               .reverse = false; },
+  { .code = "MegaV-A_Reactive";              .bovnar = "M~var";               },
+  { .code = "MegaV-A_Reactive-HR";           .bovnar = "M~var·h";             .reverse = false; },
   { .code = "MegaV-PER-M";                   .bovnar = "M~V/m";               .reverse = false; },
-  { .code = "MegaVA";                        .bovnar = "M~V·A";               .reverse = false; },
+  { .code = "MegaVA";                        .bovnar = "M~VA";                .reverse = false; },
   { .code = "MegaVA-HR";                     .bovnar = "M~V·A·h";             .reverse = false; },
-  { .code = "MegaVAR";                       .bovnar = "M~VA";                .reverse = false; },
-  { .code = "MegaVAR-HR";                    .bovnar = "M~W·h";               .reverse = false; },
+  { .code = "MegaVAR";                       .bovnar = "M~var";               .reverse = false; },
+  { .code = "MegaVAR-HR";                    .bovnar = "M~var·h";             .reverse = false; },
   { .code = "MegaYR";                        .bovnar = "M~yr";                },
   { .code = "MicroA-PER-K";                  .bovnar = "µ~A/K";               .reverse = false; },
   { .code = "MicroATM";                      .bovnar = "µ~atm";               },
@@ -1705,7 +1703,6 @@
   { .code = "MicroJ";                        .bovnar = "µ~J";                 },
   { .code = "MicroJ-PER-SEC";                .bovnar = "µ~J/s";               .reverse = false; },
   { .code = "MicroKAT";                      .bovnar = "µ~kat";               },
-  { .code = "MicroKAT-PER-L";                .bovnar = "mol/k~m^3·s";         .reverse = false; },
   { .code = "MicroL-PER-L";                  .bovnar = "µ~L/L";               .reverse = false; },
   { .code = "MicroM-PER-K";                  .bovnar = "µ~m/K";               .reverse = false; },
   { .code = "MicroM-PER-L-DAY";              .bovnar = "µ~m/L·d";             .reverse = false; },
@@ -1858,7 +1855,6 @@
   { .code = "MilliJ-PER-SEC";                .bovnar = "m~J/s";               .reverse = false; },
   { .code = "MilliK";                        .bovnar = "m~K";                 },
   { .code = "MilliKAT";                      .bovnar = "m~kat";               },
-  { .code = "MilliKAT-PER-L";                .bovnar = "mol/h~m^3·s";         .reverse = false; },
   { .code = "MilliL-PER-BAR";                .bovnar = "m~L/bar";             .reverse = false; },
   { .code = "MilliL-PER-CentiM2-SEC";        .bovnar = "m~L/c~m^2·s";         .reverse = false; },
   { .code = "MilliL-PER-DAY";                .bovnar = "m~L/d";               .reverse = false; },
@@ -1964,9 +1960,8 @@
   { .code = "MilliPA-SEC-PER-K";             .bovnar = "m~Pa·s/K";            .reverse = false; },
   { .code = "MilliR";                        .bovnar = "m~R";                 },
   { .code = "MilliRAD";                      .bovnar = "m~rad";               },
-  { .code = "MilliRAD_R";                    .bovnar = "m~rem";               },
   { .code = "MilliRAD_R-PER-HR";             .bovnar = "c~Gy/k~h";            .reverse = false; },
-  { .code = "MilliR_man";                    .bovnar = "m~rem";               .reverse = false; },
+  { .code = "MilliR_man";                    .bovnar = "m~rem";               },
   { .code = "MilliS";                        .bovnar = "m~S";                 },
   { .code = "MilliS-PER-CentiM";             .bovnar = "m~S/c~m";             .reverse = false; },
   { .code = "MilliS-PER-M";                  .bovnar = "m~S/m";               .reverse = false; },
@@ -2072,7 +2067,6 @@
   { .code = "NanoJ";                         .bovnar = "n~J";                 },
   { .code = "NanoJ-PER-SEC";                 .bovnar = "n~J/s";               .reverse = false; },
   { .code = "NanoKAT";                       .bovnar = "n~kat";               },
-  { .code = "NanoKAT-PER-L";                 .bovnar = "mol/m^3·T~s";         .reverse = false; },
   { .code = "NanoL";                         .bovnar = "n~L";                 },
   { .code = "NanoM-PER-CentiM-MegaPA";       .bovnar = "n~m/c~m·M~Pa";        .reverse = false; },
   { .code = "NanoM-PER-MilliM-MegaPA";       .bovnar = "n~m/m~m·M~Pa";        .reverse = false; },
@@ -2315,7 +2309,6 @@
   { .code = "PSI-PER-IN";                    .bovnar = "psi/in";              .reverse = false; },
   { .code = "PSI-PER-PSI";                   .bovnar = "psi/psi";             .reverse = false; },
   { .code = "PSI-YD3-PER-SEC";               .bovnar = "psi·yd^3/s";          .reverse = false; },
-  { .code = "PT";                            .bovnar = "thou";                .reverse = false; },
   { .code = "Pennyweight";                   .bovnar = "dwt";                 .reverse = false; },
   { .code = "PetaA";                         .bovnar = "P~A";                 },
   { .code = "PetaBQ";                        .bovnar = "P~Bq";                },
@@ -2342,7 +2335,6 @@
   { .code = "PicoJ";                         .bovnar = "p~J";                 },
   { .code = "PicoJ-PER-SEC";                 .bovnar = "p~J/s";               .reverse = false; },
   { .code = "PicoKAT";                       .bovnar = "p~kat";               },
-  { .code = "PicoKAT-PER-L";                 .bovnar = "mol/m^3·P~s";         .reverse = false; },
   { .code = "PicoL";                         .bovnar = "p~L";                 },
   { .code = "PicoMOL";                       .bovnar = "p~mol";               },
   { .code = "PicoMOL-PER-KiloGM";            .bovnar = "p~mol/k~g";           .reverse = false; },
@@ -2464,7 +2456,7 @@
   { .code = "TonEnergy";                     .bovnar = "G~cal";               },
   { .code = "V-A-HR";                        .bovnar = "V·A·h";               .reverse = false; },
   { .code = "V-A-PER-K";                     .bovnar = "V·A/K";               .reverse = false; },
-  { .code = "V-A_Reactive-HR";               .bovnar = "W·h";                 .reverse = false; },
+  { .code = "V-A_Reactive-HR";               .bovnar = "var·h";               .reverse = false; },
   { .code = "V-IN2-PER-LB_F";                .bovnar = "V·in^2/lbf";          .reverse = false; },
   { .code = "V-M";                           .bovnar = "V·m";                 .reverse = false; },
   { .code = "V-PER-BAR";                     .bovnar = "V/bar";               .reverse = false; },
@@ -2481,7 +2473,7 @@
   { .code = "V-PER-V";                       .bovnar = "V/V";                 .reverse = false; },
   { .code = "V-SEC-PER-M";                   .bovnar = "V·s/m";               .reverse = false; },
   { .code = "V2-PER-K2";                     .bovnar = "V^2/K^2";             .reverse = false; },
-  { .code = "VA";                            .bovnar = "V·A";                 .reverse = false; },
+  { .code = "VA";                            .bovnar = "VA";                  .reverse = false; },
   { .code = "VA-HR";                         .bovnar = "V·A·h";               .reverse = false; },
   { .code = "VA-PER-K";                      .bovnar = "V·A/K";               .reverse = false; },
   { .code = "VAR";                           .bovnar = "var";                 .reverse = false; },
@@ -2972,6 +2964,40 @@
   { .code = "LA";                          .why = "QUDT contradicts itself: the label (Lambert) and ucumCode (Lmb) say the lambert, 1e4/pi cd/m^2, while the multiplier (0.3183098862) is the apostilb, 1/pi -- four decades apart"; },
   { .code = "HP_Brake";                    .why = "QUDT states 9809.5 W, its own HP_Boiler value, for a name that means the mechanical horsepower it also carries as HP; the code and the multiplier disagree by a factor of 13"; },
   { .code = "MI2";                         .why = "QUDT's multiplier (2589997.766) is 2.7e-7 from the survey square mile and 3.7e-6 from the international one; the name does not say which"; },
+  # And again, seven more times. Each of these used to follow the number, and
+  # the cross-reference check now compares the factor as well as the dimension,
+  # which is what found them: QUDT's own ucumCode for each names the unit its
+  # label or symbol names, and the multiplier -- which the row followed --
+  # names another.
+  #
+  # The katal-per-litre family. KAT-PER-L is right (1000 mol/(m^3 s)); each
+  # prefixed member is a million too small -- QUDT multiplied by the litre's
+  # 1e-3 instead of dividing -- so MicroKAT-PER-L stated 1e-9, the picokatal
+  # per litre, beside its own label, symbol (ukat/L) and ucumCode (ukat/L).
+  # The rows had been fitted to the number. Write ucum:ukat/L or µ~kat/L.
+  { .code = "MicroKAT-PER-L";              .why = "QUDT contradicts itself: the label, symbol and ucumCode (ukat/L) say the microkatal per litre, 1e-3 mol/(m^3 s), while the multiplier (1e-9) is the picokatal per litre -- a factor of 1e6 apart"; },
+  { .code = "MilliKAT-PER-L";              .why = "QUDT contradicts itself: the label, symbol and ucumCode (mkat/L) say the millikatal per litre, 1 mol/(m^3 s), while the multiplier (1e-6) is the nanokatal per litre -- a factor of 1e6 apart"; },
+  { .code = "NanoKAT-PER-L";               .why = "QUDT contradicts itself: the label, symbol and ucumCode (nkat/L) say the nanokatal per litre, 1e-6 mol/(m^3 s), while the multiplier (1e-12) is a femtokatal per litre -- a factor of 1e6 apart"; },
+  { .code = "PicoKAT-PER-L";               .why = "QUDT contradicts itself: the label, symbol and ucumCode (pkat/L) say the picokatal per litre, 1e-9 mol/(m^3 s), while the multiplier (1e-15) is an attokatal per litre -- a factor of 1e6 apart"; },
+  # PT is labelled "Point" with symbol pt and ucumCode [pnt], the typographic
+  # point (1/72 in, native pnt, which PT_BIG maps to), and states 2.54e-5 m --
+  # the thou. It mapped to thou. Write ucum:[pnt] or the native pnt.
+  { .code = "PT";                          .why = "QUDT contradicts itself: the label (Point), symbol (pt) and ucumCode ([pnt]) say the typographic point, 1/72 in, while the multiplier (2.54e-5 m) is the thou -- a factor of 13.9 apart"; },
+  # BTU_MEAN is labelled "British Thermal Unit (mean)" with ucumCode [Btu_m],
+  # and states 1055.05585262 J, the IT value to the digit; the mean BTU is
+  # 1055.87 J (native Btu_m). It mapped to the IT Btu. Write ucum:[Btu_m].
+  { .code = "BTU_MEAN";                    .why = "QUDT contradicts itself: the label (British Thermal Unit (mean)) and ucumCode ([Btu_m]) say the mean BTU, 1055.87 J, while the multiplier (1055.05585262) is the IT BTU -- 7.7e-4 apart"; },
+  # GRAIN-PER-GAL: the symbol (grain{UK}/gal) and ucumCode ([gr].[gal_br]-1)
+  # say the imperial gallon, the multiplier (0.017118061) the US one, and the
+  # label says neither.
+  { .code = "GRAIN-PER-GAL";               .why = "QUDT contradicts itself: the symbol (grain{UK}/gal) and ucumCode ([gr].[gal_br]-1) say the imperial gallon, while the multiplier (0.017118061) is the grain per US gallon -- 20 per cent apart; the label (Grain per Gallon) does not say which"; },
+  # MilliRAD_R is the millirad, an ABSORBED DOSE (QUDT files it under
+  # AbsorbedDose, and its RAD_R maps to c~Gy). It mapped to m~rem, the dose
+  # EQUIVALENT, which is the Gy/Sv confusion doc/07 keeps apart, and was the
+  # reverse spelling of m~rem besides. 1e-5 Gy has no SI prefix on the gray,
+  # which is why ucum:mRAD is refused too; MilliRAD_R-PER-HR survives only
+  # because the hour can carry the decade.
+  { .code = "MilliRAD_R";                  .why = "a millirad is 1e-5 Gy, an absorbed dose, and no SI prefix spells 1e-5 on the gray (ucum:mRAD is refused for the same reason); the millirem the row used to read is a dose equivalent"; },
   { .code = "MIL";                         .why = "no native unit of this dimension is a decade away from QUDT's multiplier (0.000490873852)"; },
   { .code = "MI_UK3";                      .why = "QUDT states no conversionMultiplier for this unit"; },
   { .code = "MI_US-PER-SEC2";              .why = "no native unit of this dimension is a decade away from QUDT's multiplier (1609.347)"; },

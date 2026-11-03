@@ -686,6 +686,19 @@ if(NOT SKBUILD)
     if(BVNR_PC_RELDIR STREQUAL "")
         set(BVNR_PC_RELDIR ".")
     endif()
+    # The relative form only works for relative install dirs. A packager may
+    # pass an absolute one (-DCMAKE_INSTALL_LIBDIR=/usr/lib64), and counting its
+    # components climbs to / and gives -I/include. An absolute dir cannot be
+    # relocated anyway, so it is written as the full path.
+    set(BVNR_PC_PREFIX "\${pcfiledir}/${BVNR_PC_RELDIR}")
+    set(BVNR_PC_LIBDIR "\${prefix}/${CMAKE_INSTALL_LIBDIR}")
+    set(BVNR_PC_INCLUDEDIR "\${prefix}/${CMAKE_INSTALL_INCLUDEDIR}")
+    if(IS_ABSOLUTE "${CMAKE_INSTALL_LIBDIR}"
+       OR IS_ABSOLUTE "${CMAKE_INSTALL_INCLUDEDIR}")
+        set(BVNR_PC_PREFIX "${CMAKE_INSTALL_PREFIX}")
+        set(BVNR_PC_LIBDIR "${CMAKE_INSTALL_FULL_LIBDIR}")
+        set(BVNR_PC_INCLUDEDIR "${CMAKE_INSTALL_FULL_INCLUDEDIR}")
+    endif()
 
     configure_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/cmake/bovnar.pc.in
@@ -812,6 +825,10 @@ if(BVNR_PACKAGE AND NOT SKBUILD)
         COMMAND ${CMAKE_COMMAND}
             -DSRC_DIR=${CMAKE_CURRENT_SOURCE_DIR}
             -DBIN_DIR=${CMAKE_BINARY_DIR}
+            # Where the libraries and the CLI actually are: <build>/<Config>/
+            # under a multi-config generator (Visual Studio, Ninja Multi-Config),
+            # not <build>/, so the packer is told rather than left to guess.
+            -DARTIFACT_DIR=$<TARGET_FILE_DIR:bvnr_shared>
             -DVERSION=${PROJECT_VERSION}
             -DPYTHON=${_bvnr_pkg_py}
             -DNATIVE_KIND=${_bvnr_pkg_kind}

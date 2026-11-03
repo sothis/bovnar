@@ -17,6 +17,9 @@ import bovnar
 from bovnar import Quantity, Unit
 from bovnar.exceptions import BovnarArgumentError
 
+# Every test here parses a unit or loads a document through the C library.
+pytestmark = pytest.mark.needs_lib
+
 
 def _q(src: bytes, key: str = "x") -> Quantity:
     return bovnar.loads(src, typed=True)[key]

@@ -1,0 +1,25 @@
+[package]
+name = "bovnar"
+version = "2.0.0"
+edition = "2024"
+# Let-chains (`if let .. && let ..`) need 1.88; edition 2024 alone would be 1.85.
+rust-version = "1.88"
+description = "Thin Rust binding to the Bovnar (BVNR) C library"
+license = "MIT"
+publish = false
+build = "build.rs"
+
+[dependencies]
+# Arbitrary-precision integers, fractions and decimals: the exact numbers behind `BvnFloat` and
+# the lossless `Quantity` accessors.
+num-bigint = "0.4.6"
+num-integer = "0.1.46"
+num-rational = "0.4.2"
+num-traits = "0.2.19"
+
+[build-dependencies]
+cc = "1"
+
+[dev-dependencies]
+# The ABI test compiles the C manifest generator with the library's compiler.
+cc = "1"

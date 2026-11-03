@@ -444,6 +444,29 @@ jobs:
 
       - run: cargo build --target wasm32-wasip2
 
+  # crates.io gets the crate from rust/package.py, not from rust/ itself:
+  # build.rs reads ../src, which a package made from rust/ would not contain,
+  # so package.py stages a copy with the C sources and the generated tables in
+  # c/ and the crate builds from those, without Python. This is the rehearsal
+  # of `publish_crate`: on every push the same staging and `cargo publish
+  # --dry-run`, which packs the crate and compiles it from the package alone.
+  rust_package:
+    name: Rust crate package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Stage, package and verify the crate
+        run: python3 rust/package.py --out "$RUNNER_TEMP/crate" -- publish --dry-run --locked
+
+      # The unit profiles are Cargo features; a build with all of them off
+      # must still compile (THIRD_PARTY_NOTICES tells distributors they can).
+      - name: Build the packaged crate with no unit profiles
+        working-directory: ${{ runner.temp }}/crate/bovnar
+        run: cargo build --locked --no-default-features
+
   source:
     name: Source tarball
     runs-on: ubuntu-latest
@@ -593,6 +616,59 @@ jobs:
         with:
           skip-existing: true
 
+  publish_crate:
+    name: Publish to crates.io
+    # Gated like `publish`: a crates.io version is immutable (yanking only hides
+    # it), so it waits for every Rust job, the C suite and the GitHub release.
+    needs: [rust_version, rust, rust_wasm, rust_package, tests, release]
+    runs-on: ubuntu-latest
+    # Only publish on a version tag (e.g. v2.0.1).
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    environment:
+      name: crates-io
+      url: https://crates.io/crates/bovnar
+    permissions:
+      contents: read
+      id-token: write   # OIDC token for crates.io Trusted Publishing
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Trusted Publishing cannot create a crate, only add versions to one, so
+      # the first version is published by hand; this job then skips. A re-run
+      # after a successful upload skips too, where `cargo publish` would fail.
+      - name: Is this version already on crates.io?
+        id: state
+        run: |
+          set -euo pipefail
+          version=$(grep -oP '^version = "\K[^"]+' rust/Cargo.toml)
+          ua='bovnar-release-ci (https://github.com/sothis/bovnar)'
+          crate=$(curl -sS -o /dev/null -w '%{http_code}' -A "$ua" https://crates.io/api/v1/crates/bovnar)
+          if [ "$crate" = 404 ]; then
+            echo "::notice::bovnar is not on crates.io yet. Trusted Publishing cannot create a crate: publish ${version} by hand from this tag (python3 rust/package.py -- publish), then add this workflow as the crate's trusted publisher."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          [ "$crate" = 200 ] || { echo "::error::crates.io answered HTTP ${crate}"; exit 1; }
+          have=$(curl -sS -o /dev/null -w '%{http_code}' -A "$ua" "https://crates.io/api/v1/crates/bovnar/${version}")
+          case "$have" in
+            200) echo "::notice::bovnar ${version} is already on crates.io; nothing to publish."
+                 echo "publish=false" >> "$GITHUB_OUTPUT" ;;
+            404) echo "publish=true" >> "$GITHUB_OUTPUT" ;;
+            *)   echo "::error::crates.io answered HTTP ${have}"; exit 1 ;;
+          esac
+
+      - uses: rust-lang/crates-io-auth-action@v1
+        if: steps.state.outputs.publish == 'true'
+        id: auth
+
+      - name: cargo publish
+        if: steps.state.outputs.publish == 'true'
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: python3 rust/package.py --out "$RUNNER_TEMP/crate" -- publish --locked
+
   # ── GitHub Release assets ────────────────────────────────────────────────
   release:
     name: Attach archives to the release
@@ -607,7 +683,7 @@ jobs:
     # They are skipped on a release-* push, which must not skip the rehearsal,
     # hence the explicit `if:`: every need succeeded, or was one of the two
     # that may be skipped.
-    needs: [msvc, mingw, linux, source, tests, rust_version, rust, rust_wasm, build_wheels, build_sdist]
+    needs: [msvc, mingw, linux, source, tests, rust_version, rust, rust_wasm, rust_package, build_wheels, build_sdist]
     if: >-
       !cancelled() &&
       needs.msvc.result == 'success' &&
@@ -618,6 +694,7 @@ jobs:
       needs.rust_version.result == 'success' &&
       needs.rust.result == 'success' &&
       needs.rust_wasm.result == 'success' &&
+      needs.rust_package.result == 'success' &&
       (needs.build_wheels.result == 'success' || needs.build_wheels.result == 'skipped') &&
       (needs.build_sdist.result == 'success' || needs.build_sdist.result == 'skipped')
     runs-on: ubuntu-latest

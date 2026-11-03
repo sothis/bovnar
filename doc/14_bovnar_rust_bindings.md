@@ -23,6 +23,8 @@ enums are Rust enums, and an error carries the library's error kind.
 2. [Installation](#2-installation)
 3. [Building the C library](#3-building-the-c-library)
     - 3.1 [WebAssembly (`wasm32-wasip2`)](#31-webassembly-wasm32-wasip2)
+    - 3.2 [Unit-profile features](#32-unit-profile-features)
+    - 3.3 [How the published crate is made](#33-how-the-published-crate-is-made)
 4. [Quick-start](#4-quick-start)
     - 4.1 [High-level API (`parse` / `to_string`)](#41-high-level-api-parse--to_string)
     - 4.2 [SAX-style streaming reader](#42-sax-style-streaming-reader)
@@ -86,12 +88,13 @@ enums are Rust enums, and an error carries the library's error kind.
 |---|---|
 | Rust ≥ 1.88 | The crate's `rust-version`; CI builds and tests on it |
 | A C compiler | `build.rs` compiles the C library through the `cc` crate |
-| Python 3 on `PATH` (build time only) | The build runs the upstream table generator scripts, exactly as CMake does. Set the `PYTHON` environment variable to name a different interpreter. Nothing needs it at run time |
+| Python 3 on `PATH` (only when building from a repository checkout) | In the repository, the build runs the upstream table generator scripts, exactly as CMake does. Set the `PYTHON` environment variable to name a different interpreter. The crate from crates.io carries the generated tables and needs no Python ([§3.3](#33-how-the-published-crate-is-made)) |
 | `num-bigint`, `num-rational`, `num-integer`, `num-traits` | Pulled in by Cargo; they carry the exact numbers (arbitrary-width integers, rational numbers and the coefficient of a `Decimal`) |
 | [wasi-sdk](https://github.com/WebAssembly/wasi-sdk) | **Only** for the `wasm32-wasip2` target — see [§3](#3-building-the-c-library) |
 
-There are no optional features and no optional dependencies, and no integration
-with third-party unit or array libraries; see [§16](#16-crate-layout).
+The only optional features are the unit-profile notations, all on by default
+([§3.2](#32-unit-profile-features)). There are no optional dependencies and no
+integration with third-party unit or array libraries; see [§16](#16-crate-layout).
 
 ---
 
@@ -99,23 +102,22 @@ with third-party unit or array libraries; see [§16](#16-crate-layout).
 
 The crate carries the version of the C library it wraps (**2.0.0**: `version` in
 `Cargo.toml` is the `project(bovnar VERSION x.y.z)` of the top-level
-`CMakeLists.txt`, and CI fails when the two differ). It is **not published to
-crates.io** — `Cargo.toml` keeps `publish = false`, because `build.rs` compiles
-sources outside `rust/` and runs the generators in the repository root, which a
-packaged crate would not contain. Depend on it from a checkout of the
-repository.
+`CMakeLists.txt`, and CI fails when the two differ). It is published to
+crates.io with each release:
 
-As a path dependency:
+```toml
+[dependencies]
+bovnar = "2.0.0"
+```
+
+A repository checkout works too, as a path dependency or straight from Git,
+where Cargo finds the crate inside the repository. Built that way it needs
+Python 3 at build time ([§1](#1-requirements)):
 
 ```toml
 [dependencies]
 bovnar = { path = "../bovnar/rust" }
-```
-
-or straight from Git, where Cargo finds the crate inside the repository:
-
-```toml
-[dependencies]
+# or
 bovnar = { git = "https://github.com/sothis/bovnar" }
 ```
 
@@ -131,14 +133,15 @@ cargo test
 
 ## 3. Building the C library
 
-The crate has no shared library to find: `build.rs` generates the unit tables
-with the repository's table generators and compiles `../src` and `../include`
-into the crate. A downstream crate therefore needs a C compiler and the
-generators' interpreter ([§1](#1-requirements)) at build time and nothing at run
-time.
+The crate has no shared library to find: `build.rs` compiles the C library into
+the crate. The crate from crates.io carries the C sources and the generated unit
+tables in `c/` and compiles those; in a repository checkout `build.rs` runs the
+table generators and compiles `../src` and `../include` instead. Either way a
+downstream crate needs a C compiler at build time (plus Python 3 in the
+checkout case, [§1](#1-requirements)) and nothing at run time.
 
-`build.rs` re-runs when the C sources, the generators, the interpreter override
-or `WASI_SDK_PATH` change.
+`build.rs` re-runs when the C sources, the generators, the interpreter override,
+the enabled features or `WASI_SDK_PATH` change.
 
 ### 3.1 WebAssembly (`wasm32-wasip2`)
 
@@ -153,6 +156,48 @@ cargo build --release --target wasm32-wasip2
 
 The same applies to a crate that depends on this one and is built for
 `wasm32-wasip2`: set `WASI_SDK_PATH` for its build.
+
+### 3.2 Unit-profile features
+
+Each unit-profile notation of [doc/11](11_bovnar_unit_profiles.md) is a Cargo
+feature, and all seven are on by default:
+
+| Feature | Notation | C switch |
+|---|---|---|
+| `ucum` | `ucum:` | `BVNR_WITH_UCUM_PROFILE` |
+| `unece` | `unece:` | `BVNR_WITH_UNECE_PROFILE` |
+| `qudt` | `qudt:` | `BVNR_WITH_QUDT_PROFILE` |
+| `qudt-qk` | `qudt-qk:` | `BVNR_WITH_QUDT_QK_PROFILE` |
+| `udunits` | `udunits:` | `BVNR_WITH_UDUNITS_PROFILE` |
+| `om` | `om:` | `BVNR_WITH_OM_PROFILE` |
+| `cf` | `cf:` | `BVNR_WITH_CF_PROFILE` |
+
+Leaving a feature out drops that notation's tables from the library, as
+`-DBVNR_WITH_<NAME>_PROFILE=OFF` does for the CMake build, and the reader then
+refuses its codes. `THIRD_PARTY_NOTICES.md` says why a distributor may want to
+leave out `ucum` or `cf`:
+
+```toml
+[dependencies]
+bovnar = { version = "2.0.0", default-features = false, features = ["unece", "qudt", "qudt-qk", "udunits", "om"] }
+```
+
+### 3.3 How the published crate is made
+
+`build.rs` reaches `../src`, which a package made from `rust/` would not contain,
+so `rust/Cargo.toml` keeps `publish = false` and the crate is published from a
+staged copy. `rust/package.py` builds that copy: the crate without `tests/` and
+`fuzz/` (they read `../examples` and `../src/gendata`), `LICENSE`,
+`THIRD_PARTY_NOTICES.md`, and in `c/` the headers, the C sources `build.rs`
+compiles and the generators' output. It then runs cargo on the copy:
+
+```bash
+python3 rust/package.py                          # cargo package: pack and verify
+python3 rust/package.py -- publish --dry-run     # what CI runs on every push
+```
+
+CI's `rust_package` job runs that dry run on every push, and `publish_crate`
+publishes the same way on a `vX.Y.Z` tag through crates.io Trusted Publishing.
 
 ---
 
@@ -2117,8 +2162,9 @@ CC=clang CFLAGS="-fsanitize=fuzzer-no-link,address" \
 
 ```text
 rust/
-├── Cargo.toml        # version = the C library's version; publish = false
-├── build.rs          # generates the unit tables, compiles ../src and ../include
+├── Cargo.toml        # version = the C library's version; publish = false (see package.py)
+├── build.rs          # compiles the bundled c/, or in the repository ../src after running the generators
+├── package.py        # stages the crate with the C sources bundled, for crates.io
 ├── src/
 │   ├── lib.rs        # parse() / parse_typed() / to_string() / write_array() — public API
 │   ├── ffi.rs        # the C declarations; the only `unsafe` code
@@ -2195,7 +2241,7 @@ fn main() -> Result<(), bovnar::Error> {
 }
 ```
 
-The `BaseUnit` enum mirrors the C `value_base_unit_e`. See doc/05 §12.1 for the
+The `BaseUnit` enum mirrors the C `value_base_unit_e`. See [doc/05 §11.1](05_bovnar_unit_system.md#111-enumerations) for the
 block layout — an id's leading two digits name the vocabulary it comes from. The
 native units are 100000–100263 (`UNIT_NATIVE_FIRST` … `UNIT_NATIVE_LAST`) and the
 currencies 900000–900215 (`CURRENCY_FIRST` … `CURRENCY_LAST`), with the

@@ -4,8 +4,16 @@ version = "2.0.0"
 edition = "2024"
 # Let-chains (`if let .. && let ..`) need 1.88; edition 2024 alone would be 1.85.
 rust-version = "1.88"
-description = "Thin Rust binding to the Bovnar (BVNR) C library"
+description = "Thin Rust binding to the Bovnar (BVNR) C library: a typed, unit-aware text serialisation format"
 license = "MIT"
+repository = "https://github.com/sothis/bovnar"
+homepage = "https://www.bovnar.io/"
+readme = "README.md"
+keywords = ["serialization", "units", "physical-units", "telemetry", "parser"]
+categories = ["encoding", "parser-implementations", "science"]
+# Not from here: build.rs reads ../src, which a package made from rust/ would
+# not contain. rust/package.py stages a copy with the C sources and the
+# generated tables bundled in c/ and lifts this there.
 publish = false
 build = "build.rs"
 
@@ -16,6 +24,19 @@ num-bigint = "0.4.6"
 num-integer = "0.1.46"
 num-rational = "0.4.2"
 num-traits = "0.2.19"
+
+# The unit-profile notations (doc/11), each compiled in only when its feature
+# is on. A distributor can leave one out the way -DBVNR_WITH_<NAME>_PROFILE=OFF
+# does for CMake; THIRD_PARTY_NOTICES says which ones and why.
+[features]
+default = ["ucum", "unece", "qudt", "qudt-qk", "udunits", "om", "cf"]
+ucum = []
+unece = []
+qudt = []
+qudt-qk = []
+udunits = []
+om = []
+cf = []
 
 [build-dependencies]
 cc = "1"

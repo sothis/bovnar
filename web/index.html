@@ -4095,10 +4095,10 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
           <div class="qs-step">
             <div class="qs-step-num">01</div>
             <div class="qs-step-title">Add the crate</div>
-            <div class="qs-step-desc">The crate is not on crates.io yet; depend on it from Git. <code>build.rs</code> compiles the C library into the crate, so there is no system library to install. Building needs a C compiler and Python&nbsp;3.</div>
+            <div class="qs-step-desc">Published on crates.io with each release. <code>build.rs</code> compiles the bundled C library into the crate, so there is no system library to install &mdash; only a C compiler is needed.</div>
             <div class="code-block"><span class="c-comment"># Cargo.toml</span>
 [dependencies]
-<span class="sh-var">bovnar</span> = { <span class="sh-var">git</span> = <span class="cl-str">"https://github.com/sothis/bovnar"</span> }
+<span class="sh-var">bovnar</span> = <span class="cl-str">"2.0.0"</span>
 
 <span class="c-comment"># Rust 1.88 or newer</span>
 <span class="sh-cmd">cargo</span> build</div>

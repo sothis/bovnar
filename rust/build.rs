@@ -1,5 +1,8 @@
+// SPDX-License-Identifier: MIT
 //! Builds the upstream C library the same way CMakeLists.txt does: run the
 //! table generators into OUT_DIR, then compile the library sources with `cc`.
+//! The published crate carries the sources and the generated tables in c/
+//! (see package.py) and skips the generators, so it needs no Python.
 
 use std::env;
 use std::path::{Path, PathBuf};
@@ -36,26 +39,43 @@ const SOURCES: [&str; 18] = [
     "src/utils/bvn_datetime.c",
 ];
 
-/// The profile switches, passed as 0/1 like CMake does: bvn_profile_impl.h
-/// defaults each to 1 with #ifndef and tests it with #if.
-const PROFILES: [(&str, u8); 7] = [
-    ("BVNR_WITH_UCUM_PROFILE", 1),
-    ("BVNR_WITH_UNECE_PROFILE", 1),
-    ("BVNR_WITH_QUDT_PROFILE", 1),
-    ("BVNR_WITH_QUDT_QK_PROFILE", 1),
-    ("BVNR_WITH_UDUNITS_PROFILE", 1),
-    ("BVNR_WITH_OM_PROFILE", 1),
-    ("BVNR_WITH_CF_PROFILE", 1),
+/// The profile switches and the Cargo feature that turns each on, passed as 0/1
+/// like CMake does: bvn_profile_impl.h defaults each to 1 with #ifndef and
+/// tests it with #if. All features are on by default; leaving one out drops
+/// its tables from the library, as -DBVNR_WITH_<NAME>_PROFILE=OFF does for
+/// CMake (THIRD_PARTY_NOTICES names the ones a distributor may want to drop).
+const PROFILES: [(&str, &str); 7] = [
+    ("BVNR_WITH_UCUM_PROFILE", "ucum"),
+    ("BVNR_WITH_UNECE_PROFILE", "unece"),
+    ("BVNR_WITH_QUDT_PROFILE", "qudt"),
+    ("BVNR_WITH_QUDT_QK_PROFILE", "qudt-qk"),
+    ("BVNR_WITH_UDUNITS_PROFILE", "udunits"),
+    ("BVNR_WITH_OM_PROFILE", "om"),
+    ("BVNR_WITH_CF_PROFILE", "cf"),
 ];
 
 fn main() {
     let manifest = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"));
-    let repo = manifest
-        .parent()
-        .expect("rust/ lives inside the bovnar repository")
-        .to_path_buf();
-    let gen_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR")).join("generated");
-    std::fs::create_dir_all(&gen_dir).expect("create OUT_DIR/generated");
+    // The crate as published on crates.io carries the C sources and the
+    // generated tables in c/ (rust/package.py puts them there), so it builds
+    // without the repository and without Python. In the repository there is
+    // no c/: build from ../src and run the generators, as CMake does.
+    // What build.rs writes always goes to OUT_DIR: a build script may not
+    // touch the package's own files.
+    let out_gen = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR")).join("generated");
+    std::fs::create_dir_all(&out_gen).expect("create OUT_DIR/generated");
+    let bundled = manifest.join("c");
+    let from_repo = !bundled.join("generated").is_dir();
+    let (repo, gen_dir) = if from_repo {
+        let repo = manifest
+            .parent()
+            .expect("rust/ lives inside the bovnar repository")
+            .to_path_buf();
+        (repo, out_gen.clone())
+    } else {
+        let gen_dir = bundled.join("generated");
+        (bundled, gen_dir)
+    };
     // The ABI unit test compiles tests/bvnr_abi_dump.c with the same `cc`
     // compiler as the library, which it can only find knowing the triples.
     for var in ["TARGET", "HOST"] {
@@ -67,17 +87,20 @@ fn main() {
 
     println!("cargo:rerun-if-changed={}", repo.join("src").display());
     println!("cargo:rerun-if-changed={}", repo.join("include").display());
-    println!(
-        "cargo:rerun-if-changed={}",
-        repo.join("bvnr_data.py").display()
-    );
-    for script in GENERATORS {
-        println!("cargo:rerun-if-changed={}", repo.join(script).display());
-    }
     println!("cargo:rerun-if-env-changed=WASI_SDK_PATH");
-
-    generate_tables(&repo, &gen_dir);
-    generate_base_units(&repo, &gen_dir);
+    if from_repo {
+        println!(
+            "cargo:rerun-if-changed={}",
+            repo.join("bvnr_data.py").display()
+        );
+        for script in GENERATORS {
+            println!("cargo:rerun-if-changed={}", repo.join(script).display());
+        }
+        generate_tables(&repo, &gen_dir);
+    } else {
+        println!("cargo:rerun-if-changed={}", gen_dir.display());
+    }
+    generate_base_units(&repo, &gen_dir, &out_gen);
     compile_library(&repo, &gen_dir);
 }
 
@@ -86,7 +109,7 @@ fn main() {
 /// `include/bovnar_units.gen.h`; currencies from the generated catalogue, in
 /// order from 900000. A currency code that clashes with a native unit name
 /// gets a trailing `_` (`CUP_`, variant `Cup_`).
-fn generate_base_units(repo: &Path, gen_dir: &Path) {
+fn generate_base_units(repo: &Path, gen_dir: &Path, out_dir: &Path) {
     let native = header_units(&repo.join("include/bovnar_units.gen.h"));
     // The opaque ids of the unit profiles (`ucum:[IU]` is `bu_ucum_iu`): real
     // `base_unit_t` values a parsed unit carries, which the enum must cover.
@@ -166,7 +189,7 @@ fn generate_base_units(repo: &Path, gen_dir: &Path) {
         900_000 + codes.len() as i32 - 1,
         codes.len()
     ));
-    std::fs::write(gen_dir.join("base_units.rs"), out).expect("write base_units.rs");
+    std::fs::write(out_dir.join("base_units.rs"), out).expect("write base_units.rs");
 }
 
 /// The `bu_<name> = <id>,` lines of a generated header, as (NAME, id).
@@ -271,8 +294,10 @@ fn compile_library(repo: &Path, gen_dir: &Path) {
     for source in SOURCES {
         build.file(repo.join(source));
     }
-    for (name, on) in PROFILES {
-        build.define(name, on.to_string().as_str());
+    for (name, feature) in PROFILES {
+        let var = format!("CARGO_FEATURE_{}", feature.to_uppercase().replace('-', "_"));
+        let on = env::var_os(var).is_some();
+        build.define(name, if on { "1" } else { "0" });
     }
 
     // The warning set of upstream's CMakeLists.txt (BVNR_C_FLAGS) instead of

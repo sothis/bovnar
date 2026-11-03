@@ -199,7 +199,7 @@
     "# vectorized, per row": "# vektorisiert, zeilenweise",
     "# → .g_mag = &lt;float:64,m/s²&gt; [9.810…, 9.800…];": "# → .g_mag = &lt;float:64,m/s²&gt; [9.810…, 9.800…];",
     "Add the crate": "Crate einbinden",
-    "The crate is not on crates.io yet; depend on it from Git. <code>build.rs</code> compiles the C library into the crate, so there is no system library to install. Building needs a C compiler and Python&nbsp;3.": "Das Crate ist noch nicht auf crates.io; binden Sie es aus Git ein. <code>build.rs</code> übersetzt die C-Bibliothek in das Crate hinein, eine Systembibliothek ist also nicht zu installieren. Zum Bauen braucht es einen C-Compiler und Python&nbsp;3.",
+    "Published on crates.io with each release. <code>build.rs</code> compiles the bundled C library into the crate, so there is no system library to install &mdash; only a C compiler is needed.": "Mit jedem Release auf crates.io veröffentlicht. <code>build.rs</code> übersetzt die mitgelieferte C-Bibliothek in das Crate hinein, eine Systembibliothek ist also nicht zu installieren &mdash; nötig ist nur ein C-Compiler.",
     "# Cargo.toml": "# Cargo.toml",
     "# Rust 1.88 or newer": "# Rust 1.88 oder neuer",
     "<code>parse</code> reads BVNR bytes into a dynamic <code>Value</code>; <code>to_string</code> writes one back. A struct is a <code>Vec</code> of key/value pairs in document order.": "<code>parse</code> liest BVNR-Bytes in einen dynamischen <code>Value</code>; <code>to_string</code> schreibt ihn zurück. Ein Struct ist ein <code>Vec</code> aus Schlüssel-Wert-Paaren in Dokumentreihenfolge.",

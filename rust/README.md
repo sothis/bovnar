@@ -6,6 +6,14 @@ with a C99 reference implementation.
 This crate is a thin wrapper around the upstream C library. The C sources are
 compiled by `build.rs`; there is no system library to install.
 
+```toml
+[dependencies]
+bovnar = "2.0.0"
+```
+
+The full reference is [doc/14](https://www.bovnar.io/docs/rust/) on bovnar.io,
+and the format itself is described at <https://www.bovnar.io/>.
+
 The API stays close to the C library: `parse`/`to_string` over a dynamic
 `Value`, a DOM, `Reader` callbacks and `Writer` events, rather than serde
 integration, builders or typed deserialisation. The C enums are Rust enums,
@@ -21,8 +29,10 @@ top-level `CMakeLists.txt`, and CI fails when the two differ. A release tag
 
 ## Building
 
-Requirements: Rust 1.88 or later, a C compiler, and Python 3 at build time (the
-build runs the upstream table generators, exactly as CMake does).
+Requirements: Rust 1.88 or later and a C compiler. The crate from crates.io
+carries the C sources and the generated unit tables. Built from a repository
+checkout (a path or Git dependency), it also needs Python 3 at build time: the
+build then runs the upstream table generators, exactly as CMake does.
 
 The crate depends on `num-bigint`, `num-rational`, `num-integer` and
 `num-traits` for exact numbers: wide integers, exact fractions and the
@@ -32,6 +42,14 @@ coefficient of `Decimal`.
 cargo build
 cargo test
 ```
+
+### Unit-profile features
+
+The seven unit-profile notations are Cargo features, all on by default: `ucum`,
+`unece`, `qudt`, `qudt-qk`, `udunits`, `om` and `cf`. Leaving one out drops its
+tables from the library, and the reader refuses its codes;
+`THIRD_PARTY_NOTICES.md` says why a distributor may want to leave out `ucum` or
+`cf`.
 
 ### Building for WebAssembly (wasm32-wasip2)
 
@@ -344,27 +362,33 @@ The Rust jobs run in `.github/workflows/build-and-package.yml`, next to the
 C library's: a version check (crate version = `CMakeLists.txt` version),
 fmt, clippy `-D warnings` and the tests on Linux x64 (with the CLI for
 `test_writers_agree`), Linux aarch64, macOS, Windows MSVC x64 and Windows
-MinGW64, a build and test on Rust 1.88, and a `wasm32-wasip2` build with
-wasi-sdk. The release job does not wait for them, so the C release archives
-never depend on the Rust jobs.
+MinGW64, a build and test on Rust 1.88, a `wasm32-wasip2` build with wasi-sdk,
+and the packaging rehearsal below. The release job waits for all of them.
 
-The crate is **not published to crates.io**, and `Cargo.toml` keeps
-`publish = false`: as it stands it cannot be packaged. `cargo publish` packs
-only `rust/`, while `build.rs` compiles `../src` and `../include` and runs the
-`../gen_*.py` generators. Publishing would take:
+`rust/Cargo.toml` keeps `publish = false`, because a package made from `rust/`
+would not contain the `../src` that `build.rs` compiles. The crate is published
+from a staged copy that `rust/package.py` builds: the crate without `tests/`
+and `fuzz/`, plus `LICENSE`, `THIRD_PARTY_NOTICES.md` and, in `c/`, the C
+sources, the headers and the generated tables. `build.rs` builds from `c/`
+when it is there, without running the generators.
 
-- the C sources, headers and generated tables inside the package (vendored
-  into `rust/` at package time, or the generated files committed so the build
-  needs no table generators);
-- `build.rs` reading them from inside the package;
-- a release step, under the same tag == version gate as the GitHub release,
-  with a crates.io token, and `publish = false` removed.
+```bash
+python3 rust/package.py                          # cargo package: pack and verify
+python3 rust/package.py -- publish --dry-run     # what CI runs on every push
+```
+
+On every push the `rust_package` job runs that dry run and builds the package
+with no unit profiles. On a `vX.Y.Z` tag, `publish_crate` publishes it through
+crates.io Trusted Publishing once every Rust job, the C suite and the GitHub
+release have passed. It skips a version that is already on crates.io. The very
+first version is published by hand (Trusted Publishing cannot create a crate),
+with `python3 rust/package.py -- publish` and a crates.io token.
 
 ## License
 
 MIT — see [LICENSE](https://github.com/sothis/bovnar/blob/main/LICENSE).
 
-The `libbvnr` this crate compiles from the repository's C sources embeds
+The `libbvnr` this crate compiles from the bundled C sources embeds
 Bovnar's unit-profile tables, which carry identifier strings from UCUM, QUDT,
 OM 2, UDUNITS-2, the CF standard name table and UN/ECE Recommendations 20 and
 21. Those identifiers belong to their publishers and the MIT grant does not

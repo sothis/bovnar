@@ -22,7 +22,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <meta property="article:published_time" content="2026-11-03">
-<meta property="article:modified_time" content="2026-11-03">
+<meta property="article:modified_time" content="2026-11-04">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar Rust Bindings">
@@ -32,7 +32,7 @@
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
 <link rel="alternate" type="text/markdown" href="/doc/14_bovnar_rust_bindings.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Rust Bindings", "description": "The Bovnar Rust crate: parse/to_string, the streaming reader and writer, the DOM, Quantity and the exact numbers, and JSON conversion.", "url": "https://www.bovnar.io/docs/rust/", "mainEntityOfPage": "https://www.bovnar.io/docs/rust/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-11-03", "dateModified": "2026-11-03", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Rust Bindings", "item": "https://www.bovnar.io/docs/rust/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Rust Bindings", "description": "The Bovnar Rust crate: parse/to_string, the streaming reader and writer, the DOM, Quantity and the exact numbers, and JSON conversion.", "url": "https://www.bovnar.io/docs/rust/", "mainEntityOfPage": "https://www.bovnar.io/docs/rust/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-11-03", "dateModified": "2026-11-04", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Rust Bindings", "item": "https://www.bovnar.io/docs/rust/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
@@ -60,6 +60,8 @@ enums are Rust enums, and an error carries the library's error kind.</p>
 <li><a href="#2-installation">Installation</a></li>
 <li><a href="#3-building-the-c-library">Building the C library</a><ul>
 <li>3.1 <a href="#31-webassembly-wasm32-wasip2">WebAssembly (<code>wasm32-wasip2</code>)</a></li>
+<li>3.2 <a href="#32-unit-profile-features">Unit-profile features</a></li>
+<li>3.3 <a href="#33-how-the-published-crate-is-made">How the published crate is made</a></li>
 </ul>
 </li>
 <li><a href="#4-quick-start">Quick-start</a><ul>
@@ -149,8 +151,8 @@ enums are Rust enums, and an error carries the library's error kind.</p>
 <td><code>build.rs</code> compiles the C library through the <code>cc</code> crate</td>
 </tr>
 <tr>
-<td>Python 3 on <code>PATH</code> (build time only)</td>
-<td>The build runs the upstream table generator scripts, exactly as CMake does. Set the <code>PYTHON</code> environment variable to name a different interpreter. Nothing needs it at run time</td>
+<td>Python 3 on <code>PATH</code> (only when building from a repository checkout)</td>
+<td>In the repository, the build runs the upstream table generator scripts, exactly as CMake does. Set the <code>PYTHON</code> environment variable to name a different interpreter. The crate from crates.io carries the generated tables and needs no Python (<a href="#33-how-the-published-crate-is-made">§3.3</a>)</td>
 </tr>
 <tr>
 <td><code>num-bigint</code>, <code>num-rational</code>, <code>num-integer</code>, <code>num-traits</code></td>
@@ -162,24 +164,25 @@ enums are Rust enums, and an error carries the library's error kind.</p>
 </tr>
 </tbody>
 </table>
-<p>There are no optional features and no optional dependencies, and no integration
-with third-party unit or array libraries; see <a href="#16-crate-layout">§16</a>.</p>
+<p>The only optional features are the unit-profile notations, all on by default
+(<a href="#32-unit-profile-features">§3.2</a>). There are no optional dependencies and no
+integration with third-party unit or array libraries; see <a href="#16-crate-layout">§16</a>.</p>
 <hr />
 <h2 id="2-installation">2. Installation</h2>
 <p>The crate carries the version of the C library it wraps (<strong>2.0.0</strong>: <code>version</code> in
 <code>Cargo.toml</code> is the <code>project(bovnar VERSION x.y.z)</code> of the top-level
-<code>CMakeLists.txt</code>, and CI fails when the two differ). It is <strong>not published to
-crates.io</strong> — <code>Cargo.toml</code> keeps <code>publish = false</code>, because <code>build.rs</code> compiles
-sources outside <code>rust/</code> and runs the generators in the repository root, which a
-packaged crate would not contain. Depend on it from a checkout of the
-repository.</p>
-<p>As a path dependency:</p>
+<code>CMakeLists.txt</code>, and CI fails when the two differ). It is published to
+crates.io with each release:</p>
 <div class="codehilite"><pre><span></span><code><span class="k">[dependencies]</span>
-<span class="n">bovnar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">path</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;../bovnar/rust&quot;</span><span class="w"> </span><span class="p">}</span>
+<span class="n">bovnar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;2.0.0&quot;</span>
 </code></pre></div>
 
-<p>or straight from Git, where Cargo finds the crate inside the repository:</p>
+<p>A repository checkout works too, as a path dependency or straight from Git,
+where Cargo finds the crate inside the repository. Built that way it needs
+Python 3 at build time (<a href="#1-requirements">§1</a>):</p>
 <div class="codehilite"><pre><span></span><code><span class="k">[dependencies]</span>
+<span class="n">bovnar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">path</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;../bovnar/rust&quot;</span><span class="w"> </span><span class="p">}</span>
+<span class="c1"># or</span>
 <span class="n">bovnar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">git</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;https://github.com/sothis/bovnar&quot;</span><span class="w"> </span><span class="p">}</span>
 </code></pre></div>
 
@@ -191,13 +194,14 @@ cargo<span class="w"> </span><span class="nb">test</span>
 
 <hr />
 <h2 id="3-building-the-c-library">3. Building the C library</h2>
-<p>The crate has no shared library to find: <code>build.rs</code> generates the unit tables
-with the repository's table generators and compiles <code>../src</code> and <code>../include</code>
-into the crate. A downstream crate therefore needs a C compiler and the
-generators' interpreter (<a href="#1-requirements">§1</a>) at build time and nothing at run
-time.</p>
-<p><code>build.rs</code> re-runs when the C sources, the generators, the interpreter override
-or <code>WASI_SDK_PATH</code> change.</p>
+<p>The crate has no shared library to find: <code>build.rs</code> compiles the C library into
+the crate. The crate from crates.io carries the C sources and the generated unit
+tables in <code>c/</code> and compiles those; in a repository checkout <code>build.rs</code> runs the
+table generators and compiles <code>../src</code> and <code>../include</code> instead. Either way a
+downstream crate needs a C compiler at build time (plus Python 3 in the
+checkout case, <a href="#1-requirements">§1</a>) and nothing at run time.</p>
+<p><code>build.rs</code> re-runs when the C sources, the generators, the interpreter override,
+the enabled features or <code>WASI_SDK_PATH</code> change.</p>
 <h3 id="31-webassembly-wasm32-wasip2">3.1 WebAssembly (<code>wasm32-wasip2</code>)</h3>
 <p>A WebAssembly build needs a C compiler for WASI, <a href="https://github.com/WebAssembly/wasi-sdk">wasi-sdk</a>.
 Point <code>WASI_SDK_PATH</code> at it and build for <code>wasm32-wasip2</code>:</p>
@@ -208,6 +212,76 @@ cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="
 
 <p>The same applies to a crate that depends on this one and is built for
 <code>wasm32-wasip2</code>: set <code>WASI_SDK_PATH</code> for its build.</p>
+<h3 id="32-unit-profile-features">3.2 Unit-profile features</h3>
+<p>Each unit-profile notation of <a href="https://www.bovnar.io/docs/profiles/">doc/11</a> is a Cargo
+feature, and all seven are on by default:</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Notation</th>
+<th>C switch</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ucum</code></td>
+<td><code>ucum:</code></td>
+<td><code>BVNR_WITH_UCUM_PROFILE</code></td>
+</tr>
+<tr>
+<td><code>unece</code></td>
+<td><code>unece:</code></td>
+<td><code>BVNR_WITH_UNECE_PROFILE</code></td>
+</tr>
+<tr>
+<td><code>qudt</code></td>
+<td><code>qudt:</code></td>
+<td><code>BVNR_WITH_QUDT_PROFILE</code></td>
+</tr>
+<tr>
+<td><code>qudt-qk</code></td>
+<td><code>qudt-qk:</code></td>
+<td><code>BVNR_WITH_QUDT_QK_PROFILE</code></td>
+</tr>
+<tr>
+<td><code>udunits</code></td>
+<td><code>udunits:</code></td>
+<td><code>BVNR_WITH_UDUNITS_PROFILE</code></td>
+</tr>
+<tr>
+<td><code>om</code></td>
+<td><code>om:</code></td>
+<td><code>BVNR_WITH_OM_PROFILE</code></td>
+</tr>
+<tr>
+<td><code>cf</code></td>
+<td><code>cf:</code></td>
+<td><code>BVNR_WITH_CF_PROFILE</code></td>
+</tr>
+</tbody>
+</table>
+<p>Leaving a feature out drops that notation's tables from the library, as
+<code>-DBVNR_WITH_&lt;NAME&gt;_PROFILE=OFF</code> does for the CMake build, and the reader then
+refuses its codes. <code>THIRD_PARTY_NOTICES.md</code> says why a distributor may want to
+leave out <code>ucum</code> or <code>cf</code>:</p>
+<div class="codehilite"><pre><span></span><code><span class="k">[dependencies]</span>
+<span class="n">bovnar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;2.0.0&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">default-features</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="n">features</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;unece&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;qudt&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;qudt-qk&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;udunits&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;om&quot;</span><span class="p">]</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+
+<h3 id="33-how-the-published-crate-is-made">3.3 How the published crate is made</h3>
+<p><code>build.rs</code> reaches <code>../src</code>, which a package made from <code>rust/</code> would not contain,
+so <code>rust/Cargo.toml</code> keeps <code>publish = false</code> and the crate is published from a
+staged copy. <code>rust/package.py</code> builds that copy: the crate without <code>tests/</code> and
+<code>fuzz/</code> (they read <code>../examples</code> and <code>../src/gendata</code>), <code>LICENSE</code>,
+<code>THIRD_PARTY_NOTICES.md</code>, and in <code>c/</code> the headers, the C sources <code>build.rs</code>
+compiles and the generators' output. It then runs cargo on the copy:</p>
+<div class="codehilite"><pre><span></span><code>python3<span class="w"> </span>rust/package.py<span class="w">                          </span><span class="c1"># cargo package: pack and verify</span>
+python3<span class="w"> </span>rust/package.py<span class="w"> </span>--<span class="w"> </span>publish<span class="w"> </span>--dry-run<span class="w">     </span><span class="c1"># what CI runs on every push</span>
+</code></pre></div>
+
+<p>CI's <code>rust_package</code> job runs that dry run on every push, and <code>publish_crate</code>
+publishes the same way on a <code>vX.Y.Z</code> tag through crates.io Trusted Publishing.</p>
 <hr />
 <h2 id="4-quick-start">4. Quick-start</h2>
 <h3 id="41-high-level-api-parse--to_string">4.1 High-level API (<code>parse</code> / <code>to_string</code>)</h3>
@@ -2557,8 +2631,9 @@ with clang:</p>
 <hr />
 <h2 id="16-crate-layout">16. Crate layout</h2>
 <div class="codehilite"><pre><span></span><code>rust/
-├── Cargo.toml        # version = the C library&#39;s version; publish = false
-├── build.rs          # generates the unit tables, compiles ../src and ../include
+├── Cargo.toml        # version = the C library&#39;s version; publish = false (see package.py)
+├── build.rs          # compiles the bundled c/, or in the repository ../src after running the generators
+├── package.py        # stages the crate with the C sources bundled, for crates.io
 ├── src/
 │   ├── lib.rs        # parse() / parse_typed() / to_string() / write_array() — public API
 │   ├── ffi.rs        # the C declarations; the only `unsafe` code
@@ -2684,7 +2759,7 @@ common values named (<code>Exponent::LINEAR</code>, <code>Exponent::NEG_SQUARE</
 <span class="p">}</span>
 </code></pre></div>
 
-<p>The <code>BaseUnit</code> enum mirrors the C <code>value_base_unit_e</code>. See doc/05 §12.1 for the
+<p>The <code>BaseUnit</code> enum mirrors the C <code>value_base_unit_e</code>. See <a href="https://www.bovnar.io/docs/units/#111-enumerations">doc/05 §11.1</a> for the
 block layout — an id's leading two digits name the vocabulary it comes from. The
 native units are 100000–100263 (<code>UNIT_NATIVE_FIRST</code> … <code>UNIT_NATIVE_LAST</code>) and the
 currencies 900000–900215 (<code>CURRENCY_FIRST</code> … <code>CURRENCY_LAST</code>), with the

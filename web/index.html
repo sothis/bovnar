@@ -2793,11 +2793,11 @@ a[data-doc] { cursor: pointer; }
       "name": "Bovnar (BVNR)",
       "alternateName": "BVNR",
       "url": "https://www.bovnar.io/",
-      "description": "A typed, unit-aware text serialization format. Every value carries its type family, bit-width, numeric base, and validated physical unit or currency inline, with no external schema. C99 reference implementation with Python bindings.",
+      "description": "A typed, unit-aware text serialization format. Every value carries its type family, bit-width, numeric base, and validated physical unit or currency inline, with no external schema. C99 reference implementation with Python and Rust bindings.",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "Linux, macOS, Windows",
       "softwareVersion": "1.1.0",
-      "programmingLanguage": ["C", "Python"],
+      "programmingLanguage": ["C", "Python", "Rust"],
       "codeRepository": "https://github.com/sothis/bovnar",
       "downloadUrl": "https://pypi.org/project/bovnar/",
       "license": "https://github.com/sothis/bovnar/blob/main/LICENSE",
@@ -2808,7 +2808,7 @@ a[data-doc] { cursor: pointer; }
         "https://doi.org/10.5281/zenodo.21443295",
         "https://doi.org/10.5281/zenodo.21443008"
       ],
-      "keywords": "serialization, data format, physical units, units of measure, dimensional analysis, SI units, telemetry, instrumentation, scientific computing, C library, Python",
+      "keywords": "serialization, data format, physical units, units of measure, dimensional analysis, SI units, telemetry, instrumentation, scientific computing, C library, Python, Rust",
       "author": { "@id": "https://www.bovnar.io/#author" },
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
     }
@@ -3410,7 +3410,7 @@ html[data-theme="light"] #launch-demo .sw-g { color: #9a5410; }
   <noscript>
     <p class="ns-note">The three demos drive the C reference parser compiled to WebAssembly, so they need
     JavaScript and are hidden here. Nothing else on this page does: the syntax, the annotated examples and the
-    full documentation below are plain markup. The same parser ships as a C library, a Python package and the
+    full documentation below are plain markup. The same parser ships as a C library, a Python package, a Rust crate and the
     <code>bovnar</code> command-line tool.</p>
   </noscript>
 </header>
@@ -3910,10 +3910,11 @@ html[data-theme="light"] #launch-demo .sw-g { color: #9a5410; }
         <div class="feature-title">Tree-based access</div>
         <div class="feature-desc">
           Build a navigable DOM from any Bovnar stream, then traverse, query,
-          and mutate it with a clean C API. Or use the Python dict-like interface.
+          and mutate it with a clean C API. Or use the Python dict-like interface or Rust's <code>DomDoc</code>.
         </div>
         <div class="feature-example"><span class="cl-fn">bvn_dom_lookup</span>(doc, <span class="cl-str">".sensor.val"</span>);
-doc[<span class="py-str">"sensor"</span>][<span class="py-str">"val"</span>] <span class="c-comment"># Python</span></div>
+doc[<span class="py-str">"sensor"</span>][<span class="py-str">"val"</span>] <span class="c-comment"># Python</span>
+doc.<span class="cl-fn">lookup</span>(<span class="cl-str">"sensor.val"</span>) <span class="c-comment">// Rust</span></div>
       </div>
 
       <div class="feature-card reveal reveal-delay-2" data-n="6">
@@ -3943,6 +3944,7 @@ doc[<span class="py-str">"sensor"</span>][<span class="py-str">"val"</span>] <sp
       <div class="quickstart-tabs" role="tablist" aria-label="Quick start language">
         <button class="qs-tab active" role="tab" tabindex="0" id="qstab-c" aria-controls="tab-c" aria-selected="true" data-tab="c">C99 API</button>
         <button class="qs-tab" role="tab" tabindex="-1" id="qstab-python" aria-controls="tab-python" aria-selected="false" data-tab="python">Python</button>
+        <button class="qs-tab" role="tab" tabindex="-1" id="qstab-rust" aria-controls="tab-rust" aria-selected="false" data-tab="rust">Rust</button>
         <button class="qs-tab" role="tab" tabindex="-1" id="qstab-build" aria-controls="tab-build" aria-selected="false" data-tab="build">Build</button>
       </div>
 
@@ -4088,6 +4090,69 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
         </div>
       </div>
 
+      <div class="qs-pane" id="tab-rust" role="tabpanel" aria-labelledby="qstab-rust">
+        <div class="qs-pane-inner">
+          <div class="qs-step">
+            <div class="qs-step-num">01</div>
+            <div class="qs-step-title">Add the crate</div>
+            <div class="qs-step-desc">The crate is not on crates.io yet; depend on it from Git. <code>build.rs</code> compiles the C library into the crate, so there is no system library to install. Building needs a C compiler and Python&nbsp;3.</div>
+            <div class="code-block"><span class="c-comment"># Cargo.toml</span>
+[dependencies]
+<span class="sh-var">bovnar</span> = { <span class="sh-var">git</span> = <span class="cl-str">"https://github.com/sothis/bovnar"</span> }
+
+<span class="c-comment"># Rust 1.88 or newer</span>
+<span class="sh-cmd">cargo</span> build</div>
+          </div>
+          <div class="qs-step">
+            <div class="qs-step-num">02</div>
+            <div class="qs-step-title">High-level API</div>
+            <div class="qs-step-desc"><code>parse</code> reads BVNR bytes into a dynamic <code>Value</code>; <code>to_string</code> writes one back. A struct is a <code>Vec</code> of key/value pairs in document order.</div>
+            <div class="code-block"><span class="cl-kw">use</span> bovnar::{<span class="cl-type">Value</span>, parse, to_string};
+
+<span class="cl-kw">let</span> data = <span class="cl-type">Value</span>::<span class="cl-fn">Struct</span>(<span class="cl-fn">vec!</span>[
+    (<span class="cl-str">"sensor_id"</span>.<span class="cl-fn">into</span>(), <span class="cl-type">Value</span>::<span class="cl-fn">Int</span>(<span class="cl-num">42</span>)),
+    (<span class="cl-str">"label"</span>.<span class="cl-fn">into</span>(),
+     <span class="cl-type">Value</span>::<span class="cl-fn">String</span>(<span class="cl-str">"outdoor"</span>.<span class="cl-fn">into</span>())),
+]);
+<span class="cl-kw">let</span> raw = <span class="cl-fn">to_string</span>(&amp;data, <span class="cl-kw">true</span>)?;
+
+<span class="cl-kw">let</span> doc = <span class="cl-fn">parse</span>(&amp;raw)?;
+<span class="cl-fn">assert_eq!</span>(doc, data);</div>
+          </div>
+          <div class="qs-step">
+            <div class="qs-step-num">03</div>
+            <div class="qs-step-title">Typed round-trips with Quantity</div>
+            <div class="qs-step-desc"><code>parse_typed</code> keeps each typed value as a <code>Quantity</code> with its exact text, bit-width, and unit. <code>to_string</code> writes it back unchanged.</div>
+            <div class="code-block"><span class="cl-kw">use</span> bovnar::{<span class="cl-type">Value</span>, parse_typed, to_string};
+
+<span class="cl-kw">let</span> src = <span class="cl-str">b".pressure = &lt;float:32,Pa&gt; 101325.0;"</span>;
+<span class="cl-kw">let</span> doc = <span class="cl-fn">parse_typed</span>(src)?;
+<span class="cl-kw">let</span> <span class="cl-type">Value</span>::<span class="cl-fn">Struct</span>(f) = &amp;doc <span class="cl-kw">else</span> { <span class="cl-fn">panic!</span>() };
+<span class="cl-kw">let</span> <span class="cl-type">Value</span>::<span class="cl-fn">Quantity</span>(q) = &amp;f[<span class="cl-num">0</span>].<span class="cl-num">1</span>
+    <span class="cl-kw">else</span> { <span class="cl-fn">panic!</span>() };
+q.raw.<span class="cl-fn">as_deref</span>()  <span class="c-comment">// Some("101325.0")</span>
+q.<span class="cl-fn">unit_str</span>()      <span class="c-comment">// "Pa"</span>
+
+<span class="c-comment">// annotation + raw text re-emitted as-is</span>
+<span class="cl-kw">let</span> out = <span class="cl-fn">to_string</span>(&amp;doc, <span class="cl-kw">true</span>)?;
+<span class="cl-fn">assert_eq!</span>(<span class="cl-fn">parse_typed</span>(&amp;out)?, doc);</div>
+          </div>
+          <div class="qs-step">
+            <div class="qs-step-num">04</div>
+            <div class="qs-step-title">DOM</div>
+            <div class="qs-step-desc">Random access by member or dotted path. A <code>DomNode</code> borrows its <code>DomDoc</code>, so the compiler keeps the document alive while a node is in use.</div>
+            <div class="code-block"><span class="cl-kw">use</span> bovnar::<span class="cl-type">DomDoc</span>;
+
+<span class="cl-kw">let</span> doc = <span class="cl-type">DomDoc</span>::<span class="cl-fn">parse</span>(
+    <span class="cl-str">br#".config = { .host = "example.com"; };"#</span>)?;
+
+<span class="cl-kw">let</span> host = doc.<span class="cl-fn">lookup</span>(<span class="cl-str">"config.host"</span>)
+    .<span class="cl-fn">and_then</span>(|n| n.<span class="cl-fn">as_str</span>());
+<span class="cl-fn">assert_eq!</span>(host, <span class="cl-type">Some</span>(<span class="cl-str">"example.com"</span>));</div>
+          </div>
+        </div>
+      </div>
+
       <div class="qs-pane" id="tab-build" role="tabpanel" aria-labelledby="qstab-build">
         <div class="qs-pane-inner">
           <div class="qs-step">
@@ -4127,7 +4192,10 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
 <span class="sh-cmd">export</span> <span class="sh-var">LIBBOVNAR_PATH</span>=\
   $(<span class="sh-cmd">pwd</span>)/build/libbvnr.so
 <span class="sh-var">PYTHONPATH</span>=python <span class="sh-cmd">pytest</span> \
-  python/tests <span class="sh-flag">-v</span></div>
+  python/tests <span class="sh-flag">-v</span>
+
+<span class="c-comment"># Rust tests</span>
+<span class="sh-cmd">cd</span> rust &amp;&amp; <span class="sh-cmd">cargo</span> test</div>
           </div>
         </div>
       </div>
@@ -4176,7 +4244,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
     <div class="section-label reveal">documentation</div>
     <h2 class="section-h2 reveal reveal-delay-1">Everything you need to <em>ship.</em></h2>
     <p class="section-p reveal reveal-delay-2">
-      Thirteen documents — from a five-minute tutorial to the formal EBNF grammar and conformance
+      Fourteen documents — from a five-minute tutorial to the formal EBNF grammar and conformance
       protocol. Read inline below, browse them as <a href="/docs/" class="inline-link">standalone pages</a>, or <a href="#doc-downloads" class="inline-link">download the full set as PDF</a>.
     </p>
     <div class="docs-grid">
@@ -4284,6 +4352,14 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
           <div class="doc-card-tag">Verification</div>
         </div>
       </a>
+      <a href="/docs/rust/" data-doc="14_bovnar_rust_bindings.md" data-doc-title="Rust Bindings" class="doc-card reveal reveal-delay-1">
+        <div class="doc-card-num">14</div>
+        <div>
+          <div class="doc-card-title">Rust Bindings</div>
+          <div class="doc-card-desc">A safe wrapper that compiles the C library into the crate — nothing to install. <code>parse</code>/<code>to_string</code>, streaming <code>Reader</code>/<code>Writer</code>, the DOM, and exact numbers.</div>
+          <div class="doc-card-tag">Rust integration</div>
+        </div>
+      </a>
     </div>
 
     <div id="doc-downloads" class="doc-downloads reveal">
@@ -4291,8 +4367,8 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
         <div class="doc-dl-kicker">PDF downloads</div>
         <h3 class="doc-dl-title">Take the documentation offline</h3>
         <p class="doc-dl-sub">Print-ready, self-contained PDFs of every document — or grab the complete set as one archive.</p>
-        <a class="doc-dl-all" href="doc/pdf/bovnar-docs-pdf.zip" download aria-label="Download all 13 documentation PDFs as a ZIP archive">
-          <span class="doc-dl-arrow">↓</span> Download all <span class="doc-dl-meta">ZIP · 13 PDFs</span>
+        <a class="doc-dl-all" href="doc/pdf/bovnar-docs-pdf.zip" download aria-label="Download all 14 documentation PDFs as a ZIP archive">
+          <span class="doc-dl-arrow">↓</span> Download all <span class="doc-dl-meta">ZIP · 14 PDFs</span>
         </a>
       </div>
       <ul class="doc-dl-list">
@@ -4309,6 +4385,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
         <li><a href="doc/pdf/bovnar-unit-profiles.pdf" download aria-label="Download the Unit Profiles document as PDF"><span class="doc-dl-num">11</span> Unit Profiles <span class="doc-dl-ext">PDF</span></a></li>
         <li><a href="doc/pdf/bovnar-grammar.pdf"         download aria-label="Download the formal EBNF grammar as PDF"><span class="doc-dl-num">12</span> Formal EBNF Grammar <span class="doc-dl-ext">PDF</span></a></li>
         <li><a href="doc/pdf/bovnar-conformance.pdf"     download aria-label="Download the Conformance Test Tool reference as PDF"><span class="doc-dl-num">13</span> Conformance Test Tool <span class="doc-dl-ext">PDF</span></a></li>
+        <li><a href="doc/pdf/bovnar-rust-bindings.pdf"   download aria-label="Download the Rust Bindings reference as PDF"><span class="doc-dl-num">14</span> Rust Bindings <span class="doc-dl-ext">PDF</span></a></li>
       </ul>
     </div>
   </div>
@@ -4348,6 +4425,7 @@ out = bovnar.<span class="py-fn">array_to_bvnr</span>(<span class="py-str">"g_ma
           <li><a href="https://github.com/sothis/bovnar/releases" target="_blank" rel="noopener">Releases</a></li>
           <li><a href="https://github.com/sothis/bovnar/tree/main/include" target="_blank" rel="noopener">C Headers</a></li>
           <li><a href="https://github.com/sothis/bovnar/tree/main/python/bovnar" target="_blank" rel="noopener">Python Package</a></li>
+          <li><a href="https://github.com/sothis/bovnar/tree/main/rust" target="_blank" rel="noopener">Rust Crate</a></li>
           <li><a href="https://github.com/sothis/bovnar/tree/main/examples" target="_blank" rel="noopener">Examples (.bvnr)</a></li>
         </ul>
       </div>

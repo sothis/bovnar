@@ -399,9 +399,16 @@ jobs:
       # Lints are checked on current toolchains; the MSRV leg only builds and tests.
       - run: cargo fmt --check
         if: ${{ !matrix.msrv }}
-      - run: cargo clippy --all-targets -- -D warnings
+      # --locked: a Cargo.lock that no longer matches Cargo.toml fails here
+      # instead of being re-resolved silently on the runner.
+      - run: cargo clippy --locked --all-targets -- -D warnings
         if: ${{ !matrix.msrv }}
-      - run: cargo test
+      - run: cargo test --locked
+      # The cargo-fuzz targets need nightly to run, but they type-check on
+      # stable; without this they would rot unseen between fuzzing sessions.
+      - name: cargo check the fuzz targets
+        if: matrix.cli
+        run: cargo check --locked --manifest-path fuzz/Cargo.toml
 
       # test_writers_agree compares to_string with the C CLI's pretty-print and
       # is #[ignore]d without it; one leg builds the CLI and runs it.
@@ -413,7 +420,7 @@ jobs:
           cmake --build build --target bovnar --parallel
       - name: cargo test (needs the CLI)
         if: matrix.cli
-        run: cargo test --test test_writers_agree -- --ignored
+        run: cargo test --locked --test test_writers_agree -- --ignored
 
   rust_wasm:
     name: Rust (wasm32-wasip2)
@@ -600,7 +607,7 @@ jobs:
     # They are skipped on a release-* push, which must not skip the rehearsal,
     # hence the explicit `if:`: every need succeeded, or was one of the two
     # that may be skipped.
-    needs: [msvc, mingw, linux, source, tests, build_wheels, build_sdist]
+    needs: [msvc, mingw, linux, source, tests, rust_version, rust, rust_wasm, build_wheels, build_sdist]
     if: >-
       !cancelled() &&
       needs.msvc.result == 'success' &&
@@ -608,6 +615,9 @@ jobs:
       needs.linux.result == 'success' &&
       needs.source.result == 'success' &&
       needs.tests.result == 'success' &&
+      needs.rust_version.result == 'success' &&
+      needs.rust.result == 'success' &&
+      needs.rust_wasm.result == 'success' &&
       (needs.build_wheels.result == 'success' || needs.build_wheels.result == 'skipped') &&
       (needs.build_sdist.result == 'success' || needs.build_sdist.result == 'skipped')
     runs-on: ubuntu-latest

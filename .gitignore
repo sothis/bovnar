@@ -1,5 +1,7 @@
 build/*
 build*/*
+# Cargo's build tree for the Rust crate (rust/fuzz/ ignores its own).
+rust/target/
 __pycache__/*
 .claude/
 .cache/

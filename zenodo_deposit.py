@@ -43,6 +43,11 @@ are reused, their files uploaded afresh). Try it on sandbox.zenodo.org first:
 sandbox has no copy of the production records, so --make-test-base creates and
 publishes a stand-in 1.1.0 pair there to make a new version of.
 
+ORCID: the creators carry the ORCID iD, so with DataCite's ORCID auto-update
+enabled (DataCite Commons, signed in with ORCID) each published version reaches
+the author's ORCID record by itself. --resave publishes an unchanged edit of
+records deposited before auto-update was enabled, which pushes them too.
+
 The token is read from ZENODO_TOKEN (scopes deposit:write and deposit:actions);
 sandbox and production tokens are separate.
 
@@ -51,6 +56,7 @@ Usage:
     ZENODO_TOKEN=... python3 zenodo_deposit.py --host sandbox \\
         --source-record <id> --docs-record <id> [--publish]
     ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo [--tag v2.0.0] [--publish]
+    ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo --resave 23934686 23934688
 """
 import argparse
 import hashlib
@@ -340,6 +346,47 @@ def replace_files(z, draft, files):
         raise ZenodoError(f"draft {draft['id']} holds {listed} after the upload")
 
 
+def resave(z, record_ids):
+    """Publish an unchanged edit of each record, so Zenodo re-registers its DOI.
+
+    DataCite's ORCID auto-update only acts on DOIs registered or updated after
+    the author enabled it. A release deposited before that reaches ORCID once
+    its DOIs are updated, and an edit published without changes is the update
+    that alters nothing. The DataCite timestamps before and after say whether it
+    happened.
+    """
+    for rid in record_ids:
+        before = datacite_updated(z, rid)
+        d = z.call("POST", f"/deposit/depositions/{rid}/actions/edit")
+        meta = dict(d["metadata"])
+        for k in ("doi", "prereserve_doi"):
+            meta.pop(k, None)
+        z.call("PUT", d["links"]["self"], body={"metadata": meta})
+        p = z.call("POST", d["links"]["publish"])
+        print(f"==> {rid}: re-published {p.get('doi')}")
+        if before is not None:
+            after = before
+            for _ in range(12):
+                time.sleep(5)
+                after = datacite_updated(z, rid)
+                if after and after != before:
+                    break
+            print(f"    DataCite updated: {before} -> {after}")
+
+
+def datacite_updated(z, record_id):
+    """DataCite's `updated` for a production record's DOI; None on the sandbox,
+    whose 10.5072 test DOIs DataCite does not hold."""
+    if "sandbox" in z.base:
+        return None
+    doi = z.call("GET", f"/records/{record_id}", auth=False)["doi"]
+    try:
+        attrs = json.loads(fetch(f"https://api.datacite.org/dois/{doi}"))["data"]["attributes"]
+    except (urllib.error.URLError, KeyError, ValueError):
+        return None
+    return attrs.get("updated")
+
+
 def make_test_base(z):
     """Sandbox only: publish a stand-in for the production 1.1.0 pair."""
     prod = HOSTS["zenodo"]
@@ -381,6 +428,9 @@ def main():
     ap.add_argument("--publish", action="store_true", help="publish the drafts (final)")
     ap.add_argument("--make-test-base", action="store_true",
                     help="sandbox only: publish a stand-in 1.1.0 pair to version from")
+    ap.add_argument("--resave", type=int, nargs="+", metavar="RECORD",
+                    help="publish an unchanged edit of these records, so their DOIs "
+                         "reach ORCID through DataCite's auto-update")
     args = ap.parse_args()
 
     token = os.environ.get("ZENODO_TOKEN")
@@ -392,6 +442,9 @@ def main():
         if args.host != "sandbox":
             raise SystemExit("zenodo_deposit.py: --make-test-base is for the sandbox only")
         make_test_base(z)
+        return 0
+    if args.resave:
+        resave(z, args.resave)
         return 0
 
     records = {"source": args.source_record, "docs": args.docs_record}

@@ -84,7 +84,7 @@ HOSTS = {
 }
 # The latest version on each production line, i.e. the record a new version is
 # made from. A sandbox run names its own with --source-record/--docs-record.
-PRODUCTION_RECORDS = {"source": 23958544, "docs": 23958545}
+PRODUCTION_RECORDS = {"source": 23963398, "docs": 23963399}
 WEBSITE = "https://www.bovnar.io"
 USER_AGENT = "bovnar-zenodo-deposit"
 PDF_DIR = os.path.join(ROOT, "build", "doc", "pdf")
@@ -216,7 +216,10 @@ def docs_files(tag, workdir, pdf_dir):
     # only if what they were built from is the tag's, and they were built since.
     # README.md is not among them: it has no PDF, and its deposited copy is
     # read from the tag like the Markdown documents.
-    inputs = ["doc", "gen_doc_pdfs.py", "gen_html_docs.py"]
+    # The wiki drafts and the JOSS paper live in doc/ but go into no PDF; the
+    # wiki infobox names the newest release and so changes after every tag.
+    inputs = ["doc", ":(exclude)doc/wiki", ":(exclude)doc/joss_paper",
+              "gen_doc_pdfs.py", "gen_html_docs.py"]
     if subprocess.run(["git", "-C", ROOT, "diff", "--quiet", tag, "--"] + inputs).returncode:
         raise SystemExit(f"zenodo_deposit.py: doc/, gen_doc_pdfs.py or gen_html_docs.py "
                          f"differ from {tag}; the PDFs would not be the release's")

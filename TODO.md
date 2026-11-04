@@ -1,6 +1,25 @@
 # TODO
 
-## State 2026-11-04 — 2.0.1 released
+## State 2026-11-04 — 2.0.2 released
+
+`v2.0.2` is tagged on b374191 and published by CI: the GitHub release (seven
+assets, build count 806), PyPI, and crates.io through Trusted Publishing. Its
+crate is the first with `PROVENANCE.json`; the copy on crates.io was checked
+against the tag with `check_crate_provenance.py` (105 files, clean). The first
+tag run failed on the new CI provenance step (it looked for the .crate where
+`cargo package`, not `cargo publish --dry-run`, leaves it); nothing had been
+published, so the step was fixed and the unpublished tag moved onto the fix.
+
+Zenodo 2.0.2: source 10.5281/zenodo.23963398, documentation and specification
+10.5281/zenodo.23963399 (CITATION.cff, README); `PRODUCTION_RECORDS` names
+them for the next release. The deposit's doc/ check now leaves out
+doc/wiki and doc/joss_paper, which no PDF uses.
+
+Downstream: Mumcord (github.com/Mumcord/mumcord) vendors the crate and ties its
+licence notices to `PROVENANCE.json` (their PR from branch
+fix/bovnar-provenance).
+
+## 2.0.1 — released earlier the same day
 
 `v2.0.1` is tagged on be88c9a. The tag's CI run published everything: the
 GitHub release with seven assets (now including the universal
@@ -29,7 +48,7 @@ It is not Developer ID signed or notarized: a browser download is quarantined
 by Gatekeeper (`xattr -dr com.apple.quarantine`, or fetch with curl); the
 README says so under the release archives.
 
-## 2.0.0 — released earlier the same day
+## 2.0.0 — released the same day
 
 `v2.0.0` is tagged on 796171a and pushed. The Rust crate `bovnar` 2.0.0 was
 published to crates.io by hand from the tag with `rust/package.py`, and the

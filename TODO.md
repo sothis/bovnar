@@ -26,8 +26,8 @@ The macOS archive was checked by hand: checksum, the same 83 files as the
 Linux archive, every binary arm64 + x86_64 with minos 11.0, the arm64 slices'
 ad-hoc signatures valid page by page, 341 exports equal to the ABI baseline.
 It is not Developer ID signed or notarized: a browser download is quarantined
-by Gatekeeper (`xattr -d com.apple.quarantine`, or fetch with curl). Not yet
-said in the docs.
+by Gatekeeper (`xattr -dr com.apple.quarantine`, or fetch with curl); the
+README says so under the release archives.
 
 ## 2.0.0 — released earlier the same day
 

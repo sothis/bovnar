@@ -398,6 +398,16 @@ snapshot of the tag and a `SHA256SUMS` file — are attached to each
 so a build from source is optional. Earlier tags predate the packaging: 1.0.0
 was POSIX-only and had no packer at all, and carries no assets.
 
+The macOS archive's binaries are ad-hoc signed, not signed with a Developer ID
+or notarized. macOS marks what a browser downloads as quarantined, and
+Gatekeeper then refuses to run the CLI or load the dylib ("Apple could not
+verify …"). Clear the mark on the unpacked directory, or download with `curl`,
+which sets none:
+
+```bash
+xattr -dr com.apple.quarantine bovnar-macos-<version>-<count>
+```
+
 ### Build options
 
 | Option | Default | Effect |

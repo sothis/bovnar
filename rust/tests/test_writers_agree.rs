@@ -107,7 +107,7 @@ fn test_the_two_writers_produce_documents_that_read_back_alike() {
         }
     }
 
-    let dir = std::env::temp_dir().join(format!("bovnar-writers-agree-{}", std::process::id()));
+    let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("bovnar-writers-agree");
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("doc.bvnr");
     let (mut disagreed, mut compared) = (Vec::new(), 0);

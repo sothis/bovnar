@@ -133,6 +133,7 @@ fn version_directive_is_written_when_needed_and_structs_in_arrays_stay_plain() {
 /// bovnar.h (THREADING): distinct readers, writers and documents may live on
 /// distinct threads, so each can be moved to one.
 #[test]
+#[cfg_attr(target_os = "wasi", ignore = "WASI has no threads")]
 fn reader_writer_and_dom_move_between_threads() {
     fn assert_send<T: Send>() {}
     assert_send::<bovnar::Reader>();

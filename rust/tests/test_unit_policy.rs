@@ -476,8 +476,7 @@ fn test_rules_outrank_targets() {
 
 #[test]
 fn test_a_bad_policy_is_refused_by_parse_fd_too() {
-    let path =
-        std::env::temp_dir().join(format!("bovnar-test-policy-fd-{}.bvnr", std::process::id()));
+    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("bovnar-test-policy-fd.bvnr");
     std::fs::write(&path, b".a = 5 m;").unwrap();
     let file = std::fs::File::open(&path).unwrap();
     let result = DomDoc::parse_reader_with_policy(file, &policy_targets(&["nosuch"]));

@@ -212,6 +212,15 @@ cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="
 
 <p>The same applies to a crate that depends on this one and is built for
 <code>wasm32-wasip2</code>: set <code>WASI_SDK_PATH</code> for its build.</p>
+<p>The crate's own tests run there under <a href="https://wasmtime.dev">wasmtime</a>, which
+must see the checkout (the examples the tests read, and the build's output):</p>
+<div class="codehilite"><pre><span></span><code><span class="nv">CARGO_TARGET_WASM32_WASIP2_RUNNER</span><span class="o">=</span><span class="s2">&quot;wasmtime run --dir </span><span class="k">$(</span>git<span class="w"> </span>rev-parse<span class="w"> </span>--show-toplevel<span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--target<span class="w"> </span>wasm32-wasip2<span class="w"> </span>--lib<span class="w"> </span>--tests
+</code></pre></div>
+
+<p>A non-default <code>CARGO_TARGET_DIR</code> outside the checkout needs a <code>--dir</code> of its
+own. WASI has no threads and a panic aborts, so the one test of each is
+ignored there; the doctests run on native targets only.</p>
 <h3 id="32-unit-profile-features">3.2 Unit-profile features</h3>
 <p>Each unit-profile notation of <a href="https://www.bovnar.io/docs/profiles/">doc/11</a> is a Cargo
 feature, and all seven are on by default:</p>

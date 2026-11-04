@@ -68,7 +68,8 @@ fn test_parse_bytearray() {
 
 /// `DomDoc::parse_reader` over a temporary file holding `data`.
 fn parse_via_file(name: &str, data: &[u8]) -> Result<DomDoc, Error> {
-    let path = std::env::temp_dir().join(format!("bovnar-test-{name}-{}.bvnr", std::process::id()));
+    let path =
+        std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("bovnar-test-{name}.bvnr"));
     std::fs::write(&path, data).unwrap();
     let doc = DomDoc::parse_reader(std::fs::File::open(&path).unwrap());
     std::fs::remove_file(&path).unwrap();

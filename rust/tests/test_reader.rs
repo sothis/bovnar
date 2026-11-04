@@ -275,6 +275,7 @@ fn test_false_return_raises() {
 /// A panic in the callback must reach
 /// the caller of `read_mem`, not unwind into C.
 #[test]
+#[cfg_attr(panic = "abort", ignore = "a panic cannot be caught where it aborts")]
 fn test_exception_in_callback_raises() {
     let payload = std::panic::catch_unwind(|| {
         let mut crashing = |_: &EventData<'_>| -> bool { panic!("boom") };
@@ -310,7 +311,7 @@ fn keys_of_file(path: &std::path::Path) -> Result<Vec<String>, Error> {
 #[test]
 fn test_read_file_by_path() {
     // A file is read with read_reader over the opened File.
-    let path = std::env::temp_dir().join(format!("bovnar-test-reader-{}.bvnr", std::process::id()));
+    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("bovnar-test-reader.bvnr");
     std::fs::write(&path, SIMPLE_SCALAR_UINT).unwrap();
     let keys = keys_of_file(&path);
     std::fs::remove_file(&path).unwrap();
@@ -320,8 +321,7 @@ fn test_read_file_by_path() {
 #[test]
 fn test_read_fd() {
     // Reads an opened temporary file.
-    let path =
-        std::env::temp_dir().join(format!("bovnar-test-reader-fd-{}.bvnr", std::process::id()));
+    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("bovnar-test-reader-fd.bvnr");
     std::fs::write(&path, SIMPLE_SCALAR_UINT).unwrap();
     let keys = keys_of_file(&path);
     std::fs::remove_file(&path).unwrap();

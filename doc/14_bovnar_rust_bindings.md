@@ -157,6 +157,18 @@ cargo build --release --target wasm32-wasip2
 The same applies to a crate that depends on this one and is built for
 `wasm32-wasip2`: set `WASI_SDK_PATH` for its build.
 
+The crate's own tests run there under [wasmtime](https://wasmtime.dev), which
+must see the checkout (the examples the tests read, and the build's output):
+
+```bash
+CARGO_TARGET_WASM32_WASIP2_RUNNER="wasmtime run --dir $(git rev-parse --show-toplevel)" \
+    cargo test --target wasm32-wasip2 --lib --tests
+```
+
+A non-default `CARGO_TARGET_DIR` outside the checkout needs a `--dir` of its
+own. WASI has no threads and a panic aborts, so the one test of each is
+ignored there; the doctests run on native targets only.
+
 ### 3.2 Unit-profile features
 
 Each unit-profile notation of [doc/11](11_bovnar_unit_profiles.md) is a Cargo

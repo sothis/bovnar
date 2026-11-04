@@ -23,6 +23,11 @@ API and implements spec 1.2.
   library differ from it, or when an export and a declaration do not match. The
   binding ABI tests could only see the bindings drift from the headers, not the
   headers drift from the release.
+- **The Rust tests run on wasm32-wasip2.** CI only built the crate for it;
+  the `rust_wasm` job now runs `cargo test --lib --tests` under wasmtime, which
+  covers the 32-bit `usize` paths. The integration tests write their temp files
+  to `CARGO_TARGET_TMPDIR`, which every target has, instead of `temp_dir()`,
+  which WASI does not.
 
 ### Fixed
 

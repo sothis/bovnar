@@ -373,8 +373,8 @@ The Rust jobs run in `.github/workflows/build-and-package.yml`, next to the
 C library's: a version check (crate version = `CMakeLists.txt` version),
 fmt, clippy `-D warnings` and the tests on Linux x64 (with the CLI for
 `test_writers_agree`), Linux aarch64, macOS, Windows MSVC x64 and Windows
-MinGW64, a build and test on Rust 1.88, a `wasm32-wasip2` build with wasi-sdk,
-and the packaging rehearsal below. The release job waits for all of them.
+MinGW64, a build and test on Rust 1.88, a `wasm32-wasip2` build with wasi-sdk
+and its tests under wasmtime, and the packaging rehearsal below. The release job waits for all of them.
 
 `rust/Cargo.toml` keeps `publish = false`, because a package made from `rust/`
 would not contain the `../src` that `build.rs` compiles. The crate is published

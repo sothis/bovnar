@@ -121,7 +121,7 @@ mod writer_lifecycle {
     fn test_to_fd() {
         // Writes to an opened temporary file.
         let path =
-            std::env::temp_dir().join(format!("bovnar-test-writer-fd-{}.bvnr", std::process::id()));
+            std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("bovnar-test-writer-fd.bvnr");
         let file = std::fs::File::create(&path).unwrap();
         let mut w = Writer::to_writer(file, true).unwrap();
         w.write_uint("y", 99, 64, Base::DECIMAL).unwrap();
@@ -1251,7 +1251,7 @@ mod writer_flags_keywords {
     fn test_to_file_takes_them_too() {
         // A file is written with to_writer_with over the created File.
         let path =
-            std::env::temp_dir().join(format!("bovnar-test-writer-o-{}.bvnr", std::process::id()));
+            std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("bovnar-test-writer-o.bvnr");
         let file = std::fs::File::create(&path).unwrap();
         let mut w = Writer::to_writer_with(file, CAP, false, 0, true).unwrap();
         w.write_uint("a", 1, 64, Base::DECIMAL).unwrap();

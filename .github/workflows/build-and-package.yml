@@ -334,7 +334,7 @@ jobs:
   # The Rust binding in rust/: a thin wrapper that compiles the C sources above
   # through build.rs (no system library). Tested on the toolchains the C
   # library ships for -- MSVC and MinGW64 on Windows, and the Linux and macOS
-  # runners of the wheel matrix -- plus a wasm32-wasip2 build. The C suite the
+  # runners of the wheel matrix -- plus wasm32-wasip2 under wasmtime. The C suite the
   # binding wraps runs, unchanged, in the `tests` job.
   rust_version:
     name: Rust crate version
@@ -430,6 +430,7 @@ jobs:
         working-directory: rust
     env:
       WASI_SDK_VERSION: "34"
+      WASMTIME_VERSION: "50.0.1"
     steps:
       - uses: actions/checkout@v5
 
@@ -442,7 +443,24 @@ jobs:
           curl -sSL "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_SDK_VERSION}/wasi-sdk-${WASI_SDK_VERSION}.0-x86_64-linux.tar.gz" | tar xz -C "$RUNNER_TEMP"
           echo "WASI_SDK_PATH=$RUNNER_TEMP/wasi-sdk-${WASI_SDK_VERSION}.0-x86_64-linux" >> "$GITHUB_ENV"
 
-      - run: cargo build --target wasm32-wasip2
+      - name: Install wasmtime
+        run: |
+          curl -sSLf "https://github.com/bytecodealliance/wasmtime/releases/download/v${WASMTIME_VERSION}/wasmtime-v${WASMTIME_VERSION}-x86_64-linux.tar.xz" | tar xJ -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/wasmtime-v${WASMTIME_VERSION}-x86_64-linux" >> "$GITHUB_PATH"
+
+      - run: cargo build --locked --target wasm32-wasip2
+
+      # The tests on the 32-bit target, where usize is 32 bits, under wasmtime.
+      # The guest sees only the preopened directory -- the checkout, which
+      # holds the examples the tests read, the build's OUT_DIR and
+      # CARGO_TARGET_TMPDIR. The thread test and the one that catches a panic
+      # from a callback are ignored there (no threads; a panic aborts), and the
+      # doctests stay on the native legs: the README's writes a file to
+      # temp_dir(), which WASI does not have.
+      - name: cargo test (wasm32-wasip2, wasmtime)
+        env:
+          CARGO_TARGET_WASM32_WASIP2_RUNNER: wasmtime run --dir ${{ github.workspace }}
+        run: cargo test --locked --target wasm32-wasip2 --lib --tests
 
   # crates.io gets the crate from rust/package.py, not from rust/ itself:
   # build.rs reads ../src, which a package made from rust/ would not contain,

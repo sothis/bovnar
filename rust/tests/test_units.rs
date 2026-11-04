@@ -2136,8 +2136,7 @@ mod reader_want_unit {
     fn test_read_file_forwards_every_option() {
         // read_file is read_reader_want_unit over the opened File, which
         // must forward the want_unit hook and strict_version.
-        let path =
-            std::env::temp_dir().join(format!("bovnar-test-units-{}.bvnr", std::process::id()));
+        let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("bovnar-test-units.bvnr");
         std::fs::write(&path, b".d = 5 k~m;").unwrap();
         let file = std::fs::File::open(&path).unwrap();
 

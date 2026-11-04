@@ -1353,18 +1353,20 @@ Prefixes MUST NOT stack: `kkg` and `k~kg` are both `error_unit_illegal`.
 The longest-suffix rule resolves most apparent collisions without a
 special case, because a token that is itself a registered unit is read as
 that unit: `pH`, `mph`, and `kph` are registry entries and are never read
-as pico-henry, milli-phot, or kilo-phot. Exactly three compact spellings
-are refused by name, because for them the longest-suffix rule would
-silently pick one of two defensible readings:
+as pico-henry, milli-phot, or kilo-phot. Eight compact spellings are
+refused by name, because for them the longest-suffix rule would silently
+pick one of two defensible readings:
 
 | Spelling | Refused because |
 |---|---|
 | `usb` | the bus, not microstilb - write `u~sb` or `µ~sb` |
 | `kt` | kilotonne or knot - write `k~t` or `kn` |
 | `ppt` | parts per trillion or per thousand in use, the picopint by the rule - write `pptr`, `‰` or `p~pt` |
+| `MBtu`, `MBTU`, `Mbtu` | a thousand Btu in US trade use, a million by the rule - write `k~Btu` or `M~Btu` |
+| `Mlb`, `Mlbs` | a thousand pounds in US trade use, a million by the rule - write `k~lb` or `M~lb` |
 {: title="Compact spellings refused by name"}
 
-All three are `error_unit_illegal`. The separated spellings remain valid, so
+All are `error_unit_illegal`. The separated spellings remain valid, so
 the refusal costs nothing but a character.
 
 Which spelling a producer emits depends on what it is doing, and the two

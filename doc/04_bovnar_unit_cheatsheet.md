@@ -105,7 +105,7 @@ Written as `prefix~base`, or compactly without the separator: `k~m` and `km` are
 
 Examples: bare `m` = metre; `m~s` and `ms` = millisecond. Bare `d` = day; `d~s` and `ds` = decisecond. Bare `min` = minute, so milli-inch needs the separator: `m~in`.
 
-A compact spelling is refused when the token means something else in the wild: `usb`, `kt` and `ppt` are `error_unit_illegal` (write `u~sb`; for `kt`, `k~t` for the kilotonne or `kn` for the knot; for `ppt`, `pptr`, `‰` or `p~pt`). `pH`, `mph` and `kph` are units in their own right (§3.26–3.27 of the unit-system reference), so they parse as acidity and the two speeds — `p~H`, `m~ph` and `k~ph` are still the picohenry and the milli-/kilophot.
+A compact spelling is refused when the token means something else in the wild: `usb`, `kt`, `ppt`, `MBtu` and `Mlb` are `error_unit_illegal` (write `u~sb`; for `kt`, `k~t` for the kilotonne or `kn` for the knot; for `ppt`, `pptr`, `‰` or `p~pt`; for US trade's Roman-M thousand, `k~Btu` and `k~lb`, or `M~Btu` and `M~lb` for a million). `pH`, `mph` and `kph` are units in their own right (§3.26–3.27 of the unit-system reference), so they parse as acidity and the two speeds — `p~H`, `m~ph` and `k~ph` are still the picohenry and the milli-/kilophot.
 
 Currencies take the compact prefix too (`k$EUR` = `k~$EUR`, §5.4), but their `$` sigil is never optional.
 

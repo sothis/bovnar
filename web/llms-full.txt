@@ -1705,9 +1705,10 @@ In four situations, all of which are `error_unit_illegal`:
    microstilb, `kt` to the kilotonne — but `kt` is equally the standard
    abbreviation for the knot, and only the author knows which was meant — and
    `ppt` to the picopint, where everyone means parts per trillion or per
-   thousand. All three stay errors: write `u~sb`; `k~t` (mass) or `kn`
-   (speed); `pptr`, `‰` or `p~pt`. The list lives in
-   `src/gendata/units.bvnr`.
+   thousand. `MBtu` and `Mlb` would be mega-Btu and mega-pound, where the US
+   gas and commodity trades mean a thousand. All stay errors: write `u~sb`;
+   `k~t` (mass) or `kn` (speed); `pptr`, `‰` or `p~pt`; `k~Btu`/`k~lb` or
+   `M~Btu`/`M~lb`. The list lives in `src/gendata/units.bvnr`.
 
    `pH`, `mph` and `kph` were on that list until Bovnar gained the units they
    name — the acidity scale and two speeds. A bare unit alias outranks any
@@ -4605,7 +4606,7 @@ The `/` separator divides the preceding components by the following ones. The fi
 **Within each `unit-component`:**
 
 - A bare base unit with no prefix requires no separator.
-- When a prefix is present on a **physical** unit, the `~` separator is optional: `k~g` and `kg` are the same unit, as are `Mi~B` and `MiB`. The base unit is matched as the longest alias suffix, so a bare unit always outranks a prefixed reading of the same token (`min` is the minute, not milli-inch) — a compact spelling is therefore only ever accepted where the separated form would have been `error_unit_illegal`, and no existing document decodes differently because of it. Prefixes still cannot be stacked (`kkg`, `k~kg` → `error_unit_illegal`), prefix–unit validity is unchanged, and three compact spellings are refused by name because the token is a well-known annotation for something else: `usb` (the bus, not microstilb — write `u~sb`), `kt` (a standard abbreviation for *two* units this format models, the kilotonne and the knot — write `k~t` or `kn`) and `ppt` (parts per trillion or per thousand in the wild, a picopint by the compact rule — write `pptr`, `‰` or `p~pt`). `pH`, `mph` and `kph` needed an exception until the quantities they name became units in their own right; a bare alias outranks any prefixed reading, so they now resolve without one. See §4.3 of the unit-system reference.
+- When a prefix is present on a **physical** unit, the `~` separator is optional: `k~g` and `kg` are the same unit, as are `Mi~B` and `MiB`. The base unit is matched as the longest alias suffix, so a bare unit always outranks a prefixed reading of the same token (`min` is the minute, not milli-inch) — a compact spelling is therefore only ever accepted where the separated form would have been `error_unit_illegal`, and no existing document decodes differently because of it. Prefixes still cannot be stacked (`kkg`, `k~kg` → `error_unit_illegal`), prefix–unit validity is unchanged, and a few compact spellings are refused by name because the token is a well-known annotation for something else: `usb` (the bus, not microstilb — write `u~sb`), `kt` (a standard abbreviation for *two* units this format models, the kilotonne and the knot — write `k~t` or `kn`), `ppt` (parts per trillion or per thousand in the wild, a picopint by the compact rule — write `pptr`, `‰` or `p~pt`), and `MBtu`, `MBTU`, `Mbtu`, `Mlb`, `Mlbs` (a thousand in US trade use, where the compact rule reads mega — write `k~Btu`/`k~lb` or `M~Btu`/`M~lb`). `pH`, `mph` and `kph` needed an exception until the quantities they name became units in their own right; a bare alias outranks any prefixed reading, so they now resolve without one. See §4.3 of the unit-system reference.
 - The same holds for a **currency**: `k~$EUR` and `k$EUR` are the same unit. The `$` sigil already separates the prefix from the code, so the compact form is unambiguous by construction — but the sigil itself stays mandatory, and `kUSD` is `error_unit_illegal` just as bare `USD` is.
 - The canonical output form always carries the separator: `bvn_unit_to_string` and the `bvnr_write_*` helpers emit `k~g`. A *re-serialisation* is a different matter — it writes back the spelling the document carried (`unit_source`, §16.1), so `km` stays `km` through `bovnar pretty-print`. `bovnar pretty-print --canonical` does not keep the spelling either way: it writes every unit in reduced form and rescales the value to match (`1.0 km` becomes `1000.0 m`, `2.5 kg` becomes `2500.0 g`). A prefix on a base unit, a currency or a non-SI unit is folded into the value; a unit that is, or reduces to, a single named derived SI unit keeps its prefix, in the separated form (`kPa` → `k~Pa`, `k~N·m` → `k~J`), so `2.5 k~N` and `2500 N` are not unified. An integer that would stop being an integer, or stop fitting its width, fails with `error_value_out_of_range`; nothing is rounded.
 
@@ -6589,7 +6590,7 @@ Written as `prefix~base`, or compactly without the separator: `k~m` and `km` are
 
 Examples: bare `m` = metre; `m~s` and `ms` = millisecond. Bare `d` = day; `d~s` and `ds` = decisecond. Bare `min` = minute, so milli-inch needs the separator: `m~in`.
 
-A compact spelling is refused when the token means something else in the wild: `usb`, `kt` and `ppt` are `error_unit_illegal` (write `u~sb`; for `kt`, `k~t` for the kilotonne or `kn` for the knot; for `ppt`, `pptr`, `‰` or `p~pt`). `pH`, `mph` and `kph` are units in their own right (§3.26–3.27 of the unit-system reference), so they parse as acidity and the two speeds — `p~H`, `m~ph` and `k~ph` are still the picohenry and the milli-/kilophot.
+A compact spelling is refused when the token means something else in the wild: `usb`, `kt`, `ppt`, `MBtu` and `Mlb` are `error_unit_illegal` (write `u~sb`; for `kt`, `k~t` for the kilotonne or `kn` for the knot; for `ppt`, `pptr`, `‰` or `p~pt`; for US trade's Roman-M thousand, `k~Btu` and `k~lb`, or `M~Btu` and `M~lb` for a million). `pH`, `mph` and `kph` are units in their own right (§3.26–3.27 of the unit-system reference), so they parse as acidity and the two speeds — `p~H`, `m~ph` and `k~ph` are still the picohenry and the milli-/kilophot.
 
 Currencies take the compact prefix too (`k$EUR` = `k~$EUR`, §5.4), but their `$` sigil is never optional.
 
@@ -8777,17 +8778,18 @@ The rules are exactly the rules of the separated form, with one addition:
   | `usb`   | microstilb       | the bus       | `u~sb` |
   | `kt`    | kilotonne        | *also* the knot | `k~t` (mass) or `kn` (speed) |
   | `ppt`   | picopint (a volume) | parts per trillion, *or* per thousand | `pptr` (10⁻¹²), `‰` (10⁻³), `p~pt` (the volume) |
+  | `MBtu`, `MBTU`, `Mbtu`, `Mlb`, `Mlbs` | mega-Btu, mega-pound (10⁶) | a **thousand** Btu or pounds (US trade's Roman M) | `k~Btu`, `k~lb` (10³) or `M~Btu`, `M~lb` (10⁶) |
 
   `pH`, `mph` and `kph` were on this list until the quantities they name became
   units of their own (§3.26, §3.27). A bare alias outranks any prefixed reading,
   so they now need no exception — and `p~H`, `m~ph`, `k~ph` still mean what they
   always did.
 
-  The last two rows are the harder cases. `kt` is a standard abbreviation for two units Bovnar *does* model — the kilotonne in climate and energy data, the knot in marine and aviation data — and reading a speed as a mass is precisely what this format exists to stop. `ppt` is worse: the compact rule makes it a *volume*, while every real use of the token is a dimensionless ratio, and the two ratios it might mean are 10⁹ apart. A token only the author can resolve is one the author has to resolve.
+  The `kt` and `ppt` rows are the harder cases. `kt` is a standard abbreviation for two units Bovnar *does* model — the kilotonne in climate and energy data, the knot in marine and aviation data — and reading a speed as a mass is precisely what this format exists to stop. `ppt` is worse: the compact rule makes it a *volume*, while every real use of the token is a dimensionless ratio, and the two ratios it might mean are 10⁹ apart. A token only the author can resolve is one the author has to resolve. The `MBtu`/`Mlb` row is a factor of a thousand with no error: the US gas, steam and commodity trades write a Roman M for a thousand (`MMBtu` for a million), where the compact rule reads the SI mega. Only the M forms are refused — `kBtu`, `GBtu` and `klb` are unaffected, and `MMBtu` was never a unit.
 
   Note what is **not** done about `ppt`: the parts-per-trillion unit added in §3.25 does not claim the spelling. A bare alias outranks any prefixed reading (rule 2 above), so claiming it would take `ppt` away from `p~pt` and change what an existing document means — which the rule at the top of `units.bvnr` forbids and `gen_units.py` refuses at build time. The unit is spelled `pptr`, following UCUM's own `[pptr]`, and the ambiguous token is refused instead.
 
-  The list lives in `src/gendata/units.bvnr` (`.compact_exceptions`) and applies to the compact spelling only — `p~H` is still picohenry, `k~t` still the kilotonne, `p~pt` still the picopint.
+  The list lives in `src/gendata/units.bvnr` (`.compact_exceptions`) and applies to the compact spelling only — `p~H` is still picohenry, `k~t` still the kilotonne, `p~pt` still the picopint, `M~Btu` still a million Btu.
 
 Because a compact spelling is only ever reached where the separated form would have been a parse error, no document that parsed before this existed can parse differently now.
 
@@ -11079,7 +11081,7 @@ Both are deterministic, not ambiguous — but neither is guessable. Write `d~at`
 
 ## 4. Refused outright
 
-Three tokens are `error_unit_illegal` on purpose, listed in `.compact_exceptions` in
+These tokens are `error_unit_illegal` on purpose, listed in `.compact_exceptions` in
 `src/gendata/units.bvnr`. Accepting them would turn a parse error into a quietly wrong unit.
 
 | Token | Would have resolved as | Actually means, in the wild | Write |
@@ -11087,6 +11089,7 @@ Three tokens are `error_unit_illegal` on purpose, listed in `.compact_exceptions
 | `kt` | kilo-tonne | kilotonne **or** knot, depending on the field | `k~t` (mass) or `kn` (speed) |
 | `usb` | micro-stilb | the bus | `u~sb` (or `µ~sb`) if you really mean microstilb |
 | `ppt` | pico-pint (a **volume**) | parts per trillion **or** parts per thousand | `pptr` (10⁻¹²), `‰` (10⁻³), or `p~pt` if you really mean the picopint |
+| `MBtu`, `MBTU`, `Mbtu`, `Mlb`, `Mlbs` | mega-Btu, mega-pound (10⁶) | a **thousand** — US trade's Roman M (`MMBtu` is its million) | `k~Btu`, `k~lb` (10³), or `M~Btu`, `M~lb` (10⁶) |
 
 `kt` is the harder case of the first two: both readings are units Bovnar models, so no table lookup
 can settle it. Reading a speed as a mass is exactly the failure this format exists to prevent, so
@@ -11435,18 +11438,18 @@ point: a wrong unit is worse than a refused one.
 | `NM` | nautical mile | `nmi` |
 | `KB`, `Kg` | kilobyte, kilogram | `kB`, `kg` |
 | `kt` | kilotonne or knot | `k~t` or `kn` (§4) |
+| `MBtu`, `Mlb` | a thousand Btu or pounds (US trade's Roman M) | `k~Btu`, `k~lb`; a million → `M~Btu`, `M~lb` (§4) |
 
-Two that *are* accepted but rarely mean what the writer intended:
+`M` is mega everywhere in the SI, and a document from the gas, steam or commodity trade
+usually means 10³ by it, so `MBtu` and `Mlb` are refused rather than read 1000× too large.
+
+Three that *are* accepted but rarely mean what the writer intended:
 
 | Written | Bovnar reads | If you meant… |
 |---------|--------------|---------------|
 | `fl` | femtolitre | fluid ounce → `fl_oz` |
 | `mt` | millitonne (= 1 kg) | metric ton → `t`; megatonne → `Mt` or `M~t` |
 | `rad`, `mrad` | radian, milliradian | the absorbed dose (0.01 Gy, UCUM `RAD`) → `c~Gy`; a millirad → `10 µ~Gy` |
-| `MBtu`, `Mlb` | mega-Btu (10⁶ Btu), mega-pound | US industry's Roman M, a thousand → `k~Btu`, `k~lb` (`MMBtu`, a million, is refused: write `M~Btu`) |
-
-The last row is the same 1000× trap as `kt`: `MBtu` reads as 10⁶ Btu because `M` is mega
-everywhere in the SI, and a document from the gas or steam trade usually means 10³.
 
 ---
 
@@ -11555,7 +11558,7 @@ usually where the money is.
 | milli-inch | `m~in` | `min` (minute) |
 | milliradian | `mrad`, `m~rad` | `mil` (thou) |
 | absorbed dose in rad | `c~Gy` (1 rad = 1 cGy) | `rad` (the radian) |
-| thousand Btu (US "MBtu") | `k~Btu` | `MBtu` (that is 10⁶ Btu) |
+| thousand Btu (US "MBtu") | `k~Btu` | `MBtu` (refused) |
 | million Btu (US "MMBtu") | `M~Btu` | `MMBtu` (refused) |
 | picohenry | `p~H` | `pH` (acidity) |
 | acidity | `pH` | `p~H` (picohenry) |
@@ -20353,8 +20356,9 @@ profile-char = (* any unit-char, plus "," at brace or bracket depth    *)
 (* decodes.  A prefix cannot be stacked ("kkg", "k~kg" are both       *)
 (* error_unit_illegal), prefix-unit validity is unchanged, and the    *)
 (* few compact spellings listed in .compact_exceptions               *)
-(* (src/gendata/units.bvnr: "usb", "kt", "ppt") stay errors -- they  *)
-(* name something else, or two things at once.                       *)
+(* (src/gendata/units.bvnr: "usb", "kt", "ppt", "MBtu", "MBTU",     *)
+(* "Mbtu", "Mlb", "Mlbs") stay errors -- they name something else,  *)
+(* or two things at once.                                            *)
 (* A prefixed CURRENCY behaves the same way ("k~$EUR" = "k$EUR");    *)
 (* the '$' sigil separates prefix from code and stays MANDATORY, so  *)
 (* "kUSD" is error_unit_illegal just as bare "USD" is.              *)

@@ -3441,9 +3441,9 @@ therefore only ever accepted where the separated form would have been
 <p id="section-8.3-5">The longest-suffix rule resolves most apparent collisions without a
 special case, because a token that is itself a registered unit is read as
 that unit: <code>pH</code>, <code>mph</code>, and <code>kph</code> are registry entries and are never read
-as pico-henry, milli-phot, or kilo-phot. Exactly three compact spellings
-are refused by name, because for them the longest-suffix rule would
-silently pick one of two defensible readings:<a href="#section-8.3-5" class="pilcrow">¶</a></p>
+as pico-henry, milli-phot, or kilo-phot. Eight compact spellings are
+refused by name, because for them the longest-suffix rule would silently
+pick one of two defensible readings:<a href="#section-8.3-5" class="pilcrow">¶</a></p>
 <span id="name-compact-spellings-refused-b"></span><table class="center" id="table-10">
           <caption>
 <a href="#table-10" class="selfRef">Table 10</a>:
@@ -3477,9 +3477,23 @@ silently pick one of two defensible readings:<a href="#section-8.3-5" class="pil
               <td class="text-left" rowspan="1" colspan="1">parts per trillion or per thousand in use, the picopint by the rule - write <code>pptr</code>, <code>‰</code> or <code>p~pt</code>
 </td>
             </tr>
+            <tr>
+              <td class="text-left" rowspan="1" colspan="1">
+                <code>MBtu</code>, <code>MBTU</code>, <code>Mbtu</code>
+</td>
+              <td class="text-left" rowspan="1" colspan="1">a thousand Btu in US trade use, a million by the rule - write <code>k~Btu</code> or <code>M~Btu</code>
+</td>
+            </tr>
+            <tr>
+              <td class="text-left" rowspan="1" colspan="1">
+                <code>Mlb</code>, <code>Mlbs</code>
+</td>
+              <td class="text-left" rowspan="1" colspan="1">a thousand pounds in US trade use, a million by the rule - write <code>k~lb</code> or <code>M~lb</code>
+</td>
+            </tr>
           </tbody>
         </table>
-<p id="section-8.3-7">All three are <code>error_unit_illegal</code>. The separated spellings remain valid, so
+<p id="section-8.3-7">All are <code>error_unit_illegal</code>. The separated spellings remain valid, so
 the refusal costs nothing but a character.<a href="#section-8.3-7" class="pilcrow">¶</a></p>
 <p id="section-8.3-8">Which spelling a producer emits depends on what it is doing, and the two
 cases differ:<a href="#section-8.3-8" class="pilcrow">¶</a></p>

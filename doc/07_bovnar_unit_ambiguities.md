@@ -105,7 +105,7 @@ Both are deterministic, not ambiguous — but neither is guessable. Write `d~at`
 
 ## 4. Refused outright
 
-Three tokens are `error_unit_illegal` on purpose, listed in `.compact_exceptions` in
+These tokens are `error_unit_illegal` on purpose, listed in `.compact_exceptions` in
 `src/gendata/units.bvnr`. Accepting them would turn a parse error into a quietly wrong unit.
 
 | Token | Would have resolved as | Actually means, in the wild | Write |
@@ -113,6 +113,7 @@ Three tokens are `error_unit_illegal` on purpose, listed in `.compact_exceptions
 | `kt` | kilo-tonne | kilotonne **or** knot, depending on the field | `k~t` (mass) or `kn` (speed) |
 | `usb` | micro-stilb | the bus | `u~sb` (or `µ~sb`) if you really mean microstilb |
 | `ppt` | pico-pint (a **volume**) | parts per trillion **or** parts per thousand | `pptr` (10⁻¹²), `‰` (10⁻³), or `p~pt` if you really mean the picopint |
+| `MBtu`, `MBTU`, `Mbtu`, `Mlb`, `Mlbs` | mega-Btu, mega-pound (10⁶) | a **thousand** — US trade's Roman M (`MMBtu` is its million) | `k~Btu`, `k~lb` (10³), or `M~Btu`, `M~lb` (10⁶) |
 
 `kt` is the harder case of the first two: both readings are units Bovnar models, so no table lookup
 can settle it. Reading a speed as a mass is exactly the failure this format exists to prevent, so
@@ -461,18 +462,18 @@ point: a wrong unit is worse than a refused one.
 | `NM` | nautical mile | `nmi` |
 | `KB`, `Kg` | kilobyte, kilogram | `kB`, `kg` |
 | `kt` | kilotonne or knot | `k~t` or `kn` (§4) |
+| `MBtu`, `Mlb` | a thousand Btu or pounds (US trade's Roman M) | `k~Btu`, `k~lb`; a million → `M~Btu`, `M~lb` (§4) |
 
-Two that *are* accepted but rarely mean what the writer intended:
+`M` is mega everywhere in the SI, and a document from the gas, steam or commodity trade
+usually means 10³ by it, so `MBtu` and `Mlb` are refused rather than read 1000× too large.
+
+Three that *are* accepted but rarely mean what the writer intended:
 
 | Written | Bovnar reads | If you meant… |
 |---------|--------------|---------------|
 | `fl` | femtolitre | fluid ounce → `fl_oz` |
 | `mt` | millitonne (= 1 kg) | metric ton → `t`; megatonne → `Mt` or `M~t` |
 | `rad`, `mrad` | radian, milliradian | the absorbed dose (0.01 Gy, UCUM `RAD`) → `c~Gy`; a millirad → `10 µ~Gy` |
-| `MBtu`, `Mlb` | mega-Btu (10⁶ Btu), mega-pound | US industry's Roman M, a thousand → `k~Btu`, `k~lb` (`MMBtu`, a million, is refused: write `M~Btu`) |
-
-The last row is the same 1000× trap as `kt`: `MBtu` reads as 10⁶ Btu because `M` is mega
-everywhere in the SI, and a document from the gas or steam trade usually means 10³.
 
 ---
 
@@ -581,7 +582,7 @@ usually where the money is.
 | milli-inch | `m~in` | `min` (minute) |
 | milliradian | `mrad`, `m~rad` | `mil` (thou) |
 | absorbed dose in rad | `c~Gy` (1 rad = 1 cGy) | `rad` (the radian) |
-| thousand Btu (US "MBtu") | `k~Btu` | `MBtu` (that is 10⁶ Btu) |
+| thousand Btu (US "MBtu") | `k~Btu` | `MBtu` (refused) |
 | million Btu (US "MMBtu") | `M~Btu` | `MMBtu` (refused) |
 | picohenry | `p~H` | `pH` (acidity) |
 | acidity | `pH` | `p~H` (picohenry) |

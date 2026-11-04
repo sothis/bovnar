@@ -1225,17 +1225,18 @@ The rules are exactly the rules of the separated form, with one addition:
   | `usb`   | microstilb       | the bus       | `u~sb` |
   | `kt`    | kilotonne        | *also* the knot | `k~t` (mass) or `kn` (speed) |
   | `ppt`   | picopint (a volume) | parts per trillion, *or* per thousand | `pptr` (10⁻¹²), `‰` (10⁻³), `p~pt` (the volume) |
+  | `MBtu`, `MBTU`, `Mbtu`, `Mlb`, `Mlbs` | mega-Btu, mega-pound (10⁶) | a **thousand** Btu or pounds (US trade's Roman M) | `k~Btu`, `k~lb` (10³) or `M~Btu`, `M~lb` (10⁶) |
 
   `pH`, `mph` and `kph` were on this list until the quantities they name became
   units of their own (§3.26, §3.27). A bare alias outranks any prefixed reading,
   so they now need no exception — and `p~H`, `m~ph`, `k~ph` still mean what they
   always did.
 
-  The last two rows are the harder cases. `kt` is a standard abbreviation for two units Bovnar *does* model — the kilotonne in climate and energy data, the knot in marine and aviation data — and reading a speed as a mass is precisely what this format exists to stop. `ppt` is worse: the compact rule makes it a *volume*, while every real use of the token is a dimensionless ratio, and the two ratios it might mean are 10⁹ apart. A token only the author can resolve is one the author has to resolve.
+  The `kt` and `ppt` rows are the harder cases. `kt` is a standard abbreviation for two units Bovnar *does* model — the kilotonne in climate and energy data, the knot in marine and aviation data — and reading a speed as a mass is precisely what this format exists to stop. `ppt` is worse: the compact rule makes it a *volume*, while every real use of the token is a dimensionless ratio, and the two ratios it might mean are 10⁹ apart. A token only the author can resolve is one the author has to resolve. The `MBtu`/`Mlb` row is a factor of a thousand with no error: the US gas, steam and commodity trades write a Roman M for a thousand (`MMBtu` for a million), where the compact rule reads the SI mega. Only the M forms are refused — `kBtu`, `GBtu` and `klb` are unaffected, and `MMBtu` was never a unit.
 
   Note what is **not** done about `ppt`: the parts-per-trillion unit added in §3.25 does not claim the spelling. A bare alias outranks any prefixed reading (rule 2 above), so claiming it would take `ppt` away from `p~pt` and change what an existing document means — which the rule at the top of `units.bvnr` forbids and `gen_units.py` refuses at build time. The unit is spelled `pptr`, following UCUM's own `[pptr]`, and the ambiguous token is refused instead.
 
-  The list lives in `src/gendata/units.bvnr` (`.compact_exceptions`) and applies to the compact spelling only — `p~H` is still picohenry, `k~t` still the kilotonne, `p~pt` still the picopint.
+  The list lives in `src/gendata/units.bvnr` (`.compact_exceptions`) and applies to the compact spelling only — `p~H` is still picohenry, `k~t` still the kilotonne, `p~pt` still the picopint, `M~Btu` still a million Btu.
 
 Because a compact spelling is only ever reached where the separated form would have been a parse error, no document that parsed before this existed can parse differently now.
 

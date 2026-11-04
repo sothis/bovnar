@@ -130,13 +130,13 @@ Internet-Draft              The Bovnar Format              November 2026
      8.3.  Prefixes  . . . . . . . . . . . . . . . . . . . . . . . .  30
      8.4.  Currency  . . . . . . . . . . . . . . . . . . . . . . . .  32
      8.5.  Inline Unit Suffix  . . . . . . . . . . . . . . . . . . .  33
-       8.5.1.  Interaction With the Annotation . . . . . . . . . . .  33
+       8.5.1.  Interaction With the Annotation . . . . . . . . . . .  34
      8.6.  Unit Profiles . . . . . . . . . . . . . . . . . . . . . .  34
    9.  Composite Values  . . . . . . . . . . . . . . . . . . . . . .  35
      9.1.  Arrays  . . . . . . . . . . . . . . . . . . . . . . . . .  35
        9.1.1.  Element Homogeneity . . . . . . . . . . . . . . . . .  36
      9.2.  Structs . . . . . . . . . . . . . . . . . . . . . . . . .  37
-     9.3.  Octet Streams . . . . . . . . . . . . . . . . . . . . . .  37
+     9.3.  Octet Streams . . . . . . . . . . . . . . . . . . . . . .  38
    10. Validation, Limits, and Errors  . . . . . . . . . . . . . . .  38
      10.1.  Limits . . . . . . . . . . . . . . . . . . . . . . . . .  38
      10.2.  Error Model  . . . . . . . . . . . . . . . . . . . . . .  41
@@ -1695,25 +1695,31 @@ Internet-Draft              The Bovnar Format              November 2026
    The longest-suffix rule resolves most apparent collisions without a
    special case, because a token that is itself a registered unit is
    read as that unit: pH, mph, and kph are registry entries and are
-   never read as pico-henry, milli-phot, or kilo-phot.  Exactly three
-   compact spellings are refused by name, because for them the longest-
-   suffix rule would silently pick one of two defensible readings:
+   never read as pico-henry, milli-phot, or kilo-phot.  Eight compact
+   spellings are refused by name, because for them the longest-suffix
+   rule would silently pick one of two defensible readings:
 
-       +==========+================================================+
-       | Spelling | Refused because                                |
-       +==========+================================================+
-       | usb      | the bus, not microstilb - write u~sb or µ~sb   |
-       +----------+------------------------------------------------+
-       | kt       | kilotonne or knot - write k~t or kn            |
-       +----------+------------------------------------------------+
-       | ppt      | parts per trillion or per thousand in use, the |
-       |          | picopint by the rule - write pptr, ‰ or p~pt   |
-       +----------+------------------------------------------------+
+      +============+================================================+
+      | Spelling   | Refused because                                |
+      +============+================================================+
+      | usb        | the bus, not microstilb - write u~sb or µ~sb   |
+      +------------+------------------------------------------------+
+      | kt         | kilotonne or knot - write k~t or kn            |
+      +------------+------------------------------------------------+
+      | ppt        | parts per trillion or per thousand in use, the |
+      |            | picopint by the rule - write pptr, ‰ or p~pt   |
+      +------------+------------------------------------------------+
+      | MBtu,      | a thousand Btu in US trade use, a million by   |
+      | MBTU, Mbtu | the rule - write k~Btu or M~Btu                |
+      +------------+------------------------------------------------+
+      | Mlb, Mlbs  | a thousand pounds in US trade use, a million   |
+      |            | by the rule - write k~lb or M~lb               |
+      +------------+------------------------------------------------+
 
                 Table 10: Compact spellings refused by name
 
-   All three are error_unit_illegal.  The separated spellings remain
-   valid, so the refusal costs nothing but a character.
+   All are error_unit_illegal.  The separated spellings remain valid, so
+   the refusal costs nothing but a character.
 
    Which spelling a producer emits depends on what it is doing, and the
    two cases differ:
@@ -1724,12 +1730,6 @@ Internet-Draft              The Bovnar Format              November 2026
       compact form is an input convenience; emitting it would make the
       output unreadable to a consumer that predates it, for no gain.
 
-   *  A producer *reproducing an existing document*, such as a pretty-
-      printer or canonicalizer, MAY preserve the spelling its input
-      used.  Both spellings denote the same unit, so preserving one is
-      not a loss, and rewriting it would make round-tripping a document
-      alter octets that carry no information.
-
 
 
 
@@ -1737,6 +1737,12 @@ Sonntag                    Expires 8 May 2027                  [Page 31]
 
 Internet-Draft              The Bovnar Format              November 2026
 
+
+   *  A producer *reproducing an existing document*, such as a pretty-
+      printer or canonicalizer, MAY preserve the spelling its input
+      used.  Both spellings denote the same unit, so preserving one is
+      not a loss, and rewriting it would make round-tripping a document
+      alter octets that carry no information.
 
    The reference implementation does exactly this: its writer helpers
    emit k~g, while its pretty-print path reproduces kg, MiB, and u~m as
@@ -1779,12 +1785,6 @@ Internet-Draft              The Bovnar Format              November 2026
    # .bad  = <float_dec:64,Ki~$USD> 1;  # IEC prefix on a currency
    # .also = <float_dec:64,USD> 1;      # no sigil: error_unit_illegal
 
-   Each currency is its own dimension.  A cross-currency conversion is
-   always refused rather than guessed: the format carries no exchange
-   rates, and it would be wrong to imply that the pairing is time-
-   invariant.
-
-
 
 
 
@@ -1793,6 +1793,11 @@ Sonntag                    Expires 8 May 2027                  [Page 32]
 
 Internet-Draft              The Bovnar Format              November 2026
 
+
+   Each currency is its own dimension.  A cross-currency conversion is
+   always refused rather than guessed: the format carries no exchange
+   rates, and it would be wrong to imply that the pairing is time-
+   invariant.
 
    The registry retains a small number of historical codes for
    compatibility - HRK, SLL, ZWL, and BGN are examples - and represents
@@ -1832,6 +1837,19 @@ Internet-Draft              The Bovnar Format              November 2026
    whole-array annotation instead.  This keeps array elements uniform by
    construction rather than by check.
 
+
+
+
+
+
+
+
+
+Sonntag                    Expires 8 May 2027                  [Page 33]
+
+Internet-Draft              The Bovnar Format              November 2026
+
+
 8.5.1.  Interaction With the Annotation
 
    +====================================+=============================+
@@ -1842,14 +1860,6 @@ Internet-Draft              The Bovnar Format              November 2026
    | Annotation with no unit, inline    | The inline unit is the unit |
    | unit present                       |                             |
    +------------------------------------+-----------------------------+
-
-
-
-Sonntag                    Expires 8 May 2027                  [Page 33]
-
-Internet-Draft              The Bovnar Format              November 2026
-
-
    | Both present, identical            | Valid; redundant            |
    +------------------------------------+-----------------------------+
    | Both present, different            | error_unit_mismatch         |
@@ -1887,6 +1897,15 @@ Internet-Draft              The Bovnar Format              November 2026
    Format version 1.2 adds a facility for expressing a unit in a foreign
    notation, written namespace:code:
 
+
+
+
+
+Sonntag                    Expires 8 May 2027                  [Page 34]
+
+Internet-Draft              The Bovnar Format              November 2026
+
+
    #!bovnar 1.2
    .systolic = <float:64,ucum:mm[Hg]> 120.0;
 
@@ -1896,15 +1915,6 @@ Internet-Draft              The Bovnar Format              November 2026
    spelling of the same quantity produces, so the facility adds
    spellings and no values: every rule of this document applies to the
    result unchanged.
-
-
-
-
-
-Sonntag                    Expires 8 May 2027                  [Page 34]
-
-Internet-Draft              The Bovnar Format              November 2026
-
 
    *The facility is specified by [BOVNAR-SPEC] Section 11.9 and its
    companion on unit profiles, not by this document.* Its translation
@@ -1940,6 +1950,18 @@ Internet-Draft              The Bovnar Format              November 2026
 
 9.1.  Arrays
 
+
+
+
+
+
+
+
+Sonntag                    Expires 8 May 2027                  [Page 35]
+
+Internet-Draft              The Bovnar Format              November 2026
+
+
    array        = array-row *( ws "/" ws array-row )
    array-row    = "[" ws [ row-content ] ws "]"
    row-content  = filled-elem
@@ -1953,14 +1975,6 @@ Internet-Draft              The Bovnar Format              November 2026
    The two separators mean different things. , separates _elements_; /
    separates _dimension rows_ of a single rectangular block.
    [1,2,3]/[4,5,6] is one 2x3 array, not two arrays.
-
-
-
-
-Sonntag                    Expires 8 May 2027                  [Page 35]
-
-Internet-Draft              The Bovnar Format              November 2026
-
 
    All /-rows of one array MUST have the same element count;
    error_array_row_size_mismatch otherwise.  Zero is a valid width, so
@@ -1995,20 +2009,6 @@ Internet-Draft              The Bovnar Format              November 2026
       so a bare array MUST NOT mix $USD and $EUR.  (Through version 1.1
       this rule read "the same dimension"; see Section 11.4.)
 
-   *  *Datetime.* A datetime is its own kind and does not mix with the
-      plain numeric encodings.  Its *epoch is a dimension*, exactly as a
-      currency is: a bare array MUST NOT mix epochs.
-
-   *  *Rectangularity.* Sibling sub-arrays MUST have equal length and
-      recursively matching element shape. [[1,2],[3,4]] is valid;
-      [[1,2],[3,4,5]] is error_array_row_size_mismatch.
-
-
-
-
-
-
-
 
 
 
@@ -2017,6 +2017,14 @@ Sonntag                    Expires 8 May 2027                  [Page 36]
 
 Internet-Draft              The Bovnar Format              November 2026
 
+
+   *  *Datetime.* A datetime is its own kind and does not mix with the
+      plain numeric encodings.  Its *epoch is a dimension*, exactly as a
+      currency is: a bare array MUST NOT mix epochs.
+
+   *  *Rectangularity.* Sibling sub-arrays MUST have equal length and
+      recursively matching element shape. [[1,2],[3,4]] is valid;
+      [[1,2],[3,4,5]] is error_array_row_size_mismatch.
 
    *  *Structs: same keys, fields free.* Sibling structs MUST share the
       same keys, in the same order, with the same per-field kinds and
@@ -2057,14 +2065,6 @@ Internet-Draft              The Bovnar Format              November 2026
    bounded by max_struct_nesting (Section 10.1).  A } at nesting level
    zero is error_illegal_struct_close.  An empty struct, {}, is valid.
 
-   Struct keys are ordered.  A producer MUST preserve the order it was
-   given, and a consumer MUST make it available, because Section 9.1.1
-   makes key order significant for sibling records.
-
-9.3.  Octet Streams
-
-   A NUL octet where a value is expected switches to binary chunk mode.
-   Text-layer UTF-8 validation is suspended for its duration.
 
 
 
@@ -2073,6 +2073,15 @@ Sonntag                    Expires 8 May 2027                  [Page 37]
 
 Internet-Draft              The Bovnar Format              November 2026
 
+
+   Struct keys are ordered.  A producer MUST preserve the order it was
+   given, and a consumer MUST make it available, because Section 9.1.1
+   makes key order significant for sibling records.
+
+9.3.  Octet Streams
+
+   A NUL octet where a value is expected switches to binary chunk mode.
+   Text-layer UTF-8 validation is suspended for its duration.
 
    octet-stream = %x00 *os-chunk %x00
    os-chunk     = %x01 os-length os-data
@@ -2106,15 +2115,6 @@ Internet-Draft              The Bovnar Format              November 2026
    values below are the defaults of the reference implementation; they
    are not part of the format, and a document is not invalid merely
    because some other consumer is configured more tightly.
-
-
-
-
-
-
-
-
-
 
 
 

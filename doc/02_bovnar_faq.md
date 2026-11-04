@@ -495,9 +495,10 @@ In four situations, all of which are `error_unit_illegal`:
    microstilb, `kt` to the kilotonne — but `kt` is equally the standard
    abbreviation for the knot, and only the author knows which was meant — and
    `ppt` to the picopint, where everyone means parts per trillion or per
-   thousand. All three stay errors: write `u~sb`; `k~t` (mass) or `kn`
-   (speed); `pptr`, `‰` or `p~pt`. The list lives in
-   `src/gendata/units.bvnr`.
+   thousand. `MBtu` and `Mlb` would be mega-Btu and mega-pound, where the US
+   gas and commodity trades mean a thousand. All stay errors: write `u~sb`;
+   `k~t` (mass) or `kn` (speed); `pptr`, `‰` or `p~pt`; `k~Btu`/`k~lb` or
+   `M~Btu`/`M~lb`. The list lives in `src/gendata/units.bvnr`.
 
    `pH`, `mph` and `kph` were on that list until Bovnar gained the units they
    name — the acidity scale and two speeds. A bare unit alias outranks any

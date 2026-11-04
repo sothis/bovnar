@@ -80,6 +80,9 @@ amalgamation and the source tarball are attached to the GitHub release, with a
   conversion factors checked against their own definitions.
 - **Compact prefix form** — `km` beside `k~m`. The canonical form is unchanged
   (`k~m`); a document that is re-serialised keeps the spelling it was written in.
+  A few compact tokens that mean something else in the wild are refused by name:
+  `usb`, `kt`, `ppt`, and `MBtu`/`Mlb`, which US trade uses for a *thousand*
+  where the SI reads mega. Write the separated form (`k~Btu` or `M~Btu`).
 - **`text_only`** — a reader flag (and `--text-only`) that refuses a document
   containing an octet stream, for channels that are not byte-transparent.
 - **A document tree a tenth the size** — a DOM node is 48 bytes, down from 656:

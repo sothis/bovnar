@@ -22,10 +22,9 @@ A Rust toolchain (rustup, stable + 1.88) was installed user-locally in
 
 ## Open — what the third review leaves to the maintainer
 
-1. **`MBtu`, `Mlb`.** US industry writes M = 1000 (MBtu = 1000 Btu, MMBtu =
-   10⁶). Bovnar reads `MBtu` as mega-Btu (10⁶) and refuses `MMBtu`. doc/07 now
-   lists the trap; making `MBtu` a `.compact_exceptions` entry would refuse
-   the compact form, and 2.0.0 is the only release where that is free.
+1. **`MBtu`, `Mlb`** — done 2026-11-04 on the maintainer's word: `MBtu`,
+   `MBTU`, `Mbtu`, `Mlb` and `Mlbs` are `.compact_exceptions`
+   (`error_unit_illegal`); write `k~Btu`/`k~lb` or `M~Btu`/`M~lb`.
 2. **Long binary128 literals.** The digit budget is 12 288 bits for formats
    wider than binary64 (a regression of the second review is fixed), but a
    binary128 literal of more than about 4 900 significant digits that sits

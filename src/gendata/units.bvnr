@@ -3594,6 +3594,12 @@
 #   knowing the tables is one only the author can resolve, so ask them to:
 #   k~t or kn.
 #
+#   "MBtu" and "Mlb" are the 1000x case. The gas, steam and commodity trades
+#   write a Roman M for a THOUSAND (MBtu = 10^3 Btu, MMBtu = 10^6 Btu, Mlb a
+#   thousand pounds), while the compact rule reads M as mega, 10^6. A document
+#   from those trades would be read a thousand times too large, with no error;
+#   the token is refused so the author writes k~Btu or M~Btu and says which.
+#
 #   Only the compact spelling is refused. The separated form still parses and
 #   still means what it always did: p~H is picohenry, m~ph milliphot.
 #
@@ -3610,5 +3616,11 @@
   # two differ by 10^9 and only the author knows which; so, as with "usb", the
   # compact spelling becomes an error and the separated form keeps its meaning.
   # p~pt is still the picopint, pptr is parts per trillion, ‰ is per thousand.
-  { .spelling = "ppt"; .why = "parts per trillion (pptr), per thousand (‰), or the picopint (p~pt) — say which"; }
+  { .spelling = "ppt"; .why = "parts per trillion (pptr), per thousand (‰), or the picopint (p~pt) — say which"; },
+  # The Roman M of the US gas, steam and commodity trades: a thousand, not mega.
+  { .spelling = "MBtu"; .why = "a thousand Btu in US trade use (k~Btu), or a million (M~Btu) — say which"; },
+  { .spelling = "MBTU"; .why = "a thousand Btu in US trade use (k~Btu), or a million (M~Btu) — say which"; },
+  { .spelling = "Mbtu"; .why = "a thousand Btu in US trade use (k~Btu), or a million (M~Btu) — say which"; },
+  { .spelling = "Mlb";  .why = "a thousand pounds in US trade use (k~lb), or a million (M~lb) — say which"; },
+  { .spelling = "Mlbs"; .why = "a thousand pounds in US trade use (k~lb), or a million (M~lb) — say which"; }
 ];

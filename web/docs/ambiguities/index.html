@@ -282,7 +282,7 @@ quantity is the durable fix — rule 2 then keeps the prefixed reading out on it
 <code>d~au</code> / <code>da~u</code> explicitly; the separated form is unambiguous in both directions.</p>
 <hr />
 <h2 id="4-refused-outright">4. Refused outright</h2>
-<p>Three tokens are <code>error_unit_illegal</code> on purpose, listed in <code>.compact_exceptions</code> in
+<p>These tokens are <code>error_unit_illegal</code> on purpose, listed in <code>.compact_exceptions</code> in
 <code>src/gendata/units.bvnr</code>. Accepting them would turn a parse error into a quietly wrong unit.</p>
 <table>
 <thead>
@@ -311,6 +311,12 @@ quantity is the durable fix — rule 2 then keeps the prefixed reading out on it
 <td>pico-pint (a <strong>volume</strong>)</td>
 <td>parts per trillion <strong>or</strong> parts per thousand</td>
 <td><code>pptr</code> (10⁻¹²), <code>‰</code> (10⁻³), or <code>p~pt</code> if you really mean the picopint</td>
+</tr>
+<tr>
+<td><code>MBtu</code>, <code>MBTU</code>, <code>Mbtu</code>, <code>Mlb</code>, <code>Mlbs</code></td>
+<td>mega-Btu, mega-pound (10⁶)</td>
+<td>a <strong>thousand</strong> — US trade's Roman M (<code>MMBtu</code> is its million)</td>
+<td><code>k~Btu</code>, <code>k~lb</code> (10³), or <code>M~Btu</code>, <code>M~lb</code> (10⁶)</td>
 </tr>
 </tbody>
 </table>
@@ -1224,9 +1230,16 @@ point: a wrong unit is worse than a refused one.</p>
 <td>kilotonne or knot</td>
 <td><code>k~t</code> or <code>kn</code> (§4)</td>
 </tr>
+<tr>
+<td><code>MBtu</code>, <code>Mlb</code></td>
+<td>a thousand Btu or pounds (US trade's Roman M)</td>
+<td><code>k~Btu</code>, <code>k~lb</code>; a million → <code>M~Btu</code>, <code>M~lb</code> (§4)</td>
+</tr>
 </tbody>
 </table>
-<p>Two that <em>are</em> accepted but rarely mean what the writer intended:</p>
+<p><code>M</code> is mega everywhere in the SI, and a document from the gas, steam or commodity trade
+usually means 10³ by it, so <code>MBtu</code> and <code>Mlb</code> are refused rather than read 1000× too large.</p>
+<p>Three that <em>are</em> accepted but rarely mean what the writer intended:</p>
 <table>
 <thead>
 <tr>
@@ -1251,15 +1264,8 @@ point: a wrong unit is worse than a refused one.</p>
 <td>radian, milliradian</td>
 <td>the absorbed dose (0.01 Gy, UCUM <code>RAD</code>) → <code>c~Gy</code>; a millirad → <code>10 µ~Gy</code></td>
 </tr>
-<tr>
-<td><code>MBtu</code>, <code>Mlb</code></td>
-<td>mega-Btu (10⁶ Btu), mega-pound</td>
-<td>US industry's Roman M, a thousand → <code>k~Btu</code>, <code>k~lb</code> (<code>MMBtu</code>, a million, is refused: write <code>M~Btu</code>)</td>
-</tr>
 </tbody>
 </table>
-<p>The last row is the same 1000× trap as <code>kt</code>: <code>MBtu</code> reads as 10⁶ Btu because <code>M</code> is mega
-everywhere in the SI, and a document from the gas or steam trade usually means 10³.</p>
 <hr />
 <h2 id="14-water-hardness-six-scales-one-quantity">14. Water hardness: six scales, one quantity</h2>
 <p>All six measure the concentration of dissolved alkaline-earth ions, and Bovnar converts freely
@@ -1609,7 +1615,7 @@ usually where the money is.</p>
 <tr>
 <td>thousand Btu (US "MBtu")</td>
 <td><code>k~Btu</code></td>
-<td><code>MBtu</code> (that is 10⁶ Btu)</td>
+<td><code>MBtu</code> (refused)</td>
 </tr>
 <tr>
 <td>million Btu (US "MMBtu")</td>

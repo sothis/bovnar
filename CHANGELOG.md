@@ -115,6 +115,18 @@ pinned by a test.
   newline) while its offset was one past the end. The column is now one past
   the last character, as `error_file_too_long` already reported it.
 
+**Native units.**
+
+- **`MBtu` and `Mlb` are refused, as `kt` and `ppt` are.** The compact rule read
+  them as mega-Btu and mega-pound (10⁶), while the US gas, steam and commodity
+  trades write a Roman M for a *thousand* (`MMBtu` is their million), so a
+  document from those trades read a thousand times too large without an error.
+  `MBtu`, `MBTU`, `Mbtu`, `Mlb` and `Mlbs` join `.compact_exceptions` and are
+  `error_unit_illegal`; the separated `M~Btu`/`M~lb` keep their meaning, and
+  `kBtu`, `GBtu` and `klb` are unaffected. The compact form is new in 2.0.0, so
+  no document 1.1 accepted changes. doc/03 §11, doc/05 §4.3, doc/07 §4, the
+  cheat sheet, the FAQ, the grammar and the IETF draft list them.
+
 **Writer.**
 
 - **A unit flag rewrote the datetime epoch `galileo` as `Gal`.** `galileo` is

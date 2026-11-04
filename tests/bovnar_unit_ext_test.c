@@ -830,6 +830,21 @@ static void test_compact_prefix_exceptions(void)
 	assert_unit_rejected("usb");
 	assert_unit_rejected("kt");
 
+	/* The Roman M of US trade use is a thousand, not mega: "MBtu" is 10^3 Btu
+	 * there and 10^6 by the compact rule, so the token is refused. The
+	 * separated forms keep their meaning, and the k forms are not affected. */
+	assert_unit_rejected("MBtu");
+	assert_unit_rejected("MBTU");
+	assert_unit_rejected("Mbtu");
+	assert_unit_rejected("Mlb");
+	assert_unit_rejected("Mlbs");
+	assert_unit_rejected("MBtu/h");
+	assert_compact_matches("M~Btu", "M~Btu");   /* the separated form parses */
+	assert_compact_matches("M~lb", "M~lb");
+	assert_compact_matches("kBtu", "k~Btu");
+	assert_compact_matches("klb", "k~lb");
+	assert_compact_matches("GBtu", "G~Btu");    /* only the M trap is refused */
+
 	/* The exponent suffix is stripped before the check, so a decorated form is
 	 * refused too. */
 	assert_unit_rejected("usb^2");

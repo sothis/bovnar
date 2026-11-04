@@ -3675,15 +3675,21 @@ UDUNITS or CF document that says <code>year</code> be read at all. It was refuse
 <td>parts per trillion, <em>or</em> per thousand</td>
 <td><code>pptr</code> (10⁻¹²), <code>‰</code> (10⁻³), <code>p~pt</code> (the volume)</td>
 </tr>
+<tr>
+<td><code>MBtu</code>, <code>MBTU</code>, <code>Mbtu</code>, <code>Mlb</code>, <code>Mlbs</code></td>
+<td>mega-Btu, mega-pound (10⁶)</td>
+<td>a <strong>thousand</strong> Btu or pounds (US trade's Roman M)</td>
+<td><code>k~Btu</code>, <code>k~lb</code> (10³) or <code>M~Btu</code>, <code>M~lb</code> (10⁶)</td>
+</tr>
 </tbody>
 </table>
 <p><code>pH</code>, <code>mph</code> and <code>kph</code> were on this list until the quantities they name became
   units of their own (§3.26, §3.27). A bare alias outranks any prefixed reading,
   so they now need no exception — and <code>p~H</code>, <code>m~ph</code>, <code>k~ph</code> still mean what they
   always did.</p>
-<p>The last two rows are the harder cases. <code>kt</code> is a standard abbreviation for two units Bovnar <em>does</em> model — the kilotonne in climate and energy data, the knot in marine and aviation data — and reading a speed as a mass is precisely what this format exists to stop. <code>ppt</code> is worse: the compact rule makes it a <em>volume</em>, while every real use of the token is a dimensionless ratio, and the two ratios it might mean are 10⁹ apart. A token only the author can resolve is one the author has to resolve.</p>
+<p>The <code>kt</code> and <code>ppt</code> rows are the harder cases. <code>kt</code> is a standard abbreviation for two units Bovnar <em>does</em> model — the kilotonne in climate and energy data, the knot in marine and aviation data — and reading a speed as a mass is precisely what this format exists to stop. <code>ppt</code> is worse: the compact rule makes it a <em>volume</em>, while every real use of the token is a dimensionless ratio, and the two ratios it might mean are 10⁹ apart. A token only the author can resolve is one the author has to resolve. The <code>MBtu</code>/<code>Mlb</code> row is a factor of a thousand with no error: the US gas, steam and commodity trades write a Roman M for a thousand (<code>MMBtu</code> for a million), where the compact rule reads the SI mega. Only the M forms are refused — <code>kBtu</code>, <code>GBtu</code> and <code>klb</code> are unaffected, and <code>MMBtu</code> was never a unit.</p>
 <p>Note what is <strong>not</strong> done about <code>ppt</code>: the parts-per-trillion unit added in §3.25 does not claim the spelling. A bare alias outranks any prefixed reading (rule 2 above), so claiming it would take <code>ppt</code> away from <code>p~pt</code> and change what an existing document means — which the rule at the top of <code>units.bvnr</code> forbids and <code>gen_units.py</code> refuses at build time. The unit is spelled <code>pptr</code>, following UCUM's own <code>[pptr]</code>, and the ambiguous token is refused instead.</p>
-<p>The list lives in <code>src/gendata/units.bvnr</code> (<code>.compact_exceptions</code>) and applies to the compact spelling only — <code>p~H</code> is still picohenry, <code>k~t</code> still the kilotonne, <code>p~pt</code> still the picopint.</p>
+<p>The list lives in <code>src/gendata/units.bvnr</code> (<code>.compact_exceptions</code>) and applies to the compact spelling only — <code>p~H</code> is still picohenry, <code>k~t</code> still the kilotonne, <code>p~pt</code> still the picopint, <code>M~Btu</code> still a million Btu.</p>
 <p>Because a compact spelling is only ever reached where the separated form would have been a parse error, no document that parsed before this existed can parse differently now.</p>
 <p>For a token-by-token list of every spelling that could be read two ways — including case traps, look-alike characters and abbreviations that are deliberately not units — see <a href="https://www.bovnar.io/docs/ambiguities/"><code>07_bovnar_unit_ambiguities.md</code></a>.</p>
 <p>Currencies take the compact prefix too — <code>k$EUR</code> is <code>k~$EUR</code>. The <code>$</code> sigil already separates the prefix from the code (no prefix symbol and no currency code contains a <code>$</code>), so nothing is left for the <code>~</code> to resolve. What the sigil rule still requires is the sigil itself: <code>kUSD</code> is <code>error_unit_illegal</code>, because a bare code is never a currency (§10.4).</p>

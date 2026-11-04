@@ -904,7 +904,7 @@ class TestCompactPrefixForm:
         "kkg", "k~kg",       # a prefix cannot be stacked
         "k~~g", "kg~",       # malformed separated form, not a compact one
         "Kim", "mB",         # prefix policy still applies
-        "usb", "kt",         # refused by name (units.bvnr .compact_exceptions)
+        "usb", "kt", "MBtu", "Mlb",         # refused by name (units.bvnr .compact_exceptions)
         "kWh", "mcg",        # never were units, still are not
         "kUSD", "k$XYZ",     # the currency sigil and a known code stay required
         "Ki$USD", "kg$USD",

@@ -45,8 +45,9 @@ publishes a stand-in 1.1.0 pair there to make a new version of.
 
 ORCID: the creators carry the ORCID iD, so with DataCite's ORCID auto-update
 enabled (DataCite Commons, signed in with ORCID) each published version reaches
-the author's ORCID record by itself. --resave publishes an unchanged edit of
-records deposited before auto-update was enabled, which pushes them too.
+the author's ORCID record by itself. --resave publishes an edit of records
+deposited before auto-update was enabled, which pushes them too; it adds the
+ORCID iD to a creator that has none, and changes nothing else.
 
 The token is read from ZENODO_TOKEN (scopes deposit:write and deposit:actions);
 sandbox and production tokens are separate.
@@ -57,6 +58,7 @@ Usage:
         --source-record <id> --docs-record <id> [--publish]
     ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo [--tag v2.0.0] [--publish]
     ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo --resave 23934686 23934688
+    ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo --resave 21443009 21443296
 """
 import argparse
 import hashlib
@@ -347,20 +349,28 @@ def replace_files(z, draft, files):
 
 
 def resave(z, record_ids):
-    """Publish an unchanged edit of each record, so Zenodo re-registers its DOI.
+    """Publish an edit of each record, so Zenodo re-registers its DOI.
 
     DataCite's ORCID auto-update only acts on DOIs registered or updated after
     the author enabled it. A release deposited before that reaches ORCID once
     its DOIs are updated, and an edit published without changes is the update
-    that alters nothing. The DataCite timestamps before and after say whether it
-    happened.
+    that alters nothing. The one change made is the ORCID iD from CITATION.cff
+    on a creator that lacks it (the 1.1.0 records were deposited without one),
+    since without it DataCite cannot attribute the DOI to the author at all.
+    The DataCite timestamps before and after say whether the update happened.
     """
+    orcids = {c["name"]: c["orcid"] for c in creators_from(citation_at("HEAD"))
+              if c.get("orcid")}
     for rid in record_ids:
         before = datacite_updated(z, rid)
         d = z.call("POST", f"/deposit/depositions/{rid}/actions/edit")
         meta = dict(d["metadata"])
         for k in ("doi", "prereserve_doi"):
             meta.pop(k, None)
+        for c in meta.get("creators", []):
+            if not c.get("orcid") and c.get("name") in orcids:
+                c["orcid"] = orcids[c["name"]]
+                print(f"    {rid}: ORCID {c['orcid']} added to {c['name']}")
         z.call("PUT", d["links"]["self"], body={"metadata": meta})
         p = z.call("POST", d["links"]["publish"])
         print(f"==> {rid}: re-published {p.get('doi')}")
@@ -429,8 +439,8 @@ def main():
     ap.add_argument("--make-test-base", action="store_true",
                     help="sandbox only: publish a stand-in 1.1.0 pair to version from")
     ap.add_argument("--resave", type=int, nargs="+", metavar="RECORD",
-                    help="publish an unchanged edit of these records, so their DOIs "
-                         "reach ORCID through DataCite's auto-update")
+                    help="publish an edit of these records (adding a missing creator "
+                         "ORCID), so their DOIs reach ORCID through DataCite's auto-update")
     args = ap.parse_args()
 
     token = os.environ.get("ZENODO_TOKEN")

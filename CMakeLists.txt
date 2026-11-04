@@ -572,8 +572,10 @@ if(BVNR_HARDEN AND NOT MSVC)
     target_compile_options(bovnar PRIVATE -fstack-protector-strong)
 endif()
 set_target_properties(bovnar PROPERTIES POSITION_INDEPENDENT_CODE ON)
-if(NOT WIN32)
-    # -pie is an ELF executable concept; not applicable to PE/Windows.
+if(NOT WIN32 AND NOT APPLE)
+    # -pie is an ELF executable concept; not applicable to PE/Windows. A
+    # Mach-O executable is position-independent by default (MH_PIE), and on
+    # macOS clang only warns that the flag went unused.
     target_link_options(bovnar PRIVATE -pie)
 endif()
 if(MINGW)
@@ -812,6 +814,10 @@ if(BVNR_PACKAGE AND NOT SKBUILD)
         set(_bvnr_pkg_kind msvc)
     elseif(WIN32)
         set(_bvnr_pkg_kind mingw)
+    elseif(APPLE)
+        # Named macos, not linux: the generic branch below used to label a
+        # Mac build's archive bovnar-linux.
+        set(_bvnr_pkg_kind macos)
     else()
         set(_bvnr_pkg_kind linux)
     endif()

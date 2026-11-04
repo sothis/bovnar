@@ -21,6 +21,7 @@ concurrency:
 #   * Windows MSVC  -> bovnar-windows-msvc
 #   * Windows MinGW -> bovnar-windows-mingw
 #   * Linux x64     -> bovnar-linux (+ the cross-platform bovnar-amalgamate)
+#   * macOS         -> bovnar-macos (universal: arm64 and x86_64)
 # Each platform archive (packed by cmake/pack_artifacts.cmake) bundles the
 # documentation (doc/), runnable examples (examples/) and editor syntax
 # highlighters (highlighter/) alongside the headers, libs and CLI.
@@ -342,6 +343,71 @@ jobs:
           ./build/bovnar validate smoke.bvnr
           ./build/bovnar pretty-print smoke.bvnr | grep -q '<uint:8>'
           printf '.x = "hi";\n' | ./build/bovnar events -
+
+  macos:
+    name: macOS (universal)
+    # One build for both processors: CMAKE_OSX_ARCHITECTURES makes every
+    # object, the static and the shared library and the CLI fat binaries of an
+    # arm64 and an x86_64 slice. 11.0 is the first macOS for Apple's own
+    # processors, so the floor costs the x86_64 slice nothing it would use.
+    # macos-26 is an arm64 runner: the arm64 slice runs natively, the x86_64
+    # one under Rosetta where the image has it.
+    runs-on: macos-26
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Full history so the packed artifact's build count is meaningful.
+          fetch-depth: 0
+
+      - name: Configure
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=OFF \
+            "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOSX_DEPLOYMENT_TARGET" .
+
+      - name: Build
+        run: cmake --build build -j"$(sysctl -n hw.ncpu)"
+
+      - name: Both slices, and the deployment target, in every binary
+        run: |
+          set -euo pipefail
+          for f in build/bovnar build/libbvnr.a build/libbvnr.dylib; do
+            lipo -info "$f"
+            lipo "$f" -verify_arch arm64 x86_64 \
+              || { echo "::error::$f is not arm64 + x86_64" && exit 1; }
+          done
+          for f in build/bovnar build/libbvnr.dylib; do
+            for a in arm64 x86_64; do
+              otool -arch "$a" -l "$f" | grep -A4 LC_BUILD_VERSION \
+                | grep -q "minos $MACOSX_DEPLOYMENT_TARGET" \
+                || { echo "::error::$f ($a) is not for macOS $MACOSX_DEPLOYMENT_TARGET" && exit 1; }
+            done
+          done
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: bovnar-macos
+          path: build/bovnar-macos-*.tar.xz
+          if-no-files-found: error
+
+      - name: smoke - validate + pretty-print + events (arm64)
+        run: |
+          printf '.a = <uint:8> 7;\n.b = <float:64> 3.5;\n' > smoke.bvnr
+          arch -arm64 ./build/bovnar validate smoke.bvnr
+          arch -arm64 ./build/bovnar pretty-print smoke.bvnr | grep -q '<uint:8>'
+          printf '.x = "hi";\n' | arch -arm64 ./build/bovnar events -
+
+      - name: smoke - the x86_64 slice, under Rosetta
+        run: |
+          if ! arch -x86_64 /usr/bin/true 2>/dev/null; then
+            echo "::notice::no Rosetta on this image; the x86_64 slice is built and checked, not run"
+            exit 0
+          fi
+          arch -x86_64 ./build/bovnar validate smoke.bvnr
+          arch -x86_64 ./build/bovnar pretty-print smoke.bvnr | grep -q '<uint:8>'
 
   # The Rust binding in rust/: a thin wrapper that compiles the C sources above
   # through build.rs (no system library). Tested on the toolchains the C
@@ -717,12 +783,13 @@ jobs:
     # They are skipped on a release-* push, which must not skip the rehearsal,
     # hence the explicit `if:`: every need succeeded, or was one of the two
     # that may be skipped.
-    needs: [msvc, mingw, linux, source, tests, rust_version, rust, rust_wasm, rust_package, build_wheels, build_sdist]
+    needs: [msvc, mingw, linux, macos, source, tests, rust_version, rust, rust_wasm, rust_package, build_wheels, build_sdist]
     if: >-
       !cancelled() &&
       needs.msvc.result == 'success' &&
       needs.mingw.result == 'success' &&
       needs.linux.result == 'success' &&
+      needs.macos.result == 'success' &&
       needs.source.result == 'success' &&
       needs.tests.result == 'success' &&
       needs.rust_version.result == 'success' &&
@@ -770,6 +837,7 @@ jobs:
             mv "$src" assets/
           done
           mv staging/bovnar-linux/*.tar.xz \
+             staging/bovnar-macos/*.tar.xz \
              staging/bovnar-amalgamate/*.tar.xz \
              staging/bovnar-source/*.tar.xz assets/
           ls -l assets

@@ -33,7 +33,11 @@ A Rust toolchain (rustup, stable + 1.88) was installed user-locally in
 
 ## Open after 2.0.0 — known limits, documented, left for a later release
 
-Nothing is open.
+1. **The Downloads menu and the macOS archive.** From the next release on,
+   CI attaches `bovnar-macos-<version>-<count>.tar.xz`. The site's Downloads
+   menu links six assets pinned to v2.0.0, which has none; at the next
+   release add the macOS link to `web/index.html` and its name to the
+   expected list in `check_release_links.py`.
 
 ## Closed 2026-11-04 — after the release
 

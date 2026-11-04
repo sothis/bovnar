@@ -29,6 +29,15 @@ API and implements spec 1.2.
   to `CARGO_TARGET_TMPDIR`, which every target has, instead of `temp_dir()`,
   which WASI does not.
 
+- **A macOS release archive.** `bovnar-macos-<version>-<count>.tar.xz` holds
+  the library (static and shared) and the CLI as universal binaries, arm64
+  and x86_64, for macOS 11 and later. The `macos` CI job builds it natively
+  on `macos-26`, checks both slices and the deployment target in every
+  binary, and smoke-tests the CLI, the x86_64 slice under Rosetta where the
+  image has it; the release job attaches it. `pack_artifacts.cmake` names a
+  Mac build's archive `macos` (it fell through to `linux`), and the CLI is
+  linked without `-pie` there, which Mach-O does by default.
+
 ### Changed
 
 - **The MinGW Windows archive links the Universal CRT.** CI builds it in

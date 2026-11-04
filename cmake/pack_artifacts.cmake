@@ -10,6 +10,7 @@
 #   amalgamate/{bovnar.h,bovnar.c}              (the regenerated amalgamation)
 #   bovnar-<version>-<count>-amalgamate.tar.xz  (the amalgamation, packed)
 #   bovnar-linux-<version>-<count>.tar.xz       (native Linux artifacts)
+#   bovnar-macos-<version>-<count>.tar.xz       (native macOS artifacts)
 #   bovnar-windows-msvc-<version>-<count>.zip   (native MSVC artifacts)
 #   bovnar-windows-mingw-<version>-<count>.zip  (native or cross MinGW artifacts)
 #
@@ -18,7 +19,7 @@
 # with the MinGW cross-build present (CROSS_DIR), the Windows .zip is packed too.
 #
 # Required: SRC_DIR BIN_DIR VERSION
-# Optional: PYTHON  NATIVE_KIND(linux|msvc|mingw)  CROSS_DIR
+# Optional: PYTHON  NATIVE_KIND(linux|macos|msvc|mingw)  CROSS_DIR
 #           ARTIFACT_DIR (where the native libraries and CLI were built;
 #                         defaults to BIN_DIR, which is right only for a
 #                         single-config generator)
@@ -118,6 +119,10 @@ function(_stage_bin top kind dir)
     if(kind STREQUAL "linux")
         file(GLOB _libs "${dir}/libbvnr.a" "${dir}/libbvnr.so*")
         set(_exe "${dir}/bovnar")
+    elseif(kind STREQUAL "macos")
+        # libbvnr.2.0.0.dylib and its two symlinks, as the .so chain on Linux.
+        file(GLOB _libs "${dir}/libbvnr.a" "${dir}/libbvnr*.dylib")
+        set(_exe "${dir}/bovnar")
     elseif(kind STREQUAL "msvc")
         # Runtime (.dll, .exe) under bin/; import + static libs under lib/.
         file(GLOB _dll "${dir}/bvnr.dll")
@@ -133,7 +138,7 @@ function(_stage_bin top kind dir)
     endif()
     _bvnr_require("library in ${dir}" "${_libs}")
     file(COPY ${_libs} DESTINATION "${STAGE}/${top}/lib")
-    if(NOT kind STREQUAL "linux")
+    if(kind STREQUAL "msvc" OR kind STREQUAL "mingw")
         _bvnr_require("DLL in ${dir}" "${_dll}")
         file(COPY ${_dll} DESTINATION "${STAGE}/${top}/bin")
     endif()
@@ -185,6 +190,9 @@ endif()
 if(NATIVE_KIND STREQUAL "linux")
     _stage_bin("bovnar-linux-${TAG}" linux "${ARTIFACT_DIR}")
     _pack("bovnar-linux-${TAG}" xz)
+elseif(NATIVE_KIND STREQUAL "macos")
+    _stage_bin("bovnar-macos-${TAG}" macos "${ARTIFACT_DIR}")
+    _pack("bovnar-macos-${TAG}" xz)
 elseif(NATIVE_KIND STREQUAL "msvc")
     _stage_bin("bovnar-windows-msvc-${TAG}" msvc "${ARTIFACT_DIR}")
     _pack("bovnar-windows-msvc-${TAG}" zip)

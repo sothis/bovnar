@@ -387,6 +387,7 @@ Every build also regenerates the single-file amalgamation into `build/amalgamate
 |---|---|
 | `bovnar-<version>-<count>-amalgamate.tar.xz` | the amalgamation (`bovnar.h`, `bovnar.c`), plus `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`, `doc/` and `examples/` |
 | `bovnar-linux-<version>-<count>.tar.xz` | Linux libraries, CLI and headers, plus `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`, `doc/`, `examples/` and the editor `highlighter/` grammars |
+| `bovnar-macos-<version>-<count>.tar.xz` | macOS libraries (`libbvnr.a`, `libbvnr.dylib`), CLI and headers as universal binaries (arm64 and x86_64, macOS 11 or later), with the same extras |
 | `bovnar-windows-msvc-<version>-<count>.zip`, `bovnar-windows-mingw-<version>-<count>.zip` | Windows libraries, CLI and headers, one archive per toolchain; both link the Universal CRT (`ucrtbase.dll`, part of Windows 10 and later), the MinGW one being built in MSYS2's UCRT64 environment. The `BVNR_CROSS_MINGW` cross-build on a Linux host makes the MinGW one too, linking whatever CRT the host's mingw-w64 targets (msvcrt on Debian and Ubuntu); each unpacks to a directory of its own name, plus `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`, `doc/`, `examples/` and the editor `highlighter/` grammars |
 
 Disable with `-DBVNR_PACKAGE=OFF`.
@@ -472,6 +473,19 @@ target_link_libraries(my_app PRIVATE bovnar::bvnr)        # or bovnar::bvnr_stat
 
 The freedesktop MIME entry is installed too (disable with `-DBVNR_INSTALL_MIME=OFF`);
 after install, run `update-mime-database <datadir>/mime` to register the `.bvnr` type.
+
+### macOS (universal)
+
+One build makes every binary a fat one of an arm64 and an x86_64 slice, as
+the release archive is built:
+
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release \
+      "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 .
+cmake --build build                         # -> libbvnr.dylib, libbvnr.a, bovnar
+```
+
+Leave `CMAKE_OSX_ARCHITECTURES` out for the host's processor alone.
 
 ### Windows (64-bit)
 

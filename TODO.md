@@ -15,9 +15,15 @@ Zenodo 2.0.2: source 10.5281/zenodo.23963398, documentation and specification
 them for the next release. The deposit's doc/ check now leaves out
 doc/wiki and doc/joss_paper, which no PDF uses.
 
-Downstream: Mumcord (github.com/Mumcord/mumcord) vendors the crate and ties its
-licence notices to `PROVENANCE.json` (their PR from branch
-fix/bovnar-provenance).
+Downstream: Mumcord (github.com/Mumcord/mumcord) uses the crate and ties its
+licence notices to `PROVENANCE.json` (their PR #486, merged).
+
+A Build & Package run that fails only because GitHub found no runner (the macOS
+shortage that cost 2.0.1 five attempts) is now re-run by the `runner-shortage`
+workflow: after five minutes, up to attempt 6, only for push runs whose branch
+has not moved on (tags always). `.github/scripts/runner-shortage.sh REPO RUN
+[ATTEMPT]` prints its verdict for any run. It takes effect from its first push
+to main; its first real use is the evidence it works.
 
 ## 2.0.1 — released earlier the same day
 

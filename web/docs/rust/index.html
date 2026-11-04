@@ -45,7 +45,7 @@
 <strong>Scope:</strong> Installation, the high-level and streaming APIs, the DOM, <code>Quantity</code> and the exact numbers, JSON conversion, and the thread rules.</p>
 </blockquote>
 <p>Rust bindings for the <strong>Bovnar (BVNR)</strong> typed serialisation library (library
-2.0.1, format spec 1.2).</p>
+2.0.2, format spec 1.2).</p>
 <p>The crate is a thin wrapper around the C library: <code>build.rs</code> compiles the C
 sources into the crate, so there is no system library to install and nothing is
 looked up at run time. The API stays close to the C library's own shapes:
@@ -169,12 +169,12 @@ enums are Rust enums, and an error carries the library's error kind.</p>
 integration with third-party unit or array libraries; see <a href="#16-crate-layout">§16</a>.</p>
 <hr />
 <h2 id="2-installation">2. Installation</h2>
-<p>The crate carries the version of the C library it wraps (<strong>2.0.1</strong>: <code>version</code> in
+<p>The crate carries the version of the C library it wraps (<strong>2.0.2</strong>: <code>version</code> in
 <code>Cargo.toml</code> is the <code>project(bovnar VERSION x.y.z)</code> of the top-level
 <code>CMakeLists.txt</code>, and CI fails when the two differ). It is published to
 crates.io with each release:</p>
 <div class="codehilite"><pre><span></span><code><span class="k">[dependencies]</span>
-<span class="n">bovnar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;2.0.1&quot;</span>
+<span class="n">bovnar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;2.0.2&quot;</span>
 </code></pre></div>
 
 <p>A repository checkout works too, as a path dependency or straight from Git,
@@ -275,7 +275,7 @@ feature, and all seven are on by default:</p>
 refuses its codes. <code>THIRD_PARTY_NOTICES.md</code> says why a distributor may want to
 leave out <code>ucum</code> or <code>cf</code>:</p>
 <div class="codehilite"><pre><span></span><code><span class="k">[dependencies]</span>
-<span class="n">bovnar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;2.0.1&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">default-features</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="n">features</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;unece&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;qudt&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;qudt-qk&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;udunits&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;om&quot;</span><span class="p">]</span><span class="w"> </span><span class="p">}</span>
+<span class="n">bovnar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;2.0.2&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">default-features</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="n">features</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;unece&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;qudt&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;qudt-qk&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;udunits&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;om&quot;</span><span class="p">]</span><span class="w"> </span><span class="p">}</span>
 </code></pre></div>
 
 <h3 id="33-how-the-published-crate-is-made">3.3 How the published crate is made</h3>
@@ -3100,7 +3100,7 @@ and case stays load-bearing (<code>cup</code> = volume, <code>CUP</code> = curre
 <hr />
 <h2 id="18-spec-11-additions">18. Spec 1.1 additions</h2>
 <p>These bindings target the <strong>Bovnar spec 1.2</strong>; spec 1.0 remains the frozen
-baseline, and the crate's own version (2.0.1) is a separate number
+baseline, and the crate's own version (2.0.2) is a separate number
 (<code>bovnar::version()</code> against <code>bovnar::spec_version()</code>). Spec 1.2's one addition,
 the unit-profile notation, is covered in <a href="#51-the-unit-profile-notations-spec-12">§5.1</a>:
 it is gated on a <code>#!bovnar 1.2</code> directive, which <code>to_string()</code> prepends when a

@@ -23,7 +23,7 @@ install_to() {
     # VS Code forms an extension's identity from "<publisher>.<name>" and
     # expects the folder to follow "<publisher>.<name>-<version>"; a folder
     # without that (and a package.json without "publisher") is skipped.
-    local dest="$ext/bovnar.bovnar-highlight-2.0.1"
+    local dest="$ext/bovnar.bovnar-highlight-2.0.2"
     # Drop any prior install: every versioned folder, plus the old plain name.
     rm -rf "$ext"/bovnar.bovnar-highlight-* "$ext/bovnar-highlight"
     mkdir -p "$ext"

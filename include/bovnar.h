@@ -55,11 +55,11 @@ extern "C" {
  */
 #define BVNR_VERSION_MAJOR		2
 #define BVNR_VERSION_MINOR		0
-#define BVNR_VERSION_PATCH		1
+#define BVNR_VERSION_PATCH		2
 #define BVNR_VERSION			((BVNR_VERSION_MAJOR) * 10000 + \
 					 (BVNR_VERSION_MINOR) * 100 + \
 					 (BVNR_VERSION_PATCH))
-#define BVNR_VERSION_STRING		"2.0.1"
+#define BVNR_VERSION_STRING		"2.0.2"
 /*
  * Pre-release marker for a build made from a tree that is AHEAD of the released
  * version above. "-dev" while CHANGELOG.md still has an [Unreleased] section;
@@ -79,7 +79,7 @@ extern "C" {
  * bovnar.version() equals it. The suffix is applied where the mistake actually
  * happens: the `bovnar version` banner a human reads.
  */
-#define BVNR_VERSION_SUFFIX		"-dev"
+#define BVNR_VERSION_SUFFIX		""
 #define BVNR_VERSION_STRING_FULL	BVNR_VERSION_STRING BVNR_VERSION_SUFFIX
 /*
  * Highest bovnar *spec* version this build understands. A document may declare

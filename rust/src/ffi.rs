@@ -1728,7 +1728,7 @@ pub fn parse_currency(code: &str) -> c_int {
 // ---------------------------------------------------------------------------
 // Versions.
 
-/// `bvnr_version_string`: the library version, e.g. `"2.0.1"`.
+/// `bvnr_version_string`: the library version, e.g. `"2.0.2"`.
 pub fn version_string() -> String {
     // SAFETY: returns a static NUL-terminated string.
     unsafe { CStr::from_ptr(bvnr_version_string()) }

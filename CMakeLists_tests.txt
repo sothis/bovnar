@@ -1431,7 +1431,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 190)   # 129 base + rust_build_sync + canonical_keeps_meaning + interval_array + bench_iterations_zero + sitemap + convert_wide_int + unit_source + 3 for examples/unit_profiles.bvnr + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier) + cli_regressions + wasm_native_shape + abi_baseline
+set(BVNR_EXPECTED_TEST_COUNT 191)   # 129 base + rust_build_sync + canonical_keeps_meaning + interval_array + bench_iterations_zero + sitemap + convert_wide_int + unit_source + 3 for examples/unit_profiles.bvnr + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier) + cli_regressions + wasm_native_shape + abi_baseline + crate_provenance
                                     #             + citation
                                     #         + profiles_off_build
                                     # + om_test + cf_test
@@ -1930,6 +1930,19 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_rust_b
                      ${CMAKE_CURRENT_SOURCE_DIR})
     set_tests_properties(bvnr_rust_build_sync PROPERTIES
         LABELS "packaging" TIMEOUT 60)
+endif()
+
+# ── The crate's PROVENANCE.json is the commit it names ─────────────────────
+# rust/package.py stages the crate crates.io gets, writes its manifest (commit,
+# tag, every file's SHA-256) and checks it with check_crate_provenance.py:
+# staged again from that commit, the crate must come out the same. --no-cargo
+# stops there, so this needs Python and git but no Rust toolchain.
+if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_crate_provenance.py)
+    add_test(NAME bvnr_crate_provenance
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/rust/package.py --no-cargo)
+    set_tests_properties(bvnr_crate_provenance PROPERTIES
+        LABELS "packaging" TIMEOUT 120)
 endif()
 
 if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_release_links.py)

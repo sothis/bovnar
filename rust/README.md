@@ -395,6 +395,14 @@ release have passed. It skips a version that is already on crates.io. The very
 first version is published by hand (Trusted Publishing cannot create a crate),
 with `python3 rust/package.py -- publish` and a crates.io token.
 
+The crate carries `PROVENANCE.json`: the repository, commit and release tag it
+was staged from, and every file's SHA-256 and repository origin, so a program
+that vendors the C library from `c/` can tie its copy, and the notices it
+ships, to that revision. `package.py` checks the staged copy against the commit
+before cargo runs (`check_crate_provenance.py` stages the commit again and
+requires the same files), CI checks the packed `.crate`, and a publish refuses
+uncommitted changes and an untagged commit.
+
 ## License
 
 MIT — see [LICENSE](https://github.com/sothis/bovnar/blob/main/LICENSE).

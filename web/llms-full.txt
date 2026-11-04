@@ -21923,6 +21923,22 @@ python3 rust/package.py -- publish --dry-run     # what CI runs on every push
 CI's `rust_package` job runs that dry run on every push, and `publish_crate`
 publishes the same way on a `vX.Y.Z` tag through crates.io Trusted Publishing.
 
+The crate carries `PROVENANCE.json`: the repository, the commit and, on a
+release, the tag it was staged from, and for every file in the crate its
+SHA-256 and the repository path it was copied from (`"generated"` for the
+tables in `c/generated/`). A program that vendors the C library from `c/`
+can tie what it compiles, and the notices it ships, to that one revision by
+comparing its copies against those hashes. Before cargo runs, `package.py`
+checks the staged copy with `check_crate_provenance.py`, which stages the
+named commit again and requires the same files byte for byte. `rust_package`
+checks the packed `.crate` the same way, and a publish refuses uncommitted
+changes and a commit without its `vX.Y.Z` tag. To check a published crate
+against the repository:
+
+```bash
+python3 check_crate_provenance.py bovnar-X.Y.Z.crate --tag vX.Y.Z
+```
+
 ---
 
 ## 4. Quick-start

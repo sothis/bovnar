@@ -563,6 +563,16 @@ jobs:
       - name: Stage, package and verify the crate
         run: python3 rust/package.py --out "$RUNNER_TEMP/crate" -- publish --dry-run --locked
 
+      # package.py checked the staged copy before cargo ran; this checks what
+      # cargo packed from it, the file crates.io would get. On a release tag
+      # the manifest must name that tag; a publish requires the same.
+      - name: The packed crate is the commit its PROVENANCE.json names
+        run: |
+          set -euo pipefail
+          tag=()
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then tag=(--tag "$GITHUB_REF_NAME"); fi
+          python3 check_crate_provenance.py "${tag[@]}" "$RUNNER_TEMP"/crate/bovnar/target/package/bovnar-*.crate
+
       # The unit profiles are Cargo features; a build with all of them off
       # must still compile (THIRD_PARTY_NOTICES tells distributors they can).
       - name: Build the packaged crate with no unit profiles

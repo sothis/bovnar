@@ -291,6 +291,20 @@ python3<span class="w"> </span>rust/package.py<span class="w"> </span>--<span cl
 
 <p>CI's <code>rust_package</code> job runs that dry run on every push, and <code>publish_crate</code>
 publishes the same way on a <code>vX.Y.Z</code> tag through crates.io Trusted Publishing.</p>
+<p>The crate carries <code>PROVENANCE.json</code>: the repository, the commit and, on a
+release, the tag it was staged from, and for every file in the crate its
+SHA-256 and the repository path it was copied from (<code>"generated"</code> for the
+tables in <code>c/generated/</code>). A program that vendors the C library from <code>c/</code>
+can tie what it compiles, and the notices it ships, to that one revision by
+comparing its copies against those hashes. Before cargo runs, <code>package.py</code>
+checks the staged copy with <code>check_crate_provenance.py</code>, which stages the
+named commit again and requires the same files byte for byte. <code>rust_package</code>
+checks the packed <code>.crate</code> the same way, and a publish refuses uncommitted
+changes and a commit without its <code>vX.Y.Z</code> tag. To check a published crate
+against the repository:</p>
+<div class="codehilite"><pre><span></span><code>python3<span class="w"> </span>check_crate_provenance.py<span class="w"> </span>bovnar-X.Y.Z.crate<span class="w"> </span>--tag<span class="w"> </span>vX.Y.Z
+</code></pre></div>
+
 <hr />
 <h2 id="4-quick-start">4. Quick-start</h2>
 <h3 id="41-high-level-api-parse--to_string">4.1 High-level API (<code>parse</code> / <code>to_string</code>)</h3>

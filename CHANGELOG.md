@@ -12,6 +12,23 @@ implements; the highest spec a build understands is reported by
 numbers were the same. They part at 2.0.0, which breaks the ABI and the Python
 API and implements spec 1.2.
 
+## [Unreleased]
+
+### Added
+
+- **The crate states its provenance.** The published crate carries
+  `PROVENANCE.json`: the repository, the commit and (on a release) the tag it
+  was staged from, and every file's SHA-256 with the repository path it was
+  copied from, `"generated"` for the tables in `c/generated/`. A program that
+  vendors the C library from `c/` can tie its copy, and the notices it ships,
+  to one upstream revision; the crate is staged outside git, so up to 2.0.1 it
+  named none. `rust/package.py` writes the manifest and checks it before cargo
+  runs with the new `check_crate_provenance.py`, which stages the named commit
+  again and requires the same files byte for byte. CI checks the packed
+  `.crate` as well (the CTest gate `bvnr_crate_provenance` checks the staged
+  copy), and a publish refuses uncommitted changes and a commit without its
+  `vX.Y.Z` tag. `package.py --no-cargo` stages and checks without cargo.
+
 ## [2.0.1] - 2026-11-04
 
 ### Added

@@ -268,6 +268,13 @@ caret needs the right one:
 | `..._column` | **characters** | 1 | a multi-byte UTF-8 sequence advances it by one; a tab advances to the next multiple of 4 |
 | `..._offset` | **bytes** | 0 | use this to index the input buffer |
 
+An error raised at the **end of input** (`error_got_incomplete_bvnr_stream`, a
+truncated character in a final comment, a directive with no newline) is placed
+where the missing byte would go: the offset is the input length, and the column
+is one past the last character on the last line — `1` when the input ends in a
+newline. (Inside a cut-short multi-byte character the column stays on that
+character.)
+
 In `.x = "café"; .y = @;` the `@` is reported at column 19 and offset 19 — the
 19th character, and the 20th byte, because `é` is two bytes: a 1-based character
 count and a 0-based byte count that happen to land on the same number. One more
@@ -496,7 +503,7 @@ skipped:
 | `*want` dimensionally incompatible with the value's unit (seconds for a length; one currency for another) | `error_unit_mismatch` |
 | the true factor is irrational (a π-based angle, e.g. degree → radian) | `error_unit_inexact` |
 | the value's unit puts an affine scale inside a compound (`°C/h`, `°C·m`, `°C²`): the offset is a number of kelvin and the product has nowhere to add it | `error_unit_mismatch` |
-| the exact result has no terminating expansion in `*want_base` (e.g. `1 m → mile` in base 10), and `want_unit_allow_nonterminating` is off | `error_unit_inexact` |
+| the exact result has no terminating expansion in `*want_base` (e.g. `1 m → mile` in base 10; in base 85 any fraction, since `.` is a digit there), and `want_unit_allow_nonterminating` is off | `error_unit_inexact` |
 | the literal is finite but too extreme to build an exact rational from (e.g. `1e1000000`) | `error_value_out_of_range` |
 | `*want_base` is not a base bvnr writes, or the result is negative in base 64/85, or out of memory | `error_invalid_argument` |
 | the exact result would be longer than `max_conversion_length` characters | `error_value_out_of_range` |
@@ -748,7 +755,9 @@ it in coherent SI base units with prefixes folded out:
 | `<float:64,$USD> 5.0` | untouched |
 
 Every **dimensionless** unit is left exactly as written — `%`, `ppm`, `dB`, `pH`,
-`rad`, `°`, the turbidity scales — along with the currencies. Normalising a ratio
+`rad`, `°`, the turbidity scales — along with the currencies, and so is a unit
+carrying the steradian's or an angle's quantity kind (`k~lx`, `m~ph`, `W/sr`,
+`k~rad/s`), whose SI base form would be a different quantity; prefixes stay too. Normalising a ratio
 would silently restate `35 %` as `0.35`, and normalising an angle would need the
 irrational factor between `°` and `rad`. See `bvn_unit_si_normal_form`.
 
@@ -987,7 +996,7 @@ typedef struct bvnr_write_flags_s {
 | `BVN_UNIT_FLAGS_NONE` | `0` | Default: Unicode superscript exponents, no reduction |
 | `BVN_UNIT_REDUCE` | `1 << 0` | Reduce compound units to canonical form before serialising |
 | `BVN_UNIT_ASCII_EXP` | `1 << 1` | Use `^N` ASCII caret notation instead of Unicode superscripts |
-| `BVN_NUM_CANONICAL` | `1 << 2` | Render a *rescaled* float in float shape (`5000.0`, not `5000`), so a value that took the rescale lands on the same spelling as one that did not; and write every annotation in one form — the width written out (`<uint>` as `<uint:64>`), a default base `_10` and `no_unit` left out — so `1.0 km` and `<float:64,k~m> 1.0` produce the same bytes. What `bovnar pretty-print --canonical` sets beside `BVN_UNIT_REDUCE` |
+| `BVN_NUM_CANONICAL` | `1 << 2` | Render a *rescaled* float in float shape (`5000.0`, not `5000`), so a value that took the rescale lands on the same spelling as one that did not; and write every annotation in one form — the width written out (`<uint>` as `<uint:64>`), a default base `_10` and `no_unit` left out — so `1.0 km` and `<float:64,k~m> 1.0` produce the same bytes. Two spellings stay apart: a unit with an opaque profile code keeps its profile spelling and leaves the prefixes beside it unfolded (`ucum:[IU]/mL` and `ucum:[IU]/L` are not brought to one form), and an inline unit beside an annotation stays inline (`<uint:64> 5 m` is not rewritten as `<uint:64,m> 5`). What `bovnar pretty-print --canonical` sets beside `BVN_UNIT_REDUCE` |
 
 `BVN_UNIT_REDUCE` folds every prefix out of the unit, and the **writer scales the value to match**: `5` with unit `k~m` is written as `5000 m`, not `5 m`. The rescale runs in exact rational arithmetic, so a value far wider than a double keeps every digit; where the scaled value cannot be written exactly in the value's own base the write fails with `error_value_out_of_range` rather than rounding. The rescaled value must also still satisfy the type it was declared with: an `uint`/`sint` that is no longer integral or no longer fits its width, and a `float_fix` that no longer fits its Q format (`<float_fix:32,q16>` leaves 15 integer bits, so 30000 km in metres does not fit), are refused the same way — the writer must not emit a document this library's own reader rejects. (A direct caller of `bvn_unit_to_string_ex` gets no such help — see the note on that function in §3.3.)
 
@@ -1454,7 +1463,7 @@ bool bvnr_write_struct_end  (bvnr_writer_t *w);
 | `bvnr_write_null` | `.key = ;` | the null value |
 | `bvnr_write_bool` | `.key = true;` / `false` | |
 | `bvnr_write_uint` / `_sint` | `.key = <uint:16> 443;` | `width` 0 writes `<uint>` / `<sint>` (64 bits); a value that does not fit `width` is `error_value_out_of_range` |
-| `bvnr_write_float` | `.key = <float:64> 1e-1;` | `width` 0 writes `<float>`; `nan`, `inf` and `ninf` are written as those words; formatted as by `bvn_format_double` (§2.11) |
+| `bvnr_write_float` | `.key = <float:64> 1e-1;` | `width` is 0 (writes `<float>`), 16, 32, 64, 128 or 256 — another multiple of 32 the format allows, such as 96, is `error_invalid_argument` here and needs `bvnr_write_bvnf_base`. At 16 and 32 the value is rounded to binary16 or binary32 first, and a finite value that overflows that format is `error_value_out_of_range`, not an `inf`. `nan`, `inf` and `ninf` are written as those words; formatted as by `bvn_format_double` (§2.11) |
 | `bvnr_write_float_fix` | `.key = <float_fix:32,q16> 1.5e+0;` | `q` is the number of fractional bits |
 | `bvnr_write_float_dec` | `.key = <float_dec:64> 1.25e+0;` | |
 | `…_unit` | `.key = <float:64,k~m> 1e+0;` | the same, with `unit` as the annotation's unit parameter; honours `bvnr_writer_set_unit_source` (§3.1) and the writer's unit policy (§2.15) |
@@ -1736,7 +1745,7 @@ failures:
 
 | Return | Meaning |
 |--------|---------|
-| `BVN_RATIONAL_NONTERMINATING` (`-2`) | the expansion is infinite in this base. The rational itself is still exact, so use `num`/`den`. |
+| `BVN_RATIONAL_NONTERMINATING` (`-2`) | the expansion is infinite in this base, or the value has a fraction and the base is 85 (Ascii85 spends `.` on a digit, so there is no radix point). The rational itself is still exact, so use `num`/`den`. |
 | `-1` | bad arguments, an unsupported base, a negative value in the sign-less bases 64/85, out of memory, or a `bufsize` too small. |
 
 The buffer is **never truncated** — half an exact expansion is simply a different
@@ -2346,6 +2355,7 @@ int main(void)
 - [Unit & Currency Reference](05_bovnar_unit_system.md) — the unit model behind `bvn_parse_unit` and `want_unit`
 - [Streaming, Framing & Multiplexing](10_bovnar_streaming.md) — protocols layered on this event API
 - [Python Bindings](09_bovnar_python_bindings.md) — the same API from Python
+- [Rust Bindings](14_bovnar_rust_bindings.md) — the same API from Rust
 - [FAQ §12 — C API](02_bovnar_faq.md#12-c-api) — common questions about these functions
 
 ---

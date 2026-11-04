@@ -592,6 +592,7 @@ static void test_error_getters_after_recovery(void)
 		".a = [{.x = @;}, {.x = 1;}]; .b = 2;",
 		".a = 1; # \xc3\n.b = 2;",
 		".a = @;\n.b = #;\n.c = 3;\n",
+		".a = 1; #\xc3",                  /* cut short by end of input */
 	};
 	for (size_t i = 0; i < sizeof recovered / sizeof *recovered; i++) {
 		getter_probe_t p;
@@ -3859,6 +3860,141 @@ static void test_r4_bracket_cannot_close_across_a_struct(void)
 	ASSERT_TRUE(c.ok, "arrays closed where they were opened are untouched");
 }
 
+/*
+ * Third whole-project review, 2026-11.
+ *
+ * A-1: a unit group nested past the bound returned from the annotation parser
+ * before its other checks, with no unit length -- and the validator looked at
+ * the unit only when it had one. `<float:64,m{{…>` validated with the unit
+ * gone, and `<uint:99999,{{…>` skipped the width check.
+ */
+static void test_type_param_depth_bound(void)
+{
+	printf("  test_type_param_depth_bound...\n");
+	char src[256], open17[18], open16[17];
+	memset(open17, '{', 17); open17[17] = '\0';
+	memset(open16, '{', 16); open16[16] = '\0';
+	/* The document is pre + braces + post. */
+	static const struct { const char *pre, *post; error_code_t want; } C[] = {
+		{ ".a = <float:64,m",                   "> 1.0;",  error_unit_illegal },
+		{ "#!bovnar 1.2\n.a = <float:64,ucum:m", "> 1.0;",  error_unit_illegal },
+		{ ".a = <uint:99999,",                  "> 1;",    error_illegal_value_type },
+		{ ".a = <utf8:",                        "> \"x\";", error_illegal_value_type },
+	};
+	for (size_t i = 0; i < sizeof C / sizeof C[0]; i++) {
+		for (int deep = 0; deep < 2; deep++) {
+			snprintf(src, sizeof src, "%s%s%s", C[i].pre,
+				 deep ? open17 : open16, C[i].post);
+			getter_probe_t p;
+			bool ok = probe_read(src, false, &p);
+			if (!p.r) continue;
+			ASSERT_FALSE(ok, src);
+			ASSERT_EQ_INT(bvnr_reader_get_error(p.r), C[i].want, src);
+			bvnr_reader_destroy(p.r);
+		}
+	}
+	/* The public parser: past 255 bytes the unit is refused, and the other
+	 * checks still run. */
+	char ann[400];
+	memcpy(ann, "uint:99999,", 11);
+	memset(ann + 11, 'm', 300);
+	bool type_ok = true, unit_ok = true, too_long = false;
+	value_unit_t u;
+	uint8_t ubuf[256], ulen = 0;
+	(void)bvn_parse_type_annotation((const uint8_t *)ann, 311, &type_ok, &unit_ok,
+					&too_long, &u, ubuf, &ulen);
+	ASSERT_FALSE(type_ok, "a long unit does not skip the width check");
+	memcpy(ann, "uint:64,", 8);
+	memset(ann + 8, 'm', 300);
+	type_ok = true; unit_ok = true; too_long = false;
+	(void)bvn_parse_type_annotation((const uint8_t *)ann, 308,
+					&type_ok, &unit_ok, &too_long, &u, ubuf, &ulen);
+	ASSERT_TRUE(!unit_ok && too_long, "a 300-byte unit is too long");
+}
+
+/* A-2: blanks after a profile unit counted toward the 255-byte annotation cap
+ * although they are trimmed; a byte that is not blank still hits it. */
+static void test_profile_param_trailing_blanks(void)
+{
+	printf("  test_profile_param_trailing_blanks...\n");
+	char src[512];
+	int n = snprintf(src, sizeof src, "#!bovnar 1.2\n.a = <float:64,ucum:m");
+	memset(src + n, ' ', 250);
+	snprintf(src + n + 250, sizeof src - (size_t)n - 250u, "> 1.0;\n");
+	getter_probe_t p;
+	bool ok = probe_read(src, false, &p);
+	if (p.r) {
+		ASSERT_TRUE(ok, "250 trailing blanks after ucum:m are trimmed");
+		bvnr_reader_destroy(p.r);
+	}
+	snprintf(src + n + 250, sizeof src - (size_t)n - 250u, "x> 1.0;\n");
+	ok = probe_read(src, false, &p);
+	if (p.r) {
+		ASSERT_FALSE(ok, "a byte past the cap is still refused");
+		ASSERT_EQ_INT(bvnr_reader_get_error(p.r), error_type_too_long,
+			      "as type_too_long");
+		bvnr_reader_destroy(p.r);
+	}
+}
+
+/* A-3 and A-4: what the end of input does to a recovered error. */
+static void test_recovery_at_end_of_input(void)
+{
+	printf("  test_recovery_at_end_of_input...\n");
+	getter_probe_t p;
+	bool ok = probe_read(".a = 1; #\xc3", true, &p);
+	if (p.r) {
+		ASSERT_TRUE(ok, "a cut-short character in a final comment is recovered");
+		ASSERT_EQ_UINT(bvnr_reader_get_skipped_bytes(p.r), 1,
+			       "its lead byte is the skipped byte");
+		assert_getters_clear(p.r, "EOF in a comment");
+		bvnr_reader_destroy(p.r);
+	}
+	/* A malformed directive at end of input, as with a newline after it. */
+	static const char *const dirs[] = { "#!bovnar 1.x", "#!bovnar 1.x\n.a = 1;\n" };
+	for (size_t i = 0; i < 2; i++) {
+		ok = probe_read(dirs[i], true, &p);
+		if (!p.r) continue;
+		ASSERT_TRUE(ok, dirs[i]);
+		ASSERT_EQ_INT(p.calls, 1, "one error");
+		ASSERT_EQ_UINT(bvnr_reader_get_recovery_count(p.r), 1, "one recovery");
+		assert_getters_clear(p.r, dirs[i]);
+		bvnr_reader_destroy(p.r);
+		ok = probe_read(dirs[i], false, &p);
+		if (!p.r) continue;
+		ASSERT_FALSE(ok, "without continue_on_error it ends the read");
+		ASSERT_EQ_INT(bvnr_reader_get_error(p.r), error_invalid_spec_version,
+			      "as invalid_spec_version");
+		bvnr_reader_destroy(p.r);
+	}
+	/* A-5: an end-of-input error sits where the missing byte would go -- the
+	 * offset was one past the end and the column on the last character. */
+	static const struct { const char *src; uint64_t line, col, off; } eof[] = {
+		{ ".a = 1",          1, 7, 6 },
+		{ ".a = 1;\n.b = {\n", 3, 1, 15 },
+		{ "#!bovnar 1.x",    1, 13, 12 },
+	};
+	for (size_t i = 0; i < sizeof eof / sizeof eof[0]; i++) {
+		ok = probe_read(eof[i].src, false, &p);
+		if (!p.r) continue;
+		ASSERT_FALSE(ok, eof[i].src);
+		ASSERT_EQ_UINT(bvnr_reader_get_error_line(p.r), eof[i].line, eof[i].src);
+		ASSERT_EQ_UINT(bvnr_reader_get_error_column(p.r), eof[i].col, eof[i].src);
+		ASSERT_EQ_UINT(bvnr_reader_get_error_offset(p.r), eof[i].off, eof[i].src);
+		bvnr_reader_destroy(p.r);
+	}
+	p = (getter_probe_t){ .r = bvnr_reader_create() };
+	if (p.r) {
+		bvnr_read_flags_t f = {
+			.on_error = probe_getters_in_on_error, .userdata = &p,
+			.continue_on_error = true, .strict_version = true,
+		};
+		bvnr_open_read_mem(p.r, dirs[0], strlen(dirs[0]), NULL, 0, &f);
+		ASSERT_FALSE(bvnr_read(p.r), "strict_version still refuses it at EOF");
+		bvnr_reader_destroy(p.r);
+	}
+}
+
 int main(void)
 {
 	printf("Running bovnar_high_severity_test suite...\n\n");
@@ -3882,6 +4018,9 @@ int main(void)
 	test_recovery_count();
 	test_error_getters_after_recovery();
 	test_recovery_review_2026_11();
+	test_type_param_depth_bound();
+	test_profile_param_trailing_blanks();
+	test_recovery_at_end_of_input();
 	test_reader_review_2026_11_whole();
 
 	printf("\nGap 6: callback abort\n");

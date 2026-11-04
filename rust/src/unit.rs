@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! A physical unit.
 
 use std::fmt;
@@ -263,9 +264,13 @@ impl Hash for UnitComponent {
 }
 
 /// Consistent with `==` (`bvn_unit_equal`), which ignores component order:
-/// the components' keys, sorted.
+/// the components' keys, sorted; every dimensionless unit hashes as no unit.
 impl Hash for Unit {
     fn hash<H: Hasher>(&self, state: &mut H) {
+        if self.is_dimensionless() {
+            0usize.hash(state);
+            return;
+        }
         let mut keys: Vec<_> = self.components().iter().map(UnitComponent::key).collect();
         keys.sort_unstable();
         keys.dedup();
@@ -288,9 +293,12 @@ impl PartialEq<&str> for Unit {
     }
 }
 
+/// By meaning, as `bvn_unit_equal` compares; "no unit at all" (a typed
+/// value's empty unit) and "dimensionless" (a bare literal's) are both the
+/// absence of one and compare equal, as the Python binding's do.
 impl PartialEq for Unit {
     fn eq(&self, other: &Self) -> bool {
-        unit_fns::equal(self.0, other.0)
+        (self.is_dimensionless() && other.is_dimensionless()) || unit_fns::equal(self.0, other.0)
     }
 }
 

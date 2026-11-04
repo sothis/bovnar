@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The spec version directive (`#!bovnar M.N`).
 
 use bovnar::{

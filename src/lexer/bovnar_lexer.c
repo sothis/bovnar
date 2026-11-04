@@ -1083,9 +1083,13 @@ bool bvn_action_type_ws_byte(bvnr_reader_t* p)
 		l->next_state = type_body_ws;
 		return true;
 	}
+	/* A full buffer drops the blank instead of failing on it. Trailing blanks
+	 * before the '>' are trimmed anyway, so `ucum:m` + 250 spaces was refused
+	 * as type_too_long for bytes that never reach the unit; a byte that is not
+	 * blank still fails the cap in copy_type_byte. */
 	if (l->type_len == BVN_TYPE_BUF_CAP - 1u) {
-		bvn_lexer_set_error(p, error_type_too_long);
-		return false;
+		l->next_state = copy_type_byte;
+		return true;
 	}
 	l->type_data[l->type_len++] = (uint8_t)l->byte;
 	l->next_state = copy_type_byte;
@@ -2849,6 +2853,12 @@ static inline void bvn_set_eof_error(bvnr_reader_t* p, error_code_t err)
 {
 	p->val.last_error = err;
 	bvn_set_error_pos(p, 0, p->lex.processed_bytes);
+	/* The offset is one past the last byte, so the column is one past the
+	 * last character: where the missing byte would go, as file_too_long
+	 * reports it. It named the last character, and column 0 after a final
+	 * newline. Inside a cut-short character the position stays on it. */
+	if (p->lex.utf8_need == 0)
+		p->val.error_column = p->lex.column + 1u;
 }
 /*
  * Free lexer-owned heap. Note str_data/type_data/inline_unit_data are a single
@@ -3014,6 +3024,14 @@ bool bvn_lex_run(bvnr_reader_t* r)
 				 * recovered error. */
 				l->utf8_need = 0;
 				++l->recovery_count;
+				/* As bvn_recover_in_comment does: the cut-short sequence's
+				 * lead byte is the skipped byte (§13.2), and a read that ends
+				 * true reports no position (§13.4). */
+				++l->skipped_bytes;
+				r->val.error_line   = 0;
+				r->val.error_column = 0;
+				r->val.error_byte   = 0;
+				r->val.error_offset = 0;
 				if (eof_in_first_comment)
 					l->next_state = first_comment_intro;
 			}
@@ -3040,7 +3058,20 @@ bool bvn_lex_run(bvnr_reader_t* r)
 						? r->val.last_error
 						: error_invalid_spec_version);
 					bvn_notify_error(r);
-					return false;
+					/* A malformed directive is recovered from under
+					 * continue_on_error when a newline follows it; one that
+					 * runs to end of input is the same error and is
+					 * recovered the same way. An unsupported version, or
+					 * any directive error under strict_version, still ends
+					 * the read. */
+					if (!l->continue_on_error || l->strict_version ||
+					    r->val.last_error != error_invalid_spec_version)
+						return false;
+					++l->recovery_count;
+					r->val.error_line   = 0;
+					r->val.error_column = 0;
+					r->val.error_byte   = 0;
+					r->val.error_offset = 0;
 				}
 				r->val.last_error = error_none;
 				break;

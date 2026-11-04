@@ -1,12 +1,13 @@
+// SPDX-License-Identifier: MIT
 //! Integers far wider than any machine integer, up to the format's 32768
 //! bits.
 //!
-//! A `Value::Int` is an `i128`, so an integer of thousands of digits is a
-//! `Value::Quantity` here: its exact decimal literal under a `uint`/`sint`
-//! annotation as wide as the number, built from a `BigInt`. Untyped `parse`
-//! has no integer wider than `i128` to return, so the tests read the value
-//! back exactly through `parse_typed` (`Quantity::raw` parsed as a `BigInt`,
-//! and `Quantity::decimal`) or through `DomNode::as_int_str`.
+//! An integer of thousands of digits is written here as a `Value::Quantity`:
+//! its exact decimal literal under a `uint`/`sint` annotation as wide as the
+//! number, built from a `BigInt`, and read back exactly through
+//! `parse_typed` (`Quantity::raw` parsed as a `BigInt`, and
+//! `Quantity::decimal`) or through `DomNode::as_int_str`. Untyped `parse`
+//! gives such an integer as a `Value::BigInt`.
 
 use bovnar::{
     BaseUnit, Decimal, Error, Event, EventData, Exponent, Quantity, ReadOptions, Reader, SIPrefix,
@@ -224,4 +225,85 @@ fn test_write_array_under_a_wide_annotation() {
     };
     let back: Vec<BigInt> = back.iter().map(typed_int).collect();
     assert_eq!(back, [n, BigInt::from(2)]);
+}
+
+/// Integers past `i128` are `Value::BigInt`, not their digits as a string,
+/// and `to_string` writes them back as integers of a width that holds them.
+#[test]
+fn test_wide_integers_are_bigints_and_round_trip() {
+    use bovnar::parse;
+    let u256_max: BigInt = (BigInt::one() << 256u32) - 1;
+    let s256_min: BigInt = -(BigInt::one() << 255u32);
+    let cases: Vec<(String, Value)> = vec![
+        (
+            "<uint:128> 340282366920938463463374607431768211455".into(),
+            Value::BigInt(BigInt::from(u128::MAX)),
+        ),
+        (
+            format!("<uint:256,_16> \"{}\"", "f".repeat(64)),
+            Value::BigInt(u256_max.clone()),
+        ),
+        (
+            format!("<sint:256> {s256_min}"),
+            Value::BigInt(s256_min.clone()),
+        ),
+        (
+            "<sint:128> -170141183460469231731687303715884105728".into(),
+            Value::Int(i128::MIN),
+        ),
+    ];
+    for (lit, want) in cases {
+        let src = format!(".a = {lit};");
+        let doc = parse(src.as_bytes()).unwrap_or_else(|e| panic!("{src}: {e}"));
+        assert_eq!(
+            doc,
+            Value::Struct(vec![("a".into(), want.clone())]),
+            "{src}"
+        );
+        let out = to_string(&doc, false).unwrap();
+        assert_eq!(
+            parse(&out).unwrap(),
+            doc,
+            "{}",
+            String::from_utf8_lossy(&out)
+        );
+    }
+    // The width is the smallest power of two from 128; a negative power of
+    // two needs no extra sign bit.
+    let out = to_string(
+        &Value::Struct(vec![("a".into(), Value::BigInt(s256_min))]),
+        false,
+    )
+    .unwrap();
+    assert!(String::from_utf8_lossy(&out).contains("<sint:256>"));
+    let out = to_string(
+        &Value::Struct(vec![("a".into(), Value::BigInt(u256_max + 1))]),
+        false,
+    )
+    .unwrap();
+    assert!(String::from_utf8_lossy(&out).contains("<uint:512>"));
+}
+
+/// `i128::MIN` reads back: its magnitude has no positive `i128`.
+#[test]
+fn test_i128_min_round_trips() {
+    use bovnar::parse;
+    let doc = Value::Struct(vec![("a".into(), Value::Int(i128::MIN))]);
+    let out = to_string(&doc, false).unwrap();
+    assert_eq!(
+        parse(&out).unwrap(),
+        doc,
+        "{}",
+        String::from_utf8_lossy(&out)
+    );
+}
+
+/// The DOM gives the same values as `parse`.
+#[test]
+fn test_dom_wide_integers_are_bigints() {
+    use bovnar::DomDoc;
+    let src = format!(".a = <uint:256,_16> \"{}\";", "f".repeat(64));
+    let dom = DomDoc::parse(src.as_bytes()).unwrap().to_value().unwrap();
+    assert_eq!(dom, bovnar::parse(src.as_bytes()).unwrap());
+    assert!(matches!(&dom, Value::Struct(e) if matches!(e[0].1, Value::BigInt(_))));
 }

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The unit's own spelling (`bvnr_data_t.unit_source`) through the bindings:
 //! the reader hands it over, a typed parse keeps it on the `Quantity`,
 //! `to_string` writes it back, and the DOM exposes it.

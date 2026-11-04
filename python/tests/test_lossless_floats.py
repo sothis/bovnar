@@ -542,3 +542,105 @@ class TestFromNumberValidatesText:
     def test_fix_still_range_checks(self):
         with pytest.raises(BovnarArgumentError, match="does not fit"):
             Quantity.from_number("1e9", family=F.FLOAT_FIX, width=16, frac=8)
+
+
+# The reader accepts nan/inf/ninf under float_fix (spec §6.4). The C Q-format
+# conversion maps them to 0, and three accessors reported that 0 while .value
+# and .decimal reported the non-finite value -- one Quantity, two values.
+@needs_lib
+@pytest.mark.parametrize("lit, want", [
+    ("inf", Decimal("Infinity")),
+    ("ninf", Decimal("-Infinity")),
+    ("nan", None),
+])
+def test_float_fix_nonfinite_is_not_zero(lit, want):
+    q = loads(('.a = <float_fix:32,q16> %s;' % lit).encode(), typed=True)["a"]
+    sv = q.stored_value
+    if want is None:
+        assert sv.is_nan()
+    else:
+        assert sv == want
+    with pytest.raises(BovnarArgumentError):
+        q.fixed_point
+    with pytest.raises(BovnarArgumentError):
+        q.fraction
+
+
+@needs_lib
+def test_float_fix_typed_null_accessors_are_none():
+    q = loads(b'.a = [<float_fix:32,q16>];', typed=True)["a"][0]
+    assert q.raw is None
+    assert q.fixed_point is None
+    assert q.fraction is None
+    assert q.stored_value is None
+
+
+@needs_lib
+def test_fraction_names_itself_when_undefined():
+    for src in (b'.a = <float:64> inf;', b'.a = "x";', b'.a = true;'):
+        q = loads(src, typed=True)["a"]
+        with pytest.raises(BovnarArgumentError, match=r"fraction\(\)"):
+            q.fraction
+
+
+# A 28-byte literal with a huge exponent used to be materialised exactly --
+# 1/10**99999999 -- before being rounded to what the format holds:
+# stored_value, ieee_bits and fraction ran without bound (1e-500000 already
+# took 9 s). Overflow and underflow are now decided from the exponent, and
+# fraction() refuses past its documented cap.
+def _timed(fn):
+    import time
+    t0 = time.monotonic()
+    try:
+        out = fn()
+    except BovnarArgumentError as e:
+        out = e
+    took = time.monotonic() - t0
+    assert took < 1.0, "took %.2f s" % took
+    return out
+
+
+@needs_lib
+@pytest.mark.parametrize("fam", ["float", "float_dec"])
+@pytest.mark.parametrize("lit, want", [
+    ("1e-99999999", Decimal(0)),
+    ("-1e-99999999", Decimal("-0")),
+    ("1e99999999", Decimal("Infinity")),
+    ("-1e99999999", Decimal("-Infinity")),
+])
+def test_extreme_exponent_is_bounded(fam, lit, want):
+    q = loads(('.a = <%s:64> %s;' % (fam, lit)).encode(), typed=True)["a"]
+    sv = _timed(lambda: q.stored_value)
+    assert sv == want and sv.is_signed() == want.is_signed()
+    bits = _timed(lambda: q.ieee_bits)
+    assert isinstance(bits, bytes) and len(bits) == 8
+    assert (bits[-1] & 0x80 != 0) == want.is_signed()
+    err = _timed(lambda: q.fraction)
+    assert isinstance(err, BovnarArgumentError)
+    assert "cap" in str(err)
+
+
+@needs_lib
+def test_extreme_exponent_bits_match_the_exact_rounding_at_the_edge():
+    """The early-out only skips what is certain: just inside binary64's range
+    the exact path still runs and still rounds."""
+    for lit, want in (("4.9e-324", 1), ("2.4e-324", 0), ("2.5e-324", 1),
+                      ("1.7976931348623157e308", 0x7FEFFFFFFFFFFFFF),
+                      ("1.8e308", 0x7FF0000000000000)):
+        q = loads(('.a = <float:64> %s;' % lit).encode(), typed=True)["a"]
+        assert int.from_bytes(q.ieee_bits, 'little') == want, lit
+
+
+@needs_lib
+def test_fraction_exponent_cap():
+    from bovnar.quantity import FRACTION_EXPONENT_CAP
+    assert FRACTION_EXPONENT_CAP == 100_000
+    ok = loads(b'.a = <float:64> 1e-100000;', typed=True)["a"]
+    assert _timed(lambda: ok.fraction) == Fraction(1, 10 ** 100000)
+    over = loads(b'.a = <float:64> 1e-100001;', typed=True)["a"]
+    assert isinstance(_timed(lambda: over.fraction), BovnarArgumentError)
+    # float_dec:256 reaches 10**-611867; its cap is its own range.
+    dec = loads(b'.a = <float_dec:256> 1e-611900;', typed=True)["a"]
+    assert _timed(lambda: dec.fraction) == Fraction(1, 10 ** 611900)
+    far = loads(b'.a = <float_dec:256> 1e-700000;', typed=True)["a"]
+    assert isinstance(_timed(lambda: far.fraction), BovnarArgumentError)

@@ -881,6 +881,28 @@ static void test_policy_strings(void)
 	            "ucum:mmol/L matches the native spelling");
 }
 
+/* The third review: the decade fold could put a prefix UCUM does not have on a
+ * UCUM arbitrary unit. ucum:10*27.k[IU] validated, then could not be written:
+ * R~[IU] has no UCUM code. An opaque UCUM unit takes yocto to yotta only. */
+static void test_opaque_prefix_range(void)
+{
+	printf("  an arbitrary unit takes only the prefixes UCUM spells...\n");
+	chk_error("ucum:10*27.k[IU]", error_unit_profile_unsupported);
+	chk_error("ucum:10*-27.m[IU]", error_unit_profile_unsupported);
+	chk_str("ucum:10*21.k[IU]", "ucum:Y[IU]");
+	chk_str("ucum:10*-21.m[IU]", "ucum:y[IU]");
+	value_unit_prefix_t p;
+	p.system = prefix_si;
+	p.id.si = si_ronna;
+	ASSERT_FALSE(bvn_prefix_unit_valid(p, bu_ucum_iu), "ronna on [IU] is invalid");
+	p.id.si = si_quecto;
+	ASSERT_FALSE(bvn_prefix_unit_valid(p, bu_ucum_iu), "quecto on [IU] is invalid");
+	p.id.si = si_yotta;
+	ASSERT_TRUE(bvn_prefix_unit_valid(p, bu_ucum_iu), "yotta on [IU] is valid");
+	p.id.si = si_ronna;
+	ASSERT_TRUE(bvn_prefix_unit_valid(p, bu_meter), "ronna on the metre is valid");
+}
+
 int main(void)
 {
 	printf("══════════════════════════════════════\n");
@@ -894,6 +916,7 @@ int main(void)
 	test_fold();
 	test_collisions();
 	test_arbitrary();
+	test_opaque_prefix_range();
 	test_round_trip();
 	test_sweep_round_trip();
 	test_to_ucum();

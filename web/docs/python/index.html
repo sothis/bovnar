@@ -22,7 +22,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <meta property="article:published_time" content="2026-05-14">
-<meta property="article:modified_time" content="2026-11-03">
+<meta property="article:modified_time" content="2026-11-04">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar Python Bindings">
@@ -32,7 +32,7 @@
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
 <link rel="alternate" type="text/markdown" href="/doc/09_bovnar_python_bindings.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Python Bindings", "description": "The pure-ctypes Bovnar Python package: loads/dumps, the streaming reader, the DOM, Quantity, and the NumPy and Pint bridges.", "url": "https://www.bovnar.io/docs/python/", "mainEntityOfPage": "https://www.bovnar.io/docs/python/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-11-03", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Python Bindings", "item": "https://www.bovnar.io/docs/python/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Python Bindings", "description": "The pure-ctypes Bovnar Python package: loads/dumps, the streaming reader, the DOM, Quantity, and the NumPy and Pint bridges.", "url": "https://www.bovnar.io/docs/python/", "mainEntityOfPage": "https://www.bovnar.io/docs/python/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-11-04", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Python Bindings", "item": "https://www.bovnar.io/docs/python/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
@@ -259,6 +259,15 @@ for lossless round-trips:</p>
 <span class="k">assert</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="n">typed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">==</span> <span class="n">doc</span>
 </code></pre></div>
 
+<p>Two <code>Quantity</code> objects are equal (and hash alike) when their literal, unit and
+<em>effective</em> type agree: a width of 0 is 64 and a radix of 0 is 10, as the C
+library reads them, so <code>&lt;float:64,_10&gt; 5.7</code>, <code>&lt;float:0&gt; 5.7</code> and a bare <code>5.7</code>
+are one value. (The base field of <code>float_fix</code> and <code>datetime</code> is Q and the epoch
+index, and is compared as stored.) <code>dumps()</code> writes the canonical annotation,
+which is why the assertion above holds for a document that spelled the
+defaults out. It also holds for a quoted numeric literal (<code>&lt;float:64&gt; "5.7"</code>)
+and for a typed null (<code>&lt;float:64&gt; ;</code>, <code>[&lt;uint:32&gt;, &lt;sint:64&gt;]</code>): <code>dumps()</code>
+writes the annotation either one needs to read back as itself.</p>
 <p><code>dumps()</code> starts with a 4 MiB write buffer and doubles it automatically on
 overflow, up to 256 MiB.  The <code>cap</code> keyword argument that existed in earlier
 versions is no longer accepted.</p>
@@ -307,8 +316,13 @@ both tiers. If the output has to pass <code>bovnar validate</code>, run it throu
 <p>What <code>dumps()</code> does refuse, with <code>BovnarArgumentError</code>, is what <em>neither</em>
 tier reads: a list whose elements carry different units, an integer wider
 than 64 bits in a list that cannot take the width annotation it needs
-(<code>[2**70, 1.5]</code>), a <code>Decimal</code> past the range of <code>float_dec:64</code>, and a key
-that is not a <code>str</code>.</p>
+(<code>[2**70, 1.5]</code>), a <code>Decimal</code> past the range of <code>float_dec:64</code>, a key
+that is not a <code>str</code>, a key that is not a Bovnar identifier (spec §4.2:
+<code>"a b"</code>, <code>"1a"</code>, <code>"a.b"</code>, <code>""</code>), a key longer than 255 bytes in UTF-8 (the
+reader's default <code>max_identifier_length</code>, which <code>loads()</code>, <code>dom_parse()</code>
+and <code>bovnar validate</code> read with), and a string — or a key — holding a
+control character other than TAB, LF, VT, FF and CR (<code>"\x00"</code>, <code>"\x7f"</code>)
+or a lone surrogate. The message names the key.</p>
 </blockquote>
 <h3 id="42-sax-style-streaming-reader">4.2 SAX-style streaming reader</h3>
 <p>The verified callback receives exactly <strong>two</strong> positional arguments: the event
@@ -932,17 +946,17 @@ is stored under the format's own spelling (<code>inf</code>, <code>ninf</code>, 
 <tr>
 <td><code>q.fraction</code></td>
 <td><code>Fraction</code></td>
-<td>Exact value as <code>fractions.Fraction</code> (for <code>float_fix</code>, the exact <code>mantissa / 2**frac</code>)</td>
+<td>Exact value as <code>fractions.Fraction</code> (for <code>float_fix</code>, the exact <code>mantissa / 2**frac</code>); <code>None</code> for a typed null; raises for <code>nan</code>/<code>inf</code>/<code>ninf</code>, which have no ratio, and for non-numeric families. Its exact ratio holds 10^|exponent|, a number with that many digits, so it <strong>refuses</strong> (<code>BovnarArgumentError</code>) a literal whose decimal exponent — of its magnitude or of its last digit — exceeds <code>bovnar.quantity.FRACTION_EXPONENT_CAP</code> (100 000), or for <code>float_dec:256</code> its own range (611 937); <code>.decimal</code> is exact at any exponent</td>
 </tr>
 <tr>
 <td><code>q.fixed_point</code></td>
 <td><code>(int, int)</code></td>
-<td><code>(mantissa, frac_bits)</code> of a <code>float_fix</code> value; the value is <code>mantissa / 2**frac_bits</code></td>
+<td><code>(mantissa, frac_bits)</code> of a <code>float_fix</code> value; the value is <code>mantissa / 2**frac_bits</code>. <code>None</code> for a typed null; raises for <code>nan</code>/<code>inf</code>/<code>ninf</code>, which the reader accepts under <code>float_fix</code> but no Q-format datum holds</td>
 </tr>
 <tr>
 <td><code>q.stored_value</code></td>
 <td><code>Decimal</code></td>
-<td>The value materialised into the declared IEEE/fixed format (round-to-nearest-even) — differs from <code>decimal</code> only when the literal carries more precision than the format holds. <code>None</code> for a typed null, as <code>decimal</code> is</td>
+<td>The value materialised into the declared IEEE/fixed format (round-to-nearest-even) — differs from <code>decimal</code> only when the literal carries more precision than the format holds. <code>None</code> for a typed null, as <code>decimal</code> is; <code>nan</code>/<code>inf</code>/<code>ninf</code> give the non-finite <code>Decimal</code> in every float family. A literal past the format's range (<code>1e-99999999</code>, <code>1e99999999</code>) gives the signed zero or infinity it rounds to, decided from the exponent without materialising the number; <code>ieee_bits</code> does the same</td>
 </tr>
 <tr>
 <td><code>q.ieee_bits</code></td>
@@ -1265,7 +1279,11 @@ an <strong>object array of exact <code>decimal.Decimal</code></strong> on the ty
 the lossy native conversion. The DOM (<code>dom_parse</code>) path only has a C <code>double</code>
 for these, so it raises and points you at the typed path or <code>dtype='float64'</code>.
 Integers wider than 64 bits need <code>dtype=object</code>, which gives an exact object
-array of Python ints; without it <code>to_numpy</code> raises <code>BovnarArgumentError</code>.</p>
+array of Python ints; without it <code>to_numpy</code> raises <code>BovnarArgumentError</code>.
+An <strong>empty</strong> DOM array takes its dtype (and unit) from its annotation —
+<code>&lt;sint:32&gt; []</code> is an <code>int32</code> array of shape <code>(0,)</code> — since it has no element to
+infer one from; an empty array with no annotation is <code>float64</code>, as numpy
+infers.</p>
 <p>A <strong><code>datetime</code></strong> array on the <strong>unix</strong> epoch (spec 1.1) maps to/from
 <code>datetime64[s]</code> — the integer epoch-seconds carrier is unix-relative, so it
 round-trips losslessly. A non-unix epoch (<code>tai</code>, <code>gps</code>, …) is <em>not</em>
@@ -1732,7 +1750,11 @@ profile-notation unit such as <code>ucum:[IU]</code> needs 1.2).</p>
 
 <p>Send an arbitrary event to the C writer. <code>key</code> and <code>value</code> are encoded as
 UTF-8. When both <code>vt</code> and <code>value</code> are supplied the token type is inferred:
-<code>_TOKEN_IS_STRING</code> for <code>ValueTypeFamily.UTF8</code>, <code>_TOKEN_IS_NUMBER</code> otherwise.</p>
+<code>_TOKEN_IS_STRING</code> for <code>ValueTypeFamily.UTF8</code>, and also for a <code>vt</code> whose base
+is a radix other than 10 (<code>uint</code>, <code>sint</code> or <code>float</code> with <code>vt.base</code> not 0 or 10,
+whose literal must be quoted); <code>_TOKEN_IS_NUMBER</code> otherwise. The base field of
+<code>float_fix</code> (Q), <code>float_dec</code> and <code>datetime</code> (the epoch index) is not a radix and
+never makes the value a string.</p>
 <hr />
 <h2 id="13-dom-api">13. DOM API</h2>
 <p>The DOM API parses a complete BVNR document into an in-memory tree for
@@ -2441,17 +2463,17 @@ only invite the bounds check it can no longer support. Use <code>UNIT_NATIVE_FIR
 / <code>UNIT_NATIVE_LAST</code> / <code>CURRENCY_FIRST</code> / <code>CURRENCY_LAST</code>, or ask
 <code>bovnar.currency.is_currency</code>.</p>
 <blockquote>
-<p><strong>The profiles' opaque units are not in this enum.</strong> The C
-<code>value_base_unit_t</code> also has a block per profile for the profile-only units,
-and as shipped only two of them have members — UCUM's arbitrary atoms
-(200000–200039) and UN/ECE's package and count codes (300000–300024),
-doc/11 §7.1 — and
-<code>BaseUnit</code> deliberately omits them, because they have no native spelling for a
-Python name to mirror. A unit carrying one is still fully usable: <code>parse_unit</code>, <code>unit_to_str</code>,
-<code>unit_is_profile_only</code> and the comparison helpers all handle it, and
-<code>unit_to_str</code> returns the profile notation (<code>"unece:XBX"</code>). Only the
-<code>BaseUnit(...)</code> <em>constructor</em> will refuse such a value, so do not call it on a
-raw base taken from a profile-only unit.</p>
+<p><strong>The profiles' opaque units are members too.</strong> The C <code>value_base_unit_t</code>
+has a block per profile for the profile-only units — as shipped, UCUM's
+arbitrary atoms (200000–200039, <code>UCUM_IU</code> … <code>UCUM_IR</code>) and UN/ECE's package
+and count codes (300000–300024, <code>UNECE_ONE</code> … <code>UNECE_VIAL</code>), doc/11 §7.1 —
+and a parsed unit reports their ids, so <code>BaseUnit</code> names each one after its C
+enumerator, <code>bu_ucum_iu</code> → <code>BaseUnit.UCUM_IU</code>, as the Rust crate's
+<code>BaseUnit::UcumIu</code> does. (Until 2.0.0 it omitted them, and
+<code>ValueUnitComponent.base_unit</code> raised <code>ValueError</code> on <code>ucum:[IU]/mL</code>.) They
+have no native spelling and no dimension: <code>unit_to_str</code> returns the profile
+notation (<code>"unece:XBX"</code>), <code>unit_is_profile_only</code> is true, and pint has no
+form for them.</p>
 <p><strong>Note on <code>CUP</code>:</strong> the Cuban-Peso currency is exposed as <strong><code>BaseUnit.CUP_</code></strong> (trailing
 underscore), not <code>BaseUnit.CUP</code>. The plain name <code>CUP</code> is the US-cup volume unit
 (enum value 100080); since Python enum member names must be unique, the currency
@@ -2506,6 +2528,7 @@ exposed as:</p>
 <li><a href="https://www.bovnar.io/docs/units/">Unit &amp; Currency Reference</a> — the unit model behind <code>Quantity</code> and the bridges</li>
 <li><a href="https://www.bovnar.io/docs/tutorial/">Tutorial</a> — the document syntax, by example</li>
 <li><a href="https://www.bovnar.io/docs/faq/#13-python-bindings">FAQ §13 — Python Bindings</a> — common questions about this package</li>
+<li><a href="https://www.bovnar.io/docs/rust/">Rust Bindings</a> — the same tiers from Rust</li>
 </ul>
 <hr />
 <p><em>End of Bovnar — Python Bindings (Bovnar spec 1.2).</em></p>

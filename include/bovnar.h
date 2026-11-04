@@ -787,7 +787,9 @@ typedef uint32_t bvn_unit_flags_t;
  * out -- base 10 on uint/sint/float, and no_unit. So "1.0 km", which the reader
  * hands over as <float:64,_10,km>, and "<float:64,k~m> 1.0" canonicalise to the
  * same bytes. Where an annotation sits is not changed: [1, 2] and
- * <uint:64> [1, 2] stay two documents. */
+ * <uint:64> [1, 2] stay two documents, as do <uint:64,m> 5 and <uint:64> 5 m.
+ * A unit with an opaque profile code keeps its profile spelling, prefixes
+ * beside it unfolded: ucum:[IU]/mL and ucum:[IU]/L are not one form. */
 #define BVN_NUM_CANONICAL   ((bvn_unit_flags_t)(1u << 2))
 /*
  * Write options. The fields mirror bvnr_read_flags_t for symmetry, but the
@@ -1131,8 +1133,10 @@ typedef enum bvnr_unit_normalise_e {
 	bvnr_normalise_none = 0,
 	/* Deliver anything the targets did not match in coherent SI base units,
 	 * prefixes folded out (see bvn_unit_si_normal_form). Values with no
-	 * coherent SI form -- currencies, and every DIMENSIONLESS unit (%, ppm,
-	 * dB, pH, rad, °) -- are left alone rather than reinterpreted. */
+	 * coherent SI form -- currencies, every DIMENSIONLESS unit (%, ppm,
+	 * dB, pH, rad, °), and a unit carrying the steradian's or an angle's
+	 * quantity kind (k~lx, W/sr, k~rad/s) -- are left alone, prefixes
+	 * included, rather than reinterpreted. */
 	bvnr_normalise_si   = 1
 } bvnr_unit_normalise_t;
 typedef enum bvnr_unit_inexact_policy_e {
@@ -1333,6 +1337,10 @@ BVN_API value_unit_t bvn_parse_unit_n(const uint8_t* unit, uint32_t len, bool* o
  *     one whole code looked up entire, so it can spell exactly one unprefixed
  *     component;
  *   - an opaque unit beside a native one, for the same reason.
+ * A prefix is not a fourth way: an opaque UCUM unit accepts only the prefixes
+ * UCUM spells (yocto to yotta, bvn_prefix_unit_valid), so `R~[IU]` is invalid
+ * rather than valid and unwritable, and ucum:10*27.k[IU] is
+ * error_unit_profile_unsupported.
  * Such a unit is still perfectly usable in memory — it compares, and it
  * converts to itself — it simply cannot be serialised, and the writer refuses
  * it (error_unit_illegal) rather than emitting something that reads back wrong.

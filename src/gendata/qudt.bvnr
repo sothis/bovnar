@@ -832,7 +832,7 @@
   { .code = "CentiMOL";                      .bovnar = "c~mol";               },
   { .code = "CentiMOL-PER-KiloGM";           .bovnar = "c~mol/k~g";           .reverse = false; },
   { .code = "CentiMOL-PER-L";                .bovnar = "c~mol/L";             .reverse = false; },
-  { .code = "CentiM_H2O";                    .bovnar = "m~at";                },
+  { .code = "CentiM_H2O";                    .bovnar = "c~mH2O";              },
   { .code = "CentiM_HG";                     .bovnar = "da~mmHg";             },
   { .code = "CentiN";                        .bovnar = "c~N";                 },
   { .code = "CentiN-M";                      .bovnar = "c~N·m";               .reverse = false; },

@@ -341,6 +341,38 @@ bool bvnr_write_float(bvnr_writer_t *w, const char *key,
 {
 	return bvnr_write_float_unit(w, key, width, value, BVN_UNIT_NONE);
 }
+/*
+ * `value` rounded to the binary16 or binary32 grid, as a double. The float:16
+ * path used to narrow through a binary32, so float:16 kept 1e10 (beyond
+ * binary16's 65504) while float:32 turned 1e300 into inf; and a C cast of a
+ * double outside float's range is undefined. Both widths now round to their own
+ * format through the packer the reader decodes with.
+ */
+static double bvn_w_narrow(double value, uint32_t width)
+{
+	bvn_limb_t a[BVN_FLOAT_NLIMBS(64u)], b[BVN_FLOAT_NLIMBS(64u)];
+	bvn_float_t fa, fb;
+	double      out = value;
+	bvn_float_init_buf(&fa, 64u, a, BVN_FLOAT_NLIMBS(64u));
+	bvn_float_init_buf(&fb, 64u, b, BVN_FLOAT_NLIMBS(64u));
+	if (!bvn_float_from_double(&fa, value)) return value;
+	bool ok;
+	if (width == 16u) {
+		uint16_t bits = 0;
+		bvn_float_to_bin16(&fa, &bits);
+		ok = bvn_float_from_bin16(&fb, bits);
+	} else {
+		uint32_t bits = 0;
+		bvn_float_to_bin32(&fa, &bits);
+		ok = bvn_float_from_bin32(&fb, bits);
+	}
+	if (!ok || !bvn_float_to_double(&fb, &out)) return value;
+	return out;
+}
+
+/* Finite without <math.h>: inf - inf and nan - nan are nan, which is != 0. */
+static bool bvn_w_is_finite(double v) { return v - v == 0.0; }
+
 bool bvnr_write_float_unit(bvnr_writer_t *w, const char *key,
 			    uint32_t width, double value, value_unit_t unit)
 {
@@ -349,7 +381,15 @@ bool bvnr_write_float_unit(bvnr_writer_t *w, const char *key,
 	 && width != 128u && width != 256u)
 		return bvn_writer_set_error(w, error_invalid_argument);
 	value_type_spec_t vt = BVN_TYPE_FLOAT(width);
-	if (width != 0u && width <= 32u) value = (double)(float)value;
+	if (width == 16u || width == 32u) {
+		/* Round to the declared format, and refuse a finite value it cannot
+		 * hold rather than writing the inf it rounds to: the caller handed
+		 * over a number, and a reader would see infinity. */
+		double narrowed = bvn_w_narrow(value, width);
+		if (bvn_w_is_finite(value) && !bvn_w_is_finite(narrowed))
+			return bvn_writer_set_error(w, error_value_out_of_range);
+		value = narrowed;
+	}
 	char buf[64];
 	if (bvn_format_double(buf, sizeof(buf), value, vt) < 0)
 	{

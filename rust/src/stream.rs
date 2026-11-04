@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Document streams: framing several
 //! documents into one byte stream, multiplexing binary messages over
 //! channels, and embedding one document inside another.

@@ -31,6 +31,14 @@ _FLOATISH = (int(_F.FLOAT), int(_F.FLOAT_DEC), int(_F.FLOAT_FIX))
 # IEEE interchange widths that map to a bvn_float bit encoding (binary & decimal).
 _IEEE_WIDTHS = (16, 32, 64, 128, 256)
 
+# fraction() builds 10**|exponent| exactly, so a 28-byte literal such as
+# 1e-99999999 cost unbounded time and memory. It refuses a literal whose
+# decimal exponent (of its magnitude or of its last digit) is past this, which
+# is well beyond every binary float format (binary256 reaches 10**-78984).
+# float_dec:256 reaches further, to 10**-611867, and gets its own range as the
+# cap -- see _fraction_exponent_cap. Documented in doc/09 §6.2.
+FRACTION_EXPONENT_CAP = 100_000
+
 
 def _validate_float_width(family, width: int) -> None:
     """Reject a width bovnar would refuse, early and with a clear message.
@@ -366,13 +374,44 @@ class Quantity:
         ``mantissa / 2**frac_bits``; for the others it is the exact literal.
         """
         from fractions import Fraction
-        if int(self.vtype.family) == int(_F.FLOAT_FIX):
-            m, q = self.fixed_point
+        fam = int(self.vtype.family)
+        if fam == int(_F.FLOAT_FIX):
+            fp = self.fixed_point
+            if fp is None:
+                return None
+            m, q = fp
             return Fraction(m, 1 << q)
+        if fam not in (int(_F.UINT), int(_F.SINT)) + _FLOATISH:
+            raise BovnarArgumentError(
+                f"fraction() is not defined for a {_F(fam).name} value")
         d = self.decimal
         if d is None:
             return None
+        if not d.is_finite():
+            # Fraction(Decimal('Infinity')) is an OverflowError from inside
+            # fractions; a non-finite value has no ratio, so say that instead.
+            raise BovnarArgumentError(
+                f"fraction() is not defined for the non-finite value {self.raw!r}")
+        if d:
+            cap = self._fraction_exponent_cap()
+            e = max(abs(d.adjusted()), abs(d.as_tuple().exponent))
+            if e > cap:
+                raise BovnarArgumentError(
+                    f"fraction() refuses a literal with a decimal exponent of "
+                    f"{e}: its exact ratio has a {e}-digit term. The cap is "
+                    f"{cap}; .decimal is exact at any exponent, and "
+                    f".stored_value gives what the format holds")
         return Fraction(d)
+
+    def _fraction_exponent_cap(self) -> int:
+        """FRACTION_EXPONENT_CAP, or the declared format's own decimal range
+        where that is wider (float_dec:256: bias 611867 plus 70 digits)."""
+        if int(self.vtype.family) == int(_F.FLOAT_DEC):
+            from ._bvnfloat import DECIMAL_FORMATS
+            fmt = DECIMAL_FORMATS.get(int(self.vtype.width) or 64)
+            if fmt is not None:
+                return max(FRACTION_EXPONENT_CAP, fmt[3] + fmt[4])
+        return FRACTION_EXPONENT_CAP
 
     @property
     def fixed_point(self) -> tuple:
@@ -380,6 +419,19 @@ class Quantity:
         is ``mantissa / 2**frac_bits``. Raises for any other family."""
         if int(self.vtype.family) != int(_F.FLOAT_FIX):
             raise BovnarArgumentError("fixed_point() is only valid for float_fix")
+        # A typed null has no datum: None, as .value, .decimal and
+        # .stored_value answer. (It used to raise AttributeError from
+        # encoding the missing literal.)
+        if self.raw is None:
+            return None
+        # The reader accepts nan/inf/ninf under float_fix (spec §6.4), but a
+        # Q-format datum has no such value; the C conversion maps them to 0,
+        # and returning that would make .fixed_point and .fraction say 0 while
+        # .value and .decimal say inf.
+        if self._nonfinite_decimal() is not None:
+            raise BovnarArgumentError(
+                f"fixed_point() has no Q-format datum for the non-finite "
+                f"value {self.raw!r}")
         from ._bvnfloat import BvnFloat
         q = int(self.vtype.base)
         width = int(self.vtype.width) or 64
@@ -435,14 +487,14 @@ class Quantity:
         full representable range. Uses bovnar's C encoder, falling back to the
         pure-Python correctly-rounded encoder when the C parser saturates an
         extreme decimal exponent."""
-        from ._bvnfloat import BvnFloat, fraction_to_binary_bits
+        from ._bvnfloat import BvnFloat, decimal_to_binary_bits
         width = int(self.vtype.width) or 64
         base = self._numeric_base()
         f = BvnFloat.from_str(self.raw, base)
         lit = self.decimal
         if base in (0, 10) and self._parser_saturated(f, lit):
-            from fractions import Fraction
-            return fraction_to_binary_bits(Fraction(lit), width)
+            # Not Fraction(lit) first: for 1e-99999999 that is 10**99999999.
+            return decimal_to_binary_bits(lit, width)
         return f.to_binary_bits(width)
 
     @property
@@ -466,8 +518,12 @@ class Quantity:
         # encode the missing text and raised AttributeError from inside.
         if self.raw is None and fam in _FLOATISH:
             return None
+        # A non-finite literal is the value for every float family, float_fix
+        # included: the reader accepts nan/inf/ninf there too, and .value and
+        # .decimal report them. (float_fix used to fall through to the Q-format
+        # path, which materialises them as 0.)
         nf = self._nonfinite_decimal()
-        if nf is not None and fam != int(_F.FLOAT_FIX):
+        if nf is not None:
             return nf
         if fam == int(_F.FLOAT_FIX):
             m, q = self.fixed_point
@@ -531,15 +587,27 @@ class Quantity:
             return NotImplemented
         return (self.raw        == other.raw
                 and self._frac        == other._frac
-                and self.vtype.family == other.vtype.family
-                and self.vtype.width  == other.vtype.width
-                and self.vtype.base   == other.vtype.base
+                and self._type_key()  == other._type_key()
                 and self.unit_str   == other.unit_str)
 
     def __hash__(self) -> int:
         return hash((self.raw,
                      self._frac,
-                     self.vtype.family,
-                     self.vtype.width,
-                     self.vtype.base,
+                     self._type_key(),
                      self.unit_str))
+
+    def _type_key(self) -> tuple:
+        """(family, width, base) with the defaults filled in, as the C library's
+        bvn_effective_width/bvn_effective_base fill them in: `<float:0>`,
+        `<float:64,_10>` and a bare `2.5` are one type. Compared raw, a typed
+        load of `<float:64,_10> 5.7` did not equal the load of what dumps()
+        wrote for it (`5.7`), though both read as the same value.
+
+        The base field is a radix only for uint/sint/float (and is 0 for
+        utf8/bool); for float_fix it is Q, the fractional-bit count, and for
+        datetime the epoch index, so those are compared as stored."""
+        fam = int(self.vtype.family)
+        base = int(self.vtype.base)
+        if fam not in (int(_F.FLOAT_FIX), int(_F.DATETIME)):
+            base = base or 10
+        return (fam, int(self.vtype.width) or 64, base)

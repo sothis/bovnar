@@ -2850,7 +2850,9 @@
   },
     # 0.4462 mmol/m^2, the conventional column density total ozone is reported
     # in. A 300 DU column is 3 mm of pure ozone at STP, which is where the name
-    # comes from.
+    # comes from. The value is the published one (UDUNITS, WMO), a rounding:
+    # 10 um of ideal gas at STP is 101325e-5/(R*273.15) = 4.461497e-4 mol/m^2
+    # under the 2019 SI, 1.1e-4 lower. Kept as published, like Btu_59.
   {
     .id      = <uint:32> 100213;
     .name    = "dobson";
@@ -3366,6 +3368,9 @@
     .prefix  = default;
     .aliases = ["perm_23C"];
   },
+    # The metric perm, 1 g/(m^2*d*mmHg), as UDUNITS publishes it: 8.68127e-11.
+    # Computed from 1 mmHg = 101325/760 Pa it is 8.6812682e-11, 2e-7 higher;
+    # kept as published, like Btu_59.
   {
     .id      = <uint:32> 100249;
     .name    = "perm_metric";

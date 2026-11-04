@@ -173,9 +173,10 @@ BVN_API size_t bvn_rational_str_bufsize(const bvn_int_t *num, const bvn_int_t *d
  * length (excluding NUL).
  *
  * Two distinct failures, both leaving *exact=false and `buf` unwritten:
- *   BVN_RATIONAL_NONTERMINATING (-2) — the expansion is infinite in this base.
- *       Not a defect in the value: num/den remain exact and a caller that can
- *       consume a rational should use them.
+ *   BVN_RATIONAL_NONTERMINATING (-2) — the expansion is infinite in this base,
+ *       or the value has a fraction and the base is 85, whose digits include
+ *       the '.' a radix point would need. Not a defect in the value: num/den
+ *       remain exact and a caller that can consume a rational should use them.
  *   BVN_RATIONAL_TOO_LONG (-3) — the exact expansion does not fit `bufsize`.
  *       The buffer is NEVER truncated: a truncated digit string is a WRONG
  *       number under an exact contract. Size it with bvn_rational_str_bufsize,

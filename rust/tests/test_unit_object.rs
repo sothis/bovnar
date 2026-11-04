@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The `Unit` object, its equality and hashing, and the unit functions taking
 //! it.
 //!
@@ -404,4 +405,68 @@ fn test_ucum_iu_spellings_are_one_unit() {
     assert_eq!(u("ucum:[iU]").to_string(), "ucum:[IU]");
     assert_eq!(u("ucum:k[iU]"), u("ucum:k[IU]"));
     assert_ne!(u("ucum:[IU]"), u("ucum:[arb'U]"));
+}
+
+/// "No unit" (a typed value) and "dimensionless" (a bare literal) are both
+/// the absence of one: a typed `2.5` written bare and read back is equal to
+/// itself, as in the Python binding. They printed alike and compared unequal.
+#[test]
+fn test_no_unit_and_dimensionless_compare_equal() {
+    use bovnar::{Unit, Value, parse_typed, to_string};
+    for src in [
+        ".a = <float:64> 2.5;",
+        ".a = <float:64> [1.0, 2.0];",
+        "#!bovnar 1.1\n.a = 2026-06-15T12:00:00Z;",
+    ] {
+        let doc = parse_typed(src.as_bytes()).unwrap();
+        let back = parse_typed(&to_string(&doc, false).unwrap()).unwrap();
+        assert_eq!(back, doc, "{src}");
+    }
+    // A bare literal's unit (one dimensionless component) and a typed
+    // value's (none at all).
+    let bare = |src: &str| {
+        let Value::Struct(e) = parse_typed(src.as_bytes()).unwrap() else {
+            panic!()
+        };
+        let Value::Quantity(q) = &e[0].1 else {
+            panic!()
+        };
+        q.unit
+    };
+    assert_eq!(bare(".a = 2.5;"), Unit::default());
+    assert_eq!(bare(".a = <float:64> 2.5;"), Unit::default());
+    let h = |u: &Unit| {
+        let mut s = DefaultHasher::new();
+        u.hash(&mut s);
+        s.finish()
+    };
+    assert_eq!(h(&bare(".a = 2.5;")), h(&Unit::default()));
+}
+
+/// Equality uses the effective type: width 0 is 64 and base 0 is 10, but a
+/// float_fix Q and a datetime epoch compare as stored.
+#[test]
+fn test_quantity_equality_uses_the_effective_type() {
+    use bovnar::{Value, parse_typed};
+    let q = |src: &str| {
+        let Value::Struct(e) = parse_typed(src.as_bytes()).unwrap() else {
+            panic!()
+        };
+        let Value::Quantity(q) = e.into_iter().next().unwrap().1 else {
+            panic!()
+        };
+        *q
+    };
+    assert_eq!(q(".a = <float:0> 2.5;"), q(".a = 2.5;"));
+    assert_eq!(q(".a = <float:64,_10> 2.5;"), q(".a = 2.5;"));
+    assert_eq!(q(".a = <uint:32,_10> 42;"), q(".a = <uint:32> 42;"));
+    assert_ne!(q(".a = <uint:32> 42;"), q(".a = 42;"));
+    assert_ne!(
+        q(".a = <float_fix:32,q16> 0.5;"),
+        q(".a = <float_fix:32,q15> 0.5;")
+    );
+    assert_ne!(
+        q("#!bovnar 1.1\n.a = <datetime:64> 5;"),
+        q("#!bovnar 1.1\n.a = <datetime:64,tai> 5;")
+    );
 }

@@ -1408,13 +1408,35 @@ static bool bvn_unit_component_identical(const value_unit_component_t *ca,
  * Δ°F is 5/9 K, and its scale counterpart °F is affine and unusable in a
  * compound anyway, so there is no pair to merge.
  */
+/*
+ * "Lone" is asked of the unit after cancellation, as bvni_kind_exponents asks
+ * it: `ΔK·m/m` folds to a lone ΔK. Asking the written shape here made that unit
+ * EQUAL to `K·m/m` while the kind check called the two incompatible, and
+ * `--canonical` then reduced a valid array of the two into an invalid one.
+ */
+static bool bvni_is_lone_delta_kelvin(value_unit_t u)
+{
+	value_base_unit_t base[BVNR_MAX_UNIT_COMPONENTS];
+	int32_t           net[BVNR_MAX_UNIT_COMPONENTS];
+	uint32_t          n = 0;
+	for (uint32_t i = 0; i < u.num_components && i < BVNR_MAX_UNIT_COMPONENTS; i++) {
+		int32_t  e = bvn_exponent_to_int(u.components[i].exponent);
+		uint32_t j = 0;
+		for (; j < n; j++)
+			if (base[j] == u.components[i].base) { net[j] += e; break; }
+		if (j == n) { base[n] = u.components[i].base; net[n] = e; n++; }
+	}
+	uint32_t live = 0, at = 0;
+	for (uint32_t j = 0; j < n; j++)
+		if (net[j] != 0) { live++; at = j; }
+	return live == 1u && base[at] == bu_delta_kelvin && net[at] == 1;
+}
 static value_base_unit_t bvni_equality_base(value_unit_t u, uint32_t i)
 {
 	const value_unit_component_t *c = &u.components[i];
 	if (c->base != bu_delta_kelvin)
 		return c->base;
-	bool lone = (u.num_components == 1u);
-	return (lone && bvn_exponent_to_int(c->exponent) == 1)
+	return bvni_is_lone_delta_kelvin(u)
 	     ? c->base                       /* the hazard: ΔK is not K */
 	     : bu_kelvin;
 }
@@ -2154,7 +2176,14 @@ value_type_spec_t bvn_parse_type_annotation(
 			 * the bound is here so a hostile document cannot drive the SCANNER
 			 * deep before the parser gets to say so.
 			 */
+			/* Past the bound the scan goes on -- the counters are plain
+			 * integers, nothing recurses -- and only the unit is refused.
+			 * Returning here left *unit_buf_len 0 and skipped every check
+			 * below, so the validator, which looks at the unit only when it
+			 * has a length, accepted `<float:64,m{{{...>` without its unit
+			 * and `<uint:99999,{{{...>` without its width check. */
 			uint32_t bdepth = 0, kdepth = 0;
+			bool     too_deep = false;
 			while (pos < len) {
 				uint8_t uc = str[pos];
 				if (uc == ',' && bdepth == 0 && kdepth == 0)
@@ -2164,17 +2193,15 @@ value_type_spec_t bvn_parse_type_annotation(
 				else if (uc == '[') kdepth++;
 				else if (uc == ']') { if (kdepth) kdepth--; }
 				if (bdepth > BVN_UNIT_GROUP_MAX_DEPTH ||
-					kdepth > BVN_UNIT_GROUP_MAX_DEPTH) {
-					*unit_ok = false;
-					return r;
-				}
+					kdepth > BVN_UNIT_GROUP_MAX_DEPTH)
+					too_deep = true;
 				pos++;
 			}
 			uint32_t ulen = pos - ustart;
-			if (ulen > UINT8_MAX) {
-				*unit_ok      = false;
-				*unit_too_long = true;
-				return r;
+			if (too_deep || ulen > UINT8_MAX) {
+				*unit_ok       = false;
+				*unit_too_long = !too_deep;
+				continue;
 			}
 			memcpy(unit_buf, str + ustart, ulen);
 			unit_buf[ulen] = '\0';
@@ -2237,8 +2264,8 @@ value_type_spec_t bvn_parse_type_annotation(
 		 * rejected above for any non-float_fix family.) The test is on a
 		 * parameter being PRESENT, not on its value: <utf8:0> and <bool:0>
 		 * state a width and are refused like <utf8:8>. */
-		if (have_width || have_base || r.width != 0u || r.base != 0u ||
-		    *unit_buf_len != 0u) {
+		if (have_width || have_base || have_unit || r.width != 0u ||
+		    r.base != 0u || *unit_buf_len != 0u) {
 			*type_ok = false;
 			return r;
 		}

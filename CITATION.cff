@@ -14,7 +14,7 @@ abstract: >-
   schema, so that dimensional mismatches are rejected by the parser rather than
   by a separate validation pass. Ships a dependency-free C99 reference
   implementation with a streaming reader, DOM API, writer, command-line tool,
-  WebAssembly build and pure-ctypes Python bindings.
+  WebAssembly build, pure-ctypes Python bindings and a Rust crate.
 authors:
   - family-names: Sonntag
     given-names: Janos
@@ -49,6 +49,7 @@ keywords:
   - scientific data
   - C
   - Python
+  - Rust
 
 # Once a paper describing Bovnar is published, uncomment and complete the block
 # below. `preferred-citation` redirects citation tools to the paper while the

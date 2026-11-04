@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! float128 / float256 / float_fix / float_dec carried at full precision --
 //! exact `Decimal` and rational accessors, bit-exact IEEE materialisation,
 //! and exact writes.
@@ -711,4 +712,80 @@ fn test_stored_value_of_a_typed_null_is_none() {
     assert_eq!(q.decimal().unwrap(), None);
     assert_eq!(q.stored_value().unwrap(), None);
     assert_argument_error(q.ieee_bits(), "");
+}
+
+/// A 28-byte document with an extreme exponent: the exact accessors built
+/// 10^|e| and ran without bound (1e-500000 already took 9 s). Overflow and
+/// underflow are decided from the exponent now, and `fraction` refuses an
+/// exponent past what the type holds and past 100 000.
+#[test]
+fn test_extreme_exponents_are_bounded() {
+    use std::time::{Duration, Instant};
+    for (lit, stored) in [
+        ("<float:64> 1e-99999999", "0.0"),
+        ("<float:64> -1e-99999999", "-0.0"),
+        ("<float:64> 1e99999999", "Infinity"),
+        ("<float_dec:64> 1e-99999999", "0"),
+        ("<float_dec:64> -1e99999999", "-Infinity"),
+    ] {
+        let q = load(&format!(".a = {lit};"), "a");
+        let t = Instant::now();
+        assert_eq!(
+            q.stored_value().unwrap().unwrap().to_string(),
+            stored,
+            "{lit}"
+        );
+        q.ieee_bits().unwrap();
+        assert!(matches!(q.fraction(), Err(Error::Argument { .. })), "{lit}");
+        assert_eq!(
+            q.decimal().unwrap().unwrap().exponent().unwrap().abs(),
+            99_999_999
+        );
+        assert!(
+            t.elapsed() < Duration::from_secs(2),
+            "{lit}: {:?}",
+            t.elapsed()
+        );
+    }
+    // Within what the type holds, fraction is exact as before.
+    let q = load(".a = <float:256> 1e-78000;", "a");
+    assert_eq!(
+        q.fraction().unwrap().unwrap().denom().to_string().len(),
+        78001
+    );
+    // The rounding boundary at the smallest subnormal is unchanged.
+    let half_up = load(".a = <float:64> 2.4703282292062328e-324;", "a");
+    assert_eq!(half_up.ieee_bits().unwrap(), [1, 0, 0, 0, 0, 0, 0, 0]);
+    let below = load(".a = <float:64> 2.4703282292062327e-324;", "a");
+    assert_eq!(below.ieee_bits().unwrap(), [0; 8]);
+}
+
+/// A float_fix `inf` or `nan` is not 0: `stored_value` gives it, and the
+/// fixed-point accessors, which have no encoding for it, refuse.
+#[test]
+fn test_float_fix_nonfinite_is_not_zero() {
+    for (lit, want) in [("inf", "Infinity"), ("ninf", "-Infinity"), ("nan", "NaN")] {
+        let q = load(&format!(".a = <float_fix:32,q16> {lit};"), "a");
+        assert_eq!(q.stored_value().unwrap().unwrap().to_string(), want);
+        assert!(
+            matches!(q.fixed_point(), Err(Error::Argument { .. })),
+            "{lit}"
+        );
+        assert!(matches!(q.fraction(), Err(Error::Argument { .. })), "{lit}");
+    }
+}
+
+/// A typed-null float_fix has no value: `fraction` and `stored_value` give
+/// `None`, as for every other family.
+#[test]
+fn test_float_fix_typed_null_accessors() {
+    let doc = parse_typed(b".a = [<float_fix:32,q16>];").unwrap();
+    let Value::Struct(e) = doc else { panic!() };
+    let Value::Array(items) = &e[0].1 else {
+        panic!("{:?}", e[0].1)
+    };
+    let q = quantity(&items[0]);
+    assert_eq!(q.fraction().unwrap(), None);
+    assert_eq!(q.stored_value().unwrap(), None);
+    assert!(matches!(q.fixed_point(), Err(Error::Argument { .. })));
 }

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! `units_convertible` may answer true for a pair that `convert_value` then
 //! refuses only in two documented shapes: an affine scale inside a compound,
 //! and a factor too large for any representation. The sweep below draws its

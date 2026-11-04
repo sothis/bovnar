@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Arbitrary text through from_json: refused or converted, never a crash. A
 //! converted document converts back to JSON, and the JSON settles: each trip
 //! may drop what JSON cannot carry (a float with an integral value becomes an

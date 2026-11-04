@@ -1,15 +1,50 @@
 # TODO
 
-## State 2026-11-03 — after the second whole-project review
+## State 2026-11-04 — after the third whole-project review
 
-Committed on `main`, not pushed, not tagged (2.0.0 waits for the
-maintainer's word). What the review changed is in CHANGELOG.md under 2.0.0, "Fixed — a second whole-project review before
-release". Verified on that tree: `./run_tests.sh` (full build, all 185 CTest
-tests and the fuzz sweep), the ASan+UBSan build 159/159 (`-LE python`), and
-`BVNR_WERROR` builds clean with GCC 15 and clang 21. GCC 13, the CI compiler,
-was not available here; the CI tests job is where it shows. The WASM module,
-`web/`, the LLM views, `web/de/` and the IETF draft renderings were regenerated
-from the sources.
+Committed on `main`, not tagged (2.0.0 waits for the maintainer's word). What
+the review changed is in CHANGELOG.md under 2.0.0, "Fixed — a third
+whole-project review before release"; the Rust crate (PR #1) has its own
+"Added — Rust bindings" entry, and the crates.io publishing work of the same
+day (`rust/package.py`, the `rust_package`/`publish_crate` jobs) is in 8ad0130.
+Verified on that tree: `./run_tests.sh` (full build, all 189
+CTest tests and the fuzz sweep), the ASan+UBSan build 163/163 (`-LE python`),
+`BVNR_WERROR` builds clean with GCC 15.2 and clang 21, and the Rust crate's
+`cargo test --locked` 1373/1373 (with `test_writers_agree -- --ignored`),
+`cargo clippy -- -D warnings`, `cargo fmt --check` and the 1.88 MSRV. The
+WASM module, `web/`, the LLM views, `web/de/` and the IETF draft renderings
+were regenerated from the sources.
+
+The CI compiler is now GCC 15.2 (`ubuntu-latest` moved to Ubuntu 26), not 13.
+A Rust toolchain (rustup, stable + 1.88) was installed user-locally in
+`~/.rustup`/`~/.cargo` for this review, without touching the shell profile;
+`rust/target/` is git-ignored.
+
+## Open — what the third review leaves to the maintainer
+
+1. **`MBtu`, `Mlb`.** US industry writes M = 1000 (MBtu = 1000 Btu, MMBtu =
+   10⁶). Bovnar reads `MBtu` as mega-Btu (10⁶) and refuses `MMBtu`. doc/07 now
+   lists the trap; making `MBtu` a `.compact_exceptions` entry would refuse
+   the compact form, and 2.0.0 is the only release where that is free.
+2. **Long binary128 literals.** The digit budget is 12 288 bits for formats
+   wider than binary64 (a regression of the second review is fixed), but a
+   binary128 literal of more than about 4 900 significant digits that sits
+   within an ulp of a midpoint can still misround; `bvn_float.h` says so.
+   Every midpoint needs a different algorithm (big-decimal comparison), not a
+   larger budget, which overflows `10^k` past 15 360.
+3. **Hex text near the precision ceiling.** `bvn_float_from_str` saturates
+   hex text at precisions within ~200 bits of `BVN_INT_MAX_BITS`, or past
+   exponent ±32 640, as its contract says, instead of refusing it. Documented
+   in `bvn_float.h`; refusing would change the documented contract.
+4. **An annotation before an octet stream** is accepted by the writer, as
+   spec §6.1 lets the reader accept it unchecked (producers SHOULD NOT write
+   one). A writer refusal would be stricter than the reader.
+5. **wasm32-wasip2.** CI builds the crate for it but runs no tests there; the
+   ABI test cannot run on that target. `cargo test --target wasm32-wasip2`
+   under wasmtime would cover the 32-bit `usize` paths.
+6. **crates.io 2.0.0** is published by hand from the tag with
+   `rust/package.py` (Trusted Publishing cannot create a crate);
+   `publish_crate` takes over from 2.0.1.
 
 ## Closed 2026-11-03 — what the second review left to the maintainer
 

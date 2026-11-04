@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! ISO-8601 datetime literals checked against an independent reference
 //! written in this file (proleptic Gregorian civil-day arithmetic plus the
 //! IERS leap-second table).

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! End-to-end smoke test of the public API: parse, serialise, parse again.
 
 use bovnar::{DomDoc, ErrorCode, Value, parse, parse_typed, to_string};

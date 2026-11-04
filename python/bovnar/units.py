@@ -372,27 +372,44 @@ def unit_to_str_ex(unit: ValueUnit,
     buf = ctypes.create_string_buffer(UNIT_STRING_MAX)
     n   = lib.bvn_unit_to_string_ex(unit, buf, UNIT_STRING_MAX, int(flags))
     if n < 0:
-        # -1 covers four distinct causes; say which, rather than blaming the
-        # buffer for a unit that unit_valid() itself calls valid. (Adding the
-        # overflow refusal in C without adding its branch here put the third
-        # case back under the message this triage exists to stop giving.)
-        if not unit_valid(unit):
-            raise BovnarArgumentError("unit_to_str_ex: structurally invalid unit")
-        nc = min(int(unit.num_components), len(unit.components))
-        if any(int(unit.components[i].base) == 0 for i in range(nc)) and nc:
-            raise BovnarArgumentError(
-                "unit_to_str_ex: a bu_none component has no spelling outside a "
-                "bare no_unit — this unit cannot be written")
-        if int(flags) & int(UnitFlags.REDUCE):
-            try:
-                unit_reduce(unit)
-            except OverflowError as exc:
-                raise BovnarArgumentError(
-                    "unit_to_str_ex: REDUCE cannot express this unit — %s. The "
-                    "reduction drops a component, so the result would be a "
-                    "different unit; serialise it without REDUCE." % exc) from None
-        raise BovnarArgumentError("unit_to_str_ex: output buffer overflow")
+        raise _unit_no_text_error("unit_to_str_ex", unit, flags)
     return buf.raw[:n].decode('utf-8')
+
+
+def _unit_no_text_error(fn: str, unit, flags: int = 0) -> BovnarArgumentError:
+    """The error for a -1 from bvn_unit_to_string[_ex], naming its cause.
+
+    -1 is never the buffer: every formatter here passes BVNR_UNIT_STRING_MAX,
+    the bound on anything the library can emit. It covers the causes below, so
+    say which, rather than blaming the buffer for a unit that unit_valid()
+    itself calls valid. (Adding the overflow refusal in C without adding its
+    branch here put the third case back under the message this triage exists
+    to stop giving; and unit_to_str, which had no triage at all, reported every
+    one of them as "output buffer overflow".)"""
+    if not unit_valid(unit):
+        return BovnarArgumentError(f"{fn}: structurally invalid unit")
+    nc = min(int(unit.num_components), len(unit.components))
+    if any(int(unit.components[i].base) == 0 for i in range(nc)) and nc:
+        return BovnarArgumentError(
+            f"{fn}: a bu_none component has no spelling outside a "
+            "bare no_unit — this unit cannot be written")
+    if int(flags) & int(UnitFlags.REDUCE):
+        try:
+            unit_reduce(unit)
+        except OverflowError as exc:
+            return BovnarArgumentError(
+                f"{fn}: REDUCE cannot express this unit — %s. The "
+                "reduction drops a component, so the result would be a "
+                "different unit; serialise it without REDUCE." % exc)
+    # What is left is the documented case: a valid unit no notation spells.
+    # Every way there involves a profile's opaque unit (bovnar.h,
+    # bvn_unit_to_string): opaque units of two profiles in one unit, or an
+    # opaque unit of a flat profile at an exponent other than 1 or beside
+    # another component.
+    return BovnarArgumentError(
+        f"{fn}: this unit has no text form — no namespace spells opaque units "
+        "of two profiles together, and a flat profile (unece, qudt, qudt-qk, "
+        "om, cf) spells its opaque unit only alone, unprefixed, at exponent 1")
 
 
 def exponent_to_int(exp: Exponent | int) -> int:

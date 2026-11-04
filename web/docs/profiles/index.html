@@ -22,7 +22,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <meta property="article:published_time" content="2026-07-27">
-<meta property="article:modified_time" content="2026-11-03">
+<meta property="article:modified_time" content="2026-11-04">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar Unit Profiles">
@@ -32,7 +32,7 @@
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=9cf496752b97">
 <link rel="alternate" type="text/markdown" href="/doc/11_bovnar_unit_profiles.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Unit Profiles", "description": "Writing UCUM, UN/ECE, QUDT, UDUNITS, OM 2 and CF codes in a Bovnar unit slot: the transliteration tables, the collisions between the namespaces, what has no representation, and the cross-vocabulary conformance suite.", "url": "https://www.bovnar.io/docs/profiles/", "mainEntityOfPage": "https://www.bovnar.io/docs/profiles/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-07-27", "dateModified": "2026-11-03", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Unit Profiles", "item": "https://www.bovnar.io/docs/profiles/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Unit Profiles", "description": "Writing UCUM, UN/ECE, QUDT, UDUNITS, OM 2 and CF codes in a Bovnar unit slot: the transliteration tables, the collisions between the namespaces, what has no representation, and the cross-vocabulary conformance suite.", "url": "https://www.bovnar.io/docs/profiles/", "mainEntityOfPage": "https://www.bovnar.io/docs/profiles/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-07-27", "dateModified": "2026-11-04", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Unit Profiles", "item": "https://www.bovnar.io/docs/profiles/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
@@ -123,7 +123,7 @@ they wrote it in. <code>unece</code> cannot be closed the same way and §11.1 sa
 pass changed and what it cost.</p>
 <p>Every acceptance, refusal and conversion factor quoted below was produced by running the
 reference implementation built from this tree, and the behavioural claims are pinned by the test
-files named above (1433 assertions across the seven profiles, plus 4868 in the cross-vocabulary
+files named above (1483 assertions across the seven profiles, plus 4983 in the cross-vocabulary
 suite). The VOCABULARY side — whether each foreign code is <em>worth</em> what the table says — is checked
 too, but not by the same means and not to the same strength: <code>check_profile_factors.py</code> (§9.5)
 resolves every mapped code against its publisher's own machine-readable definitions, and <code>unece</code>
@@ -2987,7 +2987,7 @@ that went in spelled <code>qudt:M-PER-SEC</code> comes out spelled <code>qudt:M-
 </tr>
 <tr>
 <td><code>qudt-qk.bvnr</code></td>
-<td>908 mapped, 257 unsupported</td>
+<td>900 mapped, 265 unsupported</td>
 </tr>
 <tr>
 <td><code>udunits.bvnr</code></td>
@@ -3066,7 +3066,7 @@ them to each other:</p>
 <tr>
 <td><code>tests/bovnar_ucum_test.c</code></td>
 <td><code>bvnr_ucum_test</code></td>
-<td>209</td>
+<td>217</td>
 <td>§2–§10</td>
 </tr>
 <tr>
@@ -3078,31 +3078,31 @@ them to each other:</p>
 <tr>
 <td><code>tests/bovnar_qudt_test.c</code></td>
 <td><code>bvnr_qudt_test</code></td>
-<td>240</td>
+<td>256</td>
 <td>§12</td>
 </tr>
 <tr>
 <td><code>tests/bovnar_udunits_test.c</code></td>
 <td><code>bvnr_udunits_test</code></td>
-<td>248</td>
+<td>258</td>
 <td>§13</td>
 </tr>
 <tr>
 <td><code>tests/bovnar_om_test.c</code></td>
 <td><code>bvnr_om_test</code></td>
-<td>114</td>
+<td>118</td>
 <td>§16</td>
 </tr>
 <tr>
 <td><code>tests/bovnar_cf_test.c</code></td>
 <td><code>bvnr_cf_test</code></td>
-<td>46</td>
+<td>58</td>
 <td>§17</td>
 </tr>
 <tr>
 <td><code>tests/bovnar_crossvocab_test.c</code></td>
 <td><code>bvnr_crossvocab_test</code></td>
-<td>4868</td>
+<td>4983</td>
 <td>§14</td>
 </tr>
 </tbody>
@@ -3215,7 +3215,7 @@ dimension vector, asks the reference library what the native target is worth, an
 native side goes through <code>bvn_parse_unit</code> and <code>bvn_unit_to_si_factor</code> via the ctypes bindings, never
 through a Python reimplementation of the unit grammar — that is exactly how a table starts
 disagreeing with the parser it feeds (§9.1).</p>
-<p>As of this tree it compares <strong>10913 rows across the seven vocabularies</strong> and reports <strong>0 mismatches</strong>,
+<p>As of this tree it compares <strong>10905 rows across the seven vocabularies</strong> and reports <strong>0 mismatches</strong>,
 0 dead rows and <strong>0 coverage suggestions</strong> — the tables are closed against their publishers, so
 there is nothing left for the coverage half to propose.</p>
 <p><strong>Three outcomes, and only one fails the build.</strong></p>
@@ -3691,6 +3691,14 @@ exact code sees a change.</p>
   that would put <code>cf:air_temperature_anomaly</code> in disagreement with <code>udunits:K</code> for the same variable.
   CF 1.12's own answer is the <code>units_metadata</code> attribute, which is not in the unit slot and so still
   cannot be read by a profile — the converter §2 describes is where that call belongs.
+  <strong>The differences CF states in <code>degree_C</code> are the exception, and map to <code>Δ°C</code></strong> (the same unit as <code>ΔK</code>): the three
+  <code>difference_between_sea_surface_*_temperature</code> names and <code>sea_water_added_conservative_temperature</code>
+  / <code>sea_water_added_potential_temperature</code> (a tracer that is zero in the control climate). A <code>K</code>
+  difference read as <code>K</code> is harmless, since the two share a zero. A <code>degree_C</code> difference read as the
+  affine <code>°C</code> is not: converting the cool-skin effect of −0.17 to kelvin gave 272.98. CF's own
+  description names each of the five a difference, so this follows the publisher rather than
+  overriding it. The <code>degree_C</code> names that are on-scale temperatures (<code>perceived_temperature</code>,
+  <code>wet_bulb_globe_temperature</code>, the <code>redistributed</code> tracers and two more) stay <code>°C</code>.
 - <strong>Case-insensitive UCUM.</strong> UCUM defines a case-insensitive variant. <code>ucum:</code> is the case-sensitive
   one only, which is why <code>RAD</code> and <code>REM</code> are in the table and UCUM's bracketed <code>[RAD]</code>/<code>[REM]</code> are
   not (§6.1). <code>ucum_ci:</code> is unreserved and undefined; it would need its own atom table and would
@@ -4112,7 +4120,7 @@ names QUDT defines, plus five refusals for names it does not: <code>USD</code>, 
 <code>qudt-qk:</code> — QUDT quantity kinds (908 mapped, 257 unsupported — every one of the 1164 kinds,
 plus a refusal for <code>LogarithmicRatio</code>, which QUDT 3.1.0 does not define).
 Data files <code>src/gendata/qudt.bvnr</code> and <code>src/gendata/qudt-qk.bvnr</code>;
-pinned by <code>tests/bovnar_qudt_test.c</code> (240 assertions).</p>
+pinned by <code>tests/bovnar_qudt_test.c</code> (256 assertions).</p>
 </blockquote>
 <h3 id="121-why-this-vocabulary">12.1 Why this vocabulary</h3>
 <p>QUDT is the unit ontology of the digital-twin and building-semantics world — DTDL, Brick,
@@ -4377,7 +4385,7 @@ same equivalence class.</p>
 of netCDF and the CF conventions.
 Data file <code>src/gendata/udunits.bvnr</code> (41 prefixes, 768 mapped, 98 unsupported — every one of
 the 580 spellings the UDUNITS-2 database defines);
-pinned by <code>tests/bovnar_udunits_test.c</code> (248 assertions).</p>
+pinned by <code>tests/bovnar_udunits_test.c</code> (258 assertions).</p>
 </blockquote>
 <h3 id="131-an-expression-profile-sharing-the-ucum-parser">13.1 An expression profile, sharing the UCUM parser</h3>
 <p>UDUNITS is the second <strong>expression</strong> profile, and it runs through the same translator as UCUM with
@@ -4388,6 +4396,55 @@ two syntax differences configured on its registry row:</p>
 </ul>
 <p>A third difference runs the other way: UDUNITS has no <code>{…}</code> annotations, so <code>udunits:mL{x}</code> is
 <code>error_unit_illegal</code> (§3.4).</p>
+<p><strong>What UDUNITS accepts and this profile does not.</strong> UDUNITS' scanner is more liberal than the
+syntax above, and the rest of its grammar is refused rather than half-implemented. Every one of
+these is <code>error_unit_illegal</code> — a refusal, never a different reading:</p>
+<table>
+<thead>
+<tr>
+<th>UDUNITS accepts</th>
+<th>example</th>
+<th>here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>**</code> as the exponent operator</td>
+<td><code>m**2</code></td>
+<td>refused; write <code>m^2</code> or <code>m2</code></td>
+</tr>
+<tr>
+<td><code>·</code> (U+00B7) and <code>-</code> as multiplication</td>
+<td><code>m·s-1</code>, <code>kg-m</code></td>
+<td>refused; write <code>m*s-1</code> or <code>m.s-1</code></td>
+</tr>
+<tr>
+<td>a tab between terms</td>
+<td><code>kg⇥m-2</code></td>
+<td>refused; write a space</td>
+</tr>
+<tr>
+<td>blanks around <code>*</code> or <code>.</code></td>
+<td><code>kg * m</code></td>
+<td>refused; write <code>kg*m</code> or <code>kg m</code></td>
+</tr>
+<tr>
+<td>an exponent on a parenthesised group</td>
+<td><code>(m/s)2</code></td>
+<td>refused; write <code>m2/s2</code></td>
+</tr>
+<tr>
+<td>unit names in any case</td>
+<td><code>Kelvin</code>, <code>Meter</code></td>
+<td>refused; the names are case-sensitive here</td>
+</tr>
+</tbody>
+</table>
+<p>A prefix on a unit UDUNITS defines and this table marks non-metric — <code>kcal</code>, <code>kft</code>, <code>nmi</code> — is
+the other side of the same line: UDUNITS reads it, and this profile refuses it as
+<code>error_unit_profile_unsupported</code>, a known spelling it does not carry, because a few of those
+readings are traps (<code>nmi</code> is a nanomile to UDUNITS and a nautical mile to most of the people who
+write it).</p>
 <p>The <strong>division rule is identical</strong>, which is worth stating because it is where a units parser most
 often goes quietly wrong. In both vocabularies <code>/</code> inverts the term that follows it and nothing
 else — ordinary left-to-right arithmetic. <code>kg/m*s</code> is <code>(kg/m)*s</code>, so the second term is positive;
@@ -4600,7 +4657,7 @@ says exactly this; accepting it would cost them a silently wrong instant.</p>
 <hr />
 <h2 id="14-the-cross-vocabulary-conformance-suite">14. The cross-vocabulary conformance suite</h2>
 <blockquote>
-<p><code>tests/bovnar_crossvocab_test.c</code> — 67 concepts, 6 vocabularies, 4868 assertions.</p>
+<p><code>tests/bovnar_crossvocab_test.c</code> — 69 concepts, 6 vocabularies, 4983 assertions.</p>
 </blockquote>
 <p>Every other profile test asks <em>does this vocabulary translate correctly?</em>. This one asks the
 question that only exists once there are five: <strong>do they agree?</strong></p>
@@ -4813,7 +4870,7 @@ Growing the native registry to reach them is a separate decision, and doc/05 is 
 <p><code>om:</code> — OM 2, the Ontology of units of Measure (Rijgersberg, van Assem, Top; Wageningen), the
 second unit ontology of the semantic web beside QUDT.
 Data file <code>src/gendata/om.bvnr</code> (1337 mapped, 123 refused — every unit individual OM states);
-pinned by <code>tests/bovnar_om_test.c</code> (114 assertions); id block 70, contributing no opaque units.</p>
+pinned by <code>tests/bovnar_om_test.c</code> (118 assertions); id block 70, contributing no opaque units.</p>
 </blockquote>
 <h3 id="161-why-this-vocabulary">16.1 Why this vocabulary</h3>
 <p>QUDT is the vocabulary of digital twins and building semantics; OM is the one agrifood, food
@@ -4971,7 +5028,7 @@ spells one whole code, so <code>bvn_unit_to_profile("om", m/s²)</code> returns 
 <p><code>cf:</code> — the CF conventions' standard names, the controlled vocabulary of netCDF climate and
 forecast data.
 Data file <code>src/gendata/cf.bvnr</code> (4454 mapped, 617 refused — all 5071 names of standard name table
-<strong>v94</strong>, 2026-06-09); pinned by <code>tests/bovnar_cf_test.c</code> (46 assertions); id block 80, contributing
+<strong>v94</strong>, 2026-06-09); pinned by <code>tests/bovnar_cf_test.c</code> (58 assertions); id block 80, contributing
 no opaque units. <strong>Read-only</strong> (§17.3).</p>
 </blockquote>
 <h3 id="171-why-this-vocabulary">17.1 Why this vocabulary</h3>

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The currency catalogue the binding reads must match
 //! `src/gendata/currencies.bvnr`, the source of truth, which is read with
 //! this crate's own parser.

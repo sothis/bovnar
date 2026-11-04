@@ -39,6 +39,11 @@ pinned below 2 keeps the 1.1 API.
 pip install --upgrade bovnar     # pure-ctypes bindings + bundled shared library
 ```
 
+```toml
+[dependencies]
+bovnar = "2.0.0"                 # Rust; compiles the C library in (needs a C compiler)
+```
+
 Prebuilt archives for Linux and Windows (MinGW64 and MSVC), the single-file
 amalgamation and the source tarball are attached to the GitHub release, with a
 `SHA256SUMS` file.
@@ -85,6 +90,12 @@ amalgamation and the source tarball are attached to the GitHub release, with a
   `available_profiles()`, `unit_to_profile()`, and a typed
   `loads()` → `dumps()` round trip that is byte-identical for a profile-spelled
   document.
+- **Rust** — a new crate, `bovnar`, published to crates.io with the release. It
+  compiles the C library in, so there is no system library to install, and offers
+  `parse`/`to_string` over a dynamic `Value`, the streaming `Reader`/`Writer`, the
+  DOM, exact `Quantity`/`Decimal`/`BvnFloat` numbers, JSON conversion and the
+  stream framing. The seven unit profiles are Cargo features, all on by default.
+  The minimum supported Rust is 1.88. See doc/14.
 - **Tooling** — the mapped profile rows are checked against their publishers'
   own machine-readable definitions on a weekly schedule (UN/ECE only as far as
   QUDT's cross-reference reaches, since Rec 20 publishes none); the
@@ -212,13 +223,14 @@ Recommendation 20 exists to be implemented and is universally implemented, but
 the UN's website terms do not say so; written confirmation has been asked for
 there too. The UCUM and CF
 tables ship enabled, and `-DBVNR_WITH_UCUM_PROFILE=OFF` /
-`-DBVNR_WITH_CF_PROFILE=OFF` remove them from a build entirely. The record is in
+`-DBVNR_WITH_CF_PROFILE=OFF` remove them from a build entirely; the Rust crate
+leaves either out when its Cargo feature (`ucum`, `cf`) is off. The record is in
 [`THIRD_PARTY_NOTICES.md`](https://github.com/sothis/bovnar/blob/v2.0.0/THIRD_PARTY_NOTICES.md) and doc/11 §18.
 
 ## Documentation
 
-Full docs — tutorial, specification, unit/currency reference, unit profiles, C
-and Python API, formal EBNF grammar, FAQ, conformance protocol, and cheat sheet —
+Full docs — tutorial, specification, unit/currency reference, unit profiles, C,
+Python and Rust API, formal EBNF grammar, FAQ, conformance protocol, and cheat sheet —
 are available at **https://www.bovnar.io** (each also downloadable as **PDF**),
 and in the [`doc/`](https://github.com/sothis/bovnar/tree/main/doc) directory.
 See [`CHANGELOG.md`](https://github.com/sothis/bovnar/blob/v2.0.0/CHANGELOG.md) for the complete change list.

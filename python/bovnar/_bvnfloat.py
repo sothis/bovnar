@@ -103,6 +103,49 @@ def _round_half_even(num: int, den: int) -> int:
     return q
 
 
+# log10(2), to place a decimal exponent against a binary one. The early-outs
+# below keep a margin of two decades either side, so this needs no more digits.
+_LOG10_2 = 0.30102999566398120
+
+
+def _binary_extreme(dec, width: int):
+    """'inf' or 'zero' when the finite non-zero Decimal *dec* certainly
+    overflows or underflows IEEE binary{width}, judged from its decimal exponent
+    alone; None when it is near enough the range to need the exact rounding.
+
+    Without it, a 28-byte literal like 1e-99999999 was materialised as the
+    Fraction 1/10**99999999 before being rounded to 0: unbounded time and
+    memory for a value the format cannot tell from zero."""
+    exp_bits, man_bits, bias = BINARY_FORMATS[int(width)]
+    adj = dec.adjusted()                    # 10**adj <= |dec| < 10**(adj+1)
+    # 2**(bias+1) is past the largest finite value, so 10**adj above it is inf.
+    if adj > int((bias + 1) * _LOG10_2) + 2:
+        return 'inf'
+    # Half the smallest subnormal is 2**(-bias-man_bits); below it rounds to 0.
+    if adj + 1 < int((-bias - man_bits) * _LOG10_2) - 2:
+        return 'zero'
+    return None
+
+
+def decimal_to_binary_bits(dec, width: int) -> bytes:
+    """fraction_to_binary_bits for a finite :class:`Decimal`, deciding a
+    certain overflow (+/-inf) or underflow (+/-0) from the exponent before the
+    exact rational is built. Same bytes as ``fraction_to_binary_bits(
+    Fraction(dec), width)`` wherever that finishes."""
+    if int(width) not in BINARY_FORMATS:
+        raise BovnarArgumentError(f"no IEEE binary format for width {width}")
+    exp_bits, man_bits, bias = BINARY_FORMATS[int(width)]
+    if dec:
+        extreme = _binary_extreme(dec, width)
+        if extreme is not None:
+            sign = (1 << (int(width) - 1)) if dec.is_signed() else 0
+            bits = sign | ((((1 << exp_bits) - 1) << man_bits)
+                           if extreme == 'inf' else 0)
+            return bits.to_bytes(int(width) // 8, 'little')
+    from fractions import Fraction
+    return fraction_to_binary_bits(Fraction(dec), width)
+
+
 def fraction_to_binary_bits(value, width: int) -> bytes:
     """Correctly-rounded IEEE-754 binary{width} interchange bytes for an exact
     rational *value* (a :class:`fractions.Fraction`), little-endian word order.
@@ -172,6 +215,18 @@ def _materialise_decimal(dec, width: int):
     be_max = (3 << (exp_bits - 2)) if is_std else ((1 << exp_bits) - 1)
     sign, digits, E = dec.as_tuple()
     neg = bool(sign)
+    # Certain underflow or overflow, decided from the exponent alone. The
+    # rounding below would build 10**drop for 1e-99999999 -- unbounded time
+    # for a value that rounds to 0. Half the smallest subnormal is
+    # 0.5 * 10**-bias, and anything at 10**(be_max - bias + max_digits) is past
+    # the largest finite value; the margins keep the exact path for the
+    # boundary cases.
+    if any(digits):
+        adj = dec.adjusted()
+        if adj < -bias - 2:
+            return ('zero', neg)
+        if adj > be_max - bias + max_digits + 1:
+            return ('inf', neg)
     # Not int(str): CPython refuses a decimal conversion past 4300 digits
     # (int_max_str_digits), and an exact integer literal can have ~9865.
     from ._bigint import int_from_text, int_to_decimal

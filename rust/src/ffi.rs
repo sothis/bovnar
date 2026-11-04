@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Hand-written declarations of the C API in `bovnar.h`: its functions and
 //! the layouts of the structs passed by value.
 //!
@@ -748,7 +749,9 @@ extern "C" fn want_unit_trampoline(
 ) -> bool {
     // SAFETY: `ud` is the installed `Handlers`; `d` is NULL or valid for the
     // call, and its pointers describe bytes valid for the call.
-    let (h, view) = unsafe { (handlers(ud), EventView::new(0, d.as_ref())) };
+    // The hook runs for a value, so its view is an `ev_data` event.
+    let ev_data = crate::enums::Event::Data as c_int;
+    let (h, view) = unsafe { (handlers(ud), EventView::new(ev_data, d.as_ref())) };
     let Some((unit, base)) = h.guard(None, |h| h.want_unit.as_mut().and_then(|f| f(&view))) else {
         return false;
     };
@@ -2307,6 +2310,9 @@ mod abi_tests {
             flags, userdata, on_document, continue_past_failed, max_document_size,
         });
         layout!(v, BvnDomEntry, "bvn_dom_entry_t" { key, value });
+        layout!(v, BvnCurrencyInfo, "bvn_currency_info_t" {
+            code, numeric_code, minor_unit, is_crypto, name,
+        });
         v
     }
 

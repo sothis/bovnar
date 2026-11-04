@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The streaming writer.
 
 use crate::enums::{Event, TokenType, ValueTypeFamily};
@@ -147,6 +148,9 @@ pub struct Writer {
     handle: ffi::WriterHandle,
     struct_depth: u32,
     finished: bool,
+    /// The error the first [`Writer::finish`] failed with, returned again by
+    /// every later call instead of a success the output does not back.
+    finish_error: Option<Error>,
     /// Where [`Writer::finish`] sends the document, for [`Writer::to_writer`].
     out: Option<Box<dyn std::io::Write + Send>>,
 }
@@ -172,6 +176,7 @@ impl Writer {
             handle,
             struct_depth: 0,
             finished: false,
+            finish_error: None,
             out: None,
         };
         let mut flags = BvnrWriteFlags::zeroed();
@@ -349,6 +354,34 @@ impl Writer {
         self.write_scalar(key, vt, &text)
     }
 
+    /// [`Writer::write_bvni`] for an integer of any size: `.key =
+    /// <uint|sint:width[,_base]> value;`, for the values past `i128` that
+    /// [`crate::Value::BigInt`] carries.
+    pub fn write_big_int(
+        &mut self,
+        key: &str,
+        value: &num_bigint::BigInt,
+        width: u32,
+        base: Base,
+        signed: Signedness,
+    ) -> Result<()> {
+        let base = base.get();
+        let signed = match signed {
+            Signedness::Signed => true,
+            Signedness::Unsigned => false,
+            Signedness::Auto => value.sign() == num_bigint::Sign::Minus,
+        };
+        let family = if signed {
+            refuse_signed_high_base(base)?;
+            ValueTypeFamily::Sint
+        } else {
+            ValueTypeFamily::Uint
+        };
+        let text = format_big_int(value, base)?;
+        let vt = type_spec(family, width, if base == 10 { 0 } else { base });
+        self.write_scalar(key, vt, &text)
+    }
+
     /// `.key = <annotation> literal;` for a typed scalar, as read by
     /// [`crate::parse_typed`]: type, unit, unit spelling and datetime
     /// fraction are kept. The annotation is left out where it says nothing
@@ -482,8 +515,12 @@ impl Writer {
 
     /// Completes the document. Fails while a struct is still open. A
     /// [`Writer::to_writer`] writer then writes the document to its
-    /// [`std::io::Write`], once.
+    /// [`std::io::Write`], once. A finish that failed keeps failing: a
+    /// second call returns the same error.
     pub fn finish(&mut self) -> Result<()> {
+        if let Some(e) = &self.finish_error {
+            return Err(e.clone());
+        }
         if self.finished {
             return Ok(());
         }
@@ -494,11 +531,16 @@ impl Writer {
             )));
         }
         self.finished = true;
-        self.check(ffi::WriterHandle::finish)?;
-        if let Some(out) = self.out.take() {
-            crate::io::write_all(out, self.get_output())?;
+        let r = self
+            .check(ffi::WriterHandle::finish)
+            .and_then(|()| match self.out.take() {
+                Some(out) => crate::io::write_all(out, self.get_output()),
+                None => Ok(()),
+            });
+        if let Err(e) = &r {
+            self.finish_error = Some(e.clone());
         }
-        Ok(())
+        r
     }
 
     /// Bytes written so far.
@@ -680,10 +722,25 @@ pub(crate) fn is_numeric(q: &Quantity) -> bool {
 
 /// True only when the annotation carries
 /// something the bare literal would not give back.
+///
+/// A typed null has nothing but its annotation: `<float:64> ;` written bare
+/// is `;`, an untyped null. And a quoted literal under a numeric family
+/// (`<float:64,_10> "5.7"`) is a string to default synthesis: written bare
+/// the writer refuses it, a float type over a string token.
 pub(crate) fn needs_annotation(q: &Quantity) -> bool {
     use ValueTypeFamily as F;
     let vt = q.vtype;
-    match ValueTypeFamily::from_raw(vt.family) {
+    let fam = ValueTypeFamily::from_raw(vt.family);
+    if matches!(fam, None | Some(F::Plain | F::Illegal)) {
+        return false;
+    }
+    if q.raw.is_none() {
+        return true;
+    }
+    if matches!(q.token_type, TokenType::String | TokenType::ArrayString) && fam != Some(F::Utf8) {
+        return true;
+    }
+    match fam {
         None | Some(F::Plain | F::Bool | F::Illegal) => false,
         // A bare non-negative integer reads back as uint.
         Some(F::Sint)
@@ -717,35 +774,54 @@ fn refuse_signed_high_base(base: u32) -> Result<()> {
 
 /// `value` in any bovnar base (2..62, 64, 85).
 pub fn format_bigint(value: i128, base: u32) -> Result<String> {
+    format_big_int(&num_bigint::BigInt::from(value), base)
+}
+
+/// [`format_bigint`] for an integer of any size.
+pub fn format_big_int(value: &num_bigint::BigInt, base: u32) -> Result<String> {
     const B64: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     if !(2..=62).contains(&base) && base != 64 && base != 85 {
         return Err(Error::argument(format!("unsupported integer base {base}")));
     }
-    let digit = |d: u32| -> char {
-        let d8 = d as u8;
+    let digit = |d: u8| -> char {
         match (base, d) {
-            (64, _) => B64[d as usize] as char,
-            (85, _) => (b'!' + d8) as char,
-            (_, 0..=9) => (b'0' + d8) as char,
-            (_, 10..=35) => (b'a' + d8 - 10) as char,
-            _ => (b'A' + d8 - 36) as char,
+            (64, _) => B64[usize::from(d)] as char,
+            (85, _) => (b'!' + d) as char,
+            (_, 0..=9) => (b'0' + d) as char,
+            (_, 10..=35) => (b'a' + d - 10) as char,
+            _ => (b'A' + d - 36) as char,
         }
     };
-    let mut mag = value.unsigned_abs();
-    let mut digits = Vec::new();
-    loop {
-        digits.push(digit((mag % u128::from(base)) as u32));
-        mag /= u128::from(base);
-        if mag == 0 {
-            break;
-        }
-    }
-    let mut s: String = digits.iter().rev().collect();
-    if value < 0 {
+    let (sign, digits) = value.to_radix_be(base);
+    let mut s: String = digits.into_iter().map(digit).collect();
+    if sign == num_bigint::Sign::Minus {
         s.insert(0, '-');
     }
     Ok(s)
 }
+
+/// The width [`crate::to_string`] writes a [`crate::Value::BigInt`] at: the
+/// smallest power of two from 128 that holds it as a `uint` (non-negative)
+/// or a `sint` (negative), as `bovnar convert` writes a wide JSON integer.
+pub(crate) fn big_int_width(value: &num_bigint::BigInt) -> u32 {
+    let mag = value.magnitude();
+    let bits = u32::try_from(mag.bits()).unwrap_or(u32::MAX);
+    // A sint:N holds -2^(N-1): a negative power of two needs no extra bit.
+    let pow2 = mag.bits() > 0 && mag.trailing_zeros() == Some(mag.bits() - 1);
+    let need = if value.sign() == num_bigint::Sign::Minus && !pow2 {
+        bits.saturating_add(1)
+    } else {
+        bits
+    };
+    let mut width = 128u32;
+    while width < need && width < MAX_INT_WIDTH {
+        width *= 2;
+    }
+    width
+}
+
+/// `BVN_MAX_INT_WIDTH`: the widest integer the library holds.
+pub(crate) const MAX_INT_WIDTH: u32 = 32768;
 
 pub(crate) fn type_spec(family: ValueTypeFamily, width: u32, base: u32) -> ValueTypeSpec {
     ValueTypeSpec {
@@ -833,5 +909,28 @@ mod tests {
             .write_string("key", "a value longer than eight bytes")
             .and_then(|_| w.finish());
         assert_eq!(err.unwrap_err().name(), Some("sink_buffer_exhausted"));
+    }
+
+    #[test]
+    fn failed_finish_keeps_failing() {
+        // The document fits until finish() appends its last bytes.
+        let mut w = Writer::to_mem(6, false).unwrap();
+        w.write_string("a", "x").unwrap();
+        let first = w.finish().unwrap_err();
+        assert_eq!(w.finish().unwrap_err(), first);
+
+        struct Refuses;
+        impl std::io::Write for Refuses {
+            fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+                Err(std::io::Error::other("refused"))
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        let mut w = Writer::to_writer(Refuses, false).unwrap();
+        w.write_string("a", "x").unwrap();
+        assert!(w.finish().is_err());
+        assert!(w.finish().is_err());
     }
 }

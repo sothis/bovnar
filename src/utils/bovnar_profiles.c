@@ -193,6 +193,16 @@ typedef struct {
 	/* Does this vocabulary have UCUM's binary prefixes (Ki, Mi, Gi, Ti)? See
 	 * bvn_prof_binary_pfx. */
 	bool                    binary_pfx;
+	/*
+	 * Does this vocabulary put a prefix on ANY unit? UDUNITS does: "kcal",
+	 * "kft" and "mgauss" are valid UDUNITS. bovnar still carries a prefix only
+	 * on an atom marked metric -- the non-metric marks close real traps, such
+	 * as "nmi", which UDUNITS reads as a nanomile -- but a prefixed non-metric
+	 * atom is then known and not carryable, error_unit_profile_unsupported,
+	 * not the error_unit_illegal UCUM gives it, where the same spelling is no
+	 * UCUM at all.
+	 */
+	bool                    any_prefix;
 } bvn_profile_t;
 
 /* An ASCII letter or '_', the bytes UDUNITS' scanner lets an identifier end
@@ -459,25 +469,25 @@ static const bvn_profile_t bvn_profiles[] = {
 	{ "ucum", 4, bvn_prof_grammar_expr,
 	  ucum_pfx_table, ucum_atom_table, ucum_unsup_table, ucum_rev_table,
 	  BVN_PROFILE_UCUM_OPAQUE_FIRST, BVN_PROFILE_UCUM_OPAQUE_LAST,
-	  "", false, false, true, true },
+	  "", false, false, true, true, false },
 #endif
 #if BVNR_WITH_UNECE_PROFILE
 	{ "unece", 5, bvn_prof_grammar_flat,
 	  NULL, unece_atom_table, unece_unsup_table, unece_rev_table,
 	  BVN_PROFILE_UNECE_OPAQUE_FIRST, BVN_PROFILE_UNECE_OPAQUE_LAST,
-	  NULL, false, false, false, false },
+	  NULL, false, false, false, false, false },
 #endif
 #if BVNR_WITH_QUDT_PROFILE
 	{ "qudt", 4, bvn_prof_grammar_flat,
 	  NULL, qudt_atom_table, qudt_unsup_table, qudt_rev_table,
 	  BVN_PROFILE_QUDT_OPAQUE_FIRST, BVN_PROFILE_QUDT_OPAQUE_LAST,
-	  NULL, false, false, false, false },
+	  NULL, false, false, false, false, false },
 #endif
 #if BVNR_WITH_QUDT_QK_PROFILE
 	{ "qudt-qk", 7, bvn_prof_grammar_flat,
 	  NULL, qudt_qk_atom_table, qudt_qk_unsup_table, qudt_qk_rev_table,
 	  BVN_PROFILE_QUDT_QK_OPAQUE_FIRST, BVN_PROFILE_QUDT_QK_OPAQUE_LAST,
-	  NULL, false, false, false, false },
+	  NULL, false, false, false, false, false },
 #endif
 	/*
 	 * '*' and ' ' multiply beside '.', and '^' introduces an exponent, so
@@ -495,22 +505,22 @@ static const bvn_profile_t bvn_profiles[] = {
 	  udunits_pfx_table, udunits_atom_table, udunits_unsup_table,
 	  udunits_rev_table,
 	  BVN_PROFILE_UDUNITS_OPAQUE_FIRST, BVN_PROFILE_UDUNITS_OPAQUE_LAST,
-	  "* ", true, true, false, false },
+	  "* ", true, true, false, false, true },
 #endif
 #if BVNR_WITH_OM_PROFILE
 	{ "om", 2, bvn_prof_grammar_flat,
 	  NULL, om_atom_table, om_unsup_table, om_rev_table,
 	  BVN_PROFILE_OM_OPAQUE_FIRST, BVN_PROFILE_OM_OPAQUE_LAST,
-	  NULL, false, false, false, false },
+	  NULL, false, false, false, false, false },
 #endif
 #if BVNR_WITH_CF_PROFILE
 	{ "cf", 2, bvn_prof_grammar_flat,
 	  NULL, cf_atom_table, cf_unsup_table, cf_rev_table,
 	  BVN_PROFILE_CF_OPAQUE_FIRST, BVN_PROFILE_CF_OPAQUE_LAST,
-	  NULL, false, false, false, false },
+	  NULL, false, false, false, false, false },
 #endif
 	{ NULL, 0, bvn_prof_grammar_flat, NULL, NULL, NULL, NULL, 0, -1,
-	  NULL, false, false, false, false },
+	  NULL, false, false, false, false, false },
 };
 #define BVN_PROFILE_COUNT \
 	(sizeof(bvn_profiles) / sizeof(bvn_profiles[0]))
@@ -688,6 +698,10 @@ static bool resolve_prefixed_unsupported(const bvn_profile_t* p,
 		if (f->len >= len || memcmp(s, f->code, f->len) != 0)
 			continue;
 		if (is_known_unsupported(p, s + f->len, len - f->len))
+			return true;
+		/* A prefix on a known non-metric atom, in a vocabulary where every
+		 * unit takes one (see any_prefix). */
+		if (p->any_prefix && find_atom(p, s + f->len, len - f->len))
 			return true;
 	}
 	return false;

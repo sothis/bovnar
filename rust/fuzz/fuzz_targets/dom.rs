@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Arbitrary bytes through the DOM: parse, walk every node, convert. Errors
 //! are fine; crashes and panics are not.
 #![no_main]

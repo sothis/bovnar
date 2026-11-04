@@ -268,7 +268,9 @@ static bool bvn_validate_id_for_writer(bvnr_writer_t* w,
 	 * -- the same distinction the string and symbol caps below make. */
 	if (length > UINT16_MAX)
 		ok = bvn_writer_set_error(w, error_identifier_too_long);
-	else if (!bvn_validate_identifier(buf))
+	/* bvn_validate_identifier reads up to the first NUL, so "a\0b" was
+	 * checked as "a" and written whole, and the reader refused the NUL. */
+	else if (memchr(buf, '\0', length) || !bvn_validate_identifier(buf))
 		ok = bvn_writer_set_error(w, error_invalid_argument);
 	if (need_free) free(buf);
 	return ok;
@@ -615,9 +617,15 @@ static bool bvn_validate_type_spec_for_writer(bvnr_writer_t* w,
 		if (vt.family == vt_sint && (vt.base == 64u || vt.base == 85u))
 			return bvn_writer_set_error(w, error_illegal_value_type);
 	}
-	/* datetime carrier width has the same bound as an integer (base holds the
-	 * epoch index, not a numeric base, so it is not range-checked here). */
+	/* datetime carrier width has the same bound as an integer. Its base holds
+	 * the epoch index, not a numeral base: it must name an epoch, or the
+	 * epoch-name lookup falls back to index 0 and the annotation is written
+	 * as `unix`, a different epoch from the one asked for. An index names an
+	 * epoch exactly when its name maps back to it. */
 	if (vt.family == vt_datetime && vt.width > BVN_MAX_INT_WIDTH)
+		return bvn_writer_set_error(w, error_illegal_value_type);
+	if (vt.family == vt_datetime &&
+	    bvnr_datetime_epoch_index(bvnr_datetime_epoch_name(vt)) != (int32_t)vt.base)
 		return bvn_writer_set_error(w, error_illegal_value_type);
 	if (vt.family == vt_float) {
 		if (vt.base != 0 && vt.base != 10 && vt.base != 16) {
@@ -1525,6 +1533,10 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		if (tt == token_is_null_value) {
 		} else if (tt == token_is_number ||
 				   tt == token_is_array_number) {
+			/* max_number_length is a uint16_t too: the cap of the string,
+			 * symbol and identifier branches applies to a bare number. */
+			if (data->length > UINT16_MAX)
+				return bvn_writer_set_error(w, error_number_too_long);
 			/* A bare literal can only be read back in a base whose digits the
 			 * lexer accepts unquoted. Above base 10 the digits are letters, which
 			 * the grammar requires in a string literal — the reader even has
@@ -1625,6 +1637,9 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 					data->data, data->length))
 				return false;
 		} else if (tt == token_is_reference) {
+			/* ...and so is max_reference_length. */
+			if (data->length > UINT16_MAX)
+				return bvn_writer_set_error(w, error_reference_too_long);
 			if (!bvn_validate_reference_for_writer(w,
 					data->data, data->length))
 				return false;
@@ -2355,7 +2370,12 @@ bool bvn_ser_serialize_event(bvnr_serializer_t* s,
 					emit = (const char *)d->unit_source;
 					elen = d->unit_source_length;
 				}
+				/* A datetime's parameter is its epoch, not a unit: unit flags
+				 * leave it alone. `galileo` is also an alias of the gal, so
+				 * the rewrite below turned it into `Gal`, which no reader
+				 * takes as an epoch. */
 				if (s->unit_flags != BVN_UNIT_FLAGS_NONE &&
+				    s->ann_family != vt_datetime &&
 				    utlen < sizeof ubuf) {
 					/* Sized by the guard above. This was char[512] under
 					 * a guard of 1088, so a unit text of 512..1087 bytes

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! A typed parse and serialise cycle keeps every value's family, width, unit
 //! and literal.
 //!
@@ -165,5 +166,61 @@ fn test_typed_roundtrip_preserves_value_and_type() {
         "{} of {checked} round-trips lost information, first: {:?}",
         failures.len(),
         &failures[..failures.len().min(3)]
+    );
+}
+
+/// What only the annotation carries survives `to_string`: a quoted numeric
+/// literal under a default annotation (the writer refused it bare, a float
+/// type over a string token), and a typed null, alone or as an array
+/// element (written bare it is an untyped null).
+#[test]
+fn test_annotation_only_information_round_trips() {
+    let docs: &[&str] = &[
+        r#".a = <float:64,_10> "5.7";"#,
+        r#".a = <float> "5.7";"#,
+        r#".a = <uint> "42";"#,
+        r#".a = <uint:64,_10> "42";"#,
+        r#".a = <sint:64> "-5";"#,
+        r#".a = <float:64,_10> ["5.7", "1"];"#,
+        ".a = <float:64> ;",
+        ".a = <uint:64> ;",
+        ".a = <sint:64> ;",
+        ".a = <utf8> ;",
+        ".a = <bool> ;",
+        ".a = [<uint:32>, <sint:64>, <float:32>];",
+        r#".a = <utf8> [, "first", ];"#,
+        ".a = [<uint:8>, 1];",
+        ".a = [<bool>, true];",
+        ".a = [<float:64>, 1.5];",
+        ".a = [<float:64,m>, <float:64,m> 2.5];",
+    ];
+    for src in docs {
+        let doc = parse_typed(src.as_bytes()).unwrap_or_else(|e| panic!("{src}: {e}"));
+        let out = to_string(&doc, false).unwrap_or_else(|e| panic!("{src}: to_string: {e}"));
+        let back = parse_typed(&out).unwrap_or_else(|e| {
+            panic!(
+                "{src}: {} does not read back: {e}",
+                String::from_utf8_lossy(&out)
+            )
+        });
+        assert_eq!(
+            back,
+            doc,
+            "{src} came back as {}",
+            String::from_utf8_lossy(&out)
+        );
+    }
+}
+
+/// A plain element beside a typed null is not annotated for nothing:
+/// `[<uint:8>, 1]` keeps the `1` bare.
+#[test]
+fn test_per_element_annotations_only_where_needed() {
+    let doc = parse_typed(b".a = [<uint:8>, 1];").unwrap();
+    let out = String::from_utf8(to_string(&doc, false).unwrap()).unwrap();
+    assert!(out.contains("<uint:8>"), "{out}");
+    assert!(
+        !out.contains("no_unit") && !out.contains("<uint:64"),
+        "{out}"
     );
 }

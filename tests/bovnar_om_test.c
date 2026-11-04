@@ -469,6 +469,17 @@ static void test_scales_are_not_units(void)
 		    "Δ°Re is not written back as a scale");
 }
 
+/* The third review: om:rad, which OM defines as 1.0e-2 GRAY (an absorbed
+ * dose), mapped to the rem, a dose EQUIVALENT, and the native rem was written
+ * back as om:rad. */
+static void test_rad_is_an_absorbed_dose(void)
+{
+	chk_str("om:rad", "c~Gy");
+	chk_str("om:rem", "rem");
+	chk_om("rem",  "rem");
+	chk_om("c~Gy", "centigray");
+}
+
 int main(void)
 {
 	printf("OM 2 unit profile\n");
@@ -477,6 +488,7 @@ int main(void)
 	test_composition();
 	test_flatness();
 	test_scales_are_not_units();
+	test_rad_is_an_absorbed_dose();
 	test_refusals();
 	test_to_om();
 	test_cross_vocabulary();

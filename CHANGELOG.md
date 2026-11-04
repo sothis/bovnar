@@ -3,7 +3,8 @@
 All notable changes to Bovnar are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The headings are
 versions of the **reference implementation** (`BVNR_VERSION_STRING`,
-`bovnar.__version__`, the CMake project version), under semantic versioning: its
+`bovnar.__version__`, the Rust crate's `bovnar::version()` and its
+`Cargo.toml`, the CMake project version), under semantic versioning: its
 major moves when a program built against it has to change. The **format** is
 versioned separately, also semantically, and each release says which spec it
 implements; the highest spec a build understands is reported by
@@ -44,6 +45,290 @@ malformed inputs no longer let through; doc/03 §17 and the release notes'
 rebuild consumers against the new headers. **SOVERSION is bumped 1 → 2**
 (`libbvnr.so.2`), so a binary built against 1.x headers fails to load rather than
 reading the grown by-value structs at the wrong size.
+
+The sections below record the work in the order it was done, newest first, and
+an entry is not rewritten when a later one changes the same thing: where two
+disagree, the one nearer the top is current. Three examples: the enum ids and
+`BVN_VALUE_BASE_UNIT_COUNT` that the early registry entries give were renumbered
+into blocks and the macro removed, `qudt:HP_Brake` is refused, and native `eq`
+is an alias of `val`.
+
+### Added — Rust bindings (`rust/`)
+
+A crate, `bovnar`, contributed as pull request #1. Its `build.rs` runs the
+table generators and compiles the C sources itself, so there is no system
+library to link. The published crate carries the generated tables and needs a
+C compiler and Rust 1.88 or newer; built from a checkout, `build.rs` also runs
+the generators with Python 3. doc/14 is its reference.
+
+- **Tiers.** `parse`/`parse_typed`/`to_string` over a dynamic `Value`. The
+  streaming `Reader` with the unit policy, and the `Writer`. The DOM. JSON
+  conversion. Document framing, mux and embedding streams.
+- **Exact numbers.** `BvnFloat`, an exact `Decimal` and `Quantity`, with
+  lossless accessors, built on `num-bigint`/`num-rational`.
+- **Units.** `BaseUnit` is generated from the same tables as the C enum,
+  including the currencies and the profiles' opaque ids.
+- **Tests.** The Python suite ported test by test, an ABI test that compares
+  the `#[repr(C)]` structs with the C compiler's layout, and cargo-fuzz targets
+  for the parsers, the DOM and JSON.
+- **CI.** The crate is tested on Linux x64 (stable and the 1.88 MSRV), Linux
+  aarch64, macOS, Windows MSVC and MinGW64, and built for `wasm32-wasip2`, with
+  rustfmt and clippy. The release job waits for these jobs, and
+  `bvnr_rust_build_sync` fails when `build.rs` compiles other sources or
+  profile switches than CMakeLists.txt.
+- **Publishing.** `rust/package.py` stages the crate for crates.io with the C
+  sources, headers and generated tables bundled in `c/`, plus `LICENSE` and
+  `THIRD_PARTY_NOTICES.md`; `build.rs` builds from `c/` when it is there and
+  runs no generators. The seven unit profiles are Cargo features (`ucum`,
+  `unece`, `qudt`, `qudt-qk`, `udunits`, `om`, `cf`), all on by default. CI's
+  `rust_package` job runs `package.py -- publish --dry-run` and a build with no
+  profiles on every push, and the release waits for it; `publish_crate`
+  publishes on a `vX.Y.Z` tag through crates.io Trusted Publishing after every
+  Rust job, the C suite and the release, and skips a version that is already
+  there. 2.0.0 itself is published by hand, as Trusted Publishing cannot create
+  a crate.
+
+### Fixed — a third whole-project review before release
+
+Ten reviews side by side: the reader, the writer/DOM/stream, the native units,
+the unit profiles, the numerics and CLI, the Python and WASM bindings, the Rust
+crate's FFI, its API and documentation, the documentation set, and the
+build/CI/web. Each finding was reproduced before it was fixed, and each fix is
+pinned by a test.
+
+**Reader.**
+
+- **A unit group nested past 16 levels dropped the unit, and skipped the type
+  checks after it.** The annotation parser returned early with no unit length,
+  and the validator looked at a unit only when it had one. `<float:64,m{{…>`
+  validated without its unit, and `<uint:99999,{{…>` and `<utf8:{{…>` were
+  accepted. They are `error_unit_illegal` and `error_illegal_value_type` now,
+  and so is a unit past 255 bytes through `bvn_parse_type_annotation`.
+- **Blanks after a profile unit counted toward the 255-byte annotation cap**,
+  although they are trimmed: `ucum:m` followed by 250 spaces was
+  `error_type_too_long`.
+- **End of input under `continue_on_error`.** A character cut short in a final
+  comment is counted as a skipped byte and leaves no error position. A
+  malformed `#!bovnar` directive with no newline after it is recovered like one
+  with a newline, unless `strict_version` is set.
+- **An end-of-input error named the last character's column** (0 after a final
+  newline) while its offset was one past the end. The column is now one past
+  the last character, as `error_file_too_long` already reported it.
+
+**Writer.**
+
+- **A unit flag rewrote the datetime epoch `galileo` as `Gal`.** `galileo` is
+  also an alias of the gal, so `pretty-print --canonical` produced a document
+  the reader refuses. A datetime's parameter is left alone.
+- **A bare number or reference over 65 535 bytes was written**, and no reader
+  configuration could read it back. These are `error_number_too_long` and
+  `error_reference_too_long` now, like keys, strings and symbols.
+- **`bvnr_write_float` narrowed `float:16` through a binary32.** `float:16`
+  kept 1e10 while `float:32` turned 1e300 into `inf`. Both widths round to
+  their own format now, and a finite value that overflows it is
+  `error_value_out_of_range`.
+- **An out-of-range datetime epoch index was written as `unix`.** It is
+  `error_illegal_value_type` now.
+- **A key with a NUL byte was checked only up to the NUL and written whole.** It
+  is refused now.
+- `pretty-print --canonical` and `BVN_NUM_CANONICAL` no longer promise equal
+  bytes for a unit with a profile code, or for an inline unit beside an
+  annotation.
+
+**DOM.**
+
+- `bvn_dom_strdup` computed `len + 1` in 32 bits, so `UINT32_MAX` allocated 0
+  bytes and copied 4 GiB into them. It is refused now.
+
+**Units.**
+
+- **`ΔK·m/m` was equal to `K·m/m` but not convertible to it.** Equality asked
+  the written shape and the kind check the cancelled one, so `--canonical`
+  turned a valid array into an invalid one. Both ask after cancellation now.
+- **`°C·s/s` reduced to `°C`**, which converts to 293.15 K where the original
+  converts to nothing. Such a unit is kept as written; one that stays a
+  compound, such as `m~°C/s`→`°C/s`, still folds its prefix.
+- **Rule paths that can never match are refused.** A require rule that matches
+  nothing is satisfied, so `.a.`, `..a`, `.a*`, `.a.*.b` and `.a b` silently
+  switched the assertion off.
+- **`bvn_rational_to_str` wrote a base-85 fraction with a `.`**, which is digit
+  13 there. Such a value has no positional text now
+  (`BVN_RATIONAL_NONTERMINATING`), and under `want_unit` that is
+  `error_unit_inexact`.
+- `gen_units.py` refuses an alias that two units claim.
+
+**Unit profiles.**
+
+- **`om:rad` read as the rem.** OM defines the rad as 1.0e-2 gray, an absorbed
+  dose; it mapped to the rem, a dose equivalent, and native `rem` was written
+  back as `om:rad`. It is `c~Gy` now, and `om:rem` writes the rem.
+- **Temperature differences CF states in `degree_C` read as the affine `°C`.**
+  Converting the cool-skin effect of −0.17 to kelvin gave 272.98. The three
+  `difference_between_sea_surface_*_temperature` names and the two
+  `sea_water_added_*_temperature` tracers are `Δ°C` now; on-scale `degree_C`
+  names stay `°C` (doc/11 §10.3).
+- **The decade fold could put a prefix UCUM does not have on a UCUM arbitrary
+  unit.** `ucum:10*27.k[IU]` validated and then could not be written, because
+  `R~[IU]` has no UCUM code. A metric UCUM opaque unit takes yocto to yotta
+  only, so the unit is `error_unit_profile_unsupported`, and `R~[IU]` is
+  invalid through the API too.
+- **Eight `qudt-qk` rows followed a QUDT dimension vector that QUDT's own name
+  or definition contradicts.** Both equilibrium constants and both optical
+  rotational abilities are swapped pairs; GyromagneticRatio,
+  MagneticPolarization, ExhaustGasMeanMolecularWeight and ThrustCoefficient
+  have vectors their definitions rule out. They are refused, as `qudt:LA` was.
+  Radioactivity, ReactivePower, ApparentPower and DoseEquivalentRate named the
+  right value with the wrong unit; they are `Bq`, `var`, `VA` and `Sv/s`, and
+  QuantityOfLight is the lumen second its description states. `Exposure` is
+  `C/k~g`, `VolumeFraction` `m³/m³`, and `qudt:CentiM_H2O`/`unece:H78` the
+  centimetre of water.
+- **A prefix on a non-metric UDUNITS unit was reported as a typo.** `kcal`,
+  `kft`, `mgauss` and `nmi` are valid UDUNITS; they are refused as
+  `error_unit_profile_unsupported`, a known spelling bovnar does not carry.
+  doc/11 §13.1 lists the rest of the UDUNITS syntax the profile refuses, none
+  of it misread.
+- `check_profile_factors.py` read the `2.` of `kg.m2.s-3` as the number 2.0. No
+  table row had that shape yet; the scanner is fixed and checks itself on every
+  run.
+
+**Numerics.**
+
+- **Long binary128 literals near a rounding midpoint rounded to the wrong
+  neighbour** — a regression of the second review. Its 2624-bit digit budget,
+  sized for binary64, cut into them past about 790 digits. Formats wider than
+  binary64 keep 12 288 bits now. That is not every midpoint: `bvn_float.h` now
+  states the length past which a binary128 literal can still misround, where
+  it used to claim none.
+- `bvn_float_str_fits_fix` said yes for a Q-format with q ≥ width; no value
+  fits one.
+
+**CLI.**
+
+- `convert` json→bvnr wrote −2^127 as `<sint:256>`; it fits `<sint:128>`.
+- `events` without `-c` labelled a fatal error "RECOVERY". `bench --iterations
+  0` became 1 silently and is refused now. `--help` lists `all` for
+  `bench --profile`.
+
+**Build and CI.**
+
+- **A GCC 15 `-Wstringop-overflow` warning at the LTO link went unseen.** It
+  fired in `bvnf_to_str_dec` under `bvnr_write_float_unit` in three CI jobs,
+  all green, because `BVNR_WERROR` reaches the compile and not the LTO link. It
+  was a false positive: the per-digit bound was lost when GCC vectorised the
+  loop. The fraction digits are now one bounded `memcpy`.
+- **`bvnr_int_test`, `bvnr_float_test` and `bvnr_datetime_test` each set
+  `FAIL_REGULAR_EXPRESSION` twice**, and the second set replaced the first, so
+  `passed, N failed` was never matched. The exit status still gated; both
+  patterns are one regex now.
+- **`rust/target/` was not git-ignored**, so a `cargo build` put gigabytes into
+  `git status`, into `merge.sh`'s bundle and into the doc walkers; it is ignored
+  and pruned now. `bvnr_rust_build_sync` checks that `rust/build.rs` compiles
+  the sources, profile switches and generators of CMakeLists.txt, and that the
+  crate's copies of `BVNR_UNIT_STRING_MAX` and `BVN_CURRENCY_FIRST` match the
+  headers.
+
+**Rust crate.**
+
+- **A failed `Writer::finish()` returned `Ok(())` the second time.** The writer
+  marked itself finished before the C finish and the output ran, so a retry
+  took the early return over a truncated or unwritten document. The first
+  error is kept and returned again.
+- **A NUL byte in a unit-policy string was reported as out of memory** by
+  `DomDoc::parse_with_policy`; it is an argument error now, for the reader too.
+- **The `want_unit` hook saw its value as `Event::StreamStart`.** The view is
+  `Event::Data` now.
+- **`bvn_currency_info_t` was mirrored in `ffi.rs` but not in the ABI
+  manifest**, so its layout was never compared. It is, from both bindings.
+- `ReadOptions::max_file_size` said 0 is "the library default"; 0 is no
+  total-byte cap.
+- **The exact accessors ran without bound on a 28-byte document.**
+  `stored_value()` and `ieee_bits()` of `<float:64> 1e-99999999` built
+  10^99999999, and 1e-500000 already took 9 s. Overflow and underflow are
+  decided from the decimal exponent now, with the same margins and bytes as the
+  Python binding, and `fraction()` refuses an exponent past
+  `FRACTION_EXPONENT_CAP` (100 000; 611 937 for `float_dec:256`).
+- **An integer outside `i128` came back as `Value::String`** holding its
+  literal digits, `<uint:256,_16>` hex included, and `to_string` then wrote it
+  as a string. It is a new `Value::BigInt`, written as `<uint:N>`/`<sint:N>` at
+  the smallest power of two from 128. `i128::MIN` did not read back at all.
+- **A typed round trip lost what only the annotation carries**, as in Python:
+  a quoted numeric under a default annotation made `to_string` fail, and a
+  typed null came back untyped. Every example round-trips typed now.
+- **`json::from_json` refused integers wider than 64 bits**, which
+  `bovnar convert` writes as a wider `<uint>`/`<sint>`. They are written the
+  same way now, and still refused inside an array.
+- **A `Quantity` read back from its own output compared unequal**: no unit and
+  dimensionless differed, as did `<float:0>` and a bare float. Equality uses
+  the effective type and treats both empty units as one, as Python does.
+- A `float_fix` `inf` was 0 from `stored_value`, as in Python. `Decimal`'s
+  `Display` overflowed on an exponent near `i64::MAX`. `BvnFloat::to_str`
+  reported an unsupported base as "buffer too small". `test_zero_initially`
+  asserted nothing.
+
+**Python.**
+
+- **A quoted numeric literal under a default annotation could not be written
+  back.** `dumps(loads(b'.a = <float:64,_10> "5.7";', typed=True))` raised
+  `type_value_mismatch`: the default annotation was dropped, and the token
+  stayed a string. The repository's own `examples/floats.bvnr` and
+  `examples/strings.bvnr` failed this way. A quoted literal keeps its
+  annotation now, and every `examples/*.bvnr` round-trips typed.
+- **A typed null lost its type through `dumps()`.** `<float:64> ;` came back as
+  `.a = ;`, and `[<uint:32>, <sint:64>]` as two untyped nulls. Typed nulls keep
+  their annotation, per element in an array. `<bool> ;` was written bare
+  because `bool` was missing from the family names.
+- **A non-finite `float_fix` reported 0** from `fraction`, `fixed_point` and
+  `stored_value`, while `.value` said `inf`. `stored_value` gives the
+  non-finite value, and the other two raise `BovnarArgumentError`. On a typed
+  null they return `None` instead of raising `AttributeError`.
+- **`dumps()` wrote keys and strings no reader reads**: keys over 255 bytes,
+  non-identifiers, a NUL inside a key, C0 control bytes and lone surrogates.
+  They are refused with `BovnarArgumentError` naming the key, as doc/09 §4.1
+  says.
+- **`Quantity` equality treated the default width and base as different
+  types**, so `<float:0> 2.7` did not equal what `dumps()` wrote for it. Width
+  0 is 64 and base 0 is 10 now, except for `float_fix` (Q) and `datetime`
+  (epoch).
+- **A 28-byte literal made the exact accessors run without bound.**
+  `<float:64> 1e-99999999` made `stored_value` and `ieee_bits` build
+  10^99999999 before rounding it to 0; 1e-500000 already took 9 s. Certain
+  overflow and underflow are decided from the exponent now, bit-identical to
+  the exact rounding near every boundary. `fraction()` refuses a literal whose
+  decimal exponent exceeds `FRACTION_EXPONENT_CAP` (100 000; for
+  `float_dec:256` its own range, 611 937) with `BovnarArgumentError`;
+  `.decimal` stays exact at any exponent (doc/09 §6.2).
+- **`BaseUnit` had no members for the profiles' opaque units**, so
+  `ValueUnitComponent.base_unit` raised `ValueError` on a unit the library had
+  just parsed, such as `ucum:[IU]/mL`. The 65 ids of
+  `include/bovnar_profiles.gen.h` are members now (`BaseUnit.UCUM_IU` …, as in
+  the Rust crate), checked against the header. `unit_to_str` reported every
+  unit with no text form as "output buffer overflow"; it names the cause.
+- `to_numpy()` of an empty annotated array lost its dtype and unit.
+  `unit_to_profile()` named an unknown namespace as a missing code.
+  `Writer.emit()` sent a datetime under a non-unix epoch as a string, reading
+  the epoch index as a radix.
+
+**Documentation.** The Rust crate was missing from this changelog, the release
+notes, `CITATION.cff`, the JOSS paper, the README's features, layout and test
+sections, CONTRIBUTING's checklist and code style, SECURITY's scope and
+THIRD_PARTY_NOTICES' list of what ships the profile tables. The README and the
+wikis said the crate mirrors the Python API "name for name"; it offers the same
+tiers under Rust names. SECURITY named two of the limits an untrusted-input
+consumer must set, and said an endless stream needs only `max_file_size`.
+
+- The policy normalisation pages (doc/06 §2.3, doc/08) name the third class
+  `normalise_si` leaves alone: units with the steradian's or an angle's kind,
+  prefixes included.
+- doc/05 adds `G`, `P` and `R` to the prefix/symbol table, fixes the
+  calorie/BTU note and the `m/(s·s)` comment, and marks DU and the metric perm
+  "as published". doc/07 adds the `rad` and `MBtu`/`Mlb` traps.
+- doc/03 and the IETF draft say that a bare ISO datetime literal sets the type
+  later bare integers inherit, that `max_array_items` is a budget of `[` and
+  `,` rather than an element count, and that `\x` escapes of adjacent string
+  literals may build one character between them. doc/08 documents the
+  end-of-input error position and the float helper's widths.
+- The cross-vocabulary counts in the README and doc/07 had drifted to 4789
+  assertions over 64 concepts; `check_doc_counts.py` gates them now.
 
 ### Fixed — a second whole-project review before release
 
@@ -2177,7 +2462,8 @@ A second sweep after the units landed found refusals whose reason had become
 false — including some the additions themselves invalidated. `om:franklin` and
 `qudt:FR` are the statcoulomb; `om:point-TeX` and `om:pica-TeX` are the printer's
 point and pica to a part in 10⁸; `qudt:LA_FT` is the foot-lambert; `qudt:HP_Brake`
-carries QUDT's own 9809.5 W, which is `hp_B` exactly.
+carries QUDT's own 9809.5 W, which is `hp_B` exactly (later refused; see
+"`qudt:HP_Brake` is refused, as a QUDT modelling error" above).
 
 The tropical and Gregorian years unblocked the rest: `cf:age_of_sea_ice` and
 `cf:sea_water_age_since_surface_contact` are `yr_trop`, the two sea-level
@@ -4286,7 +4572,8 @@ defects the review named, and none could be fixed additively.
   `error_unit_inexact` rather than inventing precision. None of the degrees takes a prefix. `val`
   is the equivalent **as water analysis uses it** — the ions are divalent, so 1 val = ½ mol and
   `m~val/L` = 0.5 mmol/L; for a monovalent species an equivalent is 1 mol, which no unit can
-  convey, so there is deliberately no generic `eq`/`equivalent` alias. Two spellings matter:
+  convey, so there was deliberately no generic `eq`/`equivalent` alias (`eq` is
+  now an alias of `val`; see above). Two spellings matter:
   `dH` without the degree sign is the decihenry and stays that way, and water chemistry's "ppm"
   is `°aH`, not Bovnar's dimensionless `ppm`. Enum values 383-388;
   `BVN_VALUE_BASE_UNIT_COUNT` grows to 389.

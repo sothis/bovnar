@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The callback-driven `Reader`: event order and payloads, type annotations,
 //! untyped defaults, nesting, limits, callback results and panics, and
 //! reading from memory, paths and open files.

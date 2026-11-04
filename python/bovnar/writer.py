@@ -318,9 +318,13 @@ class Writer:
             d.data   = ctypes.cast(ctypes.c_char_p(raw), ctypes.c_void_p)
             d.length = len(raw)
 
+            # The families whose base field is not a radix (bvn_effective_base
+            # reports 10 for them): Q for float_fix, unused for float_dec, the
+            # epoch index for datetime. Their literal is never quoted for it.
             _decimal_float_families = frozenset((
                 int(ValueTypeFamily.FLOAT_FIX),
                 int(ValueTypeFamily.FLOAT_DEC),
+                int(ValueTypeFamily.DATETIME),
             ))
             if vt is not None:
                 fam = int(vt.family)

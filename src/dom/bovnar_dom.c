@@ -60,7 +60,10 @@
  */
 char *bvn_dom_strdup(const char *s, uint32_t len)
 {
-	char *r = malloc(len + 1u);
+	/* len + 1u in uint32_t wrapped to 0 at UINT32_MAX: a zero-byte block
+	 * and a 4 GiB memcpy into it. */
+	if (len == UINT32_MAX || (!s && len)) return NULL;
+	char *r = malloc((size_t)len + 1u);
 	if (!r) return NULL;
 	memcpy(r, s, len);
 	r[len] = '\0';

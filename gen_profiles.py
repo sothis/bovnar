@@ -668,14 +668,26 @@ def gen_policy_rows(profiles):
 
     Without these the slots keep the array's zero default, which is
     BVN_PFX_DEFAULT -- "any SI prefix" -- and k[arb'U] would parse although UCUM
-    forbids a prefix on a non-metric atom."""
+    forbids a prefix on a non-metric atom.
+
+    A METRIC opaque unit takes the prefixes its own profile spells, not every
+    SI prefix: UCUM has no ronna/quetta/ronto/quecto, so BVN_PFX_DEFAULT let
+    the decade fold turn ucum:10*27.k[IU] into R~[IU], a valid unit with no
+    text. Only UCUM's opaque units are metric; another profile that gains one
+    has to say which prefixes it spells here."""
     out = [BANNER % "the profile data files in src/gendata/"]
+    metric_policy = {"ucum": "BVN_PFX_UCUM"}
     for p in profiles:
         for a in p.list("opaque"):
+            if a.get("metric", False):
+                if p.ns not in metric_policy:
+                    die(p, "metric opaque unit %r: no prefix policy says which "
+                           "prefixes the %s profile spells" % (a["code"], p.ns))
+                pol = metric_policy[p.ns]
+            else:
+                pol = "BVN_PFX_NONE"
             out.append("\t[BVN_SLOT_%s(bu_%-18s = %s,\n"
-                       % (p.cname.upper(), a["name"] + ")]",
-                          "BVN_PFX_DEFAULT" if a.get("metric", False)
-                          else "BVN_PFX_NONE"))
+                       % (p.cname.upper(), a["name"] + ")]", pol))
     return "".join(out)
 
 

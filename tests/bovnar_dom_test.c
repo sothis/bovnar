@@ -1853,8 +1853,23 @@ static void test_dom_review_2026_11(void)
 	if (lo) bvn_dom_node_destroy(lo); else bvn_int_free(n);
 }
 
+/* len + 1u in uint32_t wrapped to 0 at UINT32_MAX: a zero-byte allocation and
+ * a 4 GiB copy into it (third review, 2026-11). */
+static void test_dom_strdup_length_bound(void)
+{
+	printf("  test_dom_strdup_length_bound...\n");
+	static const char k[] = "key";
+	ASSERT_TRUE(bvn_dom_strdup(k, UINT32_MAX) == NULL,
+		    "a UINT32_MAX length is refused, not wrapped");
+	ASSERT_TRUE(bvn_dom_strdup(NULL, 3u) == NULL, "NULL with a length is refused");
+	char *c = bvn_dom_strdup(k, 3u);
+	ASSERT_TRUE(c && strcmp(c, "key") == 0, "an ordinary copy still works");
+	free(c);
+}
+
 int main(void)
 {
+	test_dom_strdup_length_bound();
 	test_dom_node_layout_is_invisible();
 	test_dom_homogeneity_is_order_independent();
 	test_dom_row_sizes_are_per_array();

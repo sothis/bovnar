@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The dict parser driven by hand-built event sequences, without the C
 //! reader.
 

@@ -598,3 +598,39 @@ class TestEmptyRows:
         """np.zeros((0, 3)) was written as `[]` and came back as shape (0,)."""
         with pytest.raises(BovnarArgumentError, match="cannot be written faithfully"):
             bovnar.array_to_bvnr("a", np.zeros(shape))
+
+
+# An empty array has no element to infer a dtype from, but its annotation is
+# still on the DOM node: `<sint:32> []` came back as float64 (0,), what numpy
+# infers from nothing.
+@needs_lib
+@pytest.mark.parametrize("np_dtype, shape", [
+    ("int32", (0,)),
+    ("uint8", (0,)),
+    ("int16", (2, 0)),
+    ("float32", (0,)),
+])
+def test_to_numpy_empty_array_keeps_its_dtype(np_dtype, shape):
+    from bovnar import dom_parse, array_to_bvnr, to_numpy
+    doc = array_to_bvnr('x', np.zeros(shape, np.dtype(np_dtype)))
+    arr = to_numpy(dom_parse(doc)['x'])
+    assert arr.dtype == np.dtype(np_dtype)
+    assert arr.shape == shape
+
+
+@needs_lib
+def test_to_numpy_empty_array_keeps_its_unit():
+    from bovnar import dom_parse, to_numpy
+    arr, unit = to_numpy(dom_parse(b'.x = <float:32,m> [];')['x'],
+                         return_unit=True)
+    assert arr.dtype == np.float32 and arr.shape == (0,) and unit == 'm'
+    # No annotation: nothing to go on, numpy's own default.
+    assert to_numpy(dom_parse(b'.x = [];')['x']).dtype == np.float64
+
+
+@needs_lib
+def test_to_numpy_empty_array_unit_with_explicit_dtype():
+    from bovnar import dom_parse, to_numpy
+    arr, unit = to_numpy(dom_parse(b'.x = <float:32,m> [];')['x'],
+                         dtype='float64', return_unit=True)
+    assert arr.dtype == np.float64 and unit == 'm'

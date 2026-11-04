@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+#include <math.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -3456,6 +3457,190 @@ static void test_writer_accepts_only_readable_streams(void)
 		      "every stream the writer accepts is one the reader can read");
 }
 
+/*
+ * Third whole-project review, 2026-11. Each case is a document the writer
+ * reported as written and the reader then refused or read differently.
+ */
+
+/* A datetime's parameter is its epoch, not a unit: a unit flag rewrote
+ * `galileo` -- also an alias of the gal -- into `Gal`. */
+static void test_unit_flags_leave_datetime_epochs(void)
+{
+	printf("  test_unit_flags_leave_datetime_epochs...\n");
+	static const char *const ep[] = { "unix", "tai", "gps", "mjd", "ntp",
+		"galileo", "glonass", "y2000", "beidou" };
+	static const bvn_unit_flags_t fl[] = { BVN_UNIT_REDUCE, BVN_UNIT_ASCII_EXP,
+		BVN_NUM_CANONICAL, BVN_UNIT_REDUCE | BVN_NUM_CANONICAL };
+	for (size_t e = 0; e < sizeof ep / sizeof ep[0]; e++) {
+		for (size_t f = 0; f < sizeof fl / sizeof fl[0]; f++) {
+			uint8_t out[256];
+			char want[64];
+			bvnr_writer_t *w = r4_open(out, sizeof out, fl[f], true);
+			ASSERT_NOT_NULL(w, "writer");
+			if (!w) return;
+			ASSERT_TRUE(bvnr_write_datetime(w, "t", 64, ep[e], 5), ep[e]);
+			/* unix is the default epoch and is not written. */
+			snprintf(want, sizeof want, e ? "<datetime:64,%s>" : "<datetime:64>",
+				 ep[e]);
+			ASSERT_TRUE(strstr((const char *)out, want) != NULL, ep[e]);
+			r4_expect(w, out, NULL, ep[e]);
+		}
+	}
+}
+
+/* The reader's max_number_length and max_reference_length are uint16_t, so a
+ * longer token is a document no reader configuration takes. */
+static void test_number_and_reference_cap(void)
+{
+	printf("  test_number_and_reference_cap...\n");
+	const size_t cap = 70000u;
+	uint8_t *out = malloc(cap);
+	char *num = malloc(65537u), *ref = malloc(65537u);
+	ASSERT_TRUE(out && num && ref, "alloc");
+	if (!out || !num || !ref) { free(out); free(num); free(ref); return; }
+	for (uint32_t len = 65535u; len <= 65536u; len++) {
+		bool fits = len <= UINT16_MAX;
+		/* "1." and zeros: a float token of exactly len bytes. */
+		num[0] = '1'; num[1] = '.';
+		memset(num + 2, '0', len - 2u); num[len] = '\0';
+		bvnr_writer_t *w = r4_open(out, cap, BVN_UNIT_FLAGS_NONE, false);
+		ASSERT_NOT_NULL(w, "writer");
+		if (!w) break;
+		bool ok = r4_key(w, "n") &&
+			  r4_ann(w, BVN_TYPE_FLOAT(64), BVN_UNIT_NONE, false,
+				 BVN_UNIT_NONE, NULL) &&
+			  r4_val(w, token_is_number, BVN_TYPE_FLOAT(64), BVN_UNIT_NONE, num);
+		ASSERT_TRUE(ok == fits, "a number is written up to 65535 bytes");
+		if (!fits)
+			ASSERT_EQ_INT(bvnr_writer_get_error(w), error_number_too_long,
+				      "past 65535 it is number_too_long");
+		bvnr_writer_destroy(w);
+
+		/* ".a.a.a…": a reference of exactly len bytes. */
+		for (uint32_t i = 0; i < len; i++) ref[i] = (i % 2u) ? 'a' : '.';
+		if (len % 2u) ref[len - 1u] = 'a', ref[len - 2u] = 'a';
+		ref[len] = '\0';
+		w = r4_open(out, cap, BVN_UNIT_FLAGS_NONE, false);
+		ASSERT_NOT_NULL(w, "writer");
+		if (!w) break;
+		ok = r4_key(w, "r") &&
+		     r4_val(w, token_is_reference, BVN_TYPE_PLAIN, BVN_UNIT_NONE, ref);
+		ASSERT_TRUE(ok == fits, "a reference is written up to 65535 bytes");
+		if (!fits)
+			ASSERT_EQ_INT(bvnr_writer_get_error(w), error_reference_too_long,
+				      "past 65535 it is reference_too_long");
+		bvnr_writer_destroy(w);
+	}
+	free(out); free(num); free(ref);
+}
+
+/* float:16 and float:32 round to their own format, and a finite value that
+ * overflows it is refused instead of written as inf. */
+static void test_write_float_narrow_widths(void)
+{
+	printf("  test_write_float_narrow_widths...\n");
+	static const struct { uint32_t width; double v; bool ok; const char *want; } C[] = {
+		{ 32u, 1e300,    false, NULL },
+		{ 32u, -1e39,    false, NULL },
+		{ 16u, 1e10,     false, NULL },
+		{ 16u, 65520.0,  false, NULL },     /* rounds past 65504 to inf */
+		{ 16u, 65504.0,  true,  ".v=<float:16>6.5504e+4;" },
+		{ 16u, 0.1,      true,  NULL },
+		{ 32u, 1e-50,    true,  NULL },     /* underflow to 0 is a rounding */
+		{ 16u, INFINITY, true,  ".v=<float:16>inf;" },
+	};
+	for (size_t i = 0; i < sizeof C / sizeof C[0]; i++) {
+		uint8_t out[128];
+		bvnr_writer_t *w = r4_open(out, sizeof out, BVN_UNIT_FLAGS_NONE, false);
+		ASSERT_NOT_NULL(w, "writer");
+		if (!w) return;
+		bool ok = bvnr_write_float(w, "v", C[i].width, C[i].v);
+		ASSERT_TRUE(ok == C[i].ok, "float width narrowing");
+		if (!ok) {
+			ASSERT_EQ_INT(bvnr_writer_get_error(w), error_value_out_of_range,
+				      "an overflow is value_out_of_range");
+			bvnr_writer_destroy(w);
+			continue;
+		}
+		r4_expect(w, out, C[i].want, "narrowed float");
+	}
+	/* 0.1 at width 16 is the binary16 neighbour, not the binary32 one. */
+	uint8_t out[128];
+	bvnr_writer_t *w = r4_open(out, sizeof out, BVN_UNIT_FLAGS_NONE, false);
+	if (!w) return;
+	ASSERT_TRUE(bvnr_write_float(w, "v", 16u, 0.1), "0.1 at 16");
+	ASSERT_TRUE(bvnr_write_finish(w), "finish");
+	/* 0.0999755859375, the nearest binary16; through a binary32 it was
+	 * 0.100000001490116 and printed as such. */
+	ASSERT_TRUE(strstr((const char *)out, "<float:16>9.9976e-2;") != NULL,
+		    "0.1 rounds to the binary16 grid");
+	bvnr_writer_destroy(w);
+}
+
+/* An epoch index that names no epoch was written as `unix`. */
+static void test_datetime_epoch_index_range(void)
+{
+	printf("  test_datetime_epoch_index_range...\n");
+	uint8_t out[128];
+	bvnr_writer_t *w = r4_open(out, sizeof out, BVN_UNIT_FLAGS_NONE, true);
+	ASSERT_NOT_NULL(w, "writer");
+	if (!w) return;
+	const value_type_spec_t bad = { .family = vt_datetime, .width = 64, .base = 99 };
+	ASSERT_TRUE(r4_key(w, "t"), "key");
+	ASSERT_FALSE(bvnr_write_type_annotation(w, bad, BVN_UNIT_NONE),
+		     "epoch index 99 is refused");
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_illegal_value_type,
+		      "as illegal_value_type");
+	bvnr_writer_destroy(w);
+	w = r4_open(out, sizeof out, BVN_UNIT_FLAGS_NONE, true);
+	if (!w) return;
+	const value_type_spec_t last = { .family = vt_datetime, .width = 64, .base = 8 };
+	ASSERT_TRUE(r4_key(w, "t") && bvnr_write_type_annotation(w, last, BVN_UNIT_NONE),
+		    "the last epoch index is fine");
+	bvnr_writer_destroy(w);
+}
+
+/* bvn_validate_identifier stops at a NUL, so "a\0b" was checked as "a". */
+static void test_key_with_nul_refused(void)
+{
+	printf("  test_key_with_nul_refused...\n");
+	uint8_t out[128];
+	bvnr_writer_t *w = r4_open(out, sizeof out, BVN_UNIT_FLAGS_NONE, false);
+	ASSERT_NOT_NULL(w, "writer");
+	if (!w) return;
+	bvnr_data_t d;
+	memset(&d, 0, sizeof d);
+	d.type = token_is_identifier; d.data = "a\0b"; d.length = 3u;
+	ASSERT_FALSE(bvnr_write_event(w, ev_assignment_start, &d),
+		     "a key with a NUL byte is refused");
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_invalid_argument,
+		      "as an invalid key");
+	bvnr_writer_destroy(w);
+}
+
+/* ΔK·m/m is a lone ΔK, not K·m/m: --canonical reduced a valid array of the two
+ * into an invalid one. And °C·s/s must not reduce to a °C it never meant. */
+static void test_canonical_keeps_interval_and_affine_apart(void)
+{
+	printf("  test_canonical_keeps_interval_and_affine_apart...\n");
+	bool ok1 = false, ok2 = false;
+	value_unit_t dk = bvn_parse_unit((const uint8_t *)"ΔK·m/m", &ok1);
+	value_unit_t k  = bvn_parse_unit((const uint8_t *)"K·m/m", &ok2);
+	ASSERT_TRUE(ok1 && ok2, "parse");
+	ASSERT_FALSE(bvn_unit_equal(dk, k), "ΔK·m/m and K·m/m are not one unit");
+	uint8_t out[128];
+	bvnr_writer_t *w = r4_open(out, sizeof out, BVN_UNIT_REDUCE, false);
+	if (!w) return;
+	bool ok = false;
+	value_unit_t cs = bvn_parse_unit((const uint8_t *)"°C·s/s", &ok);
+	ASSERT_TRUE(ok, "parse °C·s/s");
+	ASSERT_TRUE(bvnr_write_float_unit(w, "v", 64, 20.0, cs), "write");
+	ASSERT_TRUE(bvnr_write_finish(w), "finish");
+	ASSERT_TRUE(strstr((const char *)out, "<float:64,°C·s/s>") != NULL,
+		    "°C·s/s is written as it is, not as °C");
+	bvnr_writer_destroy(w);
+}
+
 int main(void)
 {
 	test_unit_reduce_rescales_the_value();
@@ -3518,6 +3703,12 @@ int main(void)
 	test_write_string_vf_escapes();
 	test_canon_observer_unbalanced_struct_end_rejected();
 	test_canon_observer_emits_version();
+	test_unit_flags_leave_datetime_epochs();
+	test_number_and_reference_cap();
+	test_write_float_narrow_widths();
+	test_datetime_epoch_index_range();
+	test_key_with_nul_refused();
+	test_canonical_keeps_interval_and_affine_apart();
 
 	if (failures == 0) {
 		printf("PASSED %d tests\n", tests);

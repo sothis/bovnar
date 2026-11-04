@@ -541,6 +541,14 @@ REVIEWED_STALE = {
         "BTU_MEAN", "GRAIN-PER-GAL", "HP_Brake", "LA", "MI2",
         "MicroM-PER-MilliL", "NanoKAT-PER-L", "PT")},
     **{("unece", c): _R_CONTRADICTS for c in ("J39", "M48", "MIK", "N3", "P30")},
+    # The third review: the dimension vector the match follows is the thing
+    # QUDT's own name or definition contradicts (qudt-qk.bvnr says how).
+    **{("qudt-qk", c): _R_CONTRADICTS for c in (
+        "EquilibriumConstantBasedOnConcentration",
+        "EquilibriumConstantBasedOnPressure",
+        "MolarOpticalRotationalAbility", "SpecificOpticalRotationalAbility",
+        "GyromagneticRatio", "MagneticPolarization",
+        "ExhaustGasMeanMolecularWeight", "ThrustCoefficient")},
     ("unece", "H39"):
         "QUDT's two claimants name units a thousand apart and only one states "
         "a value; the match follows that one",
@@ -976,7 +984,10 @@ class Udunits:
             if hit:
                 out.append(('u', hit))
                 i += len(hit)
-                m2 = re.match(r'[-+]?\d+(?![\d.eE])', s[i:])
+                # An exponent ends at the digits. A '.' after it is the
+                # multiplication operator ("kg.m2.s-3") unless a digit follows,
+                # which would make the run a decimal number ("m2.5").
+                m2 = re.match(r'[-+]?\d+(?!\d|\.\d|[eE][-+]?\d)', s[i:])
                 if m2:
                     out.append(('e', int(m2.group(0))))
                     i += m2.end()
@@ -2525,6 +2536,30 @@ def doc_row_claims():
     return out
 
 
+def self_test():
+    """The checker's own evaluators, on spellings with a known answer. They
+    stand in for the publishers, so a bug here passes or fails a whole table:
+    the UDUNITS scanner once read the "2." of "kg.m2.s-3" as the number 2.0,
+    which made a watt twice too large with a dimension of m1 -- no table row had
+    that shape yet, so nothing failed. Returns a list of problems."""
+    problems = []
+    ud = object.__new__(Udunits)
+    ud._names = ["kg", "m", "s"]
+    for text, want in [
+            ("kg.m2.s-3", [('u', 'kg'), '*', ('u', 'm'), ('e', 2), '*',
+                           ('u', 's'), ('e', -3)]),
+            ("m2 s-1", [('u', 'm'), ('e', 2), '*', ('u', 's'), ('e', -1)]),
+            ("m2.5", [('u', 'm'), ('n', 2.5)])]:
+        try:
+            got = ud._scan(text)
+        except Exception as e:                                # noqa: BLE001
+            got = "raised %r" % e
+        if got != want:
+            problems.append("Udunits._scan(%r) = %r, expected %r"
+                            % (text, got, want))
+    return problems
+
+
 def main(argv):
     ap = argparse.ArgumentParser(
         description="check the unit-profile tables against their publishers")
@@ -2543,6 +2578,13 @@ def main(argv):
     args = ap.parse_args(argv[1:])
 
     which = args.profile or sorted(VOCABS)
+
+    st = self_test()
+    if st:
+        print("check_profile_factors: the checker's own evaluators are wrong:")
+        for msg in st:
+            print("  %s" % msg)
+        return 1
 
     if args.fetch:
         print("check_profile_factors: fetching into %s" % args.cache)

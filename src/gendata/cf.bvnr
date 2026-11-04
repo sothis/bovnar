@@ -536,9 +536,9 @@
   { .code = "dew_point_temperature";                                           .bovnar = "K";               },  # K
   { .code = "diameter_of_ambient_aerosol_particles";                           .bovnar = "m";               },  # m
   { .code = "difference_between_change_in_soil_moisture_content_and_sum_of_estimated_contributions"; .bovnar = "k~g/m^2";         },  # kg m-2
-  { .code = "difference_between_sea_surface_skin_temperature_and_sea_surface_subskin_temperature"; .bovnar = "°C";              },  # degree_C
-  { .code = "difference_between_sea_surface_subskin_temperature_and_sea_surface_foundation_temperature"; .bovnar = "°C";              },  # degree_C
-  { .code = "difference_between_sea_surface_subskin_temperature_and_sea_surface_temperature"; .bovnar = "°C";              },  # degree_C
+  { .code = "difference_between_sea_surface_skin_temperature_and_sea_surface_subskin_temperature"; .bovnar = "Δ°C";              },  # degree_C, a difference
+  { .code = "difference_between_sea_surface_subskin_temperature_and_sea_surface_foundation_temperature"; .bovnar = "Δ°C";              },  # degree_C, a difference
+  { .code = "difference_between_sea_surface_subskin_temperature_and_sea_surface_temperature"; .bovnar = "Δ°C";              },  # degree_C, a difference
   { .code = "difference_between_sea_surface_temperature_and_air_temperature";  .bovnar = "K";               },  # K
   { .code = "difference_of_air_pressure_from_model_reference";                 .bovnar = "Pa";              },  # Pa
   { .code = "diffuse_downwelling_shortwave_flux_in_air";                       .bovnar = "W/m^2";           },  # W m-2
@@ -2625,8 +2625,8 @@
   { .code = "sea_surface_wind_wave_significant_height";                        .bovnar = "m";               },  # m
   { .code = "sea_surface_wind_wave_to_direction";                              .bovnar = "°";               },  # degree
   { .code = "sea_water_absolute_salinity";                                     .bovnar = "g/k~g";           },  # g kg-1
-  { .code = "sea_water_added_conservative_temperature";                        .bovnar = "°C";              },  # degree_C
-  { .code = "sea_water_added_potential_temperature";                           .bovnar = "°C";              },  # degree_C
+  { .code = "sea_water_added_conservative_temperature";                        .bovnar = "Δ°C";              },  # degree_C, a difference
+  { .code = "sea_water_added_potential_temperature";                           .bovnar = "Δ°C";              },  # degree_C, a difference
   { .code = "sea_water_alkalinity_expressed_as_mole_equivalent";               .bovnar = "mol/m^3";         },  # mol m-3
   { .code = "sea_water_alkalinity_natural_analogue_expressed_as_mole_equivalent"; .bovnar = "mol/m^3";         },  # mol m-3
   { .code = "sea_water_alkalinity_per_unit_mass_expressed_as_mole_equivalent"; .bovnar = "mol/k~g";         },  # mol kg-1

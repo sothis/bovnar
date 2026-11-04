@@ -63,10 +63,11 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Streaming SAX-style reader** — Incremental parsing from memory, a file descriptor, or a socket via a symmetric `on_unverified` / `on_verified` callback pair.
 - **Error recovery** — Optional resync mode skips broken assignments and continues parsing — suitable for log streams and unreliable transports.
 - **Python bindings** — Pure-`ctypes`, no compiled extension required. Exposes both a high-level `loads`/`dumps` dict-like API and a low-level event-driven streaming API.
+- **Rust bindings** — the `bovnar` crate compiles the C library in, so there is no system library to install. It offers `parse`/`to_string` over a dynamic `Value`, the streaming `Reader`/`Writer`, the DOM, exact numbers and JSON conversion ([doc/14](doc/14_bovnar_rust_bindings.md)).
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
 - **Browser playground** — the real C reference parser, compiled to WebAssembly (`bovnar_parser_wasm.js` over `bovnar_wasm_core.js`), runs the reference verified event stream (with full type/unit/value validation) in the browser and powers an interactive web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
-- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 470-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
+- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 470-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), Python and Rust test suites with cargo-fuzz targets for the crate, and a built-in benchmark mode (`bovnar bench`).
 
 ---
 
@@ -2761,7 +2762,7 @@ standard publication by three to five years.
 - [Unit & Currency Reference](05_bovnar_unit_system.md) — the registry behind §4
 - [Read & Write API](08_bovnar_readwrite_api.md) — the C functions named in §12
 - [Python Bindings](09_bovnar_python_bindings.md) — the package described in §13
-- [Rust Bindings](14_bovnar_rust_bindings.md) — the same API as a Rust crate
+- [Rust Bindings](14_bovnar_rust_bindings.md) — the same tiers as a Rust crate
 
 ---
 
@@ -3273,6 +3274,13 @@ after `\` causes `error_illegal_escape_sequence`.
 ```
 
 The combined byte length must not exceed `max_string_length` (default 65535).
+
+UTF-8 validity is checked at two points. A raw byte must belong to a valid
+sequence within its own literal, so `"\xc3" "\xa9"` written as two raw bytes is
+`error_invalid_utf8_byte` at the second `"`. A `\x` escape is checked on the
+decoded value of the whole token, so the escapes of adjacent literals may build
+one character between them: `"\xC3" "\xA9"` is `"é"`. An escape-built invalid
+sequence is reported at the first byte after the token.
 
 #### Examples
 
@@ -4226,7 +4234,10 @@ and epoch — `[<datetime:64,tai> 1, 2]` is two `tai` instants, and
 `[<datetime:8> 1, 300]` is `error_value_out_of_range`. "Following" is in document
 order across the whole array, not only within the row: bare integers in later
 sibling sub-arrays and later `/`-rows inherit it too — `[[<datetime:8> 1], [300]]`
-is `error_value_out_of_range` and `[<datetime:8> 1]/[2]` is two datetimes. Without that, the second
+is `error_value_out_of_range` and `[<datetime:8> 1]/[2]` is two datetimes. A
+bare ISO literal sets that type as an annotation does: `[2020-01-01, 5]` is two
+`<datetime:64,unix>` instants, while `[5, 2020-01-01]` is
+`error_array_element_type_mismatch`. Without that, the second
 element would be a `uint` beside a `datetime` and the array could never be
 homogeneous (§7.4). It reaches integers only: a bare ISO literal still infers
 `<datetime:64,unix>` (§10.1), so `[<datetime:64,tai> 1, 2026-06-15]` mixes
@@ -4239,6 +4250,10 @@ literal.
 |------------|-------|
 | Array nesting depth | `max_array_nesting` — default 64, hard cap 255 |
 | Total array items | `max_array_items` (configurable; 0 → 2 147 483 647 internal default) |
+
+`max_array_items` is a budget rather than an element count: every `[` and every
+`,` under one outermost array costs one, so an empty row costs one too —
+`[]/[]` needs 2, `[[],[]]` needs 4, `[[1,2],[3,4]]` needs 6.
 
 ---
 
@@ -4390,8 +4405,10 @@ The currency row takes **precedence** over the float/integer rows: any number
 becomes `<float_dec:64,$USD>`, not `<uint:64>`.
 
 > **A bare integer inside a `datetime` array** inherits the `datetime` type
-> (width and epoch) of the array's annotation, or of the annotated element
-> before it (§7.5), rather than synthesising `uint`/`sint`, so a datetime array
+> (width and epoch) of the array's annotation, or of the datetime element
+> before it — annotated, or a bare ISO literal, which synthesises
+> `<datetime:64,unix>` (§7.5) — rather than synthesising `uint`/`sint`, so
+> `[2020-01-01, 5]` is two `unix` instants and a datetime array
 > as the pretty-printer writes it — annotation on the first element, bare
 > integers after — stays homogeneous.
 
@@ -5826,7 +5843,8 @@ major counts breaks in what a *document* means, and has not moved. The C header
 defines `BVNR_VERSION_MAJOR`, `BVNR_VERSION_MINOR`, `BVNR_VERSION_PATCH`, the
 comparable integer `BVNR_VERSION` (`major*10000 + minor*100 + patch`, so
 `#if BVNR_VERSION >= 20000` tests "≥ 2.0.0"), and `BVNR_VERSION_STRING`
-(`"2.0.0"`). The Python package mirrors this as `bovnar.__version__`.
+(`"2.0.0"`). The Python package mirrors this as `bovnar.__version__`, the Rust crate as
+`bovnar::version()`.
 Separately, `BVNR_SPEC_VERSION_MAJOR` / `BVNR_SPEC_VERSION_MINOR` name the
 highest **spec** version the build understands (`1.2`); `bvnr_version()`, `bvnr_version_string()` and
 `bvnr_spec_version()` expose both at runtime.
@@ -7948,9 +7966,10 @@ A bare array is homogeneous in its unit (spec [§7.4](03_bovnar_spec.md#74-eleme
 | `Btu_th` | `BTU_th`, `btu_th` | thermochemical BTU | `bu_btu_th` | 23722880951/22500000 J ≈ 1054.35026449 J |
 
 > **Two calories and two BTUs, and the pairs cross over.** `cal` is the THERMOCHEMICAL calorie and
-> `Btu` the INTERNATIONAL TABLE BTU, which is not an inconsistency but the two vocabularies' own
-> defaults: UCUM's unqualified `cal` is thermochemical and its unqualified `[Btu]` is too, while
-> UDUNITS' unqualified `calorie` is the IT one. Each pair is 0.067 % apart — dimensionally identical
+> `Btu` the INTERNATIONAL TABLE BTU, which is not an inconsistency but two vocabularies' defaults:
+> `cal` follows UCUM, whose unqualified `cal` is thermochemical, and `Btu` follows UDUNITS, whose
+> unqualified `BTU` is the IT one (as its `calorie` is). UCUM's unqualified `[Btu]` is
+> thermochemical too, so `ucum:[Btu]` maps to `Btu_th`, not to `Btu`. Each pair is 0.067 % apart — dimensionally identical
 > and numerically wrong if confused — so both members of both pairs are carried and every profile
 > code lands on the one its own vocabulary says it means. Both BTUs are one pound of water raised
 > one degree Fahrenheit, i.e. the corresponding calorie × 453.59237 g/lb × 5/9; that terminates for
@@ -8500,7 +8519,7 @@ document that meant dry had no way to say so.
 | `darcy` | `darcy`, `darcys`, `darcies` | darcy (permeability) | `bu_darcy` | 1/1013250000000 m² |
 | `thm_ec` | `therm_EC` | EC therm (10⁵ `Btu`) | `bu_therm_ec` | 1.05505585262×10⁸ J (exact) |
 | `ton_ref` | `refrigeration_ton`, `ton_of_refrigeration` | ton of refrigeration | `bu_refrigeration_ton` | 12 000 `Btu`/h = 52752792631/15000000 W |
-| `DU` | `dobson`, `dobson_unit`, `dobson_units` | Dobson unit (ozone column) | `bu_dobson` | 4.462×10⁻⁴ mol·m⁻² (exact) |
+| `DU` | `dobson`, `dobson_unit`, `dobson_units` | Dobson unit (ozone column) | `bu_dobson` | 4.462×10⁻⁴ mol·m⁻² (as published; 10 µm of ideal gas at STP is 4.4615×10⁻⁴) |
 | `shake` | `shake`, `shakes` | shake | `bu_shake` | 10⁻⁸ s (exact) |
 
 > `darcy` takes prefixes, so the millidarcy every reservoir report is written in is `m~darcy` (or
@@ -8608,7 +8627,7 @@ UDUNITS or CF document that says `year` be read at all. It was refused outright 
 |--------|-----------|------|------|--------|
 | `perm_0C` | — | perm (0 °C) | `bu_perm_0c` | 5.72135×10⁻¹¹ kg·Pa⁻¹·s⁻¹·m⁻² (exact) |
 | `perm_23C` | — | perm (23 °C) | `bu_perm_23c` | 5.74525×10⁻¹¹ kg·Pa⁻¹·s⁻¹·m⁻² (exact) |
-| `perm_m` | `perm_metric` | metric perm | `bu_perm_metric` | 8.68127×10⁻¹¹ kg·Pa⁻¹·s⁻¹·m⁻² (exact) |
+| `perm_m` | `perm_metric` | metric perm | `bu_perm_metric` | 8.68127×10⁻¹¹ kg·Pa⁻¹·s⁻¹·m⁻² (as published; 1 g/(m²·d·mmHg) is 8.6812682×10⁻¹¹) |
 
 **Heat conventions**
 
@@ -8681,6 +8700,9 @@ Several prefix symbols overlap with base unit symbols. A base unit symbol is mat
 | `d`    | deci      | day          |
 | `h`    | hecto     | hour         |
 | `T`    | tera      | tesla        |
+| `G`    | giga      | gauss (`GG` is giga-gauss) |
+| `P`    | peta      | poise        |
+| `R`    | ronna     | roentgen     |
 | `f`    | femto     | *(none)* — the farad is `F`, uppercase |
 | `a`    | atto      | *(none)*     |
 | `u`    | micro (ASCII alias for `µ`) | dalton |
@@ -8865,7 +8887,7 @@ compose correctly:
 ```bovnar
 .pressure = <float:64,k~g/(m·s²)> 101325;  # kg·m⁻¹·s⁻² — same as k~g/m·s²
 .areal    = <float:64,(k~g/m)·s²> 1.0;     # kg·m⁻¹·s²  — grouping changes the s sign
-.rate     = <float:64,m/(s·s)> 1.0;        # m·s⁻²
+.rate     = <float:64,m/(s·s)> 1.0;        # dimension m·s⁻², but not the unit m/s²
 ```
 
 `k~g/(m·s²)` and `k~g/m·s²` therefore parse to the **same** `value_unit_t` (the
@@ -10544,8 +10566,11 @@ policy restated this value", not "the policy looked at it".
 `bvnr_normalise_si` catches whatever the targets did not, delivering it in coherent SI base units
 with prefixes folded out. `base` sets the output base for those conversions.
 
-Values with no coherent SI form are left alone rather than reinterpreted: currencies, and every
-dimensionless unit (`%`, `ppm`, `dB`, `pH`, `rad`, `°`).
+Values with no coherent SI form are left alone rather than reinterpreted: currencies, every
+dimensionless unit (`%`, `ppm`, `dB`, `pH`, `rad`, `°`), and every unit carrying the steradian's or
+an angle's quantity kind, which no SI base form can express (`k~lx`, `k~lm`, `m~ph`, `W/sr`, `k~rad/s`).
+
+Their prefixes stay as written too: `k~lx` is not delivered as `lx` (doc/05 §12.4).
 
 ### 2.4 Inexact results
 
@@ -10802,6 +10827,7 @@ error in somebody else's file. A rejected policy leaves the previous one in forc
 |---|---|
 | `error_unit_mismatch` | `require_unit` on a bare value; `require_dimension_of` matching nothing; a value at a path a rule names that is not convertible to the rule's unit; a value nested too deep for a rule to be evaluated at all ([§2.7](#27-limits-and-lifetime)) |
 | `error_unit_inexact` | a conversion that cannot be delivered exactly, under `bvnr_inexact_error` |
+| `error_invalid_argument` | a converted value that is negative in the output base 64 or 85, which have no sign character |
 
 ---
 
@@ -11416,6 +11442,11 @@ Two that *are* accepted but rarely mean what the writer intended:
 |---------|--------------|---------------|
 | `fl` | femtolitre | fluid ounce → `fl_oz` |
 | `mt` | millitonne (= 1 kg) | metric ton → `t`; megatonne → `Mt` or `M~t` |
+| `rad`, `mrad` | radian, milliradian | the absorbed dose (0.01 Gy, UCUM `RAD`) → `c~Gy`; a millirad → `10 µ~Gy` |
+| `MBtu`, `Mlb` | mega-Btu (10⁶ Btu), mega-pound | US industry's Roman M, a thousand → `k~Btu`, `k~lb` (`MMBtu`, a million, is refused: write `M~Btu`) |
+
+The last row is the same 1000× trap as `kt`: `MBtu` reads as 10⁶ Btu because `M` is mega
+everywhere in the SI, and a document from the gas or steam trade usually means 10³.
 
 ---
 
@@ -11523,6 +11554,9 @@ usually where the money is.
 | knot | `kn` | `kt`, `kts` |
 | milli-inch | `m~in` | `min` (minute) |
 | milliradian | `mrad`, `m~rad` | `mil` (thou) |
+| absorbed dose in rad | `c~Gy` (1 rad = 1 cGy) | `rad` (the radian) |
+| thousand Btu (US "MBtu") | `k~Btu` | `MBtu` (that is 10⁶ Btu) |
+| million Btu (US "MMBtu") | `M~Btu` | `MMBtu` (refused) |
 | picohenry | `p~H` | `pH` (acidity) |
 | acidity | `pH` | `p~H` (picohenry) |
 | phot | `ph` | `pH` |
@@ -11597,7 +11631,7 @@ Two rules make this tractable, and both are worth knowing before writing a profi
 
 Where two vocabularies genuinely name the same quantity they land on the same unit, and that is
 checked: `ucum:kg`, `unece:KGM`, `qudt:KiloGM`, `udunits:kg` and `qudt-qk:Mass` all compare equal.
-The cross-vocabulary suite (doc/11 §14) verifies this pairwise across 64 concepts, and pins the
+The cross-vocabulary suite (doc/11 §14) verifies this pairwise across 69 concepts, and pins the
 rows above as pairs that must **not** compare equal.
 
 ---
@@ -11892,6 +11926,13 @@ caret needs the right one:
 | `..._column` | **characters** | 1 | a multi-byte UTF-8 sequence advances it by one; a tab advances to the next multiple of 4 |
 | `..._offset` | **bytes** | 0 | use this to index the input buffer |
 
+An error raised at the **end of input** (`error_got_incomplete_bvnr_stream`, a
+truncated character in a final comment, a directive with no newline) is placed
+where the missing byte would go: the offset is the input length, and the column
+is one past the last character on the last line — `1` when the input ends in a
+newline. (Inside a cut-short multi-byte character the column stays on that
+character.)
+
 In `.x = "café"; .y = @;` the `@` is reported at column 19 and offset 19 — the
 19th character, and the 20th byte, because `é` is two bytes: a 1-based character
 count and a 0-based byte count that happen to land on the same number. One more
@@ -12120,7 +12161,7 @@ skipped:
 | `*want` dimensionally incompatible with the value's unit (seconds for a length; one currency for another) | `error_unit_mismatch` |
 | the true factor is irrational (a π-based angle, e.g. degree → radian) | `error_unit_inexact` |
 | the value's unit puts an affine scale inside a compound (`°C/h`, `°C·m`, `°C²`): the offset is a number of kelvin and the product has nowhere to add it | `error_unit_mismatch` |
-| the exact result has no terminating expansion in `*want_base` (e.g. `1 m → mile` in base 10), and `want_unit_allow_nonterminating` is off | `error_unit_inexact` |
+| the exact result has no terminating expansion in `*want_base` (e.g. `1 m → mile` in base 10; in base 85 any fraction, since `.` is a digit there), and `want_unit_allow_nonterminating` is off | `error_unit_inexact` |
 | the literal is finite but too extreme to build an exact rational from (e.g. `1e1000000`) | `error_value_out_of_range` |
 | `*want_base` is not a base bvnr writes, or the result is negative in base 64/85, or out of memory | `error_invalid_argument` |
 | the exact result would be longer than `max_conversion_length` characters | `error_value_out_of_range` |
@@ -12372,7 +12413,9 @@ it in coherent SI base units with prefixes folded out:
 | `<float:64,$USD> 5.0` | untouched |
 
 Every **dimensionless** unit is left exactly as written — `%`, `ppm`, `dB`, `pH`,
-`rad`, `°`, the turbidity scales — along with the currencies. Normalising a ratio
+`rad`, `°`, the turbidity scales — along with the currencies, and so is a unit
+carrying the steradian's or an angle's quantity kind (`k~lx`, `m~ph`, `W/sr`,
+`k~rad/s`), whose SI base form would be a different quantity; prefixes stay too. Normalising a ratio
 would silently restate `35 %` as `0.35`, and normalising an angle would need the
 irrational factor between `°` and `rad`. See `bvn_unit_si_normal_form`.
 
@@ -12611,7 +12654,7 @@ typedef struct bvnr_write_flags_s {
 | `BVN_UNIT_FLAGS_NONE` | `0` | Default: Unicode superscript exponents, no reduction |
 | `BVN_UNIT_REDUCE` | `1 << 0` | Reduce compound units to canonical form before serialising |
 | `BVN_UNIT_ASCII_EXP` | `1 << 1` | Use `^N` ASCII caret notation instead of Unicode superscripts |
-| `BVN_NUM_CANONICAL` | `1 << 2` | Render a *rescaled* float in float shape (`5000.0`, not `5000`), so a value that took the rescale lands on the same spelling as one that did not; and write every annotation in one form — the width written out (`<uint>` as `<uint:64>`), a default base `_10` and `no_unit` left out — so `1.0 km` and `<float:64,k~m> 1.0` produce the same bytes. What `bovnar pretty-print --canonical` sets beside `BVN_UNIT_REDUCE` |
+| `BVN_NUM_CANONICAL` | `1 << 2` | Render a *rescaled* float in float shape (`5000.0`, not `5000`), so a value that took the rescale lands on the same spelling as one that did not; and write every annotation in one form — the width written out (`<uint>` as `<uint:64>`), a default base `_10` and `no_unit` left out — so `1.0 km` and `<float:64,k~m> 1.0` produce the same bytes. Two spellings stay apart: a unit with an opaque profile code keeps its profile spelling and leaves the prefixes beside it unfolded (`ucum:[IU]/mL` and `ucum:[IU]/L` are not brought to one form), and an inline unit beside an annotation stays inline (`<uint:64> 5 m` is not rewritten as `<uint:64,m> 5`). What `bovnar pretty-print --canonical` sets beside `BVN_UNIT_REDUCE` |
 
 `BVN_UNIT_REDUCE` folds every prefix out of the unit, and the **writer scales the value to match**: `5` with unit `k~m` is written as `5000 m`, not `5 m`. The rescale runs in exact rational arithmetic, so a value far wider than a double keeps every digit; where the scaled value cannot be written exactly in the value's own base the write fails with `error_value_out_of_range` rather than rounding. The rescaled value must also still satisfy the type it was declared with: an `uint`/`sint` that is no longer integral or no longer fits its width, and a `float_fix` that no longer fits its Q format (`<float_fix:32,q16>` leaves 15 integer bits, so 30000 km in metres does not fit), are refused the same way — the writer must not emit a document this library's own reader rejects. (A direct caller of `bvn_unit_to_string_ex` gets no such help — see the note on that function in §3.3.)
 
@@ -13078,7 +13121,7 @@ bool bvnr_write_struct_end  (bvnr_writer_t *w);
 | `bvnr_write_null` | `.key = ;` | the null value |
 | `bvnr_write_bool` | `.key = true;` / `false` | |
 | `bvnr_write_uint` / `_sint` | `.key = <uint:16> 443;` | `width` 0 writes `<uint>` / `<sint>` (64 bits); a value that does not fit `width` is `error_value_out_of_range` |
-| `bvnr_write_float` | `.key = <float:64> 1e-1;` | `width` 0 writes `<float>`; `nan`, `inf` and `ninf` are written as those words; formatted as by `bvn_format_double` (§2.11) |
+| `bvnr_write_float` | `.key = <float:64> 1e-1;` | `width` is 0 (writes `<float>`), 16, 32, 64, 128 or 256 — another multiple of 32 the format allows, such as 96, is `error_invalid_argument` here and needs `bvnr_write_bvnf_base`. At 16 and 32 the value is rounded to binary16 or binary32 first, and a finite value that overflows that format is `error_value_out_of_range`, not an `inf`. `nan`, `inf` and `ninf` are written as those words; formatted as by `bvn_format_double` (§2.11) |
 | `bvnr_write_float_fix` | `.key = <float_fix:32,q16> 1.5e+0;` | `q` is the number of fractional bits |
 | `bvnr_write_float_dec` | `.key = <float_dec:64> 1.25e+0;` | |
 | `…_unit` | `.key = <float:64,k~m> 1e+0;` | the same, with `unit` as the annotation's unit parameter; honours `bvnr_writer_set_unit_source` (§3.1) and the writer's unit policy (§2.15) |
@@ -13360,7 +13403,7 @@ failures:
 
 | Return | Meaning |
 |--------|---------|
-| `BVN_RATIONAL_NONTERMINATING` (`-2`) | the expansion is infinite in this base. The rational itself is still exact, so use `num`/`den`. |
+| `BVN_RATIONAL_NONTERMINATING` (`-2`) | the expansion is infinite in this base, or the value has a fraction and the base is 85 (Ascii85 spends `.` on a digit, so there is no radix point). The rational itself is still exact, so use `num`/`den`. |
 | `-1` | bad arguments, an unsupported base, a negative value in the sign-less bases 64/85, out of memory, or a `bufsize` too small. |
 
 The buffer is **never truncated** — half an exact expansion is simply a different
@@ -13970,6 +14013,7 @@ int main(void)
 - [Unit & Currency Reference](05_bovnar_unit_system.md) — the unit model behind `bvn_parse_unit` and `want_unit`
 - [Streaming, Framing & Multiplexing](10_bovnar_streaming.md) — protocols layered on this event API
 - [Python Bindings](09_bovnar_python_bindings.md) — the same API from Python
+- [Rust Bindings](14_bovnar_rust_bindings.md) — the same API from Rust
 - [FAQ §12 — C API](02_bovnar_faq.md#12-c-api) — common questions about these functions
 
 ---
@@ -14182,6 +14226,16 @@ out = bovnar.dumps(doc)
 assert bovnar.loads(out, typed=True) == doc
 ```
 
+Two `Quantity` objects are equal (and hash alike) when their literal, unit and
+*effective* type agree: a width of 0 is 64 and a radix of 0 is 10, as the C
+library reads them, so `<float:64,_10> 5.7`, `<float:0> 5.7` and a bare `5.7`
+are one value. (The base field of `float_fix` and `datetime` is Q and the epoch
+index, and is compared as stored.) `dumps()` writes the canonical annotation,
+which is why the assertion above holds for a document that spelled the
+defaults out. It also holds for a quoted numeric literal (`<float:64> "5.7"`)
+and for a typed null (`<float:64> ;`, `[<uint:32>, <sint:64>]`): `dumps()`
+writes the annotation either one needs to read back as itself.
+
 `dumps()` starts with a 4 MiB write buffer and doubles it automatically on
 overflow, up to 256 MiB.  The `cap` keyword argument that existed in earlier
 versions is no longer accepted.
@@ -14213,8 +14267,13 @@ taken as the Python numbers they are.
 > What `dumps()` does refuse, with `BovnarArgumentError`, is what *neither*
 > tier reads: a list whose elements carry different units, an integer wider
 > than 64 bits in a list that cannot take the width annotation it needs
-> (`[2**70, 1.5]`), a `Decimal` past the range of `float_dec:64`, and a key
-> that is not a `str`.
+> (`[2**70, 1.5]`), a `Decimal` past the range of `float_dec:64`, a key
+> that is not a `str`, a key that is not a Bovnar identifier (spec §4.2:
+> `"a b"`, `"1a"`, `"a.b"`, `""`), a key longer than 255 bytes in UTF-8 (the
+> reader's default `max_identifier_length`, which `loads()`, `dom_parse()`
+> and `bovnar validate` read with), and a string — or a key — holding a
+> control character other than TAB, LF, VT, FF and CR (`"\x00"`, `"\x7f"`)
+> or a lone surrogate. The message names the key.
 
 ### 4.2 SAX-style streaming reader
 
@@ -14860,9 +14919,9 @@ is stored under the format's own spelling (`inf`, `ninf`, `nan`).
 | `q.value` | property | Decode `raw` to the closest native Python scalar (`int`, `float`, `str`, `bool`) — **lossy** for `float_dec` / `float_fix` / `float:128`+ (goes through a C `double`) |
 | `q.unit_str` | `str` | Canonical unit string (e.g. `'m/s²'`), or `''` when dimensionless |
 | `q.decimal` | `Decimal` | **Exact** value as `decimal.Decimal` from the verbatim literal — lossless at any width; raises for non-numeric families |
-| `q.fraction` | `Fraction` | Exact value as `fractions.Fraction` (for `float_fix`, the exact `mantissa / 2**frac`) |
-| `q.fixed_point` | `(int, int)` | `(mantissa, frac_bits)` of a `float_fix` value; the value is `mantissa / 2**frac_bits` |
-| `q.stored_value` | `Decimal` | The value materialised into the declared IEEE/fixed format (round-to-nearest-even) — differs from `decimal` only when the literal carries more precision than the format holds. `None` for a typed null, as `decimal` is |
+| `q.fraction` | `Fraction` | Exact value as `fractions.Fraction` (for `float_fix`, the exact `mantissa / 2**frac`); `None` for a typed null; raises for `nan`/`inf`/`ninf`, which have no ratio, and for non-numeric families. Its exact ratio holds 10^\|exponent\|, a number with that many digits, so it **refuses** (`BovnarArgumentError`) a literal whose decimal exponent — of its magnitude or of its last digit — exceeds `bovnar.quantity.FRACTION_EXPONENT_CAP` (100 000), or for `float_dec:256` its own range (611 937); `.decimal` is exact at any exponent |
+| `q.fixed_point` | `(int, int)` | `(mantissa, frac_bits)` of a `float_fix` value; the value is `mantissa / 2**frac_bits`. `None` for a typed null; raises for `nan`/`inf`/`ninf`, which the reader accepts under `float_fix` but no Q-format datum holds |
+| `q.stored_value` | `Decimal` | The value materialised into the declared IEEE/fixed format (round-to-nearest-even) — differs from `decimal` only when the literal carries more precision than the format holds. `None` for a typed null, as `decimal` is; `nan`/`inf`/`ninf` give the non-finite `Decimal` in every float family. A literal past the format's range (`1e-99999999`, `1e99999999`) gives the signed zero or infinity it rounds to, decided from the exponent without materialising the number; `ieee_bits` does the same |
 | `q.ieee_bits` | `bytes` | IEEE-754 interchange bytes (binary16…256 for `float`, decimal16…256 for `float_dec`), little-endian word order |
 | `q.epoch_name` | `str \| None` | For a `datetime`, the epoch name (`"unix"`, `"tai"`, …); `None` otherwise |
 | `q.epoch_mjd` | `int \| None` | For a `datetime`, the epoch's Modified Julian Day; `None` otherwise |
@@ -15165,6 +15224,10 @@ the lossy native conversion. The DOM (`dom_parse`) path only has a C `double`
 for these, so it raises and points you at the typed path or `dtype='float64'`.
 Integers wider than 64 bits need `dtype=object`, which gives an exact object
 array of Python ints; without it `to_numpy` raises `BovnarArgumentError`.
+An **empty** DOM array takes its dtype (and unit) from its annotation —
+`<sint:32> []` is an `int32` array of shape `(0,)` — since it has no element to
+infer one from; an empty array with no annotation is `float64`, as numpy
+infers.
 
 A **`datetime`** array on the **unix** epoch (spec 1.1) maps to/from
 `datetime64[s]` — the integer epoch-seconds carrier is unix-relative, so it
@@ -15529,7 +15592,11 @@ w.emit(event, *, key=None, value=None, vt=None, vu=None)
 
 Send an arbitrary event to the C writer. `key` and `value` are encoded as
 UTF-8. When both `vt` and `value` are supplied the token type is inferred:
-`_TOKEN_IS_STRING` for `ValueTypeFamily.UTF8`, `_TOKEN_IS_NUMBER` otherwise.
+`_TOKEN_IS_STRING` for `ValueTypeFamily.UTF8`, and also for a `vt` whose base
+is a radix other than 10 (`uint`, `sint` or `float` with `vt.base` not 0 or 10,
+whose literal must be quoted); `_TOKEN_IS_NUMBER` otherwise. The base field of
+`float_fix` (Q), `float_dec` and `datetime` (the epoch index) is not a radix and
+never makes the value a string.
 
 ---
 
@@ -15897,17 +15964,17 @@ only invite the bounds check it can no longer support. Use `UNIT_NATIVE_FIRST`
 / `UNIT_NATIVE_LAST` / `CURRENCY_FIRST` / `CURRENCY_LAST`, or ask
 `bovnar.currency.is_currency`.
 
-> **The profiles' opaque units are not in this enum.** The C
-> `value_base_unit_t` also has a block per profile for the profile-only units,
-> and as shipped only two of them have members — UCUM's arbitrary atoms
-> (200000–200039) and UN/ECE's package and count codes (300000–300024),
-> doc/11 §7.1 — and
-> `BaseUnit` deliberately omits them, because they have no native spelling for a
-> Python name to mirror. A unit carrying one is still fully usable: `parse_unit`, `unit_to_str`,
-> `unit_is_profile_only` and the comparison helpers all handle it, and
-> `unit_to_str` returns the profile notation (`"unece:XBX"`). Only the
-> `BaseUnit(...)` *constructor* will refuse such a value, so do not call it on a
-> raw base taken from a profile-only unit.
+> **The profiles' opaque units are members too.** The C `value_base_unit_t`
+> has a block per profile for the profile-only units — as shipped, UCUM's
+> arbitrary atoms (200000–200039, `UCUM_IU` … `UCUM_IR`) and UN/ECE's package
+> and count codes (300000–300024, `UNECE_ONE` … `UNECE_VIAL`), doc/11 §7.1 —
+> and a parsed unit reports their ids, so `BaseUnit` names each one after its C
+> enumerator, `bu_ucum_iu` → `BaseUnit.UCUM_IU`, as the Rust crate's
+> `BaseUnit::UcumIu` does. (Until 2.0.0 it omitted them, and
+> `ValueUnitComponent.base_unit` raised `ValueError` on `ucum:[IU]/mL`.) They
+> have no native spelling and no dimension: `unit_to_str` returns the profile
+> notation (`"unece:XBX"`), `unit_is_profile_only` is true, and pint has no
+> form for them.
 
 > **Note on `CUP`:** the Cuban-Peso currency is exposed as **`BaseUnit.CUP_`** (trailing
 > underscore), not `BaseUnit.CUP`. The plain name `CUP` is the US-cup volume unit
@@ -15967,6 +16034,7 @@ exposed as:
 - [Unit & Currency Reference](05_bovnar_unit_system.md) — the unit model behind `Quantity` and the bridges
 - [Tutorial](01_bovnar_tutorial.md) — the document syntax, by example
 - [FAQ §13 — Python Bindings](02_bovnar_faq.md#13-python-bindings) — common questions about this package
+- [Rust Bindings](14_bovnar_rust_bindings.md) — the same tiers from Rust
 
 ---
 
@@ -16369,7 +16437,7 @@ pass changed and what it cost.
 
 Every acceptance, refusal and conversion factor quoted below was produced by running the
 reference implementation built from this tree, and the behavioural claims are pinned by the test
-files named above (1433 assertions across the seven profiles, plus 4868 in the cross-vocabulary
+files named above (1483 assertions across the seven profiles, plus 4983 in the cross-vocabulary
 suite). The VOCABULARY side — whether each foreign code is *worth* what the table says — is checked
 too, but not by the same means and not to the same strength: `check_profile_factors.py` (§9.5)
 resolves every mapped code against its publisher's own machine-readable definitions, and `unece`
@@ -18072,7 +18140,7 @@ One hand-edited data file per namespace in `src/gendata/`, in the same shape as 
 | `ucum.bvnr` | 20 prefixes, 206 mapped, 40 opaque, 1 opaque alias, 65 unsupported |
 | `unece.bvnr` | 1299 mapped, 25 opaque, 155 unsupported |
 | `qudt.bvnr` | 2235 mapped, 573 unsupported |
-| `qudt-qk.bvnr` | 908 mapped, 257 unsupported |
+| `qudt-qk.bvnr` | 900 mapped, 265 unsupported |
 | `udunits.bvnr` | 41 prefixes, 768 mapped, 98 unsupported |
 | `om.bvnr` | 1337 mapped, 123 unsupported |
 | `cf.bvnr` | 4454 mapped, 617 unsupported |
@@ -18138,13 +18206,13 @@ them to each other:
 
 | Test | Target | Assertions | Specifies |
 |---|---|---|---|
-| `tests/bovnar_ucum_test.c` | `bvnr_ucum_test` | 209 | §2–§10 |
+| `tests/bovnar_ucum_test.c` | `bvnr_ucum_test` | 217 | §2–§10 |
 | `tests/bovnar_unece_test.c` | `bvnr_unece_test` | 576 | §11 |
-| `tests/bovnar_qudt_test.c` | `bvnr_qudt_test` | 240 | §12 |
-| `tests/bovnar_udunits_test.c` | `bvnr_udunits_test` | 248 | §13 |
-| `tests/bovnar_om_test.c` | `bvnr_om_test` | 114 | §16 |
-| `tests/bovnar_cf_test.c` | `bvnr_cf_test` | 46 | §17 |
-| `tests/bovnar_crossvocab_test.c` | `bvnr_crossvocab_test` | 4868 | §14 |
+| `tests/bovnar_qudt_test.c` | `bvnr_qudt_test` | 256 | §12 |
+| `tests/bovnar_udunits_test.c` | `bvnr_udunits_test` | 258 | §13 |
+| `tests/bovnar_om_test.c` | `bvnr_om_test` | 118 | §16 |
+| `tests/bovnar_cf_test.c` | `bvnr_cf_test` | 58 | §17 |
+| `tests/bovnar_crossvocab_test.c` | `bvnr_crossvocab_test` | 4983 | §14 |
 
 `bvnr_ucum_test` (labels `unit;si;profile;ucum`) carries the behavioural claims of sections 2–10: the three
 outcomes with their exact error codes, equivalence with the native spelling, UCUM's non-latching
@@ -18247,7 +18315,7 @@ native side goes through `bvn_parse_unit` and `bvn_unit_to_si_factor` via the ct
 through a Python reimplementation of the unit grammar — that is exactly how a table starts
 disagreeing with the parser it feeds (§9.1).
 
-As of this tree it compares **10913 rows across the seven vocabularies** and reports **0 mismatches**,
+As of this tree it compares **10905 rows across the seven vocabularies** and reports **0 mismatches**,
 0 dead rows and **0 coverage suggestions** — the tables are closed against their publishers, so
 there is nothing left for the coverage half to propose.
 
@@ -18625,6 +18693,14 @@ exact code sees a change.
   that would put `cf:air_temperature_anomaly` in disagreement with `udunits:K` for the same variable.
   CF 1.12's own answer is the `units_metadata` attribute, which is not in the unit slot and so still
   cannot be read by a profile — the converter §2 describes is where that call belongs.
+  **The differences CF states in `degree_C` are the exception, and map to `Δ°C`** (the same unit as `ΔK`): the three
+  `difference_between_sea_surface_*_temperature` names and `sea_water_added_conservative_temperature`
+  / `sea_water_added_potential_temperature` (a tracer that is zero in the control climate). A `K`
+  difference read as `K` is harmless, since the two share a zero. A `degree_C` difference read as the
+  affine `°C` is not: converting the cool-skin effect of −0.17 to kelvin gave 272.98. CF's own
+  description names each of the five a difference, so this follows the publisher rather than
+  overriding it. The `degree_C` names that are on-scale temperatures (`perceived_temperature`,
+  `wet_bulb_globe_temperature`, the `redistributed` tracers and two more) stay `°C`.
 - **Case-insensitive UCUM.** UCUM defines a case-insensitive variant. `ucum:` is the case-sensitive
   one only, which is why `RAD` and `REM` are in the table and UCUM's bracketed `[RAD]`/`[REM]` are
   not (§6.1). `ucum_ci:` is unreserved and undefined; it would need its own atom table and would
@@ -18817,7 +18893,7 @@ that are equal in SI and different in meaning, and `C94`/`M46` is the pair that 
 > `qudt-qk:` — QUDT quantity kinds (908 mapped, 257 unsupported — every one of the 1164 kinds,
 > plus a refusal for `LogarithmicRatio`, which QUDT 3.1.0 does not define).
 > Data files `src/gendata/qudt.bvnr` and `src/gendata/qudt-qk.bvnr`;
-> pinned by `tests/bovnar_qudt_test.c` (240 assertions).
+> pinned by `tests/bovnar_qudt_test.c` (256 assertions).
 
 ### 12.1 Why this vocabulary
 
@@ -18964,7 +19040,7 @@ same equivalence class.
 > of netCDF and the CF conventions.
 > Data file `src/gendata/udunits.bvnr` (41 prefixes, 768 mapped, 98 unsupported — every one of
 > the 580 spellings the UDUNITS-2 database defines);
-> pinned by `tests/bovnar_udunits_test.c` (248 assertions).
+> pinned by `tests/bovnar_udunits_test.c` (258 assertions).
 
 ### 13.1 An expression profile, sharing the UCUM parser
 
@@ -18976,6 +19052,25 @@ two syntax differences configured on its registry row:
 
 A third difference runs the other way: UDUNITS has no `{…}` annotations, so `udunits:mL{x}` is
 `error_unit_illegal` (§3.4).
+
+**What UDUNITS accepts and this profile does not.** UDUNITS' scanner is more liberal than the
+syntax above, and the rest of its grammar is refused rather than half-implemented. Every one of
+these is `error_unit_illegal` — a refusal, never a different reading:
+
+| UDUNITS accepts | example | here |
+|---|---|---|
+| `**` as the exponent operator | `m**2` | refused; write `m^2` or `m2` |
+| `·` (U+00B7) and `-` as multiplication | `m·s-1`, `kg-m` | refused; write `m*s-1` or `m.s-1` |
+| a tab between terms | `kg⇥m-2` | refused; write a space |
+| blanks around `*` or `.` | `kg * m` | refused; write `kg*m` or `kg m` |
+| an exponent on a parenthesised group | `(m/s)2` | refused; write `m2/s2` |
+| unit names in any case | `Kelvin`, `Meter` | refused; the names are case-sensitive here |
+
+A prefix on a unit UDUNITS defines and this table marks non-metric — `kcal`, `kft`, `nmi` — is
+the other side of the same line: UDUNITS reads it, and this profile refuses it as
+`error_unit_profile_unsupported`, a known spelling it does not carry, because a few of those
+readings are traps (`nmi` is a nanomile to UDUNITS and a nautical mile to most of the people who
+write it).
 
 The **division rule is identical**, which is worth stating because it is where a units parser most
 often goes quietly wrong. In both vocabularies `/` inverts the term that follows it and nothing
@@ -19168,7 +19263,7 @@ says exactly this; accepting it would cost them a silently wrong instant.
 
 ## 14. The cross-vocabulary conformance suite
 
-> `tests/bovnar_crossvocab_test.c` — 67 concepts, 6 vocabularies, 4868 assertions.
+> `tests/bovnar_crossvocab_test.c` — 69 concepts, 6 vocabularies, 4983 assertions.
 
 Every other profile test asks *does this vocabulary translate correctly?*. This one asks the
 question that only exists once there are five: **do they agree?**
@@ -19335,7 +19430,7 @@ Growing the native registry to reach them is a separate decision, and doc/05 is 
 > `om:` — OM 2, the Ontology of units of Measure (Rijgersberg, van Assem, Top; Wageningen), the
 > second unit ontology of the semantic web beside QUDT.
 > Data file `src/gendata/om.bvnr` (1337 mapped, 123 refused — every unit individual OM states);
-> pinned by `tests/bovnar_om_test.c` (114 assertions); id block 70, contributing no opaque units.
+> pinned by `tests/bovnar_om_test.c` (118 assertions); id block 70, contributing no opaque units.
 
 ### 16.1 Why this vocabulary
 
@@ -19451,7 +19546,7 @@ spells one whole code, so `bvn_unit_to_profile("om", m/s²)` returns -1 for the 
 > `cf:` — the CF conventions' standard names, the controlled vocabulary of netCDF climate and
 > forecast data.
 > Data file `src/gendata/cf.bvnr` (4454 mapped, 617 refused — all 5071 names of standard name table
-> **v94**, 2026-06-09); pinned by `tests/bovnar_cf_test.c` (46 assertions); id block 80, contributing
+> **v94**, 2026-06-09); pinned by `tests/bovnar_cf_test.c` (58 assertions); id block 80, contributing
 > no opaque units. **Read-only** (§17.3).
 
 ### 17.1 Why this vocabulary
@@ -21850,7 +21945,8 @@ fn main() -> Result<(), bovnar::Error> {
 |---|---|
 | `Null` | |
 | `Bool(bool)` | |
-| `Int(i128)` | Any integer up to 128 bits, `uint64` and `sint64` included |
+| `Int(i128)` | Any integer an `i128` holds, every `uint64` and `sint64` included |
+| `BigInt(num_bigint::BigInt)` | An integer outside the `i128` range (a `<uint:256>`, say); `to_string` writes it as `<uint:N>`/`<sint:N>`, `N` the smallest power of two from 128 that holds it |
 | `Float(f64)` | |
 | `String(String)` | Symbols and references read back as strings too |
 | `Bytes(Vec<u8>)` | An octet stream |
@@ -21863,7 +21959,9 @@ fn main() -> Result<(), bovnar::Error> {
 `parse_typed` is `parse` with typed values kept: they come back as
 `Value::Quantity` instead of being decoded to native scalars. That preserves the
 original text representation, exact type width, numeral base and physical unit
-for lossless round trips:
+for lossless round trips. What only the annotation carries comes back too: a
+quoted numeric literal under a default annotation (`<float:64,_10> "5.7"`), and a
+typed null, alone (`<float:64> ;`) or as an array element (`[<uint:32>, <sint:64>]`):
 
 ```rust
 use bovnar::{Value, parse_typed, to_string};
@@ -22705,8 +22803,10 @@ fn main() -> Result<(), bovnar::Error> {
 }
 ```
 
-`units_equal` is also what `==` means between two `Unit`s, and `Unit` is `Eq`
-and `Hash` with the two agreeing — equal units are one `HashMap` key regardless
+`units_equal` is also what `==` means between two `Unit`s, with one addition:
+"no unit at all" (a typed value's empty unit) and a dimensionless unit (a bare
+literal's) are both the absence of one and compare, and hash, equal, as the
+Python binding's do. `Unit` is `Eq` and `Hash` with the two agreeing — equal units are one `HashMap` key regardless
 of the order their components were written in. The hash follows the equality in
 the one place the two could part: a component with **no prefix** is the same
 component whether its prefix system says SI or IEC, so `Unit::parse("B")` and
@@ -22859,12 +22959,18 @@ fields and the others are methods:
 | `q.family()` | `Option<ValueTypeFamily>` | The type family, when it is one this binding knows |
 | `unit_str()` | `String` | Canonical unit string (e.g. `"m/s²"`), or `""` when dimensionless |
 | `decimal()` | `Result<Option<Decimal>>` | **Exact** value as a `Decimal` from the verbatim literal — lossless at any width; an error for non-numeric families, `None` for a typed null |
-| `fraction()` | `Result<Option<BigRational>>` | Exact value as a rational (for `float_fix`, the exact `mantissa / 2**frac`) |
-| `fixed_point()` | `Result<(BigInt, u32)>` | `(mantissa, frac_bits)` of a `float_fix` value; the value is `mantissa / 2**frac_bits` |
+| `fraction()` | `Result<Option<BigRational>>` | Exact value as a rational (for `float_fix`, the exact `mantissa / 2**frac`). An error for `nan`/`inf`, and for a literal whose decimal exponent is past `bovnar::FRACTION_EXPONENT_CAP` ([§6.3](#63-exact-numbers-decimal-bigrational-bvnfloat)) |
+| `fixed_point()` | `Result<(BigInt, u32)>` | `(mantissa, frac_bits)` of a `float_fix` value; the value is `mantissa / 2**frac_bits`. An error for a typed null and for `nan`/`inf`/`ninf`, which a fixed-point datum has no encoding for |
 | `stored_value()` | `Result<Option<Decimal>>` | The value materialised into the declared IEEE/fixed format (round-to-nearest-even) — differs from `decimal` only when the literal carries more precision than the format holds. `None` for a typed null, as `decimal` is |
 | `ieee_bits()` | `Result<Vec<u8>>` | IEEE-754 interchange bytes (binary16…256 for `float`, decimal16…256 for `float_dec`), little-endian word order |
 | `epoch_name()` | `Option<String>` | For a `datetime`, the epoch name (`"unix"`, `"tai"`, …); `None` otherwise |
 | `epoch_mjd()` | `Option<i32>` | For a `datetime`, the epoch's Modified Julian Day; `None` otherwise |
+| `type_key()` | `(i32, u32, u32)` | `(family, width, base)` with the defaults filled in: width 0 is 64, base 0 is 10; a `float_fix` Q and a `datetime` epoch as stored |
+
+Two `Quantity`s are equal when they carry the same literal, sub-second digits,
+effective type (`type_key()`) and unit: `<float:0> 2.5`, `<float:64,_10> 2.5`
+and a bare `2.5` are one value, and the token form and unit spelling are
+presentation — the same rule as the Python binding's `Quantity.__eq__`.
 
 ### 6.3 Exact numbers (`Decimal`, `BigRational`, `BvnFloat`)
 
@@ -22873,8 +22979,8 @@ decimal-float, fixed-point, and wide binary-float families. The accessors above
 instead use the verbatim literal text (and bovnar's arbitrary-precision
 `bvn_float`), so the full precision the format carries is reachable from Rust.
 
-An integer is `i128` in a `Value` and `num_bigint::BigInt` where a number has no
-width limit, a rational is `num_rational::BigRational`, and a decimal is
+An integer is `i128` in a `Value` (`Value::BigInt` past it) and
+`num_bigint::BigInt` where a number has no width limit, a rational is `num_rational::BigRational`, and a decimal is
 **`bovnar::Decimal`**: an exact decimal — sign, coefficient (`BigUint`) and
 exponent, or an infinity or a NaN — that compares numerically and prints in the
 General Decimal Arithmetic scientific-string form (`1.50` stays `1.50`). `Decimal` is the exact value
@@ -22907,7 +23013,14 @@ fn main() -> Result<(), bovnar::Error> {
 ```
 
 These materialise over the **full** representable range, including exponents
-the C parser cannot otherwise reach (beyond ~1e9865). `decimal` / `fraction`
+the C parser cannot otherwise reach (beyond ~1e9865). Overflow and underflow
+past the format's range are decided from the decimal exponent, so a 28-byte
+`<float:64> 1e-99999999` is `0.0` at once rather than an exact rational with a
+hundred-million-digit denominator. `fraction()` has no format to round into: it
+refuses a literal whose decimal exponent, of its magnitude or of its last digit,
+is past **`bovnar::FRACTION_EXPONENT_CAP`** (100 000; `float_dec:256`, which
+reaches 10⁻⁶¹¹⁸⁶⁷, gets 611 937), the same cap as the Python binding's.
+`decimal()` is exact at any exponent. `decimal` / `fraction`
 work at every binary width bovnar allows (16, or a multiple of 32 up to 32768);
 the bit-exact `stored_value` / `ieee_bits` apply to the IEEE encodings
 (`float:16/32/64/128/256`), which are also exposed directly as `bovnar::BvnFloat`.
@@ -23054,7 +23167,7 @@ The `bovnar::json` module mirrors the CLI's `bovnar convert` in both directions:
 
 | Function | Description |
 |---|---|
-| `json::from_json(&str) -> Result<Vec<u8>>` | JSON text to a BVNR document. The root must be an object |
+| `json::from_json(&str) -> Result<Vec<u8>>` | JSON text to a BVNR document. The root must be an object. An integer wider than 64 bits is written as `<uint:N>`/`<sint:N>` (`N` the smallest power of two from 128 that holds it), byte for byte as `bovnar convert` writes it, and refused inside an array, whose elements share one type |
 | `json::to_json(&[u8]) -> Result<String>` | A BVNR document to pretty-printed JSON, as `bovnar convert` prints it |
 | `json::detect(&[u8]) -> Format` | Sniffs the format from the first significant byte: `Format::Json`, `Format::Bovnar` or `Format::Unknown`. The CLI goes by file extension; this is the content-based fallback for data without a name |
 

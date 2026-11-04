@@ -72,3 +72,46 @@ def test_units_example_derived_count_matches_its_own_header():
     assert counted == claimed, (
         "header claims %d named SI-derived units, section has %d"
         % (claimed, counted))
+
+
+def _example_files():
+    return sorted(n for n in os.listdir(EXAMPLES) if n.endswith(".bvnr"))
+
+
+@needs_lib
+@pytest.mark.parametrize("name", _example_files())
+def test_example_typed_round_trip(name):
+    """loads(typed=True) -> dumps -> loads(typed=True) gives the same document
+    for every shipped example (doc/09 §4.1). floats.bvnr and strings.bvnr hold a
+    quoted float under a default annotation, which dumps() used to write bare
+    and the writer refused; arrays.bvnr and units.bvnr spell out defaults
+    (`<float>`, `_10`) that the reloaded Quantity did not compare equal to."""
+    with open(os.path.join(EXAMPLES, name), "rb") as f:
+        doc = bovnar.loads(f.read(), typed=True)
+    out = bovnar.dumps(doc)
+    assert bovnar.loads(out, typed=True) == doc
+
+
+@needs_lib
+@pytest.mark.parametrize("a, b", [
+    (b'.a = <float:0> 2.71828;', b'.a = 2.71828;'),
+    (b'.a = <float:64,_10> 5.7;', b'.a = 5.7;'),
+    (b'.a = <uint:32,_10,no_unit> 42;', b'.a = <uint:32> 42;'),
+    (b'.a = <sint:0,_10> -3;', b'.a = -3;'),
+])
+def test_quantity_equality_uses_the_effective_type(a, b):
+    qa = bovnar.loads(a, typed=True)["a"]
+    qb = bovnar.loads(b, typed=True)["a"]
+    assert qa == qb and hash(qa) == hash(qb)
+
+
+@needs_lib
+def test_quantity_equality_keeps_q_and_epoch():
+    """float_fix's base is Q and datetime's the epoch index: no default there."""
+    q8 = bovnar.loads(b'.a = <float_fix:32,q8> 1.5;', typed=True)["a"]
+    q16 = bovnar.loads(b'.a = <float_fix:32,q16> 1.5;', typed=True)["a"]
+    assert q8 != q16
+    doc = b'#!bovnar 1.1\n.a = <datetime:64,%s> 0;'
+    unix = bovnar.loads(doc % b'unix', typed=True)["a"]
+    tai = bovnar.loads(doc % b'tai', typed=True)["a"]
+    assert unix != tai

@@ -279,11 +279,38 @@ static void test_flatness(void)
 	        "k~g/m²·s");
 }
 
+/* The third review: the temperature DIFFERENCES that CF states in degree_C
+ * mapped to the affine °C, so converting the cool-skin effect to kelvin added
+ * 273.15. They are Δ°C (ΔK); an on-scale degree_C name stays °C. */
+static void test_degree_c_differences(void)
+{
+	static const char* const diffs[] = {
+		"cf:difference_between_sea_surface_skin_temperature_and_sea_surface_subskin_temperature",
+		"cf:difference_between_sea_surface_subskin_temperature_and_sea_surface_foundation_temperature",
+		"cf:difference_between_sea_surface_subskin_temperature_and_sea_surface_temperature",
+		"cf:sea_water_added_conservative_temperature",
+		"cf:sea_water_added_potential_temperature",
+	};
+	for (size_t i = 0; i < sizeof diffs / sizeof diffs[0]; i++) {
+		chk_str(diffs[i], "ΔK");   /* Δ°C, which is ΔK */
+		double k = 0.0;
+		tests++;
+		if (!bvn_unit_convert_value(-0.17, U(diffs[i]), U("ΔK"), &k)
+		    || fabs(k + 0.17) > 1e-12) {
+			fprintf(stderr, "FAIL: %s: -0.17 is %.17g ΔK\n", diffs[i], k);
+			failures++;
+		}
+	}
+	chk_str("cf:wet_bulb_globe_temperature", "°C");
+	chk_str("cf:sea_water_redistributed_potential_temperature", "°C");
+}
+
 int main(void)
 {
 	printf("CF standard-name profile\n");
 
 	test_canonical_units();
+	test_degree_c_differences();
 	test_cross_vocabulary();
 	test_read_only();
 	test_refusals();

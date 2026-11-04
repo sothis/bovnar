@@ -173,9 +173,10 @@ static void test_codes_udunits_does_not_define(void)
 	chk_to_profile("udunits", "nmi", "nmile");
 
 	/* The two hazards are gone. `mi` is non-metric here, so nmi now simply
-	 * fails rather than resolving to either reading; `H` IS metric, so pH
-	 * resolves the way UDUNITS resolves it. */
-	chk_error("udunits:nmi", error_unit_illegal);
+	 * fails rather than resolving to either reading -- as a known spelling
+	 * bovnar does not carry, since UDUNITS reads it as nano + mile; `H` IS
+	 * metric, so pH resolves the way UDUNITS resolves it. */
+	chk_error("udunits:nmi", error_unit_profile_unsupported);
 	chk_str("udunits:pH", "p~H");
 	chk_str("udunits:nmile", "nmi");
 
@@ -659,6 +660,23 @@ static void test_refusals(void)
 	chk_error("udunits:", error_unit_illegal);
 }
 
+/* The third review: UDUNITS puts a prefix on any unit, so "kcal" and "kft" are
+ * valid UDUNITS. bovnar carries a prefix only on a metric atom, and a prefixed
+ * non-metric atom is known and not carried -- not a typo. */
+static void test_prefix_on_a_non_metric_atom(void)
+{
+	static const char* const known[] = {
+		"udunits:kcal", "udunits:kilocalorie", "udunits:kft", "udunits:klb",
+		"udunits:MBtu", "udunits:kpsi", "udunits:kdyne", "udunits:mgauss",
+	};
+	for (size_t i = 0; i < sizeof known / sizeof known[0]; i++)
+		chk_error(known[i], error_unit_profile_unsupported);
+	/* A prefix on no atom at all is still a typo. */
+	chk_error("udunits:kxyzzy", error_unit_illegal);
+	/* And a metric atom still takes one. */
+	chk_str("udunits:km", "k~m");
+}
+
 int main(void)
 {
 	printf("UDUNITS-2 unit profile\n");
@@ -675,6 +693,7 @@ int main(void)
 	test_round_trip();
 	test_regular_plurals();
 	test_refusals();
+	test_prefix_on_a_non_metric_atom();
 
 	printf("\n%d tests, %d failures\n", tests, failures);
 	if (failures == 0)

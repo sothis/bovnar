@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The core enums carry the C values, and the token-type and error-code enums
 //! agree with include/bovnar.h.
 //!

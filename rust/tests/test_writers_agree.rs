@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The C writer (the CLI's `pretty-print`) and this crate's `to_string`
 //! write documents that read back alike, for every catalogue unit in every
 //! unit-carrying shape.

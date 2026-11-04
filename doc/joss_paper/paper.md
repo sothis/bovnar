@@ -3,6 +3,7 @@ title: 'Bovnar: a unit-safe serialization format with parse-time dimensional val
 tags:
   - C
   - Python
+  - Rust
   - serialization
   - units of measure
   - dimensional analysis
@@ -40,8 +41,9 @@ chose to write them.
 
 The reference implementation is a dependency-free C99 library providing a
 streaming (SAX-style) reader, a DOM API, a canonicalizing writer, a
-command-line tool, a WebAssembly build, and pure-`ctypes` Python bindings with
-optional NumPy and Pint [@pint] bridges. It ships a registry of 264 physical
+command-line tool, a WebAssembly build, pure-`ctypes` Python bindings with
+optional NumPy and Pint [@pint] bridges, and a Rust crate that compiles the C
+library in. It ships a registry of 264 physical
 units (SI base and derived units, IEC binary prefixes [@si; @iec80000-13]),
 216 fiat and cryptocurrency denominations treated as first-class dimensions,
 and nine time epochs, with leap seconds resolved from the IERS TAI-UTC table:
@@ -111,15 +113,16 @@ integers, and optional error recovery for parsing unreliable log streams.
 
 # Quality control
 
-The implementation is roughly 30,000 lines of C against a test suite of
-comparable size: 183 CTest targets covering unit, integration, concurrency and
-socket-pair round-trip tests, a Python test suite, self-contained fuzz
+The implementation is roughly 35,000 lines of C against a test suite of
+comparable size: 189 CTest targets covering unit, integration, concurrency and
+socket-pair round-trip tests, Python and Rust test suites, self-contained fuzz
 harnesses for the reader, writer, DOM and utility layers (with optional
 libFuzzer/AFL++ targets), and ASan/UBSan builds. Conformance is defined
 independently of the implementation by a 470-case suite with a documented
 implementation-under-test protocol, so a third-party parser can be measured
-against the same corpus. Continuous integration runs the full suite on Linux
-and builds the MSVC and MinGW Windows targets. The command-line tool includes a
+against the same corpus. Continuous integration runs the full suite on Linux,
+builds the MSVC and MinGW Windows targets, and tests the Rust crate on Linux,
+macOS and both Windows toolchains. The command-line tool includes a
 benchmark mode for measuring parsing throughput across payload shapes.
 
 # Availability

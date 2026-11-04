@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! `write_array` and the arrays `to_string` writes: flat, multi-row, struct
 //! and nested elements, annotations, special floats, booleans and big
 //! integers. Tests are grouped in one module per subject.

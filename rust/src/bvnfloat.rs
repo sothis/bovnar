@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The library's arbitrary-precision float (`bvn_float_t`): the bridge to the full precision of the
 //! float formats instead of an `f64`.
 //!
@@ -188,6 +189,68 @@ pub fn fraction_to_binary_bits(value: &BigRational, width: u32) -> Result<Vec<u8
     Ok(to_le(bits.magnitude(), nbytes))
 }
 
+/// The IEEE-754 binary`width` bytes of a finite decimal, as
+/// [`fraction_to_binary_bits`] of its exact rational, but deciding overflow
+/// and underflow from the decimal exponent first: the rational of
+/// `1e-99999999` has a hundred-million-digit denominator, and building it
+/// took longer the larger the exponent, without bound.
+pub fn decimal_to_binary_bits(d: &Decimal, width: u32) -> Result<Vec<u8>> {
+    let Some((_, man_bits, bias)) = lookup(&BINARY_FORMATS, width) else {
+        return Err(Error::argument(format!(
+            "no IEEE binary format for width {width}"
+        )));
+    };
+    let (Some(coeff), Some(e)) = (d.coefficient(), d.exponent()) else {
+        return Err(Error::argument(
+            "decimal_to_binary_bits needs a finite value",
+        ));
+    };
+    if !coeff.is_zero() {
+        // 10^adj <= |d| < 10^(adj+1); the same two-decade margins as the
+        // Python binding's _binary_extreme, so both give the same bytes.
+        let adj = i128::from(e) + i128::from(ndigits(coeff)) - 1;
+        let log10_2 = std::f64::consts::LOG10_2;
+        let nbytes = width as usize / 8;
+        let sign = if d.is_signed() {
+            BigUint::from(1u32) << (width - 1)
+        } else {
+            BigUint::zero()
+        };
+        // 2^(bias+1) is past the largest finite value: 10^adj above it is inf.
+        if adj > ((f64::from(bias) + 1.0) * log10_2) as i128 + 2 {
+            let (exp_bits, _, _) = binary_params(width)?;
+            let inf = ((BigUint::from(1u32) << exp_bits) - 1u32) << man_bits;
+            return Ok(to_le(&(sign | inf), nbytes));
+        }
+        // Half the smallest subnormal is 2^(-bias-man_bits): below, it is 0.
+        if adj + 1 < ((-f64::from(bias) - f64::from(man_bits)) * log10_2) as i128 - 2 {
+            return Ok(to_le(&sign, nbytes));
+        }
+    }
+    fraction_to_binary_bits(&d.to_fraction()?, width)
+}
+
+/// [`FRACTION_EXPONENT_CAP`], or a `float_dec` width's own decimal range
+/// where that is wider (`float_dec:256`: bias 611 867 plus 70 digits).
+pub fn fraction_exponent_cap(family: crate::ValueTypeFamily, width: u32) -> i64 {
+    let own = match family {
+        crate::ValueTypeFamily::FloatDec => {
+            lookup(&DECIMAL_FORMATS, width).map_or(0, |f| f.bias + i64::from(f.max_digits))
+        }
+        _ => 0,
+    };
+    own.max(FRACTION_EXPONENT_CAP)
+}
+
+/// The largest decimal exponent, of a literal's magnitude or of its last
+/// digit, for which [`crate::Quantity::fraction`] builds an exact rational
+/// (its exact ratio has a term of that many digits). Past it `fraction`
+/// refuses; [`crate::Quantity::decimal`] is exact at any exponent. Well
+/// beyond every binary float format (binary256 reaches 10^-78984);
+/// `float_dec:256`, which reaches 10^-611867, gets its own range. The same
+/// cap as the Python binding's `FRACTION_EXPONENT_CAP`.
+pub const FRACTION_EXPONENT_CAP: i64 = 100_000;
+
 /// The outcome of rounding a finite decimal into a decimal format.
 enum Materialised {
     Zero {
@@ -235,6 +298,19 @@ fn materialise_decimal(d: &Decimal, width: u32) -> Result<Materialised> {
     let mut c = coeff.clone();
     if c.is_zero() {
         return Ok(Materialised::Zero { neg });
+    }
+    // Certain underflow or overflow, decided from the exponent alone, as the
+    // Python binding decides it: the rounding below would build 10^drop for
+    // 1e-99999999, a hundred-million-digit number for a value that rounds to
+    // 0. Half the smallest subnormal is 0.5 * 10^-bias, and anything at
+    // 10^(be_max - bias + max_digits) is past the largest finite value; the
+    // margins keep the exact path for the boundary cases.
+    let adj = i128::from(e) + i128::from(ndigits(&c)) - 1;
+    if adj < -i128::from(f.bias) - 2 {
+        return Ok(Materialised::Zero { neg });
+    }
+    if adj > i128::from(be_max - f.bias) + i128::from(max_digits) + 1 {
+        return Ok(Materialised::Inf { neg });
     }
     let ten = BigUint::from(10u32);
     let drop = (i64::from(ndigits(&c)) - i64::from(max_digits)).max(-(e + f.bias));
@@ -397,6 +473,12 @@ impl BvnFloat {
 
     /// The value as text in `base`.
     pub fn to_str(&self, base: u32) -> Result<String> {
+        if base != 10 && base != 16 {
+            return Err(Error::argument(format!(
+                "BvnFloat::to_str: base {base} is not supported; a float renders in \
+                 base 10 or 16"
+            )));
+        }
         self.handle
             .to_str(base)
             .ok_or_else(|| Error::argument("bvn_float_to_str: buffer too small"))
@@ -520,6 +602,16 @@ impl BvnFloat {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn to_str_names_an_unsupported_base() {
+        let f = BvnFloat::from_str("1.5", 10, 64).unwrap();
+        for base in [0, 1, 2, 36, 99] {
+            let err = f.to_str(base).unwrap_err().to_string();
+            assert!(err.contains(&format!("base {base}")), "{err}");
+        }
+        assert_eq!(f.to_str(10).unwrap(), "1.5e+0");
+    }
+
     use super::*;
 
     #[test]

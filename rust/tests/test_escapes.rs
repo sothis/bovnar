@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The spec 1.1 string escapes (`\u{...}` and `\xHH`).
 
 use bovnar::{Error, ErrorCode, Value, parse};

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Arrays and nested values survive a write/parse roundtrip: units, element
 //! precision, declared widths, null holes, datetime fractions and multi-chunk
 //! payloads.

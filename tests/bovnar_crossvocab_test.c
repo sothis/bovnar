@@ -288,6 +288,13 @@ static const cv_concept_t g_concepts[] = {
 	             "udunits:pound", "om:poundAvoirdupois", NULL } },
 	{ "knot", { "kn", "ucum:[kn_i]", "unece:KNT", "qudt:KN", "udunits:knot",
 	            "om:knot-International", NULL } },
+	/* The rad of radiation protection is an ABSORBED dose, a hundredth of a
+	 * gray; the rem is the dose EQUIVALENT, a hundredth of a sievert. Equal in
+	 * SI and different in kind, and OM's rad once mapped to the rem. */
+	{ "rad (absorbed dose)", { "c~Gy", "ucum:RAD", "unece:C80", "qudt:RAD_R",
+	                           "om:rad", "om:centigray", NULL } },
+	{ "rem", { "rem", "ucum:REM", "unece:D91", "qudt:REM", "udunits:rem",
+	           "om:rem", NULL } },
 };
 
 #define N_CONCEPTS (sizeof(g_concepts) / sizeof(g_concepts[0]))
@@ -459,6 +466,9 @@ static const cv_differ_t g_differ[] = {
 	  "apart" },
 	{ "ucum:mo", "ucum:a",
 	  "the month is not the year" },
+	{ "om:rad", "om:rem",
+	  "the rad is an absorbed dose (1e-2 Gy) and the rem a dose equivalent "
+	  "(1e-2 Sv): equal in SI, different in kind" },
 	{ "qudt:KiloVAR", "unece:KVA",
 	  "a kilovar is reactive power and a kilovolt-ampere apparent power; "
 	  "equal in SI, and the spelling is all that tells them apart" },

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Unit parsing, formatting and conversion helpers.
 
 use crate::enums::{BaseUnit, Exponent, Prefix};

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The public struct types: `ValueTypeSpec` (built with a struct literal),
 //! `Unit` (which wraps `value_unit_t`) with its `Unit::default` /
 //! `Unit::dimensionless` / `Unit::si` / `Unit::iec` / `Unit::compound`

@@ -265,7 +265,8 @@ def property_calls(repo):
     problems = []
     for root, dirs, files in os.walk(repo):
         dirs[:] = [d for d in dirs if d not in
-                   (".git", "build", "web", "node_modules", "__pycache__")]
+                   (".git", "build", "web", "node_modules", "__pycache__",
+                    "target")]
         for name in files:
             if not name.endswith((".md", ".txt")):
                 continue

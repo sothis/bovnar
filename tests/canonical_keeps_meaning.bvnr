@@ -1,0 +1,5 @@
+#!bovnar 1.1
+# A datetime epoch is not a unit, and an affine scale in a compound is not
+# given a meaning by reducing it (third review, 2026-11).
+.d = <datetime:64,galileo> 5;
+.c = <float:64,°C·s/s> 20.0;

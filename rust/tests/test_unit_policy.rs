@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The reader-side unit policy, its DOM and writer halves, and the unit
 //! predicates it builds on.
 //!

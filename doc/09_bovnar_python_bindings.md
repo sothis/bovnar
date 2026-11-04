@@ -202,6 +202,16 @@ out = bovnar.dumps(doc)
 assert bovnar.loads(out, typed=True) == doc
 ```
 
+Two `Quantity` objects are equal (and hash alike) when their literal, unit and
+*effective* type agree: a width of 0 is 64 and a radix of 0 is 10, as the C
+library reads them, so `<float:64,_10> 5.7`, `<float:0> 5.7` and a bare `5.7`
+are one value. (The base field of `float_fix` and `datetime` is Q and the epoch
+index, and is compared as stored.) `dumps()` writes the canonical annotation,
+which is why the assertion above holds for a document that spelled the
+defaults out. It also holds for a quoted numeric literal (`<float:64> "5.7"`)
+and for a typed null (`<float:64> ;`, `[<uint:32>, <sint:64>]`): `dumps()`
+writes the annotation either one needs to read back as itself.
+
 `dumps()` starts with a 4 MiB write buffer and doubles it automatically on
 overflow, up to 256 MiB.  The `cap` keyword argument that existed in earlier
 versions is no longer accepted.
@@ -233,8 +243,13 @@ taken as the Python numbers they are.
 > What `dumps()` does refuse, with `BovnarArgumentError`, is what *neither*
 > tier reads: a list whose elements carry different units, an integer wider
 > than 64 bits in a list that cannot take the width annotation it needs
-> (`[2**70, 1.5]`), a `Decimal` past the range of `float_dec:64`, and a key
-> that is not a `str`.
+> (`[2**70, 1.5]`), a `Decimal` past the range of `float_dec:64`, a key
+> that is not a `str`, a key that is not a Bovnar identifier (spec §4.2:
+> `"a b"`, `"1a"`, `"a.b"`, `""`), a key longer than 255 bytes in UTF-8 (the
+> reader's default `max_identifier_length`, which `loads()`, `dom_parse()`
+> and `bovnar validate` read with), and a string — or a key — holding a
+> control character other than TAB, LF, VT, FF and CR (`"\x00"`, `"\x7f"`)
+> or a lone surrogate. The message names the key.
 
 ### 4.2 SAX-style streaming reader
 
@@ -880,9 +895,9 @@ is stored under the format's own spelling (`inf`, `ninf`, `nan`).
 | `q.value` | property | Decode `raw` to the closest native Python scalar (`int`, `float`, `str`, `bool`) — **lossy** for `float_dec` / `float_fix` / `float:128`+ (goes through a C `double`) |
 | `q.unit_str` | `str` | Canonical unit string (e.g. `'m/s²'`), or `''` when dimensionless |
 | `q.decimal` | `Decimal` | **Exact** value as `decimal.Decimal` from the verbatim literal — lossless at any width; raises for non-numeric families |
-| `q.fraction` | `Fraction` | Exact value as `fractions.Fraction` (for `float_fix`, the exact `mantissa / 2**frac`) |
-| `q.fixed_point` | `(int, int)` | `(mantissa, frac_bits)` of a `float_fix` value; the value is `mantissa / 2**frac_bits` |
-| `q.stored_value` | `Decimal` | The value materialised into the declared IEEE/fixed format (round-to-nearest-even) — differs from `decimal` only when the literal carries more precision than the format holds. `None` for a typed null, as `decimal` is |
+| `q.fraction` | `Fraction` | Exact value as `fractions.Fraction` (for `float_fix`, the exact `mantissa / 2**frac`); `None` for a typed null; raises for `nan`/`inf`/`ninf`, which have no ratio, and for non-numeric families. Its exact ratio holds 10^\|exponent\|, a number with that many digits, so it **refuses** (`BovnarArgumentError`) a literal whose decimal exponent — of its magnitude or of its last digit — exceeds `bovnar.quantity.FRACTION_EXPONENT_CAP` (100 000), or for `float_dec:256` its own range (611 937); `.decimal` is exact at any exponent |
+| `q.fixed_point` | `(int, int)` | `(mantissa, frac_bits)` of a `float_fix` value; the value is `mantissa / 2**frac_bits`. `None` for a typed null; raises for `nan`/`inf`/`ninf`, which the reader accepts under `float_fix` but no Q-format datum holds |
+| `q.stored_value` | `Decimal` | The value materialised into the declared IEEE/fixed format (round-to-nearest-even) — differs from `decimal` only when the literal carries more precision than the format holds. `None` for a typed null, as `decimal` is; `nan`/`inf`/`ninf` give the non-finite `Decimal` in every float family. A literal past the format's range (`1e-99999999`, `1e99999999`) gives the signed zero or infinity it rounds to, decided from the exponent without materialising the number; `ieee_bits` does the same |
 | `q.ieee_bits` | `bytes` | IEEE-754 interchange bytes (binary16…256 for `float`, decimal16…256 for `float_dec`), little-endian word order |
 | `q.epoch_name` | `str \| None` | For a `datetime`, the epoch name (`"unix"`, `"tai"`, …); `None` otherwise |
 | `q.epoch_mjd` | `int \| None` | For a `datetime`, the epoch's Modified Julian Day; `None` otherwise |
@@ -1185,6 +1200,10 @@ the lossy native conversion. The DOM (`dom_parse`) path only has a C `double`
 for these, so it raises and points you at the typed path or `dtype='float64'`.
 Integers wider than 64 bits need `dtype=object`, which gives an exact object
 array of Python ints; without it `to_numpy` raises `BovnarArgumentError`.
+An **empty** DOM array takes its dtype (and unit) from its annotation —
+`<sint:32> []` is an `int32` array of shape `(0,)` — since it has no element to
+infer one from; an empty array with no annotation is `float64`, as numpy
+infers.
 
 A **`datetime`** array on the **unix** epoch (spec 1.1) maps to/from
 `datetime64[s]` — the integer epoch-seconds carrier is unix-relative, so it
@@ -1549,7 +1568,11 @@ w.emit(event, *, key=None, value=None, vt=None, vu=None)
 
 Send an arbitrary event to the C writer. `key` and `value` are encoded as
 UTF-8. When both `vt` and `value` are supplied the token type is inferred:
-`_TOKEN_IS_STRING` for `ValueTypeFamily.UTF8`, `_TOKEN_IS_NUMBER` otherwise.
+`_TOKEN_IS_STRING` for `ValueTypeFamily.UTF8`, and also for a `vt` whose base
+is a radix other than 10 (`uint`, `sint` or `float` with `vt.base` not 0 or 10,
+whose literal must be quoted); `_TOKEN_IS_NUMBER` otherwise. The base field of
+`float_fix` (Q), `float_dec` and `datetime` (the epoch index) is not a radix and
+never makes the value a string.
 
 ---
 
@@ -1917,17 +1940,17 @@ only invite the bounds check it can no longer support. Use `UNIT_NATIVE_FIRST`
 / `UNIT_NATIVE_LAST` / `CURRENCY_FIRST` / `CURRENCY_LAST`, or ask
 `bovnar.currency.is_currency`.
 
-> **The profiles' opaque units are not in this enum.** The C
-> `value_base_unit_t` also has a block per profile for the profile-only units,
-> and as shipped only two of them have members — UCUM's arbitrary atoms
-> (200000–200039) and UN/ECE's package and count codes (300000–300024),
-> doc/11 §7.1 — and
-> `BaseUnit` deliberately omits them, because they have no native spelling for a
-> Python name to mirror. A unit carrying one is still fully usable: `parse_unit`, `unit_to_str`,
-> `unit_is_profile_only` and the comparison helpers all handle it, and
-> `unit_to_str` returns the profile notation (`"unece:XBX"`). Only the
-> `BaseUnit(...)` *constructor* will refuse such a value, so do not call it on a
-> raw base taken from a profile-only unit.
+> **The profiles' opaque units are members too.** The C `value_base_unit_t`
+> has a block per profile for the profile-only units — as shipped, UCUM's
+> arbitrary atoms (200000–200039, `UCUM_IU` … `UCUM_IR`) and UN/ECE's package
+> and count codes (300000–300024, `UNECE_ONE` … `UNECE_VIAL`), doc/11 §7.1 —
+> and a parsed unit reports their ids, so `BaseUnit` names each one after its C
+> enumerator, `bu_ucum_iu` → `BaseUnit.UCUM_IU`, as the Rust crate's
+> `BaseUnit::UcumIu` does. (Until 2.0.0 it omitted them, and
+> `ValueUnitComponent.base_unit` raised `ValueError` on `ucum:[IU]/mL`.) They
+> have no native spelling and no dimension: `unit_to_str` returns the profile
+> notation (`"unece:XBX"`), `unit_is_profile_only` is true, and pint has no
+> form for them.
 
 > **Note on `CUP`:** the Cuban-Peso currency is exposed as **`BaseUnit.CUP_`** (trailing
 > underscore), not `BaseUnit.CUP`. The plain name `CUP` is the US-cup volume unit
@@ -1987,6 +2010,7 @@ exposed as:
 - [Unit & Currency Reference](05_bovnar_unit_system.md) — the unit model behind `Quantity` and the bridges
 - [Tutorial](01_bovnar_tutorial.md) — the document syntax, by example
 - [FAQ §13 — Python Bindings](02_bovnar_faq.md#13-python-bindings) — common questions about this package
+- [Rust Bindings](14_bovnar_rust_bindings.md) — the same tiers from Rust
 
 ---
 

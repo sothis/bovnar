@@ -113,9 +113,18 @@ def _pint_dimvec(unit):
     return vec, known
 
 
+# The profile-only (opaque) units: no dimension, commensurable with nothing,
+# and no pint form by design (doc/09: pint refuses them). They sit between the
+# native block and the currencies.
+from bovnar.enums import UNIT_NATIVE_LAST, CURRENCY_FIRST
+_OPAQUE = {int(bu) for bu in BaseUnit
+           if int(UNIT_NATIVE_LAST) < int(bu) < int(CURRENCY_FIRST)}
+
+
 def _named(predicate):
     return [bu for bu in BaseUnit
-            if not bu.name.startswith('_') and int(bu) != 0 and predicate(bu)]
+            if not bu.name.startswith('_') and int(bu) != 0
+            and int(bu) not in _OPAQUE and predicate(bu)]
 
 
 _PHYSICAL = _named(lambda bu: int(bu) not in CURRENCY_TOKENS
@@ -248,7 +257,7 @@ class TestPintAgreesWithBovnarOnWhatConverts:
         import itertools
         names = [bu for bu in BaseUnit
                  if not bu.name.startswith('_') and int(bu) != 0
-                 and int(bu) not in CURRENCY_TOKENS]
+                 and int(bu) not in CURRENCY_TOKENS and int(bu) not in _OPAQUE]
         vus = {bu: make_unit_si(bu, SIPrefix.NONE, Exponent.LINEAR) for bu in names}
         pus = {bu: to_pint_unit(vus[bu], ureg=reg) for bu in names}
         disagree = []

@@ -24,7 +24,8 @@ them. It does not, and cannot, grant rights in third-party material. See
 # Part 1 — Unit vocabularies
 
 The unit-profile tables in `src/gendata/` — and the C tables generated from them
-into the library, the amalgamation, the WebAssembly build and the Python wheel —
+into the library, the amalgamation, the WebAssembly build, the Python wheel and
+the Rust crate —
 carry identifier strings from **six external vocabularies**. This part records,
 for each, what was taken, which published version the table is verified against,
 under which licence, and what remains open.
@@ -127,7 +128,8 @@ measure, or to dilute UCUM's purpose:
 **Open action:** request written permission from Regenstrief Institute to
 distribute this derived mapping table. Until that is granted, the `ucum:`
 profile can be excluded from any build with `-DBVNR_WITH_UCUM_PROFILE=OFF`
-(`doc/11` §9.4), which drops the table from the library entirely.
+(`doc/11` §9.4), which drops the table from the library entirely; the Rust crate
+drops it when its `ucum` feature is off.
 
 ---
 
@@ -266,7 +268,8 @@ files worldwide — but there is no grant to point at.
 **Open action:** ask the CF community to declare an explicit licence for the
 standard name table, proposing CC0 1.0 to match the conventions document. Until
 then this attribution stands in its place, and the `cf:` profile can be excluded
-from any build with `-DBVNR_WITH_CF_PROFILE=OFF`.
+from any build with `-DBVNR_WITH_CF_PROFILE=OFF` (in the Rust crate, with its
+`cf` feature off).
 
 ---
 

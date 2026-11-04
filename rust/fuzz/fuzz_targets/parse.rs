@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Arbitrary bytes through the streaming parsers: they may refuse the input
 //! but must not crash, and a document they accept must write back to one
 //! that reads the same.

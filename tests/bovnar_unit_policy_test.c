@@ -1274,6 +1274,25 @@ static void test_rule_path_argument_checking(void)
 	p.rules = long_path;
 	ASSERT_TRUE(!bvnr_reader_set_unit_policy(r, &p), "rule args: path too long");
 
+	/* A path that can never match a key is refused too: a require rule that
+	 * matches nothing is satisfied, so accepting these turned the assertion
+	 * off silently (third review, 2026-11). */
+	static const char *const never[] = {
+		".a.", "..a", ".a..b", ".a.*.b", ".a*", ".a b", ".a.b ", ".",
+		".a/b", ".a.b#", ".1a", ".a.*.*",
+	};
+	for (size_t i = 0; i < sizeof never / sizeof never[0]; i++) {
+		bvnr_unit_rule_t rl = { never[i], "m", 0, bvnr_rule_require };
+		p.rules = &rl; p.num_rules = 1;
+		ASSERT_TRUE(!bvnr_reader_set_unit_policy(r, &p), never[i]);
+	}
+	static const char *const fine[] = { ".a", ".a.b", ".a.*", ".a_b.c2.*", ".ä.b" };
+	for (size_t i = 0; i < sizeof fine / sizeof fine[0]; i++) {
+		bvnr_unit_rule_t rl = { fine[i], "m", 0, bvnr_rule_require };
+		p.rules = &rl; p.num_rules = 1;
+		ASSERT_TRUE(bvnr_reader_set_unit_policy(r, &p), fine[i]);
+	}
+
 	p.rules = no_dot; p.num_rules = BVNR_MAX_UNIT_RULES + 1u;
 	ASSERT_TRUE(!bvnr_reader_set_unit_policy(r, &p), "rule args: too many rules");
 	bvnr_writer_destroy(NULL);

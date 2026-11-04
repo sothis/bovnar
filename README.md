@@ -88,10 +88,11 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Streaming SAX-style reader** — Incremental parsing from memory, a file descriptor, or a socket via a symmetric `on_unverified` / `on_verified` callback pair.
 - **Error recovery** — Optional resync mode skips broken assignments and continues parsing — suitable for log streams and unreliable transports.
 - **Python bindings** — Pure-`ctypes`, no compiled extension required. Exposes both a high-level `loads`/`dumps` dict-like API and a low-level event-driven streaming API.
+- **Rust bindings** — the `bovnar` crate compiles the C library in, so there is no system library to install. It offers `parse`/`to_string` over a dynamic `Value`, the streaming `Reader`/`Writer`, the DOM, exact numbers and JSON conversion ([doc/14](doc/14_bovnar_rust_bindings.md)).
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
 - **Browser playground** — the real C reference parser, compiled to WebAssembly (`bovnar_parser_wasm.js` over `bovnar_wasm_core.js`), runs the reference verified event stream (with full type/unit/value validation) in the browser and powers an interactive web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
-- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 470-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
+- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 470-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), Python and Rust test suites with cargo-fuzz targets for the crate, and a built-in benchmark mode (`bovnar bench`).
 
 ---
 
@@ -228,7 +229,7 @@ Because these code systems sit at a different layer, they can be **components ra
 
 The notation is **spec 1.2** and, like every construct added after 1.0, is opt-in per document: it needs the `#!bovnar 1.2` directive, and without one `ucum:mm[Hg]` is simply not a unit. Native units are unaffected in every version.
 
-A profile code is translated at parse time into exactly the same unit a native spelling produces, so nothing downstream can tell which notation was used. That holds *across* vocabularies too — `ucum:kg`, `unece:KGM`, `qudt:KiloGM`, `udunits:kg`, `om:kilogram` and `qudt-qk:Mass` are one and the same `value_unit_t`, and a cross-vocabulary suite of 4789 assertions over 64 concepts checks every spelling against every other one pairwise.
+A profile code is translated at parse time into exactly the same unit a native spelling produces, so nothing downstream can tell which notation was used. That holds *across* vocabularies too — `ucum:kg`, `unece:KGM`, `qudt:KiloGM`, `udunits:kg`, `om:kilogram` and `qudt-qk:Mass` are one and the same `value_unit_t`, and a cross-vocabulary suite of 4983 assertions over 69 concepts checks every spelling against every other one pairwise.
 
 The enforcement point does not move. A profile code either becomes a real unit or becomes an error — there is no passthrough that would let an unchecked string reach a value:
 
@@ -309,6 +310,13 @@ bovnar/
 │       ├── _ffi.py          # ctypes FFI layer
 │       ├── _bvnfloat.py     # float16 / decimal-float helpers
 │       └── _numpy.py, _pint_bridge.py, _pint_units.py   # optional NumPy / Pint bridges
+├── rust/                    # Rust crate: build.rs compiles the C library in
+│   ├── src/                 # Value / Reader / Writer / DOM / exact numbers / JSON
+│   ├── tests/               # Ports of the Python tests, plus the ABI test
+│   └── fuzz/                # cargo-fuzz targets
+├── wasm/                    # WebAssembly build of the reader (npm package source)
+├── dist/                    # Committed WASM build and registration assets
+├── cmake/                   # CMake helper scripts and package templates
 ├── examples/                # Annotated .bvnr example files
 ├── highlighter/
 │   ├── vscode/              # VS Code TextMate grammar + theme
@@ -500,7 +508,7 @@ The `bovnar` binary built above wraps the library for everyday use:
 |---|---|
 | `bovnar validate [opts] <file>` | Validate a `.bvnr` file; exit non-zero on the first error. `--require-unit` additionally rejects any numeric value that carries no unit; `--require-dimension <unit>` (repeatable) requires every numeric value to be validly convertible to one of the named units — "this document is lengths, in whatever unit it wrote them". `--require-field <path>=<unit>` (repeatable) asserts one key path rather than the whole document, and a path may end in `.*` to name a subtree. `--text-only` rejects a document containing an octet stream, for a consumer whose transport is not binary-safe. |
 | `bovnar query [opts] <path> <file>` | Print a single **value** by dotted path, e.g. `.sensor.temperature` — the number alone, so it pipes into other tools; the unit is deliberately not printed, so read `25` from a `°C` field as 25 °C and not 25 K. Floats print as the shortest decimal that reads back as the same double; a `float_dec` or `float:128` wider than a double is rounded on the way through the DOM, so use the reader or the Python bindings when you need the stored digits verbatim. Takes the unit-policy options of `events` except `--base` (the value is printed in decimal) and `--text-only` (use `bovnar validate --text-only`), so a query can assert what it expects and ask for the unit it wants back: `--field .a.b=m`, `--require-unit`. |
-| `bovnar pretty-print [--canonical] <file>` | Re-serialise a document in pretty form, keeping each unit's spelling. `--canonical` writes each unit in reduced form and rescales its value (`km` → `m`, `kg` → `g`; a prefix on a named derived unit such as `kN` stays, as `k~N`), so two spellings of one unit produce the same bytes; it fails with `value_out_of_range` rather than round where an integer cannot be rescaled. Each annotation is written in one form — the width written out, a default `_10` base and `no_unit` left out — so `1.0 km` and `<float:64,k~m> 1.0` produce the same bytes. |
+| `bovnar pretty-print [--canonical] <file>` | Re-serialise a document in pretty form, keeping each unit's spelling. `--canonical` writes each unit in reduced form and rescales its value (`km` → `m`, `kg` → `g`; a prefix on a named derived unit such as `kN` stays, as `k~N`), so two spellings of one unit produce the same bytes; it fails with `value_out_of_range` rather than round where an integer cannot be rescaled. Each annotation is written in one form — the width written out, a default `_10` base and `no_unit` left out — so `1.0 km` and `<float:64,k~m> 1.0` produce the same bytes. Two cases keep their own spelling: a unit with a profile code (`ucum:[IU]/mL` stays a profile unit, the prefixes beside it unfolded) and an inline unit beside an annotation (`<uint:64> 5 m` stays inline). |
 | `bovnar convert <file>` | Convert between `json` and `bvnr`; direction is auto-detected from the `.json`/`.bvnr` extension. Add `--from <fmt>` or `--to <fmt>` to override. bvnr → json is lossy for most documents — JSON has no units, types, symbols, references, octet streams, non-finite floats or datetimes — so the JSON is still written, what was lost is listed on stderr, and the exit status is 1: exit 0 means every *value* converts back. The annotations never do and are not counted — a width or a family, or a float such as `1.0` that returns as the integer `1`, comes back as json → bvnr infers it. A datetime with sub-second digits is refused outright. json → bvnr writes an integer wider than 64 bits as `<uint:N>`/`<sint:N>` (N the smallest power of two from 128 that holds it), and refuses what Bovnar cannot hold (a number too large for a 64-bit float, such an integer inside an array, a string with a control character, a key that is not an identifier) and names the key. |
 | `bovnar events [opts] <file\|->` | Print the lexer (unverified) and validator (verified) event streams side by side. `-c` resync on error (the exit status is still non-zero if any occurred), `-d` debug re-serialisation, `-p` pretty debug output. Pass `-` to read stdin. (`-d` re-serialises the event stream and re-emits the source's `#!bovnar` version directive, so its debug output round-trips even for spec-1.1-gated values.) Unit policy: `--unit <unit>` (repeatable) converts values to the first unit they fit, `--si` converts anything left over to coherent SI base units, `--base <N>` renders conversions in base N, `--leave-inexact` leaves a value the conversion cannot deliver exactly rather than failing the parse. |
 | `bovnar frames pack\|list <file…\|->` | Wrap each document in a length-prefixed frame, or list the documents in a frame stream. |
@@ -591,6 +599,17 @@ Pure-Python tests (`ctest -L python_pure`) run without the shared library; integ
 export LIBBOVNAR_PATH=$(pwd)/build/libbvnr.so
 pip install -e ".[dev]"          # from the repository root — pyproject.toml is there
 pytest python/tests -v
+```
+
+### Rust tests
+
+The crate has its own suite, run with Cargo (Rust 1.88 or newer; `build.rs` needs a C compiler and Python 3):
+
+```bash
+cd rust
+cargo test
+# test_writers_agree compares to_string with the CLI at build/bovnar; build it, then:
+cargo test --test test_writers_agree -- --ignored
 ```
 
 ---
@@ -726,7 +745,7 @@ Reader().read_mem(b".velocity = <float:64,m/s> 9.81;", on_verified=on_event)
 
 Beyond `loads`/`dumps`, the package provides `dom_parse()` for random-access tree traversal, `loads(..., typed=True)` to preserve each value's exact type and unit as `Quantity` objects for lossless round-trips, and a `currency` module mirroring the C currency API.
 
-See [doc/09_bovnar_python_bindings.md](doc/09_bovnar_python_bindings.md) for the full API. The Rust crate in `rust/` mirrors it name for name; see [doc/14_bovnar_rust_bindings.md](doc/14_bovnar_rust_bindings.md).
+See [doc/09_bovnar_python_bindings.md](doc/09_bovnar_python_bindings.md) for the full API. The Rust crate in `rust/` offers the same tiers (`parse`/`to_string` over a dynamic `Value`, `Reader`/`Writer`, the DOM) under Rust names; see [doc/14_bovnar_rust_bindings.md](doc/14_bovnar_rust_bindings.md).
 
 ---
 

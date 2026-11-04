@@ -417,6 +417,9 @@ PAREN_OPENERS = (
     "exact", "conventional", "linear", "affine", "=", "ISO ", "CODATA ",
     "Julian ", "CGPM ", "ITU-T ", "plane angle", "solid angle", "Delisle ",
     "the ", "dimensionless", "U+", "or ", "no prefix",
+    # A publisher's rounding the catalogue keeps (DU, perm_metric): the value
+    # is still compared, only the word "exact" is not claimed for it.
+    "as published",
 )
 
 

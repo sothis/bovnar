@@ -146,7 +146,7 @@ find . \( -type d \( -name .git -o -name .github -o -name .claude \
         -o -name .idea -o -name .cache -o -name .pytest_cache \
         -o -name __pycache__ -o -name node_modules -o -name pdf \
         -o -name build -o -name 'build-*' -o -name 'build_*' \
-        -o -name 'cmake-build*' \) \
+        -o -name 'cmake-build*' -o -name target \) \
         -o -name .gitignore \) -prune -o -print > "$TMP"/all
 
 # Drop what git ignores.  This is the backstop for the prune list above: a

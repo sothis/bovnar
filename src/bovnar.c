@@ -505,6 +505,7 @@ typedef struct {
 	uint32_t         log_used;
 	bvnr_canon_observer_t *canon;
 	bvnr_reader_t        *rd;   /* source of the declared version for the tee */
+	bool                  recovering; /* -c: an error is recovered from */
 } evt_ctx_t;
 static void evt_format_token(const bvnr_data_t *d, bvnr_event_t e,
 					  char *buf, size_t bufsize)
@@ -976,10 +977,12 @@ static void evt_on_error(void *ud, error_code_t err,
 						 uint64_t line, uint64_t column,
 						 uint32_t byte, uint64_t offset)
 {
-	(void)ud;
+	/* Without -c the error ends the read: it is not a recovery. */
+	const evt_ctx_t *ctx = (const evt_ctx_t *)ud;
 	cwe(
-			"  ⚠ RECOVERY at line %" PRIu64 " col %" PRIu64
+			"  ⚠ %s at line %" PRIu64 " col %" PRIu64
 			": %s (byte 0x%02" PRIx32 " offset %" PRIu64 ")\n",
+			(ctx && ctx->recovering) ? "RECOVERY" : "ERROR",
 			line, column,
 			bvn_error_to_string(err),
 			byte, offset);
@@ -1071,6 +1074,7 @@ static int cmd_events(int argc, char **argv)
 	flags.continue_on_error  = continue_on_error;
 	flags.text_only          = up.text_only;
 	flags.on_error           = evt_on_error;
+	ctx->recovering          = continue_on_error;
 	bvnr_canon_observer_t *canon = NULL;
 	if (enable_debug) {
 		bvnr_sink_t dbg_sink;
@@ -2008,7 +2012,13 @@ static bool write_bvn_bigint(bvnr_writer_t *w, const char *key, const char *digi
 			"than the %u bits a bovnar integer can hold\n",
 			json_key_for_msg(), (unsigned)BVN_MAX_INT_WIDTH);
 	} else {
-		uint32_t need = (uint32_t)bvn_int_bitlen(n) + (n->negative ? 1u : 0u);
+		/* A sint:N holds -2^(N-1), so a negative power of two needs no extra
+		 * sign bit: -2^127 fits <sint:128>, and used to go out as <sint:256>. */
+		int      bl   = bvn_int_bitlen(n);
+		bool     pow2 = bl > 0;
+		for (int i = 0; pow2 && i < bl - 1; i++)
+			if (bvn_int_getbit(n, i)) pow2 = false;
+		uint32_t need = (uint32_t)bl + ((n->negative && !pow2) ? 1u : 0u);
 		uint32_t width = 128u;
 		while (width < need && width < BVN_MAX_INT_WIDTH)
 			width *= 2u;
@@ -3516,7 +3526,12 @@ static int cmd_bench(int argc, char **argv)
 			if (!bench_parse_count("--iterations", argv[++i],
 					       10000000ul, &bmark_cfg.iterations))
 				return 2;
-			if (bmark_cfg.iterations < 1) bmark_cfg.iterations = 1;
+			/* Zero rounds measures nothing and divides by zero in the
+			 * per-iteration figures; it used to become 1 silently. */
+			if (bmark_cfg.iterations < 1) {
+				fprintf(stderr, "bench: --iterations must be at least 1\n");
+				return 2;
+			}
 		} else if (strcmp(argv[i], "--warmup") == 0) {
 			if (!bench_parse_count("--warmup", argv[++i],
 					       10000000ul, &bmark_cfg.warmup))
@@ -3948,7 +3963,10 @@ static void usage(FILE *out, const char *prog)
 		"                reduce every unit to canonical form, rescaling values to\n"
 		"                match, and write each annotation in one form (width\n"
 		"                written out, default _10 and no_unit left out), so two\n"
-		"                spellings of one value produce equal bytes\n"
+		"                spellings of one value produce equal bytes -- except a\n"
+		"                unit with a profile code, which keeps its spelling and\n"
+		"                its neighbours' prefixes, and an inline unit beside an\n"
+		"                annotation, which stays inline\n"
 		"  convert <file>  Convert json<->bvnr (direction from .json/.bvnr ext)\n"
 		"                  Override with --from <fmt> and/or --to <fmt>\n"
 		"                  Supported: json -> bvnr,  bvnr -> json\n"
@@ -4006,7 +4024,7 @@ static void usage(FILE *out, const char *prog)
 		"  bench [opts]\n"
 		"                  Run parsing throughput benchmark.\n"
 		"                  Options:\n"
-		"                    --profile <list>   scalars,typed,structs,arrays,units,mixed\n"
+		"                    --profile <list>   all,scalars,typed,structs,arrays,units,mixed\n"
 		"                    --size <list>      payload sizes in bytes\n"
 		"                    --iterations <N>   parse rounds per cell (default: 100)\n"
 		"                    --warmup <N>       warm-up rounds (default: 10)\n"

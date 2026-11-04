@@ -50,7 +50,8 @@ moves when a program built against it has to change, which is what 2.0.0 was;
 
 - Memory-safety defects — out-of-bounds access, use-after-free, uninitialized
   reads — reachable from the reader, the writer, the DOM, or the unit and
-  datetime utilities.
+  datetime utilities, and unsoundness reachable through the safe API of the
+  Rust crate or through the Python bindings.
 - A crash, hang, or unbounded allocation on attacker-controlled input, including
   input that is malformed, truncated, or deliberately adversarial.
 - A value that decodes to something other than what the document says, or a
@@ -67,9 +68,11 @@ These are documented properties of the format, not defects. They are listed so a
 report does not have to guess.
 
 - **Resource exhaustion under a default configuration.** The reader's
-  `max_file_size` defaults to unlimited so that an endless stream can be parsed
-  at all. A consumer of untrusted input is expected to set it, along with
-  `max_struct_nesting` and `max_array_nesting`. See the limits section of the
+  `max_file_size` defaults to no total-byte cap, and `max_text_bytes` and
+  `max_array_items` default to 2³¹ − 1. A consumer of untrusted input is
+  expected to set every limit of spec §12.2 to what it can afford —
+  `max_file_size`, `max_text_bytes`, `max_array_items` and the two nesting
+  depths (64 by default) above all. See the limits section of the
   specification.
 - **Data loss in recovery mode.** `-c` / resync deliberately skips a broken
   assignment and continues. A consumer that does not check the recovery counters

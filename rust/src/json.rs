@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! JSON <-> BVNR conversion, mirroring the upstream CLI's `bovnar convert`.
 //!
 //! [`from_json`] refuses what bovnar cannot represent (invalid keys, integers
@@ -49,6 +50,8 @@ enum Json {
     Bool(bool),
     Int(i64),
     Uint(u64),
+    /// An integer wider than 64 bits, as its decimal digits.
+    BigInt(num_bigint::BigInt),
     Float(f64),
     Str(String),
     Array(Vec<Json>),
@@ -295,14 +298,16 @@ impl Parser<'_> {
                 .map(Json::Float)
                 .ok_or_else(|| self.err("JSON number too large for a 64-bit float"));
         }
+        // Wider than 64 bits it is a wider <uint>/<sint>, as the CLI writes it.
+        let wide = || {
+            text.parse::<num_bigint::BigInt>()
+                .map(Json::BigInt)
+                .map_err(|_| self.err("malformed JSON number"))
+        };
         if text.starts_with('-') {
-            text.parse()
-                .map(Json::Int)
-                .map_err(|_| self.err("integer out of range for 64-bit signed"))
+            text.parse().map(Json::Int).or_else(|_| wide())
         } else {
-            text.parse()
-                .map(Json::Uint)
-                .map_err(|_| self.err("integer out of range for 64-bit unsigned"))
+            text.parse().map(Json::Uint).or_else(|_| wide())
         }
     }
 }
@@ -344,6 +349,18 @@ fn write_value(w: &mut Writer, key: &str, v: &Json) -> Result<()> {
         Json::Bool(b) => w.write_bool(key, *b),
         Json::Uint(u) => w.write_uint(key, *u, 0, Base::DECIMAL),
         Json::Int(i) => w.write_sint(key, *i, 0, Base::DECIMAL),
+        Json::BigInt(b) => {
+            // big_int_width stops at the widest integer the library holds.
+            let width = writer::big_int_width(b);
+            if !fits_width(b, width) {
+                return Err(refuse(format!(
+                    "the JSON integer under key '{key}' is wider than the {} bits a \
+                     bovnar integer can hold",
+                    writer::MAX_INT_WIDTH
+                )));
+            }
+            w.write_big_int(key, b, width, Base::DECIMAL, writer::Signedness::Auto)
+        }
         Json::Float(f) => w.write_float(key, *f, 0),
         Json::Str(s) => check_string(s).and_then(|_| w.write_string(key, s)),
         Json::Array(items) => {
@@ -355,6 +372,16 @@ fn write_value(w: &mut Writer, key: &str, v: &Json) -> Result<()> {
             members.iter().try_for_each(|(k, v)| write_value(w, k, v))?;
             w.end_struct()
         }
+    }
+}
+
+/// Whether `b` fits a `uint:width` (non-negative) or `sint:width` (negative).
+fn fits_width(b: &num_bigint::BigInt, width: u32) -> bool {
+    let one = num_bigint::BigInt::from(1);
+    if b.sign() == num_bigint::Sign::Minus {
+        *b >= -(&one << (width - 1))
+    } else {
+        *b < (&one << width)
     }
 }
 
@@ -383,6 +410,13 @@ fn write_element(w: &mut Writer, e: &Json) -> Result<()> {
         Json::Bool(b) => data(w, TokenType::Bool, plain, &b.to_string()),
         Json::Uint(u) => data(w, TokenType::ArrayNumber, plain, &u.to_string()),
         Json::Int(i) => data(w, TokenType::ArrayNumber, plain, &i.to_string()),
+        // An array element is written bare and read at 64 bits, and the
+        // elements of one array share a type: a wider integer cannot be one.
+        Json::BigInt(b) => Err(refuse(format!(
+            "the JSON array holds the integer {b}, which is wider than 64 bits; \
+             outside an array it would be written as a wider <uint>/<sint>, inside \
+             one it cannot share the elements' type"
+        ))),
         Json::Float(f) => {
             let vt = writer::type_spec(ValueTypeFamily::Float, 64, 0);
             let text = ffi::format_f64(*f, vt)
@@ -597,6 +631,38 @@ mod tests {
         }
     }
 
+    /// Integers wider than 64 bits outside an array are a wider `<uint>`/
+    /// `<sint>`, byte for byte what `bovnar convert` writes for the same JSON
+    /// (`bvnr_cli_convert_wide_int`), and still refused inside one.
+    #[test]
+    fn wide_integers_are_written_as_the_cli_writes_them() {
+        let out = String::from_utf8(from_json(fixture!("wide_int.json")).unwrap()).unwrap();
+        assert!(out.contains("<uint:128> 99999999999999999999"), "{out}");
+        assert!(out.contains("<sint:128> -99999999999999999999"), "{out}");
+        let crate::Value::Struct(doc) = crate::parse(out.as_bytes()).unwrap() else {
+            panic!("{out}")
+        };
+        let get = |k: &str| doc.iter().find(|(key, _)| key == k).map(|(_, v)| v.clone());
+        assert_eq!(
+            get("n"),
+            Some(crate::Value::Int(99_999_999_999_999_999_999))
+        );
+        assert_eq!(
+            get("m"),
+            Some(crate::Value::Int(-99_999_999_999_999_999_999))
+        );
+        let at = |j: &str| String::from_utf8(from_json(j).unwrap()).unwrap();
+        // -2^127 fits <sint:128>; 2^128 needs <uint:256>.
+        assert!(at(r#"{"i":-170141183460469231731687303715884105728}"#).contains("<sint:128>"));
+        assert!(at(r#"{"i":340282366920938463463374607431768211456}"#).contains("<uint:256>"));
+        assert!(matches!(
+            from_json(r#"{"a":[1,18446744073709551616]}"#),
+            Err(Error::Argument { .. })
+        ));
+        let huge = format!(r#"{{"a":1{}}}"#, "0".repeat(10_000));
+        assert!(matches!(from_json(&huge), Err(Error::Argument { .. })));
+    }
+
     #[test]
     fn edge_cases() {
         let rt = |j: &str| strip(&to_json(&from_json(j).unwrap()).unwrap());
@@ -609,7 +675,8 @@ mod tests {
         for bad in [
             r#"[1]"#,
             r#"{"a":1e999}"#,
-            r#"{"a":-9223372036854775809}"#,
+            // Wider than 64 bits is refused only inside an array.
+            r#"{"a":[-9223372036854775809]}"#,
             r#"{"a":"\u0001"}"#,
             r#"{"1a":1}"#,
             r#"{"a":[1"#,

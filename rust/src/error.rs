@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The error type.
 
 use std::fmt;

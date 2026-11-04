@@ -1,13 +1,16 @@
+// SPDX-License-Identifier: MIT
 //! A typed scalar: the verbatim
 //! literal with its type, unit and (for a datetime) sub-second digits, so a
 //! value read with [`crate::parse_typed`] is written back losslessly.
 
 use num_bigint::BigInt;
 use num_rational::BigRational;
+use num_traits::Zero;
 
 use crate::Value;
 use crate::bvnfloat::{
-    BvnFloat, WORK_PREC, decimal_stored_value, decimal_to_interchange_bits, fraction_to_binary_bits,
+    BvnFloat, WORK_PREC, decimal_stored_value, decimal_to_binary_bits, decimal_to_interchange_bits,
+    fraction_exponent_cap,
 };
 use crate::decimal::Decimal;
 use crate::enums::{TokenType, ValueTypeFamily};
@@ -15,7 +18,11 @@ use crate::error::{Error, Result};
 use crate::ffi::{self, ValueTypeSpec};
 use crate::unit::Unit;
 
-#[derive(Clone, Debug, PartialEq)]
+/// Two quantities are equal when they carry the same literal, sub-second
+/// digits, effective type and unit: `<float:0>`, `<float:64,_10>` and a bare
+/// `2.5` are one type (see [`Quantity::type_key`]), and the token form and
+/// unit spelling are presentation, as in the Python binding.
+#[derive(Clone, Debug)]
 pub struct Quantity {
     /// The literal exactly as written; `None` for a typed null.
     pub raw: Option<String>,
@@ -29,7 +36,40 @@ pub struct Quantity {
     pub unit_source: Option<String>,
 }
 
+impl PartialEq for Quantity {
+    fn eq(&self, other: &Self) -> bool {
+        self.raw == other.raw
+            && self.frac == other.frac
+            && self.type_key() == other.type_key()
+            && self.unit == other.unit
+    }
+}
+
 impl Quantity {
+    /// `(family, width, base)` with the defaults filled in, as the library's
+    /// `bvn_effective_width`/`bvn_effective_base` fill them: width 0 is 64,
+    /// and base 0 is 10 where the base is a radix (`uint`, `sint`, `float`,
+    /// and 0 for `utf8`/`bool` too). A `float_fix` base is its Q and a
+    /// `datetime` base its epoch, compared as stored.
+    pub fn type_key(&self) -> (i32, u32, u32) {
+        let fam = self.vtype.family;
+        let keep = matches!(
+            self.family(),
+            Some(ValueTypeFamily::FloatFix | ValueTypeFamily::Datetime)
+        );
+        let base = if keep || self.vtype.base != 0 {
+            self.vtype.base
+        } else {
+            10
+        };
+        let width = if self.vtype.width == 0 {
+            64
+        } else {
+            self.vtype.width
+        };
+        (fam, width, base)
+    }
+
     /// A number literal of type `vtype` in `unit`.
     pub fn new(raw: &str, vtype: ValueTypeSpec, unit: Unit) -> Self {
         Quantity {
@@ -222,23 +262,68 @@ impl Quantity {
     /// The exact value as a rational: for a
     /// `float_fix` the Q-format datum `mantissa / 2^frac_bits`, for the
     /// others the exact literal; `None` for a typed null.
+    ///
+    /// A literal whose decimal exponent (of its magnitude or of its last
+    /// digit) is past [`crate::bvnfloat::FRACTION_EXPONENT_CAP`], 100 000
+    /// (611 937 for `float_dec:256`), is an error rather than a rational
+    /// with, for `1e-99999999` (a 28-byte document), a hundred-million-digit
+    /// denominator: [`Quantity::decimal`] gives it exactly, and
+    /// [`Quantity::stored_value`] what the format stores. `nan`/`inf` have
+    /// no ratio and are errors too.
     pub fn fraction(&self) -> Result<Option<BigRational>> {
         if self.family() == Some(ValueTypeFamily::FloatFix) {
+            if self.raw.is_none() {
+                return Ok(None);
+            }
             let (m, q) = self.fixed_point()?;
             return Ok(Some(BigRational::new(m, BigInt::from(1) << q)));
         }
         match self.decimal()? {
             None => Ok(None),
-            Some(d) => d.to_fraction().map(Some),
+            Some(d) => {
+                if !d.is_finite() {
+                    return Err(Error::argument(format!(
+                        "fraction() is not defined for the non-finite value {d}"
+                    )));
+                }
+                if let (Some(c), Some(e), Some(fam)) =
+                    (d.coefficient(), d.exponent(), self.family())
+                    && !c.is_zero()
+                {
+                    let cap = fraction_exponent_cap(fam, self.width());
+                    let adjusted = i128::from(e) + c.to_str_radix(10).len() as i128 - 1;
+                    let e = adjusted.unsigned_abs().max(u128::from(e.unsigned_abs()));
+                    if e > cap.unsigned_abs().into() {
+                        return Err(Error::argument(format!(
+                            "fraction() refuses a literal with a decimal exponent of {e}: \
+                             its exact ratio has a {e}-digit term. The cap is {cap}; \
+                             decimal() is exact at any exponent, and stored_value() gives \
+                             what the format holds"
+                        )));
+                    }
+                }
+                d.to_fraction().map(Some)
+            }
         }
     }
 
     /// `(mantissa, frac_bits)` of a `float_fix` value, whose exact value is
-    /// `mantissa / 2^frac_bits`. Any other family
-    /// is an error.
+    /// `mantissa / 2^frac_bits`. Any other family, a typed null and `nan`/
+    /// `inf`/`ninf` (which a fixed-point datum has no encoding for) are
+    /// errors.
     pub fn fixed_point(&self) -> Result<(BigInt, u32)> {
         if self.family() != Some(ValueTypeFamily::FloatFix) {
             return Err(Error::argument("fixed_point() is only valid for float_fix"));
+        }
+        if self.raw.is_none() {
+            return Err(Error::argument(
+                "fixed_point() is not defined for a null value",
+            ));
+        }
+        if let Some(nf) = self.nonfinite_decimal() {
+            return Err(Error::argument(format!(
+                "fixed_point(): {nf} has no fixed-point encoding"
+            )));
         }
         let q = self.vtype.base;
         let f = BvnFloat::from_str(self.raw_str(), 10, WORK_PREC)?;
@@ -308,7 +393,7 @@ impl Quantity {
                 .as_ref()
                 .filter(|_| Self::parser_saturated(&f, lit.as_ref()))
         {
-            return fraction_to_binary_bits(&lit.to_fraction()?, width);
+            return decimal_to_binary_bits(lit, width);
         }
         f.to_binary_bits(width)
     }
@@ -329,6 +414,13 @@ impl Quantity {
         if self.raw.is_none() && self.is_floatish() {
             return Ok(None);
         }
+        // nan/inf/ninf of every float family, float_fix included: its
+        // mantissa accessor has no encoding for them and used to give 0.
+        if self.is_floatish()
+            && let Some(nf) = self.nonfinite_decimal()
+        {
+            return Ok(Some(nf));
+        }
         if family == Some(ValueTypeFamily::FloatFix) {
             let (m, q) = self.fixed_point()?;
             // m / 2^q = m * 5^q / 10^q, given with the ideal exponent of an
@@ -337,9 +429,6 @@ impl Quantity {
             return Ok(Some(
                 Decimal::from_scaled(&scaled, -i64::from(q)).reduced_to(0),
             ));
-        }
-        if let Some(nf) = self.nonfinite_decimal() {
-            return Ok(Some(nf));
         }
         match family {
             Some(ValueTypeFamily::Float) if !IEEE_WIDTHS.contains(&width) => {

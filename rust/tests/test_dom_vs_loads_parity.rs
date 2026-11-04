@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The DOM tier and the streaming tier read the same document to the same
 //! value.
 

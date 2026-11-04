@@ -1811,3 +1811,19 @@ class TestAvailableProfiles:
         if 'ucum' in bovnar.available_profiles():
             assert (ErrorCode(bovnar.unit_error_code('ucum:notacode'))
                     == ErrorCode.UNIT_ILLEGAL)
+
+
+@needs_lib
+def test_unit_to_str_says_why_a_unit_has_no_text():
+    """bvn_unit_to_string's -1 is never the buffer (it is BVNR_UNIT_STRING_MAX
+    here); unit_to_str reported every -1 as "output buffer overflow"."""
+    import bovnar
+    squared = bovnar.Unit.parse('unece:H87').raw        # a flat-profile opaque unit
+    squared.components[0].exponent = 2                    # ... squared: no spelling
+    for fn in (bovnar.unit_to_str, bovnar.unit_to_str_ex):
+        with pytest.raises(bovnar.BovnarArgumentError, match="no text form"):
+            fn(squared)
+    bogus = bovnar.Unit.parse('m').raw
+    bogus.components[0].base = 123456                     # no such base unit
+    with pytest.raises(bovnar.BovnarArgumentError, match="structurally invalid"):
+        bovnar.unit_to_str(bogus)

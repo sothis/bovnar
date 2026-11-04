@@ -332,9 +332,18 @@ def parse_rows(units):
     NOT auto-added, so the table reproduces the hand-written bu_table verbatim.
     """
     rows = []
+    owner = {}
     for u in units:
         base = "bu_" + u["name"]
         for sp in u["aliases"]:
+            # One spelling, one unit. Two rows for one spelling would sort by
+            # id and the lower id would win silently (gen_prefixes.py refuses
+            # its duplicates the same way).
+            if sp in owner and owner[sp] != u["name"]:
+                raise SystemExit(
+                    "gen_units: alias %r is claimed by both %s and %s"
+                    % (sp, owner[sp], u["name"]))
+            owner[sp] = u["name"]
             rows.append((sp, base, u["id"]))
     rows.sort(key=lambda r: (-byte_len(r[0]), r[2], r[0]))
     return rows

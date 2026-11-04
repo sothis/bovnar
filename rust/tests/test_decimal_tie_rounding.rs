@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! An exact decimal tie must round half to even, as IEEE 754 requires.
 //!
 //! The decimal-interchange helpers used to encode the parsed `bvn_float`, a

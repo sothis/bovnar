@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The `Writer`: its lifecycle, every scalar and container write, emit,
 //! buffer limits, pretty output and the regressions around annotations.
 //! Tests are grouped in one module per subject.
@@ -432,10 +433,8 @@ mod bytes_written {
 
     #[test]
     fn test_zero_initially() {
-        // `bytes_written` is unsigned, so `>= 0` holds by type. Reading it on
-        // a fresh writer must still work.
         written(|w| {
-            let _ = w.bytes_written();
+            assert_eq!(w.bytes_written(), 0);
         });
     }
 }

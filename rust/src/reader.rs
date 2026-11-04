@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The streaming reader.
 
 use crate::enums::{ErrorCode, Event, TokenType};
@@ -8,7 +9,8 @@ use crate::unit::Unit;
 /// Options for [`Reader::read_mem`]. The default reads with the library's limits.
 #[derive(Clone, Debug, Default)]
 pub struct ReadOptions {
-    /// Largest accepted input in bytes; 0 is the library default.
+    /// Largest accepted input in bytes; 0 means no total-byte cap (the
+    /// text stays bounded by the library's `max_text_bytes`).
     pub max_file_size: u64,
     /// Recover from errors and keep reading instead of stopping.
     pub continue_on_error: bool,
@@ -79,8 +81,22 @@ const UNIT_POLICY_REFUSED_GENERAL: &str = "unusable unit policy — check the un
      rule paths in targets / require_dimension_of / rules";
 
 impl UnitPolicy {
-    /// The counts the C side would refuse anyway, reported by name.
+    /// The counts the C side would refuse anyway, reported by name, and a
+    /// NUL byte in any unit text or path, which C strings cannot carry.
     pub(crate) fn check_counts(&self) -> Result<()> {
+        let texts = self
+            .rules
+            .iter()
+            .flat_map(|r| [&r.path, &r.unit])
+            .chain(self.targets.iter().map(|(u, _)| u))
+            .chain(&self.require_dimension_of);
+        for t in texts {
+            if t.contains('\0') {
+                return Err(Error::argument(format!(
+                    "unit policy text {t:?} contains a NUL byte"
+                )));
+            }
+        }
         let too_many = |what: &str, n: usize, max: usize| {
             Err(Error::argument(format!("at most {max} {what}, got {n}")))
         };
@@ -582,6 +598,23 @@ mod tests {
     }
 
     #[test]
+    fn policy_text_with_nul_is_an_argument_error() {
+        let policy = UnitPolicy {
+            targets: vec![("m\0".into(), 0)],
+            ..Default::default()
+        };
+        let err = Reader::new()
+            .unwrap()
+            .set_unit_policy(Some(&policy))
+            .unwrap_err();
+        assert!(matches!(err, Error::Argument { .. }), "{err:?}");
+        let Err(err) = crate::DomDoc::parse_with_policy(b".a = 1;", &policy) else {
+            panic!("a NUL in the policy was accepted");
+        };
+        assert!(matches!(err, Error::Argument { .. }), "{err:?}");
+    }
+
+    #[test]
     fn policy_converts_and_want_unit_converts() {
         let doc = b".d = <uint:64,k~m> 3;";
         let mut r = Reader::new().unwrap();
@@ -604,7 +637,10 @@ mod tests {
             }
             true
         };
-        let mut want = |_: &EventData<'_>| Some((Unit::parse("m").unwrap(), 16));
+        let mut want = |e: &EventData<'_>| {
+            assert_eq!(e.event, Event::Data, "the hook sees the value's ev_data");
+            Some((Unit::parse("m").unwrap(), 16))
+        };
         r.read_mem_want_unit(doc, &ReadOptions::default(), &mut want, Some(&mut on))
             .unwrap();
         assert_eq!(seen, Some((true, "3".into(), b"bb8".to_vec())));

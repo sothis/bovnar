@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Thin Rust binding to the Bovnar (BVNR) C library.
 //!
 //! All FFI
@@ -30,7 +31,7 @@ pub mod unit;
 pub mod units;
 pub mod writer;
 
-pub use bvnfloat::BvnFloat;
+pub use bvnfloat::{BvnFloat, FRACTION_EXPONENT_CAP};
 pub use decimal::Decimal;
 pub use dom::{DomDoc, DomNode, DomType};
 pub use enums::{
@@ -53,8 +54,13 @@ use writer::needs_annotation;
 pub enum Value {
     Null,
     Bool(bool),
-    /// Any integer up to 128 bits (uint64 and sint64 included).
+    /// An integer that fits an `i128` (every uint64 and sint64 included).
     Int(i128),
+    /// An integer outside the `i128` range (a `<uint:256>` say); [`parse`]
+    /// gives an [`Value::Int`] for every integer an `i128` holds, and this
+    /// for the rest. [`to_string`] writes it as `<uint:N>`/`<sint:N>` with
+    /// `N` the smallest power of two from 128 that holds it.
+    BigInt(num_bigint::BigInt),
     Float(f64),
     /// A string; symbols and references read back as strings too.
     String(String),
@@ -137,7 +143,7 @@ fn parse_with(data: &[u8], typed: bool) -> Result<Value> {
 ///
 /// Returns bytes rather than `String`: an octet stream is written raw.
 /// Everything [`parse`] and [`parse_typed`] return round-trips: arrays
-/// (multi-row ones as `/`-separated rows), integers up to 128 bits and typed
+/// (multi-row ones as `/`-separated rows), integers of any width (`Int` and `BigInt`) and typed
 /// quantities.
 pub fn to_string(value: &Value, pretty: bool) -> Result<Vec<u8>> {
     let Value::Struct(entries) = value else {
@@ -178,6 +184,13 @@ fn emit_value(w: &mut Writer, key: &str, value: &Value) -> Result<()> {
                 w.write_bvni(key, *i, int_width(*i), Base::DECIMAL, Signedness::Auto)
             }
         }
+        Value::BigInt(b) => w.write_big_int(
+            key,
+            b,
+            writer::big_int_width(b),
+            Base::DECIMAL,
+            Signedness::Auto,
+        ),
         Value::Float(f) => w.write_float(key, *f, 64),
         Value::String(s) => w.write_string(key, s),
         Value::Bytes(b) => w.write_octets(key, b),
@@ -408,8 +421,8 @@ fn array_has_unit(rows: &[Value]) -> bool {
     any
 }
 
-/// Every non-null leaf a numeric quantity with
-/// a literal, all with the same real unit.
+/// Every non-null leaf a numeric quantity, all with the same real unit. A
+/// typed null qualifies: it is written as its own annotation and `null`.
 fn array_one_unit(rows: &[Value]) -> bool {
     let Some(qs) = quantity_leaves(rows) else {
         return false;
@@ -418,7 +431,21 @@ fn array_one_unit(rows: &[Value]) -> bool {
         return false;
     };
     qs.iter()
-        .all(|q| writer::is_numeric(q) && has_real_unit(q) && q.unit == first.unit)
+        .all(|q| is_numeric_family(q) && has_real_unit(q) && q.unit == first.unit)
+}
+
+/// A quantity of a numeric family, with a literal or as a typed null.
+fn is_numeric_family(q: &Quantity) -> bool {
+    use ValueTypeFamily as F;
+    matches!(
+        q.family(),
+        Some(F::Float | F::FloatDec | F::FloatFix | F::Uint | F::Sint)
+    )
+}
+
+/// A quantity whose family has an annotation to write (not `plain`).
+fn has_annotation_family(q: &Quantity) -> bool {
+    family_name(q.vtype.family).is_some()
 }
 
 /// The one spelling every quantity leaf
@@ -450,10 +477,15 @@ fn mixed_numeric_types(rows: &[Value]) -> bool {
             Some(F::Float | F::FloatDec | F::FloatFix | F::Uint | F::Sint)
         )
     };
-    if !qs.iter().all(|q| numeric(q) && !has_real_unit(q)) {
+    // A typed null of any family qualifies: written bare it is an untyped
+    // `null`, so it needs its own annotation -- `[<uint:32>, <sint:64>]`.
+    if !qs
+        .iter()
+        .all(|q| !has_real_unit(q) && (numeric(q) || (q.raw.is_none() && has_annotation_family(q))))
+    {
         return false;
     }
-    qs.iter().any(|q| q.raw.is_some() && needs_annotation(q))
+    qs.iter().any(|q| needs_annotation(q))
 }
 
 /// The number of bits needed for `|i|` (0 for 0).
@@ -465,10 +497,10 @@ fn bit_length(i: i128) -> u32 {
 /// than 64 bits (unsigned when non-negative, signed when negative).
 fn has_wide_int(rows: &[Value]) -> bool {
     let mut wide = false;
-    leaves(
-        rows,
-        &mut |v| wide |= matches!(v, Value::Int(i) if !(i128::from(i64::MIN)..=i128::from(u64::MAX)).contains(i)),
-    );
+    leaves(rows, &mut |v| {
+        wide |= matches!(v, Value::BigInt(_))
+            || matches!(v, Value::Int(i) if !(i128::from(i64::MIN)..=i128::from(u64::MAX)).contains(i))
+    });
     wide
 }
 
@@ -487,6 +519,16 @@ fn int_annotation(rows: &[Value]) -> Option<ValueTypeSpec> {
                 pos_bits = pos_bits.max(bit_length(*i));
             }
         }
+        Value::BigInt(b) => {
+            saw = true;
+            let bits = u32::try_from(b.bits()).unwrap_or(u32::MAX);
+            if b.sign() == num_bigint::Sign::Minus {
+                neg = true;
+                neg_bits = neg_bits.max(bits);
+            } else {
+                pos_bits = pos_bits.max(bits);
+            }
+        }
         Value::Null => {}
         _ => other = true,
     });
@@ -494,7 +536,10 @@ fn int_annotation(rows: &[Value]) -> Option<ValueTypeSpec> {
         return None;
     }
     let (family, width) = if neg {
-        (ValueTypeFamily::Sint, (pos_bits + 1).max(neg_bits + 1))
+        (
+            ValueTypeFamily::Sint,
+            (pos_bits.saturating_add(1)).max(neg_bits.saturating_add(1)),
+        )
     } else {
         (ValueTypeFamily::Uint, pos_bits)
     };
@@ -612,7 +657,15 @@ fn emit_element(
     }
     match elem {
         Value::Quantity(q) => {
-            if annotate && writer::is_numeric(q) && q.raw.is_some() {
+            // Per-element annotations go only where they say something: a
+            // plain `1` beside `<uint:8> null` reads back as what it is. A
+            // typed null is its annotation and `null`.
+            let wants = if q.raw.is_none() {
+                has_annotation_family(q)
+            } else {
+                writer::is_numeric(q)
+            };
+            if annotate && wants && needs_annotation(q) {
                 w.annotation(q.vtype, &q.unit, q.unit_source.as_deref())?;
             }
             w.value(q.token_type, q, true)
@@ -632,6 +685,17 @@ fn emit_element(
                 writer::type_spec(family, int_width(*i).max(64), 10)
             });
             data(w, TokenType::ArrayNumber, vt, i.to_string().as_bytes())
+        }
+        Value::BigInt(b) => {
+            let vt = vt.unwrap_or_else(|| {
+                let family = if b.sign() == num_bigint::Sign::Minus {
+                    ValueTypeFamily::Sint
+                } else {
+                    ValueTypeFamily::Uint
+                };
+                writer::type_spec(family, writer::big_int_width(b), 10)
+            });
+            data(w, TokenType::ArrayNumber, vt, b.to_string().as_bytes())
         }
         Value::Float(f) => {
             let vt = writer::type_spec(ValueTypeFamily::Float, 64, 0);
@@ -751,8 +815,39 @@ fn held_element(elem: &Value, vt: ValueTypeSpec) -> Result<Option<(TokenType, St
                 (TokenType::ArrayString, writer::format_bigint(*i, base)?)
             }
         }
+        (F::Uint | F::Sint | F::Datetime, Value::BigInt(b)) => {
+            use num_bigint::BigInt;
+            let one = BigInt::from(1);
+            let (lo, hi) = if fam == F::Uint {
+                (BigInt::from(0), (&one << width) - 1)
+            } else {
+                (-(&one << (width - 1)), (&one << (width - 1)) - 1)
+            };
+            if *b < lo || *b > hi {
+                return refuse(&format!("it is outside [{lo}, {hi}]"));
+            }
+            let base = match (fam, vt.base) {
+                (F::Datetime, _) | (_, 0) => 10,
+                (_, b) => b,
+            };
+            if base == 10 {
+                (TokenType::ArrayNumber, b.to_string())
+            } else {
+                if fam == F::Sint && (base == 64 || base == 85) {
+                    return refuse(&format!("base {base} is unsigned"));
+                }
+                (TokenType::ArrayString, writer::format_big_int(b, base)?)
+            }
+        }
         (F::Uint | F::Sint | F::Datetime, _) => return refuse("it is not an integer"),
-        (_, Value::Int(_) | Value::Float(_) | Value::Decimal(_) | Value::Fraction(_)) => {
+        (
+            _,
+            Value::Int(_)
+            | Value::BigInt(_)
+            | Value::Float(_)
+            | Value::Decimal(_)
+            | Value::Fraction(_),
+        ) => {
             if fam == F::Float && vt.base != 0 && vt.base != 10 {
                 return refuse(
                     "a non-decimal float literal has to be given verbatim, as a Quantity",
@@ -761,6 +856,7 @@ fn held_element(elem: &Value, vt: ValueTypeSpec) -> Result<Option<(TokenType, St
             let text = match elem {
                 Value::Float(f) => exact_float_text(*f),
                 Value::Int(i) => i.to_string(),
+                Value::BigInt(b) => b.to_string(),
                 _ => quantity::ExactNumber::from_value(elem)
                     .expect("a Decimal or Fraction")
                     .text()?,
@@ -799,10 +895,8 @@ pub(crate) fn decode_value(raw: &[u8], vt: ValueTypeSpec, token: Option<TokenTyp
     let base = if vt.base > 1 { vt.base } else { 10 };
     match ValueTypeFamily::from_raw(vt.family) {
         // Epoch seconds; `base` holds the epoch index, not a radix.
-        Some(ValueTypeFamily::Datetime) => dict_parser::int_from_base(&text, 10).map(Value::Int),
-        Some(ValueTypeFamily::Uint | ValueTypeFamily::Sint) => {
-            dict_parser::int_from_base(&text, base).map(Value::Int)
-        }
+        Some(ValueTypeFamily::Datetime) => int_value_in_base(&text, 10),
+        Some(ValueTypeFamily::Uint | ValueTypeFamily::Sint) => int_value_in_base(&text, base),
         Some(
             family @ (ValueTypeFamily::Float
             | ValueTypeFamily::FloatFix
@@ -821,6 +915,19 @@ pub(crate) fn decode_value(raw: &[u8], vt: ValueTypeSpec, token: Option<TokenTyp
         _ => None,
     }
     .unwrap_or(Value::String(text))
+}
+
+/// An integer literal in `base` as an [`Value::Int`], or a
+/// [`Value::BigInt`] when an `i128` does not hold it.
+fn int_value_in_base(text: &str, base: u32) -> Option<Value> {
+    dict_parser::int_from_base(text, base)
+        .map(Value::Int)
+        .or_else(|| dict_parser::bigint_from_base(text, base).map(Value::BigInt))
+}
+
+/// Decimal digits (with an optional sign) as [`int_value_in_base`] reads them.
+pub(crate) fn int_value_from_digits(digits: &str) -> Option<Value> {
+    int_value_in_base(digits, 10)
 }
 
 /// The event consumer behind [`parse`].
@@ -1090,14 +1197,19 @@ pub mod dict_parser {
         if digits.is_empty() {
             return None;
         }
+        // Accumulated towards the sign, so i128::MIN, whose magnitude has no
+        // positive i128, reads back too.
         let mut val: i128 = 0;
         for &c in digits {
-            let d = char_to_digit(c, base)?;
-            val = val
-                .checked_mul(i128::from(base))?
-                .checked_add(i128::from(d))?;
+            let d = i128::from(char_to_digit(c, base)?);
+            val = val.checked_mul(i128::from(base))?;
+            val = if neg {
+                val.checked_sub(d)?
+            } else {
+                val.checked_add(d)?
+            };
         }
-        Some(if neg { -val } else { val })
+        Some(val)
     }
 
     /// [`int_from_base`] without the 128-bit limit.

@@ -237,7 +237,8 @@ fn main() -> Result<(), bovnar::Error> {
 |---|---|
 | `Null` | |
 | `Bool(bool)` | |
-| `Int(i128)` | Any integer up to 128 bits, `uint64` and `sint64` included |
+| `Int(i128)` | Any integer an `i128` holds, every `uint64` and `sint64` included |
+| `BigInt(num_bigint::BigInt)` | An integer outside the `i128` range (a `<uint:256>`, say); `to_string` writes it as `<uint:N>`/`<sint:N>`, `N` the smallest power of two from 128 that holds it |
 | `Float(f64)` | |
 | `String(String)` | Symbols and references read back as strings too |
 | `Bytes(Vec<u8>)` | An octet stream |
@@ -250,7 +251,9 @@ fn main() -> Result<(), bovnar::Error> {
 `parse_typed` is `parse` with typed values kept: they come back as
 `Value::Quantity` instead of being decoded to native scalars. That preserves the
 original text representation, exact type width, numeral base and physical unit
-for lossless round trips:
+for lossless round trips. What only the annotation carries comes back too: a
+quoted numeric literal under a default annotation (`<float:64,_10> "5.7"`), and a
+typed null, alone (`<float:64> ;`) or as an array element (`[<uint:32>, <sint:64>]`):
 
 ```rust
 use bovnar::{Value, parse_typed, to_string};
@@ -1092,8 +1095,10 @@ fn main() -> Result<(), bovnar::Error> {
 }
 ```
 
-`units_equal` is also what `==` means between two `Unit`s, and `Unit` is `Eq`
-and `Hash` with the two agreeing — equal units are one `HashMap` key regardless
+`units_equal` is also what `==` means between two `Unit`s, with one addition:
+"no unit at all" (a typed value's empty unit) and a dimensionless unit (a bare
+literal's) are both the absence of one and compare, and hash, equal, as the
+Python binding's do. `Unit` is `Eq` and `Hash` with the two agreeing — equal units are one `HashMap` key regardless
 of the order their components were written in. The hash follows the equality in
 the one place the two could part: a component with **no prefix** is the same
 component whether its prefix system says SI or IEC, so `Unit::parse("B")` and
@@ -1246,12 +1251,18 @@ fields and the others are methods:
 | `q.family()` | `Option<ValueTypeFamily>` | The type family, when it is one this binding knows |
 | `unit_str()` | `String` | Canonical unit string (e.g. `"m/s²"`), or `""` when dimensionless |
 | `decimal()` | `Result<Option<Decimal>>` | **Exact** value as a `Decimal` from the verbatim literal — lossless at any width; an error for non-numeric families, `None` for a typed null |
-| `fraction()` | `Result<Option<BigRational>>` | Exact value as a rational (for `float_fix`, the exact `mantissa / 2**frac`) |
-| `fixed_point()` | `Result<(BigInt, u32)>` | `(mantissa, frac_bits)` of a `float_fix` value; the value is `mantissa / 2**frac_bits` |
+| `fraction()` | `Result<Option<BigRational>>` | Exact value as a rational (for `float_fix`, the exact `mantissa / 2**frac`). An error for `nan`/`inf`, and for a literal whose decimal exponent is past `bovnar::FRACTION_EXPONENT_CAP` ([§6.3](#63-exact-numbers-decimal-bigrational-bvnfloat)) |
+| `fixed_point()` | `Result<(BigInt, u32)>` | `(mantissa, frac_bits)` of a `float_fix` value; the value is `mantissa / 2**frac_bits`. An error for a typed null and for `nan`/`inf`/`ninf`, which a fixed-point datum has no encoding for |
 | `stored_value()` | `Result<Option<Decimal>>` | The value materialised into the declared IEEE/fixed format (round-to-nearest-even) — differs from `decimal` only when the literal carries more precision than the format holds. `None` for a typed null, as `decimal` is |
 | `ieee_bits()` | `Result<Vec<u8>>` | IEEE-754 interchange bytes (binary16…256 for `float`, decimal16…256 for `float_dec`), little-endian word order |
 | `epoch_name()` | `Option<String>` | For a `datetime`, the epoch name (`"unix"`, `"tai"`, …); `None` otherwise |
 | `epoch_mjd()` | `Option<i32>` | For a `datetime`, the epoch's Modified Julian Day; `None` otherwise |
+| `type_key()` | `(i32, u32, u32)` | `(family, width, base)` with the defaults filled in: width 0 is 64, base 0 is 10; a `float_fix` Q and a `datetime` epoch as stored |
+
+Two `Quantity`s are equal when they carry the same literal, sub-second digits,
+effective type (`type_key()`) and unit: `<float:0> 2.5`, `<float:64,_10> 2.5`
+and a bare `2.5` are one value, and the token form and unit spelling are
+presentation — the same rule as the Python binding's `Quantity.__eq__`.
 
 ### 6.3 Exact numbers (`Decimal`, `BigRational`, `BvnFloat`)
 
@@ -1260,8 +1271,8 @@ decimal-float, fixed-point, and wide binary-float families. The accessors above
 instead use the verbatim literal text (and bovnar's arbitrary-precision
 `bvn_float`), so the full precision the format carries is reachable from Rust.
 
-An integer is `i128` in a `Value` and `num_bigint::BigInt` where a number has no
-width limit, a rational is `num_rational::BigRational`, and a decimal is
+An integer is `i128` in a `Value` (`Value::BigInt` past it) and
+`num_bigint::BigInt` where a number has no width limit, a rational is `num_rational::BigRational`, and a decimal is
 **`bovnar::Decimal`**: an exact decimal — sign, coefficient (`BigUint`) and
 exponent, or an infinity or a NaN — that compares numerically and prints in the
 General Decimal Arithmetic scientific-string form (`1.50` stays `1.50`). `Decimal` is the exact value
@@ -1294,7 +1305,14 @@ fn main() -> Result<(), bovnar::Error> {
 ```
 
 These materialise over the **full** representable range, including exponents
-the C parser cannot otherwise reach (beyond ~1e9865). `decimal` / `fraction`
+the C parser cannot otherwise reach (beyond ~1e9865). Overflow and underflow
+past the format's range are decided from the decimal exponent, so a 28-byte
+`<float:64> 1e-99999999` is `0.0` at once rather than an exact rational with a
+hundred-million-digit denominator. `fraction()` has no format to round into: it
+refuses a literal whose decimal exponent, of its magnitude or of its last digit,
+is past **`bovnar::FRACTION_EXPONENT_CAP`** (100 000; `float_dec:256`, which
+reaches 10⁻⁶¹¹⁸⁶⁷, gets 611 937), the same cap as the Python binding's.
+`decimal()` is exact at any exponent. `decimal` / `fraction`
 work at every binary width bovnar allows (16, or a multiple of 32 up to 32768);
 the bit-exact `stored_value` / `ieee_bits` apply to the IEEE encodings
 (`float:16/32/64/128/256`), which are also exposed directly as `bovnar::BvnFloat`.
@@ -1441,7 +1459,7 @@ The `bovnar::json` module mirrors the CLI's `bovnar convert` in both directions:
 
 | Function | Description |
 |---|---|
-| `json::from_json(&str) -> Result<Vec<u8>>` | JSON text to a BVNR document. The root must be an object |
+| `json::from_json(&str) -> Result<Vec<u8>>` | JSON text to a BVNR document. The root must be an object. An integer wider than 64 bits is written as `<uint:N>`/`<sint:N>` (`N` the smallest power of two from 128 that holds it), byte for byte as `bovnar convert` writes it, and refused inside an array, whose elements share one type |
 | `json::to_json(&[u8]) -> Result<String>` | A BVNR document to pretty-printed JSON, as `bovnar convert` prints it |
 | `json::detect(&[u8]) -> Format` | Sniffs the format from the first significant byte: `Format::Json`, `Format::Bovnar` or `Format::Unknown`. The CLI goes by file extension; this is the content-based fallback for data without a name |
 

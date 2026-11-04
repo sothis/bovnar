@@ -845,6 +845,7 @@ static bvnf_rkind bvnf_parse_rational(const char *s, uint32_t base,
 	 * `dropped_int` integer digits scale the value, `sticky` marks a non-zero
 	 * digit lost. `full` latches once num has reached the budget. */
 	uint32_t budget = 0;
+#define BVN_FLOAT_WIDE_DIGIT_BUDGET 12288u
 	if (sig_bits) {
 		/* Not just the target's bits plus guard bits: in base 10 a binary
 		 * rounding MIDPOINT can itself need many digits -- up to 768 for a
@@ -854,6 +855,16 @@ static bvnf_rkind bvnf_parse_rational(const char *s, uint32_t base,
 		budget = sig_bits + 64u;
 		if (budget < 2624u)
 			budget = 2624u;
+		/* Wider targets have longer midpoints: a binary128 one runs to
+		 * thousands of digits, and the 2624-bit floor cut into them past
+		 * about 790, rounding some inputs to the wrong neighbour. 12288 bits
+		 * keeps about 3700 digits and leaves the rest of the integer range
+		 * for the 10^k scaling that follows: at 15360 a binary128 subnormal
+		 * written with 11570 digits already overflowed it and read as 0.
+		 * Past that length the rounding can still differ from the exact one
+		 * (bvn_float.h). */
+		if (sig_bits > 53u && budget < BVN_FLOAT_WIDE_DIGIT_BUDGET)
+			budget = BVN_FLOAT_WIDE_DIGIT_BUDGET;
 		if (budget > BVN_INT_MAX_BITS - 128u)
 			budget = BVN_INT_MAX_BITS - 128u;
 	}
@@ -1076,9 +1087,11 @@ bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base)
  * See the header for the contract. nan/inf/zero are packed with the requested
  * field widths exactly as bvn_float_to_ieee_bin would; finite values are rounded
  * by bvnf_rational_to_ieee_bin from the exact rational. Because nothing here
- * builds an intermediate fixed-width bvn_float, it cannot double-round, at any
- * input length, in either the normal or subnormal range -- which is the bug the
- * old parse-into-128-bits-then-narrow path had.
+ * builds an intermediate fixed-width bvn_float, it does not double-round, in
+ * either the normal or subnormal range -- which is the bug the old
+ * parse-into-128-bits-then-narrow path had. The digit budget of the rational
+ * parse bounds the input length at which that holds for formats wider than
+ * binary64 (the header gives the figures).
  */
 /*
  * Validate a caller-supplied IEEE binary field geometry against the word
@@ -1432,7 +1445,13 @@ static int32_t bvnf_to_str_dec(const bvn_float_t *f, char *buf, size_t bufsize)
 	PUTC(digs[0]);
 	if (ndigits > 1) {
 		PUTC('.');
-		for (long i = 1; i < ndigits; i++) PUTC(digs[i]);
+		/* One bounded copy instead of a PUTC per digit: GCC 15 vectorises the
+		 * loop under LTO, loses the per-byte bound and warns
+		 * -Wstringop-overflow at link time, where -Werror does not reach. */
+		size_t nfrac = (size_t)(ndigits - 1);
+		if (nfrac >= bufsize - pos) goto overflow;
+		memcpy(buf + pos, digs + 1, nfrac);
+		pos += nfrac;
 	}
 	PUTC('e');
 	if (E10 >= 0) PUTC('+'); else { PUTC('-'); E10 = -E10; }
@@ -2313,6 +2332,10 @@ bool bvn_float_str_fits_fix(const char *s, uint32_t base,
 							uint32_t total_bits, uint32_t frac_bits)
 {
 	if (!s) return true;
+	/* A Q-format needs a sign and integer bit: q must be below the width
+	 * (doc/03 §6.3), so no value fits a field of q >= width. It used to fall
+	 * through to the float path and say yes. */
+	if (frac_bits >= total_bits) return false;
 	/* Decide the clear cases from the digits alone. Parsing "1e-9000" to a
 	 * float of this precision costs milliseconds, and a document of such
 	 * values was a denial of service; a value that far below 2^-frac_bits

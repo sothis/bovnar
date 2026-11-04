@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The public C enums (same values as `bovnar.h`; the unit enums follow
 //! with the unit API).
 

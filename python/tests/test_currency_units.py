@@ -582,10 +582,13 @@ class TestBaseUnitBlocks:
         assert native == list(range(int(UNIT_NATIVE_FIRST),
                                     int(UNIT_NATIVE_LAST) + 1))
 
-    def test_every_member_is_none_a_unit_or_a_currency(self):
+    def test_every_member_is_none_a_unit_an_opaque_unit_or_a_currency(self):
+        # The opaque blocks (20..80) sit between the native and currency ones;
+        # test_enums closes them against bovnar_profiles.gen.h.
         for b in BaseUnit:
             assert (int(b) == 0
                     or int(UNIT_NATIVE_FIRST) <= int(b) <= int(UNIT_NATIVE_LAST)
+                    or 200000 <= int(b) < 900000
                     or int(CURRENCY_FIRST) <= int(b) <= int(CURRENCY_LAST)), b
 
 

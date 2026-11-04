@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! An exact decimal number, used wherever the binding hands out or takes
 //! in a decimal value
 //! ([`crate::Quantity::decimal`], [`crate::Quantity::stored_value`],
@@ -248,13 +249,17 @@ impl fmt::Display for Decimal {
             Repr::Finite { neg, coeff, exp } => (*neg, coeff, *exp),
         };
         let digits = coeff.to_str_radix(10);
-        let n = digits.len() as i64;
+        // In i128: an exponent near i64::MAX (`"1e9223372036854775807"` parses)
+        // plus the digit count overflows an i64.
+        let n = digits.len() as i128;
+        let exp = i128::from(exp);
         let left = exp + n;
         let dot = if exp <= 0 && left > -6 { left } else { 1 };
         let mut out = String::new();
         if neg {
             out.push('-');
         }
+        // Past here `dot` is within [-5, n]: the zeros below are at most five.
         if dot <= 0 {
             out.push_str("0.");
             out.extend(std::iter::repeat_n('0', dot.unsigned_abs() as usize));
@@ -348,6 +353,17 @@ fn ungroup(text: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn display_takes_the_extreme_exponents() {
+        // exp + digits overflowed an i64 and panicked in a debug build.
+        let d: Decimal = "1e9223372036854775807".parse().unwrap();
+        assert_eq!(d.to_string(), "1E+9223372036854775807");
+        let d: Decimal = "12e9223372036854775807".parse().unwrap();
+        assert_eq!(d.to_string(), "1.2E+9223372036854775808");
+        let d: Decimal = "1e-9223372036854775808".parse().unwrap();
+        assert_eq!(d.to_string(), "1E-9223372036854775808");
+    }
 
     fn d(s: &str) -> Decimal {
         s.parse().unwrap()

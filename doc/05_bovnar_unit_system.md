@@ -414,9 +414,10 @@ A bare array is homogeneous in its unit (spec [§7.4](03_bovnar_spec.md#74-eleme
 | `Btu_th` | `BTU_th`, `btu_th` | thermochemical BTU | `bu_btu_th` | 23722880951/22500000 J ≈ 1054.35026449 J |
 
 > **Two calories and two BTUs, and the pairs cross over.** `cal` is the THERMOCHEMICAL calorie and
-> `Btu` the INTERNATIONAL TABLE BTU, which is not an inconsistency but the two vocabularies' own
-> defaults: UCUM's unqualified `cal` is thermochemical and its unqualified `[Btu]` is too, while
-> UDUNITS' unqualified `calorie` is the IT one. Each pair is 0.067 % apart — dimensionally identical
+> `Btu` the INTERNATIONAL TABLE BTU, which is not an inconsistency but two vocabularies' defaults:
+> `cal` follows UCUM, whose unqualified `cal` is thermochemical, and `Btu` follows UDUNITS, whose
+> unqualified `BTU` is the IT one (as its `calorie` is). UCUM's unqualified `[Btu]` is
+> thermochemical too, so `ucum:[Btu]` maps to `Btu_th`, not to `Btu`. Each pair is 0.067 % apart — dimensionally identical
 > and numerically wrong if confused — so both members of both pairs are carried and every profile
 > code lands on the one its own vocabulary says it means. Both BTUs are one pound of water raised
 > one degree Fahrenheit, i.e. the corresponding calorie × 453.59237 g/lb × 5/9; that terminates for
@@ -966,7 +967,7 @@ document that meant dry had no way to say so.
 | `darcy` | `darcy`, `darcys`, `darcies` | darcy (permeability) | `bu_darcy` | 1/1013250000000 m² |
 | `thm_ec` | `therm_EC` | EC therm (10⁵ `Btu`) | `bu_therm_ec` | 1.05505585262×10⁸ J (exact) |
 | `ton_ref` | `refrigeration_ton`, `ton_of_refrigeration` | ton of refrigeration | `bu_refrigeration_ton` | 12 000 `Btu`/h = 52752792631/15000000 W |
-| `DU` | `dobson`, `dobson_unit`, `dobson_units` | Dobson unit (ozone column) | `bu_dobson` | 4.462×10⁻⁴ mol·m⁻² (exact) |
+| `DU` | `dobson`, `dobson_unit`, `dobson_units` | Dobson unit (ozone column) | `bu_dobson` | 4.462×10⁻⁴ mol·m⁻² (as published; 10 µm of ideal gas at STP is 4.4615×10⁻⁴) |
 | `shake` | `shake`, `shakes` | shake | `bu_shake` | 10⁻⁸ s (exact) |
 
 > `darcy` takes prefixes, so the millidarcy every reservoir report is written in is `m~darcy` (or
@@ -1074,7 +1075,7 @@ UDUNITS or CF document that says `year` be read at all. It was refused outright 
 |--------|-----------|------|------|--------|
 | `perm_0C` | — | perm (0 °C) | `bu_perm_0c` | 5.72135×10⁻¹¹ kg·Pa⁻¹·s⁻¹·m⁻² (exact) |
 | `perm_23C` | — | perm (23 °C) | `bu_perm_23c` | 5.74525×10⁻¹¹ kg·Pa⁻¹·s⁻¹·m⁻² (exact) |
-| `perm_m` | `perm_metric` | metric perm | `bu_perm_metric` | 8.68127×10⁻¹¹ kg·Pa⁻¹·s⁻¹·m⁻² (exact) |
+| `perm_m` | `perm_metric` | metric perm | `bu_perm_metric` | 8.68127×10⁻¹¹ kg·Pa⁻¹·s⁻¹·m⁻² (as published; 1 g/(m²·d·mmHg) is 8.6812682×10⁻¹¹) |
 
 **Heat conventions**
 
@@ -1147,6 +1148,9 @@ Several prefix symbols overlap with base unit symbols. A base unit symbol is mat
 | `d`    | deci      | day          |
 | `h`    | hecto     | hour         |
 | `T`    | tera      | tesla        |
+| `G`    | giga      | gauss (`GG` is giga-gauss) |
+| `P`    | peta      | poise        |
+| `R`    | ronna     | roentgen     |
 | `f`    | femto     | *(none)* — the farad is `F`, uppercase |
 | `a`    | atto      | *(none)*     |
 | `u`    | micro (ASCII alias for `µ`) | dalton |
@@ -1331,7 +1335,7 @@ compose correctly:
 ```bovnar
 .pressure = <float:64,k~g/(m·s²)> 101325;  # kg·m⁻¹·s⁻² — same as k~g/m·s²
 .areal    = <float:64,(k~g/m)·s²> 1.0;     # kg·m⁻¹·s²  — grouping changes the s sign
-.rate     = <float:64,m/(s·s)> 1.0;        # m·s⁻²
+.rate     = <float:64,m/(s·s)> 1.0;        # dimension m·s⁻², but not the unit m/s²
 ```
 
 `k~g/(m·s²)` and `k~g/m·s²` therefore parse to the **same** `value_unit_t` (the

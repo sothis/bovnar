@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The unit helpers, unit parsing and formatting, and read-time unit
 //! conversion through the `want_unit` hook.
 //!

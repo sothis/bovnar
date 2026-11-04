@@ -1,0 +1,3 @@
+# ΔK·m/m cancels to a lone ΔK, a temperature difference; K·m/m is a
+# temperature. They are not one unit, so one array cannot hold both.
+.a = [<float:64,ΔK·m/m> 1.0, <float:64,K·m/m> 2.0];

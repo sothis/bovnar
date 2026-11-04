@@ -109,3 +109,45 @@ def test_typed_roundtrip_preserves_value_and_type():
     assert checked >= 200, "only %d documents were in scope" % checked
     assert not failures, "%d of %d round-trips lost information, first: %s" % (
         len(failures), checked, failures[:3])
+
+
+# A quoted numeric literal under a default annotation is a string to default
+# synthesis: dumps() used to drop the annotation (base 10, width 64 say
+# nothing) and the writer then refused a float type over a string token. A
+# typed null has nothing BUT its annotation: written bare it reloaded as an
+# untyped None, and per-element typed nulls in an array all became `null`.
+_ANNOTATION_ONLY_DOCS = [
+    b'.a = <float:64,_10> "5.7";',
+    b'.a = <float> "5.7";',
+    b'.a = <uint> "42";',
+    b'.a = <uint:64,_10> "42";',
+    b'.a = <float:64,_10> ["5.7", "1"];',
+    b'.a = <float:64> ;',
+    b'.a = <utf8> ;',
+    b'.a = <sint:64> ;',
+    b'.a = [<uint:32>, <sint:64>, <float:32>];',
+    b'.a = [<utf8>, <uint:8>];',
+    b'.a = [<uint:8>, 1];',
+    b'.a = <utf8> [, "first", ];',
+    b'.a = <float:64> [, 1.5];',
+    b'.a = [<float:64,m>, <uint:8,m> 1];',
+    b'.s = { .x = <float:32> ; };',
+    b'.a = <bool> ;',
+    b'.a = [<bool>, true];',
+]
+
+
+@needs_lib
+@pytest.mark.parametrize("src", _ANNOTATION_ONLY_DOCS)
+def test_annotation_only_information_round_trips(src):
+    doc = bovnar.loads(src, typed=True)
+    out = bovnar.dumps(doc)
+    assert bovnar.loads(out, typed=True) == doc, out
+
+
+@needs_lib
+def test_typed_null_keeps_its_family():
+    out = bovnar.dumps(bovnar.loads(b'.a = <float:64> ;', typed=True))
+    q = bovnar.loads(out, typed=True)["a"]
+    assert isinstance(q, bovnar.Quantity) and q.raw is None
+    assert int(q.vtype.family) == int(bovnar.ValueTypeFamily.FLOAT)

@@ -160,8 +160,11 @@ policy restated this value", not "the policy looked at it".
 `bvnr_normalise_si` catches whatever the targets did not, delivering it in coherent SI base units
 with prefixes folded out. `base` sets the output base for those conversions.
 
-Values with no coherent SI form are left alone rather than reinterpreted: currencies, and every
-dimensionless unit (`%`, `ppm`, `dB`, `pH`, `rad`, `°`).
+Values with no coherent SI form are left alone rather than reinterpreted: currencies, every
+dimensionless unit (`%`, `ppm`, `dB`, `pH`, `rad`, `°`), and every unit carrying the steradian's or
+an angle's quantity kind, which no SI base form can express (`k~lx`, `k~lm`, `m~ph`, `W/sr`, `k~rad/s`).
+
+Their prefixes stay as written too: `k~lx` is not delivered as `lx` (doc/05 §12.4).
 
 ### 2.4 Inexact results
 
@@ -418,6 +421,7 @@ error in somebody else's file. A rejected policy leaves the previous one in forc
 |---|---|
 | `error_unit_mismatch` | `require_unit` on a bare value; `require_dimension_of` matching nothing; a value at a path a rule names that is not convertible to the rule's unit; a value nested too deep for a rule to be evaluated at all ([§2.7](#27-limits-and-lifetime)) |
 | `error_unit_inexact` | a conversion that cannot be delivered exactly, under `bvnr_inexact_error` |
+| `error_invalid_argument` | a converted value that is negative in the output base 64 or 85, which have no sign character |
 
 ---
 

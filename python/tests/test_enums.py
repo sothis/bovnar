@@ -46,6 +46,18 @@ def _gendata(name: str):
     return bvnr_data.load((_REPO / "src" / "gendata" / name).read_bytes())
 
 
+def _opaque_ids() -> dict:
+    """{id: NAME} of the profile-only units, from bovnar_profiles.gen.h."""
+    text = (_REPO / "include" / "bovnar_profiles.gen.h").read_text(encoding="utf-8")
+    return {int(v): n.upper()
+            for n, v in re.findall(r"^\s*bu_(\w+)\s*=\s*(\d+),", text, re.M)}
+
+
+def _opaque_range() -> range:
+    """The ids the profile blocks can occupy (20 0000 .. 89 9999)."""
+    return range(200000, 900000)
+
+
 def _c_enum(name: str) -> dict:
     """Parse `typedef enum <name>_e { ... }` out of the C header.
 
@@ -285,13 +297,40 @@ class TestBaseUnit:
         assert got == want
         assert CURRENCY_COUNT == len(codes)
 
-    def test_no_members_outside_the_two_blocks(self):
-        """Nothing but NONE lives between or beyond them."""
+    def test_opaque_blocks_closed_against_the_profiles_header(self):
+        """The profile-only units ARE include/bovnar_profiles.gen.h's
+        bu_<ns>_<name> rows, named <NS>_<NAME>.
+
+        A parsed unit reports these ids -- `ucum:[IU]/mL` has a 200000
+        component -- and BaseUnit had no member for them, so
+        ValueUnitComponent.base_unit raised ValueError on a unit the library
+        had just parsed. The header is generated from src/gendata by
+        gen_profiles.py, and the Rust crate's BaseUnit is built from it too."""
+        want = _opaque_ids()
+        assert want, "parsed no bu_* rows from bovnar_profiles.gen.h"
+        got = {int(b): b.name for b in BaseUnit if int(b) in _opaque_range()}
+        assert got == want
+
+    def test_no_members_outside_the_blocks(self):
+        """Nothing but NONE lives between or beyond the native, opaque and
+        currency blocks."""
+        opaque = _opaque_ids()
         stray = [b.name for b in BaseUnit
                  if int(b) != 0
                  and not (UNIT_NATIVE_FIRST <= int(b) <= UNIT_NATIVE_LAST)
+                 and int(b) not in opaque
                  and not (CURRENCY_FIRST <= int(b) <= CURRENCY_LAST)]
         assert stray == []
+
+    @pytest.mark.needs_lib
+    def test_a_parsed_opaque_component_is_a_member(self):
+        from bovnar import Unit
+        c = Unit.parse("ucum:[IU]/mL").raw.components[0]
+        assert c.base_unit is BaseUnit.UCUM_IU
+        assert BaseUnit(int(c.base_unit)) is c.base_unit
+        # [iU] is an alias of [IU] (doc/11 §3.6): one opaque id.
+        assert Unit.parse("ucum:[iU]").raw.components[0].base_unit \
+            is BaseUnit.UCUM_IU
 
 
 class TestExponent:

@@ -1193,7 +1193,7 @@
   { .code = "H74";   .bovnar = "W/m";                 .reverse = false; },  # via qudt:W-PER-M
   { .code = "H75";   .bovnar = "da~Pa";               },  # via qudt:DecaPA
   { .code = "H76";   .bovnar = "g/m~m";               .reverse = false; },  # via qudt:GM-PER-MilliM
-  { .code = "H78";   .bovnar = "m~at";                },  # via qudt:CentiM_H2O
+  { .code = "H78";   .bovnar = "c~mH2O";              },  # via qudt:CentiM_H2O, the centimetre of water
   { .code = "H81";   .bovnar = "m~m/min";             .reverse = false; },  # via qudt:MilliM-PER-MIN
   { .code = "H83";   .bovnar = "L/k~g";               .reverse = false; },  # via qudt:L-PER-KiloGM
   { .code = "H84";   .bovnar = "g·m~m";               .reverse = false; },  # via qudt:GM-MilliM

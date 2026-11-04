@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Conversion factors, re-derived from each unit's definition and compared
 //! against `src/gendata/units.bvnr`, which is read here with the crate's own
 //! parser. Exact rationals use a small `i128` fraction type. The generated C

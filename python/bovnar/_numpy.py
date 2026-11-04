@@ -377,6 +377,15 @@ def _extract(src, dtype):
     acc = {'dtypes': set(), 'units': {}, 'null': False, 'unmappable': False,
            'has_negative': False, 'bare_numeric': False}
     values = _walk(src, acc)
+    # An EMPTY annotated DOM array has no leaf to report its type or unit; both
+    # are taken from the node's annotation instead.
+    def _no_leaf(v):
+        return isinstance(v, list) and all(_no_leaf(x) for x in v)
+    empty_annotated = (isinstance(src, DomNode) and src.dom_type == DomType.ARRAY
+                       and _no_leaf(values)
+                       and int(src.value_type.family) != int(F.PLAIN))
+    if empty_annotated and src.unit_str:
+        _record_unit(acc, src.unit, src.unit_str)
 
     if dtype is None:
         if acc['unmappable']:
@@ -388,6 +397,15 @@ def _extract(src, dtype):
                 "array has an element with no native numpy dtype; "
                 "pass dtype=object"))
         dts = acc['dtypes']
+        if empty_annotated:
+            # No element to take a dtype from, but the annotation is still on
+            # the node: `<sint:32> []` came back as float64 -- what numpy
+            # infers from nothing.
+            dt = _gather_dtype(acc, src.value_type.family, src.value_type.width,
+                               src.value_type.base)
+            if acc['unmappable']:
+                raise BovnarArgumentError(acc['unmappable_reason'])
+            dts = {dt} if dt else set()
         if not dts:
             resolved = None
         elif len(dts) == 1:

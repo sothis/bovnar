@@ -1167,3 +1167,88 @@ class TestWriteVersionDefault:
         out = w.get_output()
         assert b"ucum:[IU]" in out
         assert bovnar.loads(out)["a"] == 1.0
+
+
+# dumps() refuses, naming the key, what no reader takes back (doc/09 §4.1).
+# A key over 255 bytes was written and then refused by loads() with
+# identifier_too_long; a bad key or a control character in a string surfaced as
+# a BovnarWriteError with a byte offset and no key; a key holding NUL went
+# through as a C string and was written with the NUL in it.
+@needs_lib
+@pytest.mark.parametrize("doc, needle", [
+    ({'k' * 256: 1}, "256 bytes"),
+    ({'é' * 128: 1}, "256 bytes"),
+    ({'a b': 1}, "'a b'"),
+    ({'1a': 1}, "'1a'"),
+    ({'a.b': 1}, "'a.b'"),
+    ({'': 1}, "''"),
+    ({'a\x00b': 1}, "'a\\\\x00b'"),
+    ({'\ud800': 1}, "surrogate"),
+    ({'s': '\x00'}, "'s'"),
+    ({'s': '\x01'}, "'s'"),
+    ({'s': '\x1f'}, "'s'"),
+    ({'s': '\x7f'}, "'s'"),
+    ({'s': '\ud800'}, "surrogate"),
+    ({'s': ['ok', '\x01']}, "'s'"),
+    ({'outer': {'bad key': 1}}, "'bad key'"),
+])
+def test_dumps_refuses_unreadable_keys_and_strings(doc, needle):
+    with pytest.raises(bovnar.BovnarArgumentError, match=needle):
+        bovnar.dumps(doc)
+
+
+@needs_lib
+@pytest.mark.parametrize("doc", [
+    {'k' * 255: 1},
+    {'é-x+y_1': 1},
+    {'s': 'tab\there\nlf\x0bvt\x0cff\rcr'},
+])
+def test_dumps_takes_what_the_reader_reads(doc):
+    assert bovnar.loads(bovnar.dumps(doc)) == doc
+
+
+@needs_lib
+def test_unit_to_profile_names_an_unknown_profile():
+    u = bovnar.Unit.parse('k~m').raw
+    with pytest.raises(bovnar.BovnarArgumentError, match="not a unit profile"):
+        bovnar.unit_to_profile('bogus', u)
+    # A profile this build has, without a code for the unit: the other message.
+    with pytest.raises(bovnar.BovnarArgumentError, match="no cf code"):
+        bovnar.unit_to_profile('cf', u)
+
+
+@needs_lib
+@pytest.mark.parametrize("family, base, want", [
+    (ValueTypeFamily.DATETIME, 1, "NUMBER"),    # epoch index (tai), not a radix
+    (ValueTypeFamily.FLOAT_FIX, 16, "NUMBER"),  # Q, not a radix
+    (ValueTypeFamily.UINT, 16, "STRING"),       # a radix above ten: quoted
+    (ValueTypeFamily.UINT, 10, "NUMBER"),
+])
+def test_emit_infers_the_token_from_a_radix_only(family, base, want):
+    """doc/09 §12.8: emit() picks a STRING token for UTF8 and for a radix other
+    than 10. A datetime's base field is its epoch index (bvn_effective_base
+    reports 10 for it), and a tai datetime used to be sent as a string."""
+    from bovnar.enums import TokenType
+    seen = []
+
+    class _Spy:
+        def __init__(self, lib):
+            self._lib = lib
+
+        def __getattr__(self, name):
+            return getattr(self._lib, name)
+
+        def bvnr_write_event(self, ptr, ev, dp):
+            seen.append(int(dp._obj.type))
+            return self._lib.bvnr_write_event(ptr, ev, dp)
+
+    w = Writer.to_mem(cap=4096)
+    real = w._lib
+    w._lib = _Spy(real)
+    try:
+        w.emit(Event.DATA, value='5', vt=make_type_spec(family, 64, base))
+    except BovnarWriteError:
+        pass                    # only the token the writer was handed matters
+    finally:
+        w._lib = real
+    assert seen and seen[-1] == int(getattr(TokenType, want))

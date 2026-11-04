@@ -334,9 +334,10 @@ class TestUnitIsAcceptedWhereAValueUnitIs:
 
 
 def test_repr_of_a_profile_only_unit_does_not_raise():
-    """BaseUnit has no member for a profile's opaque atoms, and __repr__ went
-    through BaseUnit(...): printing such a unit was a ValueError."""
+    """__repr__ goes through BaseUnit(...), which had no member for a
+    profile's opaque atoms: printing such a unit was a ValueError. BaseUnit
+    names them now (UCUM_IU), so the repr names it too."""
     vu = bovnar.parse_unit("ucum:[IU]/mL")
-    assert "200000" in repr(vu)
+    assert "UCUM_IU" in repr(vu)
     assert "LITER" in repr(vu)
-    assert "200000" in repr(vu.active_components()[0])
+    assert "UCUM_IU" in repr(vu.active_components()[0])

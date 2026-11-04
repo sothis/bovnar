@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Currency metadata. The table is
 //! the C library's own catalogue; base units are plain `BaseUnit` ids.
 

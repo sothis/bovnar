@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The DOM: a parsed, random-access,
 //! type-preserving tree with full document-tier validation.
 
@@ -406,12 +407,13 @@ impl<'a> DomNode<'a> {
         if let Some(v) = native {
             return Ok(Value::Int(v));
         }
-        // Wider than 64 bits: go through the digits. Past i128 the digits are
-        // all this binding can carry so far.
+        // Wider than 64 bits: through the digits, to an Int while i128 holds
+        // it and a BigInt past that.
         let digits = self
             .as_int_str(10)
             .ok_or_else(|| unreadable("an integer node without digits"))?;
-        Ok(digits.parse().map_or(Value::String(digits), Value::Int))
+        crate::int_value_from_digits(&digits)
+            .ok_or_else(|| unreadable("an integer node with malformed digits"))
     }
 }
 

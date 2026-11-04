@@ -16,8 +16,10 @@ A consumer then needs only those two files:
 Project `#include "..."` directives are resolved and each project header is
 inlined exactly once; system `#include <...>` directives are hoisted and
 deduplicated. The build under build/ remains the authoritative one; this is a
-convenience distribution form. Run tests/amalgam_smoke.c (CTest target
-`bvnr_amalgam`) to verify the generated files compile and work.
+convenience distribution form. The CTest targets `bvnr_amalgam_smoke` (which
+builds and runs tests/amalgam_smoke.c against the generated files) and
+`bvnr_amalgam_reproducible` verify that they compile, work and regenerate
+byte for byte.
 """
 import os, re, sys
 

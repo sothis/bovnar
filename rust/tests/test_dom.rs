@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The DOM tier: parsing from bytes, files and readers, node types, typed
 //! accessors, lookup paths and conversion to `Value`.
 //!

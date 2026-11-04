@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The numbers inside the shipped examples agree with each other. A small
 //! exact decimal (mantissa and scale) does the arithmetic on the literals.
 
@@ -125,4 +126,33 @@ fn test_units_example_derived_count_matches_its_own_header() {
         counted, claimed,
         "header claims {claimed} named SI-derived units, section has {counted}"
     );
+}
+
+/// Every shipped example survives a typed round trip: `parse_typed`, then
+/// `to_string`, then `parse_typed` gives the same values. A quoted numeric
+/// literal under a default annotation (`<float:64,_10> "5.7"` in
+/// floats.bvnr) and a typed null used to lose the annotation they need, and
+/// `to_string` then failed or wrote an untyped value.
+#[test]
+fn test_example_typed_round_trip() {
+    let mut names: Vec<_> = std::fs::read_dir(examples())
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.extension().is_some_and(|x| x == "bvnr"))
+        .collect();
+    names.sort();
+    assert!(names.len() > 5, "examples/ looks empty: {names:?}");
+    for path in names {
+        let doc = parse_typed(&std::fs::read(&path).unwrap()).unwrap();
+        let out = bovnar::to_string(&doc, false)
+            .unwrap_or_else(|e| panic!("{}: to_string failed: {e}", path.display()));
+        let back = parse_typed(&out).unwrap_or_else(|e| {
+            panic!(
+                "{}: the output does not read back: {e}\n{}",
+                path.display(),
+                String::from_utf8_lossy(&out)
+            )
+        });
+        assert_eq!(back, doc, "{}", path.display());
+    }
 }

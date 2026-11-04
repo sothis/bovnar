@@ -328,7 +328,11 @@ and <code>to_string</code> writes a <code>Value</code> out as BVNR bytes:</p>
 </tr>
 <tr>
 <td><code>Int(i128)</code></td>
-<td>Any integer up to 128 bits, <code>uint64</code> and <code>sint64</code> included</td>
+<td>Any integer an <code>i128</code> holds, every <code>uint64</code> and <code>sint64</code> included</td>
+</tr>
+<tr>
+<td><code>BigInt(num_bigint::BigInt)</code></td>
+<td>An integer outside the <code>i128</code> range (a <code>&lt;uint:256&gt;</code>, say); <code>to_string</code> writes it as <code>&lt;uint:N&gt;</code>/<code>&lt;sint:N&gt;</code>, <code>N</code> the smallest power of two from 128 that holds it</td>
 </tr>
 <tr>
 <td><code>Float(f64)</code></td>
@@ -367,7 +371,9 @@ and <code>to_string</code> writes a <code>Value</code> out as BVNR bytes:</p>
 <p><code>parse_typed</code> is <code>parse</code> with typed values kept: they come back as
 <code>Value::Quantity</code> instead of being decoded to native scalars. That preserves the
 original text representation, exact type width, numeral base and physical unit
-for lossless round trips:</p>
+for lossless round trips. What only the annotation carries comes back too: a
+quoted numeric literal under a default annotation (<code>&lt;float:64,_10&gt; "5.7"</code>), and a
+typed null, alone (<code>&lt;float:64&gt; ;</code>) or as an array element (<code>[&lt;uint:32&gt;, &lt;sint:64&gt;]</code>):</p>
 <div class="codehilite"><pre><span></span><code><span class="k">use</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::{</span><span class="n">Value</span><span class="p">,</span><span class="w"> </span><span class="n">parse_typed</span><span class="p">,</span><span class="w"> </span><span class="n">to_string</span><span class="p">};</span>
 
 <span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">(),</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">Error</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
@@ -1289,8 +1295,10 @@ performed. Only the last is the right screen for a conversion target.</p>
 <span class="p">}</span>
 </code></pre></div>
 
-<p><code>units_equal</code> is also what <code>==</code> means between two <code>Unit</code>s, and <code>Unit</code> is <code>Eq</code>
-and <code>Hash</code> with the two agreeing — equal units are one <code>HashMap</code> key regardless
+<p><code>units_equal</code> is also what <code>==</code> means between two <code>Unit</code>s, with one addition:
+"no unit at all" (a typed value's empty unit) and a dimensionless unit (a bare
+literal's) are both the absence of one and compare, and hash, equal, as the
+Python binding's do. <code>Unit</code> is <code>Eq</code> and <code>Hash</code> with the two agreeing — equal units are one <code>HashMap</code> key regardless
 of the order their components were written in. The hash follows the equality in
 the one place the two could part: a component with <strong>no prefix</strong> is the same
 component whether its prefix system says SI or IEC, so <code>Unit::parse("B")</code> and
@@ -1472,12 +1480,12 @@ fields and the others are methods:</p>
 <tr>
 <td><code>fraction()</code></td>
 <td><code>Result&lt;Option&lt;BigRational&gt;&gt;</code></td>
-<td>Exact value as a rational (for <code>float_fix</code>, the exact <code>mantissa / 2**frac</code>)</td>
+<td>Exact value as a rational (for <code>float_fix</code>, the exact <code>mantissa / 2**frac</code>). An error for <code>nan</code>/<code>inf</code>, and for a literal whose decimal exponent is past <code>bovnar::FRACTION_EXPONENT_CAP</code> (<a href="#63-exact-numbers-decimal-bigrational-bvnfloat">§6.3</a>)</td>
 </tr>
 <tr>
 <td><code>fixed_point()</code></td>
 <td><code>Result&lt;(BigInt, u32)&gt;</code></td>
-<td><code>(mantissa, frac_bits)</code> of a <code>float_fix</code> value; the value is <code>mantissa / 2**frac_bits</code></td>
+<td><code>(mantissa, frac_bits)</code> of a <code>float_fix</code> value; the value is <code>mantissa / 2**frac_bits</code>. An error for a typed null and for <code>nan</code>/<code>inf</code>/<code>ninf</code>, which a fixed-point datum has no encoding for</td>
 </tr>
 <tr>
 <td><code>stored_value()</code></td>
@@ -1499,15 +1507,24 @@ fields and the others are methods:</p>
 <td><code>Option&lt;i32&gt;</code></td>
 <td>For a <code>datetime</code>, the epoch's Modified Julian Day; <code>None</code> otherwise</td>
 </tr>
+<tr>
+<td><code>type_key()</code></td>
+<td><code>(i32, u32, u32)</code></td>
+<td><code>(family, width, base)</code> with the defaults filled in: width 0 is 64, base 0 is 10; a <code>float_fix</code> Q and a <code>datetime</code> epoch as stored</td>
+</tr>
 </tbody>
 </table>
+<p>Two <code>Quantity</code>s are equal when they carry the same literal, sub-second digits,
+effective type (<code>type_key()</code>) and unit: <code>&lt;float:0&gt; 2.5</code>, <code>&lt;float:64,_10&gt; 2.5</code>
+and a bare <code>2.5</code> are one value, and the token form and unit spelling are
+presentation — the same rule as the Python binding's <code>Quantity.__eq__</code>.</p>
 <h3 id="63-exact-numbers-decimal-bigrational-bvnfloat">6.3 Exact numbers (<code>Decimal</code>, <code>BigRational</code>, <code>BvnFloat</code>)</h3>
 <p><code>value()</code> decodes through a C <code>double</code>, which loses precision for the
 decimal-float, fixed-point, and wide binary-float families. The accessors above
 instead use the verbatim literal text (and bovnar's arbitrary-precision
 <code>bvn_float</code>), so the full precision the format carries is reachable from Rust.</p>
-<p>An integer is <code>i128</code> in a <code>Value</code> and <code>num_bigint::BigInt</code> where a number has no
-width limit, a rational is <code>num_rational::BigRational</code>, and a decimal is
+<p>An integer is <code>i128</code> in a <code>Value</code> (<code>Value::BigInt</code> past it) and
+<code>num_bigint::BigInt</code> where a number has no width limit, a rational is <code>num_rational::BigRational</code>, and a decimal is
 <strong><code>bovnar::Decimal</code></strong>: an exact decimal — sign, coefficient (<code>BigUint</code>) and
 exponent, or an infinity or a NaN — that compares numerically and prints in the
 General Decimal Arithmetic scientific-string form (<code>1.50</code> stays <code>1.50</code>). <code>Decimal</code> is the exact value
@@ -1538,7 +1555,14 @@ only; it does no arithmetic.</p>
 </code></pre></div>
 
 <p>These materialise over the <strong>full</strong> representable range, including exponents
-the C parser cannot otherwise reach (beyond ~1e9865). <code>decimal</code> / <code>fraction</code>
+the C parser cannot otherwise reach (beyond ~1e9865). Overflow and underflow
+past the format's range are decided from the decimal exponent, so a 28-byte
+<code>&lt;float:64&gt; 1e-99999999</code> is <code>0.0</code> at once rather than an exact rational with a
+hundred-million-digit denominator. <code>fraction()</code> has no format to round into: it
+refuses a literal whose decimal exponent, of its magnitude or of its last digit,
+is past <strong><code>bovnar::FRACTION_EXPONENT_CAP</code></strong> (100 000; <code>float_dec:256</code>, which
+reaches 10⁻⁶¹¹⁸⁶⁷, gets 611 937), the same cap as the Python binding's.
+<code>decimal()</code> is exact at any exponent. <code>decimal</code> / <code>fraction</code>
 work at every binary width bovnar allows (16, or a multiple of 32 up to 32768);
 the bit-exact <code>stored_value</code> / <code>ieee_bits</code> apply to the IEEE encodings
 (<code>float:16/32/64/128/256</code>), which are also exposed directly as <code>bovnar::BvnFloat</code>.</p>
@@ -1670,7 +1694,7 @@ its own literal and is written as it is.</p>
 <tbody>
 <tr>
 <td><code>json::from_json(&amp;str) -&gt; Result&lt;Vec&lt;u8&gt;&gt;</code></td>
-<td>JSON text to a BVNR document. The root must be an object</td>
+<td>JSON text to a BVNR document. The root must be an object. An integer wider than 64 bits is written as <code>&lt;uint:N&gt;</code>/<code>&lt;sint:N&gt;</code> (<code>N</code> the smallest power of two from 128 that holds it), byte for byte as <code>bovnar convert</code> writes it, and refused inside an array, whose elements share one type</td>
 </tr>
 <tr>
 <td><code>json::to_json(&amp;[u8]) -&gt; Result&lt;String&gt;</code></td>

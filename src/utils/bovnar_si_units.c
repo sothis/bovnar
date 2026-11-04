@@ -1313,6 +1313,13 @@ int32_t bvn_rational_to_str(const bvn_int_t *num, const bvn_int_t *den,
 	if (bvn_int_to_str(q, zdig, sizeof zdig, base) != 1) goto done;
 	if (!bvn_int_from_uint64(bb, base)) goto done;
 	if (!bvn_int_divrem(q, r, n, d)) goto done;             /* integer part */
+	/* Ascii85 spends '.' on digit 13, so a radix point would read back as a
+	 * digit: a base-85 value with a fraction has no positional text, the same
+	 * answer as a fraction that never ends. */
+	if (base == 85u && !bvn_int_is_zero(r)) {
+		ret = BVN_RATIONAL_NONTERMINATING;
+		goto done;
+	}
 	/* Strip primes shared with `base` from the (reduced) denominator; if what
 	 * remains is 1 the fraction terminates in `base`, and k counts the digits. */
 	if (!bvn_int_copy(dd, d)) goto done;
@@ -1454,7 +1461,27 @@ value_unit_t bvn_unit_reduce(value_unit_t u, double *scale, bool *overflow)
  * under BVN_UNIT_REDUCE at all, and said "unit_illegal" about a unit the reader
  * had just accepted.
  */
+static value_unit_t bvni_unit_reduce_core(value_unit_t u, double *scale,
+				 bool *dim_lost, bool *scale_lost);
 value_unit_t bvni_unit_reduce_ex(value_unit_t u, double *scale,
+				 bool *dim_lost, bool *scale_lost)
+{
+	/* An affine scale beside other components, or at an exponent, has no SI
+	 * value (doc/05 §12.4), and reducing must not give it one: `°C·s/s`
+	 * cancelled to `°C`, which converts to 293.15 K where the unit it came
+	 * from converts to nothing. Such a reduction is undone and the unit
+	 * returned as written. One that stays misplaced is kept: `m~°C/s` to
+	 * `°C/s` only folds a prefix. */
+	value_unit_t r = bvni_unit_reduce_core(u, scale, dim_lost, scale_lost);
+	if (bvni_unit_affine_misplaced(u) && !bvni_unit_affine_misplaced(r)) {
+		if (scale) *scale = 1.0;
+		*dim_lost   = false;
+		*scale_lost = false;
+		return u;
+	}
+	return r;
+}
+static value_unit_t bvni_unit_reduce_core(value_unit_t u, double *scale,
 				 bool *dim_lost, bool *scale_lost)
 {
 	double scale_scratch = 1.0;
@@ -1604,7 +1631,12 @@ value_unit_t bvni_unit_reduce_ex(value_unit_t u, double *scale,
  * handled by the currency rule before this table is consulted.
  */
 typedef enum {
-	BVN_PFX_DEFAULT = 0, BVN_PFX_INFO, BVN_PFX_GERMAN, BVN_PFX_RATIO, BVN_PFX_NONE
+	BVN_PFX_DEFAULT = 0, BVN_PFX_INFO, BVN_PFX_GERMAN, BVN_PFX_RATIO, BVN_PFX_NONE,
+	/* A metric UCUM atom with no native counterpart (`[IU]`): any SI prefix
+	 * UCUM itself spells, so yocto to yotta. UCUM has no ronna, quetta, ronto
+	 * or quecto, and a unit that took one would be valid with no way to write
+	 * it: the profile writer has no code for R~[IU]. */
+	BVN_PFX_UCUM
 } bvn_prefix_policy_t;
 static const uint8_t bu_prefix_policy[BVN_UNIT_SLOT_COUNT] = {
 #include "bovnar_prefix_policy.gen.inc"
@@ -1657,6 +1689,13 @@ bool bvn_prefix_unit_valid(value_unit_prefix_t prefix, value_base_unit_t base)
 		if (prefix.system == prefix_iec)
 			return prefix.id.iec == iec_none;
 		return prefix.id.si == si_none;
+	}
+	if (pol == BVN_PFX_UCUM) {
+		if (prefix.system == prefix_iec)
+			return prefix.id.iec == iec_none;
+		return prefix.id.si == si_none ||
+		       (bvni_si_pfx_table[prefix.id.si].exp >= -24 &&
+		        bvni_si_pfx_table[prefix.id.si].exp <= 24);
 	}
 	if (prefix.system == prefix_iec)
 		return (prefix.id.iec == iec_none) || is_info;

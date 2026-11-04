@@ -255,7 +255,13 @@ match Unit::parse("furlong per fortnight") {
 ## API overview
 
 - **Plain values:** `parse`, `parse_typed` (keeping types and units in
-  `Quantity`), `to_string` and `write_array` over the dynamic `Value`.
+  `Quantity`), `to_string` and `write_array` over the dynamic `Value`. An
+  integer is a `Value::Int` while an `i128` holds it and a `Value::BigInt`
+  past that. A typed round trip keeps what only the annotation carries: a
+  quoted numeric literal under a default annotation, and a typed null, alone
+  or as an array element. Two `Quantity`s are equal when literal, sub-second
+  digits, effective type (`type_key`) and unit agree, as in the Python
+  binding; "no unit" and dimensionless are one unit.
 - **DOM:** `DomDoc::parse` / `parse_with_policy`, then `get`, `lookup`
   (dotted paths), `entries` and `DomNode` accessors; `to_value` fails rather
   than inventing a value for a node it cannot read.
@@ -295,7 +301,10 @@ match Unit::parse("furlong per fortnight") {
   encodings and the fixed-point datum, plus the exact materialisers used
   past the C parser's exponent cap. The `stored_value` of a `float_fix` is
   exact, however wide its datum (as is the literal of a terminating
-  fraction).
+  fraction). Overflow and underflow past a format's range are decided from
+  the decimal exponent, so `<float:64> 1e-99999999` costs nothing;
+  `fraction` refuses a literal whose exponent is past
+  `FRACTION_EXPONENT_CAP` (100 000, 611 937 for `float_dec:256`).
 - **Units:** `Unit`, `UnitComponent` (a `BaseUnit`, an `Exponent` and a
   `Prefix`), the `units` and `currency` modules.
 - **Enums:** `Event`, `TokenType`, `ValueTypeFamily`, `ErrorCode`,
@@ -313,7 +322,8 @@ match Unit::parse("furlong per fortnight") {
   error has no position: the C DOM reports only the code, so read the
   document with `Reader` to locate it.
 - **JSON:** `json::from_json`, `json::to_json` and `json::detect`, matching
-  the CLI's `bovnar convert`. JSON has one number type, so two values change
+  the CLI's `bovnar convert`, integers wider than 64 bits included (a wider
+  `<uint:N>`/`<sint:N>`, refused inside an array). JSON has one number type, so two values change
   on the way back, as with the CLI: a float with an integral value becomes an
   integer (`1e+6` is written `1000000` and reads back as `uint`), and `-0.0`
   is written `-0`, which reads back as `0`. From the second trip on the JSON
@@ -331,9 +341,10 @@ match Unit::parse("furlong per fortnight") {
   `tests/`, one file per area (reader, writer, DOM, units, currencies, exact
   floats, datetimes, streams, round trips and more). The ABI checks, which
   compare the private FFI structs with the C compiler's layout, are unit
-  tests in `src/ffi.rs`. Integers wider than `i128` are tested through
-  `Quantity`: the exact literal under a `uint` / `sint` annotation, read back
-  exactly with `parse_typed` or `DomNode::as_int_str`.
+  tests in `src/ffi.rs`. Integers wider than `i128` are tested as
+  `Value::BigInt` and through `Quantity`: the exact literal under a `uint` /
+  `sint` annotation, read back exactly with `parse_typed` or
+  `DomNode::as_int_str`.
 - `test_writers_agree` compares `to_string` with the C CLI's `pretty-print`,
   so it is `#[ignore]`d unless the CLI is built at `<repo>/build/bovnar`:
   `cmake -B build . && cmake --build build --target bovnar`, then

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Multi-document framing, octet multiplexing and document-in-document
 //! embedding.
 //!

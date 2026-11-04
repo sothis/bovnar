@@ -2390,7 +2390,10 @@ after a backslash are unrecognized escapes and yield
 <code>error_illegal_escape_sequence</code>.<a href="#section-6.3-8" class="pilcrow">¶</a></p>
 <p id="section-6.3-9">Adjacent string literals separated only by blanks and comments are
 concatenated into one string. The combined octet length is subject to
-<code>max_string_length</code> (<a href="#limits" class="auto internal xref">Section 10.1</a>).<a href="#section-6.3-9" class="pilcrow">¶</a></p>
+<code>max_string_length</code> (<a href="#limits" class="auto internal xref">Section 10.1</a>). A raw octet <span class="bcp14">MUST</span> form a valid UTF-8
+sequence within its own literal; <code>\x</code> escapes are checked on the decoded
+value of the whole string, so the escapes of adjacent literals can build
+one character between them: <code>"\xC3" "\xA9"</code> is <code>"é"</code>.<a href="#section-6.3-9" class="pilcrow">¶</a></p>
 <div class="alignLeft art-text artwork" id="section-6.3-10">
 <pre>
 .long = "hello " "world";        # one string, "hello world"
@@ -3263,11 +3266,16 @@ is indistinguishable from the same type written explicitly.<a href="#section-7.4
 number carrying an inline currency unit, integral or not, synthesises
 <code>float_dec</code>, so money is never held as a binary float: <code>.price = 5 $USD;</code>
 is <code>&lt;float_dec:64,$USD&gt;</code>, not <code>&lt;uint:64&gt;</code>.<a href="#section-7.4-3" class="pilcrow">¶</a></p>
-<p id="section-7.4-4">A bare integer inside an array whose whole-array annotation is <code>datetime</code>
-inherits that family, width, and epoch rather than synthesising <code>uint</code> or
-<code>sint</code>, so the canonical form of a datetime array - annotation on the
-first element, bare integers thereafter - remains homogeneous under
-<a href="#array-homogeneity" class="auto internal xref">Section 9.1.1</a>.<a href="#section-7.4-4" class="pilcrow">¶</a></p>
+<p id="section-7.4-4">A bare integer inside an array inherits the <code>datetime</code> family, width,
+and epoch in force before it - from a whole-array annotation, from an
+element annotated <code>datetime</code>, or from a bare ISO literal, which
+synthesises <code>&lt;datetime:64,unix&gt;</code> - rather than synthesising <code>uint</code> or
+<code>sint</code>. "Before it" is document order across the whole array: later
+sibling sub-arrays and later <code>/</code>-rows inherit it too. So
+<code>[2020-01-01, 5]</code> is two <code>unix</code> instants, <code>[5, 2020-01-01]</code> is
+<code>error_array_element_type_mismatch</code>, and the canonical form of a datetime
+array - annotation on the first element, bare integers thereafter -
+remains homogeneous under <a href="#array-homogeneity" class="auto internal xref">Section 9.1.1</a>.<a href="#section-7.4-4" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
@@ -3731,8 +3739,10 @@ is one 2x3 array, not two arrays.<a href="#section-9.1-3" class="pilcrow">¶</a>
 bare word <code>null</code>. <code>[,1,,2,]</code> has five elements. An element may be empty
 only beside a comma, so <code>[]</code> is the empty row and never one null; a type
 annotation alone is an element, so <code>[&lt;uint:8&gt;]</code> is one typed null.<a href="#section-9.1-5" class="pilcrow">¶</a></p>
-<p id="section-9.1-6">Array nesting is bounded by <code>max_array_nesting</code> and the total element
-count by <code>max_array_items</code> (<a href="#limits" class="auto internal xref">Section 10.1</a>).<a href="#section-9.1-6" class="pilcrow">¶</a></p>
+<p id="section-9.1-6">Array nesting is bounded by <code>max_array_nesting</code> and the size of an array
+by <code>max_array_items</code> (<a href="#limits" class="auto internal xref">Section 10.1</a>). That limit is a budget, not an element
+count: every <code>[</code> and every <code>,</code> under one outermost array costs one, so an
+empty row costs one too - <code>[]/[]</code> needs 2 and <code>[[1,2],[3,4]]</code> needs 6.<a href="#section-9.1-6" class="pilcrow">¶</a></p>
 <div id="array-homogeneity">
 <section id="section-9.1.1">
           <h4 id="name-element-homogeneity">

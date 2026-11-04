@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! `to_string`'s spec 1.1 directive detection, and a string carrying a unit
 //! round-tripping.
 //!

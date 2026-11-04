@@ -44,6 +44,7 @@
 #include "bovnar.h"
 #include "bovnar_dom.h"
 #include "bovnar_stream.h"
+#include "bovnar_currency.h"
 
 #define ABI_STRUCT(st)     printf("STRUCT %s %zu\n", #st, sizeof(st))
 #define ABI_FIELD(st, f)   printf("FIELD %s %s %zu %zu\n", #st, #f, \
@@ -175,6 +176,13 @@ int main(void)
 	ABI_STRUCT(bvn_dom_entry_t);
 	ABI_FIELD(bvn_dom_entry_t, key);
 	ABI_FIELD(bvn_dom_entry_t, value);
+
+	ABI_STRUCT(bvn_currency_info_t);
+	ABI_FIELD(bvn_currency_info_t, code);
+	ABI_FIELD(bvn_currency_info_t, numeric_code);
+	ABI_FIELD(bvn_currency_info_t, minor_unit);
+	ABI_FIELD(bvn_currency_info_t, is_crypto);
+	ABI_FIELD(bvn_currency_info_t, name);
 
 	return 0;
 }

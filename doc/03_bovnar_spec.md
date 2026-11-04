@@ -503,6 +503,13 @@ after `\` causes `error_illegal_escape_sequence`.
 
 The combined byte length must not exceed `max_string_length` (default 65535).
 
+UTF-8 validity is checked at two points. A raw byte must belong to a valid
+sequence within its own literal, so `"\xc3" "\xa9"` written as two raw bytes is
+`error_invalid_utf8_byte` at the second `"`. A `\x` escape is checked on the
+decoded value of the whole token, so the escapes of adjacent literals may build
+one character between them: `"\xC3" "\xA9"` is `"é"`. An escape-built invalid
+sequence is reported at the first byte after the token.
+
 #### Examples
 
 ```bovnar
@@ -1455,7 +1462,10 @@ and epoch — `[<datetime:64,tai> 1, 2]` is two `tai` instants, and
 `[<datetime:8> 1, 300]` is `error_value_out_of_range`. "Following" is in document
 order across the whole array, not only within the row: bare integers in later
 sibling sub-arrays and later `/`-rows inherit it too — `[[<datetime:8> 1], [300]]`
-is `error_value_out_of_range` and `[<datetime:8> 1]/[2]` is two datetimes. Without that, the second
+is `error_value_out_of_range` and `[<datetime:8> 1]/[2]` is two datetimes. A
+bare ISO literal sets that type as an annotation does: `[2020-01-01, 5]` is two
+`<datetime:64,unix>` instants, while `[5, 2020-01-01]` is
+`error_array_element_type_mismatch`. Without that, the second
 element would be a `uint` beside a `datetime` and the array could never be
 homogeneous (§7.4). It reaches integers only: a bare ISO literal still infers
 `<datetime:64,unix>` (§10.1), so `[<datetime:64,tai> 1, 2026-06-15]` mixes
@@ -1468,6 +1478,10 @@ literal.
 |------------|-------|
 | Array nesting depth | `max_array_nesting` — default 64, hard cap 255 |
 | Total array items | `max_array_items` (configurable; 0 → 2 147 483 647 internal default) |
+
+`max_array_items` is a budget rather than an element count: every `[` and every
+`,` under one outermost array costs one, so an empty row costs one too —
+`[]/[]` needs 2, `[[],[]]` needs 4, `[[1,2],[3,4]]` needs 6.
 
 ---
 
@@ -1619,8 +1633,10 @@ The currency row takes **precedence** over the float/integer rows: any number
 becomes `<float_dec:64,$USD>`, not `<uint:64>`.
 
 > **A bare integer inside a `datetime` array** inherits the `datetime` type
-> (width and epoch) of the array's annotation, or of the annotated element
-> before it (§7.5), rather than synthesising `uint`/`sint`, so a datetime array
+> (width and epoch) of the array's annotation, or of the datetime element
+> before it — annotated, or a bare ISO literal, which synthesises
+> `<datetime:64,unix>` (§7.5) — rather than synthesising `uint`/`sint`, so
+> `[2020-01-01, 5]` is two `unix` instants and a datetime array
 > as the pretty-printer writes it — annotation on the first element, bare
 > integers after — stays homogeneous.
 
@@ -3055,7 +3071,8 @@ major counts breaks in what a *document* means, and has not moved. The C header
 defines `BVNR_VERSION_MAJOR`, `BVNR_VERSION_MINOR`, `BVNR_VERSION_PATCH`, the
 comparable integer `BVNR_VERSION` (`major*10000 + minor*100 + patch`, so
 `#if BVNR_VERSION >= 20000` tests "≥ 2.0.0"), and `BVNR_VERSION_STRING`
-(`"2.0.0"`). The Python package mirrors this as `bovnar.__version__`.
+(`"2.0.0"`). The Python package mirrors this as `bovnar.__version__`, the Rust crate as
+`bovnar::version()`.
 Separately, `BVNR_SPEC_VERSION_MAJOR` / `BVNR_SPEC_VERSION_MINOR` name the
 highest **spec** version the build understands (`1.2`); `bvnr_version()`, `bvnr_version_string()` and
 `bvnr_spec_version()` expose both at runtime.

@@ -704,7 +704,10 @@ after a backslash are unrecognized escapes and yield
 
 Adjacent string literals separated only by blanks and comments are
 concatenated into one string. The combined octet length is subject to
-`max_string_length` ({{limits}}).
+`max_string_length` ({{limits}}). A raw octet MUST form a valid UTF-8
+sequence within its own literal; `\x` escapes are checked on the decoded
+value of the whole string, so the escapes of adjacent literals can build
+one character between them: `"\xC3" "\xA9"` is `"é"`.
 
 ~~~
 .long = "hello " "world";        # one string, "hello world"
@@ -1208,11 +1211,16 @@ number carrying an inline currency unit, integral or not, synthesises
 `float_dec`, so money is never held as a binary float: `.price = 5 $USD;`
 is `<float_dec:64,$USD>`, not `<uint:64>`.
 
-A bare integer inside an array whose whole-array annotation is `datetime`
-inherits that family, width, and epoch rather than synthesising `uint` or
-`sint`, so the canonical form of a datetime array - annotation on the
-first element, bare integers thereafter - remains homogeneous under
-{{array-homogeneity}}.
+A bare integer inside an array inherits the `datetime` family, width,
+and epoch in force before it - from a whole-array annotation, from an
+element annotated `datetime`, or from a bare ISO literal, which
+synthesises `<datetime:64,unix>` - rather than synthesising `uint` or
+`sint`. "Before it" is document order across the whole array: later
+sibling sub-arrays and later `/`-rows inherit it too. So
+`[2020-01-01, 5]` is two `unix` instants, `[5, 2020-01-01]` is
+`error_array_element_type_mismatch`, and the canonical form of a datetime
+array - annotation on the first element, bare integers thereafter -
+remains homogeneous under {{array-homogeneity}}.
 
 # The Unit System {#units}
 
@@ -1570,8 +1578,10 @@ bare word `null`. `[,1,,2,]` has five elements. An element may be empty
 only beside a comma, so `[]` is the empty row and never one null; a type
 annotation alone is an element, so `[<uint:8>]` is one typed null.
 
-Array nesting is bounded by `max_array_nesting` and the total element
-count by `max_array_items` ({{limits}}).
+Array nesting is bounded by `max_array_nesting` and the size of an array
+by `max_array_items` ({{limits}}). That limit is a budget, not an element
+count: every `[` and every `,` under one outermost array costs one, so an
+empty row costs one too - `[]/[]` needs 2 and `[[1,2],[3,4]]` needs 6.
 
 ### Element Homogeneity {#array-homogeneity}
 

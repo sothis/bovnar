@@ -468,6 +468,11 @@ Two that *are* accepted but rarely mean what the writer intended:
 |---------|--------------|---------------|
 | `fl` | femtolitre | fluid ounce → `fl_oz` |
 | `mt` | millitonne (= 1 kg) | metric ton → `t`; megatonne → `Mt` or `M~t` |
+| `rad`, `mrad` | radian, milliradian | the absorbed dose (0.01 Gy, UCUM `RAD`) → `c~Gy`; a millirad → `10 µ~Gy` |
+| `MBtu`, `Mlb` | mega-Btu (10⁶ Btu), mega-pound | US industry's Roman M, a thousand → `k~Btu`, `k~lb` (`MMBtu`, a million, is refused: write `M~Btu`) |
+
+The last row is the same 1000× trap as `kt`: `MBtu` reads as 10⁶ Btu because `M` is mega
+everywhere in the SI, and a document from the gas or steam trade usually means 10³.
 
 ---
 
@@ -575,6 +580,9 @@ usually where the money is.
 | knot | `kn` | `kt`, `kts` |
 | milli-inch | `m~in` | `min` (minute) |
 | milliradian | `mrad`, `m~rad` | `mil` (thou) |
+| absorbed dose in rad | `c~Gy` (1 rad = 1 cGy) | `rad` (the radian) |
+| thousand Btu (US "MBtu") | `k~Btu` | `MBtu` (that is 10⁶ Btu) |
+| million Btu (US "MMBtu") | `M~Btu` | `MMBtu` (refused) |
 | picohenry | `p~H` | `pH` (acidity) |
 | acidity | `pH` | `p~H` (picohenry) |
 | phot | `ph` | `pH` |
@@ -649,7 +657,7 @@ Two rules make this tractable, and both are worth knowing before writing a profi
 
 Where two vocabularies genuinely name the same quantity they land on the same unit, and that is
 checked: `ucum:kg`, `unece:KGM`, `qudt:KiloGM`, `udunits:kg` and `qudt-qk:Mass` all compare equal.
-The cross-vocabulary suite (doc/11 §14) verifies this pairwise across 64 concepts, and pins the
+The cross-vocabulary suite (doc/11 §14) verifies this pairwise across 69 concepts, and pins the
 rows above as pairs that must **not** compare equal.
 
 ---

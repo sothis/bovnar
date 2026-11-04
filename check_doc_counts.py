@@ -233,7 +233,7 @@ RANGE_CLAIMS = [
 # that IS checked. Rewriting a changelog to match today's catalogue would be a
 # lie about what shipped.
 SKIP_DIRS = {".git", "build", "dist", "web", "__pycache__", ".pytest_cache",
-             ".cache", ".idea", "node_modules"}
+             ".cache", ".idea", "node_modules", "target"}
 SKIP_FILES = {"CHANGELOG.md", "check_doc_counts.py"}
 SKIP_PREFIXES = ("RELEASE_NOTES_",)
 SUFFIXES = (".md", ".py", ".txt", ".bvnr", ".h", ".c", ".ebnf", ".cff", ".xml")
@@ -436,6 +436,61 @@ def check_assertion_counts(repo):
     return problems, checked
 
 
+def check_crossvocab_counts(repo):
+    """The cross-vocabulary suite's concept and assertion counts, wherever the
+    prose restates them: README.md, doc/07 and doc/11 §14.
+
+    They said 64 concepts and 4789 assertions while the suite had grown to 67
+    and 4868. Concepts are counted from the test's table; assertions from the
+    binary's own total, as check_assertion_counts does (skipped without a
+    build)."""
+    src = os.path.join(repo, "tests", "bovnar_crossvocab_test.c")
+    if not os.path.exists(src):
+        return [], 0
+    with open(src, encoding="utf-8") as f:
+        test = f.read()
+    m = re.search(r"g_concepts\[\] = \{(.*?)\n\};", test, re.S)
+    concepts = len(re.findall(r'^\s*\{ "[^"]+", \{', m.group(1), re.M)) if m else 0
+    asserts = None
+    exe = os.path.join(bvnr_build_env.tests_dir(repo), "bvnr_crossvocab_test")
+    if os.path.exists(exe):
+        try:
+            out = subprocess.run([exe], capture_output=True, text=True, timeout=120)
+            a = re.search(r"(\d+) tests", (out.stdout or "") + (out.stderr or ""))
+            asserts = int(a.group(1)) if a else None
+        except Exception:                                     # noqa: BLE001
+            asserts = None
+    claims = [
+        ("README.md", r"suite of (\d+) assertions over (\d+) concepts", ("a", "c")),
+        ("README.md", r"pairwise across (\d+) concepts", ("c",)),
+        ("doc/07_bovnar_unit_ambiguities.md", r"pairwise across (\d+) concepts", ("c",)),
+        ("doc/11_bovnar_unit_profiles.md",
+         r"bovnar_crossvocab_test\.c` \u2014 (\d+) concepts, \d+ vocabularies, (\d+) assertions",
+         ("c", "a")),
+    ]
+    want = {"c": concepts, "a": asserts}
+    problems, checked = [], 0
+    for rel, pat, keys in claims:
+        path = os.path.join(repo, rel)
+        if not os.path.exists(path):
+            continue
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        for mm in re.finditer(pat, text):
+            for i, k in enumerate(keys):
+                if want[k] is None:
+                    continue
+                checked += 1
+                got = int(mm.group(i + 1))
+                if got != want[k]:
+                    line = text.count("\n", 0, mm.start()) + 1
+                    problems.append("%s:%d: says %d %s, the cross-vocabulary "
+                                    "suite has %d" % (rel, line, got,
+                                    "concepts" if k == "c" else "assertions",
+                                    want[k]))
+    return problems, checked
+
+
 INVENTORY_DOC = "doc/02_bovnar_faq.md"
 INVENTORY_HEAD = "**How many base units does Bovnar support?**"
 
@@ -493,6 +548,9 @@ def main(argv):
     asrt_bad, asrt_checked = check_assertion_counts(repo)
     bad += asrt_bad
     checked += asrt_checked
+    cv_bad, cv_checked = check_crossvocab_counts(repo)
+    bad += cv_bad
+    checked += cv_checked
     for path in files(repo):
         try:
             with open(path, encoding="utf-8") as f:

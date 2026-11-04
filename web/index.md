@@ -57,10 +57,11 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Streaming SAX-style reader** — Incremental parsing from memory, a file descriptor, or a socket via a symmetric `on_unverified` / `on_verified` callback pair.
 - **Error recovery** — Optional resync mode skips broken assignments and continues parsing — suitable for log streams and unreliable transports.
 - **Python bindings** — Pure-`ctypes`, no compiled extension required. Exposes both a high-level `loads`/`dumps` dict-like API and a low-level event-driven streaming API.
+- **Rust bindings** — the `bovnar` crate compiles the C library in, so there is no system library to install. It offers `parse`/`to_string` over a dynamic `Value`, the streaming `Reader`/`Writer`, the DOM, exact numbers and JSON conversion ([doc/14](doc/14_bovnar_rust_bindings.md)).
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
 - **Browser playground** — the real C reference parser, compiled to WebAssembly (`bovnar_parser_wasm.js` over `bovnar_wasm_core.js`), runs the reference verified event stream (with full type/unit/value validation) in the browser and powers an interactive web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
-- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 470-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), and a built-in benchmark mode (`bovnar bench`).
+- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 470-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), Python and Rust test suites with cargo-fuzz targets for the crate, and a built-in benchmark mode (`bovnar bench`).
 
 ---
 

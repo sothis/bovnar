@@ -34,7 +34,7 @@ pass changed and what it cost.
 
 Every acceptance, refusal and conversion factor quoted below was produced by running the
 reference implementation built from this tree, and the behavioural claims are pinned by the test
-files named above (1433 assertions across the seven profiles, plus 4868 in the cross-vocabulary
+files named above (1483 assertions across the seven profiles, plus 4983 in the cross-vocabulary
 suite). The VOCABULARY side — whether each foreign code is *worth* what the table says — is checked
 too, but not by the same means and not to the same strength: `check_profile_factors.py` (§9.5)
 resolves every mapped code against its publisher's own machine-readable definitions, and `unece`
@@ -1737,7 +1737,7 @@ One hand-edited data file per namespace in `src/gendata/`, in the same shape as 
 | `ucum.bvnr` | 20 prefixes, 206 mapped, 40 opaque, 1 opaque alias, 65 unsupported |
 | `unece.bvnr` | 1299 mapped, 25 opaque, 155 unsupported |
 | `qudt.bvnr` | 2235 mapped, 573 unsupported |
-| `qudt-qk.bvnr` | 908 mapped, 257 unsupported |
+| `qudt-qk.bvnr` | 900 mapped, 265 unsupported |
 | `udunits.bvnr` | 41 prefixes, 768 mapped, 98 unsupported |
 | `om.bvnr` | 1337 mapped, 123 unsupported |
 | `cf.bvnr` | 4454 mapped, 617 unsupported |
@@ -1803,13 +1803,13 @@ them to each other:
 
 | Test | Target | Assertions | Specifies |
 |---|---|---|---|
-| `tests/bovnar_ucum_test.c` | `bvnr_ucum_test` | 209 | §2–§10 |
+| `tests/bovnar_ucum_test.c` | `bvnr_ucum_test` | 217 | §2–§10 |
 | `tests/bovnar_unece_test.c` | `bvnr_unece_test` | 576 | §11 |
-| `tests/bovnar_qudt_test.c` | `bvnr_qudt_test` | 240 | §12 |
-| `tests/bovnar_udunits_test.c` | `bvnr_udunits_test` | 248 | §13 |
-| `tests/bovnar_om_test.c` | `bvnr_om_test` | 114 | §16 |
-| `tests/bovnar_cf_test.c` | `bvnr_cf_test` | 46 | §17 |
-| `tests/bovnar_crossvocab_test.c` | `bvnr_crossvocab_test` | 4868 | §14 |
+| `tests/bovnar_qudt_test.c` | `bvnr_qudt_test` | 256 | §12 |
+| `tests/bovnar_udunits_test.c` | `bvnr_udunits_test` | 258 | §13 |
+| `tests/bovnar_om_test.c` | `bvnr_om_test` | 118 | §16 |
+| `tests/bovnar_cf_test.c` | `bvnr_cf_test` | 58 | §17 |
+| `tests/bovnar_crossvocab_test.c` | `bvnr_crossvocab_test` | 4983 | §14 |
 
 `bvnr_ucum_test` (labels `unit;si;profile;ucum`) carries the behavioural claims of sections 2–10: the three
 outcomes with their exact error codes, equivalence with the native spelling, UCUM's non-latching
@@ -1912,7 +1912,7 @@ native side goes through `bvn_parse_unit` and `bvn_unit_to_si_factor` via the ct
 through a Python reimplementation of the unit grammar — that is exactly how a table starts
 disagreeing with the parser it feeds (§9.1).
 
-As of this tree it compares **10913 rows across the seven vocabularies** and reports **0 mismatches**,
+As of this tree it compares **10905 rows across the seven vocabularies** and reports **0 mismatches**,
 0 dead rows and **0 coverage suggestions** — the tables are closed against their publishers, so
 there is nothing left for the coverage half to propose.
 
@@ -2290,6 +2290,14 @@ exact code sees a change.
   that would put `cf:air_temperature_anomaly` in disagreement with `udunits:K` for the same variable.
   CF 1.12's own answer is the `units_metadata` attribute, which is not in the unit slot and so still
   cannot be read by a profile — the converter §2 describes is where that call belongs.
+  **The differences CF states in `degree_C` are the exception, and map to `Δ°C`** (the same unit as `ΔK`): the three
+  `difference_between_sea_surface_*_temperature` names and `sea_water_added_conservative_temperature`
+  / `sea_water_added_potential_temperature` (a tracer that is zero in the control climate). A `K`
+  difference read as `K` is harmless, since the two share a zero. A `degree_C` difference read as the
+  affine `°C` is not: converting the cool-skin effect of −0.17 to kelvin gave 272.98. CF's own
+  description names each of the five a difference, so this follows the publisher rather than
+  overriding it. The `degree_C` names that are on-scale temperatures (`perceived_temperature`,
+  `wet_bulb_globe_temperature`, the `redistributed` tracers and two more) stay `°C`.
 - **Case-insensitive UCUM.** UCUM defines a case-insensitive variant. `ucum:` is the case-sensitive
   one only, which is why `RAD` and `REM` are in the table and UCUM's bracketed `[RAD]`/`[REM]` are
   not (§6.1). `ucum_ci:` is unreserved and undefined; it would need its own atom table and would
@@ -2482,7 +2490,7 @@ that are equal in SI and different in meaning, and `C94`/`M46` is the pair that 
 > `qudt-qk:` — QUDT quantity kinds (908 mapped, 257 unsupported — every one of the 1164 kinds,
 > plus a refusal for `LogarithmicRatio`, which QUDT 3.1.0 does not define).
 > Data files `src/gendata/qudt.bvnr` and `src/gendata/qudt-qk.bvnr`;
-> pinned by `tests/bovnar_qudt_test.c` (240 assertions).
+> pinned by `tests/bovnar_qudt_test.c` (256 assertions).
 
 ### 12.1 Why this vocabulary
 
@@ -2629,7 +2637,7 @@ same equivalence class.
 > of netCDF and the CF conventions.
 > Data file `src/gendata/udunits.bvnr` (41 prefixes, 768 mapped, 98 unsupported — every one of
 > the 580 spellings the UDUNITS-2 database defines);
-> pinned by `tests/bovnar_udunits_test.c` (248 assertions).
+> pinned by `tests/bovnar_udunits_test.c` (258 assertions).
 
 ### 13.1 An expression profile, sharing the UCUM parser
 
@@ -2641,6 +2649,25 @@ two syntax differences configured on its registry row:
 
 A third difference runs the other way: UDUNITS has no `{…}` annotations, so `udunits:mL{x}` is
 `error_unit_illegal` (§3.4).
+
+**What UDUNITS accepts and this profile does not.** UDUNITS' scanner is more liberal than the
+syntax above, and the rest of its grammar is refused rather than half-implemented. Every one of
+these is `error_unit_illegal` — a refusal, never a different reading:
+
+| UDUNITS accepts | example | here |
+|---|---|---|
+| `**` as the exponent operator | `m**2` | refused; write `m^2` or `m2` |
+| `·` (U+00B7) and `-` as multiplication | `m·s-1`, `kg-m` | refused; write `m*s-1` or `m.s-1` |
+| a tab between terms | `kg⇥m-2` | refused; write a space |
+| blanks around `*` or `.` | `kg * m` | refused; write `kg*m` or `kg m` |
+| an exponent on a parenthesised group | `(m/s)2` | refused; write `m2/s2` |
+| unit names in any case | `Kelvin`, `Meter` | refused; the names are case-sensitive here |
+
+A prefix on a unit UDUNITS defines and this table marks non-metric — `kcal`, `kft`, `nmi` — is
+the other side of the same line: UDUNITS reads it, and this profile refuses it as
+`error_unit_profile_unsupported`, a known spelling it does not carry, because a few of those
+readings are traps (`nmi` is a nanomile to UDUNITS and a nautical mile to most of the people who
+write it).
 
 The **division rule is identical**, which is worth stating because it is where a units parser most
 often goes quietly wrong. In both vocabularies `/` inverts the term that follows it and nothing
@@ -2833,7 +2860,7 @@ says exactly this; accepting it would cost them a silently wrong instant.
 
 ## 14. The cross-vocabulary conformance suite
 
-> `tests/bovnar_crossvocab_test.c` — 67 concepts, 6 vocabularies, 4868 assertions.
+> `tests/bovnar_crossvocab_test.c` — 69 concepts, 6 vocabularies, 4983 assertions.
 
 Every other profile test asks *does this vocabulary translate correctly?*. This one asks the
 question that only exists once there are five: **do they agree?**
@@ -3000,7 +3027,7 @@ Growing the native registry to reach them is a separate decision, and doc/05 is 
 > `om:` — OM 2, the Ontology of units of Measure (Rijgersberg, van Assem, Top; Wageningen), the
 > second unit ontology of the semantic web beside QUDT.
 > Data file `src/gendata/om.bvnr` (1337 mapped, 123 refused — every unit individual OM states);
-> pinned by `tests/bovnar_om_test.c` (114 assertions); id block 70, contributing no opaque units.
+> pinned by `tests/bovnar_om_test.c` (118 assertions); id block 70, contributing no opaque units.
 
 ### 16.1 Why this vocabulary
 
@@ -3116,7 +3143,7 @@ spells one whole code, so `bvn_unit_to_profile("om", m/s²)` returns -1 for the 
 > `cf:` — the CF conventions' standard names, the controlled vocabulary of netCDF climate and
 > forecast data.
 > Data file `src/gendata/cf.bvnr` (4454 mapped, 617 refused — all 5071 names of standard name table
-> **v94**, 2026-06-09); pinned by `tests/bovnar_cf_test.c` (46 assertions); id block 80, contributing
+> **v94**, 2026-06-09); pinned by `tests/bovnar_cf_test.c` (58 assertions); id block 80, contributing
 > no opaque units. **Read-only** (§17.3).
 
 ### 17.1 Why this vocabulary

@@ -332,6 +332,30 @@ static bool bvn_unit_policy_parse(const bvnr_unit_policy_t* p,
 		 * fires. */
 		if (rl->path[0] != '.')
 			return false;
+		/* The same reasoning for the rest of it: every component between the
+		 * dots must be a key the grammar can write, and `*` may only be the
+		 * last one. `.a.`, `..a`, `.a*`, `.a.*.b` and `.a b` were accepted and
+		 * matched nothing, and a require rule that matches nothing is
+		 * satisfied -- so the assertion was silently off. */
+		{
+			char comp[BVNR_MAX_UNIT_PATH + 1u];
+			size_t at = 1u;
+			for (;;) {
+				size_t end = at;
+				while (end < plen && rl->path[end] != '.')
+					end++;
+				size_t clen = end - at;
+				bool last = (end == plen);
+				memcpy(comp, rl->path + at, clen);
+				comp[clen] = '\0';
+				if (!(last && clen == 1u && comp[0] == '*') &&
+				    !bvn_validate_identifier(comp))
+					return false;
+				if (last)
+					break;
+				at = end + 1u;
+			}
+		}
 		bvn_unit_rule_state_t* rs = &np.rule[i];
 		rs->wildcard = (plen >= 2u && rl->path[plen - 1] == '*' &&
 				rl->path[plen - 2] == '.');
@@ -1945,6 +1969,13 @@ static bool bvn_val_receive_type(bvnr_reader_t* r,
 				ev_type_annotation_type_family_parameter,
 				&d))
 			return false;
+	}
+	/* A unit refused before it had a length -- group nesting past the bound,
+	 * or text past 255 bytes -- is refused like any other. Testing unit_ok
+	 * only under ulen > 0 let both through with the unit silently dropped. */
+	if (ulen == 0 && !unit_ok && v->value_type.family != vt_utf8) {
+		v->last_error = unit_too_long ? error_unit_too_long : error_unit_illegal;
+		return false;
 	}
 	if (ulen > 0) {
 		/*

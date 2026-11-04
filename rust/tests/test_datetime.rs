@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The spec 1.1 native time family (`<datetime:width,epoch>`) through the
 //! bindings.
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! An exact read-time conversion renders in a base exactly when the
 //! arithmetic says its expansion terminates there, and every rendering
 //! decodes back to the exact rational.

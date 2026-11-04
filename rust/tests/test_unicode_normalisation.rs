@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! A unit symbol must survive Unicode normalisation.
 //!
 //! Three of the symbols are characters Unicode declares equivalent to another:

@@ -585,6 +585,37 @@ static void test_round_trip(void)
 	}
 }
 
+/* The third review: quantity-kind rows that copied a QUDT dimension vector
+ * its own name or definition contradicts, and rows that named the right value
+ * with the wrong unit (doc/11 §12.4). */
+static void test_kinds_qudt_contradicts(void)
+{
+	static const char* const refused[] = {
+		"qudt-qk:EquilibriumConstantBasedOnConcentration",
+		"qudt-qk:EquilibriumConstantBasedOnPressure",
+		"qudt-qk:MolarOpticalRotationalAbility",
+		"qudt-qk:SpecificOpticalRotationalAbility",
+		"qudt-qk:GyromagneticRatio",
+		"qudt-qk:MagneticPolarization",
+		"qudt-qk:ExhaustGasMeanMolecularWeight",
+		"qudt-qk:ThrustCoefficient",
+	};
+	for (size_t i = 0; i < sizeof refused / sizeof refused[0]; i++)
+		chk_error(refused[i], error_unit_profile_unsupported);
+	chk_str("qudt-qk:Radioactivity",      "Bq");
+	chk_str("qudt-qk:ReactivePower",      "var");
+	chk_str("qudt-qk:ApparentPower",      "VA");
+	chk_str("qudt-qk:DoseEquivalentRate", "Sv/s");
+	chk_str("qudt-qk:Exposure",           "C/k~g");
+	/* Luminous flux times time, as QUDT's description says; its vector cannot
+	 * tell the lumen from the candela, and a lumen second is LuminousEnergy. */
+	chk_str("qudt-qk:QuantityOfLight",    "lm·s");
+	ASSERT_TRUE(bvn_unit_equal(U("qudt-qk:QuantityOfLight"),
+	                           U("qudt-qk:LuminousEnergy")),
+	            "QuantityOfLight is a luminous energy");
+	chk_str("qudt:CentiM_H2O",            "c~mH2O");
+}
+
 int main(void)
 {
 	printf("QUDT unit and quantity-kind profiles\n");
@@ -595,6 +626,7 @@ int main(void)
 	test_quantity_kinds();
 	test_kind_agrees_with_unit();
 	test_kind_refusals();
+	test_kinds_qudt_contradicts();
 	test_namespace_syntax();
 	test_to_qudt();
 	test_cross_reference_rows();

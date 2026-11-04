@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! The currency/crypto unit extension (id blocks, catalogue metadata,
 //! predicates, code lookup).
 

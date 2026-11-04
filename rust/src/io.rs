@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! Reading a caller's `std::io::Read` for the `*_reader` entry points and
 //! writing to a caller's `std::io::Write` for the `to_writer` / `*_to` ones,
 //! the counterparts of the C library's file-descriptor source and sink.

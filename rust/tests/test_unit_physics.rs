@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 //! SI factors, compatibility, conversion factors, dimension vectors,
 //! reduction and value conversion.
 //!

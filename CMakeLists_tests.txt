@@ -352,20 +352,17 @@ set_tests_properties(bvnr_currency_test PROPERTIES
 add_test(NAME bvnr_int_test COMMAND bvnr_int_test)
 set_tests_properties(bvnr_int_test PROPERTIES
     LABELS "unit;int"
-    FAIL_REGULAR_EXPRESSION "passed, [1-9][0-9]* failed"
-    FAIL_REGULAR_EXPRESSION "FAIL")
+    FAIL_REGULAR_EXPRESSION "passed, [1-9][0-9]* failed|FAIL")
 
 add_test(NAME bvnr_float_test COMMAND bvnr_float_test)
 set_tests_properties(bvnr_float_test PROPERTIES
     LABELS "unit;float"
-    FAIL_REGULAR_EXPRESSION "passed, [1-9][0-9]* failed"
-    FAIL_REGULAR_EXPRESSION "FAIL")
+    FAIL_REGULAR_EXPRESSION "passed, [1-9][0-9]* failed|FAIL")
 
 add_test(NAME bvnr_datetime_test COMMAND bvnr_datetime_test)
 set_tests_properties(bvnr_datetime_test PROPERTIES
     LABELS "unit;datetime;calendar"
-    FAIL_REGULAR_EXPRESSION "passed, [1-9][0-9]* failed"
-    FAIL_REGULAR_EXPRESSION "FAIL")
+    FAIL_REGULAR_EXPRESSION "passed, [1-9][0-9]* failed|FAIL")
 
 # ── Conformance tests ────────────────────────────────────────────────────────
 #
@@ -1306,8 +1303,9 @@ _bvnr_convert_fail(trailing         bad_trailing.json         "trailing content"
 _bvnr_convert_fail(nul_in_string    bad_nul.json              "NUL")
 _bvnr_convert_fail(dup_key          bad_dupkey.json           "duplicate key")
 _bvnr_convert_fail(diff_key_records bad_diffkeys.json         "differing key sets")
+# -2^127 is the least sint:128, so a negative power of two takes no extra bit.
 _bvnr_cli_expect(bvnr_cli_convert_wide_int "cli;convert" 0
-                 ".n = <uint:128> 99999999999999999999;.*.m = <sint:128> -99999999999999999999;" ""
+                 ".n = <uint:128> 99999999999999999999;.*.m = <sint:128> -99999999999999999999;.*.p = <sint:128> -170141183460469231731687303715884105728;" ""
                  convert ${CMAKE_CURRENT_SOURCE_DIR}/tests/json/wide_int.json)
 
 # bvnr -> json must refuse a datetime with sub-second digits rather than
@@ -1430,7 +1428,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 185)   # 129 base + sitemap + convert_wide_int + unit_source + 3 for examples/unit_profiles.bvnr + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier) + cli_regressions + wasm_native_shape
+set(BVNR_EXPECTED_TEST_COUNT 189)   # 129 base + rust_build_sync + canonical_keeps_meaning + interval_array + bench_iterations_zero + sitemap + convert_wide_int + unit_source + 3 for examples/unit_profiles.bvnr + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier) + cli_regressions + wasm_native_shape
                                     #             + citation
                                     #         + profiles_off_build
                                     # + om_test + cf_test
@@ -1894,6 +1892,17 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_instal
         LABELS "packaging" TIMEOUT 60)
 endif()
 
+# rust/build.rs compiles the C library from its own copy of the source,
+# profile and generator lists; this fails when it drifts from CMakeLists.txt.
+if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_rust_build.py)
+    add_test(NAME bvnr_rust_build_sync
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/check_rust_build.py
+                     ${CMAKE_CURRENT_SOURCE_DIR})
+    set_tests_properties(bvnr_rust_build_sync PROPERTIES
+        LABELS "packaging" TIMEOUT 60)
+endif()
+
 if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_release_links.py)
     add_test(NAME bvnr_release_links
              COMMAND ${Python3_EXECUTABLE}
@@ -1974,6 +1983,20 @@ add_test(
             -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/canonical_converges.cmake)
 set_tests_properties(bvnr_cli_canonical_converges PROPERTIES
     LABELS "cli;canonical;units" TIMEOUT 30)
+# ...and two spellings that do NOT mean the same thing stay apart: a datetime
+# epoch is not rewritten as a unit (`galileo` is also the gal), an affine scale
+# in a compound is not reduced into one that converts, and ΔK·m/m is not K·m/m.
+_bvnr_cli_expect(bvnr_cli_canonical_keeps_meaning "cli;canonical;units" 0
+                 "<datetime:64,galileo> 5" "Gal>|°C>"
+                 pretty-print --canonical
+                 ${CMAKE_CURRENT_SOURCE_DIR}/tests/canonical_keeps_meaning.bvnr)
+# Zero benchmark rounds measure nothing; it used to become one silently.
+_bvnr_cli_expect(bvnr_cli_bench_iterations_zero "cli" 2
+                 "--iterations must be at least 1" ""
+                 bench --iterations 0)
+_bvnr_cli_expect(bvnr_cli_interval_array "cli;units" 1
+                 "array_element_type_mismatch" ""
+                 validate ${CMAKE_CURRENT_SOURCE_DIR}/tests/interval_array.bvnr)
 
 # ── the IETF draft against the header ────────────────────────────────────────
 # doc/ietf/draft-sonntag-bovnar-00 is a SECOND, independent statement of the

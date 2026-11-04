@@ -114,7 +114,8 @@ them cannot be reviewed as a whole:
 - the conformance corpus in `tests/`, with cases for both the accepting and the
   rejecting side, and `doc/13_bovnar_conformance.md` updated to match (a CTest
   gate compares the document against what the adapter emits)
-- the C implementation, the Python bindings, and the CLI, where each is affected
+- the C implementation, the Python bindings, the Rust crate, and the CLI, where
+  each is affected
 - `CHANGELOG.md`
 - version gating, if the change is not backward compatible: new syntax must be
   reachable only from a document that opts in with `#!bovnar <major>.<minor>`,
@@ -130,7 +131,8 @@ is a data change plus a regeneration rather than a code change. See
 
 Requirements: CMake ≥ 3.21, a C99 compiler, and Python 3. Python is optional,
 but without it the Python binding tests and the documentation checks are not
-registered at configure time.
+registered at configure time. The Rust crate in `rust/` additionally needs
+Cargo with Rust 1.88 or newer; it is built and tested on its own, not by CMake.
 
 ```bash
 cmake -B build .
@@ -196,6 +198,10 @@ ctest --test-dir build-asan -LE python --output-on-failure
 
 # 3. The fuzz harnesses.
 ./run_tests.sh
+
+# 4. The Rust crate, if you have Cargo.
+(cd rust && cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings \
+    && cargo test --locked)
 ```
 
 Besides the unit, integration, conformance and fuzz tests, `ctest` runs every
@@ -254,6 +260,7 @@ The surrounding file is the authority. In summary:
   nothing.
 - Public API in `include/`; implementation-internal headers sit beside their
   code as `src/<area>/bvn_*_impl.h`.
+- Rust is formatted with `rustfmt` and must pass `cargo clippy -- -D warnings`.
 - Python is 4-space indented and targets plain CPython 3 with no compiled
   extension. The bindings are pure `ctypes` by design; NumPy and Pint are
   optional bridges and must stay optional.
@@ -263,7 +270,10 @@ The surrounding file is the authority. In summary:
 `libbvnr.so` carries a versioned soname, and `bvnr_abi_dump` records public
 struct layouts. If a change alters a public type's layout or an exported
 signature, note it in the pull request: it is an ABI break and requires a soname
-bump.
+bump. Both bindings restate the layouts — `python/bovnar/_ffi.py` and
+`rust/src/ffi.rs` — and change with it; their ABI tests compare them with the C
+compiler's. A new C source goes into `rust/build.rs` as well as into
+`BVNR_SOURCES`; `bvnr_rust_build_sync` fails until it does.
 
 ## Documentation
 
@@ -318,7 +328,7 @@ ucum: the profile was missing from the grammar, the corpus and the changelog
 ```
 
 Common scopes: `spec`, `docs`, `cli`, `units`, `profiles`, `web`, `python`,
-`tests`, `ietf`, `publish`. Keep one logical change per commit, and put the reasoning in the body
+`rust`, `tests`, `ietf`, `publish`. Keep one logical change per commit, and put the reasoning in the body
 when the subject cannot carry it.
 
 ## Licensing

@@ -338,7 +338,8 @@ def unit_to_str(unit: ValueUnit) -> str:
     buf = _ct.create_string_buffer(UNIT_STRING_MAX)
     n   = lib.bvn_unit_to_string(_as_vu(unit), buf, UNIT_STRING_MAX)
     if n < 0:
-        raise BovnarArgumentError("unit_to_str: output buffer overflow")
+        from .units import _unit_no_text_error
+        raise _unit_no_text_error("unit_to_str", _as_vu(unit))
     return buf.raw[:n].decode('utf-8')
 
 
@@ -369,6 +370,10 @@ def unit_to_profile(namespace: str, unit: ValueUnit) -> str:
     n   = lib.bvn_unit_to_profile(namespace.encode('utf-8'), _as_vu(unit), buf,
                                   UNIT_STRING_MAX)
     if n < 0:
+        if namespace not in available_profiles():
+            raise BovnarArgumentError(
+                "unit_to_profile: %r is not a unit profile this build of "
+                "libbvnr carries (available_profiles() lists them)" % namespace)
         raise BovnarArgumentError(
             "unit_to_profile: this unit has no %s code" % namespace)
     return buf.raw[:n].decode('utf-8')
@@ -933,6 +938,9 @@ _FAM_NAMES = {
     int(ValueTypeFamily.FLOAT_FIX): 'float_fix',
     int(ValueTypeFamily.FLOAT_DEC): 'float_dec',
     int(ValueTypeFamily.DATETIME):  'datetime',
+    # bool needs its annotation only as a typed null (`<bool> ;`); a value
+    # reads back as bool without one, and _needs_annotation says so.
+    int(ValueTypeFamily.BOOL):      'bool',
 }
 
 
@@ -940,17 +948,30 @@ def _has_real_unit(vu: ValueUnit) -> bool:
     return any(vu.components[i].base != 0 for i in range(vu.num_components))
 
 
-def _needs_annotation(vt: ValueTypeSpec, vu: ValueUnit, raw: str | None = None) -> bool:
+def _needs_annotation(vt: ValueTypeSpec, vu: ValueUnit, raw: str | None = None,
+                      tok=None) -> bool:
     """Return True only when the type annotation carries non-default information.
 
-    `raw` matters for exactly one case: default synthesis reads a bare
-    NON-NEGATIVE integer as uint, so a sint value that happens to be >= 0 loses
-    its family without an annotation -- "<sint:64> 127" came back as
-    "<uint:64> 127". A negative one re-reads as sint on its own and needs none.
+    `raw` matters for two cases. Default synthesis reads a bare NON-NEGATIVE
+    integer as uint, so a sint value that happens to be >= 0 loses its family
+    without an annotation -- "<sint:64> 127" came back as "<uint:64> 127". A
+    negative one re-reads as sint on its own and needs none. And a typed null
+    (raw None) has nothing but its annotation: `<float:64> ;` written bare is
+    `;`, which re-reads as an untyped None.
+
+    `tok` matters for one: a QUOTED literal under a numeric family
+    (`<float:64,_10> "5.7"`) is a string to default synthesis. Written without
+    its annotation the writer refuses it (a float type over a string token),
+    and the reader would take it for utf8 anyway.
     """
     fam = int(vt.family)
     if fam == int(ValueTypeFamily.PLAIN):
         return False
+    if raw is None:
+        return True
+    if tok in (TokenType.STRING, TokenType.ARRAY_STRING) \
+            and fam != int(ValueTypeFamily.UTF8):
+        return True
     if fam == int(ValueTypeFamily.SINT) and raw is not None \
             and not raw.lstrip().startswith('-'):
         return True
@@ -991,7 +1012,8 @@ def _emit_quantity(w: Writer, key: str, q: 'Quantity') -> None:
                 "not spell this Quantity's unit, which is no unit at all")
     w.emit(Event.ASSIGNMENT_START, key=key)
     fam_name = _FAM_NAMES.get(fam)
-    if fam_name is not None and _needs_annotation(q.vtype, q.unit.raw, q.raw):
+    if fam_name is not None and _needs_annotation(q.vtype, q.unit.raw, q.raw,
+                                                  q._tok_type):
         w._emit_annotation(fam_name, q.vtype, q.unit.raw, q.unit_source)
     raw_bytes = q.raw.encode('utf-8') if q.raw else b''
     d = BvnrData()
@@ -1054,13 +1076,18 @@ def _array_quantity_annotation(rows):
                                      int(ValueTypeFamily.FLOAT)):
                 base = 10
             key = (fam, int(e.vtype.width) or 64, base)
-            if first is not None and e.unit != first[1].unit:
+            # "No unit" (a typed null, an annotated value) and "dimensionless"
+            # (a bare literal) are both the absence of one, and must not stop
+            # `[<bool>, true]` from sharing the annotation its null needs.
+            if first is not None and e.unit != first[1].unit and (
+                    _has_real_unit(e.unit.raw)
+                    or _has_real_unit(first[1].unit.raw)):
                 return None, None
             # Ask EVERY leaf, not just the first. A sint array of mixed sign
             # needs the annotation because its non-negative elements would
             # otherwise re-read as uint, but the first element it happened to see
             # was negative and answered "no annotation needed" for the lot.
-            if _needs_annotation(e.vtype, e.unit.raw, e.raw):
+            if _needs_annotation(e.vtype, e.unit.raw, e.raw, e._tok_type):
                 needed = True
             if first is None:
                 first = (key, e)
@@ -1113,7 +1140,9 @@ def _array_one_unit(rows) -> bool:
                 stack.append(e)
             elif e is None:
                 continue
-            elif not (isinstance(e, Quantity) and e.raw
+            # A typed null (raw None) qualifies: it is written as its own
+            # annotation and `null` (see _emit_array_element).
+            elif not (isinstance(e, Quantity)
                       and int(e.vtype.family) in numeric
                       and _has_real_unit(e.unit.raw)):
                 return False
@@ -1258,13 +1287,18 @@ def _array_mixed_numeric_types(rows) -> bool:
                 stack.append(e)
             elif e is None:
                 continue
+            elif (isinstance(e, Quantity) and e.raw is None
+                  and int(e.vtype.family) in _FAM_NAMES
+                  and not _has_real_unit(e.unit.raw)):
+                # A typed null of any family: written bare it is an untyped
+                # `null`, so it needs its own annotation -- which is how
+                # `[<uint:32>, <sint:64>, <float:32>]` was read.
+                needed = True
             elif not (isinstance(e, Quantity)
                       and int(e.vtype.family) in numeric
                       and not _has_real_unit(e.unit.raw)):
                 return False
-            elif e.raw is None:
-                continue                      # a typed null is written `null`
-            elif _needs_annotation(e.vtype, e.unit.raw, e.raw):
+            elif _needs_annotation(e.vtype, e.unit.raw, e.raw, e._tok_type):
                 needed = True
     return needed
 
@@ -1358,6 +1392,71 @@ def _emit_octets(w: Writer, payload: bytes) -> None:
         w._raise_error()
 
 
+# The bytes the C writer refuses inside a string (bvn_validate_string_content):
+# C0 controls other than TAB, LF, VT, FF and CR, and DEL. Neither tier reads them.
+_BAD_TEXT_RX = _re.compile('[\x00-\x08\x0e-\x1f\x7f]')
+
+# The reader's default max_identifier_length (bvn_val_impl.h), which loads(),
+# dom_parse() and `bovnar validate` all read with and which Python has no knob
+# for. The writer itself takes keys up to 65 535 bytes.
+_MAX_KEY_BYTES = 255
+
+
+def _shown(text: str) -> str:
+    return repr(text if len(text) <= 40 else text[:40] + '...')
+
+
+def _check_key(key: str) -> None:
+    """Refuse, naming it, a key no reader takes back. The C writer refused most
+    of these too, but as a BovnarWriteError with a byte offset and no key; a key
+    over 255 bytes it wrote, and loads() then refused the document; and a key
+    holding NUL went through ctypes as a C string and was written with the NUL
+    in it."""
+    try:
+        raw = key.encode('utf-8')
+    except UnicodeEncodeError:
+        raise BovnarArgumentError(
+            f"Cannot serialise key {_shown(key)}: it holds a lone surrogate, "
+            "which has no UTF-8 form") from None
+    if len(raw) > _MAX_KEY_BYTES:
+        raise BovnarArgumentError(
+            f"Cannot serialise key {_shown(key)}: it is {len(raw)} bytes long, "
+            f"and loads(), dom_parse() and `bovnar validate` read keys of at "
+            f"most {_MAX_KEY_BYTES} bytes")
+    from ._ffi import get_library
+    if '\x00' in key or not get_library().bvn_validate_identifier(raw):
+        raise BovnarArgumentError(
+            f"Cannot serialise key {key!r}: it is not a Bovnar identifier "
+            "(spec §4.2)")
+
+
+def _check_text(key: str, text: str) -> None:
+    """Refuse, naming the key, a string the writer cannot write."""
+    try:
+        text.encode('utf-8')
+    except UnicodeEncodeError:
+        raise BovnarArgumentError(
+            f"Cannot serialise {key!r}: its string {_shown(text)} holds a lone "
+            "surrogate, which has no UTF-8 form") from None
+    m = _BAD_TEXT_RX.search(text)
+    if m:
+        raise BovnarArgumentError(
+            f"Cannot serialise {key!r}: its string {_shown(text)} holds the "
+            f"control character {m.group()!r}, which no Bovnar string may "
+            "contain (only TAB, LF, VT, FF and CR are allowed)")
+
+
+def _check_texts(key: str, rows) -> None:
+    """_check_text over every str leaf of a (nested) list."""
+    stack = [rows]
+    while stack:
+        for e in stack.pop():
+            if isinstance(e, (list, tuple)):
+                stack.append(e)
+            elif isinstance(e, str):
+                _check_text(key, e)
+
+
 def _emit_value(w: Writer, key: str, value) -> None:
     # Checked here and not in _emit_dict because a struct inside an array comes
     # through here too. `{1: 2}` used to die on `key.encode` with an
@@ -1367,7 +1466,15 @@ def _emit_value(w: Writer, key: str, value) -> None:
         raise BovnarArgumentError(
             f"Cannot serialise key {key!r}: a key must be a str, "
             f"not {type(key).__name__}")
+    _check_key(key)
     value = _coerce_scalar(value)
+    if isinstance(value, str):
+        _check_text(key, value)
+    elif isinstance(value, Quantity) and isinstance(value.raw, str) \
+            and int(value.vtype.family) == int(ValueTypeFamily.UTF8):
+        _check_text(key, value.raw)
+    elif isinstance(value, (list, tuple)):
+        _check_texts(key, value)
     if value is None:
         w.write_null(key)
     elif isinstance(value, bool):
@@ -1630,6 +1737,17 @@ def _emit_array_element(w: Writer, elem, annotate: bool = False,
             d.frac_length = len(frac)
             _write_event_data(w, d)
             return
+        # A typed null under per-element annotations: its annotation and
+        # `null`. Written as elem.value it lost its type (`[<uint:32>]` came
+        # back as `[null]`, an untyped None).
+        if elem.raw is None and annotate \
+                and int(elem.vtype.family) in _FAM_NAMES:
+            w._emit_annotation(_FAM_NAMES[int(elem.vtype.family)],
+                               elem.vtype, elem.unit.raw, elem.unit_source)
+            d = BvnrData()
+            d.type = _TOKEN_IS_NULL_VALUE
+            _write_event_data(w, d)
+            return
         # Write the ORIGINAL literal, not the decoded scalar. Going through
         # elem.value routes the number through a C double, so a float_dec:128
         # element with 29 significant digits came back with 17.
@@ -1638,7 +1756,11 @@ def _emit_array_element(w: Writer, elem, annotate: bool = False,
                 int(ValueTypeFamily.FLOAT_FIX), int(ValueTypeFamily.UINT),
                 int(ValueTypeFamily.SINT)):
             raw = elem.raw.encode('utf-8')
-            if annotate:
+            # Per-element annotations, but only on the elements that need one:
+            # a plain `1` beside `<uint:8> null` reads back as the uint:64 it
+            # is, and annotating it wrote `<uint:64,no_unit> 1`.
+            if annotate and _needs_annotation(elem.vtype, elem.unit.raw,
+                                              elem.raw, elem._tok_type):
                 w._emit_annotation(_FAM_NAMES[int(elem.vtype.family)],
                                    elem.vtype, elem.unit.raw, elem.unit_source)
             d = BvnrData()

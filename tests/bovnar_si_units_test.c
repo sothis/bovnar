@@ -1949,9 +1949,11 @@ static void test_rational_to_str_bases(void)
 	/* A high base's ZERO digit is not '0' — Base64 spells it 'A', Ascii85 '!' —
 	 * and it is what both the integer part and the fraction's leading padding
 	 * must use, exactly as bvn_int_to_str renders zero. 1/4096 is 1·64⁻², so
-	 * base 64 gives "A.AB"; 1/7225 is 1·85⁻², so base 85 gives "!.!\"". */
+	 * base 64 gives "A.AB". */
 	check_str("1", "4096", 64, "A.AB", "1/4096 in base 64 zero-pads with 'A'");
-	check_str("1", "7225", 85, "!.!\"", "1/7225 in base 85 zero-pads with '!'");
+	/* ...but base 85 has no radix point: '.' is its digit 13, so "!.!\""
+	 * would read back as three digits. A base-85 fraction has no text. */
+	check_str("1", "7225", 85, NULL, "1/7225 in base 85 has no positional text");
 	check_str("1", "8", 10, "0.125", "1/8 in base 10");
 	check_str("1", "8", 2, "0.001", "1/8 in base 2");
 	check_str("-3", "8", 10, "-0.375", "negative fraction keeps its sign");
@@ -3387,6 +3389,70 @@ static void test_exactness_of_pi_and_prefix_conversions(void)
 		    "10^6000 is not a double");
 }
 
+/* Third whole-project review, 2026-11. */
+static value_unit_t rv_pu(const char *t)
+{
+	bool ok = false;
+	value_unit_t u = bvn_parse_unit((const uint8_t *)t, &ok);
+	ASSERT_TRUE(ok, t);
+	return u;
+}
+/* Equality implies convertibility: a ΔK that cancels to a lone ΔK is one in
+ * both, where equality used to ask the written shape and kind the folded one. */
+static void test_cancelled_interval_equality_matches_kind(void)
+{
+	printf("  cancelled ΔK: equality agrees with kind...\n");
+	static const char *const P[][2] = {
+		{ "ΔK·m/m", "K·m/m" }, { "ΔK²/ΔK", "K²/K" }, { "ΔK·s·s⁻¹", "K·s·s⁻¹" },
+	};
+	for (size_t i = 0; i < sizeof P / sizeof P[0]; i++) {
+		value_unit_t a = rv_pu(P[i][0]), b = rv_pu(P[i][1]);
+		bool eq = bvn_unit_equal(a, b);
+		ASSERT_TRUE(!eq, P[i][0]);
+		ASSERT_TRUE(!eq || bvn_units_convertible(a, b), "equal implies convertible");
+	}
+	/* The compound ΔK is still one unit with K, as the U-value rule says. */
+	ASSERT_TRUE(bvn_unit_equal(rv_pu("W/(m²·ΔK)"), rv_pu("W/(m²·K)")),
+		    "W/(m²·ΔK) is W/(m²·K)");
+}
+/* Reduction must not give an affine scale in a compound a meaning: °C·s/s used
+ * to reduce to °C, which converts to 293.15 K. One that stays misplaced still
+ * folds its prefix. */
+static void test_reduce_keeps_misplaced_affine(void)
+{
+	printf("  reduce: misplaced affine units...\n");
+	double sc = 0.0;
+	bool ov = true;
+	value_unit_t u = rv_pu("°C·s/s");
+	value_unit_t r = bvn_unit_reduce(u, &sc, &ov);
+	ASSERT_TRUE(bvn_unit_equal(r, u) && r.num_components == u.num_components,
+		    "°C·s/s reduces to itself");
+	ASSERT_EQ_DBL(sc, 1.0, 0.0, "with scale 1");
+	ASSERT_TRUE(!ov, "and no overflow");
+	r = bvn_unit_reduce(rv_pu("m~°C/s"), &sc, &ov);
+	ASSERT_TRUE(bvn_unit_equal(r, rv_pu("°C/s")), "m~°C/s still folds to °C/s");
+	ASSERT_EQ_DBL(sc, 1e-3, 1e-18, "scale 10^-3");
+}
+/* Ascii85 spends '.' on a digit: a base-85 fraction has no positional text. */
+static void test_rational_base85_fraction(void)
+{
+	printf("  bvn_rational_to_str: base-85 fraction...\n");
+	bvn_int_t *n = bvn_int_alloc(), *d = bvn_int_alloc();
+	char buf[64];
+	bool exact = true;
+	ASSERT_TRUE(n && d, "alloc");
+	if (!n || !d) { bvn_int_free(n); bvn_int_free(d); return; }
+	bvn_int_from_uint64(n, 1u);
+	bvn_int_from_uint64(d, 85u);
+	ASSERT_EQ_INT(bvn_rational_to_str(n, d, 85u, buf, sizeof buf, &exact),
+		      BVN_RATIONAL_NONTERMINATING, "1/85 in base 85 has no text");
+	ASSERT_TRUE(!exact, "and is not exact");
+	bvn_int_from_uint64(n, 170u);
+	ASSERT_TRUE(bvn_rational_to_str(n, d, 85u, buf, sizeof buf, &exact) > 0 && exact,
+		    "170/85 = 2 is an integer and renders");
+	bvn_int_free(n); bvn_int_free(d);
+}
+
 int main(void)
 {
 	printf("══════════════════════════════════════\n");
@@ -3462,6 +3528,9 @@ int main(void)
 	test_prefix_unit_valid_out_of_range();
 	test_si_prefix_info_unit_restrictions();
 	test_refused_unit_parse_is_none();
+	test_cancelled_interval_equality_matches_kind();
+	test_reduce_keeps_misplaced_affine();
+	test_rational_base85_fraction();
 
 	printf("\n──────────────────────────────────────\n");
 	printf("  Results: %d tests, %d failures\n", tests, failures);

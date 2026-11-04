@@ -12,6 +12,18 @@ implements; the highest spec a build understands is reported by
 numbers were the same. They part at 2.0.0, which breaks the ABI and the Python
 API and implements spec 1.2.
 
+## [Unreleased]
+
+### Added
+
+- **ABI baseline.** `tests/abi/bvnr-2.abi` and `bvnr-2.syms` hold the public C
+  ABI as released in 2.0.0: every public struct's size and member offsets, enum
+  value, integer constant and prototype, and `libbvnr.so`'s exports. The new
+  CTest gate `bvnr_abi_baseline` (`check_abi.py`) fails when the headers or the
+  library differ from it, or when an export and a declaration do not match. The
+  binding ABI tests could only see the bindings drift from the headers, not the
+  headers drift from the release.
+
 ## [2.0.0] - 2026-11-04
 
 **Library 2.0.0, implementing spec 1.2.** The major is for the library: the ABI

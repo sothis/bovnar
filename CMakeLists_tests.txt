@@ -786,10 +786,13 @@ if(_bvnr_have_pytest AND BVNR_ALL_PROFILES)
     # ctypes mirrors against a STALE generator binary (built before a header
     # change). This setup fixture rebuilds bvnr_abi_dump first — a no-op when up
     # to date, a refresh when a struct header changed — so the manifest the test
-    # reads always reflects the current C layout.
+    # reads always reflects the current C layout. It rebuilds bvnr_shared too,
+    # whose exports bvnr_abi_baseline reads: one setup for both, because two
+    # running `cmake --build` in the same tree at once can race.
     add_test(
         NAME    bvnr_abi_dump_build
-        COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target bvnr_abi_dump
+        COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}
+                --target bvnr_abi_dump bvnr_shared
     )
     set_tests_properties(bvnr_abi_dump_build PROPERTIES
         FIXTURES_SETUP abi_dump_fixture
@@ -1428,7 +1431,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 189)   # 129 base + rust_build_sync + canonical_keeps_meaning + interval_array + bench_iterations_zero + sitemap + convert_wide_int + unit_source + 3 for examples/unit_profiles.bvnr + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier) + cli_regressions + wasm_native_shape
+set(BVNR_EXPECTED_TEST_COUNT 190)   # 129 base + rust_build_sync + canonical_keeps_meaning + interval_array + bench_iterations_zero + sitemap + convert_wide_int + unit_source + 3 for examples/unit_profiles.bvnr + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier) + cli_regressions + wasm_native_shape + abi_baseline
                                     #             + citation
                                     #         + profiles_off_build
                                     # + om_test + cf_test
@@ -1890,6 +1893,32 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_instal
                      ${CMAKE_CURRENT_SOURCE_DIR})
     set_tests_properties(bvnr_install_headers PROPERTIES
         LABELS "packaging" TIMEOUT 60)
+endif()
+
+# ── The public ABI, against its committed baseline ─────────────────────────
+# The binding ABI tests compare the Python and Rust mirrors with the headers,
+# so a header change that both mirrors follow passes them, while a program
+# built against the previous release still reads the old layout from the same
+# soname. check_abi.py compares the headers' struct layouts, enum values,
+# integer constants and prototypes, and libbvnr.so's exports, with
+# tests/abi/bvnr-<BVNR_ABI_MAJOR>.*; its failure message says what to do. The
+# baseline is a 64-bit GCC/Clang one, and the export list is read with nm -D,
+# so on ELF only.
+if(Python3_Interpreter_FOUND AND CMAKE_SIZEOF_VOID_P EQUAL 8
+   AND CMAKE_C_COMPILER_ID MATCHES "GNU|Clang" AND NOT CMAKE_CROSSCOMPILING)
+    set(_bvnr_abi_lib "")
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_NM AND TARGET bvnr_shared)
+        set(_bvnr_abi_lib --lib $<TARGET_FILE:bvnr_shared> --nm ${CMAKE_NM})
+    endif()
+    add_test(NAME bvnr_abi_baseline
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/check_abi.py
+                     --cc ${CMAKE_C_COMPILER} ${_bvnr_abi_lib})
+    # The fixture (registered with the Python gates) rebuilds bvnr_shared
+    # first; without it the test reads whatever the last build left.
+    set_tests_properties(bvnr_abi_baseline PROPERTIES
+        LABELS "abi;packaging" TIMEOUT 60
+        FIXTURES_REQUIRED abi_dump_fixture)
 endif()
 
 # rust/build.rs compiles the C library from its own copy of the source,

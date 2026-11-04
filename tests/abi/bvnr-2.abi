@@ -1,0 +1,1081 @@
+size bvn_int_t 40
+offset bvn_int_t.limbs 0 8
+offset bvn_int_t.nlimbs 8 4
+offset bvn_int_t.nused 12 4
+offset bvn_int_t.negative 16 1
+offset bvn_int_t.heap 17 1
+offset bvn_int_t._reserved 24 16
+size bvn_float_t 64
+offset bvn_float_t._prec 0 4
+offset bvn_float_t._sign 4 4
+offset bvn_float_t._exp 8 8
+offset bvn_float_t._d 16 8
+offset bvn_float_t._nlimbs 24 4
+offset bvn_float_t._heap 28 1
+offset bvn_float_t._reserved 32 32
+size value_type_spec_t 12
+offset value_type_spec_t.family 0 4
+offset value_type_spec_t.width 4 4
+offset value_type_spec_t.base 8 4
+size value_unit_prefix_t 8
+offset value_unit_prefix_t.system 0 4
+offset value_unit_prefix_t.id 4 4
+size value_unit_component_t 16
+offset value_unit_component_t.base 0 4
+offset value_unit_component_t.exponent 4 4
+offset value_unit_component_t.prefix 8 8
+size value_unit_t 516
+offset value_unit_t.num_components 0 4
+offset value_unit_t.components 4 512
+size bvnr_converted_t 552
+offset bvnr_converted_t.unit 0 516
+offset bvnr_converted_t.text 520 8
+offset bvnr_converted_t.length 528 4
+offset bvnr_converted_t.base 532 4
+offset bvnr_converted_t.num 536 8
+offset bvnr_converted_t.den 544 8
+size bvnr_data_t 1136
+offset bvnr_data_t.type 0 4
+offset bvnr_data_t.value_type 4 12
+offset bvnr_data_t.value_unit 16 516
+offset bvnr_data_t.data 536 8
+offset bvnr_data_t.length 544 4
+offset bvnr_data_t.frac_data 552 8
+offset bvnr_data_t.frac_length 560 4
+offset bvnr_data_t.unit_source 568 8
+offset bvnr_data_t.unit_source_length 576 4
+offset bvnr_data_t.converted 580 1
+offset bvnr_data_t.conv 584 552
+size bvnr_read_flags_t 120
+offset bvnr_read_flags_t.max_identifier_length 0 2
+offset bvnr_read_flags_t.max_string_length 2 2
+offset bvnr_read_flags_t.max_number_length 4 2
+offset bvnr_read_flags_t.max_symbol_length 6 2
+offset bvnr_read_flags_t.max_reference_length 8 2
+offset bvnr_read_flags_t.max_array_items 16 8
+offset bvnr_read_flags_t.max_text_bytes 24 8
+offset bvnr_read_flags_t.max_file_size 32 8
+offset bvnr_read_flags_t.max_struct_nesting 40 1
+offset bvnr_read_flags_t.max_array_nesting 41 1
+offset bvnr_read_flags_t.userdata 48 8
+offset bvnr_read_flags_t.on_unverified 56 8
+offset bvnr_read_flags_t.on_verified 64 8
+offset bvnr_read_flags_t.continue_on_error 72 1
+offset bvnr_read_flags_t.on_error 80 8
+offset bvnr_read_flags_t.strict_version 88 1
+offset bvnr_read_flags_t.text_only 89 1
+offset bvnr_read_flags_t.want_unit_allow_nonterminating 90 1
+offset bvnr_read_flags_t.max_conversion_length 92 4
+offset bvnr_read_flags_t.want_unit 96 8
+offset bvnr_read_flags_t._reserved 104 16
+size bvnr_write_flags_t 120
+offset bvnr_write_flags_t.max_identifier_length 0 2
+offset bvnr_write_flags_t.max_string_length 2 2
+offset bvnr_write_flags_t.max_number_length 4 2
+offset bvnr_write_flags_t.max_symbol_length 6 2
+offset bvnr_write_flags_t.max_reference_length 8 2
+offset bvnr_write_flags_t.max_array_items 16 8
+offset bvnr_write_flags_t.max_text_bytes 24 8
+offset bvnr_write_flags_t.max_file_size 32 8
+offset bvnr_write_flags_t.max_struct_nesting 40 1
+offset bvnr_write_flags_t.max_array_nesting 41 1
+offset bvnr_write_flags_t.userdata 48 8
+offset bvnr_write_flags_t.on_event 56 8
+offset bvnr_write_flags_t.continue_on_error 64 1
+offset bvnr_write_flags_t.on_error 72 8
+offset bvnr_write_flags_t.unit_flags 80 4
+offset bvnr_write_flags_t.emit_version 84 1
+offset bvnr_write_flags_t._reserved 88 32
+size bvnr_source_t 64
+offset bvnr_source_t._reserved 0 64
+size bvnr_sink_t 64
+offset bvnr_sink_t._reserved 0 64
+size bvnr_unit_target_t 16
+offset bvnr_unit_target_t.unit 0 8
+offset bvnr_unit_target_t.base 8 4
+size bvnr_unit_rule_t 24
+offset bvnr_unit_rule_t.path 0 8
+offset bvnr_unit_rule_t.unit 8 8
+offset bvnr_unit_rule_t.base 16 4
+offset bvnr_unit_rule_t.mode 20 4
+size bvnr_unit_policy_t 64
+offset bvnr_unit_policy_t.rules 0 8
+offset bvnr_unit_policy_t.num_rules 8 4
+offset bvnr_unit_policy_t.targets 16 8
+offset bvnr_unit_policy_t.num_targets 24 4
+offset bvnr_unit_policy_t.base 28 4
+offset bvnr_unit_policy_t.normalise 32 4
+offset bvnr_unit_policy_t.on_inexact 36 4
+offset bvnr_unit_policy_t.require_unit 40 1
+offset bvnr_unit_policy_t.require_dimension_of 48 8
+offset bvnr_unit_policy_t.num_require_dimension_of 56 4
+size bvn_currency_info_t 58
+offset bvn_currency_info_t.code 0 5
+offset bvn_currency_info_t.numeric_code 6 2
+offset bvn_currency_info_t.minor_unit 8 1
+offset bvn_currency_info_t.is_crypto 9 1
+offset bvn_currency_info_t.name 10 48
+size bvn_dom_entry_t 16
+offset bvn_dom_entry_t.key 0 8
+offset bvn_dom_entry_t.value 8 8
+size bvnr_doc_stream_opts_t 40
+offset bvnr_doc_stream_opts_t.flags 0 8
+offset bvnr_doc_stream_opts_t.userdata 8 8
+offset bvnr_doc_stream_opts_t.on_document 16 8
+offset bvnr_doc_stream_opts_t.continue_past_failed 24 1
+offset bvnr_doc_stream_opts_t.max_document_size 32 8
+size bvn_gregorian_date_t 40
+offset bvn_gregorian_date_t.year 0 8
+offset bvn_gregorian_date_t.month 8 8
+offset bvn_gregorian_date_t.day 16 8
+offset bvn_gregorian_date_t.leap 24 4
+offset bvn_gregorian_date_t.wday 28 4
+offset bvn_gregorian_date_t.yday 32 4
+size bvn_datetime_t 80
+offset bvn_datetime_t.date 0 40
+offset bvn_datetime_t.hour 40 8
+offset bvn_datetime_t.minute 48 8
+offset bvn_datetime_t.second 56 8
+offset bvn_datetime_t.mjd 64 8
+offset bvn_datetime_t.submjd 72 8
+enum ev_stream_start 0
+enum ev_assignment_start 1
+enum ev_octet_stream_start 2
+enum ev_octet_stream_end 3
+enum ev_struct_start 4
+enum ev_struct_end 5
+enum ev_array_row_start 6
+enum ev_array_row_end 7
+enum ev_array_dim_start 8
+enum ev_data 9
+enum ev_type_annotation_start 10
+enum ev_type_annotation_end 11
+enum ev_type_annotation_type_family 12
+enum ev_type_annotation_type_family_parameter 13
+enum ev_stream_end 14
+enum vt_plain 0
+enum vt_utf8 1
+enum vt_sint 2
+enum vt_uint 3
+enum vt_float 4
+enum vt_float_fix 5
+enum vt_float_dec 6
+enum vt_bool 7
+enum vt_datetime 8
+enum vt_illegal 9
+enum token_is_identifier 0
+enum token_is_string 1
+enum token_is_number 2
+enum token_is_symbol 3
+enum token_is_reference 4
+enum token_is_array_number 5
+enum token_is_array_string 6
+enum token_is_type 7
+enum token_is_octet_stream 8
+enum token_is_null_value 9
+enum token_is_structure 10
+enum token_is_unit 11
+enum token_is_type_width 12
+enum token_is_type_base 13
+enum token_is_type_q 14
+enum token_is_bool 15
+enum token_is_unknown 16
+enum error_none 0
+enum error_unknown_token_type 1
+enum error_array_row_size_mismatch 2
+enum error_identifier_too_long 3
+enum error_empty_identifier 4
+enum error_struct_nesting_too_high 5
+enum error_array_nesting_too_high 6
+enum error_illegal_struct_close 7
+enum error_string_too_long 8
+enum error_illegal_escape_sequence 9
+enum error_number_too_long 10
+enum error_symbol_too_long 11
+enum error_reference_too_long 12
+enum error_read_complete_chunk_failed 13
+enum error_octet_stream_out_of_sync 14
+enum error_unexpected_input_byte 15
+enum error_text_data_too_long 16
+enum error_reading_from_source_fd 17
+enum error_got_incomplete_bvnr_stream 18
+enum error_invalid_utf8_byte 19
+enum error_invalid_byte_order_mark 20
+enum error_type_too_long 21
+enum error_unit_too_long 22
+enum error_expected_string_in_array 23
+enum error_expected_number_in_array 24
+enum error_illegal_value_type 25
+enum error_scanner_callback_failed 26
+enum error_file_too_long 27
+enum error_invalid_argument 28
+enum error_too_many_array_items 29
+enum error_writing_to_sink 30
+enum error_sink_buffer_exhausted 31
+enum error_unit_illegal 32
+enum error_base_requires_string_literal 33
+enum error_type_value_mismatch 34
+enum error_value_out_of_range 35
+enum error_digit_not_in_base 36
+enum error_recovered 37
+enum error_unit_mismatch 38
+enum error_array_element_type_mismatch 39
+enum error_struct_shape_mismatch 40
+enum error_duplicate_struct_key 41
+enum error_invalid_spec_version 42
+enum error_unsupported_spec_version 43
+enum error_invalid_codepoint 44
+enum error_invalid_datetime_literal 45
+enum error_datetime_literal_unsupported_epoch 46
+enum error_unit_inexact 47
+enum error_octet_stream_truncated 48
+enum error_unit_profile_unknown 49
+enum error_unit_profile_unsupported 50
+enum error_octet_stream_forbidden 51
+enum error_type_param_whitespace 52
+enum prefix_si 0
+enum prefix_iec 1
+enum si_none 0
+enum si_quecto 1
+enum si_ronto 2
+enum si_yocto 3
+enum si_zepto 4
+enum si_atto 5
+enum si_femto 6
+enum si_pico 7
+enum si_nano 8
+enum si_micro 9
+enum si_milli 10
+enum si_centi 11
+enum si_deci 12
+enum si_deca 13
+enum si_hecto 14
+enum si_kilo 15
+enum si_mega 16
+enum si_giga 17
+enum si_tera 18
+enum si_peta 19
+enum si_exa 20
+enum si_zetta 21
+enum si_yotta 22
+enum si_ronna 23
+enum si_quetta 24
+enum iec_none 0
+enum iec_kibi 1
+enum iec_mebi 2
+enum iec_gibi 3
+enum iec_tebi 4
+enum iec_pebi 5
+enum iec_exbi 6
+enum iec_zebi 7
+enum iec_yobi 8
+enum iec_robi 9
+enum iec_quebi 10
+enum bu_none 0
+enum bu_bit 100000
+enum bu_byte 100001
+enum bu_second 100002
+enum bu_meter 100003
+enum bu_gram 100004
+enum bu_ampere 100005
+enum bu_kelvin 100006
+enum bu_mol 100007
+enum bu_candela 100008
+enum bu_hertz 100009
+enum bu_newton 100010
+enum bu_pascal 100011
+enum bu_joule 100012
+enum bu_watt 100013
+enum bu_volt 100014
+enum bu_ohm 100015
+enum bu_farad 100016
+enum bu_coulomb 100017
+enum bu_siemens 100018
+enum bu_weber 100019
+enum bu_tesla 100020
+enum bu_henry 100021
+enum bu_lumen 100022
+enum bu_lux 100023
+enum bu_becquerel 100024
+enum bu_gray 100025
+enum bu_sievert 100026
+enum bu_katal 100027
+enum bu_liter 100028
+enum bu_minute 100029
+enum bu_hour 100030
+enum bu_day 100031
+enum bu_degree 100032
+enum bu_celsius 100033
+enum bu_radian 100034
+enum bu_steradian 100035
+enum bu_tonne 100036
+enum bu_bar 100037
+enum bu_electronvolt 100038
+enum bu_dalton 100039
+enum bu_astronomical_unit 100040
+enum bu_hectare 100041
+enum bu_week 100042
+enum bu_year 100043
+enum bu_inch 100044
+enum bu_foot 100045
+enum bu_yard 100046
+enum bu_mile 100047
+enum bu_nautical_mile 100048
+enum bu_angstrom 100049
+enum bu_light_year 100050
+enum bu_parsec 100051
+enum bu_furlong 100052
+enum bu_fathom 100053
+enum bu_pound 100054
+enum bu_ounce 100055
+enum bu_grain 100056
+enum bu_stone 100057
+enum bu_short_ton 100058
+enum bu_long_ton 100059
+enum bu_troy_ounce 100060
+enum bu_carat 100061
+enum bu_fahrenheit 100062
+enum bu_atmosphere 100063
+enum bu_mmhg 100064
+enum bu_torr 100065
+enum bu_psi 100066
+enum bu_calorie 100067
+enum bu_btu 100068
+enum bu_erg 100069
+enum bu_therm 100070
+enum bu_horsepower 100071
+enum bu_pound_force 100072
+enum bu_dyne 100073
+enum bu_kip 100074
+enum bu_knot 100075
+enum bu_gallon 100076
+enum bu_gallon_uk 100077
+enum bu_quart 100078
+enum bu_pint 100079
+enum bu_cup 100080
+enum bu_fluid_ounce 100081
+enum bu_tablespoon 100082
+enum bu_teaspoon 100083
+enum bu_barrel 100084
+enum bu_acre 100085
+enum bu_barn 100086
+enum bu_arcminute 100087
+enum bu_arcsecond 100088
+enum bu_grad 100089
+enum bu_poise 100090
+enum bu_stokes 100091
+enum bu_gauss 100092
+enum bu_maxwell 100093
+enum bu_oersted 100094
+enum bu_stilb 100095
+enum bu_phot 100096
+enum bu_galileo 100097
+enum bu_curie 100098
+enum bu_roentgen 100099
+enum bu_rem 100100
+enum bu_neper 100101
+enum bu_decibel 100102
+enum bu_rankine 100103
+enum bu_slug 100104
+enum bu_thou 100105
+enum bu_pint_uk 100106
+enum bu_fluid_ounce_uk 100107
+enum bu_quart_uk 100108
+enum bu_var 100109
+enum bu_volt_ampere 100110
+enum bu_kilogram_force 100111
+enum bu_inch_hg 100112
+enum bu_rpm 100113
+enum bu_foot_pound 100114
+enum bu_dram 100115
+enum bu_pennyweight 100116
+enum bu_chain 100117
+enum bu_rod 100118
+enum bu_gill 100119
+enum bu_gill_uk 100120
+enum bu_standard_gravity 100121
+enum bu_metric_horsepower 100122
+enum bu_revolution 100123
+enum bu_month 100124
+enum bu_fortnight 100125
+enum bu_atmosphere_technical 100126
+enum bu_tex 100127
+enum bu_denier 100128
+enum bu_fluid_dram 100129
+enum bu_minim 100130
+enum bu_peck 100131
+enum bu_bushel 100132
+enum bu_pfund 100133
+enum bu_zentner 100134
+enum bu_doppelzentner 100135
+enum bu_lot 100136
+enum bu_prussian_line 100137
+enum bu_prussian_zoll 100138
+enum bu_prussian_fuss 100139
+enum bu_prussian_elle 100140
+enum bu_prussian_rute 100141
+enum bu_klafter 100142
+enum bu_german_mile 100143
+enum bu_morgen 100144
+enum bu_scheffel 100145
+enum bu_survey_foot 100146
+enum bu_league 100147
+enum bu_cable 100148
+enum bu_hand 100149
+enum bu_quintal 100150
+enum bu_scruple 100151
+enum bu_baud 100152
+enum bu_delisle 100153
+enum bu_newton_temp 100154
+enum bu_reaumur 100155
+enum bu_romer 100156
+enum bu_percent 100157
+enum bu_per_mille 100158
+enum bu_per_myriad 100159
+enum bu_per_cent_mille 100160
+enum bu_ppm 100161
+enum bu_ppb 100162
+enum bu_ph_scale 100163
+enum bu_mile_per_hour 100164
+enum bu_kilometer_per_hour 100165
+enum bu_german_hardness 100166
+enum bu_english_hardness 100167
+enum bu_french_hardness 100168
+enum bu_russian_hardness 100169
+enum bu_american_hardness 100170
+enum bu_val 100171
+enum bu_grains_per_gallon 100172
+enum bu_turbidity_ntu 100173
+enum bu_turbidity_fnu 100174
+enum bu_practical_salinity 100175
+enum bu_conductivity_factor 100176
+enum bu_turbidity_ftu 100177
+enum bu_turbidity_fau 100178
+enum bu_turbidity_jtu 100179
+enum bu_delta_kelvin 100180
+enum bu_delta_fahrenheit 100181
+enum bu_delta_delisle 100182
+enum bu_delta_newton_temp 100183
+enum bu_delta_reaumur 100184
+enum bu_delta_romer 100185
+enum bu_meter_water 100186
+enum bu_calorie_it 100187
+enum bu_btu_th 100188
+enum bu_troy_pound 100189
+enum bu_apothecary_dram 100190
+enum bu_long_hundredweight 100191
+enum bu_survey_inch 100192
+enum bu_survey_yard 100193
+enum bu_survey_fathom 100194
+enum bu_survey_rod 100195
+enum bu_survey_chain 100196
+enum bu_survey_link 100197
+enum bu_survey_furlong 100198
+enum bu_survey_mile 100199
+enum bu_survey_acre 100200
+enum bu_point 100201
+enum bu_pica 100202
+enum bu_line 100203
+enum bu_dry_gallon 100204
+enum bu_dry_quart 100205
+enum bu_dry_pint 100206
+enum bu_board_foot 100207
+enum bu_cord 100208
+enum bu_survey_acre_foot 100209
+enum bu_darcy 100210
+enum bu_therm_ec 100211
+enum bu_refrigeration_ton 100212
+enum bu_dobson 100213
+enum bu_shake 100214
+enum bu_ppt 100215
+enum bu_ppq 100216
+enum bu_printers_point 100217
+enum bu_printers_pica 100218
+enum bu_horsepower_electric 100219
+enum bu_horsepower_boiler 100220
+enum bu_abvolt 100221
+enum bu_assay_ton 100222
+enum bu_bushel_uk 100223
+enum bu_clo 100224
+enum bu_debye 100225
+enum bu_year_tropical 100226
+enum bu_year_gregorian 100227
+enum bu_year_sidereal 100228
+enum bu_year_common 100229
+enum bu_month_synodal 100230
+enum bu_month_tropical 100231
+enum bu_month_sidereal 100232
+enum bu_day_sidereal 100233
+enum bu_hour_sidereal 100234
+enum bu_minute_sidereal 100235
+enum bu_second_sidereal 100236
+enum bu_statvolt 100237
+enum bu_statampere 100238
+enum bu_statcoulomb 100239
+enum bu_statfarad 100240
+enum bu_statohm 100241
+enum bu_stathenry 100242
+enum bu_statsiemens 100243
+enum bu_lambert 100244
+enum bu_apostilb 100245
+enum bu_footlambert 100246
+enum bu_perm_0c 100247
+enum bu_perm_23c 100248
+enum bu_perm_metric 100249
+enum bu_calorie_mean 100250
+enum bu_calorie_15c 100251
+enum bu_calorie_20c 100252
+enum bu_btu_59f 100253
+enum bu_btu_60f 100254
+enum bu_btu_mean 100255
+enum bu_elementary_charge 100256
+enum bu_spere 100257
+enum bu_circular_mil 100258
+enum bu_unit_pole 100259
+enum bu_horsepower_water 100260
+enum bu_month_gregorian 100261
+enum bu_statweber 100262
+enum bu_stattesla 100263
+enum bu_ucum_iu 200000
+enum bu_ucum_arb_u 200001
+enum bu_ucum_usp_u 200002
+enum bu_ucum_gpl_u 200003
+enum bu_ucum_mpl_u 200004
+enum bu_ucum_apl_u 200005
+enum bu_ucum_beth_u 200006
+enum bu_ucum_anti_xa_u 200007
+enum bu_ucum_todd_u 200008
+enum bu_ucum_dye_u 200009
+enum bu_ucum_smgy_u 200010
+enum bu_ucum_bdsk_u 200011
+enum bu_ucum_ka_u 200012
+enum bu_ucum_knk_u 200013
+enum bu_ucum_mclg_u 200014
+enum bu_ucum_tb_u 200015
+enum bu_ucum_ccid_50 200016
+enum bu_ucum_tcid_50 200017
+enum bu_ucum_eid_50 200018
+enum bu_ucum_pfu 200019
+enum bu_ucum_ffu 200020
+enum bu_ucum_cfu 200021
+enum bu_ucum_bau 200022
+enum bu_ucum_au_allerg 200023
+enum bu_ucum_amb_a_1_u 200024
+enum bu_ucum_pnu 200025
+enum bu_ucum_lf 200026
+enum bu_ucum_d_ag_u 200027
+enum bu_ucum_feu 200028
+enum bu_ucum_elu 200029
+enum bu_ucum_eu 200030
+enum bu_ucum_hp_x 200031
+enum bu_ucum_hp_c 200032
+enum bu_ucum_hp_m 200033
+enum bu_ucum_hp_q 200034
+enum bu_ucum_kp_x 200035
+enum bu_ucum_kp_c 200036
+enum bu_ucum_kp_m 200037
+enum bu_ucum_kp_q 200038
+enum bu_ucum_ir 200039
+enum bu_unece_one 300000
+enum bu_unece_piece 300001
+enum bu_unece_article 300002
+enum bu_unece_pair 300003
+enum bu_unece_set 300004
+enum bu_unece_bag 300005
+enum bu_unece_barrel 300006
+enum bu_unece_bottle 300007
+enum bu_unece_box 300008
+enum bu_unece_bunch 300009
+enum bu_unece_can 300010
+enum bu_unece_carton 300011
+enum bu_unece_case 300012
+enum bu_unece_container 300013
+enum bu_unece_crate 300014
+enum bu_unece_drum 300015
+enum bu_unece_package 300016
+enum bu_unece_packet 300017
+enum bu_unece_pallet 300018
+enum bu_unece_reel 300019
+enum bu_unece_roll 300020
+enum bu_unece_sack 300021
+enum bu_unece_sheet 300022
+enum bu_unece_tube 300023
+enum bu_unece_vial 300024
+enum exp_range_min -100
+enum exp_range_max 100
+enum exp_invalid 0
+enum exp_linear 1
+enum exp_square 2
+enum exp_cubic 3
+enum exp_quartic 4
+enum exp_quintic 5
+enum exp_sextic 6
+enum exp_septic 7
+enum exp_octic 8
+enum exp_nonic 9
+enum exp_neg_linear -1
+enum exp_neg_square -2
+enum exp_neg_cubic -3
+enum exp_neg_quartic -4
+enum exp_neg_quintic -5
+enum exp_neg_sextic -6
+enum exp_neg_septic -7
+enum exp_neg_octic -8
+enum exp_neg_nonic -9
+enum bvnr_rule_convert 0
+enum bvnr_rule_require 1
+enum bvnr_normalise_none 0
+enum bvnr_normalise_si 1
+enum bvnr_inexact_error 0
+enum bvnr_inexact_leave 1
+enum BVN_DOM_NULL 0
+enum BVN_DOM_INT 1
+enum BVN_DOM_FLOAT 2
+enum BVN_DOM_STRING 3
+enum BVN_DOM_SYMBOL 4
+enum BVN_DOM_REFERENCE 5
+enum BVN_DOM_STRUCT 6
+enum BVN_DOM_ARRAY 7
+enum BVN_DOM_OCTET_STREAM 8
+enum BVN_DOM_BOOL 9
+enum bvn_si_dim_meter 0
+enum bvn_si_dim_kilogram 1
+enum bvn_si_dim_second 2
+enum bvn_si_dim_ampere 3
+enum bvn_si_dim_kelvin 4
+enum bvn_si_dim_mol 5
+enum bvn_si_dim_candela 6
+enum bvn_si_dim_count 7
+enum bvn_epoch_mjd 0
+enum bvn_epoch_ntp 15020
+enum bvn_epoch_tai 36204
+enum bvn_epoch_unix 40587
+enum bvn_epoch_gps 44244
+enum bvn_epoch_glonass 50083
+enum bvn_epoch_galileo 51412
+enum bvn_epoch_2000 51544
+enum bvn_epoch_beidou 53736
+const BVN_INT_MAX_BITS 32768
+const BVN_INT_MAX_LIMBS 1024
+const BVN_FLOAT_MAX_PREC 32768
+const BVN_LIMB_BITS 64
+const BVN_FLOAT_EXP_MIN -9223372036854775808
+const BVN_FLOAT_EXP_ZERO -9223372036854775807
+const BVN_FLOAT_EXP_NAN -9223372036854775806
+const BVN_FLOAT_EXP_INF -9223372036854775805
+const BVNR_MAX_UNIT_COMPONENTS 32
+const BVNR_UNIT_STRING_MAX 1088
+const BVNR_UNIT_SOURCE_MAX 255
+const BVN_MAX_INT_WIDTH 32768
+const BVNR_FILESIZE_UNLIMITED 0
+const BVN_UNIT_BLOCK_SIZE 10000
+const BVN_UNIT_ID_FIRST 100000
+const BVN_UNIT_NATIVE_FIRST 100000
+const BVN_UNIT_NATIVE_LAST 100263
+const BVN_UNIT_NATIVE_COUNT 264
+const BVN_UNIT_SLOT_NATIVE_BASE 1
+const BVN_PROFILE_UCUM_OPAQUE_FIRST 200000
+const BVN_PROFILE_UCUM_OPAQUE_LAST 200039
+const BVN_PROFILE_UCUM_OPAQUE_COUNT 40
+const BVN_PROFILE_UCUM_SLOT_BASE 265
+const BVN_PROFILE_UNECE_OPAQUE_FIRST 300000
+const BVN_PROFILE_UNECE_OPAQUE_LAST 300024
+const BVN_PROFILE_UNECE_OPAQUE_COUNT 25
+const BVN_PROFILE_UNECE_SLOT_BASE 305
+const BVN_PROFILE_QUDT_OPAQUE_FIRST 400000
+const BVN_PROFILE_QUDT_OPAQUE_LAST 399999
+const BVN_PROFILE_QUDT_OPAQUE_COUNT 0
+const BVN_PROFILE_QUDT_SLOT_BASE 330
+const BVN_PROFILE_QUDT_QK_OPAQUE_FIRST 500000
+const BVN_PROFILE_QUDT_QK_OPAQUE_LAST 499999
+const BVN_PROFILE_QUDT_QK_OPAQUE_COUNT 0
+const BVN_PROFILE_QUDT_QK_SLOT_BASE 330
+const BVN_PROFILE_UDUNITS_OPAQUE_FIRST 600000
+const BVN_PROFILE_UDUNITS_OPAQUE_LAST 599999
+const BVN_PROFILE_UDUNITS_OPAQUE_COUNT 0
+const BVN_PROFILE_UDUNITS_SLOT_BASE 330
+const BVN_PROFILE_OM_OPAQUE_FIRST 700000
+const BVN_PROFILE_OM_OPAQUE_LAST 699999
+const BVN_PROFILE_OM_OPAQUE_COUNT 0
+const BVN_PROFILE_OM_SLOT_BASE 330
+const BVN_PROFILE_CF_OPAQUE_FIRST 800000
+const BVN_PROFILE_CF_OPAQUE_LAST 799999
+const BVN_PROFILE_CF_OPAQUE_COUNT 0
+const BVN_PROFILE_CF_SLOT_BASE 330
+const BVN_PROFILE_OPAQUE_COUNT 65
+const BVN_UNIT_SLOT_COUNT 330
+const BVN_EXPONENT_MIN -100
+const BVN_EXPONENT_MAX 100
+const BVNR_DEFAULT_MAX_CONVERSION_LENGTH 1024
+const BVN_UNIT_FLAGS_NONE 0
+const BVN_UNIT_REDUCE 1
+const BVN_UNIT_ASCII_EXP 2
+const BVN_NUM_CANONICAL 4
+const BVNR_SOURCE_RESERVED_SIZE 64
+const BVNR_SINK_RESERVED_SIZE 64
+const BVNR_MAX_UNIT_TARGETS 8
+const BVNR_MAX_UNIT_RULES 8
+const BVNR_MAX_UNIT_PATH 96
+const BVN_CURRENCY_FIRST 900000
+const BVN_CURRENCY_LAST 900215
+const BVN_CURRENCY_COUNT 216
+const BVNR_CURRENCY_ROWS 216
+const BVN_RATIONAL_NONTERMINATING -2
+const BVN_RATIONAL_TOO_LONG -3
+const BVNR_FRAME_MAGIC0 66
+const BVNR_FRAME_MAGIC1 86
+const BVNR_FRAME_MAGIC2 70
+const BVNR_FRAME_MAGIC3 49
+const BVNR_FRAME_HEADER_SIZE 12
+const BVNR_DOC_DEFAULT_MAX 268435456
+const BVNR_MUX_MAX_MESSAGE 65516
+const BVNR_MUX_DEFAULT_MAX 67108864
+const BVN_MJD_OFFSET 678881
+const BVN_LOWER_YEAR_BOUNDARY_MARGIN 254
+const BVN_UPPER_YEAR_BOUNDARY_MARGIN 268
+const BVN_GDATE_OVF -9223372036854775808
+const BVN_GDATE_MJD_MIN -9223372036854775554
+const BVN_GDATE_MJD_MAX 9223372036854096658
+const BVN_GDATE_YEAR_MIN -25252734927764695
+const BVN_GDATE_YEAR_MAX 25252734927766553
+func bvn_char_to_digit uint32_t (uint32_t, uint32_t)
+func bvn_currency_info const bvn_currency_info_t * (int)
+func bvn_currency_minor_unit uint8_t (int, _Bool *)
+func bvn_currency_prefix_valid _Bool (int, int)
+func bvn_dom_array_append _Bool (bvn_dom_node_t *, bvn_dom_node_t *)
+func bvn_dom_array_at bvn_dom_node_t * (const bvn_dom_node_t *, uint32_t)
+func bvn_dom_array_count uint32_t (const bvn_dom_node_t *)
+func bvn_dom_array_dims uint32_t (const bvn_dom_node_t *)
+func bvn_dom_doc_add _Bool (bvn_dom_doc_t *, const char *, uint32_t, bvn_dom_node_t *)
+func bvn_dom_doc_count uint32_t (const bvn_dom_doc_t *)
+func bvn_dom_doc_create bvn_dom_doc_t * (void)
+func bvn_dom_doc_destroy void (bvn_dom_doc_t *)
+func bvn_dom_doc_entries const bvn_dom_entry_t * (const bvn_dom_doc_t *)
+func bvn_dom_doc_get_parse_error error_code_t (const bvn_dom_doc_t *)
+func bvn_dom_free_string void (char *)
+func bvn_dom_get_bigint const bvn_int_t * (const bvn_dom_node_t *)
+func bvn_dom_get_bool _Bool (const bvn_dom_node_t *, _Bool *)
+func bvn_dom_get_datetime_fraction const char * (const bvn_dom_node_t *, uint32_t *)
+func bvn_dom_get_float _Bool (const bvn_dom_node_t *, double *)
+func bvn_dom_get_i16 _Bool (const bvn_dom_node_t *, int16_t *)
+func bvn_dom_get_i32 _Bool (const bvn_dom_node_t *, int32_t *)
+func bvn_dom_get_i64 _Bool (const bvn_dom_node_t *, int64_t *)
+func bvn_dom_get_i8 _Bool (const bvn_dom_node_t *, int8_t *)
+func bvn_dom_get_octets _Bool (const bvn_dom_node_t *, const uint8_t * *, uint32_t *)
+func bvn_dom_get_reference _Bool (const bvn_dom_node_t *, const char * *, uint32_t *)
+func bvn_dom_get_string _Bool (const bvn_dom_node_t *, const char * *, uint32_t *)
+func bvn_dom_get_symbol _Bool (const bvn_dom_node_t *, const char * *, uint32_t *)
+func bvn_dom_get_u16 _Bool (const bvn_dom_node_t *, uint16_t *)
+func bvn_dom_get_u32 _Bool (const bvn_dom_node_t *, uint32_t *)
+func bvn_dom_get_u64 _Bool (const bvn_dom_node_t *, uint64_t *)
+func bvn_dom_get_u8 _Bool (const bvn_dom_node_t *, uint8_t *)
+func bvn_dom_get_unit value_unit_t (const bvn_dom_node_t *)
+func bvn_dom_get_unit_source const char * (const bvn_dom_node_t *, uint32_t *)
+func bvn_dom_get_unit_string int32_t (const bvn_dom_node_t *, char *, size_t)
+func bvn_dom_get_value_in_base_units double (const bvn_dom_node_t *)
+func bvn_dom_get_value_type value_type_spec_t (const bvn_dom_node_t *)
+func bvn_dom_int_to_str char * (const bvn_dom_node_t *, uint32_t)
+func bvn_dom_is_null _Bool (const bvn_dom_node_t *)
+func bvn_dom_lookup bvn_dom_node_t * (const bvn_dom_doc_t *, const char *)
+func bvn_dom_node_alloc bvn_dom_node_t * (bvn_dom_type_t)
+func bvn_dom_node_destroy void (bvn_dom_node_t *)
+func bvn_dom_node_from_bigint bvn_dom_node_t * (bvn_int_t *, value_type_spec_t, value_unit_t)
+func bvn_dom_node_from_i16 bvn_dom_node_t * (int16_t)
+func bvn_dom_node_from_i32 bvn_dom_node_t * (int32_t)
+func bvn_dom_node_from_i64 bvn_dom_node_t * (int64_t)
+func bvn_dom_node_from_i8 bvn_dom_node_t * (int8_t)
+func bvn_dom_node_from_u16 bvn_dom_node_t * (uint16_t)
+func bvn_dom_node_from_u32 bvn_dom_node_t * (uint32_t)
+func bvn_dom_node_from_u64 bvn_dom_node_t * (uint64_t)
+func bvn_dom_node_from_u8 bvn_dom_node_t * (uint8_t)
+func bvn_dom_node_type bvn_dom_type_t (const bvn_dom_node_t *)
+func bvn_dom_parse bvn_dom_doc_t * (const void *, uint32_t)
+func bvn_dom_parse_fd bvn_dom_doc_t * (int)
+func bvn_dom_parse_fd_ex bvn_dom_doc_t * (int, uint64_t)
+func bvn_dom_parse_fd_policy bvn_dom_doc_t * (int, uint64_t, const bvnr_unit_policy_t *)
+func bvn_dom_parse_policy bvn_dom_doc_t * (const void *, uint32_t, const bvnr_unit_policy_t *)
+func bvn_dom_strdup char * (const char *, uint32_t)
+func bvn_dom_struct_add _Bool (bvn_dom_node_t *, const char *, uint32_t, bvn_dom_node_t *)
+func bvn_dom_struct_count uint32_t (const bvn_dom_node_t *)
+func bvn_dom_struct_entries const bvn_dom_entry_t * (const bvn_dom_node_t *)
+func bvn_dom_struct_get bvn_dom_node_t * (const bvn_dom_node_t *, const char *)
+func bvn_dt_convert_epoch_seconds int64_t (bvn_epoch_t, bvn_epoch_t, int64_t)
+func bvn_dt_datetime_to_epoch_seconds int64_t (bvn_datetime_t *, bvn_epoch_t)
+func bvn_dt_dump void (bvn_datetime_t *)
+func bvn_dt_epoch_seconds_from_galileo_time int64_t (int64_t, int64_t, bvn_epoch_t)
+func bvn_dt_epoch_seconds_from_gps_time int64_t (int64_t, int64_t, bvn_epoch_t)
+func bvn_dt_epoch_seconds_to_datetime void (bvn_datetime_t *, bvn_epoch_t, int64_t)
+func bvn_dt_is_date_equal int (bvn_datetime_t *, bvn_datetime_t *)
+func bvn_dt_is_equal int (bvn_datetime_t *, bvn_datetime_t *)
+func bvn_dt_is_time_equal int (bvn_datetime_t *, bvn_datetime_t *)
+func bvn_dt_print void (bvn_datetime_t *)
+func bvn_dt_tai_second_is_dls_in_europe int (int64_t)
+func bvn_dt_tai_seconds_from_galileo_time int64_t (int64_t, int64_t)
+func bvn_dt_tai_seconds_from_gps_time int64_t (int64_t, int64_t)
+func bvn_dt_tai_seconds_to_local_time void (bvn_datetime_t *, int64_t, int64_t, int)
+func bvn_dt_tai_seconds_to_utc void (bvn_datetime_t *, int64_t)
+func bvn_dt_utc_to_tai_seconds int64_t (bvn_datetime_t *)
+func bvn_error_to_string const char * (error_code_t)
+func bvn_exponent_to_int int32_t (unit_exponent_t)
+func bvn_float_alloc bvn_float_t * (uint32_t)
+func bvn_float_copy _Bool (bvn_float_t *, const bvn_float_t *)
+func bvn_float_fix_in_range _Bool (const bvn_float_t *, uint32_t, uint32_t)
+func bvn_float_free void (bvn_float_t *)
+func bvn_float_from_bin128 _Bool (bvn_float_t *, const uint32_t [ 4 ])
+func bvn_float_from_bin16 _Bool (bvn_float_t *, uint16_t)
+func bvn_float_from_bin256 _Bool (bvn_float_t *, const uint32_t [ 8 ])
+func bvn_float_from_bin32 _Bool (bvn_float_t *, uint32_t)
+func bvn_float_from_bin64 _Bool (bvn_float_t *, uint64_t)
+func bvn_float_from_dec128 _Bool (bvn_float_t *, const uint32_t [ 4 ])
+func bvn_float_from_dec16 _Bool (bvn_float_t *, uint16_t)
+func bvn_float_from_dec256 _Bool (bvn_float_t *, const uint32_t [ 8 ])
+func bvn_float_from_dec32 _Bool (bvn_float_t *, uint32_t)
+func bvn_float_from_dec64 _Bool (bvn_float_t *, uint64_t)
+func bvn_float_from_double _Bool (bvn_float_t *, double)
+func bvn_float_from_fix128 _Bool (bvn_float_t *, const uint32_t [ 4 ], uint32_t)
+func bvn_float_from_fix16 _Bool (bvn_float_t *, int16_t, uint32_t)
+func bvn_float_from_fix256 _Bool (bvn_float_t *, const uint32_t [ 8 ], uint32_t)
+func bvn_float_from_fix32 _Bool (bvn_float_t *, int32_t, uint32_t)
+func bvn_float_from_fix64 _Bool (bvn_float_t *, int64_t, uint32_t)
+func bvn_float_from_float _Bool (bvn_float_t *, float)
+func bvn_float_from_ieee_bin _Bool (bvn_float_t *, uint32_t, uint32_t, int32_t, const uint32_t *, int)
+func bvn_float_from_str _Bool (bvn_float_t *, const char *, uint32_t)
+func bvn_float_init_buf void (bvn_float_t *, uint32_t, bvn_limb_t *, uint32_t)
+func bvn_float_is_inf _Bool (const bvn_float_t *)
+func bvn_float_is_nan _Bool (const bvn_float_t *)
+func bvn_float_is_neg _Bool (const bvn_float_t *)
+func bvn_float_is_regular _Bool (const bvn_float_t *)
+func bvn_float_is_zero _Bool (const bvn_float_t *)
+func bvn_float_parse_rational _Bool (const char *, uint32_t, bvn_int_t *, bvn_int_t *)
+func bvn_float_set_inf void (bvn_float_t *, _Bool)
+func bvn_float_set_nan void (bvn_float_t *)
+func bvn_float_set_zero void (bvn_float_t *, _Bool)
+func bvn_float_str_bufsize size_t (uint32_t, uint32_t)
+func bvn_float_str_fits_fix _Bool (const char *, uint32_t, uint32_t, uint32_t)
+func bvn_float_strtod double (const char *)
+func bvn_float_strtodec _Bool (const char *, uint32_t, uint32_t *, int)
+func bvn_float_strtoieee_bin void (const char *, uint32_t, uint32_t, uint32_t, int32_t, uint32_t *, int)
+func bvn_float_to_bin128 void (const bvn_float_t *, uint32_t [ 4 ])
+func bvn_float_to_bin16 void (const bvn_float_t *, uint16_t *)
+func bvn_float_to_bin256 void (const bvn_float_t *, uint32_t [ 8 ])
+func bvn_float_to_bin32 void (const bvn_float_t *, uint32_t *)
+func bvn_float_to_bin64 void (const bvn_float_t *, uint64_t *)
+func bvn_float_to_dec128 void (const bvn_float_t *, uint32_t [ 4 ])
+func bvn_float_to_dec16 void (const bvn_float_t *, uint16_t *)
+func bvn_float_to_dec256 void (const bvn_float_t *, uint32_t [ 8 ])
+func bvn_float_to_dec32 void (const bvn_float_t *, uint32_t *)
+func bvn_float_to_dec64 void (const bvn_float_t *, uint64_t *)
+func bvn_float_to_double _Bool (const bvn_float_t *, double *)
+func bvn_float_to_fix128 void (const bvn_float_t *, uint32_t, uint32_t [ 4 ])
+func bvn_float_to_fix16 int16_t (const bvn_float_t *, uint32_t)
+func bvn_float_to_fix256 void (const bvn_float_t *, uint32_t, uint32_t [ 8 ])
+func bvn_float_to_fix32 int32_t (const bvn_float_t *, uint32_t)
+func bvn_float_to_fix64 int64_t (const bvn_float_t *, uint32_t)
+func bvn_float_to_float _Bool (const bvn_float_t *, float *)
+func bvn_float_to_ieee_bin void (const bvn_float_t *, uint32_t, uint32_t, int32_t, uint32_t *, int)
+func bvn_float_to_str int32_t (const bvn_float_t *, char *, size_t, uint32_t)
+func bvn_format_double int32_t (char *, size_t, double, value_type_spec_t)
+func bvn_format_int64 int32_t (char *, size_t, int64_t, uint32_t, uint32_t)
+func bvn_format_uint64 int32_t (char *, size_t, uint64_t, uint32_t, uint32_t)
+func bvn_get_escape_repl_table const uint8_t * (void)
+func bvn_gregorian_date_calc_ascension_day _Bool (bvn_gregorian_date_t *, int64_t)
+func bvn_gregorian_date_calc_easter_monday _Bool (bvn_gregorian_date_t *, int64_t)
+func bvn_gregorian_date_calc_easter_sunday _Bool (bvn_gregorian_date_t *, int64_t)
+func bvn_gregorian_date_calc_good_friday _Bool (bvn_gregorian_date_t *, int64_t)
+func bvn_gregorian_date_calc_whit_monday _Bool (bvn_gregorian_date_t *, int64_t)
+func bvn_gregorian_date_easter_sunday_mjd int64_t (int64_t)
+func bvn_gregorian_date_from_mjd void (bvn_gregorian_date_t *, int64_t)
+func bvn_gregorian_date_get_first_banking_day_in_month void (bvn_gregorian_date_t *, bvn_gregorian_date_t *)
+func bvn_gregorian_date_get_first_banking_day_in_quarter void (int, bvn_gregorian_date_t *, bvn_gregorian_date_t *)
+func bvn_gregorian_date_get_last_banking_day_in_month void (bvn_gregorian_date_t *, bvn_gregorian_date_t *)
+func bvn_gregorian_date_get_last_banking_day_in_quarter void (int, bvn_gregorian_date_t *, bvn_gregorian_date_t *)
+func bvn_gregorian_date_get_last_saturday_in_month void (bvn_gregorian_date_t *, bvn_gregorian_date_t *)
+func bvn_gregorian_date_get_last_sunday_in_month void (bvn_gregorian_date_t *, bvn_gregorian_date_t *)
+func bvn_gregorian_date_get_mid_banking_day_in_month void (bvn_gregorian_date_t *, bvn_gregorian_date_t *)
+func bvn_gregorian_date_get_penultimate_banking_day_in_month void (bvn_gregorian_date_t *, bvn_gregorian_date_t *)
+func bvn_gregorian_date_is_banking_day_in_germany _Bool (bvn_gregorian_date_t *)
+func bvn_gregorian_date_is_business_day_in_germany _Bool (bvn_gregorian_date_t *)
+func bvn_gregorian_date_is_day_before_daylight_saving_switch_in_germany _Bool (bvn_gregorian_date_t *)
+func bvn_gregorian_date_is_daylight_saving_switch_in_germany _Bool (bvn_gregorian_date_t *)
+func bvn_gregorian_date_is_equal _Bool (bvn_gregorian_date_t *, bvn_gregorian_date_t *)
+func bvn_gregorian_date_is_federal_holiday_in_germany _Bool (bvn_gregorian_date_t *)
+func bvn_gregorian_date_is_first_banking_day_in_month _Bool (bvn_gregorian_date_t *)
+func bvn_gregorian_date_is_first_banking_day_in_quarter _Bool (int, bvn_gregorian_date_t *)
+func bvn_gregorian_date_is_last_banking_day_in_month _Bool (bvn_gregorian_date_t *)
+func bvn_gregorian_date_is_last_banking_day_in_quarter _Bool (int, bvn_gregorian_date_t *)
+func bvn_gregorian_date_is_mid_banking_day_in_month _Bool (bvn_gregorian_date_t *)
+func bvn_gregorian_date_is_penultimate_banking_day_in_month _Bool (bvn_gregorian_date_t *)
+func bvn_gregorian_date_mjd_in_leap_year _Bool (int64_t)
+func bvn_gregorian_date_mjd_to_wday int32_t (int64_t)
+func bvn_gregorian_date_mjd_to_yday int32_t (int64_t)
+func bvn_gregorian_date_normalize _Bool (bvn_gregorian_date_t *)
+func bvn_gregorian_date_to_mjd int64_t (const bvn_gregorian_date_t *)
+func bvn_gregorian_date_to_mjd_fast int64_t (const bvn_gregorian_date_t *)
+func bvn_int_add _Bool (bvn_int_t *, const bvn_int_t *, const bvn_int_t *)
+func bvn_int_add_u32 _Bool (bvn_int_t *, uint32_t)
+func bvn_int_alloc bvn_int_t * (void)
+func bvn_int_bitlen int (const bvn_int_t *)
+func bvn_int_cmp int (const bvn_int_t *, const bvn_int_t *)
+func bvn_int_copy _Bool (bvn_int_t *, const bvn_int_t *)
+func bvn_int_div_u32 uint32_t (bvn_int_t *, uint32_t)
+func bvn_int_divrem _Bool (bvn_int_t *, bvn_int_t *, const bvn_int_t *, const bvn_int_t *)
+func bvn_int_free void (bvn_int_t *)
+func bvn_int_from_int16 _Bool (bvn_int_t *, int16_t)
+func bvn_int_from_int32 _Bool (bvn_int_t *, int32_t)
+func bvn_int_from_int64 _Bool (bvn_int_t *, int64_t)
+func bvn_int_from_int8 _Bool (bvn_int_t *, int8_t)
+func bvn_int_from_str _Bool (bvn_int_t *, const char *, uint32_t)
+func bvn_int_from_uint16 _Bool (bvn_int_t *, uint16_t)
+func bvn_int_from_uint32 _Bool (bvn_int_t *, uint32_t)
+func bvn_int_from_uint64 _Bool (bvn_int_t *, uint64_t)
+func bvn_int_from_uint8 _Bool (bvn_int_t *, uint8_t)
+func bvn_int_gcd _Bool (bvn_int_t *, const bvn_int_t *, const bvn_int_t *)
+func bvn_int_getbit int (const bvn_int_t *, int)
+func bvn_int_is_zero _Bool (const bvn_int_t *)
+func bvn_int_mul _Bool (bvn_int_t *, const bvn_int_t *, const bvn_int_t *)
+func bvn_int_mul_pow10 _Bool (bvn_int_t *, int)
+func bvn_int_mul_u32 _Bool (bvn_int_t *, uint32_t)
+func bvn_int_norm void (bvn_int_t *)
+func bvn_int_setbit _Bool (bvn_int_t *, int)
+func bvn_int_shl _Bool (bvn_int_t *, int)
+func bvn_int_shr void (bvn_int_t *, int)
+func bvn_int_str_bufsize size_t (uint32_t, uint32_t)
+func bvn_int_sub_inplace _Bool (bvn_int_t *, const bvn_int_t *)
+func bvn_int_to_exponent unit_exponent_t (int32_t)
+func bvn_int_to_int16 _Bool (const bvn_int_t *, int16_t *)
+func bvn_int_to_int32 _Bool (const bvn_int_t *, int32_t *)
+func bvn_int_to_int64 _Bool (const bvn_int_t *, int64_t *)
+func bvn_int_to_int8 _Bool (const bvn_int_t *, int8_t *)
+func bvn_int_to_str int32_t (const bvn_int_t *, char *, size_t, uint32_t)
+func bvn_int_to_uint16 _Bool (const bvn_int_t *, uint16_t *)
+func bvn_int_to_uint32 _Bool (const bvn_int_t *, uint32_t *)
+func bvn_int_to_uint64 _Bool (const bvn_int_t *, uint64_t *)
+func bvn_int_to_uint8 _Bool (const bvn_int_t *, uint8_t *)
+func bvn_int_zero void (bvn_int_t *)
+func bvn_is_special_number_string _Bool (const char *)
+func bvn_looks_like_double _Bool (const char *)
+func bvn_min_digits_for_type uint32_t (value_type_spec_t)
+func bvn_parse_currency_str int (const uint8_t *, uint32_t)
+func bvn_parse_double _Bool (const char *, value_type_spec_t, double *)
+func bvn_parse_double_in_base _Bool (const char *, uint32_t, double *)
+func bvn_parse_int64 _Bool (const char *, value_type_spec_t, int64_t *)
+func bvn_parse_type_annotation value_type_spec_t (const uint8_t *, uint32_t, _Bool *, _Bool *, _Bool *, value_unit_t *, uint8_t *, uint8_t *)
+func bvn_parse_uint64 _Bool (const char *, value_type_spec_t, uint64_t *)
+func bvn_parse_unit value_unit_t (const uint8_t *, _Bool *)
+func bvn_parse_unit_n value_unit_t (const uint8_t *, uint32_t, _Bool *)
+func bvn_prefix_unit_valid _Bool (value_unit_prefix_t, value_base_unit_t)
+func bvn_rational_str_bufsize size_t (const bvn_int_t *, const bvn_int_t *, uint32_t)
+func bvn_rational_to_str int32_t (const bvn_int_t *, const bvn_int_t *, uint32_t, char *, size_t, _Bool *)
+func bvn_unit_convert_factor double (value_unit_t, value_unit_t, _Bool *, _Bool *)
+func bvn_unit_convert_rational _Bool (const bvn_int_t *, const bvn_int_t *, value_unit_t, value_unit_t, bvn_int_t *, bvn_int_t *, _Bool *)
+func bvn_unit_convert_value _Bool (double, value_unit_t, value_unit_t, double *)
+func bvn_unit_dimension_vector _Bool (value_unit_t, int32_t [ bvn_si_dim_count ])
+func bvn_unit_equal _Bool (value_unit_t, value_unit_t)
+func bvn_unit_error_code error_code_t (const uint8_t *, uint32_t)
+func bvn_unit_is_crypto _Bool (int)
+func bvn_unit_is_currency _Bool (int)
+func bvn_unit_is_fiat _Bool (int)
+func bvn_unit_is_profile_only _Bool (value_unit_t)
+func bvn_unit_prefix_exponent int32_t (value_unit_t)
+func bvn_unit_prefix_factor double (value_unit_t)
+func bvn_unit_profile_count uint32_t (void)
+func bvn_unit_profile_name const char * (uint32_t)
+func bvn_unit_reduce value_unit_t (value_unit_t, double *, _Bool *)
+func bvn_unit_si_normal_form _Bool (value_unit_t, value_unit_t *)
+func bvn_unit_to_profile int32_t (const char *, value_unit_t, char *, size_t)
+func bvn_unit_to_si_factor double (value_unit_t, _Bool *, double *, _Bool *)
+func bvn_unit_to_string int32_t (value_unit_t, char *, size_t)
+func bvn_unit_to_string_ex int32_t (value_unit_t, char *, size_t, bvn_unit_flags_t)
+func bvn_unit_to_ucum int32_t (value_unit_t, char *, size_t)
+func bvn_unit_valid _Bool (value_unit_t)
+func bvn_units_compatible _Bool (value_unit_t, value_unit_t)
+func bvn_units_convertible _Bool (value_unit_t, value_unit_t)
+func bvn_validate_digits_for_base _Bool (const char *, uint32_t)
+func bvn_validate_identifier _Bool (const char *)
+func bvn_validate_number _Bool (const char *)
+func bvn_validate_number_in_base _Bool (const char *, uint32_t)
+func bvn_validate_reference _Bool (const char *)
+func bvn_validate_sint_range _Bool (const char *, uint32_t, uint32_t)
+func bvn_validate_string _Bool (const uint8_t *, size_t)
+func bvn_validate_symbol _Bool (const char *)
+func bvn_validate_uint_range _Bool (const char *, uint32_t, uint32_t)
+func bvnr_canon_observer_create bvnr_canon_observer_t * (const bvnr_sink_t *, _Bool)
+func bvnr_canon_observer_destroy void (bvnr_canon_observer_t *)
+func bvnr_canon_observer_finish _Bool (bvnr_canon_observer_t *)
+func bvnr_canon_observer_on_event _Bool (void *, bvnr_event_t, bvnr_data_t *)
+func bvnr_canon_observer_set_version void (bvnr_canon_observer_t *, uint16_t, uint16_t)
+func bvnr_datetime_epoch_index int32_t (const char *)
+func bvnr_datetime_epoch_mjd int32_t (value_type_spec_t)
+func bvnr_datetime_epoch_name const char * (value_type_spec_t)
+func bvnr_demux_create bvnr_demux_t * (bvnr_mux_on_msg_fn, void *, uint64_t)
+func bvnr_demux_destroy void (bvnr_demux_t *)
+func bvnr_demux_error error_code_t (const bvnr_demux_t *)
+func bvnr_demux_on_event _Bool (void *, bvnr_event_t, bvnr_data_t *)
+func bvnr_demux_set_key _Bool (bvnr_demux_t *, const char *)
+func bvnr_doc_stream_read _Bool (bvnr_source_t *, const bvnr_doc_stream_opts_t *, uint64_t *)
+func bvnr_embed_document _Bool (bvnr_writer_t *, const char *, const void *, uint64_t)
+func bvnr_frame_write _Bool (bvnr_sink_t *, const void *, uint64_t)
+func bvnr_mux_begin _Bool (bvnr_writer_t *, const char *)
+func bvnr_mux_end _Bool (bvnr_writer_t *)
+func bvnr_mux_send _Bool (bvnr_writer_t *, uint64_t, const void *, uint64_t)
+func bvnr_open_read_mem _Bool (bvnr_reader_t *, const void *, uint64_t, void *, uint64_t, bvnr_read_flags_t *)
+func bvnr_open_read_source _Bool (bvnr_reader_t *, const bvnr_source_t *, const bvnr_sink_t *, bvnr_read_flags_t *)
+func bvnr_open_write_mem _Bool (bvnr_writer_t *, void *, uint64_t, _Bool, bvnr_write_flags_t *)
+func bvnr_open_write_sink _Bool (bvnr_writer_t *, const bvnr_sink_t *, _Bool, bvnr_write_flags_t *)
+func bvnr_parse_embedded _Bool (const void *, uint64_t, bvnr_read_flags_t *)
+func bvnr_peek_version _Bool (const void *, uint64_t, uint16_t *, uint16_t *)
+func bvnr_read _Bool (bvnr_reader_t *)
+func bvnr_reader_create bvnr_reader_t * (void)
+func bvnr_reader_destroy void (bvnr_reader_t *)
+func bvnr_reader_get_declared_version _Bool (const bvnr_reader_t *, uint16_t *, uint16_t *)
+func bvnr_reader_get_error error_code_t (const bvnr_reader_t *)
+func bvnr_reader_get_error_byte uint32_t (const bvnr_reader_t *)
+func bvnr_reader_get_error_column uint64_t (const bvnr_reader_t *)
+func bvnr_reader_get_error_line uint64_t (const bvnr_reader_t *)
+func bvnr_reader_get_error_offset uint64_t (const bvnr_reader_t *)
+func bvnr_reader_get_recovery_count uint64_t (const bvnr_reader_t *)
+func bvnr_reader_get_skipped_bytes uint64_t (const bvnr_reader_t *)
+func bvnr_reader_set_unit_policy _Bool (bvnr_reader_t *, const bvnr_unit_policy_t *)
+func bvnr_sink_bytes_written uint64_t (const bvnr_sink_t *)
+func bvnr_sink_to_fd void (bvnr_sink_t *, int)
+func bvnr_sink_to_mem void (bvnr_sink_t *, void *, uint64_t)
+func bvnr_source_from_fd void (bvnr_source_t *, int)
+func bvnr_source_from_mem void (bvnr_source_t *, const void *, uint64_t)
+func bvnr_spec_version void (uint16_t *, uint16_t *)
+func bvnr_version uint32_t (void)
+func bvnr_version_string const char * (void)
+func bvnr_write_bool _Bool (bvnr_writer_t *, const char *, _Bool)
+func bvnr_write_bvnf _Bool (bvnr_writer_t *, const char *, const bvn_float_t *, uint32_t)
+func bvnr_write_bvnf_base _Bool (bvnr_writer_t *, const char *, const bvn_float_t *, uint32_t, uint32_t)
+func bvnr_write_bvnf_base_unit _Bool (bvnr_writer_t *, const char *, const bvn_float_t *, uint32_t, uint32_t, value_unit_t)
+func bvnr_write_bvnf_unit _Bool (bvnr_writer_t *, const char *, const bvn_float_t *, uint32_t, value_unit_t)
+func bvnr_write_bvni _Bool (bvnr_writer_t *, const char *, const bvn_int_t *, uint32_t, uint32_t)
+func bvnr_write_bvni_unit _Bool (bvnr_writer_t *, const char *, const bvn_int_t *, uint32_t, uint32_t, value_unit_t)
+func bvnr_write_datetime _Bool (bvnr_writer_t *, const char *, uint32_t, const char *, int64_t)
+func bvnr_write_event _Bool (bvnr_writer_t *, bvnr_event_t, bvnr_data_t *)
+func bvnr_write_finish _Bool (bvnr_writer_t *)
+func bvnr_write_float _Bool (bvnr_writer_t *, const char *, uint32_t, double)
+func bvnr_write_float_dec _Bool (bvnr_writer_t *, const char *, uint32_t, double)
+func bvnr_write_float_dec_unit _Bool (bvnr_writer_t *, const char *, uint32_t, double, value_unit_t)
+func bvnr_write_float_fix _Bool (bvnr_writer_t *, const char *, uint32_t, uint32_t, double)
+func bvnr_write_float_fix_unit _Bool (bvnr_writer_t *, const char *, uint32_t, uint32_t, double, value_unit_t)
+func bvnr_write_float_unit _Bool (bvnr_writer_t *, const char *, uint32_t, double, value_unit_t)
+func bvnr_write_null _Bool (bvnr_writer_t *, const char *)
+func bvnr_write_plain _Bool (bvnr_writer_t *, const char *, const char *)
+func bvnr_write_sint _Bool (bvnr_writer_t *, const char *, uint32_t, int64_t)
+func bvnr_write_sint_unit _Bool (bvnr_writer_t *, const char *, uint32_t, int64_t, value_unit_t)
+func bvnr_write_string _Bool (bvnr_writer_t *, const char *, const char *)
+func bvnr_write_struct_end _Bool (bvnr_writer_t *)
+func bvnr_write_struct_start _Bool (bvnr_writer_t *, const char *)
+func bvnr_write_type_annotation _Bool (bvnr_writer_t *, value_type_spec_t, value_unit_t)
+func bvnr_write_uint _Bool (bvnr_writer_t *, const char *, uint32_t, uint64_t)
+func bvnr_write_uint_unit _Bool (bvnr_writer_t *, const char *, uint32_t, uint64_t, value_unit_t)
+func bvnr_write_version _Bool (bvnr_writer_t *, uint16_t, uint16_t)
+func bvnr_writer_bytes_written uint64_t (const bvnr_writer_t *)
+func bvnr_writer_create bvnr_writer_t * (void)
+func bvnr_writer_destroy void (bvnr_writer_t *)
+func bvnr_writer_get_error error_code_t (const bvnr_writer_t *)
+func bvnr_writer_get_error_offset uint64_t (const bvnr_writer_t *)
+func bvnr_writer_set_unit_policy _Bool (bvnr_writer_t *, const bvnr_unit_policy_t *)
+func bvnr_writer_set_unit_source _Bool (bvnr_writer_t *, const char *, uint32_t)
+func bvnr_writer_unit_flags bvn_unit_flags_t (const bvnr_writer_t *)

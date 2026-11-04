@@ -267,12 +267,18 @@ The surrounding file is the authority. In summary:
 - Comments explain why rather than what. Where a patch makes a non-obvious
   choice, the comment recording the reason is part of the patch.
 
-`libbvnr.so` carries a versioned soname, and `bvnr_abi_dump` records public
-struct layouts. If a change alters a public type's layout or an exported
-signature, note it in the pull request: it is an ABI break and requires a soname
-bump. Both bindings restate the layouts — `python/bovnar/_ffi.py` and
-`rust/src/ffi.rs` — and change with it; their ABI tests compare them with the C
-compiler's. A new C source goes into `rust/build.rs` as well as into
+`libbvnr.so` carries a versioned soname (`BVNR_ABI_MAJOR` in `CMakeLists.txt`),
+and the public ABI is committed in `tests/abi/`: every public struct's layout,
+enum value, integer constant and prototype in `bvnr-<major>.abi`, and the
+library's exports in `bvnr-<major>.syms`. `bvnr_abi_baseline` (`check_abi.py`)
+fails on any difference. An addition is made by running
+`python3 check_abi.py --update` and committing the baseline with the change and
+a line in `CHANGELOG.md`. A change that alters what a compiled caller depends
+on, such as a public type's layout, an enum value or an exported signature, is an
+ABI break: note it in the pull request, bump `BVNR_ABI_MAJOR`, and `--update`
+starts the new major's baseline. Both bindings restate the layouts —
+`python/bovnar/_ffi.py` and `rust/src/ffi.rs` — and change with it; their ABI
+tests compare them with the C compiler's. A new C source goes into `rust/build.rs` as well as into
 `BVNR_SOURCES`; `bvnr_rust_build_sync` fails until it does.
 
 ## Documentation

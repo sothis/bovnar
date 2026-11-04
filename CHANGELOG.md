@@ -29,6 +29,16 @@ API and implements spec 1.2.
   to `CARGO_TARGET_TMPDIR`, which every target has, instead of `temp_dir()`,
   which WASI does not.
 
+### Changed
+
+- **The MinGW Windows archive links the Universal CRT.** CI builds it in
+  MSYS2's UCRT64 environment instead of MINGW64, which MSYS2 deprecates, so
+  `libbvnr.dll` and `bovnar.exe` import `ucrtbase.dll` (as the MSVC archive
+  does, part of Windows 10 and later) instead of `msvcrt.dll`, and the job
+  fails if they import msvcrt. Its `libbvnr.a` is for a UCRT MinGW toolchain.
+  The Rust MinGW leg stays on MINGW64: Rust's `x86_64-pc-windows-gnu` links
+  msvcrt, and the C objects build.rs compiles must match it.
+
 ### Fixed
 
 - **Long decimal literals round correctly at any length.** Past its digit

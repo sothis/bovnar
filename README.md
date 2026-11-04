@@ -387,7 +387,7 @@ Every build also regenerates the single-file amalgamation into `build/amalgamate
 |---|---|
 | `bovnar-<version>-<count>-amalgamate.tar.xz` | the amalgamation (`bovnar.h`, `bovnar.c`), plus `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`, `doc/` and `examples/` |
 | `bovnar-linux-<version>-<count>.tar.xz` | Linux libraries, CLI and headers, plus `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`, `doc/`, `examples/` and the editor `highlighter/` grammars |
-| `bovnar-windows-msvc-<version>-<count>.zip`, `bovnar-windows-mingw-<version>-<count>.zip` | Windows libraries, CLI and headers, one archive per toolchain (the MinGW one also from the `BVNR_CROSS_MINGW` cross-build on a Linux host); each unpacks to a directory of its own name, plus `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`, `doc/`, `examples/` and the editor `highlighter/` grammars |
+| `bovnar-windows-msvc-<version>-<count>.zip`, `bovnar-windows-mingw-<version>-<count>.zip` | Windows libraries, CLI and headers, one archive per toolchain; both link the Universal CRT (`ucrtbase.dll`, part of Windows 10 and later), the MinGW one being built in MSYS2's UCRT64 environment. The `BVNR_CROSS_MINGW` cross-build on a Linux host makes the MinGW one too, linking whatever CRT the host's mingw-w64 targets (msvcrt on Debian and Ubuntu); each unpacks to a directory of its own name, plus `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`, `doc/`, `examples/` and the editor `highlighter/` grammars |
 
 Disable with `-DBVNR_PACKAGE=OFF`.
 
@@ -483,7 +483,7 @@ builds into its own subdirectory so the two can coexist in one checkout:
 cmake -B build/msvc -A x64 .
 cmake --build build/msvc --config Release   # -> bvnr.dll + bvnr.lib, bvnr_static.lib, bovnar.exe
 
-# MinGW64
+# MinGW-w64 (an MSYS2 UCRT64 shell, as CI uses)
 cmake -B build/mingw -G Ninja -DCMAKE_BUILD_TYPE=Release .
 cmake --build build/mingw                   # -> libbvnr.dll + libbvnr.dll.a, libbvnr.a, bovnar.exe
 ```

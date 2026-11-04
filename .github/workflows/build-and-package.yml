@@ -129,20 +129,23 @@ jobs:
 
       # `git` is in this list because pack_artifacts.cmake shells out to it for
       # the build count and falls back to 0 when it cannot — a fallback meant for
-      # builds from the source tarball, which has no .git. The MINGW64 shell had
+      # builds from the source tarball, which has no .git. The MSYS2 shell had
       # no git at all, so this job alone stamped every Windows archive
       # bovnar-windows-mingw-<version>-0, in the zip name AND in its internal directory
       # prefix, while MSVC and Linux got the real count. It shipped that way in
       # the v1.1.0 assets before anyone noticed.
+      #
+      # UCRT64, not MINGW64, which MSYS2 deprecates: the archive links the
+      # Universal CRT (ucrtbase.dll), as the MSVC one does, not msvcrt.dll.
       - uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: UCRT64
           update: true
           install: >-
             git
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-ninja
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
 
       - name: Configure (Ninja)
         run: cmake -B build/mingw -G Ninja -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=OFF .
@@ -168,6 +171,15 @@ jobs:
           if objdump -p build/mingw/libbvnr.dll | grep -iE 'libgcc_s|libwinpthread|libstdc\+\+'; then
             echo "DLL has an unexpected GCC runtime dependency" && exit 1
           fi
+          # The CRT is the Universal one, not msvcrt.dll: a toolchain that
+          # quietly fell back to MINGW64 would still build.
+          for f in build/mingw/libbvnr.dll build/mingw/bovnar.exe; do
+            if objdump -p "$f" | grep -iE 'DLL Name: msvcrt\.dll'; then
+              echo "$f links msvcrt.dll, not the UCRT" && exit 1
+            fi
+            objdump -p "$f" | grep -iqE 'DLL Name: (ucrtbase|api-ms-win-crt-)' \
+              || { echo "$f does not link the UCRT" && exit 1; }
+          done
 
       - name: Prepare sample document
         run: printf '.a = <uint:8> 7;\n.b = <float:64> 3.5;\n' > smoke.bvnr
@@ -376,8 +388,11 @@ jobs:
       - uses: actions/checkout@v5
 
       # The GNU toolchain links with its own MinGW runtime but build.rs needs a
-      # MinGW C compiler for the library itself: the same MINGW64 gcc the
-      # `mingw` job builds with, put on PATH for cargo.
+      # MinGW C compiler for the library itself, put on PATH for cargo. It is
+      # MINGW64's, not the UCRT64 one the `mingw` job uses: Rust's
+      # x86_64-pc-windows-gnu links -lmsvcrt, and the C objects must be built
+      # for the same CRT. MSYS2 deprecates MINGW64; the warning is acknowledged
+      # here for that reason, until the Rust target moves to the UCRT.
       - uses: msys2/setup-msys2@v2
         if: matrix.mingw
         id: msys2
@@ -385,6 +400,7 @@ jobs:
           msystem: MINGW64
           update: true
           install: mingw-w64-x86_64-gcc
+          suppress-deprecation-warnings: msystem-mingw64
 
       - name: Put MINGW64 gcc on PATH
         if: matrix.mingw

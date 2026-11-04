@@ -2,8 +2,10 @@
 # Copyright (c) 2026 Janos Sonntag
 #
 # CMake toolchain file for cross-compiling the 64-bit MinGW-w64 Windows build
-# from a Linux host (mirrors the MINGW64 leg of .github/workflows/build-and-package.yml,
-# which builds natively under MSYS2). Use it for a local cross-build:
+# from a Linux host (mirrors the MinGW leg of .github/workflows/build-and-package.yml,
+# which builds natively under MSYS2 UCRT64). A distro mingw-w64 (Debian, Ubuntu)
+# targets msvcrt.dll by default, so what this builds links msvcrt where the CI
+# archive links the Universal CRT. Use it for a local cross-build:
 #
 #   cmake -B build/mingw -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-mingw-w64-x86_64.cmake \
 #         -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=OFF .

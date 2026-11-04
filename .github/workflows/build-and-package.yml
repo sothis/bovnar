@@ -571,7 +571,14 @@ jobs:
           set -euo pipefail
           tag=()
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then tag=(--tag "$GITHUB_REF_NAME"); fi
-          python3 check_crate_provenance.py "${tag[@]}" "$RUNNER_TEMP"/crate/bovnar/target/package/bovnar-*.crate
+          # `cargo publish --dry-run` leaves the .crate in target/package/tmp-crate/,
+          # `cargo package` in target/package/: take the one there is, wherever.
+          crate=$(find "$RUNNER_TEMP/crate/bovnar/target/package" -name 'bovnar-*.crate')
+          if [ "$(printf '%s\n' "$crate" | grep -c .)" != 1 ]; then
+            echo "::error::expected one packed .crate, found: ${crate:-none}"
+            exit 1
+          fi
+          python3 check_crate_provenance.py "${tag[@]}" "$crate"
 
       # The unit profiles are Cargo features; a build with all of them off
       # must still compile (THIRD_PARTY_NOTICES tells distributors they can).

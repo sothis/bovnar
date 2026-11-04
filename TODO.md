@@ -1,6 +1,35 @@
 # TODO
 
-## State 2026-11-04 — 2.0.0 released
+## State 2026-11-04 — 2.0.1 released
+
+`v2.0.1` is tagged on be88c9a. The tag's CI run published everything: the
+GitHub release with seven assets (now including the universal
+`bovnar-macos-2.0.1-801.tar.xz`), PyPI, and crates.io — the first crate
+version CI published, through Trusted Publishing. The run needed five
+attempts: GitHub had no macOS arm64 runner for the `macos` job ("not acquired
+by Runner of type hosted"), so four were cancelled before anything was
+published. A re-run of the failed jobs is the fix; nothing in the tree.
+
+Zenodo 2.0.1, deposited with `zenodo_deposit.py`: source
+10.5281/zenodo.23958544, documentation and specification
+10.5281/zenodo.23958545 (in CITATION.cff and the README). `PRODUCTION_RECORDS`
+now names the 2.0.0 records (it still named 1.1.0's).
+
+**For the next release:** bump `version:` in CITATION.cff in the release
+commit itself. v2.0.1 was tagged with it still at 2.0.0, which
+`zenodo_deposit.py` refuses; the deposit ran with `--citation CITATION.cff`
+(the working copy, version 2.0.1, same date) since the tag cannot move. The
+deposit also refuses a working tree whose `doc/` differs from the tag, wiki
+drafts included: deposit before editing `doc/`, or stash the edits.
+
+The macOS archive was checked by hand: checksum, the same 83 files as the
+Linux archive, every binary arm64 + x86_64 with minos 11.0, the arm64 slices'
+ad-hoc signatures valid page by page, 341 exports equal to the ABI baseline.
+It is not Developer ID signed or notarized: a browser download is quarantined
+by Gatekeeper (`xattr -d com.apple.quarantine`, or fetch with curl). Not yet
+said in the docs.
+
+## 2.0.0 — released earlier the same day
 
 `v2.0.0` is tagged on 796171a and pushed. The Rust crate `bovnar` 2.0.0 was
 published to crates.io by hand from the tag with `rust/package.py`, and the
@@ -31,13 +60,12 @@ A Rust toolchain (rustup, stable + 1.88) was installed user-locally in
 `~/.rustup`/`~/.cargo` for this review, without touching the shell profile;
 `rust/target/` is git-ignored.
 
-## Open after 2.0.0 — known limits, documented, left for a later release
+## Closed 2026-11-04 — with 2.0.1
 
-1. **The Downloads menu and the macOS archive.** From the next release on,
-   CI attaches `bovnar-macos-<version>-<count>.tar.xz`. The site's Downloads
-   menu links six assets pinned to v2.0.0, which has none; at the next
-   release add the macOS link to `web/index.html` and its name to the
-   expected list in `check_release_links.py`.
+1. **The Downloads menu and the macOS archive.** The menu links the seven
+   v2.0.1 assets, macOS among them, and `check_release_links.py` expects
+   `bovnar-macos-<version>-<count>.tar.xz`. `zenodo_deposit.py` finds the
+   source tarball by name, not by its place in that list.
 
 ## Closed 2026-11-04 — after the release
 

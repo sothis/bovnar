@@ -4,7 +4,7 @@
 """
 check_release_links.py — the site's Downloads menu points at the newest release.
 
-The landing page's nav carries a Downloads menu whose six links go straight to
+The landing page's nav carries a Downloads menu whose seven links go straight to
 the GitHub release assets. Those assets cannot be named generically: CI packs
 them as `bovnar-<version>-<count>-…`, where <count> is the tagged commit's total
 commit count, so there is no name-agnostic URL GitHub would redirect. The menu
@@ -105,6 +105,7 @@ def expected_assets(version, count):
     tag = f"{version}-{count}"
     return [
         f"bovnar-linux-{tag}.tar.xz",
+        f"bovnar-macos-{tag}.tar.xz",
         f"bovnar-windows-msvc-{tag}.zip",
         f"bovnar-windows-mingw-{tag}.zip",
         f"bovnar-{tag}-amalgamate.tar.xz",

@@ -19,8 +19,8 @@ authors:
   - family-names: Sonntag
     given-names: Janos
     orcid: "https://orcid.org/0009-0008-1299-6534"
-version: 2.0.0
-# The release date of version 2.0.0 (tag v2.0.0, and the CHANGELOG entry), not
+version: 2.0.1
+# The release date of version 2.0.1 (tag v2.0.1, and the CHANGELOG entry), not
 # the later date on which the Zenodo archive of it is deposited.
 date-released: "2026-11-04"
 license: MIT
@@ -37,14 +37,13 @@ identifiers:
       Concept DOI, resolving to the latest archived documentation and
       specification
   # The version DOIs of this release, deposited by zenodo_deposit.py after the
-  # tag. Those of 1.1.0 -- 10.5281/zenodo.21443009 (source) and
-  # 10.5281/zenodo.21443296 (documentation) -- are in README.md.
+  # tag. Those of earlier releases (2.0.0, 1.1.0) are in README.md.
   - type: doi
-    value: 10.5281/zenodo.23934686
-    description: Version DOI of the 2.0.0 source release
+    value: 10.5281/zenodo.23958544
+    description: Version DOI of the 2.0.1 source release
   - type: doi
-    value: 10.5281/zenodo.23934688
-    description: Version DOI of the 2.0.0 documentation and specification
+    value: 10.5281/zenodo.23958545
+    description: Version DOI of the 2.0.1 documentation and specification
 keywords:
   - serialization
   - units of measure

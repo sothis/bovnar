@@ -5,7 +5,7 @@
 | MIME                 = <code>text/vnd.bovnar</code>
 | Entwickler           = Janos Sonntag
 | Veröffentlicht       = 15.06.2026
-| LetzteVersion        = 2.0.0
+| LetzteVersion        = 2.0.1
 | LetzteVersionDatum   = 4. November 2026
 | Art                  = [[Serialisierung|Datenserialisierungsformat]]
 | Standard             = Bovnar-Spezifikation 1.2

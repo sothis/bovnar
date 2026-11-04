@@ -56,7 +56,7 @@ Usage:
     ZENODO_TOKEN=... python3 zenodo_deposit.py --host sandbox --make-test-base
     ZENODO_TOKEN=... python3 zenodo_deposit.py --host sandbox \\
         --source-record <id> --docs-record <id> [--publish]
-    ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo [--tag v2.0.0] [--publish]
+    ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo [--tag v2.0.1] [--citation CITATION.cff] [--publish]
     ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo --resave 23934686 23934688
     ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo --resave 21443009 21443296
 """
@@ -84,7 +84,7 @@ HOSTS = {
 }
 # The latest version on each production line, i.e. the record a new version is
 # made from. A sandbox run names its own with --source-record/--docs-record.
-PRODUCTION_RECORDS = {"source": 21443009, "docs": 21443296}
+PRODUCTION_RECORDS = {"source": 23934686, "docs": 23934688}
 WEBSITE = "https://www.bovnar.io"
 USER_AGENT = "bovnar-zenodo-deposit"
 PDF_DIR = os.path.join(ROOT, "build", "doc", "pdf")
@@ -141,15 +141,19 @@ def git_bytes(tag, path):
     return out.stdout
 
 
-def citation_at(tag):
+def citation_at(tag, path=None):
+    """CITATION.cff as committed at the tag, or the file at `path` instead."""
     try:
         import yaml
     except ImportError:
         raise SystemExit("zenodo_deposit.py: needs PyYAML to read CITATION.cff")
+    if path:
+        with open(path, "rb") as fh:
+            return yaml.safe_load(fh)
     return yaml.safe_load(git_bytes(tag, "CITATION.cff"))
 
 
-def release_info(tag):
+def release_info(tag, citation=None):
     version = version_at(tag)
     if version is None or tag != f"v{version}":
         raise SystemExit(f"zenodo_deposit.py: {tag} does not carry project() "
@@ -157,9 +161,10 @@ def release_info(tag):
     count = git("rev-list", "--count", tag)
     if git("rev-parse", "--is-shallow-repository") == "true" or not (count or "").isdigit():
         raise SystemExit("zenodo_deposit.py: needs a full clone to count commits")
-    cff = citation_at(tag)
+    cff = citation_at(tag, citation)
+    where = citation or f"CITATION.cff at {tag}"
     if str(cff.get("version")) != version:
-        raise SystemExit(f"zenodo_deposit.py: CITATION.cff at {tag} says version "
+        raise SystemExit(f"zenodo_deposit.py: {where} says version "
                          f"{cff.get('version')}, not {version}")
     return version, count, cff
 
@@ -184,7 +189,8 @@ def fetch(url):
 
 def source_files(tag, version, count, workdir):
     """The release's source tarball, checked against its SHA256SUMS."""
-    name = expected_assets(version, count)[4]
+    name = next(n for n in expected_assets(version, count)
+                if n.endswith("-source.tar.xz"))
     sums = fetch(f"{DOWNLOAD_PREFIX}{tag}/SHA256SUMS").decode("utf-8")
     want = None
     for line in sums.splitlines():
@@ -435,6 +441,12 @@ def main():
     ap.add_argument("--source-record", type=int, help="record to make the new source version of")
     ap.add_argument("--docs-record", type=int, help="record to make the new docs version of")
     ap.add_argument("--pdf-dir", default=PDF_DIR)
+    # v2.0.1 was tagged with CITATION.cff still at version 2.0.0; a tag cannot
+    # be moved once its release is published, so the file is read from here.
+    ap.add_argument("--citation", metavar="FILE",
+                    help="read CITATION.cff from FILE instead of from the tag "
+                         "(for a tag cut with a stale one); its version must still "
+                         "be the tag's")
     ap.add_argument("--publish", action="store_true", help="publish the drafts (final)")
     ap.add_argument("--make-test-base", action="store_true",
                     help="sandbox only: publish a stand-in 1.1.0 pair to version from")
@@ -465,7 +477,7 @@ def main():
                          "--docs-record (see --make-test-base)")
 
     tag = args.tag or newest_tag()
-    version, count, cff = release_info(tag)
+    version, count, cff = release_info(tag, args.citation)
     print(f"==> {tag}: version {version}, build count {count}, host {args.host}")
 
     # A line that already has this version is done; making another would give

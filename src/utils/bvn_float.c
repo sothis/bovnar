@@ -288,6 +288,7 @@ void bvn_float_set_zero(bvn_float_t *f, bool neg)
 }
 /* Defined below, after the bvn_int repack helpers; needed by bvn_float_copy. */
 static void bvnf_store_mant(bvn_float_t *f, const bvn_int_t *Q);
+static void bvnf_load_mant_bvint(const bvn_float_t *f, bvn_int_t *M);
 /*
  * Copy src into dst, preserving the represented value (sign * M * 2^(_exp-_prec),
  * with the leading mantissa bit at _prec-1). When the precisions match this is a
@@ -782,9 +783,10 @@ static bool bvnf_pow2_base(uint32_t base, uint32_t *log2base)
  * keeps every rounding decision what the full literal would give as long as
  * the kept digits hold the rounding boundaries exactly: then a dropped tail
  * moves the value off a boundary in the right direction and never across one.
- * The budget below guarantees that for every format up to binary64; wider ones
- * get the target's bits plus 64 guard bits, which is correct except within
- * 2^-64 ulp of a boundary whose decimal expansion is longer than that.
+ * The budget below guarantees that for every format up to binary64; past it a
+ * boundary's decimal expansion can be longer than what was kept, and
+ * *dropped_out tells the caller to settle the rounding against the full
+ * literal (bvnf_float_settle_decimal, bvnf_ieee_settle_decimal).
  */
 typedef enum {
 	BVNF_RK_OK = 0,
@@ -794,11 +796,54 @@ typedef enum {
 	BVNF_RK_UNDERFLOW,
 	BVNF_RK_FAIL
 } bvnf_rkind;
+/*
+ * A base-10 literal's digits as the text has them: the integer and fraction
+ * runs, the first significant digit (NULL for a zero), and x with the value
+ * 0.D * 10^x, D running from that digit. The exponent saturates far past any
+ * value the parse can hold. Syntax is the parser's business; this only reads.
+ */
+typedef struct {
+	const char *ip, *ip_end, *fp, *fp_end, *first;
+	int64_t x;
+} bvnf_dec_lit_t;
+static void bvnf_dec_scan(const char *s, bvnf_dec_lit_t *l)
+{
+	while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r') s++;
+	if (*s == '+' || *s == '-') s++;
+	l->ip = s;
+	while (*s >= '0' && *s <= '9') s++;
+	l->ip_end = l->fp = l->fp_end = s;
+	if (*s == '.') {
+		l->fp = ++s;
+		while (*s >= '0' && *s <= '9') s++;
+		l->fp_end = s;
+	}
+	int64_t ex = 0;
+	if (*s == 'e' || *s == 'E') {
+		bool eneg = (*++s == '-');
+		if (*s == '+' || *s == '-') s++;
+		for (; *s >= '0' && *s <= '9'; s++)
+			if (ex < INT64_C(1) << 50) ex = ex * 10 + (*s - '0');
+		if (eneg) ex = -ex;
+	}
+	const char *p = l->ip;
+	while (p < l->ip_end && *p == '0') p++;
+	if (p < l->ip_end) {
+		l->first = p;
+		l->x = (int64_t)(l->ip_end - p) + ex;
+		return;
+	}
+	p = l->fp;
+	while (p < l->fp_end && *p == '0') p++;
+	l->first = (p < l->fp_end) ? p : NULL;
+	l->x = -(int64_t)(p - l->fp) + ex;
+}
 static bvnf_rkind bvnf_parse_rational(const char *s, uint32_t base,
 									  bool *neg_out, bvn_int_t *num, bvn_int_t *den,
-									  uint32_t sig_bits)
+									  uint32_t sig_bits, bool *dropped_out)
 {
 	*neg_out = false;
+	if (dropped_out) *dropped_out = false;
 	if (!s || (base != 10u && base != 16u)) return BVNF_RK_FAIL;
 	while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r') s++;
 	bool neg = false;
@@ -861,12 +906,34 @@ static bvnf_rkind bvnf_parse_rational(const char *s, uint32_t base,
 		 * keeps about 3700 digits and leaves the rest of the integer range
 		 * for the 10^k scaling that follows: at 15360 a binary128 subnormal
 		 * written with 11570 digits already overflowed it and read as 0.
-		 * Past that length the rounding can still differ from the exact one
-		 * (bvn_float.h). */
+		 * Past that length bvnf_float_settle_decimal and
+		 * bvnf_ieee_settle_decimal check the rounding against the exact
+		 * literal. */
 		if (sig_bits > 53u && budget < BVN_FLOAT_WIDE_DIGIT_BUDGET)
 			budget = BVN_FLOAT_WIDE_DIGIT_BUDGET;
 		if (budget > BVN_INT_MAX_BITS - 128u)
 			budget = BVN_INT_MAX_BITS - 128u;
+		/* A small magnitude puts its leading zeros in the denominator as
+		 * well as the kept digits: 10^(kept - x) for 0.D * 10^x. Kept at
+		 * the full budget they took up to 3700 digits off the ~1e-9865 the
+		 * denominator can reach, and 1.333...e-6200 read as 0. Past
+		 * sig_bits + 64 the digits are only there to settle a midpoint,
+		 * which bvnf_*_settle_decimal does against the literal anyway, so
+		 * leave the denominator its room and keep fewer. */
+		if (base == 10u) {
+			bvnf_dec_lit_t lit;
+			bvnf_dec_scan(s, &lit);
+			if (lit.first && lit.x < 0) {
+				/* Clamped: past ~1e-9865 the value underflows anyway,
+				 * and the saturated exponent would overflow the product. */
+				int64_t mag = -lit.x < 1000000 ? -lit.x : 1000000;
+				int64_t room = (int64_t)BVN_INT_MAX_BITS - 192
+					     - mag * 3322 / 1000;
+				int64_t least = (int64_t)sig_bits + 64;
+				if (room < least) room = least;
+				if (room < (int64_t)budget) budget = (uint32_t)room;
+			}
+		}
 	}
 	bool full = false, sticky = false;
 	long dropped_int = 0;
@@ -928,6 +995,7 @@ static bvnf_rkind bvnf_parse_rational(const char *s, uint32_t base,
 		if (!bvn_int_mul_u32(num, base) || !bvn_int_add_u32(num, 1u))
 			overflow = true;
 		frac_digits++;
+		if (dropped_out) *dropped_out = true;
 	}
 	/* Dropped integer digits scale the value as fractional ones divide it. */
 	long frac_eff = (long)frac_digits - dropped_int;
@@ -1035,7 +1103,7 @@ bool bvn_float_parse_rational(const char *s, uint32_t base,
 {
 	if (!s || !num || !den || (base != 10u && base != 16u)) return false;
 	bool neg = false;
-	bvnf_rkind k = bvnf_parse_rational(s, base, &neg, num, den, 0u);
+	bvnf_rkind k = bvnf_parse_rational(s, base, &neg, num, den, 0u, NULL);
 	if (k == BVNF_RK_ZERO) {               /* the literal really is zero */
 		bvn_int_zero(num);
 		return bvn_int_from_uint64(den, 1u);
@@ -1049,6 +1117,352 @@ bool bvn_float_parse_rational(const char *s, uint32_t base,
 	return true;
 }
 /*
+ * Settling a rounding the digit budget could not decide.
+ *
+ * Past the budget bvnf_parse_rational keeps a sticky digit in place of the
+ * dropped ones. That rounds correctly unless the value lies so close to a
+ * rounding MIDPOINT that the kept digits cannot tell which side it is on, which
+ * happens when the midpoint's own decimal expansion is longer than the budget:
+ * binary128's run to about 11 500 digits, a bvn_float's at high precision to
+ * tens of thousands. The value the sticky rounding gives is then at most one
+ * step off, so the result is checked against the two midpoints around it and
+ * moved by one step where the exact literal says so.
+ *
+ * The check needs no big rational. A midpoint N * 2^k (N odd) is a terminating
+ * decimal, N * 5^-k / 10^-k for k < 0, so its digits are generated in base 1e9
+ * by repeated multiplication and compared with the literal's digits one by one.
+ * That has no size ceiling: it costs time linear in the midpoint's length per
+ * multiplication step, and it runs only for a literal whose tail was dropped.
+ */
+typedef struct { uint32_t *w; size_t n, cap; } bvnf_dec_t;   /* base 1e9, LE */
+#define BVNF_DEC_BASE 1000000000u
+static bool bvnf_dec_mul_add(bvnf_dec_t *d, uint32_t m, uint32_t a)
+{
+	uint64_t c = a;
+	for (size_t i = 0; i < d->n; i++) {
+		uint64_t t = (uint64_t)d->w[i] * m + c;
+		d->w[i] = (uint32_t)(t % BVNF_DEC_BASE);
+		c = t / BVNF_DEC_BASE;
+	}
+	while (c) {
+		if (d->n == d->cap) {
+			size_t nc = d->cap ? d->cap * 2u : 16u;
+			uint32_t *nw = realloc(d->w, nc * sizeof *nw);
+			if (!nw) return false;
+			d->w = nw;
+			d->cap = nc;
+		}
+		d->w[d->n++] = (uint32_t)(c % BVNF_DEC_BASE);
+		c /= BVNF_DEC_BASE;
+	}
+	return true;
+}
+/* Digit i (0 = most significant) of a decimal whose top limb has `top` digits. */
+static int bvnf_dec_digit(const bvnf_dec_t *d, unsigned top, size_t i)
+{
+	static const uint32_t P10[10] = { 1u, 10u, 100u, 1000u, 10000u, 100000u,
+		1000000u, 10000000u, 100000000u, 1000000000u };
+	uint32_t limb;
+	unsigned pos;                         /* digits below the wanted one */
+	if (i < top) {
+		limb = d->w[d->n - 1u];
+		pos  = top - 1u - (unsigned)i;
+	} else {
+		size_t j = i - top;
+		limb = d->w[d->n - 2u - j / 9u];
+		pos  = 8u - (unsigned)(j % 9u);
+	}
+	return (int)(limb / P10[pos] % 10u);
+}
+/*
+ * Compare |s|, a base-10 literal bvnf_parse_rational accepted, with N * 2^k
+ * (N > 0). -1, 0 or 1 for less, equal or greater; 2 if memory ran out.
+ */
+static int bvnf_cmp_decimal_dyadic(const char *s, const bvn_int_t *N, long k)
+{
+	bvnf_dec_t d = { NULL, 0, 0 };
+	bool ok = true;
+	for (uint32_t i = N->nused; ok && i-- > 0;) {
+		ok = bvnf_dec_mul_add(&d, 1u << 16, N->limbs[i] >> 16) &&
+		     bvnf_dec_mul_add(&d, 1u << 16, N->limbs[i] & 0xffffu);
+	}
+	for (long e = k; ok && e > 0; e -= 29)
+		ok = bvnf_dec_mul_add(&d, 1u << (e >= 29 ? 29 : e), 0u);
+	for (long e = -k; ok && e > 0; e -= 13) {
+		uint32_t m = 1u;
+		for (long j = 0; j < (e >= 13 ? 13 : e); j++) m *= 5u;
+		ok = bvnf_dec_mul_add(&d, m, 0u);
+	}
+	if (!ok || d.n == 0) { free(d.w); return ok ? 1 : 2; }
+	unsigned top = 1u;
+	for (uint32_t t = d.w[d.n - 1u]; t >= 10u; t /= 10u) top++;
+	size_t nd = (d.n - 1u) * 9u + top;
+	/* Both values as 0.DIGITS * 10^X, X counted to the first significant digit. */
+	int64_t xm = (int64_t)nd + (k < 0 ? k : 0);
+
+	bvnf_dec_lit_t lit;
+	bvnf_dec_scan(s, &lit);
+	if (!lit.first) { free(d.w); return -1; }      /* the literal is 0 */
+	const char *p = lit.first, *ip_end = lit.ip_end, *fp = lit.fp,
+		   *fp_end = lit.fp_end;
+	int res = 0;
+	if (lit.x != xm) {
+		res = lit.x < xm ? -1 : 1;
+	} else {
+		size_t i = 0;
+		for (; res == 0 && p < fp_end; p++) {
+			if (p == ip_end) { p = fp - 1; continue; }   /* step over '.' */
+			int ld = *p - '0';
+			if (i == nd) { if (ld) res = 1; continue; }
+			int md = bvnf_dec_digit(&d, top, i++);
+			if (ld != md) res = ld < md ? -1 : 1;
+		}
+		for (; res == 0 && i < nd; i++)
+			if (bvnf_dec_digit(&d, top, i)) res = -1;
+	}
+	free(d.w);
+	return res;
+}
+/* The midpoint (2S + 1) * 2^(E-1), or (2S - 1) / (4S - 1) for the one below. */
+static int bvnf_cmp_midpoint(const char *s, const bvn_int_t *S, long E,
+			     bool below, bool binade_floor)
+{
+	bvn_int_t N;
+	if (!bvnf_scratch(&N, S->nused + 2u)) return 2;
+	int shift = binade_floor ? 2 : 1;
+	int res = 2;
+	if (bvn_int_copy(&N, S) && bvn_int_shl(&N, shift)) {
+		if (!below) {
+			if (bvn_int_add_u32(&N, 1u)) res = 0;
+		} else {
+			bvn_int_t one;
+			if (bvnf_scratch(&one, 1u)) {
+				if (bvn_int_from_uint64(&one, 1u) && bvn_int_sub_inplace(&N, &one))
+					res = 0;
+				bvnf_scratch_free(&one);
+			}
+		}
+	}
+	if (res == 0) res = bvnf_cmp_decimal_dyadic(s, &N, E - shift);
+	bvnf_scratch_free(&N);
+	return res;
+}
+/*
+ * Which way the step goes: +1 up, -1 down, 0 none. S * 2^E is the value; S is
+ * odd when a tie must leave it for its even neighbour. `at_floor` says the value
+ * below sits in the binade under it, at half the spacing; `can_up`/`can_down`
+ * say whether there is a neighbour that way.
+ */
+static int bvnf_settle_step(const char *s, const bvn_int_t *S, long E,
+			    bool at_floor, bool can_up, bool can_down)
+{
+	bool odd = bvn_int_getbit(S, 0) != 0;
+	if (can_up) {
+		int c = bvnf_cmp_midpoint(s, S, E, false, false);
+		if (c == 1 || (c == 0 && odd)) return 1;
+		if (c == 0 || c == 2) return 0;
+	}
+	if (can_down) {
+		int c = bvnf_cmp_midpoint(s, S, E, true, at_floor);
+		if (c == -1 || (c == 0 && odd)) return -1;
+	}
+	return 0;
+}
+static bool bvnf_int_dec1(bvn_int_t *n)
+{
+	for (uint32_t i = 0; i < n->nused; i++)
+		if (n->limbs[i]--) { bvn_int_norm(n); return true; }
+	return false;
+}
+static void bvnf_float_settle_decimal(bvn_float_t *f, const char *s)
+{
+	if (!bvn_float_is_regular(f)) return;
+	long p = (long)f->_prec;
+	bvn_int_t Q;
+	if (!bvnf_scratch(&Q, bvnf_hint_limbs(f->_prec) + 2u)) return;
+	bvnf_load_mant_bvint(f, &Q);
+	long E = (long)f->_exp - p;
+	bool at_floor = true;            /* Q == 2^(p-1), the binade's bottom */
+	for (long i = 0; i < p - 1 && at_floor; i++)
+		if (bvn_int_getbit(&Q, (int)i)) at_floor = false;
+	int step = bvnf_settle_step(s, &Q, E, at_floor, true, true);
+	if (step > 0) {
+		if (bvn_int_add_u32(&Q, 1u) && bvn_int_bitlen(&Q) > p) {
+			bvn_int_shr(&Q, 1);
+			f->_exp++;
+		}
+		bvnf_store_mant(f, &Q);
+	} else if (step < 0) {
+		if (at_floor) {   /* 2^(p-1) -> 2^p - 1 one binade down */
+			bvn_int_shl(&Q, 1);
+			f->_exp--;
+		}
+		bvnf_int_dec1(&Q);
+		bvnf_store_mant(f, &Q);
+	}
+	bvnf_scratch_free(&Q);
+}
+/*
+ * The same for an IEEE result in bits[]: the magnitude is read as an exponent
+ * field and a significand S (the implicit bit added for a normal), with the
+ * all-ones exponent standing for 2^(emax+1), so that overflow rounds at its
+ * midpoint like every other step.
+ */
+static void bvnf_ieee_settle_decimal(const char *s, uint32_t exp_bits,
+				     uint32_t man_bits, int32_t bias, uint32_t *bits)
+{
+#define IEEE_BIT(i) ((bits[(i) / 32u] >> ((i) % 32u)) & 1u)
+	uint32_t ef = 0, eall = (1u << exp_bits) - 1u;
+	for (uint32_t i = exp_bits; i-- > 0;)
+		ef = (ef << 1) | IEEE_BIT(man_bits + i);
+	bvn_int_t S;
+	if (!bvnf_scratch(&S, bvnf_hint_limbs(man_bits + 2u))) return;
+	bool zero_frac = true;
+	for (uint32_t i = 0; i < man_bits; i++)
+		if (IEEE_BIT(i)) { bvn_int_setbit(&S, (int)i); zero_frac = false; }
+	if (ef) bvn_int_setbit(&S, (int)man_bits);
+#undef IEEE_BIT
+	long E = (ef ? (long)ef : 1L) - (long)bias - (long)man_bits;
+	bool is_zero = ef == 0 && zero_frac;
+	int step = bvnf_settle_step(s, &S, E, ef >= 2u && zero_frac,
+				    ef != eall, !is_zero);
+	if (step > 0) {
+		bvn_int_add_u32(&S, 1u);
+		if (bvn_int_bitlen(&S) > (int)man_bits + 1) {   /* next binade */
+			bvn_int_shr(&S, 1);
+			ef++;
+		} else if (ef == 0 && bvn_int_getbit(&S, (int)man_bits)) {
+			ef = 1u;                                     /* smallest normal */
+		}
+	} else if (step < 0) {
+		if (ef >= 2u && zero_frac) {
+			bvn_int_shl(&S, 1);
+			ef--;
+		} else if (ef == 1u && zero_frac) {
+			ef = 0u;                                     /* largest subnormal */
+		}
+		bvnf_int_dec1(&S);
+	}
+	if (step) {
+		for (uint32_t i = 0; i < man_bits + exp_bits; i++)
+			bits[i / 32u] &= ~(1u << (i % 32u));
+		for (uint32_t i = 0; i < man_bits; i++)
+			if (bvn_int_getbit(&S, (int)i))
+				bits[i / 32u] |= 1u << (i % 32u);
+		for (uint32_t i = 0; i < exp_bits; i++)
+			if ((ef >> i) & 1u)
+				bits[(man_bits + i) / 32u] |= 1u << ((man_bits + i) % 32u);
+	}
+	bvnf_scratch_free(&S);
+}
+/*
+ * Hex text straight into a bvn_float, with no rational in between. A hex digit
+ * is four bits and the 'p' exponent is binary, so the mantissa is the digits'
+ * bits from the first set one, rounded to the precision with a guard bit and a
+ * sticky, and the exponent is counted, not computed. The rational path had to
+ * shift by the exponent inside BVN_INT_MAX_BITS, so it saturated past about
+ * p+/-32640 and at precisions near that ceiling -- including on hex that
+ * bvn_float_to_str itself wrote. This takes any precision, and any exponent up
+ * to BVNF_HEX_EXP_LIMIT, the range the rest of this file handles (the decimal
+ * writer refuses past it, and on LLP64 the conversions hold _exp in a long);
+ * beyond that it saturates to inf or 0.
+ *
+ * Returns 1 or 0 for success or a malformed literal, and -1 for text that is
+ * not digits (nan, inf, ninf), which bvn_float_from_str then reads as before.
+ */
+#define BVNF_HEX_EXP_LIMIT 1000000000L
+static int bvnf_from_hex(bvn_float_t *f, const char *s)
+{
+	while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r') s++;
+	bool neg = false;
+	if      (*s == '+') s++;
+	else if (*s == '-') { neg = true; s++; }
+	if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X') &&
+	    (bvnf_digit((uint8_t)s[2], 16u) < 16u || s[2] == '.'))
+		s += 2;
+	if (bvnf_digit((uint8_t)*s, 16u) >= 16u && *s != '.') return -1;
+	const char *ip = s;
+	while (bvnf_digit((uint8_t)*s, 16u) < 16u) s++;
+	const char *ip_end = s, *fp = s, *fp_end = s;
+	if (*s == '.') {
+		fp = ++s;
+		while (bvnf_digit((uint8_t)*s, 16u) < 16u) s++;
+		fp_end = s;
+	}
+	if (ip == ip_end && fp == fp_end) return 0;
+	int64_t ex = 0;
+	if (*s == 'p' || *s == 'P') {
+		bool eneg = false;
+		s++;
+		if      (*s == '+') s++;
+		else if (*s == '-') { eneg = true; s++; }
+		if (*s < '0' || *s > '9') return 0;
+		for (; *s >= '0' && *s <= '9'; s++)      /* saturates far past the limit */
+			if (ex < INT64_C(1) << 40) ex = ex * 10 + (*s - '0');
+		if (eneg) ex = -ex;
+	}
+	if (*s != '\0') return 0;
+
+	uint32_t prec = f->_prec;
+	if (!prec) return -1;
+	size_t words = ((size_t)prec + 1u + 31u) / 32u + 1u;
+	uint32_t *M = calloc(words, sizeof *M);
+	if (!M) return 0;
+	/* The first prec+1 bits from the leading one go into M, MSB first; the
+	 * rest only decide the sticky. lead is the leading bit's weight, 2^lead. */
+	uint32_t taken = 0;
+	bool sticky = false, found = false;
+	int64_t lead = 0, ni = (int64_t)(ip_end - ip), idx = 0;
+	for (const char *p = ip; p < fp_end; p++) {
+		if (p == ip_end) { p = fp - 1; continue; }        /* step over '.' */
+		uint32_t d = bvnf_digit((uint8_t)*p, 16u);
+		for (int b = 3; b >= 0; b--) {
+			uint32_t bit = (d >> b) & 1u;
+			if (!found) {
+				if (!bit) continue;
+				found = true;
+				lead = 4 * (ni - 1 - idx) + b;
+			}
+			if (taken <= prec) {
+				uint32_t pos = prec - taken++;
+				if (bit) M[pos / 32u] |= 1u << (pos % 32u);
+			} else if (bit) {
+				sticky = true;
+			}
+		}
+		idx++;
+	}
+	if (!found) { free(M); bvn_float_set_zero(f, neg); return 1; }
+	/* Round the guard bit (bit 0) away, to nearest, ties to even. */
+	bool guard = M[0] & 1u;
+	for (size_t i = 0; i < words; i++)
+		M[i] = (M[i] >> 1) | (i + 1u < words ? M[i + 1u] << 31 : 0u);
+	int64_t e = lead + ex + 1;
+	if (guard && (sticky || (M[0] & 1u))) {
+		size_t i = 0;
+		while (i < words && ++M[i] == 0u) i++;
+		if ((M[prec / 32u] >> (prec % 32u)) & 1u) {     /* carried to 2^prec */
+			M[prec / 32u] = 0u;
+			M[(prec - 1u) / 32u] |= 1u << ((prec - 1u) % 32u);
+			e++;
+		}
+	}
+	if (e > BVNF_HEX_EXP_LIMIT) {
+		bvn_float_set_inf(f, neg);
+	} else if (e < -BVNF_HEX_EXP_LIMIT) {
+		bvn_float_set_zero(f, neg);
+	} else {
+		uint32_t nused = (uint32_t)words;
+		while (nused && M[nused - 1u] == 0u) nused--;
+		bvn_int_t view = { M, (uint32_t)words, nused, false, false, { 0, 0 } };
+		bvnf_store_mant(f, &view);
+		f->_sign = neg ? -1 : 1;
+		f->_exp  = e;
+	}
+	free(M);
+	return 1;
+}
+/*
  * Parse a floating literal in base 10 or 16 into a correctly-rounded bvn_float
  * of precision f->_prec. The exact rational is built by bvnf_parse_rational and
  * rounded once by bvnf_rational_to_float. Routing all parsing through the exact
@@ -1060,16 +1474,25 @@ bool bvn_float_parse_rational(const char *s, uint32_t base,
 bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base)
 {
 	if (!f || !s || (base != 10u && base != 16u)) return false;
+	if (base == 16u) {
+		int r = bvnf_from_hex(f, s);
+		if (r >= 0) return r == 1;
+	}
 	bvn_int_t num, den;
 	uint32_t hint = bvnf_hint_limbs(f->_prec);
 	if (!bvnf_scratch(&num, hint)) return false;
 	if (!bvnf_scratch(&den, hint)) { bvnf_scratch_free(&num); return false; }
 	bool neg = false;
+	bool dropped = false;
 	bvnf_rkind k = bvnf_parse_rational(s, base, &neg, &num, &den,
-					   f->_prec ? f->_prec : 1u);
+					   f->_prec ? f->_prec : 1u, &dropped);
 	bool rc;
 	switch (k) {
-		case BVNF_RK_OK:   rc = bvnf_rational_to_float(f, neg, &num, &den); break;
+		case BVNF_RK_OK:
+			rc = bvnf_rational_to_float(f, neg, &num, &den);
+			if (rc && dropped && base == 10u)
+				bvnf_float_settle_decimal(f, s);
+			break;
 		case BVNF_RK_NAN:  bvn_float_set_nan(f);        rc = true;  break;
 		case BVNF_RK_INF:  bvn_float_set_inf(f, neg);   rc = true;  break;
 		case BVNF_RK_UNDERFLOW:   /* not representable exactly; rounds to +-0 */
@@ -1121,11 +1544,14 @@ void bvn_float_strtoieee_bin(const char *s, uint32_t base,
 	if (!bvnf_scratch(&num, hint)) return;
 	if (!bvnf_scratch(&den, hint)) { bvnf_scratch_free(&num); return; }
 	bool neg = false;
+	bool dropped = false;
 	bvnf_rkind k = bvnf_parse_rational(s, base, &neg, &num, &den,
-					   man_bits + 1u);
+					   man_bits + 1u, &dropped);
 	switch (k) {
 	case BVNF_RK_OK:
 		bvnf_rational_to_ieee_bin(neg, &num, &den, exp_bits, man_bits, bias, bits, bits32);
+		if (dropped && base == 10u)
+			bvnf_ieee_settle_decimal(s, exp_bits, man_bits, bias, bits);
 		break;
 	case BVNF_RK_NAN:
 		for (uint32_t i = 0; i < exp_bits; i++)
@@ -2284,7 +2710,7 @@ static int bvnf_fix_fits_exact(const char *s, uint32_t base,
 	}
 	int res = -1;
 	bool neg = false;
-	switch (bvnf_parse_rational(s, base, &neg, &num, &den, 0u)) {
+	switch (bvnf_parse_rational(s, base, &neg, &num, &den, 0u, NULL)) {
 	case BVNF_RK_ZERO:
 	case BVNF_RK_NAN:          /* range-exempt (§6.4); callers pass none */
 		res = 1; break;

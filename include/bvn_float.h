@@ -82,21 +82,22 @@ BVN_API bool bvn_float_copy(bvn_float_t *dst, const bvn_float_t *src);
  * (rounded to f's precision). Returns false on malformed input or an
  * unsupported base. Note a capacity limit: a finite decimal whose exact
  * value would need more than BVN_INT_MAX_BITS of intermediate precision -- i.e.
- * an extreme decimal exponent (on this build, magnitude beyond ~1e9865 -- the
- * exact bound shifts slightly with the number of coefficient digits), such as
+ * an extreme decimal exponent (on this build, magnitude beyond ~1e9865; for a
+ * small magnitude a long literal moves the bound in by the digits the
+ * precision needs, about (prec + 64) / 3.3, so at precision 113 it is about
+ * 1e-9810 and at 1000 about 1e-9540), such as
  * "1e10000" or "1e-10000" -- saturates to +/-inf or +/-0 and still returns
  * true, rather than failing. The 64-bit stored exponent is not the binding
- * limit here; the exact rational is. The same bound holds in base 16: a binary
- * exponent beyond about +/-32640 saturates, so hex text that bvn_float_to_str
- * writes for a value outside that range, or for a precision above about 32000
- * bits, does not read back to the value it was written from. The MANTISSA's length is not a limit on
+ * limit here; the exact rational is. Base 16 has no such bound: hex text is
+ * read bit for bit, at any precision, and is exact up to a binary exponent of
+ * +/-1e9 (past it, inf or 0), so what bvn_float_to_str writes in base 16 reads
+ * back to the value it was written from. The MANTISSA's length is not a limit on
  * reading: only the digits the precision needs are kept, and the rest are folded
  * into the exponent and a sticky digit, so "0." followed by ten thousand 1s
- * rounds correctly (it used to come back as +inf or 0). What is kept is at least
- * 2624 bits, and 12288 for a precision above 53, so a literal longer than that
- * which sits within the dropped digits of a rounding midpoint can round to the
- * neighbour -- never at precision 53 or below (bvn_float_strtoieee_bin gives
- * the figures). bvn_float_parse_rational, which
+ * rounds correctly (it used to come back as +inf or 0). Where that is not
+ * enough to tell the value from a rounding midpoint, a decimal literal is
+ * compared digit by digit with the midpoint's exact expansion, so the result
+ * is correctly rounded at any length. bvn_float_parse_rational, which
  * must be exact, keeps every digit and refuses a literal it cannot hold. Callers parsing untrusted extreme
  * exponents can distinguish saturation from a literal inf/0 via
  * bvn_float_is_inf / bvn_float_is_zero if that matters.
@@ -127,7 +128,7 @@ BVN_API bool bvn_float_from_double(bvn_float_t *f, double v);
  * build a bvn_float and narrow at all: use the exact single-rounding path
  * bvn_float_strtoieee_bin / bvn_float_strtod (used by bvn_parse_double_in_base
  * for base 10 and 16 and by the bvn_float_parse_bin* helpers), which rounds the
- * exact rational once and is correctly rounded (see the length limit there). Narrowing a
+ * exact rational once and is correctly rounded. Narrowing a
  * bvn_float that already holds the value you want (e.g. the result of arithmetic
  * at full precision) is fine; it is only the parse-then-narrow sequence on a
  * decimal/hex string that double-rounds.
@@ -151,15 +152,12 @@ BVN_API void bvn_float_to_ieee_bin(const bvn_float_t *f,
  * subnormals, overflow to inf, underflow to zero). The literal is parsed as an
  * exact rational num/den and rounded once to the requested (exp_bits, man_bits,
  * bias) format; it does NOT build an intermediate fixed-width bvn_float and then
- * narrow, so it does not double-round. Its one limit is input LENGTH: past a
- * significand budget the remaining digits are folded into a sticky bit, which
- * rounds correctly unless the dropped digits were needed to tell a value from a
- * rounding midpoint. The budget covers every midpoint of binary64 and narrower
- * (at most 768 significant digits), so those are correctly rounded at any input
- * length; for wider formats it is 12288 bits, about 3700 digits, which covers
- * most binary128 midpoints but not the longest (the subnormal ones run to about
- * 11500 digits). Only a literal that long and that close to a midpoint can round
- * to the neighbour. The bit layout of *bits matches bvn_float_to_ieee_bin. This is the
+ * narrow, so it does not double-round. Input LENGTH is no limit: past a
+ * significand budget the remaining digits are folded into a sticky bit, and
+ * where the dropped digits were needed to tell a value from a rounding midpoint
+ * (binary128's longest run to about 11500 digits) a decimal literal is compared
+ * digit by digit with the midpoint's exact expansion instead. The bit layout of
+ * *bits matches bvn_float_to_ieee_bin. This is the
  * primitive behind bvn_float_strtod and the bvn_float_parse_bin* helpers; the
  * value layer uses it for base-10 and base-16 float literals. NULL string or an
  * unsupported base leaves *bits all-zero (i.e. +0.0); a syntactically invalid

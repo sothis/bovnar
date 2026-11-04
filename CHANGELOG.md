@@ -24,6 +24,36 @@ API and implements spec 1.2.
   binding ABI tests could only see the bindings drift from the headers, not the
   headers drift from the release.
 
+### Fixed
+
+- **Long decimal literals round correctly at any length.** Past its digit
+  budget the parse keeps a sticky digit for the dropped tail, which cannot tell
+  a value from a rounding midpoint whose own expansion is longer than what was
+  kept: binary128's run to about 11 500 digits, and a `bvn_float`'s at a large
+  exponent can too, at a precision of 53 or below as well. Such a literal could
+  round to the wrong neighbour. When digits were dropped, `bvn_float_strtoieee_bin`
+  (and through it `bvn_float_strtod`, `bvn_parse_double_in_base` and the
+  `bvn_float_parse_bin*` helpers) and `bvn_float_from_str` now compare the
+  literal digit by digit with the exact decimal expansion of the midpoints
+  around the result, and move it by one step where it is on the other side.
+  Checked against an exact rational oracle on 1 017 literals, of which the
+  previous code rounded 141 wrongly.
+- **Hex text is read exactly at any precision and exponent.** `bvn_float_from_str`
+  in base 16 built an exact rational and so saturated to inf or 0 past a binary
+  exponent of about ±32 640, and at precisions near `BVN_INT_MAX_BITS` --
+  including on hex that `bvn_float_to_str` wrote. It now reads the digits'
+  bits directly, rounding once to the precision, and is exact up to a binary
+  exponent of ±10^9 (the range the rest of `bvn_float` handles); what
+  `bvn_float_to_str` writes in base 16 reads back.
+- **A long decimal literal at a small magnitude keeps its range.** The digits
+  kept past the budget's floor count in the exact rational's denominator next
+  to the leading zeros, so a long literal at a precision above 53 read as 0
+  from about 1e-6165, not the ~1e9865 `bvn_float.h` gave ("shifts slightly
+  with the number of coefficient digits"). For a small magnitude the parse now
+  keeps only what the precision needs plus the denominator's room -- the
+  midpoint check above settles the rest -- and reads down to about 1e-9810 at
+  precision 113, 1e-9540 at 1000; the header gives the figures.
+
 ## [2.0.0] - 2026-11-04
 
 **Library 2.0.0, implementing spec 1.2.** The major is for the library: the ABI

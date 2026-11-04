@@ -1271,6 +1271,196 @@ static void test_bvnf_binary128_long_midpoint(void)
 	bvn_float_free(f);
 }
 
+/*
+ * Rounding midpoints longer than the digit budget (TODO "long binary128
+ * literals", closed). The literal is the exact decimal of N * 2^k, built here
+ * in base 1e9, plus the two literals just either side of it: the tie rounds to
+ * even, and a tail far past the budget decides the rest. Before the exact
+ * check the parse kept ~3700 digits and rounded these by the truncated value.
+ */
+static char *dyadic_dec(uint64_t N, long k)
+{
+	size_t cap = 64, n = 0;
+	uint32_t *w = malloc(cap * sizeof *w);
+	if (!w) return NULL;
+	for (; N; N /= 1000000000u) w[n++] = (uint32_t)(N % 1000000000u);
+	for (long e = k > 0 ? k : -k; e > 0; e--) {
+		uint64_t c = 0, m = k > 0 ? 2u : 5u;
+		for (size_t i = 0; i < n; i++) {
+			uint64_t t = (uint64_t)w[i] * m + c;
+			w[i] = (uint32_t)(t % 1000000000u);
+			c = t / 1000000000u;
+		}
+		if (c) {
+			if (n == cap) {
+				uint32_t *nw = realloc(w, (cap *= 2) * sizeof *w);
+				if (!nw) { free(w); return NULL; }
+				w = nw;
+			}
+			w[n++] = (uint32_t)c;
+		}
+	}
+	size_t len = n * 9u + 4u + (size_t)(k < 0 ? -k : 0);
+	char *digits = malloc(len), *out = malloc(len + 2u);
+	if (!digits || !out) { free(w); free(digits); free(out); return NULL; }
+	int pos = sprintf(digits, "%" PRIu32, w[n - 1u]);
+	for (size_t i = n - 1u; i-- > 0;) pos += sprintf(digits + pos, "%09" PRIu32, w[i]);
+	free(w);
+	size_t nd = (size_t)pos, frac = (size_t)(k < 0 ? -k : 0);
+	if (!frac) { memcpy(out, digits, nd + 1u); free(digits); return out; }
+	size_t lead = frac >= nd ? frac - nd + 1u : 0u;   /* zeros before the digits */
+	memset(out, '0', lead);
+	memcpy(out + lead, digits, nd + 1u);
+	free(digits);
+	size_t tot = lead + nd, ip = tot - frac;
+	memmove(out + ip + 1u, out + ip, frac + 1u);
+	out[ip] = '.';
+	return out;
+}
+/* s with `n` digits appended just above (+1 at the end) or just below it. */
+static char *dyadic_nudge(const char *s, bool above, size_t n)
+{
+	size_t l = strlen(s);
+	bool dot = strchr(s, '.') != NULL;
+	char *t = malloc(l + n + 3u);
+	if (!t) return NULL;
+	memcpy(t, s, l);
+	if (!above) {                         /* decrement, then .999... */
+		for (size_t i = l; i-- > 0;) {
+			if (t[i] == '.') continue;
+			if (t[i] != '0') { t[i]--; break; }
+			t[i] = '9';
+		}
+	}
+	size_t p = l;
+	if (!dot) t[p++] = '.';
+	memset(t + p, above ? '0' : '9', n);
+	p += n;
+	if (above) t[p - 1u] = '1';
+	t[p] = '\0';
+	return t;
+}
+static void check_b128(const char *s, uint64_t want_lo, const char *what)
+{
+	uint32_t got[4] = { 0 };
+	bvn_float_strtoieee_bin(s, 10u, 15u, 112u, 16383, got, 4);
+	CHECK(s && got[0] == (uint32_t)want_lo && got[1] == (uint32_t)(want_lo >> 32) &&
+	      got[2] == 0u && got[3] == 0u, what);
+}
+static void check_prec(const char *s, uint32_t prec, const char *want_hex,
+		       const char *what)
+{
+	bvn_float_t *f = bvn_float_alloc(prec), *w = bvn_float_alloc(prec);
+	char a[256] = "", b[256] = "";
+	CHECK(f && w && s && bvn_float_from_str(f, s, 10u) &&
+	      bvn_float_from_str(w, want_hex, 16u) &&
+	      bvn_float_to_str(f, a, sizeof a, 16u) > 0 &&
+	      bvn_float_to_str(w, b, sizeof b, 16u) > 0 && strcmp(a, b) == 0, what);
+	bvn_float_free(f);
+	bvn_float_free(w);
+}
+static void test_bvnf_midpoint_past_budget(void)
+{
+	printf("  midpoints longer than the digit budget...\n");
+	/* binary128 subnormals 1 and 2: their midpoint 3 * 2^-16495 has 11530
+	 * significant digits. The tie goes to 2 (even). */
+	char *m = dyadic_dec(3u, -16495);
+	char *up = m ? dyadic_nudge(m, true, 40) : NULL;
+	char *dn = m ? dyadic_nudge(m, false, 40) : NULL;
+	check_b128(m,  2u, "b128: the 11530-digit midpoint of 1 and 2 ulp ties to 2");
+	check_b128(up, 2u, "b128: just above it rounds up");
+	check_b128(dn, 1u, "b128: just below it rounds down");
+	free(m); free(up); free(dn);
+	/* 12345 and 12346 ulp: the tie goes to 12346, its neighbours either way. */
+	m  = dyadic_dec(2u * 12345u + 1u, -16495);
+	up = m ? dyadic_nudge(m, true, 4000) : NULL;
+	dn = m ? dyadic_nudge(m, false, 4000) : NULL;
+	check_b128(m,  12346u, "b128: odd lower neighbour, the tie goes up to even");
+	check_b128(up, 12346u, "b128: a tail 4000 digits past the midpoint, up");
+	check_b128(dn, 12345u, "b128: a tail 4000 digits past the midpoint, down");
+	free(m); free(up); free(dn);
+	/* A 40-bit float far out: 2^39 * 2^9000 sits at the bottom of its binade,
+	 * so the midpoint below it is (2^41 - 1) * 2^8998, with 2722 digits -- past
+	 * the 2624-bit floor a precision this low keeps. */
+	m  = dyadic_dec((UINT64_C(1) << 41) - 1u, 8998);
+	up = m ? dyadic_nudge(m, true, 50) : NULL;
+	dn = m ? dyadic_nudge(m, false, 50) : NULL;
+	check_prec(m,  40u, "0x1p9039", "prec 40: the tie below a binade floor goes up to it");
+	check_prec(up, 40u, "0x1p9039", "prec 40: just above that midpoint");
+	check_prec(dn, 40u, "0xffffffffffp8999", "prec 40: just below it, the binade under");
+	free(m); free(up); free(dn);
+	/* And the midpoint above it, (2^40 + 1) * 2^8999: the tie stays on 2^39. */
+	m  = dyadic_dec((UINT64_C(1) << 40) + 1u, 8999);
+	up = m ? dyadic_nudge(m, true, 50) : NULL;
+	check_prec(m,  40u, "0x1p9039", "prec 40: the tie above an even value stays");
+	check_prec(up, 40u, "0x8000000001p9000", "prec 40: just above it, the next value");
+	free(m); free(up);
+	/* A long literal at a small magnitude keeps the denominator's range: the
+	 * 3700 digits once kept took that much off ~1e-9865, and 1.333...e-9000
+	 * written with 5000 digits read as 0 at precision 113. */
+	char *tiny = long_lit("1.", '3', 5000, "e-9000");
+	char *tiny_short = long_lit("1.", '3', 60, "e-9000");
+	bvn_float_t *a = bvn_float_alloc(113u), *b = bvn_float_alloc(113u);
+	char sa[96] = "", sb[96] = "";
+	CHECK(a && b && tiny && tiny_short && bvn_float_from_str(a, tiny, 10u) &&
+	      bvn_float_from_str(b, tiny_short, 10u) && !bvn_float_is_zero(a) &&
+	      bvn_float_to_str(a, sa, sizeof sa, 16u) > 0 &&
+	      bvn_float_to_str(b, sb, sizeof sb, 16u) > 0 && strcmp(sa, sb) == 0,
+	      "a 5000-digit 1.333...e-9000 is not 0 at precision 113");
+	bvn_float_free(a); bvn_float_free(b);
+	free(tiny); free(tiny_short);
+}
+
+/*
+ * Hex text is read bit for bit, at any precision and any exponent up to 1e9
+ * (TODO "hex text near the precision ceiling", closed). It used to saturate
+ * past p+/-32640 and at precisions near BVN_INT_MAX_BITS -- including on text
+ * bvn_float_to_str wrote.
+ */
+static bool hex_roundtrips(const char *s, uint32_t prec, const char *want)
+{
+	bvn_float_t *f = bvn_float_alloc(prec), *g = bvn_float_alloc(prec);
+	size_t n = bvn_float_str_bufsize(prec, 16u);
+	char *a = malloc(n), *b = malloc(n);
+	bool ok = f && g && a && b && bvn_float_from_str(f, s, 16u) &&
+		  bvn_float_to_str(f, a, n, 16u) > 0 &&
+		  bvn_float_from_str(g, a, 16u) &&
+		  bvn_float_to_str(g, b, n, 16u) > 0 && strcmp(a, b) == 0 &&
+		  (!want || strcmp(a, want) == 0);
+	if (!ok && a) printf("    got %.60s\n", a);
+	bvn_float_free(f); bvn_float_free(g); free(a); free(b);
+	return ok;
+}
+static void test_bvnf_hex_any_exponent(void)
+{
+	printf("  hex text at any exponent and precision...\n");
+	CHECK(hex_roundtrips("0x1.8p40000", 53u, "1.8p+40000"), "p+40000 is exact, not inf");
+	CHECK(hex_roundtrips("-0x1.8p-40000", 53u, "-1.8p-40000"), "p-40000 is exact, not 0");
+	CHECK(hex_roundtrips("1p999999999", 24u, "1p+999999999"), "the largest exponent kept");
+	bvn_float_t *f = bvn_float_alloc(24u);
+	CHECK(f && bvn_float_from_str(f, "0x1p1000000000", 16u) && bvn_float_is_inf(f),
+	      "past 1e9 it saturates to inf");
+	CHECK(f && bvn_float_from_str(f, "-0x1p-1000000002", 16u) && bvn_float_is_zero(f) &&
+	      bvn_float_is_neg(f), "and to -0 below");
+	/* 24 bits: 1.000001p0 + half an ulp is a tie, to even; a further 1 breaks it. */
+	CHECK(hex_roundtrips("0x1.000001p0", 24u, "1p+0"), "a tie rounds to even");
+	CHECK(hex_roundtrips("0x1.0000010000000000000001p0", 24u, "1.000002p+0"),
+	      "past the tie rounds up");
+	CHECK(hex_roundtrips("0x1.ffffffp0", 24u, "1p+1"), "a carry moves the exponent");
+	bvn_float_free(f);
+	/* Precision 32768, and 8200 digits of it, with an exponent past the old
+	 * ceiling: the rational path saturated both. */
+	char *big = long_lit("0x1.", 'a', 8200, "p-50000");
+	CHECK(big && hex_roundtrips(big, 32768u, NULL), "prec 32768 at p-50000 round-trips");
+	free(big);
+	CHECK(!bvn_float_from_str(f = bvn_float_alloc(64u), "0x1.8p", 16u) &&
+	      !bvn_float_from_str(f, "1.2.3", 16u) && !bvn_float_from_str(f, ".", 16u) &&
+	      !bvn_float_from_str(f, "1x", 16u), "malformed hex is still refused");
+	CHECK(bvn_float_from_str(f, "-inf", 16u) && bvn_float_is_inf(f) && bvn_float_is_neg(f),
+	      "inf is still read in base 16");
+	bvn_float_free(f);
+}
+
 /* No value fits a Q-format whose q is not below its width. */
 static void test_bvnf_str_fits_fix_q_bound(void)
 {
@@ -1285,6 +1475,8 @@ int main(void)
 #define RUN(fn) do { fprintf(stderr,">>> " #fn "\n"); fflush(stderr); fn(); } while(0)
 	RUN(test_bigint_internals);
 	RUN(test_bvnf_binary128_long_midpoint);
+	RUN(test_bvnf_midpoint_past_budget);
+	RUN(test_bvnf_hex_any_exponent);
 	RUN(test_bvnf_str_fits_fix_q_bound);
 	RUN(test_parse_basics);
 	RUN(test_parse_normalization);

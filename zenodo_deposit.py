@@ -56,7 +56,7 @@ Usage:
     ZENODO_TOKEN=... python3 zenodo_deposit.py --host sandbox --make-test-base
     ZENODO_TOKEN=... python3 zenodo_deposit.py --host sandbox \\
         --source-record <id> --docs-record <id> [--publish]
-    ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo [--tag v2.0.1] [--citation CITATION.cff] [--publish]
+    ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo [--tag v2.0.2] [--publish]
     ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo --resave 23934686 23934688
     ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo --resave 21443009 21443296
 """
@@ -84,7 +84,7 @@ HOSTS = {
 }
 # The latest version on each production line, i.e. the record a new version is
 # made from. A sandbox run names its own with --source-record/--docs-record.
-PRODUCTION_RECORDS = {"source": 23934686, "docs": 23934688}
+PRODUCTION_RECORDS = {"source": 23958544, "docs": 23958545}
 WEBSITE = "https://www.bovnar.io"
 USER_AGENT = "bovnar-zenodo-deposit"
 PDF_DIR = os.path.join(ROOT, "build", "doc", "pdf")

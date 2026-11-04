@@ -33,22 +33,36 @@ A Rust toolchain (rustup, stable + 1.88) was installed user-locally in
 
 ## Open after 2.0.0 — known limits, documented, left for a later release
 
-1. **Long binary128 literals.** The digit budget is 12 288 bits for formats
-   wider than binary64 (a regression of the second review is fixed), but a
-   binary128 literal of more than about 4 900 significant digits that sits
-   within an ulp of a midpoint can still misround; `bvn_float.h` says so.
-   Every midpoint needs a different algorithm (big-decimal comparison), not a
-   larger budget, which overflows `10^k` past 15 360.
-2. **Hex text near the precision ceiling.** `bvn_float_from_str` saturates
-   hex text at precisions within ~200 bits of `BVN_INT_MAX_BITS`, or past
-   exponent ±32 640, as its contract says, instead of refusing it. Documented
-   in `bvn_float.h`; refusing would change the documented contract.
-3. **An annotation before an octet stream** is accepted by the writer, as
-   spec §6.1 lets the reader accept it unchecked (producers SHOULD NOT write
-   one). A writer refusal would be stricter than the reader.
-4. **wasm32-wasip2.** CI builds the crate for it but runs no tests there; the
-   ABI test cannot run on that target. `cargo test --target wasm32-wasip2`
-   under wasmtime would cover the 32-bit `usize` paths.
+Nothing is open.
+
+## Closed 2026-11-04 — after the release
+
+1. **ABI baseline.** `tests/abi/bvnr-2.abi` and `.syms`, checked by
+   `bvnr_abi_baseline` (`check_abi.py`). A change to a public header or the
+   exports fails it: `python3 check_abi.py --update` for an addition, a
+   `BVNR_ABI_MAJOR` bump for a break (CONTRIBUTING.md).
+2. **Long binary128 literals** — every length is correctly rounded: when the
+   digit budget dropped a tail, the result is checked against the midpoints'
+   exact decimal expansions (`bvnf_float_settle_decimal`,
+   `bvnf_ieee_settle_decimal`). `test_bvnf_midpoint_past_budget`.
+3. **Hex text near the precision ceiling** — read bit for bit
+   (`bvnf_from_hex`), exact at any precision up to a binary exponent of ±1e9.
+   `test_bvnf_hex_any_exponent`.
+4. **An annotation before an octet stream** — decided on the maintainer's
+   word: the writer keeps accepting it, as the reader does (spec §6.1:
+   carried, not checked; producers SHOULD NOT write one). A refusal would make
+   `bovnar pretty-print`, `convert` and the DOM writer fail on a document
+   `validate` accepts, since they pass the annotation through.
+5. **wasm32-wasip2 tests** — `cargo test --target wasm32-wasip2 --lib --tests`
+   runs under wasmtime in the `rust_wasm` CI job (1315 passed locally,
+   wasmtime 50.0.1, wasi-sdk 34). Integration tests write their temp files to
+   `CARGO_TARGET_TMPDIR` (WASI has no `temp_dir()` or pid); the thread test
+   and the callback-panic test are ignored there; doctests stay native.
+6. **Long decimal literals at a small magnitude** — the kept digits no
+   longer crowd out the denominator: for 0.D * 10^x with x < 0 the digit
+   budget leaves 10^(kept - x) its room, down to sig_bits + 64, and the
+   midpoint check settles the rest. A 5000-digit literal at precision 113
+   reads down to ~1e-9810 (was ~1e-6165).
 
 ## Closed 2026-11-04 — what the third review left to the maintainer
 
@@ -83,6 +97,9 @@ All four done on the maintainer's word ("do all"):
   CTest test may carry PASS_REGULAR_EXPRESSION (it replaces the exit status);
   a test that checks output goes through `cmake/cli_expect.cmake`.
 - `web/de/` is git-ignored as well; `python3 gen_i18n.py de` recreates it.
+- A change to a public header or to the library's exports fails
+  `bvnr_abi_baseline` until `python3 check_abi.py --update` rewrites
+  `tests/abi/` (with `build/libbvnr.so` built, for the export list).
 - After any C change, regenerate in this order: `wasm/build_wasm.sh` (needs
   emsdk), `gen_html_docs.py`, `gen_llms.py`, `gen_csp.py` if an inline script
   in `web/index.html` changed, `gen_i18n.py de` last. The WASM freshness

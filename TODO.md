@@ -1,8 +1,13 @@
 # TODO
 
-## State 2026-11-04 — after the third whole-project review
+## State 2026-11-04 — 2.0.0 released
 
-Committed on `main`, not tagged (2.0.0 waits for the maintainer's word). What
+`v2.0.0` is tagged on 796171a and pushed. The Rust crate `bovnar` 2.0.0 was
+published to crates.io by hand from the tag with `rust/package.py`, and the
+crate's Trusted Publishing is configured, so from 2.0.1 on a `vX.Y.Z` tag
+publishes through CI's `publish_crate` job.
+
+The released tree is the one the third whole-project review left. What
 the review changed is in CHANGELOG.md under 2.0.0, "Fixed — a third
 whole-project review before release"; the Rust crate (PR #1) has its own
 "Added — Rust bindings" entry, and the crates.io publishing work of the same
@@ -20,30 +25,33 @@ A Rust toolchain (rustup, stable + 1.88) was installed user-locally in
 `~/.rustup`/`~/.cargo` for this review, without touching the shell profile;
 `rust/target/` is git-ignored.
 
-## Open — what the third review leaves to the maintainer
+## Open after 2.0.0 — known limits, documented, left for a later release
 
-1. **`MBtu`, `Mlb`** — done 2026-11-04 on the maintainer's word: `MBtu`,
-   `MBTU`, `Mbtu`, `Mlb` and `Mlbs` are `.compact_exceptions`
-   (`error_unit_illegal`); write `k~Btu`/`k~lb` or `M~Btu`/`M~lb`.
-2. **Long binary128 literals.** The digit budget is 12 288 bits for formats
+1. **Long binary128 literals.** The digit budget is 12 288 bits for formats
    wider than binary64 (a regression of the second review is fixed), but a
    binary128 literal of more than about 4 900 significant digits that sits
    within an ulp of a midpoint can still misround; `bvn_float.h` says so.
    Every midpoint needs a different algorithm (big-decimal comparison), not a
    larger budget, which overflows `10^k` past 15 360.
-3. **Hex text near the precision ceiling.** `bvn_float_from_str` saturates
+2. **Hex text near the precision ceiling.** `bvn_float_from_str` saturates
    hex text at precisions within ~200 bits of `BVN_INT_MAX_BITS`, or past
    exponent ±32 640, as its contract says, instead of refusing it. Documented
    in `bvn_float.h`; refusing would change the documented contract.
-4. **An annotation before an octet stream** is accepted by the writer, as
+3. **An annotation before an octet stream** is accepted by the writer, as
    spec §6.1 lets the reader accept it unchecked (producers SHOULD NOT write
    one). A writer refusal would be stricter than the reader.
-5. **wasm32-wasip2.** CI builds the crate for it but runs no tests there; the
+4. **wasm32-wasip2.** CI builds the crate for it but runs no tests there; the
    ABI test cannot run on that target. `cargo test --target wasm32-wasip2`
    under wasmtime would cover the 32-bit `usize` paths.
-6. **crates.io 2.0.0** is published by hand from the tag with
-   `rust/package.py` (Trusted Publishing cannot create a crate);
-   `publish_crate` takes over from 2.0.1.
+
+## Closed 2026-11-04 — what the third review left to the maintainer
+
+1. **`MBtu`, `Mlb`** — done on the maintainer's word: `MBtu`, `MBTU`, `Mbtu`,
+   `Mlb` and `Mlbs` are `.compact_exceptions` (`error_unit_illegal`); write
+   `k~Btu`/`k~lb` or `M~Btu`/`M~lb`.
+2. **crates.io 2.0.0** — published by hand from the `v2.0.0` tag with
+   `rust/package.py` (Trusted Publishing cannot create a crate); Trusted
+   Publishing is configured, and `publish_crate` takes over from 2.0.1.
 
 ## Closed 2026-11-03 — what the second review left to the maintainer
 

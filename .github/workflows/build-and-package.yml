@@ -305,7 +305,9 @@ jobs:
 
   linux:
     name: Linux (x64)
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: the release archive is built on a known
+    # image, and moves to the next one by an edit here, not on GitHub's date.
+    runs-on: ubuntu-26.04
     # Native 64-bit Linux build (this is the Ubuntu runner that previously ran
     # the MinGW cross + Wine job). It builds the library + CLI and publishes the
     # packed Linux release tarball — and the cross-platform amalgamation — as
@@ -632,14 +634,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # The current images, pinned. The manylinux wheels build inside
+        # cibuildwheel's containers, so the host only runs them; on macOS
+        # cibuildwheel sets the deployment target itself, and the macOS 26
+        # SDK still takes 10.13, so the wheel tags do not move.
         os:
-          - ubuntu-latest      # manylinux x86_64
-          - ubuntu-24.04-arm   # manylinux aarch64 (native runner)
-          # macos-15, not -14: GitHub retires the macOS 14 images on
-          # 2026-11-02 and fails jobs on them in announced brownout windows
-          # through October (actions/runner-images#13518). cibuildwheel sets
-          # the deployment target itself, so the wheel tags do not move.
-          - macos-15           # arm64 native + x86_64 cross-compiled
+          - ubuntu-26.04       # manylinux x86_64
+          - ubuntu-26.04-arm   # manylinux aarch64 (native runner)
+          - macos-26           # arm64 native + x86_64 cross-compiled
     steps:
       - uses: actions/checkout@v5
 

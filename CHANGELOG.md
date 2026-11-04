@@ -40,6 +40,11 @@ API and implements spec 1.2.
 
 ### Changed
 
+- **The Linux archive and the wheels build on current runners.** The `linux`
+  job runs on `ubuntu-26.04`, and the wheel matrix on `ubuntu-26.04`,
+  `ubuntu-26.04-arm` and `macos-26` (was `ubuntu-latest`, `ubuntu-24.04-arm`,
+  `macos-15`), pinned so an image changes by an edit. The wheel artifacts are
+  named after the runner and change name with it.
 - **The MinGW Windows archive links the Universal CRT.** CI builds it in
   MSYS2's UCRT64 environment instead of MINGW64, which MSYS2 deprecates, so
   `libbvnr.dll` and `bovnar.exe` import `ucrtbase.dll` (as the MSVC archive

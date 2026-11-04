@@ -7,6 +7,12 @@ published to crates.io by hand from the tag with `rust/package.py`, and the
 crate's Trusted Publishing is configured, so from 2.0.1 on a `vX.Y.Z` tag
 publishes through CI's `publish_crate` job.
 
+Zenodo has 2.0.0 on both lines, deposited with `zenodo_deposit.py`: source
+10.5281/zenodo.23934686, documentation and specification (Markdown and PDF)
+10.5281/zenodo.23934688; the concept DOIs resolve to them. A later release
+runs the same script (sandbox first with `--make-test-base`, then `--host
+zenodo`, review, `--publish`) and adds its DOIs to CITATION.cff and README.md.
+
 The released tree is the one the third whole-project review left. What
 the review changed is in CHANGELOG.md under 2.0.0, "Fixed — a third
 whole-project review before release"; the Rust crate (PR #1) has its own

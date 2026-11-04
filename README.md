@@ -848,7 +848,7 @@ To cite Bovnar in published work, use the concept DOI, which always resolves to 
 
 The documentation and specification are archived separately, under their own concept DOI: https://doi.org/10.5281/zenodo.21443295
 
-To pin a particular release instead, use its version DOI — [1.1.0 source](https://doi.org/10.5281/zenodo.21443009), [1.1.0 documentation and specification](https://doi.org/10.5281/zenodo.21443296).
+To pin a particular release instead, use its version DOI — [2.0.0 source](https://doi.org/10.5281/zenodo.23934686), [2.0.0 documentation and specification](https://doi.org/10.5281/zenodo.23934688); for 1.1.0, [source](https://doi.org/10.5281/zenodo.21443009) and [documentation and specification](https://doi.org/10.5281/zenodo.21443296).
 
 Machine-readable metadata lives in [`CITATION.cff`](CITATION.cff): GitHub's *Cite this repository* button reads it, and `cffconvert` renders it as BibTeX, APA or RIS.
 

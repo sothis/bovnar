@@ -45,7 +45,7 @@
 <strong>Scope:</strong> Installation, the high-level and streaming APIs, the DOM, <code>Quantity</code>, and the NumPy and pint bridges.</p>
 </blockquote>
 <p>Pure-<code>ctypes</code> Python bindings for the <strong>Bovnar (BVNR)</strong> typed serialisation
-library (library 2.0.0, format spec 1.2).</p>
+library (library 2.0.1, format spec 1.2).</p>
 <p>No compiled extension module is needed — the bindings load <code>libbvnr.so</code>
 through the standard <code>ctypes.CDLL</code> machinery the first time something needs
 the C library; <code>import bovnar</code> itself never loads it.</p>
@@ -2484,7 +2484,7 @@ at value 900033 takes the suffixed name. This affects the Python member name onl
 <hr />
 <h2 id="19-spec-11-additions">19. Spec 1.1 additions</h2>
 <p>These bindings target the <strong>Bovnar spec 1.2</strong>; spec 1.0 remains the frozen
-baseline, and the package's own version (2.0.0) is a separate number
+baseline, and the package's own version (2.0.1) is a separate number
 (<code>bovnar.version()</code> against <code>bovnar.spec_version()</code>). Spec 1.2's one addition,
 the unit-profile notation, is covered in <a href="#51-the-unit-profile-notations-spec-12">§5.1</a>:
 it is gated on a <code>#!bovnar 1.2</code> directive, which <code>dumps()</code> prepends when a

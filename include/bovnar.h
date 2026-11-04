@@ -55,11 +55,11 @@ extern "C" {
  */
 #define BVNR_VERSION_MAJOR		2
 #define BVNR_VERSION_MINOR		0
-#define BVNR_VERSION_PATCH		0
+#define BVNR_VERSION_PATCH		1
 #define BVNR_VERSION			((BVNR_VERSION_MAJOR) * 10000 + \
 					 (BVNR_VERSION_MINOR) * 100 + \
 					 (BVNR_VERSION_PATCH))
-#define BVNR_VERSION_STRING		"2.0.0"
+#define BVNR_VERSION_STRING		"2.0.1"
 /*
  * Pre-release marker for a build made from a tree that is AHEAD of the released
  * version above. "-dev" while CHANGELOG.md still has an [Unreleased] section;

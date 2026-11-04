@@ -5,7 +5,7 @@
 > **Scope:** Installation, the high-level and streaming APIs, the DOM, `Quantity` and the exact numbers, JSON conversion, and the thread rules.
 
 Rust bindings for the **Bovnar (BVNR)** typed serialisation library (library
-2.0.0, format spec 1.2).
+2.0.1, format spec 1.2).
 
 The crate is a thin wrapper around the C library: `build.rs` compiles the C
 sources into the crate, so there is no system library to install and nothing is
@@ -100,14 +100,14 @@ integration with third-party unit or array libraries; see [§16](#16-crate-layou
 
 ## 2. Installation
 
-The crate carries the version of the C library it wraps (**2.0.0**: `version` in
+The crate carries the version of the C library it wraps (**2.0.1**: `version` in
 `Cargo.toml` is the `project(bovnar VERSION x.y.z)` of the top-level
 `CMakeLists.txt`, and CI fails when the two differ). It is published to
 crates.io with each release:
 
 ```toml
 [dependencies]
-bovnar = "2.0.0"
+bovnar = "2.0.1"
 ```
 
 A repository checkout works too, as a path dependency or straight from Git,
@@ -191,7 +191,7 @@ leave out `ucum` or `cf`:
 
 ```toml
 [dependencies]
-bovnar = { version = "2.0.0", default-features = false, features = ["unece", "qudt", "qudt-qk", "udunits", "om"] }
+bovnar = { version = "2.0.1", default-features = false, features = ["unece", "qudt", "qudt-qk", "udunits", "om"] }
 ```
 
 ### 3.3 How the published crate is made
@@ -2370,7 +2370,7 @@ or ask `currency::is_currency`.
 ## 18. Spec 1.1 additions
 
 These bindings target the **Bovnar spec 1.2**; spec 1.0 remains the frozen
-baseline, and the crate's own version (2.0.0) is a separate number
+baseline, and the crate's own version (2.0.1) is a separate number
 (`bovnar::version()` against `bovnar::spec_version()`). Spec 1.2's one addition,
 the unit-profile notation, is covered in [§5.1](#51-the-unit-profile-notations-spec-12):
 it is gated on a `#!bovnar 1.2` directive, which `to_string()` prepends when a

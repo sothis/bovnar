@@ -3071,7 +3071,7 @@ major counts breaks in what a *document* means, and has not moved. The C header
 defines `BVNR_VERSION_MAJOR`, `BVNR_VERSION_MINOR`, `BVNR_VERSION_PATCH`, the
 comparable integer `BVNR_VERSION` (`major*10000 + minor*100 + patch`, so
 `#if BVNR_VERSION >= 20000` tests "≥ 2.0.0"), and `BVNR_VERSION_STRING`
-(`"2.0.0"`). The Python package mirrors this as `bovnar.__version__`, the Rust crate as
+(`"2.0.1"`). The Python package mirrors this as `bovnar.__version__`, the Rust crate as
 `bovnar::version()`.
 Separately, `BVNR_SPEC_VERSION_MAJOR` / `BVNR_SPEC_VERSION_MINOR` name the
 highest **spec** version the build understands (`1.2`); `bvnr_version()`, `bvnr_version_string()` and

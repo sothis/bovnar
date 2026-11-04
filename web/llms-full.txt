@@ -1319,7 +1319,7 @@ Spec 1.0 remains the frozen, stable baseline: a document that declares no
 number from the spec version and has been since library 2.0.0: that release
 broke the C ABI and the Python API, which is what a library major is for, while
 the format it reads grew only additively. `bovnar version` prints both —
-`bovnar 2.0.0 (spec 1.2)`.
+`bovnar 2.0.1 (spec 1.2)`.
 
 ---
 
@@ -5844,7 +5844,7 @@ major counts breaks in what a *document* means, and has not moved. The C header
 defines `BVNR_VERSION_MAJOR`, `BVNR_VERSION_MINOR`, `BVNR_VERSION_PATCH`, the
 comparable integer `BVNR_VERSION` (`major*10000 + minor*100 + patch`, so
 `#if BVNR_VERSION >= 20000` tests "≥ 2.0.0"), and `BVNR_VERSION_STRING`
-(`"2.0.0"`). The Python package mirrors this as `bovnar.__version__`, the Rust crate as
+(`"2.0.1"`). The Python package mirrors this as `bovnar.__version__`, the Rust crate as
 `bovnar::version()`.
 Separately, `BVNR_SPEC_VERSION_MAJOR` / `BVNR_SPEC_VERSION_MINOR` name the
 highest **spec** version the build understands (`1.2`); `bvnr_version()`, `bvnr_version_string()` and
@@ -14032,7 +14032,7 @@ int main(void)
 > **Scope:** Installation, the high-level and streaming APIs, the DOM, `Quantity`, and the NumPy and pint bridges.
 
 Pure-`ctypes` Python bindings for the **Bovnar (BVNR)** typed serialisation
-library (library 2.0.0, format spec 1.2).
+library (library 2.0.1, format spec 1.2).
 
 No compiled extension module is needed — the bindings load `libbvnr.so`
 through the standard `ctypes.CDLL` machinery the first time something needs
@@ -15991,7 +15991,7 @@ only invite the bounds check it can no longer support. Use `UNIT_NATIVE_FIRST`
 ## 19. Spec 1.1 additions
 
 These bindings target the **Bovnar spec 1.2**; spec 1.0 remains the frozen
-baseline, and the package's own version (2.0.0) is a separate number
+baseline, and the package's own version (2.0.1) is a separate number
 (`bovnar.version()` against `bovnar.spec_version()`). Spec 1.2's one addition,
 the unit-profile notation, is covered in [§5.1](#51-the-unit-profile-notations-spec-12):
 it is gated on a `#!bovnar 1.2` directive, which `dumps()` prepends when a
@@ -18104,7 +18104,7 @@ The existing `from_pint_unit` / `to_pint_unit` bridge is untouched.
 when a code that should parse does not:
 
 ```
-bovnar 2.0.0 (spec 1.2)
+bovnar 2.0.1 (spec 1.2)
 unit profiles: ucum unece qudt qudt-qk udunits om cf
 ```
 
@@ -21717,7 +21717,7 @@ ctest --output-on-failure
 > **Scope:** Installation, the high-level and streaming APIs, the DOM, `Quantity` and the exact numbers, JSON conversion, and the thread rules.
 
 Rust bindings for the **Bovnar (BVNR)** typed serialisation library (library
-2.0.0, format spec 1.2).
+2.0.1, format spec 1.2).
 
 The crate is a thin wrapper around the C library: `build.rs` compiles the C
 sources into the crate, so there is no system library to install and nothing is
@@ -21812,14 +21812,14 @@ integration with third-party unit or array libraries; see [§16](#16-crate-layou
 
 ## 2. Installation
 
-The crate carries the version of the C library it wraps (**2.0.0**: `version` in
+The crate carries the version of the C library it wraps (**2.0.1**: `version` in
 `Cargo.toml` is the `project(bovnar VERSION x.y.z)` of the top-level
 `CMakeLists.txt`, and CI fails when the two differ). It is published to
 crates.io with each release:
 
 ```toml
 [dependencies]
-bovnar = "2.0.0"
+bovnar = "2.0.1"
 ```
 
 A repository checkout works too, as a path dependency or straight from Git,
@@ -21903,7 +21903,7 @@ leave out `ucum` or `cf`:
 
 ```toml
 [dependencies]
-bovnar = { version = "2.0.0", default-features = false, features = ["unece", "qudt", "qudt-qk", "udunits", "om"] }
+bovnar = { version = "2.0.1", default-features = false, features = ["unece", "qudt", "qudt-qk", "udunits", "om"] }
 ```
 
 ### 3.3 How the published crate is made
@@ -24082,7 +24082,7 @@ or ask `currency::is_currency`.
 ## 18. Spec 1.1 additions
 
 These bindings target the **Bovnar spec 1.2**; spec 1.0 remains the frozen
-baseline, and the crate's own version (2.0.0) is a separate number
+baseline, and the crate's own version (2.0.1) is a separate number
 (`bovnar::version()` against `bovnar::spec_version()`). Spec 1.2's one addition,
 the unit-profile notation, is covered in [§5.1](#51-the-unit-profile-notations-spec-12):
 it is gated on a `#!bovnar 1.2` directive, which `to_string()` prepends when a

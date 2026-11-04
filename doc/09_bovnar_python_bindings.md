@@ -5,7 +5,7 @@
 > **Scope:** Installation, the high-level and streaming APIs, the DOM, `Quantity`, and the NumPy and pint bridges.
 
 Pure-`ctypes` Python bindings for the **Bovnar (BVNR)** typed serialisation
-library (library 2.0.0, format spec 1.2).
+library (library 2.0.1, format spec 1.2).
 
 No compiled extension module is needed — the bindings load `libbvnr.so`
 through the standard `ctypes.CDLL` machinery the first time something needs
@@ -1964,7 +1964,7 @@ only invite the bounds check it can no longer support. Use `UNIT_NATIVE_FIRST`
 ## 19. Spec 1.1 additions
 
 These bindings target the **Bovnar spec 1.2**; spec 1.0 remains the frozen
-baseline, and the package's own version (2.0.0) is a separate number
+baseline, and the package's own version (2.0.1) is a separate number
 (`bovnar.version()` against `bovnar.spec_version()`). Spec 1.2's one addition,
 the unit-profile notation, is covered in [§5.1](#51-the-unit-profile-notations-spec-12):
 it is gated on a `#!bovnar 1.2` directive, which `dumps()` prepends when a

@@ -43,7 +43,7 @@ bvnr.toJSON('.speed = 9.81 m/s;\n.name = "probe";');
 bvnr.events('.x = <uint:16> 7;');
 // { ok: true, events: [ { seq: 0, ev: 'stream_start', ... }, ... ] }
 
-bvnr.version();  // "2.0.0"
+bvnr.version();  // "2.0.1"
 ```
 
 `input` is a string (UTF-8 encoded for you) or a `Uint8Array` (pass bytes
@@ -72,7 +72,7 @@ import { loadBovnar } from 'bovnar-wasm/single';
 | `parse(in)` | `{ ok, error, error_name, events: [...], errors: [...], declared_version }` — `events` and `errors` in one pass (streaming tier only) |
 | `eventsConvert(in, unit = '', base = 0, allowNonterminating = false)` | as `events`; each numeric `data` event that can be delivered in `unit` also carries `converted`, `converted_base` and `converted_unit` |
 | `doc(in)` | `{ ok, error, error_name, tree: [{ key, value }, ...] }` — the document as a tree of keyed nodes |
-| `version()` | library version string, e.g. `"2.0.0"` |
+| `version()` | library version string, e.g. `"2.0.1"` |
 | `Module` | the raw Emscripten module |
 
 ### Two tiers of validity

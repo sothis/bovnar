@@ -109,7 +109,7 @@ Spec 1.0 remains the frozen, stable baseline: a document that declares no
 number from the spec version and has been since library 2.0.0: that release
 broke the C ABI and the Python API, which is what a library major is for, while
 the format it reads grew only additively. `bovnar version` prints both —
-`bovnar 2.0.0 (spec 1.2)`.
+`bovnar 2.0.1 (spec 1.2)`.
 
 ---
 

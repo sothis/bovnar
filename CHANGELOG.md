@@ -12,7 +12,7 @@ implements; the highest spec a build understands is reported by
 numbers were the same. They part at 2.0.0, which breaks the ABI and the Python
 API and implements spec 1.2.
 
-## [Unreleased]
+## [2.0.1] - 2026-11-04
 
 ### Added
 
@@ -28,7 +28,6 @@ API and implements spec 1.2.
   covers the 32-bit `usize` paths. The integration tests write their temp files
   to `CARGO_TARGET_TMPDIR`, which every target has, instead of `temp_dir()`,
   which WASI does not.
-
 - **A macOS release archive.** `bovnar-macos-<version>-<count>.tar.xz` holds
   the library (static and shared) and the CLI as universal binaries, arm64
   and x86_64, for macOS 11 and later. The `macos` CI job builds it natively
@@ -5702,6 +5701,7 @@ arrays (including the homogeneity rules), structs, octet streams, references,
 and the error-code values. See [`RELEASE_NOTES_v1.0.0.md`](RELEASE_NOTES_v1.0.0.md)
 for the full notes.
 
+[2.0.1]: https://github.com/sothis/bovnar/releases/tag/v2.0.1
 [2.0.0]: https://github.com/sothis/bovnar/releases/tag/v2.0.0
 [1.1.0]: https://github.com/sothis/bovnar/releases/tag/v1.1.0
 [1.0.1]: https://github.com/sothis/bovnar/releases/tag/v1.0.1

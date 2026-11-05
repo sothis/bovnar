@@ -3090,8 +3090,10 @@ html[data-theme="light"] #launch-demo * { scrollbar-color: #c1c1c1 transparent; 
 #launch-demo header.intro p code { font-family: var(--mono); color: var(--cyan); font-size: 0.85em; }
 #launch-demo header.intro p.engine-note { margin-top: 0.65rem; padding: 0.5rem 0.8rem; border-left: 2px solid var(--teal); background: var(--panel-bg); border-radius: 0 6px 6px 0; font-size: 0.84rem; }
 #launch-demo header.intro p.engine-note strong { color: var(--text); font-weight: 600; }
-#launch-demo header.intro p.engine-note a { color: var(--cyan); text-decoration: none; border-bottom: 1px solid transparent; }
-#launch-demo header.intro p.engine-note a:hover { border-bottom-color: currentColor; }
+/* Underlined at rest, not only on hover: inside running text a link that differs
+   by colour alone fails WCAG 1.4.1 (Lighthouse "links are distinguishable"). */
+#launch-demo header.intro p.engine-note a { color: var(--cyan); text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 2px; }
+#launch-demo header.intro p.engine-note a:hover { text-decoration-color: currentColor; }
 
 /* Visualizer (top) + config (bottom) stack in the left column; the intrinsically
    tall telemetry stream fills the right column full-height. The config sits at its

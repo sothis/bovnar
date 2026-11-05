@@ -115,6 +115,9 @@ p.addr { font-family: var(--mono); font-size: 0.92rem; line-height: 1.8; color: 
 .muted { color: var(--text2); font-size: 0.88rem; }
 a { color: var(--cyan); text-decoration: none; }
 a:hover { text-decoration: underline; }
+/* Links in running text are underlined at rest (WCAG 1.4.1: not by colour alone). */
+main :is(p, li) a, footer a { text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); text-underline-offset: 2px; }
+main :is(p, li) a:hover, footer a:hover { text-decoration-color: currentColor; }
 footer {
   border-top: 1px solid var(--border); padding: 1rem 1.4rem;
   font-family: var(--mono); font-size: 0.72rem; color: var(--text3);

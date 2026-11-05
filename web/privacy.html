@@ -114,6 +114,9 @@ p.addr { font-family: var(--mono); font-size: 0.92rem; line-height: 1.8; color: 
 .muted { color: var(--text2); font-size: 0.88rem; }
 a { color: var(--cyan); text-decoration: none; }
 a:hover { text-decoration: underline; }
+/* Links in running text are underlined at rest (WCAG 1.4.1: not by colour alone). */
+main :is(p, li) a, footer a { text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); text-underline-offset: 2px; }
+main :is(p, li) a:hover, footer a:hover { text-decoration-color: currentColor; }
 footer {
   border-top: 1px solid var(--border); padding: 1rem 1.4rem;
   font-family: var(--mono); font-size: 0.72rem; color: var(--text3);
@@ -225,8 +228,10 @@ code {
     <a href="https://myadcenter.google.com/" target="_blank" rel="noopener">myadcenter.google.com</a>.
   </p>
   <p class="muted">
-    Google Analytics keeps the event and user data it collects here for 14 months and then deletes
-    it automatically.
+    Google Analytics deletes the event data it collects here 14 months after collection; the data
+    tied to a returning browser's identifier is kept until 14 months after that browser's last
+    visit. Age, gender and interest data is kept for two months. Aggregated reports derived from
+    the data, such as page-view counts, are not subject to this deletion.
   </p>
   <p class="muted">
     The legal basis is your consent under Art. 6(1)(a) GDPR. You may withdraw it at any time with

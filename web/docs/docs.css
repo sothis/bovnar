@@ -188,6 +188,17 @@ h3 { font-size: 1.2rem; margin-top: 1.9em; }
 h4, h5, h6 { margin-top: 1.6em; }
 a { color: var(--blue); text-decoration: none; }
 a:hover { text-decoration: underline; }
+/* A link inside running text is underlined at rest: told apart from the words
+   around it by colour alone, it fails WCAG 1.4.1, and Lighthouse flagged every
+   cross-reference in the doc pages for it, and the footer links, which sit in a
+   line of text too. Navigation and headings keep the plain style; the underline
+   is muted until hover. */
+main :is(p, li, td, th, dd, blockquote) a,
+.doc-meta a,
+footer a { text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); text-underline-offset: 2px; }
+main :is(p, li, td, th, dd, blockquote) a:hover,
+.doc-meta a:hover,
+footer a:hover { text-decoration-color: currentColor; }
 p, li { color: var(--text); }
 strong { color: var(--text); }
 

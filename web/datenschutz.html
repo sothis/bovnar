@@ -114,6 +114,9 @@ p.addr { font-family: var(--mono); font-size: 0.92rem; line-height: 1.8; color: 
 .muted { color: var(--text2); font-size: 0.88rem; }
 a { color: var(--cyan); text-decoration: none; }
 a:hover { text-decoration: underline; }
+/* Links in running text are underlined at rest (WCAG 1.4.1: not by colour alone). */
+main :is(p, li) a, footer a { text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); text-underline-offset: 2px; }
+main :is(p, li) a:hover, footer a:hover { text-decoration-color: currentColor; }
 footer {
   border-top: 1px solid var(--border); padding: 1rem 1.4rem;
   font-family: var(--mono); font-size: 0.72rem; color: var(--text3);
@@ -231,8 +234,11 @@ code {
     abschalten.
   </p>
   <p class="muted">
-    Google Analytics speichert die hier erhobenen Ereignis- und Nutzerdaten 14 Monate lang und
-    löscht sie danach automatisch.
+    Google Analytics löscht die hier erhobenen Ereignisdaten 14 Monate nach ihrer Erhebung; die
+    einem wiederkehrenden Browser zugeordneten Daten werden bis 14 Monate nach dessen letztem
+    Besuch aufbewahrt. Daten zu Alter, Geschlecht und Interessen werden zwei Monate lang
+    gespeichert. Aggregierte Berichte, die daraus entstehen, etwa Seitenaufrufzahlen, sind von
+    dieser Löschung nicht erfasst.
   </p>
   <p class="muted">
     Rechtsgrundlage ist Ihre Einwilligung nach Art. 6 Abs. 1 lit. a DSGVO. Sie können sie jederzeit

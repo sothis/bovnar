@@ -191,6 +191,9 @@ server {
         if ($bvnr_doc_moved) { return 301 $bvnr_doc_moved; }
 
         add_header Cache-Control "$bvnr_cache_ctl" always;
+        # Canonical HTML page for a documentation PDF; empty (so omitted) for
+        # every other asset. See the $bvnr_canon_hdr map.
+        add_header Link "$bvnr_canon_hdr" always;
         include snippets/bovnar-headers.conf;
         try_files $uri =404;
     }
@@ -203,6 +206,14 @@ server {
         # and $bvnr_page_moved is empty for everything else, so the test costs
         # one variable lookup and changes nothing it does not name.
         if ($bvnr_page_moved) { return 301 $bvnr_page_moved; }
+
+        # /index.html and /de/index.html served the home pages a second time
+        # with a 200; Search Console listed /index.html as a duplicate. 301 any
+        # .../index.html to its directory. Tested on $request_uri, the URL the
+        # client sent, not $uri: the index directive turns /docs/ into an
+        # internal /docs/index.html, and testing $uri would 301 that to /docs/
+        # forever.
+        if ($request_uri ~ "^([^?]*/)index\.html(?:\?|$)") { return 301 $1$is_args$args; }
 
         add_header Cache-Control "no-cache" always;
         include snippets/bovnar-headers.conf;
@@ -311,6 +322,27 @@ map $uri $bvnr_canon_hdr {
     "/doc/12_bovnar.ebnf"                "<https://www.bovnar.io/docs/grammar/>; rel=\"canonical\"";
     "/doc/13_bovnar_conformance.md"      "<https://www.bovnar.io/docs/conformance/>; rel=\"canonical\"";
     "/doc/14_bovnar_rust_bindings.md"    "<https://www.bovnar.io/docs/rust/>; rel=\"canonical\"";
+    # The PDFs are a third rendering of the same documents (gen_doc_pdfs.py
+    # builds each from the .md its HTML page comes from), and Google indexes
+    # them: in Search Console the cheat-sheet PDF drew as many impressions as
+    # the cheat-sheet page, ranked lower, and both were splitting one
+    # document's signals. A Link header is the only way a PDF can name its
+    # canonical. The asset location below sends it; every non-PDF asset maps
+    # to "" and gets no header.
+    "/doc/pdf/bovnar-tutorial.pdf"          "<https://www.bovnar.io/docs/tutorial/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-faq.pdf"               "<https://www.bovnar.io/docs/faq/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-specification.pdf"     "<https://www.bovnar.io/docs/spec/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-cheatsheet.pdf"        "<https://www.bovnar.io/docs/cheatsheet/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-unit-system.pdf"       "<https://www.bovnar.io/docs/units/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-unit-policy.pdf"       "<https://www.bovnar.io/docs/policy/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-unit-ambiguities.pdf"  "<https://www.bovnar.io/docs/ambiguities/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-readwrite-api.pdf"     "<https://www.bovnar.io/docs/api/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-python-bindings.pdf"   "<https://www.bovnar.io/docs/python/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-streaming.pdf"         "<https://www.bovnar.io/docs/streaming/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-unit-profiles.pdf"     "<https://www.bovnar.io/docs/profiles/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-grammar.pdf"           "<https://www.bovnar.io/docs/grammar/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-conformance.pdf"       "<https://www.bovnar.io/docs/conformance/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-rust-bindings.pdf"     "<https://www.bovnar.io/docs/rust/>; rel=\"canonical\"";
 }
 ```
 
@@ -336,6 +368,12 @@ Then, inside the existing `location ~ \.md$`, add the header — nginx omits an
 `/doc/12_bovnar.ebnf` is not matched by the `.md` location — it has its own, for
 the MIME type (above), or it downloads instead of displaying. The same
 `add_header Link "$bvnr_canon_hdr"` line goes there; one map serves both.
+
+The PDFs are in the same map and get the same header from the static-asset
+location. Google indexes PDFs, and Search Console showed the cheat-sheet PDF
+drawing as many impressions as `/docs/cheatsheet/` while ranking lower, so the
+two were splitting one document's signals. A document added to `gen_doc_pdfs.py`
+needs a line here for its PDF as well as for its `.md`.
 
 ## Renamed documents: 301 the old paths
 
@@ -602,6 +640,27 @@ map $uri $bvnr_canon_hdr {
     "/doc/12_bovnar.ebnf"                "<https://www.bovnar.io/docs/grammar/>; rel=\"canonical\"";
     "/doc/13_bovnar_conformance.md"      "<https://www.bovnar.io/docs/conformance/>; rel=\"canonical\"";
     "/doc/14_bovnar_rust_bindings.md"    "<https://www.bovnar.io/docs/rust/>; rel=\"canonical\"";
+    # The PDFs are a third rendering of the same documents (gen_doc_pdfs.py
+    # builds each from the .md its HTML page comes from), and Google indexes
+    # them: in Search Console the cheat-sheet PDF drew as many impressions as
+    # the cheat-sheet page, ranked lower, and both were splitting one
+    # document's signals. A Link header is the only way a PDF can name its
+    # canonical. The asset location below sends it; every non-PDF asset maps
+    # to "" and gets no header.
+    "/doc/pdf/bovnar-tutorial.pdf"          "<https://www.bovnar.io/docs/tutorial/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-faq.pdf"               "<https://www.bovnar.io/docs/faq/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-specification.pdf"     "<https://www.bovnar.io/docs/spec/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-cheatsheet.pdf"        "<https://www.bovnar.io/docs/cheatsheet/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-unit-system.pdf"       "<https://www.bovnar.io/docs/units/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-unit-policy.pdf"       "<https://www.bovnar.io/docs/policy/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-unit-ambiguities.pdf"  "<https://www.bovnar.io/docs/ambiguities/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-readwrite-api.pdf"     "<https://www.bovnar.io/docs/api/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-python-bindings.pdf"   "<https://www.bovnar.io/docs/python/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-streaming.pdf"         "<https://www.bovnar.io/docs/streaming/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-unit-profiles.pdf"     "<https://www.bovnar.io/docs/profiles/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-grammar.pdf"           "<https://www.bovnar.io/docs/grammar/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-conformance.pdf"       "<https://www.bovnar.io/docs/conformance/>; rel=\"canonical\"";
+    "/doc/pdf/bovnar-rust-bindings.pdf"     "<https://www.bovnar.io/docs/rust/>; rel=\"canonical\"";
 }
 
 # 1) Serve the site over HTTPS on the canonical host only
@@ -745,6 +804,9 @@ server {
         if ($bvnr_doc_moved) { return 301 $bvnr_doc_moved; }
 
         add_header Cache-Control "$bvnr_cache_ctl" always;
+        # Canonical HTML page for a documentation PDF; empty (so omitted) for
+        # every other asset. See the $bvnr_canon_hdr map.
+        add_header Link "$bvnr_canon_hdr" always;
         include snippets/bovnar-headers.conf;
         try_files $uri =404;
     }
@@ -766,6 +828,14 @@ server {
         # and $bvnr_page_moved is empty for everything else, so the test costs
         # one variable lookup and changes nothing it does not name.
         if ($bvnr_page_moved) { return 301 $bvnr_page_moved; }
+
+        # /index.html and /de/index.html served the home pages a second time
+        # with a 200; Search Console listed /index.html as a duplicate. 301 any
+        # .../index.html to its directory. Tested on $request_uri, the URL the
+        # client sent, not $uri: the index directive turns /docs/ into an
+        # internal /docs/index.html, and testing $uri would 301 that to /docs/
+        # forever.
+        if ($request_uri ~ "^([^?]*/)index\.html(?:\?|$)") { return 301 $1$is_args$args; }
 
         add_header Cache-Control "no-cache" always;
         include snippets/bovnar-headers.conf;

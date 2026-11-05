@@ -48,5 +48,10 @@ jobs:
           # Asked again: a newer push may have landed while this waited.
           verdict=$(.github/scripts/runner-shortage.sh "$GITHUB_REPOSITORY" "$RUN" "$ATTEMPT")
           [ "$verdict" = retry ] || { echo "run $RUN: $verdict"; exit 0; }
+          # `rerun --failed` acts on the run's LATEST attempt, but the verdict is
+          # about attempt $ATTEMPT. If someone re-ran the run by hand during the
+          # wait, the latest attempt is one nobody judged; leave it to them.
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN" --jq .run_attempt)
+          [ "$latest" = "$ATTEMPT" ] || { echo "run $RUN: attempt $latest started meanwhile; keep"; exit 0; }
           gh run rerun "$RUN" --failed -R "$GITHUB_REPOSITORY"
           echo "::notice::re-ran the failed jobs of run $RUN (attempt $ATTEMPT): GitHub had found no runner for them"

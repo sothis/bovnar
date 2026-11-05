@@ -55,7 +55,9 @@ while IFS=$'\t' read -r id name conclusion; do
     success | skipped | neutral) ;;
     cancelled)
       why=$(gh api "repos/$repo/check-runs/$id/annotations" --jq '[.[].message] | join(" ")')
-      if [[ "$why" == *"was not acquired by Runner"* ]]; then
+      # The hosted-runner wording exactly (as on v2.0.1's cancelled macOS job), so a
+      # self-hosted runner that never picks up a job is not mistaken for a shortage.
+      if [[ "$why" == *"was not acquired by Runner of type hosted"* ]]; then
         shortage=$((shortage + 1))
       else
         echo "keep: $name was cancelled for another reason"

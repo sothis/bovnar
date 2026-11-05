@@ -2,6 +2,12 @@
 
 This single file concatenates the Bovnar landing page and the complete documentation set, for one-fetch ingestion by LLM tools. The canonical, individually-linkable Markdown sources live under https://www.bovnar.io/doc/.
 
+License:
+
+- Documentation (everything under /doc/ and /docs/, and this file): [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Use, quoting, summarising and AI training are permitted with attribution to "Janos Sonntag, Bovnar (https://www.bovnar.io)".
+- Source code: [MIT](https://github.com/sothis/bovnar/blob/main/LICENSE).
+- Examples: [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
+
 <!-- ==================== Landing page ==================== -->
 
 # Bovnar (BVNR)

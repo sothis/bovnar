@@ -17,6 +17,7 @@ immutable. So the stamps are derived here, from the bytes:
 
   * each url(...woff2) inside fonts.css gets that font file's hash
   * every page that links fonts.css gets the (now rewritten) stylesheet's hash
+  * the orbit demo's two textures on the landing page get theirs (TEXTURES)
 
   ./gen_font_stamps.py           rewrite the stamps in place
   ./gen_font_stamps.py --check   verify only; exit non-zero on drift (CI)
@@ -43,6 +44,23 @@ CSS_LINK = re.compile(r"""(href="[^"]*fonts/fonts\.css)(\?v=[0-9a-f]+)?(")""")
 # warns about for the WASM chain.
 FONT_PRELOAD = re.compile(
     r"""(href="[^"]*fonts/)([\w.-]+\.woff2)(\?v=[0-9a-f]+)?(")""")
+
+
+# The orbit demo's textures. They went out as bare earth.jpg / earth_night.jpg,
+# so they got the one-hour default while everything else on the landing page is
+# a year-long immutable URL; PageSpeed Insights listed their ~120 kB as the
+# page's only short-lived cache entries. Each is named twice on the page -- the
+# <link rel=preload> and the script's new Image() -- and both must carry the
+# same stamp, or the preloaded copy is not reused and the file downloads twice.
+# The pattern requires a closing quote, so the names in prose comments are left
+# alone. (This lives here, not in wasm/build_wasm.sh with the module stamps:
+# that script is itself an input to the WASM freshness hash.)
+TEXTURES = ["earth.jpg", "earth_night.jpg"]
+TEXTURE_PAGE = WEB / "index.html"
+
+
+def texture_re(name: str):
+    return re.compile(r"(" + re.escape(name) + r""")(\?v=[0-9a-zA-Z]+)?(["'])""")
 
 
 def stamp(path: Path) -> str:
@@ -126,6 +144,22 @@ def main() -> int:
             if not check:
                 page.write_text(new, encoding="utf-8")
 
+    text = TEXTURE_PAGE.read_text(encoding="utf-8")
+    new = text
+    for name in TEXTURES:
+        h = stamp(WEB / name)
+        new, n = texture_re(name).subn(lambda m: f"{m.group(1)}?v={h}{m.group(3)}", new)
+        if n != 2:
+            print(f"gen_font_stamps.py: expected 2 references to {name} in "
+                  f"{TEXTURE_PAGE.name} (preload + script), found {n}",
+                  file=sys.stderr)
+            return 1
+    if new != text:
+        if "web/" + TEXTURE_PAGE.name not in stale:
+            stale.append("web/" + TEXTURE_PAGE.name)
+        if not check:
+            TEXTURE_PAGE.write_text(new, encoding="utf-8")
+
     if check:
         if stale:
             print("gen_font_stamps.py --check: stale stamps in "
@@ -133,8 +167,8 @@ def main() -> int:
                   file=sys.stderr)
             return 1
         n = len(FONT_URL.findall(css))
-        print(f"gen_font_stamps.py --check: {n} font stamps, {preloads} preloads "
-              f"and {len(PAGES)} stylesheet links are current")
+        print(f"gen_font_stamps.py --check: {n} font stamps, {preloads} preloads, "
+              f"{len(PAGES)} stylesheet links and {len(TEXTURES)} textures are current")
         return 0
 
     print(f"gen_font_stamps.py: fonts.css -> ?v={digest}"

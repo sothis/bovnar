@@ -67,7 +67,11 @@ PROJECT_LINKS = [
     (f"{SITE}/", "Website",
      "The Bovnar homepage and interactive browser playground."),
     (REPO, "Source (GitHub)",
-     "The C99 reference implementation, Python bindings, and tooling (MIT-licensed)."),
+     "The C99 reference implementation, the Python and Rust bindings, and tooling."),
+    ("https://pypi.org/project/bovnar/", "Python package (PyPI)",
+     "pip install bovnar."),
+    ("https://crates.io/crates/bovnar", "Rust crate (crates.io)",
+     "cargo add bovnar."),
     ("https://www.iana.org/assignments/media-types/text/vnd.bovnar",
      "IANA media type (text/vnd.bovnar)",
      "The registered media type for .bvnr documents."),
@@ -161,6 +165,20 @@ def build_index_md(preamble, sections):
     return "\n".join(parts).rstrip("\n") + "\n"
 
 
+# Licensing, stated where AI tools read it. The documentation is CC BY 4.0, so
+# using it -- quoting, summarising, training on it -- is allowed with
+# attribution, and an ingesting tool has no other place on the site that says
+# so in a form it can rely on. Same terms as the README "License" table.
+LICENSE_LINES = [
+    "- Documentation (everything under /doc/ and /docs/, and this file): "
+    "[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Use, quoting, "
+    "summarising and AI training are permitted with attribution to "
+    "\"Janos Sonntag, Bovnar (https://www.bovnar.io)\".",
+    "- Source code: [MIT](https://github.com/sothis/bovnar/blob/main/LICENSE).",
+    "- Examples: [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).",
+]
+
+
 def build_llms_txt(tag):
     out = []
     out.append("# Bovnar (BVNR)")
@@ -181,6 +199,10 @@ def build_llms_txt(tag):
     out.append("")
     for url, title, desc in PROJECT_LINKS:
         out.append(f"- [{title}]({url}): {desc}")
+    out.append("")
+    out.append("## License")
+    out.append("")
+    out.extend(LICENSE_LINES)
     out.append("")
     out.append("## Optional")
     out.append("")
@@ -269,6 +291,10 @@ def build_llms_full(index_md):
                  "complete documentation set, for one-fetch ingestion by LLM tools. "
                  f"The canonical, individually-linkable Markdown sources live under "
                  f"{SITE}/doc/.")
+    parts.append("")
+    parts.append("License:")
+    parts.append("")
+    parts.extend(LICENSE_LINES)
     parts.append("")
     parts.append("<!-- ==================== Landing page ==================== -->")
     parts.append("")

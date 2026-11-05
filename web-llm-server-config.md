@@ -113,6 +113,19 @@ server {
     error_page 404 /404.html;
     location = /404.html { internal; }
 
+    # W3C TDMRep: text and data mining rights are NOT reserved anywhere on the
+    # site (tdm-reservation 0), matching CC BY 4.0 for the docs and MIT for the
+    # code. The same statement goes out as a header on every response (see
+    # snippets/bovnar-headers.conf); this file is where a TDM agent looks
+    # first. Served from here rather than the web root because publish_web.sh
+    # --delete excludes /.well-known/ from the upload, to protect certbot.
+    location = /.well-known/tdmrep.json {
+        default_type application/json;
+        add_header Cache-Control "public, max-age=86400" always;
+        include snippets/bovnar-headers.conf;
+        return 200 '[{"location": "/*", "tdm-reservation": 0}]\n';
+    }
+
     # Home page: advertise + serve the Markdown edition to AI tools.
     # Declares add_header, so it must repeat the server-level HSTS (see above).
     location = / {
@@ -152,10 +165,8 @@ server {
         default_type  text/markdown;
         charset       utf-8;
         charset_types text/markdown;
-        # Canonical HTML page, and noindex for bingbot, which ignores the
-        # canonical header (see the $bvnr_canon_hdr section below).
+        # Canonical HTML page (see the $bvnr_canon_hdr section below).
         add_header Link "$bvnr_canon_hdr" always;
-        add_header X-Robots-Tag "$bvnr_bing_noindex" always;
         add_header Cache-Control "no-cache" always;
         include snippets/bovnar-headers.conf;
         try_files $uri =404;
@@ -172,7 +183,6 @@ server {
         charset       utf-8;
         charset_types text/plain;
         add_header Link "$bvnr_canon_hdr" always;
-        add_header X-Robots-Tag "$bvnr_bing_noindex" always;
         add_header Cache-Control "no-cache" always;
         include snippets/bovnar-headers.conf;
         try_files $uri =404;
@@ -199,8 +209,8 @@ server {
         if ($bvnr_doc_moved) { return 301 $bvnr_doc_moved; }
 
         add_header Cache-Control "$bvnr_cache_ctl" always;
-        # Canonical HTML page for a documentation PDF; empty (so omitted) for
-        # every other asset. See the $bvnr_canon_hdr map.
+        # Canonical HTML page for a documentation PDF, and noindex for bingbot;
+        # both empty (so omitted) for every other asset. See the maps above.
         add_header Link "$bvnr_canon_hdr" always;
         add_header X-Robots-Tag "$bvnr_bing_noindex" always;
         include snippets/bovnar-headers.conf;
@@ -224,6 +234,13 @@ server {
         # forever.
         if ($request_uri ~ "^([^?]*/)index\.html(?:\?|$)") { return 301 $1$is_args$args; }
 
+        # A documentation page asked for as Markdown: its raw source (see the
+        # $bvnr_doc_md_redirect map). Both headers below are empty, hence
+        # omitted, for every URL that is not a doc page.
+        if ($bvnr_doc_md_redirect) { return 302 $bvnr_doc_md_redirect; }
+
+        add_header Link "$bvnr_doc_md_alt" always;
+        add_header Vary "$bvnr_doc_md_vary" always;
         add_header Cache-Control "no-cache" always;
         include snippets/bovnar-headers.conf;
         try_files $uri $uri/ =404;
@@ -379,14 +396,13 @@ entry gets no header. `/index.md` and `/de/index.md` have entries pointing at
     #  the shared header snippet there, since declaring add_header stops the
     #  location inheriting it)
     add_header Link "$bvnr_canon_hdr" always;
-    add_header X-Robots-Tag "$bvnr_bing_noindex" always;
     include snippets/bovnar-headers.conf;
 ```
 
 `/doc/12_bovnar.ebnf` is not matched by the `.md` location — it has its own, for
-the MIME type (above), or it downloads instead of displaying. The same two
-lines go there and into the static-asset location (for the PDFs); one map
-serves all three.
+the MIME type (above), or it downloads instead of displaying. The same line
+goes there and into the static-asset location (for the PDFs); one map serves
+all three.
 
 The PDFs are in the same map and get the same header from the static-asset
 location. Google indexes PDFs, and Search Console showed the cheat-sheet PDF
@@ -395,10 +411,11 @@ two were splitting one document's signals. A document added to `gen_doc_pdfs.py`
 needs a line here for its PDF as well as for its `.md`.
 
 Bing does not act on a canonical sent as an HTTP header: its Site Explorer kept
-the doc `.md` and all the PDFs as indexed pages of their own. So every response
-that carries one of these canonical headers also carries
-`X-Robots-Tag: bingbot: noindex` from a second map, derived from this one and
-placed beside it in `http{}`:
+the doc `.md` and all the PDFs as indexed pages of their own. The PDFs, which
+drew more of the site's Bing impressions than the HTML pages, therefore also
+carry `X-Robots-Tag: bingbot: noindex` (static-asset location only:
+`add_header X-Robots-Tag "$bvnr_bing_noindex" always;`), from a second map
+derived from this one and placed beside it in `http{}`:
 
 ```nginx
 map $bvnr_canon_hdr $bvnr_bing_noindex {
@@ -408,10 +425,37 @@ map $bvnr_canon_hdr $bvnr_bing_noindex {
 ```
 
 Google ignores a directive addressed to another crawler and keeps following the
-canonical. The cost is on Microsoft's side only: Bing has described `noindex` as
-also keeping a page out of the training of its generative models, so these
-copies drop out of that as well. The same text stays eligible through the HTML
-pages, which carry no such header, and robots.txt keeps `ai-train=yes`.
+canonical. The Markdown and the grammar deliberately do not get the header:
+they are the format AI tools read best, and a copy Bing does not index is
+invisible to Bing-grounded answers such as Copilot's. For them, being findable
+outweighs the duplicate listing.
+
+## AI tools: Markdown on request, licence and training signals
+
+What the site does so AI crawlers and agents can use it cheaply and know they
+may:
+
+- **Markdown everywhere it exists.** A client whose `Accept` prefers
+  `text/markdown` gets a 302 to the raw source: `/` → `/index.md`, `/de/` →
+  `/de/index.md`, `/docs/` → `/llms.txt`, `/docs/<slug>/` → `/doc/NN_….md`
+  (the `$bvnr_doc_md_redirect` map). Every one of those HTML pages also sends
+  `Link: <…>; rel="alternate"; type="text/markdown"` and `Vary: Accept`, so an
+  agent that only does a HEAD learns of the Markdown too.
+- **`/llms.txt` and `/llms-full.txt`** (gen_llms.py) map and concatenate the
+  documentation, and both state the licence.
+- **Licence.** The documentation is CC BY 4.0 and the code MIT (README
+  "License"). The doc pages name it in `<link rel="license">`, in the JSON-LD
+  `license` and in the footer.
+- **Training is welcome, said four ways:** robots.txt `Content-Signal:
+  ai-train=yes`; a `User-agent: __usage_ai-training` group with `Allow: /`
+  (the shared IETF AI-preferences token, honoured by Microsoft from
+  2027-02-01); the W3C TDMRep header `tdm-reservation: 0` on every response
+  (the header snippet below); and `/.well-known/tdmrep.json`, served by nginx
+  itself because `publish_web.sh --delete` keeps `/.well-known/` out of the
+  upload.
+- **No bingbot `noindex` on the Markdown.** Only the PDFs carry it (see above);
+  the Markdown and the grammar stay indexable so Bing-grounded answers can use
+  them.
 
 ## Renamed documents: 301 the old paths
 
@@ -558,11 +602,16 @@ which is what stops the set from quietly thinning out one location at a time.
 #                                only place that directive works; the two
 #                                policies are enforced together, and this one
 #                                restricts nothing else.
+#   tdm-reservation            — W3C TDMRep: 0 = text and data mining rights are
+#                                not reserved, i.e. crawling for AI training and
+#                                analysis is welcome (docs CC BY 4.0, code MIT).
+#                                /.well-known/tdmrep.json says the same.
 ##
 add_header Strict-Transport-Security "max-age=31536000" always;
 add_header X-Content-Type-Options "nosniff" always;
 add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 add_header Content-Security-Policy "frame-ancestors 'none'" always;
+add_header tdm-reservation "0" always;
 ```
 
 ## Complete assembled nginx config
@@ -707,19 +756,83 @@ map $uri $bvnr_canon_hdr {
     "/doc/pdf/bovnar-rust-bindings.pdf"     "<https://www.bovnar.io/docs/rust/>; rel=\"canonical\"";
 }
 
-# Bing for the same duplicates. Bing does not act on a canonical sent as an
-# HTTP header: its Site Explorer listed the doc .md and 13 of the 14 PDFs as
-# indexed pages of their own, and the PDFs drew more of the site's Bing
-# impressions than the HTML pages they duplicate. Every URL that carries a
-# canonical header therefore also tells bingbot -- and only bingbot -- not to
-# index it. Google ignores a directive addressed to another crawler, so it
-# keeps reading the canonical and consolidating as before. Bing has described
-# noindex as also keeping a page out of its generative-model training, so these
-# copies drop out of that too; the HTML pages carry the same text and no such
-# header, and robots.txt keeps ai-train=yes.
+# Bing for the same duplicates, PDFs only. Bing does not act on a canonical
+# sent as an HTTP header: its Site Explorer listed the doc .md and 13 of the 14
+# PDFs as indexed pages of their own, and the PDFs drew more of the site's Bing
+# impressions than the HTML pages they duplicate. The static-asset location
+# therefore tells bingbot -- and only bingbot -- not to index a PDF; Google
+# ignores a directive addressed to another crawler and keeps following the
+# canonical. The Markdown and the grammar do NOT get it: they are the format AI
+# tools read best, and an unindexed copy is invisible to Bing-grounded answers
+# (Copilot), so for them being findable outweighs the duplicate listing.
 map $bvnr_canon_hdr $bvnr_bing_noindex {
     ""       "";
     default  "bingbot: noindex";
+}
+
+# Markdown for AI tools on the documentation pages too, not just the two home
+# pages. A client that prefers text/markdown on /docs/<slug>/ is sent to the
+# raw source (302, Vary: Accept), and every doc page advertises that source in
+# a Link header, so an agent that only does a HEAD learns of it as well. The
+# key joins $bvnr_wants_md and $uri because nginx's "if" cannot test two
+# conditions; /docs/ itself maps to llms.txt, the Markdown index of the set.
+# The Link/Vary map is keyed on both forms of each page: the redirect is decided
+# while $uri is still /docs/<slug>/, but the headers are computed after the
+# index directive has turned it into /docs/<slug>/index.html.
+map $uri $bvnr_doc_md_alt {
+    default                "";
+    "/docs/"               "</llms.txt>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/index.html"     "</llms.txt>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/tutorial/"      "</doc/01_bovnar_tutorial.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/tutorial/index.html" "</doc/01_bovnar_tutorial.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/faq/"           "</doc/02_bovnar_faq.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/faq/index.html" "</doc/02_bovnar_faq.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/spec/"          "</doc/03_bovnar_spec.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/spec/index.html" "</doc/03_bovnar_spec.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/cheatsheet/"    "</doc/04_bovnar_unit_cheatsheet.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/cheatsheet/index.html" "</doc/04_bovnar_unit_cheatsheet.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/units/"         "</doc/05_bovnar_unit_system.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/units/index.html" "</doc/05_bovnar_unit_system.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/policy/"        "</doc/06_bovnar_unit_policy.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/policy/index.html" "</doc/06_bovnar_unit_policy.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/ambiguities/"   "</doc/07_bovnar_unit_ambiguities.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/ambiguities/index.html" "</doc/07_bovnar_unit_ambiguities.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/api/"           "</doc/08_bovnar_readwrite_api.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/api/index.html" "</doc/08_bovnar_readwrite_api.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/python/"        "</doc/09_bovnar_python_bindings.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/python/index.html" "</doc/09_bovnar_python_bindings.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/streaming/"     "</doc/10_bovnar_streaming.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/streaming/index.html" "</doc/10_bovnar_streaming.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/profiles/"      "</doc/11_bovnar_unit_profiles.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/profiles/index.html" "</doc/11_bovnar_unit_profiles.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/grammar/"       "</doc/12_bovnar.ebnf>; rel=\"alternate\"; type=\"text/plain\"";
+    "/docs/grammar/index.html" "</doc/12_bovnar.ebnf>; rel=\"alternate\"; type=\"text/plain\"";
+    "/docs/conformance/"   "</doc/13_bovnar_conformance.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/conformance/index.html" "</doc/13_bovnar_conformance.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/rust/"          "</doc/14_bovnar_rust_bindings.md>; rel=\"alternate\"; type=\"text/markdown\"";
+    "/docs/rust/index.html" "</doc/14_bovnar_rust_bindings.md>; rel=\"alternate\"; type=\"text/markdown\"";
+}
+map "$bvnr_wants_md$uri" $bvnr_doc_md_redirect {
+    default                 "";
+    "1/docs/"               "/llms.txt";
+    "1/docs/tutorial/"      "/doc/01_bovnar_tutorial.md";
+    "1/docs/faq/"           "/doc/02_bovnar_faq.md";
+    "1/docs/spec/"          "/doc/03_bovnar_spec.md";
+    "1/docs/cheatsheet/"    "/doc/04_bovnar_unit_cheatsheet.md";
+    "1/docs/units/"         "/doc/05_bovnar_unit_system.md";
+    "1/docs/policy/"        "/doc/06_bovnar_unit_policy.md";
+    "1/docs/ambiguities/"   "/doc/07_bovnar_unit_ambiguities.md";
+    "1/docs/api/"           "/doc/08_bovnar_readwrite_api.md";
+    "1/docs/python/"        "/doc/09_bovnar_python_bindings.md";
+    "1/docs/streaming/"     "/doc/10_bovnar_streaming.md";
+    "1/docs/profiles/"      "/doc/11_bovnar_unit_profiles.md";
+    "1/docs/grammar/"       "/doc/12_bovnar.ebnf";
+    "1/docs/conformance/"   "/doc/13_bovnar_conformance.md";
+    "1/docs/rust/"          "/doc/14_bovnar_rust_bindings.md";
+}
+map $bvnr_doc_md_alt $bvnr_doc_md_vary {
+    ""       "";
+    default  "Accept";
 }
 
 # 1) Serve the site over HTTPS on the canonical host only
@@ -779,6 +892,19 @@ server {
     error_page 404 /404.html;
     location = /404.html { internal; }
 
+    # W3C TDMRep: text and data mining rights are NOT reserved anywhere on the
+    # site (tdm-reservation 0), matching CC BY 4.0 for the docs and MIT for the
+    # code. The same statement goes out as a header on every response (see
+    # snippets/bovnar-headers.conf); this file is where a TDM agent looks
+    # first. Served from here rather than the web root because publish_web.sh
+    # --delete excludes /.well-known/ from the upload, to protect certbot.
+    location = /.well-known/tdmrep.json {
+        default_type application/json;
+        add_header Cache-Control "public, max-age=86400" always;
+        include snippets/bovnar-headers.conf;
+        return 200 '[{"location": "/*", "tdm-reservation": 0}]\n';
+    }
+
     # Home page: advertise + serve the Markdown edition to AI tools. Declaring
     # add_header here drops the whole inherited set, so the snippet is included.
     location = / {
@@ -812,7 +938,6 @@ server {
         charset       utf-8;
         charset_types text/markdown;
         add_header Link "$bvnr_canon_hdr" always;
-        add_header X-Robots-Tag "$bvnr_bing_noindex" always;
         add_header Cache-Control "no-cache" always;
         include snippets/bovnar-headers.conf;
         try_files $uri =404;
@@ -836,7 +961,6 @@ server {
         # so /doc/12_bovnar.ebnf and /docs/grammar/ competed as two URLs for one
         # document. Same map, same reason.
         add_header Link "$bvnr_canon_hdr" always;
-        add_header X-Robots-Tag "$bvnr_bing_noindex" always;
         add_header Cache-Control "no-cache" always;
         include snippets/bovnar-headers.conf;
         try_files $uri =404;
@@ -867,8 +991,8 @@ server {
         if ($bvnr_doc_moved) { return 301 $bvnr_doc_moved; }
 
         add_header Cache-Control "$bvnr_cache_ctl" always;
-        # Canonical HTML page for a documentation PDF; empty (so omitted) for
-        # every other asset. See the $bvnr_canon_hdr map.
+        # Canonical HTML page for a documentation PDF, and noindex for bingbot;
+        # both empty (so omitted) for every other asset. See the maps above.
         add_header Link "$bvnr_canon_hdr" always;
         add_header X-Robots-Tag "$bvnr_bing_noindex" always;
         include snippets/bovnar-headers.conf;
@@ -901,6 +1025,13 @@ server {
         # forever.
         if ($request_uri ~ "^([^?]*/)index\.html(?:\?|$)") { return 301 $1$is_args$args; }
 
+        # A documentation page asked for as Markdown: its raw source (see the
+        # $bvnr_doc_md_redirect map). Both headers below are empty, hence
+        # omitted, for every URL that is not a doc page.
+        if ($bvnr_doc_md_redirect) { return 302 $bvnr_doc_md_redirect; }
+
+        add_header Link "$bvnr_doc_md_alt" always;
+        add_header Vary "$bvnr_doc_md_vary" always;
         add_header Cache-Control "no-cache" always;
         include snippets/bovnar-headers.conf;
         try_files $uri $uri/ =404;

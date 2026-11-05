@@ -149,6 +149,13 @@ def git_date(relpath, first=False):
 DOC_DIR = os.path.join(ROOT, "doc")
 OUT_DIR = os.path.join(ROOT, "web", "docs")
 SITE = "https://www.bovnar.io"
+# The documentation's licence (README "License"): the text is CC BY 4.0, the
+# code MIT. The footer used to say "MIT-licensed" for the docs, which was wrong,
+# and nothing machine-readable said either -- yet a crawler deciding whether it
+# may train on or quote these pages, and how to attribute them, reads exactly
+# that. So every doc page names it three ways: <link rel="license">, the
+# JSON-LD "license", and the footer link.
+DOC_LICENSE = "https://creativecommons.org/licenses/by/4.0/"
 
 
 def css_stamp(relpath):
@@ -544,7 +551,8 @@ FOOTER = (
     ' · <a href="/">Home</a> · <a href="/docs/">All docs</a> · '
     '<a href="https://github.com/sothis/bovnar">Source</a> · '
     '<a href="/impressum.html">Impressum</a> · '
-    '<a href="/privacy.html">Privacy</a> · MIT-licensed'
+    '<a href="/privacy.html">Privacy</a> · Text '
+    '<a href="' + DOC_LICENSE + '" rel="license">CC BY 4.0</a> · Code MIT'
     '</footer>')
 
 
@@ -595,6 +603,7 @@ def page(title, description, canonical, body, extra_head="", og_dates=None):
 <meta name="theme-color" content="#1e1e1e">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="{canonical}">
+<link rel="license" href="{DOC_LICENSE}">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <meta property="og:type" content="article">
@@ -702,6 +711,9 @@ def doc_schema(title, desc, canonical, published, modified, faqs=None):
             "author": AUTHOR,
             "publisher": PUBLISHER,
             "isPartOf": WEBSITE_REF,
+            "license": DOC_LICENSE,
+            "isAccessibleForFree": True,
+            "copyrightHolder": AUTHOR,
         },
         breadcrumb(title, canonical),
     ]

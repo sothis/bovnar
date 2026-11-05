@@ -156,6 +156,15 @@ SITE = "https://www.bovnar.io"
 # that. So every doc page names it three ways: <link rel="license">, the
 # JSON-LD "license", and the footer link.
 DOC_LICENSE = "https://creativecommons.org/licenses/by/4.0/"
+# Except where it is not ours to give. The unit-profiles document quotes
+# identifier strings (and a few unit names) from UCUM, QUDT, OM 2, UDUNITS-2,
+# the CF standard-name table and UN/ECE Rec 20/21; its §18 says they "are not
+# this project's to license", and for UCUM and CF the question is still open.
+# That page therefore gets no blanket machine-readable licence -- no
+# <link rel="license">, no JSON-LD "license" -- and its footer names the
+# exception, the way the README licence table splits that row off.
+MIXED_LICENCE_PAGES = {f"{SITE}/docs/profiles/"}
+PROFILES_LICENCE_ANCHOR = "#18-provenance-licensing-and-attribution"
 
 
 def css_stamp(relpath):
@@ -546,14 +555,19 @@ BACK_TOP_BTN = (
 # are indexable and rank on their own, so a reader arriving from a search engine
 # lands here with no route to the provider identification that § 5 DDG requires
 # to be reachable from any page of the offering.
-FOOTER = (
-    '<footer>Bovnar (BVNR) spec ' + VERSION +
-    ' · <a href="/">Home</a> · <a href="/docs/">All docs</a> · '
-    '<a href="https://github.com/sothis/bovnar">Source</a> · '
-    '<a href="/impressum.html">Impressum</a> · '
-    '<a href="/privacy.html">Privacy</a> · Text '
-    '<a href="' + DOC_LICENSE + '" rel="license">CC BY 4.0</a> · Code MIT'
-    '</footer>')
+def footer(canonical):
+    if canonical in MIXED_LICENCE_PAGES:
+        licence = ('Text <a href="' + DOC_LICENSE + '">CC BY 4.0</a>, except the '
+                   'third-party vocabulary identifiers (<a href="'
+                   + PROFILES_LICENCE_ANCHOR + '">§18</a>)')
+    else:
+        licence = 'Text <a href="' + DOC_LICENSE + '" rel="license">CC BY 4.0</a>'
+    return ('<footer>Bovnar (BVNR) spec ' + VERSION +
+            ' · <a href="/">Home</a> · <a href="/docs/">All docs</a> · '
+            '<a href="https://github.com/sothis/bovnar">Source</a> · '
+            '<a href="/impressum.html">Impressum</a> · '
+            '<a href="/privacy.html">Privacy</a> · ' + licence + ' · Code MIT'
+            '</footer>')
 
 
 # Appended to a short <title> only. "Bovnar FAQ" told a searcher nothing about
@@ -574,6 +588,8 @@ def title_tag(title):
 
 def page(title, description, canonical, body, extra_head="", og_dates=None):
     esc = html.escape
+    licence_link = ("" if canonical in MIXED_LICENCE_PAGES
+                    else f'<link rel="license" href="{DOC_LICENSE}">\n')
     date_meta = ""
     if og_dates:
         pub, mod = og_dates
@@ -603,8 +619,7 @@ def page(title, description, canonical, body, extra_head="", og_dates=None):
 <meta name="theme-color" content="#1e1e1e">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="{canonical}">
-<link rel="license" href="{DOC_LICENSE}">
-<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+{licence_link}<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Bovnar">
@@ -629,7 +644,7 @@ def page(title, description, canonical, body, extra_head="", og_dates=None):
 <main>
 {body}
 </main>
-{FOOTER}
+{footer(canonical)}
 {BACK_TOP_BTN}
 {bvnr_hl}<script>{THEME_TOGGLE_JS}</script>
 <script>{BACK_TOP_JS}</script>
@@ -711,9 +726,9 @@ def doc_schema(title, desc, canonical, published, modified, faqs=None):
             "author": AUTHOR,
             "publisher": PUBLISHER,
             "isPartOf": WEBSITE_REF,
-            "license": DOC_LICENSE,
             "isAccessibleForFree": True,
-            "copyrightHolder": AUTHOR,
+            **({} if canonical in MIXED_LICENCE_PAGES else
+               {"license": DOC_LICENSE, "copyrightHolder": AUTHOR}),
         },
         breadcrumb(title, canonical),
     ]
@@ -750,18 +765,22 @@ def build_index_page():
         "@graph": [
             {"@type": "CollectionPage", "url": f"{SITE}/docs/",
              "name": "Bovnar documentation", "inLanguage": "en",
-             "isPartOf": WEBSITE_REF, "publisher": PUBLISHER},
+             "isPartOf": WEBSITE_REF, "publisher": PUBLISHER,
+             "license": DOC_LICENSE},
             {"@type": "BreadcrumbList", "itemListElement": [
                 {"@type": "ListItem", "position": 1, "name": "Home", "item": f"{SITE}/"},
                 {"@type": "ListItem", "position": 2, "name": "Documentation",
                  "item": f"{SITE}/docs/"}]},
         ],
     })
+    # llms.txt is the Markdown index of this set; nginx advertises it for
+    # /docs/ in a Link header too, and sends Markdown clients there.
+    alt = '<link rel="alternate" type="text/markdown" href="/llms.txt">\n'
     return page(
         "Bovnar Documentation",
-        "Bovnar (BVNR) documentation: tutorial, specification, unit system, C and "
-        "Python APIs, grammar, FAQ, conformance, and streaming.",
-        f"{SITE}/docs/", body, schema)
+        "Bovnar (BVNR) documentation: tutorial, specification, unit system, the C, "
+        "Python and Rust APIs, grammar, FAQ, conformance, and streaming.",
+        f"{SITE}/docs/", body, alt + schema)
 
 
 # A doc source that has lost its content still renders — as an empty page that

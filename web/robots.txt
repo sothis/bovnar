@@ -3,7 +3,9 @@ Allow: /
 Content-Signal: search=yes, ai-input=yes, ai-train=yes
 
 # AI training is welcome: the documentation is CC BY 4.0 (attribution:
-# Janos Sonntag, https://www.bovnar.io), the code MIT. This group says so with
+# Janos Sonntag, https://www.bovnar.io), the code MIT -- except the third-party
+# vocabulary identifiers quoted in the unit profiles, which are their
+# publishers' (see /llms.txt "License"). This group says so with
 # the shared AI-training token of the IETF AI-preferences work, which Microsoft
 # honours from 2027-02-01. No crawler's user agent matches it, so it changes
 # nothing about what may be crawled. /.well-known/tdmrep.json and the

@@ -170,10 +170,18 @@ def build_index_md(preamble, sections):
 # attribution, and an ingesting tool has no other place on the site that says
 # so in a form it can rely on. Same terms as the README "License" table.
 LICENSE_LINES = [
-    "- Documentation (everything under /doc/ and /docs/, and this file): "
+    "- Documentation text (under /doc/ and /docs/, and this file): "
     "[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Use, quoting, "
     "summarising and AI training are permitted with attribution to "
     "\"Janos Sonntag, Bovnar (https://www.bovnar.io)\".",
+    # Not ours to grant: the unit-profiles document's own §18 says so, and the
+    # README licence table gives these their own row.
+    "- Except: the identifier strings and unit names from external vocabularies "
+    "(UCUM, QUDT, OM 2, UDUNITS-2, the CF standard name table, UN/ECE Rec 20/21) "
+    "quoted in the [unit profiles](https://www.bovnar.io/doc/11_bovnar_unit_profiles.md) "
+    "belong to their publishers and are not covered by the grant above; their "
+    "terms are listed in its section 18 and in "
+    "[THIRD_PARTY_NOTICES.md](https://github.com/sothis/bovnar/blob/main/THIRD_PARTY_NOTICES.md).",
     "- Source code: [MIT](https://github.com/sothis/bovnar/blob/main/LICENSE).",
     "- Examples: [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).",
 ]

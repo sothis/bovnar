@@ -88,9 +88,19 @@ GA_MEASUREMENT_ID = "G-S8GFD3W21V"
 # some privacy modes -- and there, failing to read the choice must leave
 # analytics OFF rather than default it on.
 CONSENT_KEY = "bovnar-analytics-consent"
+
+# The maintainer's own visits. GA showed three users in a month, all of them the
+# maintainer, so the property counted mostly itself. An IP rule cannot hold
+# them out: the home line is IPv6 with a prefix the ISP reassigns. Instead a
+# browser that has this key set to "1" tags its hits traffic_type=internal, and
+# the property's Internal Traffic data filter (Admin > Data filters, Active)
+# drops them. The site never writes the key; it is set by hand, once per
+# browser, in the console on www.bovnar.io:
+#   localStorage.setItem('bovnar-internal', '1')
+INTERNAL_KEY = "bovnar-internal"
 CONSENT_JS = """
 (function () {
-  var KEY = '%s', ID = '%s';
+  var KEY = '%s', ID = '%s', INTERNAL = '%s';
   var box = document.getElementById('bvnr-consent');
   function load() {
     if (window.__bvnrAnalytics) return;
@@ -102,7 +112,11 @@ CONSENT_JS = """
     s.src = 'https://www.googletagmanager.com/gtag/js?id=' + ID;
     document.head.appendChild(s);
     gtag('js', new Date());
-    gtag('config', ID);
+    var cfg = {};
+    try {
+      if (localStorage.getItem(INTERNAL) === '1') cfg.traffic_type = 'internal';
+    } catch (e) {}
+    gtag('config', ID, cfg);
   }
   function save(v) { try { localStorage.setItem(KEY, v); } catch (e) {} }
   var seen = null;
@@ -119,7 +133,7 @@ CONSENT_JS = """
     save('denied'); box.hidden = true;
   });
 })();
-""" % (CONSENT_KEY, GA_MEASUREMENT_ID)
+""" % (CONSENT_KEY, GA_MEASUREMENT_ID, INTERNAL_KEY)
 
 # Withdrawing has to be as easy as granting, so the privacy pages carry a button
 # that clears the stored choice; the banner then asks again on the next load.

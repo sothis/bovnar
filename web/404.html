@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://www.googletagmanager.com 'sha256-XOcoioxV4CFktrq7QfqsgVSHc+5YmPc/viXMF1/OV28=' 'sha256-Cye+JnTa0PWKn05L8nglrzyFGjcgzPCdeXTD8qlkemM='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.google-analytics.com https://www.googletagmanager.com https://*.g.doubleclick.net https://www.google.com https://google.com; font-src 'self'; connect-src https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://*.googletagmanager.com https://*.g.doubleclick.net https://www.google.com https://google.com https://pagead2.googlesyndication.com; frame-src https://www.googletagmanager.com; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src https://www.googletagmanager.com 'sha256-XOcoioxV4CFktrq7QfqsgVSHc+5YmPc/viXMF1/OV28=' 'sha256-oefv59VfqNe3UGW5n5FhzqnIYTnQrGwFO9YsWyA/s6Y='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.google-analytics.com https://www.googletagmanager.com https://*.g.doubleclick.net https://www.google.com https://google.com; font-src 'self'; connect-src https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://*.googletagmanager.com https://*.g.doubleclick.net https://www.google.com https://google.com https://pagead2.googlesyndication.com; frame-src https://www.googletagmanager.com; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, follow">
 <title>404 — Page not found · Bovnar</title>
@@ -133,7 +133,7 @@ code {
 </div>
 <script>
 (function () {
-  var KEY = 'bovnar-analytics-consent', ID = 'G-S8GFD3W21V';
+  var KEY = 'bovnar-analytics-consent', ID = 'G-S8GFD3W21V', INTERNAL = 'bovnar-internal';
   var box = document.getElementById('bvnr-consent');
   function load() {
     if (window.__bvnrAnalytics) return;
@@ -145,7 +145,11 @@ code {
     s.src = 'https://www.googletagmanager.com/gtag/js?id=' + ID;
     document.head.appendChild(s);
     gtag('js', new Date());
-    gtag('config', ID);
+    var cfg = {};
+    try {
+      if (localStorage.getItem(INTERNAL) === '1') cfg.traffic_type = 'internal';
+    } catch (e) {}
+    gtag('config', ID, cfg);
   }
   function save(v) { try { localStorage.setItem(KEY, v); } catch (e) {} }
   var seen = null;

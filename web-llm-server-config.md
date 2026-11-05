@@ -81,7 +81,9 @@ server {
     server_name www.bovnar.io;
 
     root /var/www/html;
-    index index.html index.htm index.nginx-debian.html;
+    # Every directory served here has an index.html; the Debian defaults that
+    # followed it named a placeholder page that is no longer in the web root.
+    index index.html;
 
     # ── Compression ──────────────────────────────────────────────────────────
     # nginx compresses text/html and nothing else unless told otherwise, so the
@@ -150,6 +152,10 @@ server {
         default_type  text/markdown;
         charset       utf-8;
         charset_types text/markdown;
+        # Canonical HTML page, and noindex for bingbot, which ignores the
+        # canonical header (see the $bvnr_canon_hdr section below).
+        add_header Link "$bvnr_canon_hdr" always;
+        add_header X-Robots-Tag "$bvnr_bing_noindex" always;
         add_header Cache-Control "no-cache" always;
         include snippets/bovnar-headers.conf;
         try_files $uri =404;
@@ -165,6 +171,8 @@ server {
         default_type  text/plain;
         charset       utf-8;
         charset_types text/plain;
+        add_header Link "$bvnr_canon_hdr" always;
+        add_header X-Robots-Tag "$bvnr_bing_noindex" always;
         add_header Cache-Control "no-cache" always;
         include snippets/bovnar-headers.conf;
         try_files $uri =404;
@@ -367,15 +375,18 @@ entry gets no header. `/index.md` and `/de/index.md` have entries pointing at
 "crawled - currently not indexed" with no canonical to explain why:
 
 ```nginx
-    # (add to the existing .md location; also include the shared header snippet
-    #  there, since declaring add_header stops the location inheriting it)
+    # (add to the existing .md, .ebnf and static-asset locations; also include
+    #  the shared header snippet there, since declaring add_header stops the
+    #  location inheriting it)
     add_header Link "$bvnr_canon_hdr" always;
+    add_header X-Robots-Tag "$bvnr_bing_noindex" always;
     include snippets/bovnar-headers.conf;
 ```
 
 `/doc/12_bovnar.ebnf` is not matched by the `.md` location — it has its own, for
-the MIME type (above), or it downloads instead of displaying. The same
-`add_header Link "$bvnr_canon_hdr"` line goes there; one map serves both.
+the MIME type (above), or it downloads instead of displaying. The same two
+lines go there and into the static-asset location (for the PDFs); one map
+serves all three.
 
 The PDFs are in the same map and get the same header from the static-asset
 location. Google indexes PDFs, and Search Console showed the cheat-sheet PDF
@@ -386,9 +397,21 @@ needs a line here for its PDF as well as for its `.md`.
 Bing does not act on a canonical sent as an HTTP header: its Site Explorer kept
 the doc `.md` and all the PDFs as indexed pages of their own. So every response
 that carries one of these canonical headers also carries
-`X-Robots-Tag: bingbot: noindex` (the `$bvnr_bing_noindex` map, derived from
-this one). Google ignores a directive addressed to another crawler and keeps
-following the canonical.
+`X-Robots-Tag: bingbot: noindex` from a second map, derived from this one and
+placed beside it in `http{}`:
+
+```nginx
+map $bvnr_canon_hdr $bvnr_bing_noindex {
+    ""       "";
+    default  "bingbot: noindex";
+}
+```
+
+Google ignores a directive addressed to another crawler and keeps following the
+canonical. The cost is on Microsoft's side only: Bing has described `noindex` as
+also keeping a page out of the training of its generative models, so these
+copies drop out of that as well. The same text stays eligible through the HTML
+pages, which carry no such header, and robots.txt keeps `ai-train=yes`.
 
 ## Renamed documents: 301 the old paths
 
@@ -690,7 +713,10 @@ map $uri $bvnr_canon_hdr {
 # impressions than the HTML pages they duplicate. Every URL that carries a
 # canonical header therefore also tells bingbot -- and only bingbot -- not to
 # index it. Google ignores a directive addressed to another crawler, so it
-# keeps reading the canonical and consolidating as before.
+# keeps reading the canonical and consolidating as before. Bing has described
+# noindex as also keeping a page out of its generative-model training, so these
+# copies drop out of that too; the HTML pages carry the same text and no such
+# header, and robots.txt keeps ai-train=yes.
 map $bvnr_canon_hdr $bvnr_bing_noindex {
     ""       "";
     default  "bingbot: noindex";
@@ -708,7 +734,9 @@ server {
     server_name www.bovnar.io;
 
     root /var/www/html;
-    index index.html index.htm index.nginx-debian.html;
+    # Every directory served here has an index.html; the Debian defaults that
+    # followed it named a placeholder page that is no longer in the web root.
+    index index.html;
 
     # Compression. nginx compresses text/html and nothing else unless told, and
     # the http{} block leaves gzip_types commented out -- so llms-full.txt (560

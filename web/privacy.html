@@ -172,21 +172,26 @@ code {
     access data in doing so: your IP address, the date and time, the path requested, the referring
     page, and your browser's user-agent string. This is necessary to operate the service and to
     detect and defend against attacks, which is our legitimate interest under Art. 6(1)(f) GDPR.
-    These logs are not combined with analytics data and are not used to profile visitors.
+    These logs are not combined with analytics data and are not used to profile visitors. They
+    are rotated daily and deleted automatically after 15 days at the latest.
   </p>
 
   <h2>Storage on your device</h2>
   <p class="muted">
-    The site sets <strong>no cookies</strong>. It keeps two small values in your browser's local
-    storage, which are never transmitted to the server:
+    The site itself sets <strong>no cookies</strong>. It keeps up to three small values in your
+    browser's local storage, which are never transmitted to the server:
   </p>
   <p class="addr">
     <code>bovnar-theme</code> — your light/dark choice<br>
+    <code>bovnar-lang</code> — your choice between the English and the German edition<br>
     <code>bovnar-analytics-consent</code> — your answer to the analytics question
   </p>
   <p class="muted">
-    Both are strictly necessary to honour a preference you expressed, and you can clear them at
-    any time through your browser's site-data settings.
+    Each is written only when you make that choice, is strictly necessary to honour it, and can be
+    cleared at any time through your browser's site-data settings. Only if you allow analytics
+    does Google Analytics set two cookies of its own on this site, <code>_ga</code> and
+    <code>_ga_S8GFD3W21V</code>, which recognise a returning browser for up to two years;
+    see the next section.
   </p>
 
   <h2>Analytics — Google Analytics 4</h2>
@@ -214,6 +219,14 @@ code {
     account, recognise the same browser or person across devices, and use the visit for remarketing
     audiences and for the aggregated age, gender and interest reports. None of this happens before
     you allow analytics — declining, or withdrawing below, prevents every one of these requests.
+    What Google links to your account can be reviewed and deleted at
+    <a href="https://myactivity.google.com/" target="_blank" rel="noopener">myactivity.google.com</a>,
+    and ad personalisation can be switched off at
+    <a href="https://myadcenter.google.com/" target="_blank" rel="noopener">myadcenter.google.com</a>.
+  </p>
+  <p class="muted">
+    Google Analytics keeps the event and user data it collects here for 14 months and then deletes
+    it automatically.
   </p>
   <p class="muted">
     The legal basis is your consent under Art. 6(1)(a) GDPR. You may withdraw it at any time with

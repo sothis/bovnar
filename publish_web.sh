@@ -29,8 +29,12 @@
 #   --pdf            Regenerate the doc PDFs + zip bundle before publishing.
 #   --delete         Pass --delete to rsync (prune files removed locally).
 #   -n, --dry-run    Show what rsync would transfer; do not build or upload.
-#   --no-indexnow    Do not submit the sitemap URLs to IndexNow after upload
-#                    (use it when DEST is not the live www.bovnar.io).
+#   --no-indexnow    Do not submit the sitemap URLs to IndexNow after upload.
+#   --indexnow       Submit them even though DEST is not one of the live
+#                    server's names (an IP, an ssh alias). By default the ping
+#                    runs only for a [user@][www.]bovnar.{io,com,net,org}: DEST,
+#                    so a staging publish cannot ask engines to recrawl
+#                    production.
 #   -h, --help       Show this help and exit.
 #
 # Examples:
@@ -96,7 +100,7 @@ EXCLUDES=(
 BUILD_PDF=0
 DRY_RUN=0
 RSYNC_DELETE=0
-INDEXNOW=1
+INDEXNOW=auto
 DEST="${BOVNAR_PUBLISH_DEST:-}"
 
 # The header block: line 2 through the last comment line before the first line
@@ -112,6 +116,7 @@ while [ $# -gt 0 ]; do
         --delete)          RSYNC_DELETE=1 ;;
         -n|--dry-run)      DRY_RUN=1 ;;
         --no-indexnow)     INDEXNOW=0 ;;
+        --indexnow)        INDEXNOW=1 ;;
         -h|--help)         usage; exit 0 ;;
         -*) echo "publish_web.sh: unknown option: $1" >&2; exit 2 ;;
         *)  DEST="$1" ;;
@@ -291,6 +296,15 @@ rsync "${RSYNC_OPTS[@]}" "$STAGE"/ "$DEST"/
 # After the upload, because the engines fetch the key file and the pages as soon
 # as they are told to. A failure only warns: the site is already live, and the
 # next publish or an ordinary crawl catches up.
+if [ "$INDEXNOW" = auto ]; then
+    if [[ "$DEST" =~ ^([^@/]+@)?(www\.)?bovnar\.(io|com|net|org): ]]; then
+        INDEXNOW=1
+    else
+        INDEXNOW=0
+        [ "$DRY_RUN" -eq 1 ] ||
+            echo "==> Not submitting to IndexNow: $DEST is not the live server (--indexnow forces it)"
+    fi
+fi
 if [ "$DRY_RUN" -eq 0 ] && [ "$INDEXNOW" -eq 1 ]; then
     echo "==> Submitting the sitemap URLs to IndexNow (indexnow_ping.py)"
     python3 "$ROOT/indexnow_ping.py" ||

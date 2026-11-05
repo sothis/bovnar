@@ -6,8 +6,8 @@
 The sitemap was hand-maintained, so its <lastmod> dates drifted from the actual
 content (PDFs stamped 2026-06-01 long after the docs changed). This builds it
 from the real last-commit date of each source file, falling back to the file
-mtime and then today. It also lists the new HTML doc pages (/docs/<slug>/) as the
-canonical, indexable form of each document.
+mtime and then today. It lists only the canonical, indexable pages: the two
+home pages, /docs/ and the HTML doc pages (/docs/<slug>/).
 
 publish_web.sh runs this after the doc/LLM generators. Run: python3 gen_sitemap.py
 
@@ -75,14 +75,15 @@ def build():
     entries.append(url(f"{SITE}/docs/", newest_doc, "0.8"))
     for src, slug, _pdf, _title, _desc in DOCS:
         entries.append(url(f"{SITE}/docs/{slug}/", lastmod(f"doc/{src}"), "0.7"))
-    # PDF editions (a distinct, searchable format; built from the same sources).
-    for src, _slug, pdf, _title, _desc in DOCS:
-        entries.append(url(f"{SITE}/doc/pdf/{pdf}.pdf", lastmod(f"doc/{src}"), "0.6"))
-    # LLM-facing entry points.
-    entries.append(url(f"{SITE}/index.md", lastmod("README.md"), "0.7"))
-    entries.append(url(f"{SITE}/de/index.md", lastmod("README.md"), "0.6"))
-    entries.append(url(f"{SITE}/llms.txt", lastmod("README.md"), "0.5"))
-    entries.append(url(f"{SITE}/llms-full.txt", newest_doc, "0.5"))
+    # Nothing else. A sitemap is the list of URLs we want indexed, and every
+    # other rendering of these documents names one of the pages above as its
+    # canonical (the PDFs and the doc .md by a Link header, /index.md and
+    # /de/index.md likewise). The PDFs, the two Markdown home pages, llms.txt and
+    # llms-full.txt used to be listed here, which asked Google to index URLs that
+    # in the same breath declared themselves duplicates: those 18 entries are
+    # what Search Console reported as "crawled/discovered - currently not
+    # indexed". The LLM files are found at their well-known paths and through
+    # the Link: rel=alternate on the home pages, not through this file.
 
     return ('<?xml version="1.0" encoding="UTF-8"?>\n'
             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'

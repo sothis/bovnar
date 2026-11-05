@@ -194,6 +194,7 @@ server {
         # Canonical HTML page for a documentation PDF; empty (so omitted) for
         # every other asset. See the $bvnr_canon_hdr map.
         add_header Link "$bvnr_canon_hdr" always;
+        add_header X-Robots-Tag "$bvnr_bing_noindex" always;
         include snippets/bovnar-headers.conf;
         try_files $uri =404;
     }
@@ -308,6 +309,11 @@ the `http{}` context beside the other `map`:
 ```nginx
 map $uri $bvnr_canon_hdr {
     default                              "";
+    # The Markdown editions of the two home pages. They were left without a
+    # canonical, the only .md on the site that was, and Search Console listed
+    # both as "crawled - currently not indexed" with nothing saying why.
+    "/index.md"                          "<https://www.bovnar.io/>; rel=\"canonical\"";
+    "/de/index.md"                       "<https://www.bovnar.io/de/>; rel=\"canonical\"";
     "/doc/01_bovnar_tutorial.md"         "<https://www.bovnar.io/docs/tutorial/>; rel=\"canonical\"";
     "/doc/02_bovnar_faq.md"              "<https://www.bovnar.io/docs/faq/>; rel=\"canonical\"";
     "/doc/03_bovnar_spec.md"             "<https://www.bovnar.io/docs/spec/>; rel=\"canonical\"";
@@ -346,7 +352,7 @@ map $uri $bvnr_canon_hdr {
 }
 ```
 
-The map lists all thirteen documents, in document order. It listed nine for a
+The map lists all fourteen documents, in document order. It listed nine for a
 while — the unit policy, the ambiguity reference and the UCUM profile joined the
 numbered set after this map was written, and the grammar was left out on the
 argument that `/docs/grammar/` was too niche to have anything to compete with.
@@ -354,9 +360,11 @@ The argument does not survive the file being served at two URLs either way, and
 a map that has to be remembered when a document is added is a map that will be
 out of date again.
 
-Then, inside the existing `location ~ \.md$`, add the header — nginx omits an
-`add_header` whose value evaluates to the empty string, so `/index.md` and
-`/de/index.md` get no canonical header, while the doc `.md` do:
+Then, inside the existing `location ~ \.md$`, add the header. nginx omits an
+`add_header` whose value evaluates to the empty string, so a `.md` without an
+entry gets no header. `/index.md` and `/de/index.md` have entries pointing at
+`/` and `/de/`; they were once left out, and Search Console listed both as
+"crawled - currently not indexed" with no canonical to explain why:
 
 ```nginx
     # (add to the existing .md location; also include the shared header snippet
@@ -374,6 +382,13 @@ location. Google indexes PDFs, and Search Console showed the cheat-sheet PDF
 drawing as many impressions as `/docs/cheatsheet/` while ranking lower, so the
 two were splitting one document's signals. A document added to `gen_doc_pdfs.py`
 needs a line here for its PDF as well as for its `.md`.
+
+Bing does not act on a canonical sent as an HTTP header: its Site Explorer kept
+the doc `.md` and all the PDFs as indexed pages of their own. So every response
+that carries one of these canonical headers also carries
+`X-Robots-Tag: bingbot: noindex` (the `$bvnr_bing_noindex` map, derived from
+this one). Google ignores a directive addressed to another crawler and keeps
+following the canonical.
 
 ## Renamed documents: 301 the old paths
 
@@ -615,8 +630,9 @@ map $uri $bvnr_page_moved {
 }
 
 # Search consolidation: the full "Link: rel=canonical" value (RFC 8288 — URI in
-# angle brackets) for each raw document; empty for /index.md and /de/index.md,
-# so nginx adds no canonical header there (it omits an empty-valued add_header).
+# angle brackets) for each raw document, PDF and Markdown home page; empty for
+# everything else, so nginx adds no header there (it omits an empty-valued
+# add_header).
 #
 # These keys were left on the pre-renumbering paths when the documents were
 # renamed, so the map had stopped matching anything: every raw .md served since
@@ -626,6 +642,11 @@ map $uri $bvnr_page_moved {
 # for a renamed document lands on the new path and picks the header up there.
 map $uri $bvnr_canon_hdr {
     default                              "";
+    # The Markdown editions of the two home pages. They were left without a
+    # canonical, the only .md on the site that was, and Search Console listed
+    # both as "crawled - currently not indexed" with nothing saying why.
+    "/index.md"                          "<https://www.bovnar.io/>; rel=\"canonical\"";
+    "/de/index.md"                       "<https://www.bovnar.io/de/>; rel=\"canonical\"";
     "/doc/01_bovnar_tutorial.md"         "<https://www.bovnar.io/docs/tutorial/>; rel=\"canonical\"";
     "/doc/02_bovnar_faq.md"              "<https://www.bovnar.io/docs/faq/>; rel=\"canonical\"";
     "/doc/03_bovnar_spec.md"             "<https://www.bovnar.io/docs/spec/>; rel=\"canonical\"";
@@ -661,6 +682,18 @@ map $uri $bvnr_canon_hdr {
     "/doc/pdf/bovnar-grammar.pdf"           "<https://www.bovnar.io/docs/grammar/>; rel=\"canonical\"";
     "/doc/pdf/bovnar-conformance.pdf"       "<https://www.bovnar.io/docs/conformance/>; rel=\"canonical\"";
     "/doc/pdf/bovnar-rust-bindings.pdf"     "<https://www.bovnar.io/docs/rust/>; rel=\"canonical\"";
+}
+
+# Bing for the same duplicates. Bing does not act on a canonical sent as an
+# HTTP header: its Site Explorer listed the doc .md and 13 of the 14 PDFs as
+# indexed pages of their own, and the PDFs drew more of the site's Bing
+# impressions than the HTML pages they duplicate. Every URL that carries a
+# canonical header therefore also tells bingbot -- and only bingbot -- not to
+# index it. Google ignores a directive addressed to another crawler, so it
+# keeps reading the canonical and consolidating as before.
+map $bvnr_canon_hdr $bvnr_bing_noindex {
+    ""       "";
+    default  "bingbot: noindex";
 }
 
 # 1) Serve the site over HTTPS on the canonical host only
@@ -739,8 +772,8 @@ server {
         try_files /de/index.html =404;
     }
 
-    # .md as Markdown (RFC 7763) + UTF-8; plus the canonical->HTML header for the
-    # doc .md (empty, hence omitted, for /index.md and /de/index.md).
+    # .md as Markdown (RFC 7763) + UTF-8; plus the canonical->HTML header from
+    # the $bvnr_canon_hdr map (every .md served here has an entry).
     location ~ \.md$ {
         # A document that has been renamed: 301 to its current path before
         # try_files can turn it into a 404 (see the $bvnr_doc_moved map).
@@ -751,6 +784,7 @@ server {
         charset       utf-8;
         charset_types text/markdown;
         add_header Link "$bvnr_canon_hdr" always;
+        add_header X-Robots-Tag "$bvnr_bing_noindex" always;
         add_header Cache-Control "no-cache" always;
         include snippets/bovnar-headers.conf;
         try_files $uri =404;
@@ -774,6 +808,7 @@ server {
         # so /doc/12_bovnar.ebnf and /docs/grammar/ competed as two URLs for one
         # document. Same map, same reason.
         add_header Link "$bvnr_canon_hdr" always;
+        add_header X-Robots-Tag "$bvnr_bing_noindex" always;
         add_header Cache-Control "no-cache" always;
         include snippets/bovnar-headers.conf;
         try_files $uri =404;
@@ -793,7 +828,7 @@ server {
     # add_header here stops this location inheriting the server-level headers, so
     # it includes them (same trap as the home-page locations above).
     #
-    # pdf and zip are here because the documentation ships as both: ten PDFs and
+    # pdf and zip are here because the documentation ships as both: a PDF per document and
     # a 2.5 MB bundle, none of which matched this list, so each download
     # revalidated on every visit while every other asset on the site was told
     # what to do. They are regenerated on publish, hence the map's short default
@@ -807,6 +842,7 @@ server {
         # Canonical HTML page for a documentation PDF; empty (so omitted) for
         # every other asset. See the $bvnr_canon_hdr map.
         add_header Link "$bvnr_canon_hdr" always;
+        add_header X-Robots-Tag "$bvnr_bing_noindex" always;
         include snippets/bovnar-headers.conf;
         try_files $uri =404;
     }

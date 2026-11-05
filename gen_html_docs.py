@@ -173,16 +173,16 @@ DOCS = [
      "documents — types, units, arrays, references, and the streaming API."),
     ("02_bovnar_faq.md", "faq", "bovnar-faq",
      "Bovnar FAQ",
-     "Frequently asked questions about Bovnar types, units, limits, encoding, and "
-     "the C and Python APIs."),
+     "Frequently asked questions about Bovnar (BVNR): syntax, type annotations, "
+     "units, numbers, strings, arrays, errors, limits, and the C and Python APIs."),
     ("03_bovnar_spec.md", "spec", "bovnar-specification",
      "Bovnar Specification (v1.2)",
      "The complete Bovnar (BVNR) format specification, version 1.2: grammar, type "
      "system, physical units, numeric bases, limits, and error semantics."),
     ("04_bovnar_unit_cheatsheet.md", "cheatsheet", "bovnar-cheatsheet",
      "Bovnar Unit & Currency Cheat Sheet",
-     "A one-page reference of every Bovnar unit symbol, SI/IEC prefix, and ISO 4217 "
-     "and cryptocurrency code."),
+     "A one-page reference of every Bovnar unit symbol, SI and IEC binary prefix "
+     "and ISO 4217 and cryptocurrency code, with prefix rules and disambiguation."),
     ("05_bovnar_unit_system.md", "units", "bovnar-unit-system",
      "Bovnar Unit & Currency System",
      "Every Bovnar physical unit, SI and IEC prefix, and currency — 264 units and "
@@ -205,8 +205,8 @@ DOCS = [
      "DOM, Quantity, and the NumPy and Pint bridges."),
     ("10_bovnar_streaming.md", "streaming", "bovnar-streaming",
      "Bovnar Streaming, Framing & Multiplexing",
-     "Bovnar octet streams, frames, multiplexing/demultiplexing, and embedded "
-     "documents for transport over sockets and files."),
+     "Bovnar endless streaming, multi-document record framing, octet multiplexing "
+     "over out-of-band channels, and documents embedded in documents."),
     ("11_bovnar_unit_profiles.md", "profiles", "bovnar-unit-profiles",
      "Bovnar Unit Profiles",
      "Writing UCUM, UN/ECE, QUDT, UDUNITS, OM 2 and CF codes in a Bovnar unit slot: the "
@@ -214,12 +214,14 @@ DOCS = [
      "no representation, and the cross-vocabulary conformance suite."),
     ("12_bovnar.ebnf", "grammar", "bovnar-grammar",
      "Bovnar EBNF Grammar",
-     "The formal EBNF grammar of the Bovnar format, annotated against the reference "
-     "lexer and validator."),
+     "The formal EBNF grammar (ISO/IEC 14977) of the Bovnar (BVNR) format, version "
+     "1.2, derived from and annotated against the reference lexer, parser and "
+     "validator."),
     ("13_bovnar_conformance.md", "conformance", "bovnar-conformance",
      "Bovnar Conformance Testing",
-     "The Bovnar 470-case conformance test suite and the IUT protocol for validating "
-     "third-party implementations."),
+     "The Bovnar 470-case conformance test suite: the IUT protocol, writing an "
+     "adapter for a third-party implementation, TAP output, and CMake "
+     "integration."),
     ("14_bovnar_rust_bindings.md", "rust", "bovnar-rust-bindings",
      "Bovnar Rust Bindings",
      "The Bovnar Rust crate: parse/to_string, the streaming reader and writer, the DOM, "
@@ -546,6 +548,22 @@ FOOTER = (
     '</footer>')
 
 
+# Appended to a short <title> only. "Bovnar FAQ" told a searcher nothing about
+# what Bovnar is, and Bing Webmaster Tools flagged it (and the other short doc
+# titles) as too short to rank well. A title that already runs long keeps its
+# own wording, so none of them passes the ~60 characters a result shows. The
+# visible <h1>, og:title, the docs index and the JSON-LD headline keep the
+# plain name.
+TITLE_SUFFIX = " — unit-safe serialization format"
+TITLE_MAX = 60
+
+
+def title_tag(title):
+    """The <title> text: the plain name, plus TITLE_SUFFIX when that fits."""
+    full = title + TITLE_SUFFIX
+    return full if len(full) <= TITLE_MAX else title
+
+
 def page(title, description, canonical, body, extra_head="", og_dates=None):
     esc = html.escape
     date_meta = ""
@@ -572,7 +590,7 @@ def page(title, description, canonical, body, extra_head="", og_dates=None):
 <meta http-equiv="Content-Security-Policy" content="{page_csp}">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>{THEME_INIT_JS}</script>
-<title>{esc(title)}</title>
+<title>{esc(title_tag(title))}</title>
 <meta name="description" content="{esc(description)}">
 <meta name="theme-color" content="#1e1e1e">
 <meta name="robots" content="index, follow">
@@ -728,7 +746,7 @@ def build_index_page():
         ],
     })
     return page(
-        "Documentation · Bovnar",
+        "Bovnar Documentation",
         "Bovnar (BVNR) documentation: tutorial, specification, unit system, C and "
         "Python APIs, grammar, FAQ, conformance, and streaming.",
         f"{SITE}/docs/", body, schema)

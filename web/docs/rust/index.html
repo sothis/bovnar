@@ -880,8 +880,9 @@ of <code>bvn_dom_parse_fd</code>), because it builds the whole document anyway.<
 <p>A writer twin, and <code>Writer::to_writer</code>, push the document into <code>out</code> through a
 callback sink (<code>bvnr_sink_to_callback</code>) as it is serialised: the C writer
 batches its output as it does for an fd, so <code>out</code> receives 64 KiB blocks as
-they fill and the rest on <code>finish()</code>, which then flushes <code>out</code> once. The bytes
-are those of the in-memory twin. Since output leaves as it is made, a value
+they fill and the rest on <code>finish()</code>, which then flushes <code>out</code> once; a
+<code>to_writer</code> writer also hands over what it holds whenever <code>flush()</code> is called
+(<a href="#115-struct-helpers">§11.5</a>). The bytes are those of the in-memory twin. Since output leaves as it is made, a value
 that cannot be serialised part-way through leaves the blocks before it in
 <code>out</code> (a value that is not a struct at all leaves nothing), and a <code>to_writer</code>
 writer dropped unfinished drops what it still holds. <code>to_writer</code> has no cap on
@@ -2751,7 +2752,7 @@ and <code>recovery_count()</code> is how to tell that any were (spec §13.4).</p
 </tr>
 <tr>
 <td><code>Writer::to_writer(out, pretty)</code></td>
-<td>Write to any <code>std::io::Write</code>: the document streams into <code>out</code> in 64 KiB blocks as it is written, the rest on <code>finish()</code>, which flushes <code>out</code>; no cap on its size</td>
+<td>Write to any <code>std::io::Write</code>: the document streams into <code>out</code> in 64 KiB blocks as it is written, the rest on <code>flush()</code> or <code>finish()</code>, which flush <code>out</code>; no cap on its size</td>
 </tr>
 <tr>
 <td><code>Writer::to_writer_with(out, cap, pretty, unit_flags, emit_version)</code></td>
@@ -2783,6 +2784,10 @@ the size until the output fits (up to 256 MiB).</p>
 <tr>
 <td><code>Writer::bytes_written -&gt; u64</code></td>
 <td>Number of bytes written</td>
+</tr>
+<tr>
+<td><code>w.flush()</code></td>
+<td>Hand over what is written so far without ending the document (<code>bvnr_write_flush</code>): a <code>to_writer</code> writer pushes what it holds to its <code>std::io::Write</code> and flushes it once; a <code>to_mem</code> writer does nothing. See <a href="#115-struct-helpers">§11.5</a></td>
 </tr>
 <tr>
 <td><code>w.finish()</code></td>
@@ -2907,9 +2912,83 @@ named: <code>BINARY</code>, <code>OCTAL</code>, <code>DECIMAL</code>, <code>HEX<
 </tbody>
 </table>
 <p>On a <code>to_writer</code> writer a message reaches <code>out</code> when the writer's 64 KiB block
-fills or the document is finished: there is no C call to push a block early.
-For a stream whose every message must go out at once, write it with
-<code>codec::MuxWriter</code> (<a href="#48-live-streams-the-framing-codec-bovnarcodec">§4.8</a>).</p>
+fills, when the document is finished, or at <code>w.flush()</code> (<code>bvnr_write_flush</code>),
+which writes out what the block holds and then calls <code>out.flush()</code>, once per
+call. A consumer that needs each message as it is sent — a <code>live::Demux</code> at the
+other end of a socket — gets it by a <code>flush()</code> after each <code>mux_send</code>. It is
+legal between any two writer calls, inside an open struct, array or mux stream
+too, and it changes only when the bytes leave, never which: a document flushed
+after every call is byte for byte the one written without a flush. It allocates
+nothing. A failing <code>out</code> is an <code>Error::Io</code> with <code>writing_to_sink</code>, from the
+<code>flush()</code> and from every call after it; on a <code>to_mem</code> writer <code>flush()</code> does
+nothing.</p>
+<div class="codehilite"><pre><span></span><code><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">io</span><span class="p">::</span><span class="n">Read</span><span class="p">;</span>
+<span class="k">use</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">live</span><span class="p">::{</span><span class="n">Demux</span><span class="p">,</span><span class="w"> </span><span class="n">DemuxItem</span><span class="p">,</span><span class="w"> </span><span class="n">DemuxOptions</span><span class="p">};</span>
+<span class="k">use</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">Writer</span><span class="p">;</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">(),</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">Error</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="p">(</span><span class="k">mut</span><span class="w"> </span><span class="n">rx</span><span class="p">,</span><span class="w"> </span><span class="n">tx</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">io</span><span class="p">::</span><span class="n">pipe</span><span class="p">().</span><span class="n">expect</span><span class="p">(</span><span class="s">&quot;pipe&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">w</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Writer</span><span class="p">::</span><span class="n">to_writer</span><span class="p">(</span><span class="n">tx</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">w</span><span class="p">.</span><span class="n">begin_struct</span><span class="p">(</span><span class="s">&quot;meta&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">w</span><span class="p">.</span><span class="n">write_string</span><span class="p">(</span><span class="s">&quot;codec&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;av1&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">w</span><span class="p">.</span><span class="n">end_struct</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">w</span><span class="p">.</span><span class="n">mux_begin</span><span class="p">(</span><span class="s">&quot;media&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">w</span><span class="p">.</span><span class="n">mux_send</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">b&quot;key frame&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">w</span><span class="p">.</span><span class="n">flush</span><span class="p">()</span><span class="o">?</span><span class="p">;</span><span class="w"> </span><span class="c1">// the metadata and the first message leave now</span>
+
+<span class="w">    </span><span class="c1">// The other end has the message while the document is still open</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">options</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DemuxOptions</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">key</span><span class="p">:</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="s">&quot;media&quot;</span><span class="p">.</span><span class="n">into</span><span class="p">()),</span><span class="w"> </span><span class="o">..</span><span class="n">DemuxOptions</span><span class="p">::</span><span class="n">default</span><span class="p">()</span><span class="w"> </span><span class="p">};</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">demux</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Demux</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="o">&amp;</span><span class="n">options</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">buf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="k">u8</span><span class="p">;</span><span class="w"> </span><span class="mi">4096</span><span class="p">];</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">first</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">None</span><span class="p">;</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="n">first</span><span class="p">.</span><span class="n">is_none</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rx</span><span class="p">.</span><span class="n">read</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">buf</span><span class="p">).</span><span class="n">expect</span><span class="p">(</span><span class="s">&quot;read&quot;</span><span class="p">);</span>
+<span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">buf</span><span class="p">[</span><span class="o">..</span><span class="n">n</span><span class="p">];</span>
+<span class="w">        </span><span class="k">while</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="n">item</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">demux</span><span class="p">.</span><span class="n">next</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">input</span><span class="p">)</span><span class="o">?</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="n">DemuxItem</span><span class="p">::</span><span class="n">Message</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">channel</span><span class="p">,</span><span class="w"> </span><span class="n">payload</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">item</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="n">first</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Some</span><span class="p">((</span><span class="n">channel</span><span class="p">,</span><span class="w"> </span><span class="n">payload</span><span class="p">.</span><span class="n">to_vec</span><span class="p">()));</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">first</span><span class="p">,</span><span class="w"> </span><span class="nb">Some</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">b&quot;key frame&quot;</span><span class="p">.</span><span class="n">to_vec</span><span class="p">())));</span>
+<span class="w">    </span><span class="n">w</span><span class="p">.</span><span class="n">mux_end</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">w</span><span class="p">.</span><span class="n">finish</span><span class="p">()</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p>Two writers produce a multiplexed stream message by message, byte for byte the
+same for the same messages:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><code>Writer</code> with <code>mux_send</code> and <code>flush</code></th>
+<th><code>codec::MuxWriter</code> (<a href="#48-live-streams-the-framing-codec-bovnarcodec">§4.8</a>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Implementation</td>
+<td>the C writer: a C call per send and per flush, each message copied into the writer's 64 KiB buffer</td>
+<td>pure Rust, no C call; the chunk headers can be handed out next to the borrowed payload for a vectored write</td>
+</tr>
+<tr>
+<td>Document shape</td>
+<td>any: the stream is one value, with values of every kind before and after it, each one checked as the writer checks every value</td>
+<td>a text preamble, the stream, and nothing after it</td>
+</tr>
+<tr>
+<td>Destination</td>
+<td>a <code>to_writer</code> writer's <code>std::io::Write</code>, flushed by <code>flush()</code></td>
+<td>a <code>Vec</code> or any <code>std::io::Write</code>, which the caller flushes</td>
+</tr>
+<tr>
+<td>Use it for</td>
+<td>a stream inside a larger document, or when the writer already writes the rest</td>
+<td>a dedicated stream, a router or a relay</td>
+</tr>
+</tbody>
+</table>
 <h3 id="116-version-directive">11.6 Version directive</h3>
 <div class="codehilite"><pre><span></span><code><span class="k">use</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">Writer</span><span class="p">;</span>
 

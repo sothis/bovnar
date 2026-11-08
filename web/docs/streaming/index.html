@@ -596,7 +596,15 @@ With <code>deliver_events</code> the demux hands out the document's own events i
 with the messages, so the metadata before a stream is there before its first
 message. <code>EmbeddedFeed</code> reads the documents embedded in a live document (§4)
 by feeding their chunks to one reused reader, and a <code>Writer</code> takes
-<code>embed_document</code> and <code>mux_begin</code> / <code>mux_send</code> / <code>mux_end</code> mid-document.
+<code>embed_document</code> and <code>mux_begin</code> / <code>mux_send</code> / <code>mux_end</code> mid-document.</p>
+<p>Either writer sends a stream message by message. A <code>Writer</code> into a
+<code>std::io::Write</code> (<code>Writer::to_writer</code>) batches into the C writer's 64 KiB buffer,
+and <code>Writer::flush</code> (<code>bvnr_write_flush</code>, §8.5) hands over what it holds and
+flushes the destination, so a <code>flush</code> after each <code>mux_send</code> gives a consumer
+every message as it is sent, inside a document that may hold any values before
+and after the stream. <code>codec::MuxWriter</code> writes the same bytes with no C call,
+for a stream that is the whole document after its preamble, and leaves the
+flushing to the caller.
 <code>MuxReader</code> stays the fast path for a stream that is one octet stream; <code>Demux</code>
 takes a document of any shape — values after the stream, other octet streams
 beside it, every reader limit. See
@@ -831,7 +839,8 @@ the stream, and flushes after every message:</p>
 message and each message as soon as its last byte arrives, so message N is
 there before message N+1 is sent (<code>tests/bovnar_feed_test.c</code> runs exactly this,
 with the writer's sink feeding the demux). A failed push or flush latches like
-any writer error.</p>
+any writer error. The bindings wrap it: <code>Writer.flush()</code> and
+<code>stream.MuxWriter</code> in Python (§5), <code>Writer::flush</code> in Rust (§6).</p>
 <p>There is no "flush after every message" option on <code>bvnr_mux_send</code>: it would
 need a field in <code>bvnr_write_flags_t</code> or a second send function, and the call
 after the send costs what the table in §8.4 shows — about 8 ns on a 150-byte

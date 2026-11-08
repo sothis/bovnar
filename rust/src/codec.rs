@@ -784,10 +784,10 @@ struct Channel {
 }
 
 impl Channel {
-    fn new(id: u64) -> Self {
+    fn new(id: u64, buf: Vec<u8>) -> Self {
         Channel {
             id,
-            buf: Vec::new(),
+            buf,
             need: 0,
             have: 0,
             active: false,
@@ -946,6 +946,9 @@ pub struct MuxReader {
     /// The channel of the current chunk.
     cur: usize,
     channels: Vec<Channel>,
+    /// The buffers of the channels of earlier streams, kept by
+    /// [`reset`](Self::reset) for the channels of the next.
+    spare: Vec<Vec<u8>>,
     index: HashMap<u64, u32, BuildHasherDefault<ChannelHasher>>,
     /// The channel found last, checked before the index.
     last: usize,
@@ -981,6 +984,7 @@ impl MuxReader {
             channel_varint_len: 0,
             cur: 0,
             channels: Vec::new(),
+            spare: Vec::new(),
             index: HashMap::default(),
             last: usize::MAX,
             small: [0; SMALL_CHANNELS],
@@ -1105,6 +1109,11 @@ impl MuxReader {
     /// Makes the reader ready for a new stream, keeping its options and the
     /// capacity of its message buffers.
     pub fn reset(&mut self) {
+        let mut spare = std::mem::take(&mut self.spare);
+        spare.extend(self.channels.drain(..).map(|c| c.buf));
+        let channels = std::mem::take(&mut self.channels);
+        let mut index = std::mem::take(&mut self.index);
+        index.clear();
         *self = MuxReader {
             max_message: self.max_message,
             filter: self.filter.take(),
@@ -1113,6 +1122,9 @@ impl MuxReader {
             text: std::mem::take(&mut self.text),
             head: std::mem::take(&mut self.head),
             wire: std::mem::take(&mut self.wire),
+            channels,
+            spare,
+            index,
             ..Self::new()
         };
         self.key.clear();
@@ -1383,7 +1395,9 @@ impl MuxReader {
                     return Err(self.fail(ErrorCode::OctetStreamOutOfSync));
                 }
                 let i = self.channels.len();
-                self.channels.push(Channel::new(id));
+                let mut buf = self.spare.pop().unwrap_or_default();
+                buf.clear();
+                self.channels.push(Channel::new(id, buf));
                 match self.small.get_mut(id as usize) {
                     // Below MAX_CHANNELS, so the index fits.
                     Some(slot) => *slot = i as u16 + 1,

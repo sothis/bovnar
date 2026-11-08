@@ -44,6 +44,7 @@ The writer uses the same event/data model as the reader — `bvnr_event_t` and `
     - 2.15 [Writer-side unit policy (`bvnr_writer_set_unit_policy`)](#215-writer-side-unit-policy-bvnr_writer_set_unit_policy)
     - 2.16 [Value helpers](#216-value-helpers)
     - 2.17 [`bvnr_sink_to_callback`](#217-bvnr_sink_to_callback)
+    - 2.18 [`bvnr_write_flush`](#218-bvnr_write_flush)
 3. [Shared](#3-shared)
     - 3.1 [`bvnr_write_type_annotation`](#31-bvnr_write_type_annotation)
     - 3.2 [`bvn_parse_unit` / `bvn_parse_unit_n`](#32-bvn_parse_unit--bvn_parse_unit_n)
@@ -1309,7 +1310,7 @@ Flush any buffered output and finalise the stream. Must be called after all `bvn
 
 **After an earlier error** it returns `false` at once, and still hands the sink everything written up to that error — the same bytes a memory sink already holds — so an fd sink ends with the document up to the failing value, not with whatever part of it the 64 KiB buffer happened to have pushed. (A sink that has itself failed, `error_writing_to_sink` or `error_sink_buffer_exhausted`, is not pushed again.) That output is not a document: discard it, or keep it only to see where the error fell.
 
-**64 KiB write buffer.** For an fd or a custom sink the writer accumulates output into an internal 64 KiB buffer. Individual `bvnr_write_event` calls do not push bytes to the sink immediately; instead bytes accumulate in the buffer and are forwarded to the sink only when the buffer is full or when `bvnr_write_finish` is called. A memory sink (`bvnr_open_write_mem`) is written through directly — there is no point buffering a buffer — so its bytes are in the caller's buffer as soon as each event returns. This means the sink receives large contiguous writes rather than one tiny push per token, which is important for fd-based sinks. `bvnr_writer_bytes_written` always reflects the true total of bytes handed off to the sink plus bytes still in the buffer, so the count is accurate at any point during writing.
+**64 KiB write buffer.** For an fd or a custom sink the writer accumulates output into an internal 64 KiB buffer. Individual `bvnr_write_event` calls do not push bytes to the sink immediately; instead bytes accumulate in the buffer and are forwarded to the sink only when the buffer is full, when `bvnr_write_flush` is called (§2.18), or when `bvnr_write_finish` is called. A memory sink (`bvnr_open_write_mem`) is written through directly — there is no point buffering a buffer — so its bytes are in the caller's buffer as soon as each event returns. This means the sink receives large contiguous writes rather than one tiny push per token, which is important for fd-based sinks. `bvnr_writer_bytes_written` always reflects the true total of bytes handed off to the sink plus bytes still in the buffer, so the count is accurate at any point during writing.
 
 ```c
 if (!bvnr_write_finish(w)) {
@@ -1622,8 +1623,9 @@ It behaves as an fd sink does, not as a memory sink: the writer batches output
 into its 64 KiB buffer and pushes whole blocks, and a refused push is
 `error_writing_to_sink` (never `error_sink_buffer_exhausted`).
 `bvnr_writer_bytes_written` and `bvnr_sink_bytes_written` count what `push`
-accepted. `flush` may be `NULL`; when set, `bvnr_write_finish` calls it after the
-last push, and a `false` from it fails the finish with `error_writing_to_sink`.
+accepted. `bvnr_write_flush` (§2.18) pushes the buffer early. `flush` may be
+`NULL`; when set, `bvnr_write_flush` and `bvnr_write_finish` call it after
+their last push, and a `false` from it fails them with `error_writing_to_sink`.
 
 As with the source, `userdata` lives inside the 64-byte handle, the writer
 pushes through its own copy, and the callback recovers the pointer with
@@ -1639,6 +1641,52 @@ static bool sock_push(bvnr_sink_t *s, const void *buf, uint32_t len)
 bvnr_sink_t sink;
 bvnr_sink_to_callback(&sink, sock_push, NULL, &conn);
 bvnr_open_write_sink(w, &sink, false, NULL);
+```
+
+---
+
+### 2.18 `bvnr_write_flush`
+
+```c
+bool bvnr_write_flush(bvnr_writer_t *w);
+```
+
+Hand everything written so far to the sink now, then call the sink's flush
+callback if it has one. For an fd or callback sink the writer gathers output
+in its 64 KiB buffer (§2.9), so a consumer at the other end of a socket would
+otherwise see nothing until the buffer fills or the document finishes; a
+producer that streams — a mux message per `bvnr_mux_send`, a record per event —
+calls this after each one to hand it over at once.
+
+It is legal between any two writer calls: inside an open struct or array, and
+inside an open mux stream between `bvnr_mux_send` calls. It changes only *when*
+the bytes leave, never which bytes: a separator still owed to the next value
+(the `;` after a value, the `,` before the next array element) stays owed, so
+output flushed at every possible point is byte-identical to output never
+flushed.
+
+| Sink | What it does |
+|---|---|
+| memory (`bvnr_sink_to_mem`, `bvnr_open_write_mem`) | nothing; the bytes are in the buffer already. Returns `true`. |
+| fd (`bvnr_sink_to_fd`) | writes the buffer out. |
+| callback (`bvnr_sink_to_callback`) | pushes the buffer, then calls `flush` when one was given. |
+
+A failure latches like any writer error (§2.10): a refused push or a `false`
+from `flush` is `error_writing_to_sink`, with the error offset at the end of
+the output so far, and a writer with no sink attached is
+`error_invalid_argument`. After an earlier error it returns `false` at once and
+pushes nothing. After `bvnr_write_finish` it returns `true` and does nothing:
+the finish has flushed. It allocates nothing.
+
+```c
+bvnr_mux_begin(w, "media");
+bvnr_write_flush(w);                      /* the preamble and the opener */
+while (next_frame(&ch, &frame, &len)) {
+    if (!bvnr_mux_send(w, ch, frame, len) || !bvnr_write_flush(w))
+        break;                            /* bvnr_writer_get_error(w) */
+}
+bvnr_mux_end(w);
+bvnr_write_finish(w);
 ```
 
 ---

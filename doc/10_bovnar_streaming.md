@@ -41,11 +41,12 @@ capabilities are sub-protocols carried in or around them.
 5. [Python bindings](#5-python-bindings)
 6. [Rust bindings](#6-rust-bindings)
 7. [Composition](#7-composition)
-8. [Live streams: callback I/O and push-fed reading](#8-live-streams-callback-io-and-push-fed-reading)
+8. [Live streams: callback I/O, push-fed reading, flushed writing](#8-live-streams-callback-io-push-fed-reading-flushed-writing)
     - 8.1 [Callback sources and sinks](#81-callback-sources-and-sinks)
     - 8.2 [The push-fed document reader](#82-the-push-fed-document-reader)
     - 8.3 [Draining without a callback per item](#83-draining-without-a-callback-per-item)
     - 8.4 [What it costs](#84-what-it-costs)
+    - 8.5 [Writing live: a flush per message](#85-writing-live-a-flush-per-message)
 - [See also](#see-also)
 
 ---
@@ -238,6 +239,7 @@ bool bvnr_mux_begin(bvnr_writer_t* w, const char* key);
 bool bvnr_mux_send (bvnr_writer_t* w, uint64_t channel,
                     const void* data, uint64_t len);   /* split as needed */
 bool bvnr_mux_end  (bvnr_writer_t* w);
+bool bvnr_write_flush(bvnr_writer_t* w);   /* hand what was sent over now */
 
 /* Consumer */
 typedef bool (*bvnr_mux_on_msg_fn)(void* ud, uint64_t channel,
@@ -250,6 +252,11 @@ bool          bvnr_demux_set_key (bvnr_demux_t* dm, const char* key);
 bool          bvnr_demux_on_event(void* demux, bvnr_event_t ev, bvnr_data_t* d);
 error_code_t  bvnr_demux_error(const bvnr_demux_t* dm);
 ```
+
+A message sent to an fd or callback sink waits in the writer's 64 KiB buffer
+until it fills or the document finishes; a producer feeding a live consumer
+calls `bvnr_write_flush` after each `bvnr_mux_send` (§8.5). The bytes are the
+same either way.
 
 Install `bvnr_demux_on_event` as `bvnr_read_flags_t.on_verified` with `userdata`
 set to the `bvnr_demux_t*`. It peels the channel varint off each chunk,
@@ -507,6 +514,23 @@ figures, and what feeding in small pieces costs, are in
 [Python Bindings §4.7](09_bovnar_python_bindings.md#47-live-streams-feeding-in-pieces)
 (`python/bench/bench_stream.py`).
 
+**Writing live** (§8.5) is `stream.MuxWriter(file, key=, preamble=)`, whose
+`send(channel, payload)` hands each message to the socket or file before it
+returns, and `stream.FrameWriter(file)`, one framed document per `write` or
+`dump`; `Writer.flush()` does the same for a document written value by value.
+The bytes are those of `mux_dump` and `dump_documents`:
+
+```python
+with stream.MuxWriter(sock, key="media", preamble={"meta": {"codec": "av1"}}) as mux:
+    for channel, frame in frames:
+        mux.send(channel, frame)                  # flushed: the reader has it now
+```
+
+A flushed send costs about 5.5 µs for a 150-byte message against 2.2 µs
+batched (`flush_each=False`), the ctypes call and the call of the object's
+`sendall`
+([Python Bindings §4.8](09_bovnar_python_bindings.md#48-live-streams-writing-a-message-at-a-time)).
+
 ---
 
 ## 6. Rust bindings
@@ -546,14 +570,15 @@ your own consumer/producer at the same seam without touching the core.
 
 ---
 
-## 8. Live streams: callback I/O and push-fed reading
+## 8. Live streams: callback I/O, push-fed reading, flushed writing
 
 Everything above reads from a `bvnr_source_t` that is *pulled* until it ends.
 That fits a file and a blocking socket. It does not fit a stream that never
 ends and arrives when it arrives — a non-blocking socket in an event loop, a
 binding that is handed bytes — because a pull that returns nothing *is* end of
 input: a short feed would read as a truncated document. This section is the
-other way in.
+other way in, and (§8.5) the writing side of it: a producer that hands each
+message over as it is sent.
 
 ### 8.1 Callback sources and sinks
 
@@ -566,7 +591,7 @@ lives inside the 64-byte handle, because the reader and writer work on a copy of
 it; the callback reads it back with `bvnr_source_get_userdata` /
 `bvnr_sink_get_userdata`. A callback sink fails as a transport does
 (`error_writing_to_sink`), and the writer batches into its 64 KiB buffer before
-pushing.
+pushing, or pushes early at `bvnr_write_flush` (§8.5).
 
 ### 8.2 The push-fed document reader
 
@@ -614,6 +639,12 @@ point.
 | push-fed demux, callback, 1460 B feeds | 152 ns | 7.9 µs | 158 µs |
 | push-fed demux, `bvnr_demux_next`, 1460 B feeds | 168 ns | 7.9 µs | 157 µs |
 | push-fed demux, `bvnr_demux_next`, 64 B feeds | 327 ns | 28 µs | 206 µs |
+| `bvnr_mux_send` into a callback sink, batched | 105 ns | 6.1 µs | 86 µs |
+| `bvnr_mux_send` + `bvnr_write_flush` into a callback sink | 113 ns | 6.1 µs | 86 µs |
+
+The two callback-sink rows are from a later run (§8.5), where `bvnr_mux_send`
+into a memory sink measured 100 ns, 4.8 µs and 69 µs: the sink copies what it
+is pushed, as a socket's send does, minus the system call.
 
 A message that fits one chunk and arrives in one feed is handed out without
 touching its bytes, which is why the 30 KB column falls by a factor of thirty.
@@ -639,6 +670,61 @@ warm, nor the parsing frame reader and a re-opened fed demux per document; a
 `bvnr_doc_stream_read` call allocates the same whatever the number of documents
 (`tests/bovnar_alloc_test.c`).
 
+### 8.5 Writing live: a flush per message
+
+The writer gathers what it writes for an fd or callback sink in a 64 KiB buffer
+and pushes it when the buffer is full or at `bvnr_write_finish`, so a consumer
+at the other end of a socket sees a stream of small messages in 64 KiB bursts,
+or not at all until the producer stops. `bvnr_write_flush` hands everything
+written so far to the sink, then calls the sink's flush callback if it has one
+([doc/08 §2.18](08_bovnar_readwrite_api.md#218-bvnr_write_flush)). It is legal
+between any two writer calls — inside an open mux stream as much as between two
+values — and changes only when the bytes leave: a separator owed to the next
+value stays owed, so the output is byte-identical however often it is flushed.
+For a memory sink it does nothing.
+
+A producer that streams frames to a live consumer writes its metadata, opens
+the stream, and flushes after every message:
+
+```c
+static bool sock_push(bvnr_sink_t* s, const void* buf, uint32_t len)
+{
+    return send_all(*(int*)bvnr_sink_get_userdata(s), buf, len);
+}
+
+bvnr_sink_t sink;
+bvnr_sink_to_callback(&sink, sock_push, NULL, &sock);
+bvnr_writer_t* w = bvnr_writer_create();
+bvnr_open_write_sink(w, &sink, false, NULL);
+
+bvnr_write_struct_start(w, "meta");               /* .meta = { ... }; */
+bvnr_write_string(w, "codec", "av1");
+bvnr_write_float_unit(w, "rate", 32, 30.0, BVN_UNIT_NO_PREFIX(bu_hertz));
+bvnr_write_struct_end(w);
+bvnr_mux_begin(w, "media");                       /* .media = \x00 */
+bvnr_write_flush(w);                              /* the consumer has .meta now */
+
+while (next_frame(&channel, &frame, &len)) {
+    if (!bvnr_mux_send(w, channel, frame, len) || !bvnr_write_flush(w))
+        break;                                    /* error_writing_to_sink */
+}
+
+bvnr_mux_end(w);                                  /* \x00; */
+if (!bvnr_write_finish(w)) { /* bvnr_writer_get_error(w) */ }
+bvnr_writer_destroy(w);
+```
+
+At the other end a push-fed demux (§3.4) hands out `.meta` before the first
+message and each message as soon as its last byte arrives, so message N is
+there before message N+1 is sent (`tests/bovnar_feed_test.c` runs exactly this,
+with the writer's sink feeding the demux). A failed push or flush latches like
+any writer error.
+
+There is no "flush after every message" option on `bvnr_mux_send`: it would
+need a field in `bvnr_write_flags_t` or a second send function, and the call
+after the send costs what the table in §8.4 shows — about 8 ns on a 150-byte
+message, the push of the sink included — and allocates nothing.
+
 ---
 
 ## See also
@@ -649,9 +735,9 @@ warm, nor the parsing frame reader and a re-opened fed demux per document; a
 - [Rust Bindings](14_bovnar_rust_bindings.md) — the `bovnar::stream` module
 - `include/bovnar_stream.h` — full declarations and per-function contracts
 - `tests/bovnar_stream_test.c` — round-trip tests for all four capabilities
-- `tests/bovnar_feed_test.c` — the push-fed readers and callback I/O against the batch functions
+- `tests/bovnar_feed_test.c` — the push-fed readers, callback I/O and the flushed writer against the batch functions
 - `python/bovnar/stream.py` — Python bindings; `python/tests/test_stream.py`,
-  `test_stream_io.py`, `test_stream_feed.py`
+  `test_stream_io.py`, `test_stream_feed.py`, `test_stream_live.py`
 
 ---
 

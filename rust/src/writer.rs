@@ -190,16 +190,16 @@ impl Writer {
     /// a [`std::fs::File`] or a socket.
     ///
     /// The writer batches its output as it does for an fd: `out` receives it
-    /// in 64 KiB blocks as they fill, the rest on [`Writer::finish`], which
-    /// then flushes `out`. So `out` may hold the start of a document whose
-    /// writing later fails, and a document shorter than a block reaches `out`
-    /// only on [`Writer::finish`]; dropping the writer unfinished drops what
-    /// it holds. There is no cap on the document's size;
-    /// [`Writer::to_writer_with`] sets one. Every write is whole: a short
-    /// write or an `Interrupted` one is continued. A failing `out` is an
-    /// [`Error::Io`] with `writing_to_sink`, the code of a failing fd sink,
-    /// from the call whose output it refused and from every call after. A
-    /// panic in `out` reaches the caller of that call.
+    /// in 64 KiB blocks as they fill, the rest on [`Writer::flush`] or
+    /// [`Writer::finish`], which then flush `out`. So `out` may hold the
+    /// start of a document whose writing later fails, and a document shorter
+    /// than a block reaches `out` only on one of those two; dropping the
+    /// writer unfinished drops what it holds. There is no cap on the
+    /// document's size; [`Writer::to_writer_with`] sets one. Every write is
+    /// whole: a short write or an `Interrupted` one is continued. A failing
+    /// `out` is an [`Error::Io`] with `writing_to_sink`, the code of a
+    /// failing fd sink, from the call whose output it refused and from every
+    /// call after. A panic in `out` reaches the caller of that call.
     /// [`Writer::get_output`] is empty for such a writer.
     pub fn to_writer(out: impl std::io::Write + Send + 'static, pretty: bool) -> Result<Self> {
         Self::to_sink(
@@ -550,9 +550,10 @@ impl Writer {
 
     /// One message on `channel` (`bvnr_mux_send`), split over as many octet
     /// chunks as it needs. On a [`Writer::to_writer`] writer it reaches the
-    /// destination when the writer's 64 KiB block fills or the document is
-    /// finished; for a message to go out at once, write the stream with
-    /// [`crate::codec::MuxWriter`] instead.
+    /// destination when the writer's 64 KiB block fills, at
+    /// [`Writer::flush`], or when the document is finished: call
+    /// [`Writer::flush`] after each send for a consumer that needs every
+    /// message as it is sent.
     pub fn mux_send(&mut self, channel: u64, payload: &[u8]) -> Result<()> {
         self.check(|h| h.mux_send(channel, payload))
     }
@@ -615,6 +616,26 @@ impl Writer {
             self.finish_error = Some(e.clone());
         }
         r
+    }
+
+    /// Hands everything written so far to the destination now
+    /// (`bvnr_write_flush`), then flushes it: a [`Writer::to_writer`]
+    /// writer writes what its 64 KiB block holds into its
+    /// [`std::io::Write`] and calls that writer's `flush` once. For a live
+    /// consumer, such as a [`crate::live::Demux`] at the other end of a
+    /// socket, that needs each message as it is sent rather than in 64 KiB
+    /// bursts or at [`Writer::finish`].
+    ///
+    /// Legal between any two writer calls, inside an open struct, array or
+    /// mux stream too, and it never changes the bytes: a separator owed to
+    /// the next value stays owed, so a document flushed after every call is
+    /// the one written without a flush. It allocates nothing. For a
+    /// [`Writer::to_mem`] writer it does nothing. A failing destination is
+    /// an [`Error::Io`] with `writing_to_sink`, from this call and every
+    /// later one, as for any write. After a [`Writer::finish`] that
+    /// succeeded it does nothing and succeeds.
+    pub fn flush(&mut self) -> Result<()> {
+        self.check(ffi::WriterHandle::flush)
     }
 
     /// Bytes written so far.

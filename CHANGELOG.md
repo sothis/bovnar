@@ -169,6 +169,14 @@ API and implements spec 1.2.
   are a fresh generation) and the `bvnr_cli_vectors_*` group; the Python
   bindings read them in `python/tests/test_stream_vectors.py`. doc/10 §9. This
   is the minimal set; the full one is still to come.
+- **Rust: `Writer::flush`** wraps `bvnr_write_flush`: a `to_writer` writer
+  writes what its 64 KiB buffer holds into its `std::io::Write` and calls that
+  writer's `flush` once, so a `flush()` after each `mux_send` hands a live
+  consumer every message as it is sent, inside a document of any shape (doc/14
+  §11.5 sets it beside `codec::MuxWriter`). It never changes the bytes — tests
+  flush after every writer call and after each single one — allocates nothing
+  per message once warm, does nothing on a `to_mem` writer, and reports a
+  failing `write` or `flush` as `Error::Io` with `writing_to_sink`.
 
 ### Changed
 

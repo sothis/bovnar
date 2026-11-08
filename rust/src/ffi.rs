@@ -319,6 +319,7 @@ unsafe extern "C" {
     ) -> bool;
     pub fn bvnr_write_event(w: *mut c_void, ev: c_int, data: *mut BvnrData) -> bool;
     pub fn bvnr_write_finish(w: *mut c_void) -> bool;
+    pub fn bvnr_write_flush(w: *mut c_void) -> bool;
     pub fn bvnr_writer_get_error(w: *mut c_void) -> c_int;
     pub fn bvnr_writer_get_error_offset(w: *mut c_void) -> u64;
     pub fn bvnr_writer_bytes_written(w: *mut c_void) -> u64;
@@ -1628,6 +1629,13 @@ impl WriterHandle {
     pub fn finish(&mut self) -> bool {
         // SAFETY: the writer is live.
         unsafe { bvnr_write_finish(self.ptr.as_ptr()) }
+    }
+
+    /// `bvnr_write_flush`: pushes what is buffered, then calls the sink's
+    /// flush (for a callback sink, `flush_trampoline`).
+    pub fn flush(&mut self) -> bool {
+        // SAFETY: the writer is live.
+        unsafe { bvnr_write_flush(self.ptr.as_ptr()) }
     }
 
     /// `bvnr_writer_get_error` and `bvnr_writer_get_error_offset`.

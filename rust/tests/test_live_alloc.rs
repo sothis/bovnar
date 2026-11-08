@@ -11,6 +11,7 @@
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 use std::io::{self, Read};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use bovnar::live::{Demux, DemuxItem, DemuxOptions, DocumentFeed, FramePull};
 use bovnar::{ReadOptions, Reader, Writer, stream};
@@ -164,6 +165,57 @@ fn a_warm_frame_pull_and_document_feed_allocate_nothing_per_document() {
         );
     }
     assert!(events > 0);
+}
+
+/// A destination that takes every byte and keeps only counts, shared with the
+/// test through atomics so that the writer can own it.
+#[derive(Clone, Default)]
+struct Counted(std::sync::Arc<(AtomicUsize, AtomicUsize)>);
+
+impl io::Write for Counted {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.0.0.fetch_add(buf.len(), Ordering::Relaxed);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.0.1.fetch_add(1, Ordering::Relaxed);
+        Ok(())
+    }
+}
+
+#[test]
+fn a_warm_writer_sends_and_flushes_without_allocating() {
+    let out = Counted::default();
+    let mut w = Writer::to_writer(out.clone(), false).unwrap();
+    w.begin_struct("meta").unwrap();
+    w.write_string("codec", "av1").unwrap();
+    w.end_struct().unwrap();
+    w.mux_begin("media").unwrap();
+    let payloads: Vec<Vec<u8>> = SIZES.iter().map(|&n| vec![0x3Cu8; n]).collect();
+    let round = |w: &mut Writer| {
+        for (ch, p) in payloads.iter().enumerate() {
+            w.mux_send(ch as u64, p).unwrap();
+            w.flush().unwrap();
+        }
+    };
+    round(&mut w);
+    let flushes = out.0.1.load(Ordering::Relaxed);
+    let (calls, _) = allocations_in(|| {
+        for _ in 0..20 {
+            round(&mut w);
+        }
+    });
+    assert_eq!(
+        calls,
+        0,
+        "{calls} allocations for {} sends",
+        20 * SIZES.len()
+    );
+    assert_eq!(out.0.1.load(Ordering::Relaxed) - flushes, 20 * SIZES.len());
+    w.mux_end().unwrap();
+    w.finish().unwrap();
+    assert_eq!(out.0.0.load(Ordering::Relaxed) as u64, w.bytes_written());
 }
 
 /// An endless-looking input: the same document, `left` bytes of it.

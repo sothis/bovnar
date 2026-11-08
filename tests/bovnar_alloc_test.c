@@ -25,8 +25,9 @@
 /*
  * The hot paths of the streaming layer allocate nothing per message once
  * warm: bvnr_mux_send (whose 64 KiB chunk used to be malloc'd and freed on
- * every call), the pull-style drains of a fed demux and frame reader for
- * messages and documents that lie whole in the fed buffer, and every path that
+ * every call), alone and followed by bvnr_write_flush into a callback sink,
+ * the pull-style drains of a fed demux and frame reader for messages and
+ * documents that lie whole in the fed buffer, and every path that
  * re-opens a reader for the next document -- the parsing frame reader,
  * bvnr_doc_stream_read and a fed demux -- which used to allocate the reader's
  * frame stack and scratch buffers again (about 120 KB) for each one.
@@ -92,6 +93,17 @@ static void expect_none(const char* what, unsigned long allocs)
 	if (allocs) g_failures++;
 }
 
+/* A transport that takes every byte: what a socket's send does, minus the
+ * system call. */
+static uint64_t g_pushed;
+static bool take_push(bvnr_sink_t* s, const void* p, uint32_t n)
+{
+	(void)s; (void)p;
+	g_pushed += n;
+	return true;
+}
+static bool take_flush(bvnr_sink_t* s) { (void)s; return true; }
+
 static void count_begin(void) { g_allocs = 0; g_counting = true; }
 static unsigned long count_end(void) { g_counting = false; return g_allocs; }
 
@@ -141,6 +153,32 @@ int main(void)
 	count_begin();
 	bvnr_mux_send(w, 1, payload, 150);
 	expect_none("bvnr_mux_send after re-opening the writer", count_end());
+	bvnr_writer_destroy(w);
+
+	/* Live: each message sent and flushed into a callback sink. */
+	w = bvnr_writer_create();
+	bvnr_sink_t live;
+	bvnr_sink_to_callback(&live, take_push, take_flush, NULL);
+	bvnr_open_write_sink(w, &live, false, NULL);
+	bvnr_mux_begin(w, "mux");
+	bvnr_mux_send(w, 1, payload, 150);       /* warm: the chunk buffer */
+	bvnr_write_flush(w);
+	for (size_t s = 0; s < 3; s++) {
+		count_begin();
+		for (int i = 0; i < 40; i++) {
+			bvnr_mux_send(w, (uint64_t)i, payload, sizes[s]);
+			bvnr_write_flush(w);
+		}
+		char what[64];
+		snprintf(what, sizeof(what), "40 x bvnr_mux_send + bvnr_write_flush "
+			 "of %llu B", (unsigned long long)sizes[s]);
+		expect_none(what, count_end());
+	}
+	bvnr_mux_end(w);
+	if (!bvnr_write_finish(w) || g_pushed != bvnr_writer_bytes_written(w)) {
+		printf("  the live writer did not push its output\n");
+		g_failures++;
+	}
 	bvnr_writer_destroy(w);
 
 	/* A stream of small messages, drained from one fed buffer. */

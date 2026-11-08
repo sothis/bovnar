@@ -1091,6 +1091,7 @@ func bvnr_write_float_dec_unit _Bool (bvnr_writer_t *, const char *, uint32_t, d
 func bvnr_write_float_fix _Bool (bvnr_writer_t *, const char *, uint32_t, uint32_t, double)
 func bvnr_write_float_fix_unit _Bool (bvnr_writer_t *, const char *, uint32_t, uint32_t, double, value_unit_t)
 func bvnr_write_float_unit _Bool (bvnr_writer_t *, const char *, uint32_t, double, value_unit_t)
+func bvnr_write_flush _Bool (bvnr_writer_t *)
 func bvnr_write_null _Bool (bvnr_writer_t *, const char *)
 func bvnr_write_plain _Bool (bvnr_writer_t *, const char *, const char *)
 func bvnr_write_sint _Bool (bvnr_writer_t *, const char *, uint32_t, int64_t)

@@ -979,9 +979,9 @@ BVN_API void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint64_t cap);
  * push must take all `len` bytes or return false. A failure is reported as
  * error_writing_to_sink -- a callback sink is never mistaken for a full memory
  * buffer -- and the writer batches output into its 64 KiB buffer before pushing,
- * as it does for an fd. flush may be NULL; when set, bvnr_write_finish calls it
- * after the last push, and a false return fails the finish with
- * error_writing_to_sink.
+ * as it does for an fd; bvnr_write_flush pushes it early. flush may be NULL;
+ * when set, bvnr_write_flush and bvnr_write_finish call it after their last
+ * push, and a false return fails them with error_writing_to_sink.
  *
  * `userdata` is stored inside the handle. The reader and writer work on a COPY
  * of the source or sink they are given, so the callback must not compare the
@@ -1384,6 +1384,28 @@ BVN_API bool bvnr_write_event(
 BVN_API bool bvnr_write_version(
 	bvnr_writer_t* w, uint16_t major, uint16_t minor);
 BVN_API bool bvnr_write_finish(bvnr_writer_t* w);
+/*
+ * Push everything written so far to the sink now, then call the sink's flush
+ * callback if it has one. The writer batches output into a 64 KiB buffer for
+ * fd and callback sinks and pushes it only when the buffer is full or at
+ * bvnr_write_finish; a live consumer at the other end of a socket needs each
+ * message when it is sent, so call this after bvnr_mux_send (or after any
+ * write) to hand it over.
+ *
+ * Legal between any two writer calls: inside an open struct or array, and
+ * inside an open mux stream between bvnr_mux_send calls. It never changes the
+ * bytes produced -- output flushed at every possible point is byte-identical to
+ * output never flushed -- because a separator still owed to the next value
+ * stays owed. It only moves when the bytes leave.
+ *
+ * For a memory sink it does nothing and succeeds (the bytes are in the buffer
+ * already); for an fd sink it writes the buffer out; for a callback sink it
+ * pushes the buffer and then calls flush, when one was given. A failure latches
+ * like any writer error: error_writing_to_sink for a refused push or flush,
+ * error_invalid_argument when no sink is attached. False at once after an
+ * earlier error; true and a no-op after bvnr_write_finish, which has flushed.
+ */
+BVN_API bool bvnr_write_flush(bvnr_writer_t* w);
 BVN_API error_code_t bvnr_writer_get_error(const bvnr_writer_t* w);
 BVN_API uint64_t     bvnr_writer_get_error_offset(const bvnr_writer_t* w);
 BVN_API uint64_t     bvnr_writer_bytes_written(const bvnr_writer_t* w);

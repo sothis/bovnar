@@ -26,6 +26,9 @@
  * Per-message cost of the streaming layer's hot paths, on one core:
  *
  *   mux_send      bvnr_mux_send into a memory sink;
+ *   live send     bvnr_mux_send into a callback sink that copies what it is
+ *                 pushed (a socket's send, minus the system call), batched by
+ *                 the writer and flushed after every message;
  *   demux read    bvnr_read with bvnr_demux_on_event (the batch path);
  *   demux feed    the push-fed demux, callback mode (on_message) and pull mode
  *                 (bvnr_demux_next), fed the whole document at once and in
@@ -149,6 +152,46 @@ static void bench_read(cell_t* c, double budget)
 }
 
 #if !defined(BVNR_BENCH_BATCH_ONLY)
+typedef struct {
+	uint8_t* out;
+	uint64_t at;
+} copy_sink_t;
+
+static bool copy_push(bvnr_sink_t* s, const void* p, uint32_t n)
+{
+	copy_sink_t* c = bvnr_sink_get_userdata(s);
+	memcpy(c->out + c->at, p, n);
+	c->at += n;
+	return true;
+}
+
+static void live_stream(cell_t* c, bvnr_writer_t* w, bool flush)
+{
+	copy_sink_t cs = { c->doc, 0 };
+	bvnr_sink_t sink;
+	bvnr_sink_to_callback(&sink, copy_push, NULL, &cs);
+	bvnr_open_write_sink(w, &sink, false, NULL);
+	bvnr_mux_begin(w, "mux");
+	for (uint32_t i = 0; i < c->msgs; i++) {
+		bvnr_mux_send(w, i % 4u, g_payload + (i % 64u), c->size);
+		if (flush)
+			bvnr_write_flush(w);
+	}
+	bvnr_mux_end(w);
+	bvnr_write_finish(w);
+	g_sink += cs.at;
+}
+
+static void bench_live_send(cell_t* c, double budget, bool flush)
+{
+	bvnr_writer_t* w = bvnr_writer_create();
+	uint64_t rounds; double secs;
+	BENCH(budget, &rounds, &secs, live_stream(c, w, flush));
+	report(flush ? "live send, flushed per message" : "live send, batched",
+	       c, secs, rounds);
+	bvnr_writer_destroy(w);
+}
+
 static void feed_all(bvnr_demux_t* dm, const cell_t* c, uint64_t piece,
 	bool pull)
 {
@@ -324,6 +367,8 @@ int main(int argc, char** argv)
 		bench_send(&c, budget);
 		bench_read(&c, budget);
 #if !defined(BVNR_BENCH_BATCH_ONLY)
+		bench_live_send(&c, budget, false);
+		bench_live_send(&c, budget, true);
 		bench_feed(&c, budget, 0, false);
 		bench_feed(&c, budget, 0, true);
 		bench_feed(&c, budget, 1460, false);

@@ -36,7 +36,7 @@ API and implements spec 1.2.
   and read back from the copy the reader or writer passes to the callback
   (`bvnr_source_get_userdata`, `bvnr_sink_get_userdata`). A callback sink fails
   as a transport (`error_writing_to_sink`), keeps the writer's 64 KiB buffer in
-  use, and is flushed by `bvnr_write_finish`.
+  use, and is flushed by `bvnr_write_flush` and `bvnr_write_finish`.
 - **Push-fed frame reader.** `bvnr_frame_reader_*`: the twin of
   `bvnr_doc_stream_read` for fed input. Created from `bvnr_doc_stream_opts_t` it
   parses each document as that does, streaming the payload into one reused fed
@@ -54,6 +54,18 @@ API and implements spec 1.2.
   ordinary metadata values (`.meta = {…}; .media = <stream>;`) that a consumer
   has before the first message. A message that lies whole in the fed buffer is
   handed out from it.
+- **A mid-stream flush: `bvnr_write_flush`.** The writer gathers fd and
+  callback output in its 64 KiB buffer and pushed it only when the buffer was
+  full or at `bvnr_write_finish`, so a producer on a socket could not send a
+  mux stream message by message. `bvnr_write_flush` pushes what is buffered and
+  then calls the sink's flush, between any two writer calls — inside an open
+  struct, array or mux stream as well — and changes only when the bytes leave,
+  never which: `bvnr_feed_test` replays every corpus document flushed after no
+  event, every event and each single event, and a writer whose sink feeds a
+  fed demux has each message delivered before the next is sent. A memory sink
+  has nothing to flush. Errors latch as for every writer call. Calling it after
+  each `bvnr_mux_send` adds about 8 ns to a 150-byte message and allocates
+  nothing (doc/08 §2.18, doc/10 §8.5). An export-only ABI addition.
 - **Python: live streams.** `bovnar.stream.DocumentFeed`, `FrameFeed` and
   `DemuxFeed` wrap the push-fed reader, frame reader and demux: each is handed
   bytes in pieces of any size, and `feed()` returns the object, which iterates
@@ -81,6 +93,16 @@ API and implements spec 1.2.
   of the call unchanged.
 - **Python: `mux_dump(..., preamble={...})`** writes ordinary values before
   the mux stream opens, for a reader to have before the first message.
+- **Python: live writing.** `bovnar.stream.MuxWriter(file, key=, preamble=,
+  flush_each=True)` writes a mux stream to a socket or binary file object one
+  `send(channel, payload)` at a time, each message handed to the object (and
+  its `flush()`) before `send` returns, so a `DemuxFeed` at the other end has
+  message N before N+1 is sent; `close()` or the `with` block ends the stream.
+  `stream.FrameWriter(file)` writes a frame stream a `write(bytes)` or
+  `dump(obj)` at a time, and `Writer.flush()` wraps `bvnr_write_flush`. The
+  bytes are those of `mux_dump` and `dump_documents`, and an exception the
+  object raises comes out of the call that pushed. A flushed 150-byte send
+  costs about 5.5 µs (doc/09 §4.8).
 - **`bvnr_stream_bench`**, a benchmark of `bvnr_mux_send` and the demux, batch
   and fed, and of framed documents through `bvnr_doc_stream_read` and the
   parsing frame reader (`tests/bovnar_stream_bench.c`, built but not a test;

@@ -224,14 +224,20 @@ def load_documents(data,
 # ===========================================================================
 
 def mux_dump(messages: Iterable[tuple], *, key: str = 'mux',
-             file=None) -> bytes | None:
+             preamble: dict | None = None, file=None) -> bytes | None:
     """Serialise ``(channel:int, payload:bytes)`` messages as one multiplexed
     octet-stream document under ``key``. Channels may repeat and interleave;
     messages of any size are split across octet chunks and reassembled by
     :func:`mux_load`.
 
+    ``preamble`` is a dict written as ordinary values before the stream opens
+    -- what the stream is, say ``{"meta": {"codec": "av1"}}`` -- for a reader
+    to have before the first message. :func:`bovnar.loads` reads it as
+    ordinary values, beside the stream's raw bytes under ``key``.
+
     With ``file`` (a socket or a binary file object) the document is written
     there, through the writer's 64 KiB buffer, and nothing is returned."""
+    from . import _emit_dict, _uses_spec_1_1, _uses_spec_1_2  # deferred (import cycle)
     lib  = get_library()
     msgs = [(int(ch), _as_bytes(p)) for ch, p in messages]
     # The channel crosses the FFI as a uint64_t, and ctypes wraps an
@@ -241,9 +247,19 @@ def mux_dump(messages: Iterable[tuple], *, key: str = 'mux',
         if not 0 <= ch < (1 << 64):
             raise BovnarArgumentError(
                 f"mux channel {ch} is outside the unsigned 64-bit range")
+    if preamble is not None and not isinstance(preamble, dict):
+        raise BovnarArgumentError("mux_dump() preamble must be a dict")
+    need_version = None
+    if preamble:
+        need_version = (1, 2) if _uses_spec_1_2(preamble) else \
+                       (1, 1) if _uses_spec_1_1(preamble) else None
     kb = key.encode('utf-8')
 
     def write(w):
+        if need_version:
+            w.write_version(*need_version)
+        if preamble:
+            _emit_dict(w, preamble)
         if not lib.bvnr_mux_begin(w._ptr, kb):
             w._raise_error()
         for ch, payload in msgs:

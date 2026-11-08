@@ -117,6 +117,24 @@ class TestMultiplexing:
         msgs = [(1, b"a"), (2, b"bb"), (1, b"ccc"), (3, b"dddd"), (2, b"e")]
         assert stream.mux_load(stream.mux_dump(msgs)) == msgs
 
+    def test_preamble(self):
+        # Values before the stream, for a reader to have before the first
+        # message; the batch reader skips them, loads() reads them.
+        meta = {"meta": {"codec": "av1", "rate": 30.0}}
+        msgs = [(1, b"frame"), (2, b"x" * 70000)]
+        blob = stream.mux_dump(msgs, key="media", preamble=meta)
+        assert blob.startswith(bovnar.dumps(meta, pretty=False))
+        assert stream.mux_load(blob, key="media") == msgs
+        assert stream.mux_load(blob) == msgs
+        assert bovnar.loads(blob)["meta"] == meta["meta"]
+        # a preamble that needs a version directive gets one
+        q = bovnar.loads(b'#!bovnar 1.1\n.t = <datetime:64,unix> 1;',
+                         typed=True)["t"]
+        assert stream.mux_dump(msgs, preamble={"t": q}).startswith(b"#!bovnar 1.1")
+        from bovnar.exceptions import BovnarArgumentError
+        with pytest.raises(BovnarArgumentError):
+            stream.mux_dump(msgs, preamble=[("meta", 1)])
+
     def test_key_scope(self):
         # A mux stream under "data": scoping to the right key round-trips, a
         # non-matching key ignores the stream, and no scope is the default.

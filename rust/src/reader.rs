@@ -274,9 +274,13 @@ impl<'a> EventData<'a> {
     /// The public view of a raw event; `None` for an event this binding does
     /// not know.
     pub(crate) fn from_view(view: &ffi::EventView<'a>) -> Option<Self> {
-        let event = Event::from_raw(view.event)?;
+        Event::from_raw(view.event).map(|event| Self::with_event(view, event))
+    }
+
+    /// The public view of a raw event already known to be `event`.
+    pub(crate) fn with_event(view: &ffi::EventView<'a>, event: Event) -> Self {
         let d = view.data;
-        Some(EventData {
+        EventData {
             event,
             token_type: d.and_then(|d| TokenType::from_raw(d.type_)),
             value_type: d.map_or(ValueTypeSpec::default(), |d| d.value_type),
@@ -291,7 +295,7 @@ impl<'a> EventData<'a> {
                 .filter(|d| d.converted)
                 .map_or(Unit::default(), |d| Unit(d.conv.unit)),
             conv_exact: view.conv_exact,
-        })
+        }
     }
 
     /// The exact converted value as a reduced `(numerator, denominator)`
@@ -444,7 +448,8 @@ impl Reader {
     /// `read_mem` gives for the same bytes, `file_too_long` at the same
     /// offset for a document over `options.max_file_size` included. `input`
     /// is read until it reports its end (`Ok(0)`), so a blocking source
-    /// suits it. Short reads are fine and
+    /// suits it; for one that runs dry before it is done, feed a
+    /// [`crate::live::DocumentFeed`] instead. Short reads are fine and
     /// `Interrupted` is retried. A failing `input` is an [`Error::Io`] with
     /// `reading_from_source_fd`, the code an unreadable fd gives, after the
     /// events of what it had delivered. A panic in `input` reaches the

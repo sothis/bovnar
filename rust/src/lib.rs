@@ -25,6 +25,7 @@ pub mod error;
 mod ffi;
 mod io;
 pub mod json;
+pub mod live;
 pub mod quantity;
 pub mod reader;
 pub mod stream;
@@ -1094,6 +1095,9 @@ pub mod dict_parser {
                     let bytes = std::mem::take(&mut self.octets);
                     self.push_value(Value::Bytes(bytes));
                 }
+                // A top-level array is complete once nothing more can continue
+                // it, which the end of the document settles too.
+                Event::StreamEnd => self.maybe_seal_array(),
                 Event::Data if self.in_octet => self.octets.extend_from_slice(d.raw),
                 Event::Data => {
                     let value = if self.typed {
@@ -1104,6 +1108,16 @@ pub mod dict_parser {
                     self.push_value(value);
                 }
                 _ => {}
+            }
+        }
+
+        /// Moves the top-level assignments completed so far into `out`, in
+        /// document order, so that a parser of an endless document holds
+        /// only the assignment in progress. A key assigned again after its
+        /// first value was taken is delivered again.
+        pub fn take_completed(&mut self, out: &mut Vec<(String, Value)>) {
+            if let Some(Scope::Doc(entries)) = self.stack.first_mut() {
+                out.append(entries);
             }
         }
 

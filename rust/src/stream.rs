@@ -5,7 +5,7 @@
 //!
 //! These work on whole streams: they return everything at once, and suit a
 //! file or a finite transfer. For a stream that never ends, see
-//! [`crate::codec`].
+//! [`crate::codec`] and [`crate::live`].
 //!
 //! Each function has a twin over [`std::io::Read`] (`*_reader`) or
 //! [`std::io::Write`] (`*_to`) that streams through the library's callback
@@ -150,7 +150,8 @@ fn load_from(
 
 /// [`load_documents`] over any [`std::io::Read`], such as a
 /// [`std::fs::File`]. It returns once `input` has ended, so it suits a finite
-/// stream; for an endless one, see [`crate::codec::FrameReader`].
+/// stream; for an endless one, feed a [`crate::live::FrameParser`] or a
+/// [`crate::live::FramePull`].
 pub fn load_documents_reader(
     mut input: impl std::io::Read,
     typed: bool,
@@ -218,7 +219,7 @@ fn mux_load_with(
 }
 
 /// [`mux_load`] over any [`std::io::Read`]. It returns once `input` has
-/// ended; for messages as they arrive, see [`crate::codec::MuxReader`].
+/// ended; for messages as they arrive, feed a [`crate::live::Demux`].
 pub fn mux_load_reader(
     mut input: impl std::io::Read,
     max_message: u64,

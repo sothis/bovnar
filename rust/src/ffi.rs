@@ -608,6 +608,7 @@ unsafe fn bytes<'a>(ptr: *const c_void, len: u32) -> &'a [u8] {
 
 /// One reader event as the callback sees it. Borrowed: valid only for the
 /// duration of the callback.
+#[derive(Clone, Copy)]
 pub struct EventView<'a> {
     pub event: c_int,
     pub data: Option<&'a BvnrData>,
@@ -2712,6 +2713,508 @@ extern "C" fn flush_trampoline(s: *mut BvnrSink) -> bool {
     // SAFETY: `s` comes from `open_sink`.
     let st = unsafe { push_state(s) };
     st.call(0, |w| w.flush())
+}
+
+// ---------------------------------------------------------------------------
+// Push-fed reading: a reader, a frame reader and a demultiplexer that are
+// handed bytes.
+
+/// Borrows `len` bytes at `ptr`; NULL or zero length is empty.
+///
+/// SAFETY: as for [`bytes`].
+unsafe fn bytes64<'a>(ptr: *const u8, len: u64) -> &'a [u8] {
+    if ptr.is_null() || len == 0 {
+        &[]
+    } else {
+        // SAFETY: guaranteed by the caller; the bytes exist, so their count
+        // fits a usize.
+        unsafe { std::slice::from_raw_parts(ptr, len as usize) }
+    }
+}
+
+/// The handlers of the call in progress on a fed object. The library copies
+/// the user pointer when the object is opened, so the pointer it is given is
+/// this slot's, which stays put, and each call points the slot at its own
+/// [`Handlers`] for as long as it runs. NULL between calls.
+struct Slot(*mut c_void);
+
+/// A new slot, owned through the raw pointer the library is also given.
+fn new_slot() -> *mut Slot {
+    Box::into_raw(Box::new(Slot(std::ptr::null_mut())))
+}
+
+/// SAFETY: `slot` must come from [`new_slot`] and be freed exactly once,
+/// after the last call that could reach it.
+unsafe fn free_slot(slot: *mut Slot) {
+    // SAFETY: guaranteed by the caller.
+    drop(unsafe { Box::from_raw(slot) });
+}
+
+/// Runs `f` with `slot` pointing at `h`; a handler panic is resumed after.
+///
+/// SAFETY: `slot` must be live.
+unsafe fn with_slot<R>(slot: *mut Slot, h: &mut Handlers<'_>, f: impl FnOnce() -> R) -> R {
+    // SAFETY: the slot is live; `h` outlives `f`, after which the slot is
+    // emptied again, so no callback can reach `h` once it is gone.
+    unsafe { (*slot).0 = (h as *mut Handlers<'_>).cast() };
+    let result = f();
+    // SAFETY: as above.
+    unsafe { (*slot).0 = std::ptr::null_mut() };
+    h.resume();
+    result
+}
+
+/// The handlers a slot points at, or NULL outside a call.
+///
+/// SAFETY: `ud` must be a live [`Slot`].
+unsafe fn slot_handlers(ud: *mut c_void) -> *mut c_void {
+    // SAFETY: guaranteed by the caller.
+    unsafe { (*ud.cast::<Slot>()).0 }
+}
+
+extern "C" fn slot_on_verified(ud: *mut c_void, ev: c_int, d: *const BvnrData) -> bool {
+    // SAFETY: the user pointer of every fed object is its live slot.
+    let h = unsafe { slot_handlers(ud) };
+    // Events arrive only inside a feed or a finish, which fill the slot.
+    !h.is_null() && dispatch(h, ev, d, true)
+}
+
+extern "C" fn slot_on_document(ud: *mut c_void, index: u64, ok: bool, err: c_int) -> bool {
+    // SAFETY: as for slot_on_verified.
+    let h = unsafe { slot_handlers(ud) };
+    !h.is_null() && on_document_trampoline(h, index, ok, err)
+}
+
+/// A reader opened with `bvnr_open_read_feed` for one document after
+/// another; events go to the handlers of the feed or finish that produces
+/// them.
+pub struct FeedHandle {
+    reader: ReaderHandle,
+    slot: *mut Slot,
+}
+
+impl FeedHandle {
+    /// A reader and its slot; `None` when the library is out of memory.
+    pub fn new() -> Option<Self> {
+        Some(FeedHandle {
+            reader: ReaderHandle::new()?,
+            slot: new_slot(),
+        })
+    }
+
+    /// The reader, for its error and its counters.
+    pub fn reader(&self) -> &ReaderHandle {
+        &self.reader
+    }
+
+    /// The reader, for its unit policy.
+    pub fn reader_mut(&mut self) -> &mut ReaderHandle {
+        &mut self.reader
+    }
+
+    /// `bvnr_open_read_feed` with the limits in `flags` (its userdata and
+    /// callbacks are set here): starts a document.
+    pub fn open(&mut self, mut flags: BvnrReadFlags) -> bool {
+        flags.userdata = self.slot.cast();
+        flags.on_verified = Some(slot_on_verified as EventCallbackFn);
+        // SAFETY: the reader is live; `flags` is copied during the call, and
+        // its user pointer, the slot, lives as long as the reader.
+        unsafe { bvnr_open_read_feed(self.reader.0.as_ptr(), std::ptr::null(), &mut flags) }
+    }
+
+    /// `bvnr_read_feed`: `h.verified` sees the events `data` completes.
+    pub fn feed(&mut self, data: &[u8], h: &mut Handlers<'_>) -> bool {
+        let r = self.reader.0.as_ptr();
+        // SAFETY: the slot and the reader are live; `data` is only read, and
+        // only during the call.
+        unsafe {
+            with_slot(self.slot, h, || {
+                bvnr_read_feed(r, data.as_ptr().cast(), data.len() as u64)
+            })
+        }
+    }
+
+    /// `bvnr_read_finish`: `h.verified` sees the closing events.
+    pub fn finish(&mut self, h: &mut Handlers<'_>) -> bool {
+        let r = self.reader.0.as_ptr();
+        // SAFETY: the slot and the reader are live.
+        unsafe { with_slot(self.slot, h, || bvnr_read_finish(r)) }
+    }
+}
+
+// SAFETY: the reader is Send (see ReaderHandle), and the slot is owned by the
+// handle alone and empty between calls. Not Sync, like the reader.
+unsafe impl Send for FeedHandle {}
+
+impl Drop for FeedHandle {
+    fn drop(&mut self) {
+        // The reader is a field and is destroyed after this, but it holds the
+        // slot only as an opaque pointer it calls back through inside a feed
+        // or finish, of which none is running.
+        // SAFETY: the slot came from new_slot and is freed once.
+        unsafe { free_slot(self.slot) }
+    }
+}
+
+/// A `bvnr_frame_reader_create` frame reader: it parses each document of a
+/// fed frame stream, with the events and the per-document results going to
+/// the handlers of the feed that completes them.
+pub struct FrameParseHandle {
+    fr: std::ptr::NonNull<c_void>,
+    slot: *mut Slot,
+}
+
+impl FrameParseHandle {
+    /// A frame reader with the limits in `flags` and the policy of
+    /// `bvnr_doc_stream_read`; `None` when the library is out of memory.
+    pub fn new(
+        mut flags: BvnrReadFlags,
+        continue_past_failed: bool,
+        max_document_size: u64,
+    ) -> Option<Self> {
+        let slot = new_slot();
+        flags.userdata = slot.cast();
+        flags.on_verified = Some(slot_on_verified as EventCallbackFn);
+        let opts = BvnrDocStreamOpts {
+            flags: &mut flags,
+            userdata: slot.cast(),
+            on_document: Some(slot_on_document as OnDocumentFn),
+            continue_past_failed,
+            max_document_size,
+        };
+        // SAFETY: `opts` and `flags` are copied during the call; their user
+        // pointer, the slot, lives as long as the frame reader.
+        let fr = unsafe { bvnr_frame_reader_create(&opts) };
+        match std::ptr::NonNull::new(fr) {
+            Some(fr) => Some(FrameParseHandle { fr, slot }),
+            None => {
+                // SAFETY: the slot came from new_slot, and nothing holds it.
+                unsafe { free_slot(slot) };
+                None
+            }
+        }
+    }
+
+    /// `bvnr_frame_reader_feed`: `h.verified` sees the events of the
+    /// documents `data` reaches into, `h.on_document` each one it completes.
+    pub fn feed(&mut self, data: &[u8], h: &mut Handlers<'_>) -> bool {
+        let fr = self.fr.as_ptr();
+        // SAFETY: the slot and the frame reader are live; in parse mode
+        // `data` is only read during the call.
+        unsafe {
+            with_slot(self.slot, h, || {
+                bvnr_frame_reader_feed(fr, data.as_ptr().cast(), data.len() as u64)
+            })
+        }
+    }
+
+    /// `bvnr_frame_reader_finish`.
+    pub fn finish(&mut self) -> bool {
+        // SAFETY: the frame reader is live; finishing parses nothing.
+        unsafe { bvnr_frame_reader_finish(self.fr.as_ptr()) }
+    }
+
+    /// `bvnr_frame_reader_error`.
+    pub fn error(&self) -> c_int {
+        // SAFETY: the frame reader is live.
+        unsafe { bvnr_frame_reader_error(self.fr.as_ptr()) }
+    }
+
+    /// `bvnr_frame_reader_count`.
+    pub fn count(&self) -> u64 {
+        // SAFETY: the frame reader is live.
+        unsafe { bvnr_frame_reader_count(self.fr.as_ptr()) }
+    }
+}
+
+// SAFETY: a frame reader holds its whole state, like a reader (bovnar.h,
+// THREADING); the slot is owned by the handle alone and empty between calls.
+unsafe impl Send for FrameParseHandle {}
+
+impl Drop for FrameParseHandle {
+    fn drop(&mut self) {
+        // SAFETY: both are live and released once, the frame reader first.
+        unsafe {
+            bvnr_frame_reader_destroy(self.fr.as_ptr());
+            free_slot(self.slot);
+        }
+    }
+}
+
+/// What a pull-style `next` gave.
+pub enum Next<T, E> {
+    /// A document or an item.
+    Item(T),
+    /// The input is used up.
+    None,
+    /// The stream failed, for this reason.
+    Error(E),
+    /// The input differs from the one still being drained, which was left
+    /// alone.
+    OtherInput,
+}
+
+/// The input a pull-style object is draining: the library keeps a pointer
+/// into it between calls. Each call is handed the input again, borrowed for
+/// the call, and is refused unless it is the same bytes, so the library only
+/// ever reads memory the caller lends it at that moment.
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+struct Attached(Option<(usize, usize)>);
+
+impl Attached {
+    fn of(input: &[u8]) -> Option<(usize, usize)> {
+        Some((input.as_ptr() as usize, input.len()))
+    }
+}
+
+/// A `bvnr_frame_reader_create_pull` frame reader.
+pub struct FramePullHandle {
+    fr: std::ptr::NonNull<c_void>,
+    attached: Attached,
+}
+
+impl FramePullHandle {
+    /// `None` when the library is out of memory.
+    pub fn new(max_document_size: u64) -> Option<Self> {
+        // SAFETY: no preconditions; the result is NULL or a fresh reader.
+        let fr = unsafe { bvnr_frame_reader_create_pull(max_document_size) };
+        std::ptr::NonNull::new(fr).map(|fr| FramePullHandle {
+            fr,
+            attached: Attached::default(),
+        })
+    }
+
+    /// Whether fed bytes are still being drained.
+    pub fn is_attached(&self) -> bool {
+        self.attached.0.is_some()
+    }
+
+    /// Feeds `input` unless it is being drained already, then
+    /// `bvnr_frame_reader_next`.
+    pub fn next<'s, 'a: 's>(&'s mut self, input: &'a [u8]) -> Next<&'s [u8], c_int> {
+        let fr = self.fr.as_ptr();
+        match self.attached.0 {
+            Some(a) if Attached::of(input) != Some(a) => return Next::OtherInput,
+            Some(_) => {}
+            None => {
+                // SAFETY: the frame reader is live. It keeps a pointer into
+                // `input` until `next` reports NONE; it reads through it only
+                // in `next`, which is called only with these same bytes
+                // borrowed again (checked above).
+                if !unsafe { bvnr_frame_reader_feed(fr, input.as_ptr().cast(), input.len() as u64) }
+                {
+                    return Next::Error(self.error());
+                }
+                self.attached = Attached(Attached::of(input));
+            }
+        }
+        let (mut doc, mut len) = (std::ptr::null(), 0u64);
+        // SAFETY: the frame reader is live and `input` is the fed buffer,
+        // borrowed for 'a; the outputs are writable.
+        match unsafe { bvnr_frame_reader_next(fr, &mut doc, &mut len) } {
+            // SAFETY: the document lies in `input` or in the reader's buffer,
+            // valid until the next call, which needs `&mut self`.
+            NEXT_DOCUMENT => Next::Item(unsafe { bytes64(doc, len) }),
+            NEXT_NONE => {
+                self.attached = Attached::default();
+                Next::None
+            }
+            _ => {
+                // A failed reader reads no input again.
+                self.attached = Attached::default();
+                Next::Error(self.error())
+            }
+        }
+    }
+
+    /// `bvnr_frame_reader_finish`; call it only while nothing is attached.
+    pub fn finish(&mut self) -> bool {
+        // SAFETY: the frame reader is live; finishing reads no input.
+        unsafe { bvnr_frame_reader_finish(self.fr.as_ptr()) }
+    }
+
+    /// `bvnr_frame_reader_error`.
+    pub fn error(&self) -> c_int {
+        // SAFETY: the frame reader is live.
+        unsafe { bvnr_frame_reader_error(self.fr.as_ptr()) }
+    }
+
+    /// `bvnr_frame_reader_count`.
+    pub fn count(&self) -> u64 {
+        // SAFETY: the frame reader is live.
+        unsafe { bvnr_frame_reader_count(self.fr.as_ptr()) }
+    }
+}
+
+// SAFETY: as for FrameParseHandle; the attached input is only an address,
+// read through only while the caller lends the bytes to a call.
+unsafe impl Send for FramePullHandle {}
+
+impl Drop for FramePullHandle {
+    fn drop(&mut self) {
+        // SAFETY: live and destroyed once; destroying reads no input.
+        unsafe { bvnr_frame_reader_destroy(self.fr.as_ptr()) }
+    }
+}
+
+/// An item of a fed demultiplexer.
+pub enum DemuxItem<'a> {
+    /// (channel, payload)
+    Message(u64, &'a [u8]),
+    /// A document event this binding knows; its data is the demux's copy.
+    Event(crate::enums::Event, EventView<'a>),
+}
+
+/// A `bvnr_demux_create` demultiplexer without `on_message`, fed with
+/// `bvnr_demux_open_feed` and drained with `bvnr_demux_next`.
+pub struct DemuxHandle {
+    dm: std::ptr::NonNull<c_void>,
+    attached: Attached,
+}
+
+impl DemuxHandle {
+    /// A demux for messages up to `max_message` (0 for the default), only of
+    /// streams under `key` when there is one. `Err` names the call that could
+    /// not allocate.
+    pub fn new(max_message: u64, key: Option<&CStr>) -> Result<Self, &'static str> {
+        // SAFETY: no callback, so no user pointer to keep alive.
+        let dm = unsafe { bvnr_demux_create(None, std::ptr::null_mut(), max_message) };
+        let dm = std::ptr::NonNull::new(dm).ok_or("bvnr_demux_create()")?;
+        let handle = DemuxHandle {
+            dm,
+            attached: Attached::default(),
+        };
+        // SAFETY: the demux is live; `key` is NUL-terminated and copied.
+        if key.is_some_and(|k| !unsafe { bvnr_demux_set_key(dm.as_ptr(), k.as_ptr()) }) {
+            // bovnar_stream.h: false only for a NULL demux or a failed
+            // allocation.
+            return Err("bvnr_demux_set_key()");
+        }
+        Ok(handle)
+    }
+
+    /// `bvnr_demux_open_feed` with the limits in `flags` (no callbacks):
+    /// starts a document.
+    pub fn open(&mut self, mut flags: BvnrReadFlags, deliver_events: bool) -> bool {
+        self.attached = Attached::default();
+        flags.userdata = std::ptr::null_mut();
+        flags.on_verified = None;
+        flags.on_unverified = None;
+        flags.on_error = None;
+        flags.want_unit = None;
+        // SAFETY: the demux is live; `flags` is copied during the call. The
+        // reader is re-armed, so it holds no pointer into an earlier input.
+        unsafe { bvnr_demux_open_feed(self.dm.as_ptr(), &flags, deliver_events) }
+    }
+
+    /// Whether fed bytes are still being drained.
+    pub fn is_attached(&self) -> bool {
+        self.attached.0.is_some()
+    }
+
+    /// Feeds `input` unless it is being drained already (or with `None`,
+    /// after the finish, feeds nothing), then `bvnr_demux_next`, passing
+    /// over an event this binding does not know. A failure carries
+    /// `bvnr_demux_error` and the reader's error.
+    pub fn next<'s, 'a: 's>(
+        &'s mut self,
+        input: Option<&'a [u8]>,
+    ) -> Next<DemuxItem<'s>, (c_int, Option<ReaderError>)> {
+        let dm = self.dm.as_ptr();
+        match (self.attached.0, input) {
+            (Some(a), Some(input)) if Attached::of(input) != Some(a) => return Next::OtherInput,
+            (Some(_), None) => return Next::OtherInput,
+            (Some(_), Some(_)) | (None, None) => {}
+            (None, Some(input)) => {
+                // SAFETY: the demux is live. It keeps a pointer into `input`
+                // until `next` reports NONE; it reads through it only in
+                // `next`, which is called only with these same bytes borrowed
+                // again (checked above).
+                if !unsafe { bvnr_demux_feed(dm, input.as_ptr().cast(), input.len() as u64) } {
+                    return Next::Error((self.error(), self.reader_error()));
+                }
+                self.attached = Attached(Attached::of(input));
+            }
+        }
+        let mut item = BvnrDemuxItem {
+            channel: 0,
+            data: std::ptr::null(),
+            length: 0,
+            event: 0,
+            value: std::ptr::null(),
+        };
+        let (rc, event) = loop {
+            // SAFETY: the demux is live, any attached input is borrowed for
+            // 'a, and `item` is writable.
+            let rc = unsafe { bvnr_demux_next(dm, &mut item) };
+            let event = crate::enums::Event::from_raw(item.event);
+            if rc != NEXT_EVENT || event.is_some() {
+                break (rc, event);
+            }
+        };
+        match (rc, event) {
+            // SAFETY: the message lies in the input or in the channel's
+            // buffer, valid until the next call, which needs `&mut self`.
+            (NEXT_MESSAGE, _) => Next::Item(DemuxItem::Message(item.channel, unsafe {
+                bytes64(item.data, item.length)
+            })),
+            // SAFETY: `value` points at the demux's copy of the event, whose
+            // bytes are in its arena, all valid until the next call.
+            (NEXT_EVENT, Some(event)) => Next::Item(DemuxItem::Event(event, unsafe {
+                EventView::new(item.event, item.value.as_ref())
+            })),
+            (NEXT_NONE, _) => {
+                self.attached = Attached::default();
+                Next::None
+            }
+            _ => {
+                // A failed demux reads no input again.
+                self.attached = Attached::default();
+                Next::Error((self.error(), self.reader_error()))
+            }
+        }
+    }
+
+    /// `bvnr_demux_finish`; call it only while nothing is attached.
+    pub fn finish(&mut self) -> bool {
+        // SAFETY: the demux is live; finishing reads no input.
+        unsafe { bvnr_demux_finish(self.dm.as_ptr()) }
+    }
+
+    /// `bvnr_demux_error`.
+    pub fn error(&self) -> c_int {
+        // SAFETY: the demux is live.
+        unsafe { bvnr_demux_error(self.dm.as_ptr()) }
+    }
+
+    /// The error of the fed reader, when the demux has been opened.
+    pub fn reader_error(&self) -> Option<ReaderError> {
+        // SAFETY: the demux is live; the reader it returns is NULL or owned
+        // by the demux, and only read here.
+        let r = unsafe { bvnr_demux_get_reader(self.dm.as_ptr()) }.cast_mut();
+        // SAFETY: as above.
+        (!r.is_null()).then(|| unsafe {
+            ReaderError {
+                code: bvnr_reader_get_error(r),
+                line: bvnr_reader_get_error_line(r),
+                column: bvnr_reader_get_error_column(r),
+                offset: bvnr_reader_get_error_offset(r),
+                byte: bvnr_reader_get_error_byte(r),
+            }
+        })
+    }
+}
+
+// SAFETY: a demux and its reader hold their whole state (bovnar.h,
+// THREADING); the attached input is only an address, read through only while
+// the caller lends the bytes to a call.
+unsafe impl Send for DemuxHandle {}
+
+impl Drop for DemuxHandle {
+    fn drop(&mut self) {
+        // SAFETY: live and destroyed once; destroying reads no input.
+        unsafe { bvnr_demux_destroy(self.dm.as_ptr()) }
+    }
 }
 
 /// Checks every mirrored struct against the C compiler's own layout, as printed by the upstream ABI manifest generator

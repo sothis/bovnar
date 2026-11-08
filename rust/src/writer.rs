@@ -530,7 +530,8 @@ impl Writer {
 
     /// `.key = <octets>;` where the octets are the document `doc`
     /// (`bvnr_embed_document`), so that a reader can parse it back:
-    /// [`crate::stream::parse_embedded`]. On a [`Writer::to_writer`] writer this
+    /// [`crate::stream::parse_embedded`], or, on a live stream,
+    /// [`crate::live::EmbeddedFeed`]. On a [`Writer::to_writer`] writer this
     /// embeds one document after another into a document that is still being
     /// written.
     pub fn embed_document(&mut self, key: &str, doc: &[u8]) -> Result<()> {

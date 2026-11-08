@@ -24,6 +24,8 @@ The writer uses the same event/data model as the reader — `bvnr_event_t` and `
     - 1.11 [`bvn_parse_uint64` / `bvn_parse_int64` / `bvn_parse_double`](#111-bvn_parse_uint64--bvn_parse_int64--bvn_parse_double)
     - 1.12 [Reader-side unit policy (`bvnr_reader_set_unit_policy`)](#112-reader-side-unit-policy-bvnr_reader_set_unit_policy)
     - 1.13 [Refusing the binary half (`text_only`)](#113-refusing-the-binary-half-text_only)
+    - 1.14 [`bvnr_source_from_callback`](#114-bvnr_source_from_callback)
+    - 1.15 [Push-fed reading (`bvnr_open_read_feed`)](#115-push-fed-reading-bvnr_open_read_feed)
 2. [Writer](#2-writer)
     - 2.1 [`bvnr_writer_create` / `bvnr_writer_destroy`](#21-bvnr_writer_create--bvnr_writer_destroy)
     - 2.2 [`bvnr_sink_to_fd`](#22-bvnr_sink_to_fd)
@@ -41,6 +43,7 @@ The writer uses the same event/data model as the reader — `bvnr_event_t` and `
     - 2.14 [`BVN_TYPE_FLOAT_BASE`](#214-bvn_type_float_base)
     - 2.15 [Writer-side unit policy (`bvnr_writer_set_unit_policy`)](#215-writer-side-unit-policy-bvnr_writer_set_unit_policy)
     - 2.16 [Value helpers](#216-value-helpers)
+    - 2.17 [`bvnr_sink_to_callback`](#217-bvnr_sink_to_callback)
 3. [Shared](#3-shared)
     - 3.1 [`bvnr_write_type_annotation`](#31-bvnr_write_type_annotation)
     - 3.2 [`bvn_parse_unit` / `bvn_parse_unit_n`](#32-bvn_parse_unit--bvn_parse_unit_n)
@@ -848,6 +851,116 @@ worse than none.
 
 ---
 
+### 1.14 `bvnr_source_from_callback`
+
+```c
+void  bvnr_source_from_callback(bvnr_source_t *s, bvnr_pull_fn pull,
+                                void *userdata);
+void *bvnr_source_get_userdata(const bvnr_source_t *s);
+
+typedef bool (*bvnr_pull_fn)(bvnr_source_t *s, void *buf,
+                             uint32_t want, uint32_t *got);
+```
+
+Initialise `s` to read through the caller's own `pull` function — a socket
+wrapper, a TLS session, a decompressor, a file-like object in a binding. The
+source works wherever an fd or memory source does: `bvnr_open_read_source`,
+`bvnr_doc_stream_read`.
+
+`pull` fills `buf` with up to `want` bytes and sets `*got`. A short read is
+fine; the reader asks again. `true` with `*got == 0` is **end of input**, and
+`false` is an I/O error (`error_reading_from_source_fd`). A pull source has no
+way to say "nothing yet": a transport that can run dry before the document is
+complete must block inside `pull`, or be read with the push-fed reader (§1.15)
+instead.
+
+`userdata` is stored *inside* the 64-byte `bvnr_source_t`. The reader works on
+a copy of the source it is given, so the `s` the callback receives is not the
+caller's variable; the callback recovers its context with
+`bvnr_source_get_userdata(s)`. The getter returns `NULL` for a `NULL` handle and
+for fd and memory sources.
+
+```c
+typedef struct { int sock; } conn_t;
+
+static bool sock_pull(bvnr_source_t *s, void *buf, uint32_t want, uint32_t *got)
+{
+    conn_t *c = bvnr_source_get_userdata(s);
+    ssize_t n = recv(c->sock, buf, want, 0);
+    if (n < 0) return false;          /* error_reading_from_source_fd */
+    *got = (uint32_t)n;               /* 0: the peer closed, end of input */
+    return true;
+}
+
+conn_t conn = { sock };
+bvnr_source_t src;
+bvnr_source_from_callback(&src, sock_pull, &conn);
+bvnr_open_read_source(r, &src, NULL, &flags);
+bvnr_read(r);
+```
+
+---
+
+### 1.15 Push-fed reading (`bvnr_open_read_feed`)
+
+```c
+bool bvnr_open_read_feed(bvnr_reader_t *r, const bvnr_sink_t *src_mirror,
+                         bvnr_read_flags_t *options);
+bool bvnr_read_feed     (bvnr_reader_t *r, const void *buf, uint64_t len);
+bool bvnr_read_finish   (bvnr_reader_t *r);
+```
+
+For input that arrives when it arrives — a non-blocking socket, an event loop,
+a binding receiving bytes from elsewhere. `bvnr_read` *pulls* until its source
+says end of input; a fed reader is *handed* bytes, as many times as you like and
+in pieces of any size, and told separately that the document is over.
+
+```c
+bvnr_open_read_feed(r, NULL, &flags);
+while ((n = next_packet(buf)) > 0)
+    if (!bvnr_read_feed(r, buf, n))
+        break;                         /* the read failed: see the getters */
+bool ok = bvnr_read_finish(r);         /* the result bvnr_read would give */
+```
+
+**Equivalence.** The callbacks receive exactly the events, in the same order,
+that `bvnr_read` delivers for the concatenation of everything fed, wherever the
+pieces were cut — inside a token, a multi-byte character or an octet-stream
+chunk — and every error carries the same code, line, column, byte and offset.
+The lexer and validator keep all their state between feeds and buffer nothing
+beyond what one token or one octet chunk needs, so memory stays flat over an
+endless stream. (`tests/bovnar_feed_test.c` and `bvnr_conformance --feed` check
+this over the corpus, the examples and the conformance suite, cut at every
+byte.)
+
+- `bvnr_open_read_feed` arms the reader as `bvnr_open_read_source` does — it may
+  be a reader used before, the unit policy survives — with no source. The
+  optional `src_mirror` receives the bytes as they are consumed. `bvnr_read` on
+  a fed reader returns `false` with `error_invalid_argument`.
+- `bvnr_read_feed` lexes the bytes and returns when they are consumed; the
+  buffer may be reused at once. The first call delivers `ev_stream_start`. It
+  returns `false` only when the read has ended in an error — the same errors at
+  the same bytes as `bvnr_read`, a callback's abort, `max_file_size` — and
+  `true` otherwise, including after errors recovered under `continue_on_error`.
+  **Running out of input is never a feed error.**
+- `bvnr_read_finish` declares end of input and returns what `bvnr_read` would:
+  `true` for a complete document (`ev_stream_end` delivered),
+  `error_got_incomplete_bvnr_stream` for one cut off in a value or a struct,
+  `error_read_complete_chunk_failed` inside an octet stream.
+- After an error or a finish the read is over: further calls return `false` and
+  leave the getters (§1.7) as they were. Re-open to read the next document.
+
+**A stream with metadata.** A document can carry ordinary values before (and
+after) a binary or multiplexed octet stream — `.meta = { .codec = "av1"; };`
+then `.media = <octet stream>` — and a fed reader delivers them as it reads
+them, before the first chunk of the stream. For a multiplexed stream, the
+push-fed demultiplexer (`bvnr_demux_open_feed`, [doc/10
+§3.2](10_bovnar_streaming.md#32-api)) does this with the reader built in: the
+metadata goes to your `on_verified`, or comes out of `bvnr_demux_next` as events
+ahead of the messages.
+
+---
+
 ## 2. Writer
 
 **The writer enforces the streaming tier only.** Each of its checks judges the
@@ -1485,6 +1598,47 @@ bvnr_write_struct_start(w, "limits");            /* .limits = {               */
 bvnr_write_bool  (w, "strict", true);            /*     .strict = true;       */
 bvnr_write_null  (w, "owner");                   /*     .owner = ;            */
 bvnr_write_struct_end(w);                        /* };                        */
+```
+
+---
+
+### 2.17 `bvnr_sink_to_callback`
+
+```c
+void  bvnr_sink_to_callback(bvnr_sink_t *s, bvnr_push_fn push,
+                            bvnr_flush_fn flush, void *userdata);
+void *bvnr_sink_get_userdata(const bvnr_sink_t *s);
+
+typedef bool (*bvnr_push_fn) (bvnr_sink_t *s, const void *buf, uint32_t len);
+typedef bool (*bvnr_flush_fn)(bvnr_sink_t *s);
+```
+
+The writer's twin of §1.14: output goes to the caller's `push`, which must take
+all `len` bytes or return `false`. Usable wherever an fd or memory sink is —
+`bvnr_open_write_sink`, the reader's mirror, the canonicalising observer,
+`bvnr_frame_write`.
+
+It behaves as an fd sink does, not as a memory sink: the writer batches output
+into its 64 KiB buffer and pushes whole blocks, and a refused push is
+`error_writing_to_sink` (never `error_sink_buffer_exhausted`).
+`bvnr_writer_bytes_written` and `bvnr_sink_bytes_written` count what `push`
+accepted. `flush` may be `NULL`; when set, `bvnr_write_finish` calls it after the
+last push, and a `false` from it fails the finish with `error_writing_to_sink`.
+
+As with the source, `userdata` lives inside the 64-byte handle, the writer
+pushes through its own copy, and the callback recovers the pointer with
+`bvnr_sink_get_userdata(s)`.
+
+```c
+static bool sock_push(bvnr_sink_t *s, const void *buf, uint32_t len)
+{
+    conn_t *c = bvnr_sink_get_userdata(s);
+    return send_all(c->sock, buf, len);
+}
+
+bvnr_sink_t sink;
+bvnr_sink_to_callback(&sink, sock_push, NULL, &conn);
+bvnr_open_write_sink(w, &sink, false, NULL);
 ```
 
 ---

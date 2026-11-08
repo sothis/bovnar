@@ -12,6 +12,66 @@ implements; the highest spec a build understands is reported by
 numbers were the same. They part at 2.0.0, which breaks the ABI and the Python
 API and implements spec 1.2.
 
+## [Unreleased]
+
+### Added
+
+- **Push-fed reading.** `bvnr_open_read_feed`, `bvnr_read_feed` and
+  `bvnr_read_finish` read a document that is handed over in pieces of any size
+  instead of pulled from a source — a non-blocking socket, an event loop, a
+  binding. The callbacks receive exactly the events `bvnr_read` delivers for the
+  whole buffer, wherever the pieces were cut, and every error has the same code
+  and position; running out of input is a `finish` result, never a feed error.
+  It is the same state machine as `bvnr_read`: the octet-stream framing, which
+  used to pull until a chunk was complete, is now resumable at any byte, and a
+  chunk that lies whole in the input is passed to the callbacks without a copy.
+  `tests/bovnar_feed_test.c` and the new `bvnr_conformance --feed` check the
+  equivalence over the corpus, `examples/` and the conformance suite cut at
+  every byte; the fuzz driver has a `feed` harness (`bvnr_fuzz_feed`,
+  `bvnr_fuzz_feed_deep`, the sweep in `run_tests.sh`) and there is a libFuzzer
+  target `bvnr_fuzz_ext_feed`.
+- **Callback sources and sinks.** `bvnr_source_from_callback` and
+  `bvnr_sink_to_callback` put the caller's own pull or push (and optional flush)
+  behind a source or sink, with a user pointer stored inside the 64-byte handle
+  and read back from the copy the reader or writer passes to the callback
+  (`bvnr_source_get_userdata`, `bvnr_sink_get_userdata`). A callback sink fails
+  as a transport (`error_writing_to_sink`), keeps the writer's 64 KiB buffer in
+  use, and is flushed by `bvnr_write_finish`.
+- **Push-fed frame reader.** `bvnr_frame_reader_*`: the twin of
+  `bvnr_doc_stream_read` for fed input. Created from `bvnr_doc_stream_opts_t` it
+  parses each document as that does, streaming the payload into one reused fed
+  reader instead of buffering the frame; created with `_create_pull` it hands
+  the documents out as bytes through `bvnr_frame_reader_next`, from the fed
+  buffer where a frame lies whole in it.
+- **Push-fed demultiplexer.** `bvnr_demux_open_feed`, `bvnr_demux_feed`,
+  `bvnr_demux_next`, `bvnr_demux_finish` and `bvnr_demux_get_reader`: the demux
+  is handed the document carrying the mux stream, in pieces, with the key
+  scope, `max_message`, the 4096-channel limit and every error code of
+  `bvnr_demux_on_event`. With `on_message` the messages arrive by callback;
+  without it `bvnr_demux_next` drains them in one loop of plain calls
+  (`BVNR_NEXT_*`), and with `deliver_events` the document's own events come out
+  of the same loop in order with the messages — so a stream can be preceded by
+  ordinary metadata values (`.meta = {…}; .media = <stream>;`) that a consumer
+  has before the first message. A message that lies whole in the fed buffer is
+  handed out from it.
+- **`bvnr_stream_bench`**, a benchmark of `bvnr_mux_send` and the demux, batch
+  and fed (`tests/bovnar_stream_bench.c`, built but not a test; figures in
+  doc/10 §7.4), and `bvnr_alloc_test`, which counts allocations on glibc: none
+  per message on those paths once warm.
+
+### Changed
+
+- **`bvnr_mux_send` allocates nothing per call.** Its 64 KiB chunk buffer used
+  to be malloc'd and freed on every message; it now belongs to the writer,
+  allocated on the first send and kept across re-opens. The output is byte for
+  byte the same (a pinned vector in `bvnr_feed_test`); a 150-byte send went
+  from about 262 to 202 ns.
+- **The demux copies a message only when it has to.** A message that lies
+  whole in one octet chunk is passed to `on_message` straight from the chunk;
+  only one that spans chunks is reassembled. `on_message`'s `data` is now
+  documented as valid for the call only. Demultiplexing 30 KB messages with
+  `bvnr_read` and `bvnr_demux_on_event` went from about 7.2 µs to 0.25 µs each.
+
 ## [2.0.2] - 2026-11-04
 
 ### Added

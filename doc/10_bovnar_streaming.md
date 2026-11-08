@@ -31,14 +31,20 @@ capabilities are sub-protocols carried in or around them.
     - 2.1 [Wire format](#21-wire-format)
     - 2.2 [API](#22-api)
     - 2.3 [CLI](#23-cli)
+    - 2.4 [Push-fed frame reading](#24-push-fed-frame-reading)
 3. [Octet multiplexing (out-of-band channels, cross-chunk)](#3-octet-multiplexing-out-of-band-channels-cross-chunk)
     - 3.1 [Wire convention (two layers)](#31-wire-convention-two-layers)
     - 3.2 [API](#32-api)
     - 3.3 [CLI](#33-cli)
+    - 3.4 [Push-fed demultiplexing, with metadata before the stream](#34-push-fed-demultiplexing-with-metadata-before-the-stream)
 4. [Document-in-document](#4-document-in-document)
 5. [Python bindings](#5-python-bindings)
 6. [Composition](#6-composition)
-
+7. [Live streams: callback I/O and push-fed reading](#7-live-streams-callback-io-and-push-fed-reading)
+    - 7.1 [Callback sources and sinks](#71-callback-sources-and-sinks)
+    - 7.2 [The push-fed document reader](#72-the-push-fed-document-reader)
+    - 7.3 [Draining without a callback per item](#73-draining-without-a-callback-per-item)
+    - 7.4 [What it costs](#74-what-it-costs)
 - [See also](#see-also)
 
 ---
@@ -151,6 +157,42 @@ bovnar frames list docs.bvf                          # list documents + status
 bovnar frames list -                                 # read the frame stream from stdin
 ```
 
+### 2.4 Push-fed frame reading
+
+`bvnr_doc_stream_read` pulls from a source until it ends. For a frame stream
+that arrives in pieces — a non-blocking socket, an event loop — the frame
+reader is **fed** instead (§7), and keeps one reader for the whole stream:
+
+```c
+bvnr_frame_reader_t* bvnr_frame_reader_create(const bvnr_doc_stream_opts_t* opts);
+bvnr_frame_reader_t* bvnr_frame_reader_create_pull(uint64_t max_document_size);
+void         bvnr_frame_reader_destroy(bvnr_frame_reader_t* fr);
+bool         bvnr_frame_reader_feed  (bvnr_frame_reader_t* fr, const void* buf, uint64_t len);
+int          bvnr_frame_reader_next  (bvnr_frame_reader_t* fr, const uint8_t** doc, uint64_t* len);
+bool         bvnr_frame_reader_finish(bvnr_frame_reader_t* fr);
+error_code_t bvnr_frame_reader_error (const bvnr_frame_reader_t* fr);
+uint64_t     bvnr_frame_reader_count (const bvnr_frame_reader_t* fr);
+```
+
+Two kinds, chosen when it is created:
+
+- **Parsing** (`bvnr_frame_reader_create`): every document is parsed exactly as
+  `bvnr_doc_stream_read` parses it with the same `opts` — the same events through
+  `opts->flags`, the same `on_document` calls, `continue_past_failed` and
+  `max_document_size`. Each payload is streamed into a reused push-fed reader as
+  its bytes arrive, so a frame is never buffered whole, however large.
+- **Pull** (`bvnr_frame_reader_create_pull`): the documents are handed out as
+  bytes by `bvnr_frame_reader_next`, for the caller to parse as it likes. A
+  document whose frame lies whole in the fed buffer is handed out from that
+  buffer; one split across feeds is gathered in a buffer the reader owns and
+  reuses. Either pointer is valid until the next call.
+
+Feeding never fails for want of input; `bvnr_frame_reader_finish` is where a
+stream cut inside a header or a payload is `error_got_incomplete_bvnr_stream`. A
+bad magic is `error_unexpected_input_byte`, a declared length over the cap
+`error_value_out_of_range`.
+
+
 ---
 
 ## 3. Octet multiplexing (out-of-band channels, cross-chunk)
@@ -258,6 +300,105 @@ bovnar mux list mux.bvnr                            # channel <n>: <len> bytes
 bovnar mux pack 7:a.bvnr | bovnar mux list -        # pipe producer to consumer
 ```
 
+### 3.4 Push-fed demultiplexing, with metadata before the stream
+
+A mux stream is one value of an ordinary document, so the document can say what
+the stream is before it starts — and go on after it ends. The producer writes
+the metadata with the normal writer, then opens the stream:
+
+```c
+bvnr_write_struct_start(w, "meta");
+bvnr_write_string(w, "codec", "av1");
+bvnr_write_float_unit(w, "rate", 32, 30.0, BVN_UNIT_NO_PREFIX(bu_hertz));
+bvnr_write_struct_end(w);
+bvnr_mux_begin(w, "media");             /* .media = \x00 ... */
+bvnr_mux_send(w, 1, frame, frame_len);
+/* ... */
+bvnr_mux_end(w);                        /* ... \x00; */
+```
+
+which is, on the wire,
+
+<!-- bovnar-example: illustrative -->
+```bovnar
+.meta = { .codec = "av1"; .rate = <float:32,Hz> 30.0; };
+.media = \x00 …chunks… \x00;
+```
+
+A consumer reading that live hands the bytes to a **push-fed demux**: it owns a
+push-fed reader (§7.2), keeps the key scope, `max_message`, the 4096-channel
+limit and every error code of `bvnr_demux_on_event`, and the result is the same
+as installing that on a reader of the whole buffer.
+
+```c
+bool bvnr_demux_open_feed(bvnr_demux_t* dm, const bvnr_read_flags_t* flags,
+                          bool deliver_events);
+bool bvnr_demux_feed  (bvnr_demux_t* dm, const void* buf, uint64_t len);
+int  bvnr_demux_next  (bvnr_demux_t* dm, bvnr_demux_item_t* item);
+bool bvnr_demux_finish(bvnr_demux_t* dm);
+const bvnr_reader_t* bvnr_demux_get_reader(const bvnr_demux_t* dm);
+
+typedef struct bvnr_demux_item_s {
+    uint64_t           channel;   /* BVNR_NEXT_MESSAGE */
+    const uint8_t*     data;
+    uint64_t           length;
+    bvnr_event_t       event;     /* BVNR_NEXT_EVENT */
+    const bvnr_data_t* value;
+} bvnr_demux_item_t;
+```
+
+**With callbacks** (an `on_message` given to `bvnr_demux_create`): every message
+a feed completes is delivered before `bvnr_demux_feed` returns, and the caller's
+`flags->on_verified` sees every event of the document — the metadata first, then
+the stream, then whatever follows — so the metadata is known before the first
+message:
+
+```c
+bvnr_demux_t* dm = bvnr_demux_create(on_message, ctx, 0);
+bvnr_demux_set_key(dm, "media");
+bvnr_read_flags_t fl = { .on_verified = on_meta_event, .userdata = ctx };
+bvnr_demux_open_feed(dm, &fl, false);
+while ((n = recv(sock, buf, sizeof buf, 0)) > 0)
+    if (!bvnr_demux_feed(dm, buf, (uint64_t)n)) break;
+bvnr_demux_finish(dm);
+if (bvnr_demux_error(dm) != error_none) { /* as in §3.2 */ }
+```
+
+**Pulled** (no `on_message`): the fed bytes are drained with `bvnr_demux_next`,
+one plain call per item and no callback at all (§7.3). Opened with
+`deliver_events`, the document's own events come out of the same loop, in
+document order and in order with the messages — the metadata values, the mux
+stream's `ev_octet_stream_start`, its messages, its `ev_octet_stream_end`, the
+values after it:
+
+```c
+bvnr_demux_t* dm = bvnr_demux_create(NULL, NULL, 0);
+bvnr_demux_set_key(dm, "media");
+bvnr_demux_open_feed(dm, NULL, true);
+bvnr_demux_item_t it;
+while ((n = recv(sock, buf, sizeof buf, 0)) > 0) {
+    bvnr_demux_feed(dm, buf, (uint64_t)n);
+    int rc;
+    while ((rc = bvnr_demux_next(dm, &it)) > 0) {
+        if (rc == BVNR_NEXT_EVENT)  on_meta(it.event, it.value);
+        else                        on_frame(it.channel, it.data, it.length);
+    }
+    if (rc == BVNR_NEXT_ERROR) break;          /* bvnr_demux_error(dm) */
+}
+bvnr_demux_finish(dm);
+while (bvnr_demux_next(dm, &it) > 0) { /* the closing events */ }
+```
+
+A message that lies whole in the fed buffer is handed out from it without a
+copy; one split across chunks or feeds is reassembled in the channel's buffer.
+Everything an item points to is valid until the next call on the demux, and the
+fed buffer must stay valid until `bvnr_demux_next` has returned
+`BVNR_NEXT_NONE` (feeding before that is refused). Truncation is a finish
+result, as for any fed reader: `bvnr_demux_finish` returns what `bvnr_read` would
+for the document, and a message the stream's end cut short is still the latched,
+non-fatal `error_octet_stream_truncated`.
+
+
 ---
 
 ## 4. Document-in-document
@@ -341,6 +482,84 @@ your own consumer/producer at the same seam without touching the core.
 
 ---
 
+## 7. Live streams: callback I/O and push-fed reading
+
+Everything above reads from a `bvnr_source_t` that is *pulled* until it ends.
+That fits a file and a blocking socket. It does not fit a stream that never
+ends and arrives when it arrives — a non-blocking socket in an event loop, a
+binding that is handed bytes — because a pull that returns nothing *is* end of
+input: a short feed would read as a truncated document. This section is the
+other way in.
+
+### 7.1 Callback sources and sinks
+
+`bvnr_source_from_callback(s, pull, userdata)` and
+`bvnr_sink_to_callback(s, push, flush, userdata)` put the caller's own transport
+behind a source or sink, usable everywhere an fd or memory one is
+([doc/08 §1.14](08_bovnar_readwrite_api.md#114-bvnr_source_from_callback),
+[§2.17](08_bovnar_readwrite_api.md#217-bvnr_sink_to_callback)). The user pointer
+lives inside the 64-byte handle, because the reader and writer work on a copy of
+it; the callback reads it back with `bvnr_source_get_userdata` /
+`bvnr_sink_get_userdata`. A callback sink fails as a transport does
+(`error_writing_to_sink`), and the writer batches into its 64 KiB buffer before
+pushing.
+
+### 7.2 The push-fed document reader
+
+`bvnr_open_read_feed`, `bvnr_read_feed`, `bvnr_read_finish`
+([doc/08 §1.15](08_bovnar_readwrite_api.md#115-push-fed-reading-bvnr_open_read_feed)):
+the caller hands over bytes in pieces of any size and says when the document is
+over. The events are exactly those `bvnr_read` delivers for the whole buffer,
+wherever the pieces were cut, and so are the errors and their positions. Running
+out of input is never an error until the finish. One reader serves an endless
+document with flat memory, and the frame reader (§2.4) and the demux (§3.4) are
+built on it.
+
+It is the same state machine `bvnr_read` runs, not a second one: the text lexer
+already resumed at any byte, and the octet-stream framing — which used to pull
+until a chunk was complete — is now a state machine of its own that stops at the
+end of any buffer, so both readers share every line of it. A chunk that lies
+whole in the input reaches the callbacks straight from it.
+
+### 7.3 Draining without a callback per item
+
+A caller that pays for every callback — a binding calling back through an FFI —
+drains a feed in one loop instead: `bvnr_frame_reader_next` hands out documents,
+`bvnr_demux_next` messages and, with `deliver_events`, the document's events.
+Each returns `BVNR_NEXT_DOCUMENT` / `BVNR_NEXT_MESSAGE` / `BVNR_NEXT_EVENT` for an
+item, `BVNR_NEXT_NONE` when the fed bytes are used up, and `BVNR_NEXT_ERROR` when
+the stream failed. Items point into the fed buffer where they lie whole in it,
+into the reader's own buffers otherwise, and are valid until the next call; the
+fed buffer must stay valid until the drain has returned `BVNR_NEXT_NONE`.
+
+### 7.4 What it costs
+
+Measured with `bvnr_stream_bench` (`tests/bovnar_stream_bench.c`), release
+build, one core of an Intel i7-2700K (3.5 GHz, 2011); per message, the 400 KB
+message spanning seven chunks. Figures move with the machine; the ratios are the
+point.
+
+| Path | 150 B | 30 KB | 400 KB |
+|------|------:|------:|-------:|
+| `bvnr_mux_send` (2.0.2: allocated a 64 KiB chunk per call) | 262 ns | 8.2 µs | 121 µs |
+| `bvnr_mux_send` (chunk buffer kept on the writer) | 202 ns | 8.6 µs | 120 µs |
+| `bvnr_read` + `bvnr_demux_on_event` (2.0.2: copied every message) | 183 ns | 7.2 µs | 116 µs |
+| `bvnr_read` + `bvnr_demux_on_event` (whole-chunk messages not copied) | 134 ns | 0.25 µs | 84 µs |
+| push-fed demux, callback, one feed | 139 ns | 0.25 µs | 83 µs |
+| push-fed demux, `bvnr_demux_next`, one feed | 159 ns | 0.27 µs | 86 µs |
+| push-fed demux, callback, 1460 B feeds | 152 ns | 7.9 µs | 158 µs |
+| push-fed demux, `bvnr_demux_next`, 1460 B feeds | 168 ns | 7.9 µs | 157 µs |
+| push-fed demux, `bvnr_demux_next`, 64 B feeds | 327 ns | 28 µs | 206 µs |
+
+A message that fits one chunk and arrives in one feed is handed out without
+touching its bytes, which is why the 30 KB column falls by a factor of thirty.
+Fed in small pieces, a chunk is gathered before it is passed on, and a message
+split over chunks is reassembled: one copy each. `bvnr_mux_send`,
+`bvnr_demux_next` and `bvnr_frame_reader_next` allocate nothing per message once
+warm (`tests/bovnar_alloc_test.c`).
+
+---
+
 ## See also
 
 - [Specification §9 — Octet Streams](03_bovnar_spec.md#9-octet-streams-binary-mode) — the binary substrate three of these four build on
@@ -349,6 +568,7 @@ your own consumer/producer at the same seam without touching the core.
 - [Rust Bindings](14_bovnar_rust_bindings.md) — the `bovnar::stream` module
 - `include/bovnar_stream.h` — full declarations and per-function contracts
 - `tests/bovnar_stream_test.c` — round-trip tests for all four capabilities
+- `tests/bovnar_feed_test.c` — the push-fed readers and callback I/O against the batch functions
 - `python/bovnar/stream.py` — Python bindings; `python/tests/test_stream.py`
 
 ---

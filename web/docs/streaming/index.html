@@ -118,10 +118,13 @@ capabilities are sub-protocols carried in or around them.</p>
 <li>8.3 <a href="#83-draining-without-a-callback-per-item">Draining without a callback per item</a></li>
 <li>8.4 <a href="#84-what-it-costs">What it costs</a></li>
 <li>8.5 <a href="#85-writing-live-a-flush-per-message">Writing live: a flush per message</a></li>
-<li><a href="#see-also">See also</a></li>
 </ul>
 </li>
+<li><a href="#9-shared-conformance-vectors">Shared conformance vectors</a></li>
 </ol>
+<ul>
+<li><a href="#see-also">See also</a></li>
+</ul>
 <hr />
 <h2 id="1-endless-streaming">1. Endless streaming</h2>
 <p>Every byte/offset/line/column counter in the core is 64-bit, so a single
@@ -834,6 +837,40 @@ need a field in <code>bvnr_write_flags_t</code> or a second send function, and t
 after the send costs what the table in §8.4 shows — about 8 ns on a 150-byte
 message, the push of the sink included — and allocates nothing.</p>
 <hr />
+<h2 id="9-shared-conformance-vectors">9. Shared conformance vectors</h2>
+<p><code>tests/stream_vectors/</code> holds one set of wire vectors that the C library and
+the Rust crate are both held to, so that the C reference and the pure-Rust
+codec (<code>bovnar::codec</code>) cannot each agree with their own test code and
+disagree with each other. <code>tests/gen_stream_vectors.py</code> writes them from the
+wire conventions of §2.1 and §3.1 alone, never through the library, and lists
+each with its expected outcome in <code>manifest.bvnr</code>, a Bovnar document: the
+messages (channel, length and 64-bit FNV-1a of each), the preamble text, the
+framed documents, and the error the C demultiplexer gives a malformed stream.
+The set covers a stream after a preamble of text values (a struct with a
+unit, a string) and the same stream without it — messages of 150 B, 30 KB and
+400 KB, an empty one, one that fills a 65536-byte chunk, two channels
+interleaved message by message —, a frame stream of three documents, and
+three malformed streams: one truncated inside a message
+(<code>error_octet_stream_truncated</code>), one with a bad chunk tag
+(<code>error_octet_stream_out_of_sync</code>) and one over a stated <code>max_message</code>
+(<code>error_value_out_of_range</code>).</p>
+<p>The C demultiplexer, batch and fed (<code>tests/bovnar_stream_vectors_test.c</code>),
+<code>codec::MuxReader</code>, <code>codec::FrameReader</code> and <code>live::Demux</code>
+(<code>rust/tests/test_stream_vectors.rs</code>) read every vector fed whole, a byte at
+a time, cut in two at every position (sampled positions for the large ones)
+and in random pieces; <code>python/tests/test_stream_vectors.py</code> reads them through
+<code>mux_load</code>, <code>DemuxFeed</code> and <code>FrameFeed</code>, whole and in small pieces.
+<code>bvnr_mux_send</code> and
+<code>codec::MuxWriter</code>, its preamble included, write the well-formed multiplexed
+vectors byte for byte, and <code>bvnr_frame_write</code> and <code>codec::write_frame</code> the
+frame stream, so each side reads what the other writes. <code>bovnar mux list</code> and
+<code>bovnar frames list</code> read the valid vectors and refuse the malformed ones,
+except the one over <code>max_message</code>, which the CLI cannot set. CTest checks that
+the committed files are what the generator writes.</p>
+<p>This is a minimal set. The full one — every reader and writer of every layer,
+the remaining wire shapes and limits, and where readers deliberately differ —
+is still to come.</p>
+<hr />
 <h2 id="see-also">See also</h2>
 <ul>
 <li><a href="https://www.bovnar.io/docs/spec/#9-octet-streams-binary-mode">Specification §9 — Octet Streams</a> — the binary substrate three of these four build on</li>
@@ -843,6 +880,7 @@ message, the push of the sink included — and allocates nothing.</p>
 <li><code>include/bovnar_stream.h</code> — full declarations and per-function contracts</li>
 <li><code>tests/bovnar_stream_test.c</code> — round-trip tests for all four capabilities</li>
 <li><code>tests/bovnar_feed_test.c</code> — the push-fed readers, callback I/O and the flushed writer against the batch functions</li>
+<li><code>tests/stream_vectors/</code> — the shared conformance vectors of §9, and <code>tests/gen_stream_vectors.py</code>, which writes them</li>
 <li><code>python/bovnar/stream.py</code> — Python bindings; <code>python/tests/test_stream.py</code>,
   <code>test_stream_io.py</code>, <code>test_stream_feed.py</code>, <code>test_stream_live.py</code></li>
 </ul>

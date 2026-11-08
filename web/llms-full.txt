@@ -16583,6 +16583,8 @@ capabilities are sub-protocols carried in or around them.
     - 8.3 [Draining without a callback per item](#83-draining-without-a-callback-per-item)
     - 8.4 [What it costs](#84-what-it-costs)
     - 8.5 [Writing live: a flush per message](#85-writing-live-a-flush-per-message)
+9. [Shared conformance vectors](#9-shared-conformance-vectors)
+
 - [See also](#see-also)
 
 ---
@@ -17284,6 +17286,45 @@ message, the push of the sink included — and allocates nothing.
 
 ---
 
+## 9. Shared conformance vectors
+
+`tests/stream_vectors/` holds one set of wire vectors that the C library and
+the Rust crate are both held to, so that the C reference and the pure-Rust
+codec (`bovnar::codec`) cannot each agree with their own test code and
+disagree with each other. `tests/gen_stream_vectors.py` writes them from the
+wire conventions of §2.1 and §3.1 alone, never through the library, and lists
+each with its expected outcome in `manifest.bvnr`, a Bovnar document: the
+messages (channel, length and 64-bit FNV-1a of each), the preamble text, the
+framed documents, and the error the C demultiplexer gives a malformed stream.
+The set covers a stream after a preamble of text values (a struct with a
+unit, a string) and the same stream without it — messages of 150 B, 30 KB and
+400 KB, an empty one, one that fills a 65536-byte chunk, two channels
+interleaved message by message —, a frame stream of three documents, and
+three malformed streams: one truncated inside a message
+(`error_octet_stream_truncated`), one with a bad chunk tag
+(`error_octet_stream_out_of_sync`) and one over a stated `max_message`
+(`error_value_out_of_range`).
+
+The C demultiplexer, batch and fed (`tests/bovnar_stream_vectors_test.c`),
+`codec::MuxReader`, `codec::FrameReader` and `live::Demux`
+(`rust/tests/test_stream_vectors.rs`) read every vector fed whole, a byte at
+a time, cut in two at every position (sampled positions for the large ones)
+and in random pieces; `python/tests/test_stream_vectors.py` reads them through
+`mux_load`, `DemuxFeed` and `FrameFeed`, whole and in small pieces.
+`bvnr_mux_send` and
+`codec::MuxWriter`, its preamble included, write the well-formed multiplexed
+vectors byte for byte, and `bvnr_frame_write` and `codec::write_frame` the
+frame stream, so each side reads what the other writes. `bovnar mux list` and
+`bovnar frames list` read the valid vectors and refuse the malformed ones,
+except the one over `max_message`, which the CLI cannot set. CTest checks that
+the committed files are what the generator writes.
+
+This is a minimal set. The full one — every reader and writer of every layer,
+the remaining wire shapes and limits, and where readers deliberately differ —
+is still to come.
+
+---
+
 ## See also
 
 - [Specification §9 — Octet Streams](03_bovnar_spec.md#9-octet-streams-binary-mode) — the binary substrate three of these four build on
@@ -17293,6 +17334,7 @@ message, the push of the sink included — and allocates nothing.
 - `include/bovnar_stream.h` — full declarations and per-function contracts
 - `tests/bovnar_stream_test.c` — round-trip tests for all four capabilities
 - `tests/bovnar_feed_test.c` — the push-fed readers, callback I/O and the flushed writer against the batch functions
+- `tests/stream_vectors/` — the shared conformance vectors of §9, and `tests/gen_stream_vectors.py`, which writes them
 - `python/bovnar/stream.py` — Python bindings; `python/tests/test_stream.py`,
   `test_stream_io.py`, `test_stream_feed.py`, `test_stream_live.py`
 

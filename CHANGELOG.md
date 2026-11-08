@@ -55,12 +55,26 @@ API and implements spec 1.2.
   has before the first message. A message that lies whole in the fed buffer is
   handed out from it.
 - **`bvnr_stream_bench`**, a benchmark of `bvnr_mux_send` and the demux, batch
-  and fed (`tests/bovnar_stream_bench.c`, built but not a test; figures in
-  doc/10 §7.4), and `bvnr_alloc_test`, which counts allocations on glibc: none
-  per message on those paths once warm.
+  and fed, and of framed documents through `bvnr_doc_stream_read` and the
+  parsing frame reader (`tests/bovnar_stream_bench.c`, built but not a test;
+  figures in doc/10 §7.4), and `bvnr_alloc_test`, which counts allocations on
+  glibc: none per message or document on those paths once warm.
 
 ### Changed
 
+- **Re-opening a reader allocates nothing.** `bvnr_open_read_*` freed the
+  reader's array-frame stack and scratch buffers and allocated them again, about
+  120 KB zeroed, for every document, and copied the 13 KB unit policy out of the
+  validator and back while clearing it. A reader now keeps its buffers, zeroes
+  only the frames the last document wrote, and is cleared around the policy.
+  Every path that reads document after document through one reader gains: the
+  parsing frame reader and a re-opened fed demux allocate nothing per document
+  once warm, and `bvnr_doc_stream_read` also keeps one payload buffer for the
+  whole sequence instead of one per frame. Events, errors and positions are
+  unchanged: `bvnr_feed_test` reads every document after every other, under
+  every pair of settings, and a frame stream cut at every byte, against a reader
+  fresh from `bvnr_reader_create`. A 43-byte framed document went from about 5.5
+  to 2.3 µs (doc/10 §7.4).
 - **`bvnr_mux_send` allocates nothing per call.** Its 64 KiB chunk buffer used
   to be malloc'd and freed on every message; it now belongs to the writer,
   allocated on the first send and kept across re-opens. The output is byte for

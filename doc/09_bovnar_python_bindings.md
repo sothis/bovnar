@@ -523,7 +523,7 @@ dm.close()
 ```
 
 **What it costs.** Every item crosses the ctypes boundary, so a message costs
-microseconds in Python, not the nanoseconds of the C path (doc/10 §7.4).
+microseconds in Python, not the nanoseconds of the C path (doc/10 §8.4).
 `DemuxFeed` and the unparsed `FrameFeed` make one plain C call per item and no
 callback; `DocumentFeed`, the parsing `FrameFeed` and the batch `mux_load` call
 back into Python once per event or message. Measured with

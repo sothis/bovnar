@@ -44,3 +44,8 @@ cc = "1"
 [dev-dependencies]
 # The ABI test compiles the C manifest generator with the library's compiler.
 cc = "1"
+
+# Per-message figures for the pure-Rust codec, std only: `cargo bench --bench codec`.
+[[bench]]
+name = "codec"
+harness = false

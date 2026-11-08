@@ -27,7 +27,7 @@ stream.mux_load (one ctypes callback per message) next to stream.DemuxFeed
 pieces (a TCP segment's payload), with payloads as bytes and as memoryviews.
 
 Messages of 150 B, 30 KB and 400 KB (the last spans seven octet chunks), the
-same cells as tests/bovnar_stream_bench.c, whose C figures doc/10 §7.4 lists.
+same cells as tests/bovnar_stream_bench.c, whose C figures doc/10 §8.4 lists.
 Not a test (pytest does not collect python/bench); run it by hand, pinned to one
 core, on a library built as Release or RelWithDebInfo:
 

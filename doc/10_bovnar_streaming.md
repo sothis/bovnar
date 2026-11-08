@@ -39,12 +39,13 @@ capabilities are sub-protocols carried in or around them.
     - 3.4 [Push-fed demultiplexing, with metadata before the stream](#34-push-fed-demultiplexing-with-metadata-before-the-stream)
 4. [Document-in-document](#4-document-in-document)
 5. [Python bindings](#5-python-bindings)
-6. [Composition](#6-composition)
-7. [Live streams: callback I/O and push-fed reading](#7-live-streams-callback-io-and-push-fed-reading)
-    - 7.1 [Callback sources and sinks](#71-callback-sources-and-sinks)
-    - 7.2 [The push-fed document reader](#72-the-push-fed-document-reader)
-    - 7.3 [Draining without a callback per item](#73-draining-without-a-callback-per-item)
-    - 7.4 [What it costs](#74-what-it-costs)
+6. [Rust bindings](#6-rust-bindings)
+7. [Composition](#7-composition)
+8. [Live streams: callback I/O and push-fed reading](#8-live-streams-callback-io-and-push-fed-reading)
+    - 8.1 [Callback sources and sinks](#81-callback-sources-and-sinks)
+    - 8.2 [The push-fed document reader](#82-the-push-fed-document-reader)
+    - 8.3 [Draining without a callback per item](#83-draining-without-a-callback-per-item)
+    - 8.4 [What it costs](#84-what-it-costs)
 - [See also](#see-also)
 
 ---
@@ -328,7 +329,7 @@ which is, on the wire,
 ```
 
 A consumer reading that live hands the bytes to a **push-fed demux**: it owns a
-push-fed reader (§7.2), keeps the key scope, `max_message`, the 4096-channel
+push-fed reader (§8.2), keeps the key scope, `max_message`, the 4096-channel
 limit and every error code of `bvnr_demux_on_event`, and the result is the same
 as installing that on a reader of the whole buffer.
 
@@ -367,7 +368,7 @@ if (bvnr_demux_error(dm) != error_none) { /* as in §3.2 */ }
 ```
 
 **Pulled** (no `on_message`): the fed bytes are drained with `bvnr_demux_next`,
-one plain call per item and no callback at all (§7.3). Opened with
+one plain call per item and no callback at all (§8.3). Opened with
 `deliver_events`, the document's own events come out of the same loop, in
 document order and in order with the messages — the metadata values, the mux
 stream's `ev_octet_stream_start`, its messages, its `ev_octet_stream_end`, the
@@ -469,19 +470,19 @@ and `python/tests/test_stream.py`.
 
 **Sockets and file objects.** The loaders (`load_documents`, `mux_load`, and
 `bovnar.load` for one document) also take a socket or a binary file object and
-read it to its end through a callback source (§7.1), parsing as they pull; the
+read it to its end through a callback source (§8.1), parsing as they pull; the
 dumpers take a `file=` and write through a callback sink. `mux_dump(...,
 preamble={...})` writes the values that describe the stream before it opens
 (§3.4).
 
 **Live streams** (§7) are read with three feed objects over the push-fed C
-readers, each handed bytes in pieces of any size: `DocumentFeed` (§7.2: a
+readers, each handed bytes in pieces of any size: `DocumentFeed` (§8.2: a
 document's events, or each top-level value once it is complete), `FrameFeed`
 (§2.4: each document's bytes, or each document parsed) and `DemuxFeed` (§3.4:
 `(channel, payload)` per message, and with `values=True` the values before and
 after the mux stream, in document order). `DemuxFeed` and the unparsed
 `FrameFeed` drain with `bvnr_demux_next` / `bvnr_frame_reader_next`, one plain
-call per item and no callback (§7.3); a payload is `bytes`, or with
+call per item and no callback (§8.3); a payload is `bytes`, or with
 `view=True` a `memoryview` valid until the next call, which the feed then
 releases:
 
@@ -499,16 +500,38 @@ with stream.DemuxFeed(key="media", values=True) as dm:
 ```
 
 The limits and error codes are those of the batch functions. A message costs
-microseconds in Python — the interpreter and ctypes, not the C path of §7.4:
+microseconds in Python — the interpreter and ctypes, not the C path of §8.4:
 about 3 µs for a 150-byte message and 7 µs for a 30 KB one fed whole, against
-5 µs and 36 µs through `mux_load`'s callback, on the machine of §7.4. The
+5 µs and 36 µs through `mux_load`'s callback, on the machine of §8.4. The
 figures, and what feeding in small pieces costs, are in
 [Python Bindings §4.7](09_bovnar_python_bindings.md#47-live-streams-feeding-in-pieces)
 (`python/bench/bench_stream.py`).
 
 ---
 
-## 6. Composition
+## 6. Rust bindings
+
+The Rust crate has the same batch functions in `bovnar::stream`
+(`frame_documents`, `load_documents`, `mux_dump`, `mux_load`,
+`embed_document`, `parse_embedded`), over the C functions above. Like
+Python's, they work on whole buffers.
+
+For a stream that never ends, `bovnar::codec` writes and reads the framing of
+§2 and the multiplexing of §3 incrementally, in pure Rust: `MuxWriter` and
+`MuxReader`, `write_frame` and `FrameReader`. The writer's output is byte for
+byte that of `bvnr_mux_send` and `bvnr_frame_write`; the reader is fed bytes in
+pieces of any size, keeps the demultiplexer's limits and error codes, hands a
+message out without a copy when it lies whole in the input, and can peek at a
+message's channel, length and first bytes to skip it or forward its chunks
+unchanged. A multiplexed stream may open with a **preamble**, ordinary text
+values in the same document before the stream's assignment
+(`.meta = { … }; .media = <octet stream>;`). Nothing is allocated per message
+once the reader's buffers have grown. See
+[Rust Bindings §4.8](14_bovnar_rust_bindings.md#48-live-streams-the-framing-codec-bovnarcodec).
+
+---
+
+## 7. Composition
 
 The four compose cleanly because they live at different layers:
 
@@ -523,7 +546,7 @@ your own consumer/producer at the same seam without touching the core.
 
 ---
 
-## 7. Live streams: callback I/O and push-fed reading
+## 8. Live streams: callback I/O and push-fed reading
 
 Everything above reads from a `bvnr_source_t` that is *pulled* until it ends.
 That fits a file and a blocking socket. It does not fit a stream that never
@@ -532,7 +555,7 @@ binding that is handed bytes — because a pull that returns nothing *is* end of
 input: a short feed would read as a truncated document. This section is the
 other way in.
 
-### 7.1 Callback sources and sinks
+### 8.1 Callback sources and sinks
 
 `bvnr_source_from_callback(s, pull, userdata)` and
 `bvnr_sink_to_callback(s, push, flush, userdata)` put the caller's own transport
@@ -545,7 +568,7 @@ it; the callback reads it back with `bvnr_source_get_userdata` /
 (`error_writing_to_sink`), and the writer batches into its 64 KiB buffer before
 pushing.
 
-### 7.2 The push-fed document reader
+### 8.2 The push-fed document reader
 
 `bvnr_open_read_feed`, `bvnr_read_feed`, `bvnr_read_finish`
 ([doc/08 §1.15](08_bovnar_readwrite_api.md#115-push-fed-reading-bvnr_open_read_feed)):
@@ -562,7 +585,7 @@ until a chunk was complete — is now a state machine of its own that stops at t
 end of any buffer, so both readers share every line of it. A chunk that lies
 whole in the input reaches the callbacks straight from it.
 
-### 7.3 Draining without a callback per item
+### 8.3 Draining without a callback per item
 
 A caller that pays for every callback — a binding calling back through an FFI —
 drains a feed in one loop instead: `bvnr_frame_reader_next` hands out documents,
@@ -573,7 +596,7 @@ the stream failed. Items point into the fed buffer where they lie whole in it,
 into the reader's own buffers otherwise, and are valid until the next call; the
 fed buffer must stay valid until the drain has returned `BVNR_NEXT_NONE`.
 
-### 7.4 What it costs
+### 8.4 What it costs
 
 Measured with `bvnr_stream_bench` (`tests/bovnar_stream_bench.c`), release
 build, one core of an Intel i7-2700K (3.5 GHz, 2011); per message, the 400 KB

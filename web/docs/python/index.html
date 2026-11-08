@@ -621,7 +621,7 @@ and leaves the stream as it was.</p>
 </code></pre></div>
 
 <p><strong>What it costs.</strong> Every item crosses the ctypes boundary, so a message costs
-microseconds in Python, not the nanoseconds of the C path (doc/10 §7.4).
+microseconds in Python, not the nanoseconds of the C path (doc/10 §8.4).
 <code>DemuxFeed</code> and the unparsed <code>FrameFeed</code> make one plain C call per item and no
 callback; <code>DocumentFeed</code>, the parsing <code>FrameFeed</code> and the batch <code>mux_load</code> call
 back into Python once per event or message. Measured with

@@ -15,6 +15,7 @@
 mod rust_bindings_doc {}
 
 pub mod bvnfloat;
+pub mod codec;
 pub mod currency;
 pub mod decimal;
 pub mod dom;

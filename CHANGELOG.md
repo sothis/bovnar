@@ -84,8 +84,32 @@ API and implements spec 1.2.
 - **`bvnr_stream_bench`**, a benchmark of `bvnr_mux_send` and the demux, batch
   and fed, and of framed documents through `bvnr_doc_stream_read` and the
   parsing frame reader (`tests/bovnar_stream_bench.c`, built but not a test;
-  figures in doc/10 §7.4), and `bvnr_alloc_test`, which counts allocations on
+  figures in doc/10 §8.4), and `bvnr_alloc_test`, which counts allocations on
   glibc: none per message or document on those paths once warm.
+- **A framing codec for live streams in the Rust crate: `bovnar::codec`.**
+  `bovnar::stream` builds its output in memory and reads its input to the
+  end, so it cannot serve a stream that never ends. The new module writes and
+  reads the octet multiplexing and `BVF1` frames of doc/10 incrementally, in
+  pure Rust (`#![forbid(unsafe_code)]`, no C call per message). `MuxWriter`
+  writes exactly what `bvnr_mux_send` writes, byte for byte that of
+  `mux_dump`, and can hand each message's chunk headers out next to the
+  borrowed payload for a vectored write. `MuxReader` is fed bytes in pieces of
+  any size and returns each message once complete: borrowed from the input
+  when it lies whole there, else gathered in a reused buffer per channel. It
+  reads every valid octet region (packed chunks, interleaved channels, a
+  length varint split across chunks), keeps the C demultiplexer's limits and
+  error codes (`max_message`, 4096 channels, out of sync, truncated), and can
+  peek at a message's channel, length and first bytes to skip it or forward
+  its chunks unchanged, without a copy when they lie in the input. A stream
+  may open with a **preamble**, ordinary text values in the same document
+  before the stream's assignment, checked once with the full parser and
+  handed to the caller before any message. `write_frame` and `FrameReader`
+  do the same for frames, with `bvnr_doc_stream_read`'s 256 MiB
+  `max_document_size`. Nothing is allocated per message once the buffers have
+  grown (a counting-allocator test pins it); the codec is held to the C
+  functions by shared tests and a new `codec` fuzz target, and
+  `rust/benches/codec.rs` measures it (doc/14 §4.8 has the figures). The
+  batch functions are unchanged.
 
 ### Changed
 
@@ -101,7 +125,7 @@ API and implements spec 1.2.
   unchanged: `bvnr_feed_test` reads every document after every other, under
   every pair of settings, and a frame stream cut at every byte, against a reader
   fresh from `bvnr_reader_create`. A 43-byte framed document went from about 5.5
-  to 2.3 µs (doc/10 §7.4).
+  to 2.3 µs (doc/10 §8.4).
 - **`bvnr_mux_send` allocates nothing per call.** Its 64 KiB chunk buffer used
   to be malloc'd and freed on every message; it now belongs to the writer,
   allocated on the first send and kept across re-opens. The output is byte for

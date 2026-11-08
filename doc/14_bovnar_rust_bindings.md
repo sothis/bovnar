@@ -9,7 +9,9 @@ Rust bindings for the **Bovnar (BVNR)** typed serialisation library (library
 
 The crate is a thin wrapper around the C library: `build.rs` compiles the C
 sources into the crate, so there is no system library to install and nothing is
-looked up at run time. The API stays close to the C library's own shapes:
+looked up at run time. One module is not a wrapper: `bovnar::codec`, the
+incremental framing codec for live streams, is pure Rust
+([§4.8](#48-live-streams-the-framing-codec-bovnarcodec)). The API stays close to the C library's own shapes:
 `parse` / `to_string` over a dynamic `Value`, `Reader` callbacks, `Writer` calls
 and a random-access DOM. There is no serde integration, no builder and no typed
 deserialisation. Where Rust's types can say more at no cost, they do: the C
@@ -33,6 +35,7 @@ enums are Rust enums, and an error carries the library's error kind.
     - 4.5 [Low-level writer](#45-low-level-writer)
     - 4.6 [Streaming / framing (`bovnar::stream`)](#46-streaming--framing-bovnarstream)
     - 4.7 [Files and I/O streams (`std::io::Read` / `Write`)](#47-files-and-io-streams-stdioread--write)
+    - 4.8 [Live streams: the framing codec (`bovnar::codec`)](#48-live-streams-the-framing-codec-bovnarcodec)
 5. [Unit helpers](#5-unit-helpers)
     - 5.1 [The unit-profile notations (spec 1.2)](#51-the-unit-profile-notations-spec-12)
     - 5.2 [Extended unit functions](#52-extended-unit-functions)
@@ -630,6 +633,225 @@ code the C library gives an unreadable fd source or unwritable fd sink
 (`reading_from_source_fd`, `writing_to_sink`); no event is delivered for a reader
 that failed, because nothing is parsed before the input has been read. No file
 descriptor is involved, so these work the same on Windows.
+
+### 4.8 Live streams: the framing codec (`bovnar::codec`)
+
+The `stream` functions of [§4.6](#46-streaming--framing-bovnarstream) work on
+whole buffers. `bovnar::codec` does the same two wire conventions — octet
+multiplexing and `BVF1` frames ([Streaming](10_bovnar_streaming.md) §2 and §3)
+— on a live stream: the writer hands out each message's bytes as it is sent,
+and the reader is fed bytes in pieces of any size, as they arrive from a
+socket or a pipe, and hands out each message as soon as its last byte is in.
+The module is pure Rust (`#![forbid(unsafe_code)]`): no message goes through
+the C library, and nothing is allocated per message once the reader's buffers
+have grown to the largest message.
+
+```rust
+use bovnar::codec::{MuxReader, MuxWriter};
+
+fn main() -> Result<(), bovnar::Error> {
+    // A stream under the key "media" that opens with ordinary values
+    let mux = MuxWriter::with_preamble(b".meta = { .codec = \"av1\"; .rate = 30; };", "media")?;
+    let mut wire = Vec::new(); // stands in for a socket
+    wire.extend_from_slice(mux.opener());
+    let mut head = Vec::new();
+    for (channel, frame) in [(1, &b"key frame"[..]), (2, b"audio"), (1, b"delta")] {
+        // Only the chunk headers are written, into `head`; the frame is
+        // borrowed, ready for a vectored write
+        for part in mux.encode(&mut head, channel, frame) {
+            wire.extend_from_slice(part);
+        }
+    }
+    wire.extend_from_slice(mux.terminator());
+
+    // The C library reads the same bytes
+    assert_eq!(bovnar::stream::mux_load(&wire, 0, Some("media"))?.len(), 3);
+
+    // Fed in pieces, as from a socket
+    let mut reader = MuxReader::with_options(0, Some("media"))?;
+    let mut received = Vec::new();
+    for piece in wire.chunks(7) {
+        let mut input = piece;
+        while let Some(m) = reader.read(&mut input)? {
+            received.push((m.channel, m.payload.to_vec()));
+        }
+    }
+    reader.finish()?; // the input ended where a stream may end
+    assert_eq!(received[1], (2, b"audio".to_vec()));
+    let meta = reader.preamble_value(false)?.expect("the stream is open");
+    assert_eq!(meta, bovnar::parse(b".meta = { .codec = \"av1\"; .rate = 30; };")?);
+    Ok(())
+}
+```
+
+**Writing.** `MuxWriter::new(key)` or `MuxWriter::with_preamble(preamble,
+key)` validates the key (1 to 255 bytes, the identifier rules of spec §4.2:
+what the C writer accepts and a reader at its defaults reads) and the
+preamble, once. A stream is `opener()`, the messages, then `terminator()`;
+`begin(&mut vec)` and `finish(&mut vec)` append them to a `Vec`. Each message
+is one of:
+
+| Call | What it writes |
+|---|---|
+| `encode(&mut head, channel, payload)` | only the chunk headers, into `head` (cleared, then reused); returns `Parts`, an iterator over the message's wire bytes in order — header, payload slice, header, … — for a vectored write |
+| `write_message(&mut vec, channel, payload)` | the whole message, appended to a `Vec` |
+| `write_message_to(&mut out, channel, payload)` | the whole message to any `std::io::Write`, one vectored write per chunk, nothing allocated; `out` is not flushed |
+
+A message is cut into chunks exactly as `bvnr_mux_send` cuts it (a message of
+at most `stream::BVNR_MUX_MAX_MESSAGE` bytes is one chunk), so the bytes are
+those of `stream::mux_dump` for the same key and messages.
+
+**Reading.** `MuxReader::read(&mut input)` takes `input: &mut &[u8]`, the bytes
+not yet read, reads from its front and returns the next complete message as
+`Message { channel, payload }`. `None` means every byte of `input` was taken
+(an unfinished message is kept inside the reader), so the buffer can be
+refilled; after a message, call again with the same slice until `None`. A
+message that lies whole in `input` is borrowed from it; one that spans pieces
+or chunks is gathered in a buffer per channel that is reused. The slice is
+valid until the next call. `finish()` checks that the input ended after the
+document's `;` (or before its first byte); `reset()` readies the reader for
+another stream, keeping the buffers it has grown. The reader reads every valid octet region, not only what
+`bvnr_mux_send` writes: several messages packed into one chunk, channels
+interleaved chunk by chunk, a length varint split across chunks.
+
+| Option | Default |
+|---|---|
+| `MuxReader::with_options(max_message, key)` | `max_message` 0 is 64 MiB, as for `mux_load`; with `key`, a stream under another key is an `Error::Argument` naming both (`bvnr_demux_set_key` would ignore it, but this reader reads one stream) |
+| `.with_max_preamble(bytes)` | 64 KiB of text before the octet stream, preamble and opening assignment together; more is `text_data_too_long` |
+
+**Peek, skip, forward.** For a router or relay, `next_item(&mut input, n)`
+also stops at the start of each message with `Item::Peek`, holding its
+channel, its declared length and its first `n` bytes; nothing else of the
+message has been read. Drop the peek to receive the message as
+`Item::Message`, call `skip()` to have its bytes passed over as they arrive,
+or `forward()` to receive it as `Item::Wire`: whole chunks carrying that
+message alone, which can be written into any other multiplexed stream between
+two messages. When those chunks lie consecutive in the input, `Wire::bytes`
+is the input itself, not copied; otherwise the reader gathers the message and
+writes it out again as `MuxWriter` would.
+
+```rust
+use bovnar::codec::{Item, MuxReader, MuxWriter};
+
+fn main() -> Result<(), bovnar::Error> {
+    let mux = MuxWriter::new("mux")?;
+    let mut inbound = Vec::new();
+    mux.begin(&mut inbound);
+    for (channel, msg) in [(1, &b"for the relay"[..]), (2, b"local only"), (1, b"again")] {
+        mux.write_message(&mut inbound, channel, msg);
+    }
+    mux.finish(&mut inbound);
+
+    // Forward channel 1, drop the rest, decided on the peek alone
+    let mut reader = MuxReader::new();
+    let mut outbound = mux.opener().to_vec();
+    let mut input = &inbound[..];
+    while let Some(item) = reader.next_item(&mut input, 0)? {
+        match item {
+            Item::Peek(p) if p.channel == 1 => p.forward(),
+            Item::Peek(p) => p.skip(),
+            Item::Wire(w) => outbound.extend_from_slice(w.bytes),
+            Item::Message(_) => unreachable!("every message was decided"),
+        }
+    }
+    outbound.extend_from_slice(mux.terminator());
+    let relayed = bovnar::stream::mux_load(&outbound, 0, None)?;
+    assert_eq!(relayed, [(1, b"for the relay".to_vec()), (1, b"again".to_vec())]);
+    Ok(())
+}
+```
+
+**The preamble.** Text before the stream's assignment — complete statements,
+a `#!bovnar` directive first if needed — lets a stream carry ordinary values
+about itself in the same document. `with_preamble` checks it once with the
+full parser; it must be text, so an octet stream in it is `octet_stream_forbidden`
+(a reader takes the document's first `0x00` for the stream's opener). The
+reader gathers the text up to that `0x00`, requires it to end with the
+assignment `.KEY =`, checks the preamble with the full parser (once per
+stream; a bare `.KEY=` or `.KEY = ` skips the check), and then reads the octet
+stream in pure Rust. `read_preamble(&mut input)` reads only up to the opener
+and returns the preamble, so it can be acted on before any message;
+`preamble()` returns it afterwards and `preamble_value(typed)` parses it into
+a `Value`. A C-written document with values before `bvnr_mux_begin` reads the
+same way.
+
+**What the reader reads.** A preamble (possibly empty), one octet stream as
+the value of the document's last assignment, `;`, then only whitespace. A
+statement after the stream, or any other byte after the `;`, is
+`unexpected_input_byte`: the codec reads multiplexed streams, not the
+grammar. Parse a general document with `stream::mux_load` or a `Reader`.
+
+**Errors** are `Error::Parse` with the code the C demultiplexer gives
+(`mux_load` gives the same code for the same input), and they are latched:
+
+| Condition | Code |
+|---|---|
+| A chunk tag other than `0x01`/`0x00`, a channel varint not whole in its chunk, a varint over 10 bytes or 64 bits, a 4097th distinct channel | `octet_stream_out_of_sync` |
+| A declared length over `max_message` | `value_out_of_range` |
+| The octet stream closes inside a message or its length | `octet_stream_truncated` |
+| `finish()` inside the octet stream | `read_complete_chunk_failed` |
+| `finish()` before the stream opened, or before its `;` | `got_incomplete_bvnr_stream` |
+
+**Frames.** `codec::frame_header(len)`, `write_frame(&mut vec, doc)` and
+`write_frame_to(&mut out, doc)` (one vectored write, no copy) write what
+`bvnr_frame_write` writes. `FrameReader::read(&mut input)` returns each
+complete document's bytes, borrowed when whole in the input, gathered
+otherwise; parse each with `parse`, a `Reader` or `DomDoc`.
+`FrameReader::with_max_document_size(n)` caps a document (0 is 256 MiB, as in
+`bvnr_doc_stream_read`; the buffer only grows with bytes that arrived). A bad
+magic is `unexpected_input_byte`, a length over the cap `value_out_of_range`,
+and `finish()` inside a frame `got_incomplete_bvnr_stream`.
+
+```rust
+use bovnar::codec::{FrameReader, write_frame};
+
+fn main() -> Result<(), bovnar::Error> {
+    let mut wire = Vec::new();
+    write_frame(&mut wire, b".id = 1;");
+    write_frame(&mut wire, b".id = 2;");
+    assert_eq!(wire, bovnar::stream::frame_documents(&[".id = 1;", ".id = 2;"])?);
+
+    let mut reader = FrameReader::new();
+    let mut ids = Vec::new();
+    for piece in wire.chunks(5) {
+        let mut input = piece;
+        while let Some(doc) = reader.read(&mut input)? {
+            ids.push(bovnar::parse(doc)?);
+        }
+    }
+    reader.finish()?;
+    assert_eq!(ids.len(), 2);
+    Ok(())
+}
+```
+
+**Cost per message**, from `cargo bench --bench codec`: a release build pinned
+to one core (`taskset -c 3`) of an Intel Core i7-2700K (2011), whose clock
+scales with load. Each figure is the median of seven runs (each run the median
+of nine passes over at least 64 MiB of messages), and in brackets the fastest
+run. The stream is a few MiB held in the cache, as the bytes of a socket read
+are when the reader sees them; it is opened once and fed the same messages
+every pass, as a live stream is fed, so opening it is not counted. A 400 KB
+message spans seven chunks.
+
+| Message | write | write + copy | peek + skip | forward | read | `mux_dump` | `mux_load` |
+|---|---|---|---|---|---|---|---|
+| 150 B | 8.6 ns (8.4) | 28 ns (27) | 14 ns (12) | 15 ns (14) | 8.9 ns (8.1) | 274 ns (268) | 150 ns (146) |
+| 30 KB | 8.9 ns (8.6) | 1.6 µs (1.5) | 13 ns (13) | 15 ns (14) | 8.9 ns (8.8) | 8.8 µs (8.3) | 7.2 µs (5.2) |
+| 400 KB | 39 ns (38) | 24 µs (22) | 55 ns (55) | 57 ns (56) | 27 µs (23) | 118 µs (110) | 110 µs (86) |
+
+*write* is `encode` (the headers only, for a vectored write); *write + copy* is
+`write_message` into a reused `Vec`; *peek + skip* and *forward* are
+`next_item`, a look at the channel and the first payload byte, and the
+decision, the forwarded chunks borrowed from the input; *read* is `read`, which gathers (copies) a message that spans
+chunks, so the 400 KB one; *mux_dump* and *mux_load* are the batch functions
+through the C library, for comparison. Counted in instructions, which the
+clock does not move, a 150-byte message is about 145 to write, 120 to read and
+140 to peek at and skip, the benchmark's loop included. From a stream much
+larger than the cache, every chunk header a 400 KB message has is a cache
+miss, which puts peek and forward at about 145 ns for it, and small messages
+are read as fast as memory delivers them: about 25 ns to read a 150-byte one
+and 29 ns to peek at and skip it. The other figures move little.
 
 ---
 
@@ -2176,7 +2398,8 @@ cargo test --doc
 (one file per topic — `test_units.rs`, `test_dom.rs`, `test_stream.rs` and so
 on — plus `smoke.rs`) and the documentation examples. The ABI check is three
 unit tests in `src/ffi.rs`, because the C structs it compares against are
-private.
+private. `test_codec_alloc.rs` installs a counting global allocator to show that
+the codec allocates nothing per message, so it is a test binary of its own.
 
 `test_writers_agree` compares `to_string` with the C CLI's `pretty-print`, so it
 is `#[ignore]`d unless the CLI is built at `<repo>/build/bovnar`:
@@ -2192,8 +2415,10 @@ cmake --build build && ctest --test-dir build`. That suite also parses every
 
 `rust/fuzz/` holds [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz) targets
 (nightly toolchain): `parse` (the streaming parsers and a write-back round
-trip), `dom` (parse and walk every node) and `json_roundtrip` (`from_json` and
-`to_json` until the JSON is stable). Instrument the C library too by building it
+trip), `dom` (parse and walk every node), `json_roundtrip` (`from_json` and
+`to_json` until the JSON is stable) and `codec` (`MuxReader` and `FrameReader`
+fed in pieces, against themselves and against the C library's `mux_load` and
+`load_documents`). Instrument the C library too by building it
 with clang:
 
 ```bash
@@ -2215,6 +2440,7 @@ rust/
 │   ├── lib.rs        # parse() / parse_typed() / to_string() / write_array() — public API
 │   ├── ffi.rs        # the C declarations; the only `unsafe` code
 │   ├── bvnfloat.rs   # BvnFloat: arbitrary-precision float + IEEE binary/decimal/fixed encoders
+│   ├── codec.rs      # MuxWriter, MuxReader, FrameReader — the pure-Rust framing codec
 │   ├── currency.rs   # ISO 4217 / crypto currency metadata (read from the C catalogue)
 │   ├── decimal.rs    # Decimal: an exact decimal number (sign, coefficient, exponent)
 │   ├── dom.rs        # DomDoc, DomNode, DomType — random-access DOM
@@ -2229,6 +2455,7 @@ rust/
 │   ├── units.rs      # unit_to_si_factor, unit_convert_factor, etc.
 │   └── writer.rs     # Writer, Base, Signedness, EmitSpec
 ├── tests/            # one integration-test file per topic, plus smoke.rs
+├── benches/          # codec.rs: per-message figures of the framing codec (std only)
 └── fuzz/             # cargo-fuzz targets
 ```
 
@@ -2247,6 +2474,7 @@ rust/
 | `src/decimal.rs` | `Decimal`, the exact decimal value |
 | `src/currency.rs` | currency metadata |
 | `src/stream.rs` | framing, multiplexing and document-in-document, with their `Read` / `Write` twins |
+| `src/codec.rs` | the incremental framing codec in pure Rust: `MuxWriter`, `MuxReader`, `FrameReader`, the frame writers |
 | `src/io.rs` | the `std::io::Read` and `Write` helpers behind the `_reader` and `_to` entry points |
 | `src/json.rs` | JSON ⇄ BVNR, as the CLI's `bovnar convert` does it |
 | `src/lib.rs` | `parse`, `parse_typed`, `to_string`, the reader and writer twins, `write_array` and the crate-root re-exports |

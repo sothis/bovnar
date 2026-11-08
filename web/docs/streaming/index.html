@@ -112,11 +112,12 @@ capabilities are sub-protocols carried in or around them.</p>
 <li><a href="#5-python-bindings">Python bindings</a></li>
 <li><a href="#6-rust-bindings">Rust bindings</a></li>
 <li><a href="#7-composition">Composition</a></li>
-<li><a href="#8-live-streams-callback-io-and-push-fed-reading">Live streams: callback I/O and push-fed reading</a><ul>
+<li><a href="#8-live-streams-callback-io-push-fed-reading-flushed-writing">Live streams: callback I/O, push-fed reading, flushed writing</a><ul>
 <li>8.1 <a href="#81-callback-sources-and-sinks">Callback sources and sinks</a></li>
 <li>8.2 <a href="#82-the-push-fed-document-reader">The push-fed document reader</a></li>
 <li>8.3 <a href="#83-draining-without-a-callback-per-item">Draining without a callback per item</a></li>
 <li>8.4 <a href="#84-what-it-costs">What it costs</a></li>
+<li>8.5 <a href="#85-writing-live-a-flush-per-message">Writing live: a flush per message</a></li>
 <li><a href="#see-also">See also</a></li>
 </ul>
 </li>
@@ -309,6 +310,7 @@ per channel:        concat(fragments in order) = the channel&#39;s logical strea
 <span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_mux_send</span><span class="w"> </span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="o">*</span><span class="w"> </span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">channel</span><span class="p">,</span>
 <span class="w">                    </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">len</span><span class="p">);</span><span class="w">   </span><span class="cm">/* split as needed */</span>
 <span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_mux_end</span><span class="w">  </span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="o">*</span><span class="w"> </span><span class="n">w</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_flush</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="o">*</span><span class="w"> </span><span class="n">w</span><span class="p">);</span><span class="w">   </span><span class="cm">/* hand what was sent over now */</span>
 
 <span class="cm">/* Consumer */</span>
 <span class="k">typedef</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">bvnr_mux_on_msg_fn</span><span class="p">)(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">ud</span><span class="p">,</span><span class="w"> </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">channel</span><span class="p">,</span>
@@ -322,6 +324,10 @@ per channel:        concat(fragments in order) = the channel&#39;s logical strea
 <span class="n">error_code_t</span><span class="w">  </span><span class="nf">bvnr_demux_error</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_demux_t</span><span class="o">*</span><span class="w"> </span><span class="n">dm</span><span class="p">);</span>
 </code></pre></div>
 
+<p>A message sent to an fd or callback sink waits in the writer's 64 KiB buffer
+until it fills or the document finishes; a producer feeding a live consumer
+calls <code>bvnr_write_flush</code> after each <code>bvnr_mux_send</code> (§8.5). The bytes are the
+same either way.</p>
 <p>Install <code>bvnr_demux_on_event</code> as <code>bvnr_read_flags_t.on_verified</code> with <code>userdata</code>
 set to the <code>bvnr_demux_t*</code>. It peels the channel varint off each chunk,
 reassembles per-channel messages (owning a buffer per active channel), and
@@ -540,6 +546,20 @@ about 3 µs for a 150-byte message and 7 µs for a 30 KB one fed whole, against
 figures, and what feeding in small pieces costs, are in
 <a href="https://www.bovnar.io/docs/python/#47-live-streams-feeding-in-pieces">Python Bindings §4.7</a>
 (<code>python/bench/bench_stream.py</code>).</p>
+<p><strong>Writing live</strong> (§8.5) is <code>stream.MuxWriter(file, key=, preamble=)</code>, whose
+<code>send(channel, payload)</code> hands each message to the socket or file before it
+returns, and <code>stream.FrameWriter(file)</code>, one framed document per <code>write</code> or
+<code>dump</code>; <code>Writer.flush()</code> does the same for a document written value by value.
+The bytes are those of <code>mux_dump</code> and <code>dump_documents</code>:</p>
+<div class="codehilite"><pre><span></span><code><span class="k">with</span> <span class="n">stream</span><span class="o">.</span><span class="n">MuxWriter</span><span class="p">(</span><span class="n">sock</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s2">&quot;media&quot;</span><span class="p">,</span> <span class="n">preamble</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;meta&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;codec&quot;</span><span class="p">:</span> <span class="s2">&quot;av1&quot;</span><span class="p">}})</span> <span class="k">as</span> <span class="n">mux</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">channel</span><span class="p">,</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">frames</span><span class="p">:</span>
+        <span class="n">mux</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">channel</span><span class="p">,</span> <span class="n">frame</span><span class="p">)</span>                  <span class="c1"># flushed: the reader has it now</span>
+</code></pre></div>
+
+<p>A flushed send costs about 5.5 µs for a 150-byte message against 2.2 µs
+batched (<code>flush_each=False</code>), the ctypes call and the call of the object's
+<code>sendall</code>
+(<a href="https://www.bovnar.io/docs/python/#48-live-streams-writing-a-message-at-a-time">Python Bindings §4.8</a>).</p>
 <hr />
 <h2 id="6-rust-bindings">6. Rust bindings</h2>
 <p>The Rust crate has the same batch functions in <code>bovnar::stream</code>
@@ -571,13 +591,14 @@ once the reader's buffers have grown. See
 <p>Because each is a thin application over the public event API, you can also write
 your own consumer/producer at the same seam without touching the core.</p>
 <hr />
-<h2 id="8-live-streams-callback-io-and-push-fed-reading">8. Live streams: callback I/O and push-fed reading</h2>
+<h2 id="8-live-streams-callback-io-push-fed-reading-flushed-writing">8. Live streams: callback I/O, push-fed reading, flushed writing</h2>
 <p>Everything above reads from a <code>bvnr_source_t</code> that is <em>pulled</em> until it ends.
 That fits a file and a blocking socket. It does not fit a stream that never
 ends and arrives when it arrives — a non-blocking socket in an event loop, a
 binding that is handed bytes — because a pull that returns nothing <em>is</em> end of
 input: a short feed would read as a truncated document. This section is the
-other way in.</p>
+other way in, and (§8.5) the writing side of it: a producer that hands each
+message over as it is sent.</p>
 <h3 id="81-callback-sources-and-sinks">8.1 Callback sources and sinks</h3>
 <p><code>bvnr_source_from_callback(s, pull, userdata)</code> and
 <code>bvnr_sink_to_callback(s, push, flush, userdata)</code> put the caller's own transport
@@ -588,7 +609,7 @@ lives inside the 64-byte handle, because the reader and writer work on a copy of
 it; the callback reads it back with <code>bvnr_source_get_userdata</code> /
 <code>bvnr_sink_get_userdata</code>. A callback sink fails as a transport does
 (<code>error_writing_to_sink</code>), and the writer batches into its 64 KiB buffer before
-pushing.</p>
+pushing, or pushes early at <code>bvnr_write_flush</code> (§8.5).</p>
 <h3 id="82-the-push-fed-document-reader">8.2 The push-fed document reader</h3>
 <p><code>bvnr_open_read_feed</code>, <code>bvnr_read_feed</code>, <code>bvnr_read_finish</code>
 (<a href="https://www.bovnar.io/docs/api/#115-push-fed-reading-bvnr_open_read_feed">doc/08 §1.15</a>):
@@ -681,8 +702,23 @@ point.</p>
 <td style="text-align: right;">28 µs</td>
 <td style="text-align: right;">206 µs</td>
 </tr>
+<tr>
+<td><code>bvnr_mux_send</code> into a callback sink, batched</td>
+<td style="text-align: right;">105 ns</td>
+<td style="text-align: right;">6.1 µs</td>
+<td style="text-align: right;">86 µs</td>
+</tr>
+<tr>
+<td><code>bvnr_mux_send</code> + <code>bvnr_write_flush</code> into a callback sink</td>
+<td style="text-align: right;">113 ns</td>
+<td style="text-align: right;">6.1 µs</td>
+<td style="text-align: right;">86 µs</td>
+</tr>
 </tbody>
 </table>
+<p>The two callback-sink rows are from a later run (§8.5), where <code>bvnr_mux_send</code>
+into a memory sink measured 100 ns, 4.8 µs and 69 µs: the sink copies what it
+is pushed, as a socket's send does, minus the system call.</p>
 <p>A message that fits one chunk and arrives in one feed is handed out without
 touching its bytes, which is why the 30 KB column falls by a factor of thirty.
 Fed in small pieces, a chunk is gathered before it is passed on, and a message
@@ -728,6 +764,55 @@ small document costs to parse, and the frame reader paid it too (5.5 µs for the
 warm, nor the parsing frame reader and a re-opened fed demux per document; a
 <code>bvnr_doc_stream_read</code> call allocates the same whatever the number of documents
 (<code>tests/bovnar_alloc_test.c</code>).</p>
+<h3 id="85-writing-live-a-flush-per-message">8.5 Writing live: a flush per message</h3>
+<p>The writer gathers what it writes for an fd or callback sink in a 64 KiB buffer
+and pushes it when the buffer is full or at <code>bvnr_write_finish</code>, so a consumer
+at the other end of a socket sees a stream of small messages in 64 KiB bursts,
+or not at all until the producer stops. <code>bvnr_write_flush</code> hands everything
+written so far to the sink, then calls the sink's flush callback if it has one
+(<a href="https://www.bovnar.io/docs/api/#218-bvnr_write_flush">doc/08 §2.18</a>). It is legal
+between any two writer calls — inside an open mux stream as much as between two
+values — and changes only when the bytes leave: a separator owed to the next
+value stays owed, so the output is byte-identical however often it is flushed.
+For a memory sink it does nothing.</p>
+<p>A producer that streams frames to a live consumer writes its metadata, opens
+the stream, and flushes after every message:</p>
+<div class="codehilite"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="nf">sock_push</span><span class="p">(</span><span class="n">bvnr_sink_t</span><span class="o">*</span><span class="w"> </span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">len</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">send_all</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="kt">int</span><span class="o">*</span><span class="p">)</span><span class="n">bvnr_sink_get_userdata</span><span class="p">(</span><span class="n">s</span><span class="p">),</span><span class="w"> </span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="n">len</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="n">bvnr_sink_t</span><span class="w"> </span><span class="n">sink</span><span class="p">;</span>
+<span class="n">bvnr_sink_to_callback</span><span class="p">(</span><span class="o">&amp;</span><span class="n">sink</span><span class="p">,</span><span class="w"> </span><span class="n">sock_push</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">sock</span><span class="p">);</span>
+<span class="n">bvnr_writer_t</span><span class="o">*</span><span class="w"> </span><span class="n">w</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvnr_writer_create</span><span class="p">();</span>
+<span class="n">bvnr_open_write_sink</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">sink</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span>
+
+<span class="n">bvnr_write_struct_start</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;meta&quot;</span><span class="p">);</span><span class="w">               </span><span class="cm">/* .meta = { ... }; */</span>
+<span class="n">bvnr_write_string</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;codec&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;av1&quot;</span><span class="p">);</span>
+<span class="n">bvnr_write_float_unit</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;rate&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mf">30.0</span><span class="p">,</span><span class="w"> </span><span class="n">BVN_UNIT_NO_PREFIX</span><span class="p">(</span><span class="n">bu_hertz</span><span class="p">));</span>
+<span class="n">bvnr_write_struct_end</span><span class="p">(</span><span class="n">w</span><span class="p">);</span>
+<span class="n">bvnr_mux_begin</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;media&quot;</span><span class="p">);</span><span class="w">                       </span><span class="cm">/* .media = \x00 */</span>
+<span class="n">bvnr_write_flush</span><span class="p">(</span><span class="n">w</span><span class="p">);</span><span class="w">                              </span><span class="cm">/* the consumer has .meta now */</span>
+
+<span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">next_frame</span><span class="p">(</span><span class="o">&amp;</span><span class="n">channel</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">frame</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">len</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">bvnr_mux_send</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="n">channel</span><span class="p">,</span><span class="w"> </span><span class="n">frame</span><span class="p">,</span><span class="w"> </span><span class="n">len</span><span class="p">)</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="o">!</span><span class="n">bvnr_write_flush</span><span class="p">(</span><span class="n">w</span><span class="p">))</span>
+<span class="w">        </span><span class="k">break</span><span class="p">;</span><span class="w">                                    </span><span class="cm">/* error_writing_to_sink */</span>
+<span class="p">}</span>
+
+<span class="n">bvnr_mux_end</span><span class="p">(</span><span class="n">w</span><span class="p">);</span><span class="w">                                  </span><span class="cm">/* \x00; */</span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">bvnr_write_finish</span><span class="p">(</span><span class="n">w</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* bvnr_writer_get_error(w) */</span><span class="w"> </span><span class="p">}</span>
+<span class="n">bvnr_writer_destroy</span><span class="p">(</span><span class="n">w</span><span class="p">);</span>
+</code></pre></div>
+
+<p>At the other end a push-fed demux (§3.4) hands out <code>.meta</code> before the first
+message and each message as soon as its last byte arrives, so message N is
+there before message N+1 is sent (<code>tests/bovnar_feed_test.c</code> runs exactly this,
+with the writer's sink feeding the demux). A failed push or flush latches like
+any writer error.</p>
+<p>There is no "flush after every message" option on <code>bvnr_mux_send</code>: it would
+need a field in <code>bvnr_write_flags_t</code> or a second send function, and the call
+after the send costs what the table in §8.4 shows — about 8 ns on a 150-byte
+message, the push of the sink included — and allocates nothing.</p>
 <hr />
 <h2 id="see-also">See also</h2>
 <ul>
@@ -737,9 +822,9 @@ warm, nor the parsing frame reader and a re-opened fed demux per document; a
 <li><a href="https://www.bovnar.io/docs/rust/">Rust Bindings</a> — the <code>bovnar::stream</code> module</li>
 <li><code>include/bovnar_stream.h</code> — full declarations and per-function contracts</li>
 <li><code>tests/bovnar_stream_test.c</code> — round-trip tests for all four capabilities</li>
-<li><code>tests/bovnar_feed_test.c</code> — the push-fed readers and callback I/O against the batch functions</li>
+<li><code>tests/bovnar_feed_test.c</code> — the push-fed readers, callback I/O and the flushed writer against the batch functions</li>
 <li><code>python/bovnar/stream.py</code> — Python bindings; <code>python/tests/test_stream.py</code>,
-  <code>test_stream_io.py</code>, <code>test_stream_feed.py</code></li>
+  <code>test_stream_io.py</code>, <code>test_stream_feed.py</code>, <code>test_stream_live.py</code></li>
 </ul>
 <hr />
 <p><em>End of Bovnar — Streaming, Framing &amp; Multiplexing (Bovnar spec 1.2).</em></p>

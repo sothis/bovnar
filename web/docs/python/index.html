@@ -64,6 +64,7 @@ the C library; <code>import bovnar</code> itself never loads it.</p>
 <li>4.5 <a href="#45-low-level-writer">Low-level writer</a></li>
 <li>4.6 <a href="#46-streaming--framing-bovnarstream">Streaming / framing (<code>bovnar.stream</code>)</a></li>
 <li>4.7 <a href="#47-live-streams-feeding-in-pieces">Live streams: feeding in pieces</a></li>
+<li>4.8 <a href="#48-live-streams-writing-a-message-at-a-time">Live streams: writing a message at a time</a></li>
 </ul>
 </li>
 <li><a href="#5-unit-helpers">Unit helpers</a><ul>
@@ -677,6 +678,125 @@ copied through a callback, which is the factor of about five. Fed in
 microseconds each, twenty of them for a 30 KB message; read from a socket, take
 the largest <code>recv</code> the transport offers. A <code>memoryview</code> saves the copy only
 where there is one to save, from a few kilobytes up.</p>
+<h3 id="48-live-streams-writing-a-message-at-a-time">4.8 Live streams: writing a message at a time</h3>
+<p><code>mux_dump(..., file=)</code> and <code>dump_documents(..., file=)</code> take every message or
+document at once, and the writer behind them gathers its output in a 64 KiB
+buffer, so a reader at the other end of a socket sees nothing until it fills.
+Two objects in <code>bovnar.stream</code> write as the messages come instead, each handing
+what it writes to the socket or file before it returns:</p>
+<table>
+<thead>
+<tr>
+<th>Object</th>
+<th>Writes</th>
+<th>Per call</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MuxWriter(file, *, key="mux", preamble=None, flush_each=True)</code></td>
+<td>a document carrying a mux stream, as <code>mux_dump</code> writes it</td>
+<td><code>send(channel, payload)</code>: one message</td>
+</tr>
+<tr>
+<td><code>FrameWriter(file, *, flush_each=True)</code></td>
+<td>a <code>BVF1</code> frame stream, as <code>frame_documents</code> writes it</td>
+<td><code>write(document_bytes)</code> or <code>dump(obj)</code>: one framed document</td>
+</tr>
+</tbody>
+</table>
+<p><code>file</code> is a socket (<code>sendall</code>) or a binary file object (<code>write</code>). <code>MuxWriter</code>
+writes the preamble and opens the stream when it is made, and with
+<code>flush_each=True</code> it calls <code>bvnr_write_flush</code> after every send: the message goes
+to the object, then the object's <code>flush()</code> runs when it has one, so a
+<code>DemuxFeed</code> at the other end has message N before message N+1 is sent. With
+<code>flush_each=False</code> it batches into the 64 KiB buffer, and <code>flush()</code> hands over
+what has gathered. <code>close()</code> — or leaving the <code>with</code> block normally — ends the
+stream and the document; the object stays open. The bytes are <code>mux_dump</code>'s for
+the same messages and preamble, however often they were flushed:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">io</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">stream</span>
+
+<span class="n">out</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
+<span class="k">with</span> <span class="n">stream</span><span class="o">.</span><span class="n">MuxWriter</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s2">&quot;media&quot;</span><span class="p">,</span>
+                      <span class="n">preamble</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;meta&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;codec&quot;</span><span class="p">:</span> <span class="s2">&quot;av1&quot;</span><span class="p">}})</span> <span class="k">as</span> <span class="n">mux</span><span class="p">:</span>
+    <span class="n">first_len</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">getvalue</span><span class="p">())</span>     <span class="c1"># the preamble is out already</span>
+    <span class="n">mux</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;frame-1&quot;</span><span class="p">)</span>
+    <span class="n">sent_len</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">getvalue</span><span class="p">())</span>      <span class="c1"># and so is the first message</span>
+    <span class="n">mux</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;audio&quot;</span><span class="p">)</span>
+
+<span class="n">first_len</span> <span class="o">&gt;</span> <span class="mi">0</span>                           <span class="c1"># → True</span>
+<span class="n">sent_len</span> <span class="o">&gt;</span> <span class="n">first_len</span>                    <span class="c1"># → True</span>
+<span class="n">same</span> <span class="o">=</span> <span class="n">out</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span> <span class="o">==</span> <span class="n">stream</span><span class="o">.</span><span class="n">mux_dump</span><span class="p">(</span>
+    <span class="p">[(</span><span class="mi">1</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;frame-1&quot;</span><span class="p">),</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;audio&quot;</span><span class="p">)],</span> <span class="n">key</span><span class="o">=</span><span class="s2">&quot;media&quot;</span><span class="p">,</span>
+    <span class="n">preamble</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;meta&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;codec&quot;</span><span class="p">:</span> <span class="s2">&quot;av1&quot;</span><span class="p">}})</span>
+<span class="n">same</span>                                    <span class="c1"># → True</span>
+</code></pre></div>
+
+<p>Over a socket, the reader is a <code>DemuxFeed</code> fed whatever <code>recv</code> returns
+(§4.7):</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># check-doc-python: skip</span>
+<span class="k">with</span> <span class="n">stream</span><span class="o">.</span><span class="n">MuxWriter</span><span class="p">(</span><span class="n">sock</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s2">&quot;media&quot;</span><span class="p">,</span> <span class="n">preamble</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;meta&quot;</span><span class="p">:</span> <span class="n">meta</span><span class="p">})</span> <span class="k">as</span> <span class="n">mux</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">channel</span><span class="p">,</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">frames</span><span class="p">():</span>
+        <span class="n">mux</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">channel</span><span class="p">,</span> <span class="n">frame</span><span class="p">)</span>        <span class="c1"># on the wire when send returns</span>
+</code></pre></div>
+
+<p><code>FrameWriter</code> frames each document as it is written; a frame stream has no
+terminator, so <code>close()</code> only flushes the object:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">out</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
+<span class="k">with</span> <span class="n">stream</span><span class="o">.</span><span class="n">FrameWriter</span><span class="p">(</span><span class="n">out</span><span class="p">)</span> <span class="k">as</span> <span class="n">frames</span><span class="p">:</span>
+    <span class="n">frames</span><span class="o">.</span><span class="n">dump</span><span class="p">({</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">})</span>
+    <span class="n">frames</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;.id = 2;&#39;</span><span class="p">)</span>
+<span class="n">stream</span><span class="o">.</span><span class="n">load_documents</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">getvalue</span><span class="p">())</span>   <span class="c1"># → [{&#39;id&#39;: 1}, {&#39;id&#39;: 2}]</span>
+<span class="n">frames</span><span class="o">.</span><span class="n">count</span>                            <span class="c1"># → 2</span>
+</code></pre></div>
+
+<p>An exception the object raises (a closed socket, a full disk) comes out of the
+call that pushed — the constructor, <code>send</code>, <code>write</code>, <code>flush</code> or <code>close</code> —
+unchanged. The writer has failed then: <code>MuxWriter.close()</code> only releases it,
+and a <code>FrameWriter</code>, which may have written half a frame, refuses further
+documents. Leaving a <code>MuxWriter</code>'s <code>with</code> block by an exception does not end the
+stream either, so a reader sees it cut off rather than complete.
+<code>Writer.to_stream(...).flush()</code> (§12.2) does the same for a document written
+value by value.</p>
+<p><strong>What it costs.</strong> Measured with <code>python/bench/bench_stream.py</code> on the machine
+of §4.7, into a socket-like object whose <code>sendall</code> takes the bytes, per
+message, median of five runs:</p>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th style="text-align: right;">150 B</th>
+<th style="text-align: right;">30 KB</th>
+<th style="text-align: right;">400 KB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mux_dump</code> (batch, to <code>bytes</code>)</td>
+<td style="text-align: right;">7.6 µs</td>
+<td style="text-align: right;">29 µs</td>
+<td style="text-align: right;">287 µs</td>
+</tr>
+<tr>
+<td><code>MuxWriter</code>, <code>flush_each=False</code></td>
+<td style="text-align: right;">2.2 µs</td>
+<td style="text-align: right;">10 µs</td>
+<td style="text-align: right;">114 µs</td>
+</tr>
+<tr>
+<td><code>MuxWriter</code>, flushed per message</td>
+<td style="text-align: right;">5.5 µs</td>
+<td style="text-align: right;">12 µs</td>
+<td style="text-align: right;">126 µs</td>
+</tr>
+</tbody>
+</table>
+<p>A flush per message costs a ctypes call and a Python call of the object's
+<code>sendall</code> (with the copy of the bytes it is handed) for every message, against
+one per 64 KiB batched: about 3 µs on a small message, which is the price of
+the reader having it at once. Large messages are dominated by the copy either
+way.</p>
 <hr />
 <h2 id="5-unit-helpers">5. Unit helpers</h2>
 <div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">bovnar</span>
@@ -1861,7 +1981,7 @@ to a <code>DocumentFeed</code> instead (§4.7).</p>
 </tr>
 <tr>
 <td><code>Writer.to_stream(stream, *, pretty=True, unit_flags=0, emit_version=False)</code></td>
-<td>Write to a socket (<code>sendall</code>) or a binary file object (<code>write</code>, repeated until it has taken every byte). Output is pushed a full 64 KiB buffer at a time and the rest at <code>finish()</code>, which then calls the object's <code>flush</code> if it has one. An exception the object raises is re-raised from the write call that pushed.</td>
+<td>Write to a socket (<code>sendall</code>) or a binary file object (<code>write</code>, repeated until it has taken every byte). Output is pushed a full 64 KiB buffer at a time and the rest at <code>flush()</code> or <code>finish()</code>, which then call the object's <code>flush</code> if it has one. An exception the object raises is re-raised from the write call that pushed.</td>
 </tr>
 </tbody>
 </table>
@@ -1889,6 +2009,10 @@ keeps a rescaled float in float shape and writes annotations in one form. <code>
 <tr>
 <td><code>w.bytes_written</code></td>
 <td>Number of bytes written (all writer modes).</td>
+</tr>
+<tr>
+<td><code>w.flush()</code></td>
+<td>Hand everything written so far to the sink now (<code>bvnr_write_flush</code>) and call the stream's <code>flush</code>, between any two writes; the bytes are the same as without it. A no-op for a memory writer and after <code>finish()</code>.</td>
 </tr>
 <tr>
 <td><code>w.finish()</code></td>
@@ -2207,7 +2331,7 @@ are skipped automatically when <code>numpy</code> / <code>pint</code> is not ins
 ├── exceptions.py    # BovnarError hierarchy
 ├── quantity.py      # Quantity — typed, unit-annotated scalar for lossless round-trips
 ├── reader.py        # Reader, EventPayload, UnitPolicy, UnitRule
-├── stream.py        # framing, octet multiplexing, document-in-document, the feeds
+├── stream.py        # framing, octet multiplexing, document-in-document, the feeds, the live writers
 ├── structs.py       # ctypes Structure/Union definitions + ValueUnitPrefix + make_* helpers
 ├── unit.py          # Unit — a ValueUnit with equality, hashing and its operations
 ├── units.py         # unit_to_si_factor, unit_convert_factor, etc.
@@ -2222,6 +2346,7 @@ tests/
 ├── test_stream.py                       # framing, mux, document-in-document
 ├── test_stream_io.py                    # sockets and file objects as sources and sinks
 ├── test_stream_feed.py                  # DocumentFeed, FrameFeed, DemuxFeed, the wire vectors
+├── test_stream_live.py                  # Writer.flush, MuxWriter, FrameWriter
 ├── test_dom.py, test_dom_vs_loads_parity.py   # the DOM, and its agreement with loads()
 ├── test_write_array.py, test_array_parser.py, test_array_roundtrip_fidelity.py
 ├── test_roundtrip_property.py, test_writers_agree.py, test_dumps_directive.py
@@ -2238,7 +2363,7 @@ tests/
 └── test_example_consistency.py          # the shipped examples
 
 bench/
-└── bench_stream.py                      # per-message cost of the fed demux, run by hand
+└── bench_stream.py                      # per-message cost of the fed demux and the live writer, run by hand
 </code></pre></div>
 
 <hr />

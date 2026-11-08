@@ -85,6 +85,7 @@
 <li>2.15 <a href="#215-writer-side-unit-policy-bvnr_writer_set_unit_policy">Writer-side unit policy (<code>bvnr_writer_set_unit_policy</code>)</a></li>
 <li>2.16 <a href="#216-value-helpers">Value helpers</a></li>
 <li>2.17 <a href="#217-bvnr_sink_to_callback"><code>bvnr_sink_to_callback</code></a></li>
+<li>2.18 <a href="#218-bvnr_write_flush"><code>bvnr_write_flush</code></a></li>
 </ul>
 </li>
 <li><a href="#3-shared">Shared</a><ul>
@@ -1279,7 +1280,7 @@ spec version right after open.</p>
 
 <p>Flush any buffered output and finalise the stream. Must be called after all <code>bvnr_write_event</code> calls and before <code>bvnr_writer_destroy</code>. Returns <code>false</code> if any struct or array is still open, or an assignment, a type annotation or a <code>/</code> row separator was left with nothing after it (<code>error_got_incomplete_bvnr_stream</code>), if writing the trailing semicolon fails, or if flushing the write buffer to the sink fails.</p>
 <p><strong>After an earlier error</strong> it returns <code>false</code> at once, and still hands the sink everything written up to that error — the same bytes a memory sink already holds — so an fd sink ends with the document up to the failing value, not with whatever part of it the 64 KiB buffer happened to have pushed. (A sink that has itself failed, <code>error_writing_to_sink</code> or <code>error_sink_buffer_exhausted</code>, is not pushed again.) That output is not a document: discard it, or keep it only to see where the error fell.</p>
-<p><strong>64 KiB write buffer.</strong> For an fd or a custom sink the writer accumulates output into an internal 64 KiB buffer. Individual <code>bvnr_write_event</code> calls do not push bytes to the sink immediately; instead bytes accumulate in the buffer and are forwarded to the sink only when the buffer is full or when <code>bvnr_write_finish</code> is called. A memory sink (<code>bvnr_open_write_mem</code>) is written through directly — there is no point buffering a buffer — so its bytes are in the caller's buffer as soon as each event returns. This means the sink receives large contiguous writes rather than one tiny push per token, which is important for fd-based sinks. <code>bvnr_writer_bytes_written</code> always reflects the true total of bytes handed off to the sink plus bytes still in the buffer, so the count is accurate at any point during writing.</p>
+<p><strong>64 KiB write buffer.</strong> For an fd or a custom sink the writer accumulates output into an internal 64 KiB buffer. Individual <code>bvnr_write_event</code> calls do not push bytes to the sink immediately; instead bytes accumulate in the buffer and are forwarded to the sink only when the buffer is full, when <code>bvnr_write_flush</code> is called (§2.18), or when <code>bvnr_write_finish</code> is called. A memory sink (<code>bvnr_open_write_mem</code>) is written through directly — there is no point buffering a buffer — so its bytes are in the caller's buffer as soon as each event returns. This means the sink receives large contiguous writes rather than one tiny push per token, which is important for fd-based sinks. <code>bvnr_writer_bytes_written</code> always reflects the true total of bytes handed off to the sink plus bytes still in the buffer, so the count is accurate at any point during writing.</p>
 <div class="codehilite"><pre><span></span><code><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">bvnr_write_finish</span><span class="p">(</span><span class="n">w</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stderr</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;write finish failed: %s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
 <span class="w">            </span><span class="n">bvn_error_to_string</span><span class="p">(</span><span class="n">bvnr_writer_get_error</span><span class="p">(</span><span class="n">w</span><span class="p">)));</span>
@@ -1587,8 +1588,9 @@ all <code>len</code> bytes or return <code>false</code>. Usable wherever an fd o
 into its 64 KiB buffer and pushes whole blocks, and a refused push is
 <code>error_writing_to_sink</code> (never <code>error_sink_buffer_exhausted</code>).
 <code>bvnr_writer_bytes_written</code> and <code>bvnr_sink_bytes_written</code> count what <code>push</code>
-accepted. <code>flush</code> may be <code>NULL</code>; when set, <code>bvnr_write_finish</code> calls it after the
-last push, and a <code>false</code> from it fails the finish with <code>error_writing_to_sink</code>.</p>
+accepted. <code>bvnr_write_flush</code> (§2.18) pushes the buffer early. <code>flush</code> may be
+<code>NULL</code>; when set, <code>bvnr_write_flush</code> and <code>bvnr_write_finish</code> call it after
+their last push, and a <code>false</code> from it fails them with <code>error_writing_to_sink</code>.</p>
 <p>As with the source, <code>userdata</code> lives inside the 64-byte handle, the writer
 pushes through its own copy, and the callback recovers the pointer with
 <code>bvnr_sink_get_userdata(s)</code>.</p>
@@ -1601,6 +1603,61 @@ pushes through its own copy, and the callback recovers the pointer with
 <span class="n">bvnr_sink_t</span><span class="w"> </span><span class="n">sink</span><span class="p">;</span>
 <span class="n">bvnr_sink_to_callback</span><span class="p">(</span><span class="o">&amp;</span><span class="n">sink</span><span class="p">,</span><span class="w"> </span><span class="n">sock_push</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">conn</span><span class="p">);</span>
 <span class="n">bvnr_open_write_sink</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">sink</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span>
+</code></pre></div>
+
+<hr />
+<h3 id="218-bvnr_write_flush">2.18 <code>bvnr_write_flush</code></h3>
+<div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_write_flush</span><span class="p">(</span><span class="n">bvnr_writer_t</span><span class="w"> </span><span class="o">*</span><span class="n">w</span><span class="p">);</span>
+</code></pre></div>
+
+<p>Hand everything written so far to the sink now, then call the sink's flush
+callback if it has one. For an fd or callback sink the writer gathers output
+in its 64 KiB buffer (§2.9), so a consumer at the other end of a socket would
+otherwise see nothing until the buffer fills or the document finishes; a
+producer that streams — a mux message per <code>bvnr_mux_send</code>, a record per event —
+calls this after each one to hand it over at once.</p>
+<p>It is legal between any two writer calls: inside an open struct or array, and
+inside an open mux stream between <code>bvnr_mux_send</code> calls. It changes only <em>when</em>
+the bytes leave, never which bytes: a separator still owed to the next value
+(the <code>;</code> after a value, the <code>,</code> before the next array element) stays owed, so
+output flushed at every possible point is byte-identical to output never
+flushed.</p>
+<table>
+<thead>
+<tr>
+<th>Sink</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>memory (<code>bvnr_sink_to_mem</code>, <code>bvnr_open_write_mem</code>)</td>
+<td>nothing; the bytes are in the buffer already. Returns <code>true</code>.</td>
+</tr>
+<tr>
+<td>fd (<code>bvnr_sink_to_fd</code>)</td>
+<td>writes the buffer out.</td>
+</tr>
+<tr>
+<td>callback (<code>bvnr_sink_to_callback</code>)</td>
+<td>pushes the buffer, then calls <code>flush</code> when one was given.</td>
+</tr>
+</tbody>
+</table>
+<p>A failure latches like any writer error (§2.10): a refused push or a <code>false</code>
+from <code>flush</code> is <code>error_writing_to_sink</code>, with the error offset at the end of
+the output so far, and a writer with no sink attached is
+<code>error_invalid_argument</code>. After an earlier error it returns <code>false</code> at once and
+pushes nothing. After <code>bvnr_write_finish</code> it returns <code>true</code> and does nothing:
+the finish has flushed. It allocates nothing.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">bvnr_mux_begin</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;media&quot;</span><span class="p">);</span>
+<span class="n">bvnr_write_flush</span><span class="p">(</span><span class="n">w</span><span class="p">);</span><span class="w">                      </span><span class="cm">/* the preamble and the opener */</span>
+<span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">next_frame</span><span class="p">(</span><span class="o">&amp;</span><span class="n">ch</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">frame</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">len</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">bvnr_mux_send</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="n">ch</span><span class="p">,</span><span class="w"> </span><span class="n">frame</span><span class="p">,</span><span class="w"> </span><span class="n">len</span><span class="p">)</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="o">!</span><span class="n">bvnr_write_flush</span><span class="p">(</span><span class="n">w</span><span class="p">))</span>
+<span class="w">        </span><span class="k">break</span><span class="p">;</span><span class="w">                            </span><span class="cm">/* bvnr_writer_get_error(w) */</span>
+<span class="p">}</span>
+<span class="n">bvnr_mux_end</span><span class="p">(</span><span class="n">w</span><span class="p">);</span>
+<span class="n">bvnr_write_finish</span><span class="p">(</span><span class="n">w</span><span class="p">);</span>
 </code></pre></div>
 
 <hr />

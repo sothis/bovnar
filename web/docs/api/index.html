@@ -23,7 +23,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <meta property="article:published_time" content="2026-05-14">
-<meta property="article:modified_time" content="2026-11-04">
+<meta property="article:modified_time" content="2026-11-08">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar C Read &amp; Write API">
@@ -33,7 +33,7 @@
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=535fc13f09d4">
 <link rel="alternate" type="text/markdown" href="/doc/08_bovnar_readwrite_api.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar C Read & Write API", "description": "The Bovnar C reader, writer, and DOM API reference (bovnar.h, bovnar_dom.h), including read-time lossless unit and base conversion.", "url": "https://www.bovnar.io/docs/api/", "mainEntityOfPage": "https://www.bovnar.io/docs/api/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-11-04", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}, "isAccessibleForFree": true, "license": "https://creativecommons.org/licenses/by/4.0/", "copyrightHolder": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar C Read & Write API", "item": "https://www.bovnar.io/docs/api/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar C Read & Write API", "description": "The Bovnar C reader, writer, and DOM API reference (bovnar.h, bovnar_dom.h), including read-time lossless unit and base conversion.", "url": "https://www.bovnar.io/docs/api/", "mainEntityOfPage": "https://www.bovnar.io/docs/api/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-05-14", "dateModified": "2026-11-08", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}, "isAccessibleForFree": true, "license": "https://creativecommons.org/licenses/by/4.0/", "copyrightHolder": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar C Read & Write API", "item": "https://www.bovnar.io/docs/api/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
@@ -63,6 +63,8 @@
 <li>1.11 <a href="#111-bvn_parse_uint64--bvn_parse_int64--bvn_parse_double"><code>bvn_parse_uint64</code> / <code>bvn_parse_int64</code> / <code>bvn_parse_double</code></a></li>
 <li>1.12 <a href="#112-reader-side-unit-policy-bvnr_reader_set_unit_policy">Reader-side unit policy (<code>bvnr_reader_set_unit_policy</code>)</a></li>
 <li>1.13 <a href="#113-refusing-the-binary-half-text_only">Refusing the binary half (<code>text_only</code>)</a></li>
+<li>1.14 <a href="#114-bvnr_source_from_callback"><code>bvnr_source_from_callback</code></a></li>
+<li>1.15 <a href="#115-push-fed-reading-bvnr_open_read_feed">Push-fed reading (<code>bvnr_open_read_feed</code>)</a></li>
 </ul>
 </li>
 <li><a href="#2-writer">Writer</a><ul>
@@ -82,6 +84,7 @@
 <li>2.14 <a href="#214-bvn_type_float_base"><code>BVN_TYPE_FLOAT_BASE</code></a></li>
 <li>2.15 <a href="#215-writer-side-unit-policy-bvnr_writer_set_unit_policy">Writer-side unit policy (<code>bvnr_writer_set_unit_policy</code>)</a></li>
 <li>2.16 <a href="#216-value-helpers">Value helpers</a></li>
+<li>2.17 <a href="#217-bvnr_sink_to_callback"><code>bvnr_sink_to_callback</code></a></li>
 </ul>
 </li>
 <li><a href="#3-shared">Shared</a><ul>
@@ -869,6 +872,103 @@ rather than ignoring it, because that command parses through the DOM, which take
 a unit policy but not the read flags — an assertion silently not in force is
 worse than none.</p>
 <hr />
+<h3 id="114-bvnr_source_from_callback">1.14 <code>bvnr_source_from_callback</code></h3>
+<div class="codehilite"><pre><span></span><code><span class="kt">void</span><span class="w">  </span><span class="nf">bvnr_source_from_callback</span><span class="p">(</span><span class="n">bvnr_source_t</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="n">bvnr_pull_fn</span><span class="w"> </span><span class="n">pull</span><span class="p">,</span>
+<span class="w">                                </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">userdata</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">bvnr_source_get_userdata</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_source_t</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="p">);</span>
+
+<span class="k">typedef</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">bvnr_pull_fn</span><span class="p">)(</span><span class="n">bvnr_source_t</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">buf</span><span class="p">,</span>
+<span class="w">                             </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">want</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="o">*</span><span class="n">got</span><span class="p">);</span>
+</code></pre></div>
+
+<p>Initialise <code>s</code> to read through the caller's own <code>pull</code> function — a socket
+wrapper, a TLS session, a decompressor, a file-like object in a binding. The
+source works wherever an fd or memory source does: <code>bvnr_open_read_source</code>,
+<code>bvnr_doc_stream_read</code>.</p>
+<p><code>pull</code> fills <code>buf</code> with up to <code>want</code> bytes and sets <code>*got</code>. A short read is
+fine; the reader asks again. <code>true</code> with <code>*got == 0</code> is <strong>end of input</strong>, and
+<code>false</code> is an I/O error (<code>error_reading_from_source_fd</code>). A pull source has no
+way to say "nothing yet": a transport that can run dry before the document is
+complete must block inside <code>pull</code>, or be read with the push-fed reader (§1.15)
+instead.</p>
+<p><code>userdata</code> is stored <em>inside</em> the 64-byte <code>bvnr_source_t</code>. The reader works on
+a copy of the source it is given, so the <code>s</code> the callback receives is not the
+caller's variable; the callback recovers its context with
+<code>bvnr_source_get_userdata(s)</code>. The getter returns <code>NULL</code> for a <code>NULL</code> handle and
+for fd and memory sources.</p>
+<div class="codehilite"><pre><span></span><code><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">sock</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="n">conn_t</span><span class="p">;</span>
+
+<span class="k">static</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="nf">sock_pull</span><span class="p">(</span><span class="n">bvnr_source_t</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">want</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="o">*</span><span class="n">got</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">conn_t</span><span class="w"> </span><span class="o">*</span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvnr_source_get_userdata</span><span class="p">(</span><span class="n">s</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">ssize_t</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">recv</span><span class="p">(</span><span class="n">c</span><span class="o">-&gt;</span><span class="n">sock</span><span class="p">,</span><span class="w"> </span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="n">want</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span><span class="w">          </span><span class="cm">/* error_reading_from_source_fd */</span>
+<span class="w">    </span><span class="o">*</span><span class="n">got</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="p">)</span><span class="n">n</span><span class="p">;</span><span class="w">               </span><span class="cm">/* 0: the peer closed, end of input */</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">conn_t</span><span class="w"> </span><span class="n">conn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">sock</span><span class="w"> </span><span class="p">};</span>
+<span class="n">bvnr_source_t</span><span class="w"> </span><span class="n">src</span><span class="p">;</span>
+<span class="n">bvnr_source_from_callback</span><span class="p">(</span><span class="o">&amp;</span><span class="n">src</span><span class="p">,</span><span class="w"> </span><span class="n">sock_pull</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">conn</span><span class="p">);</span>
+<span class="n">bvnr_open_read_source</span><span class="p">(</span><span class="n">r</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">src</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">flags</span><span class="p">);</span>
+<span class="n">bvnr_read</span><span class="p">(</span><span class="n">r</span><span class="p">);</span>
+</code></pre></div>
+
+<hr />
+<h3 id="115-push-fed-reading-bvnr_open_read_feed">1.15 Push-fed reading (<code>bvnr_open_read_feed</code>)</h3>
+<div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_open_read_feed</span><span class="p">(</span><span class="n">bvnr_reader_t</span><span class="w"> </span><span class="o">*</span><span class="n">r</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_sink_t</span><span class="w"> </span><span class="o">*</span><span class="n">src_mirror</span><span class="p">,</span>
+<span class="w">                         </span><span class="n">bvnr_read_flags_t</span><span class="w"> </span><span class="o">*</span><span class="n">options</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_read_feed</span><span class="w">     </span><span class="p">(</span><span class="n">bvnr_reader_t</span><span class="w"> </span><span class="o">*</span><span class="n">r</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">len</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_read_finish</span><span class="w">   </span><span class="p">(</span><span class="n">bvnr_reader_t</span><span class="w"> </span><span class="o">*</span><span class="n">r</span><span class="p">);</span>
+</code></pre></div>
+
+<p>For input that arrives when it arrives — a non-blocking socket, an event loop,
+a binding receiving bytes from elsewhere. <code>bvnr_read</code> <em>pulls</em> until its source
+says end of input; a fed reader is <em>handed</em> bytes, as many times as you like and
+in pieces of any size, and told separately that the document is over.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">bvnr_open_read_feed</span><span class="p">(</span><span class="n">r</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">flags</span><span class="p">);</span>
+<span class="k">while</span><span class="w"> </span><span class="p">((</span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">next_packet</span><span class="p">(</span><span class="n">buf</span><span class="p">))</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">bvnr_read_feed</span><span class="p">(</span><span class="n">r</span><span class="p">,</span><span class="w"> </span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="n">n</span><span class="p">))</span>
+<span class="w">        </span><span class="k">break</span><span class="p">;</span><span class="w">                         </span><span class="cm">/* the read failed: see the getters */</span>
+<span class="kt">bool</span><span class="w"> </span><span class="n">ok</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvnr_read_finish</span><span class="p">(</span><span class="n">r</span><span class="p">);</span><span class="w">         </span><span class="cm">/* the result bvnr_read would give */</span>
+</code></pre></div>
+
+<p><strong>Equivalence.</strong> The callbacks receive exactly the events, in the same order,
+that <code>bvnr_read</code> delivers for the concatenation of everything fed, wherever the
+pieces were cut — inside a token, a multi-byte character or an octet-stream
+chunk — and every error carries the same code, line, column, byte and offset.
+The lexer and validator keep all their state between feeds and buffer nothing
+beyond what one token or one octet chunk needs, so memory stays flat over an
+endless stream. (<code>tests/bovnar_feed_test.c</code> and <code>bvnr_conformance --feed</code> check
+this over the corpus, the examples and the conformance suite, cut at every
+byte.)</p>
+<ul>
+<li><code>bvnr_open_read_feed</code> arms the reader as <code>bvnr_open_read_source</code> does — it may
+  be a reader used before, the unit policy survives — with no source. The
+  optional <code>src_mirror</code> receives the bytes as they are consumed. <code>bvnr_read</code> on
+  a fed reader returns <code>false</code> with <code>error_invalid_argument</code>.</li>
+<li><code>bvnr_read_feed</code> lexes the bytes and returns when they are consumed; the
+  buffer may be reused at once. The first call delivers <code>ev_stream_start</code>. It
+  returns <code>false</code> only when the read has ended in an error — the same errors at
+  the same bytes as <code>bvnr_read</code>, a callback's abort, <code>max_file_size</code> — and
+  <code>true</code> otherwise, including after errors recovered under <code>continue_on_error</code>.
+  <strong>Running out of input is never a feed error.</strong></li>
+<li><code>bvnr_read_finish</code> declares end of input and returns what <code>bvnr_read</code> would:
+  <code>true</code> for a complete document (<code>ev_stream_end</code> delivered),
+  <code>error_got_incomplete_bvnr_stream</code> for one cut off in a value or a struct,
+  <code>error_read_complete_chunk_failed</code> inside an octet stream.</li>
+<li>After an error or a finish the read is over: further calls return <code>false</code> and
+  leave the getters (§1.7) as they were. Re-open to read the next document.</li>
+</ul>
+<p><strong>A stream with metadata.</strong> A document can carry ordinary values before (and
+after) a binary or multiplexed octet stream — <code>.meta = { .codec = "av1"; };</code>
+then <code>.media = &lt;octet stream&gt;</code> — and a fed reader delivers them as it reads
+them, before the first chunk of the stream. For a multiplexed stream, the
+push-fed demultiplexer (<code>bvnr_demux_open_feed</code>, <a href="https://www.bovnar.io/docs/streaming/#32-api">doc/10
+§3.2</a>) does this with the reader built in: the
+metadata goes to your <code>on_verified</code>, or comes out of <code>bvnr_demux_next</code> as events
+ahead of the messages.</p>
+<hr />
 <h2 id="2-writer">2. Writer</h2>
 <p><strong>The writer enforces the streaming tier only.</strong> Each of its checks judges the
 event in front of it — a key, a value against its type and width, a struct or
@@ -1467,6 +1567,40 @@ element, <code>ev_array_row_end</code>).</p>
 <span class="n">bvnr_write_bool</span><span class="w">  </span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;strict&quot;</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span><span class="w">            </span><span class="cm">/*     .strict = true;       */</span>
 <span class="n">bvnr_write_null</span><span class="w">  </span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;owner&quot;</span><span class="p">);</span><span class="w">                   </span><span class="cm">/*     .owner = ;            */</span>
 <span class="n">bvnr_write_struct_end</span><span class="p">(</span><span class="n">w</span><span class="p">);</span><span class="w">                        </span><span class="cm">/* };                        */</span>
+</code></pre></div>
+
+<hr />
+<h3 id="217-bvnr_sink_to_callback">2.17 <code>bvnr_sink_to_callback</code></h3>
+<div class="codehilite"><pre><span></span><code><span class="kt">void</span><span class="w">  </span><span class="nf">bvnr_sink_to_callback</span><span class="p">(</span><span class="n">bvnr_sink_t</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="n">bvnr_push_fn</span><span class="w"> </span><span class="n">push</span><span class="p">,</span>
+<span class="w">                            </span><span class="n">bvnr_flush_fn</span><span class="w"> </span><span class="n">flush</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">userdata</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">bvnr_sink_get_userdata</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_sink_t</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="p">);</span>
+
+<span class="k">typedef</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">bvnr_push_fn</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="n">bvnr_sink_t</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">len</span><span class="p">);</span>
+<span class="k">typedef</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">bvnr_flush_fn</span><span class="p">)(</span><span class="n">bvnr_sink_t</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="p">);</span>
+</code></pre></div>
+
+<p>The writer's twin of §1.14: output goes to the caller's <code>push</code>, which must take
+all <code>len</code> bytes or return <code>false</code>. Usable wherever an fd or memory sink is —
+<code>bvnr_open_write_sink</code>, the reader's mirror, the canonicalising observer,
+<code>bvnr_frame_write</code>.</p>
+<p>It behaves as an fd sink does, not as a memory sink: the writer batches output
+into its 64 KiB buffer and pushes whole blocks, and a refused push is
+<code>error_writing_to_sink</code> (never <code>error_sink_buffer_exhausted</code>).
+<code>bvnr_writer_bytes_written</code> and <code>bvnr_sink_bytes_written</code> count what <code>push</code>
+accepted. <code>flush</code> may be <code>NULL</code>; when set, <code>bvnr_write_finish</code> calls it after the
+last push, and a <code>false</code> from it fails the finish with <code>error_writing_to_sink</code>.</p>
+<p>As with the source, <code>userdata</code> lives inside the 64-byte handle, the writer
+pushes through its own copy, and the callback recovers the pointer with
+<code>bvnr_sink_get_userdata(s)</code>.</p>
+<div class="codehilite"><pre><span></span><code><span class="k">static</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="nf">sock_push</span><span class="p">(</span><span class="n">bvnr_sink_t</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">len</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">conn_t</span><span class="w"> </span><span class="o">*</span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bvnr_sink_get_userdata</span><span class="p">(</span><span class="n">s</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">send_all</span><span class="p">(</span><span class="n">c</span><span class="o">-&gt;</span><span class="n">sock</span><span class="p">,</span><span class="w"> </span><span class="n">buf</span><span class="p">,</span><span class="w"> </span><span class="n">len</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="n">bvnr_sink_t</span><span class="w"> </span><span class="n">sink</span><span class="p">;</span>
+<span class="n">bvnr_sink_to_callback</span><span class="p">(</span><span class="o">&amp;</span><span class="n">sink</span><span class="p">,</span><span class="w"> </span><span class="n">sock_push</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">conn</span><span class="p">);</span>
+<span class="n">bvnr_open_write_sink</span><span class="p">(</span><span class="n">w</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">sink</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span>
 </code></pre></div>
 
 <hr />

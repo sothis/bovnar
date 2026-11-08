@@ -26,6 +26,7 @@ the C library; `import bovnar` itself never loads it.
     - 4.5 [Low-level writer](#45-low-level-writer)
     - 4.6 [Streaming / framing (`bovnar.stream`)](#46-streaming--framing-bovnarstream)
     - 4.7 [Live streams: feeding in pieces](#47-live-streams-feeding-in-pieces)
+    - 4.8 [Live streams: writing a message at a time](#48-live-streams-writing-a-message-at-a-time)
 5. [Unit helpers](#5-unit-helpers)
     - 5.1 [The unit-profile notations (spec 1.2)](#51-the-unit-profile-notations-spec-12)
     - 5.2 [Extended unit functions](#52-extended-unit-functions)
@@ -546,6 +547,96 @@ copied through a callback, which is the factor of about five. Fed in
 microseconds each, twenty of them for a 30 KB message; read from a socket, take
 the largest `recv` the transport offers. A `memoryview` saves the copy only
 where there is one to save, from a few kilobytes up.
+
+### 4.8 Live streams: writing a message at a time
+
+`mux_dump(..., file=)` and `dump_documents(..., file=)` take every message or
+document at once, and the writer behind them gathers its output in a 64 KiB
+buffer, so a reader at the other end of a socket sees nothing until it fills.
+Two objects in `bovnar.stream` write as the messages come instead, each handing
+what it writes to the socket or file before it returns:
+
+| Object | Writes | Per call |
+|---|---|---|
+| `MuxWriter(file, *, key="mux", preamble=None, flush_each=True)` | a document carrying a mux stream, as `mux_dump` writes it | `send(channel, payload)`: one message |
+| `FrameWriter(file, *, flush_each=True)` | a `BVF1` frame stream, as `frame_documents` writes it | `write(document_bytes)` or `dump(obj)`: one framed document |
+
+`file` is a socket (`sendall`) or a binary file object (`write`). `MuxWriter`
+writes the preamble and opens the stream when it is made, and with
+`flush_each=True` it calls `bvnr_write_flush` after every send: the message goes
+to the object, then the object's `flush()` runs when it has one, so a
+`DemuxFeed` at the other end has message N before message N+1 is sent. With
+`flush_each=False` it batches into the 64 KiB buffer, and `flush()` hands over
+what has gathered. `close()` — or leaving the `with` block normally — ends the
+stream and the document; the object stays open. The bytes are `mux_dump`'s for
+the same messages and preamble, however often they were flushed:
+
+```python
+import io
+from bovnar import stream
+
+out = io.BytesIO()
+with stream.MuxWriter(out, key="media",
+                      preamble={"meta": {"codec": "av1"}}) as mux:
+    first_len = len(out.getvalue())     # the preamble is out already
+    mux.send(1, b"frame-1")
+    sent_len = len(out.getvalue())      # and so is the first message
+    mux.send(2, b"audio")
+
+first_len > 0                           # → True
+sent_len > first_len                    # → True
+same = out.getvalue() == stream.mux_dump(
+    [(1, b"frame-1"), (2, b"audio")], key="media",
+    preamble={"meta": {"codec": "av1"}})
+same                                    # → True
+```
+
+Over a socket, the reader is a `DemuxFeed` fed whatever `recv` returns
+(§4.7):
+
+```python
+# check-doc-python: skip
+with stream.MuxWriter(sock, key="media", preamble={"meta": meta}) as mux:
+    for channel, frame in frames():
+        mux.send(channel, frame)        # on the wire when send returns
+```
+
+`FrameWriter` frames each document as it is written; a frame stream has no
+terminator, so `close()` only flushes the object:
+
+```python
+out = io.BytesIO()
+with stream.FrameWriter(out) as frames:
+    frames.dump({"id": 1})
+    frames.write(b'.id = 2;')
+stream.load_documents(out.getvalue())   # → [{'id': 1}, {'id': 2}]
+frames.count                            # → 2
+```
+
+An exception the object raises (a closed socket, a full disk) comes out of the
+call that pushed — the constructor, `send`, `write`, `flush` or `close` —
+unchanged. The writer has failed then: `MuxWriter.close()` only releases it,
+and a `FrameWriter`, which may have written half a frame, refuses further
+documents. Leaving a `MuxWriter`'s `with` block by an exception does not end the
+stream either, so a reader sees it cut off rather than complete.
+`Writer.to_stream(...).flush()` (§12.2) does the same for a document written
+value by value.
+
+**What it costs.** Measured with `python/bench/bench_stream.py` on the machine
+of §4.7, into a socket-like object whose `sendall` takes the bytes, per
+message, median of five runs:
+
+| Path | 150 B | 30 KB | 400 KB |
+|------|------:|------:|-------:|
+| `mux_dump` (batch, to `bytes`) | 7.6 µs | 29 µs | 287 µs |
+| `MuxWriter`, `flush_each=False` | 2.2 µs | 10 µs | 114 µs |
+| `MuxWriter`, flushed per message | 5.5 µs | 12 µs | 126 µs |
+
+A flush per message costs a ctypes call and a Python call of the object's
+`sendall` (with the copy of the bytes it is handed) for every message, against
+one per 64 KiB batched: about 3 µs on a small message, which is the price of
+the reader having it at once. Large messages are dominated by the copy either
+way.
 
 ---
 
@@ -1625,7 +1716,7 @@ to a `DocumentFeed` instead (§4.7).
 | `Writer.to_mem(buf=None, cap=4194304, *, pretty=True, unit_flags=0, emit_version=False)` | Write to an in-process buffer. `buf` may be a pre-allocated `bytearray`; when `None` an internal buffer of size `cap` is allocated. |
 | `Writer.to_fd(fd, *, pretty=True, unit_flags=0, emit_version=False)` | Write to an open POSIX file descriptor. |
 | `Writer.to_file(path, *, pretty=True, unit_flags=0, emit_version=False)` | Open `path` for writing (`O_WRONLY\|O_CREAT\|O_TRUNC`, mode `0o644`) and write to it; the fd is closed when the writer is finished or destroyed. |
-| `Writer.to_stream(stream, *, pretty=True, unit_flags=0, emit_version=False)` | Write to a socket (`sendall`) or a binary file object (`write`, repeated until it has taken every byte). Output is pushed a full 64 KiB buffer at a time and the rest at `finish()`, which then calls the object's `flush` if it has one. An exception the object raises is re-raised from the write call that pushed. |
+| `Writer.to_stream(stream, *, pretty=True, unit_flags=0, emit_version=False)` | Write to a socket (`sendall`) or a binary file object (`write`, repeated until it has taken every byte). Output is pushed a full 64 KiB buffer at a time and the rest at `flush()` or `finish()`, which then call the object's `flush` if it has one. An exception the object raises is re-raised from the write call that pushed. |
 
 All four are used as context managers.  On clean exit (`exc_type is None`)
 the context manager calls `finish()` automatically.
@@ -1643,6 +1734,7 @@ keeps a rescaled float in float shape and writes annotations in one form. `emit_
 |---|---|
 | `w.get_output() -> bytes` | Return the bytes written so far (mem writers only). |
 | `w.bytes_written` | Number of bytes written (all writer modes). |
+| `w.flush()` | Hand everything written so far to the sink now (`bvnr_write_flush`) and call the stream's `flush`, between any two writes; the bytes are the same as without it. A no-op for a memory writer and after `finish()`. |
 | `w.finish()` | Flush and seal the output. Raises `BovnarWriteError` if any struct is still open. |
 | `w.destroy()` | Release the underlying C writer object immediately. |
 
@@ -1890,7 +1982,7 @@ bovnar/
 ├── exceptions.py    # BovnarError hierarchy
 ├── quantity.py      # Quantity — typed, unit-annotated scalar for lossless round-trips
 ├── reader.py        # Reader, EventPayload, UnitPolicy, UnitRule
-├── stream.py        # framing, octet multiplexing, document-in-document, the feeds
+├── stream.py        # framing, octet multiplexing, document-in-document, the feeds, the live writers
 ├── structs.py       # ctypes Structure/Union definitions + ValueUnitPrefix + make_* helpers
 ├── unit.py          # Unit — a ValueUnit with equality, hashing and its operations
 ├── units.py         # unit_to_si_factor, unit_convert_factor, etc.
@@ -1905,6 +1997,7 @@ tests/
 ├── test_stream.py                       # framing, mux, document-in-document
 ├── test_stream_io.py                    # sockets and file objects as sources and sinks
 ├── test_stream_feed.py                  # DocumentFeed, FrameFeed, DemuxFeed, the wire vectors
+├── test_stream_live.py                  # Writer.flush, MuxWriter, FrameWriter
 ├── test_dom.py, test_dom_vs_loads_parity.py   # the DOM, and its agreement with loads()
 ├── test_write_array.py, test_array_parser.py, test_array_roundtrip_fidelity.py
 ├── test_roundtrip_property.py, test_writers_agree.py, test_dumps_directive.py
@@ -1921,7 +2014,7 @@ tests/
 └── test_example_consistency.py          # the shipped examples
 
 bench/
-└── bench_stream.py                      # per-message cost of the fed demux, run by hand
+└── bench_stream.py                      # per-message cost of the fed demux and the live writer, run by hand
 ```
 
 ---

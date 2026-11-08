@@ -142,6 +142,80 @@ BVN_API bool bvnr_doc_stream_read(
 	uint64_t* out_count);
 
 /*
+ * Pull-style calls (bvnr_frame_reader_next, bvnr_demux_next) return one of
+ * these. They exist so that a caller who pays for every callback -- a binding
+ * calling back through an FFI -- can drain everything one feed made available
+ * in a single loop of plain calls.
+ */
+#define BVNR_NEXT_ERROR      (-1)  /* the stream failed; see the *_error getter */
+#define BVNR_NEXT_NONE       0     /* nothing more until more input is fed */
+#define BVNR_NEXT_DOCUMENT   1     /* bvnr_frame_reader_next: a document */
+#define BVNR_NEXT_MESSAGE    1     /* bvnr_demux_next: a multiplexed message */
+#define BVNR_NEXT_EVENT      2     /* bvnr_demux_next: a document event */
+
+/*
+ * Push-fed frame reading: the twin of bvnr_doc_stream_read for input that is
+ * handed over in pieces (bvnr_frame_reader_feed) rather than pulled, so an
+ * endless frame stream on a non-blocking socket costs one reader for its whole
+ * life. Two kinds, chosen at creation:
+ *
+ * bvnr_frame_reader_create(opts) PARSES every document, exactly as
+ * bvnr_doc_stream_read does with the same opts: the same events through
+ * opts->flags, the same on_document calls, the same continue_past_failed and
+ * max_document_size policy (opts may be NULL: validate only). The payload is
+ * streamed into one reused push-fed reader (bvnr_open_read_feed) as it arrives,
+ * so a frame is never buffered whole, however large. opts and *opts->flags are
+ * copied.
+ *
+ * bvnr_frame_reader_create_pull(max_document_size) hands documents out instead,
+ * as bytes, through bvnr_frame_reader_next; the caller parses them as it likes.
+ * A document whose frame lies whole in the fed buffer is handed out from that
+ * buffer without a copy; one split across feeds is gathered into a buffer the
+ * reader owns and reuses (it grows with the bytes that arrive, never to a
+ * declared length up front). Either pointer is valid until the next call on the
+ * reader. max_document_size 0 selects BVNR_DOC_DEFAULT_MAX, as for
+ * bvnr_doc_stream_opts_t.
+ *
+ * bvnr_frame_reader_feed: in parse mode, every frame the bytes complete is
+ * parsed and reported before it returns, and the buffer may be reused then. In
+ * pull mode the bytes are only referenced: they must stay valid until
+ * bvnr_frame_reader_next has returned BVNR_NEXT_NONE, and feeding again before
+ * that returns false and changes nothing. Returns false once the stream has
+ * failed: a bad magic (error_unexpected_input_byte), a declared length over the
+ * cap (error_value_out_of_range), on_document returning false
+ * (error_scanner_callback_failed), or in parse mode a failed document without
+ * continue_past_failed (that document's error code). Running out of input
+ * mid-frame is never a feed error.
+ *
+ * bvnr_frame_reader_next (pull mode only, BVNR_NEXT_ERROR otherwise) returns
+ * BVNR_NEXT_DOCUMENT with the next document in *doc and *len, BVNR_NEXT_NONE when
+ * the fed bytes are used up, or BVNR_NEXT_ERROR.
+ *
+ * bvnr_frame_reader_finish declares end of input: true on a frame boundary,
+ * false with error_got_incomplete_bvnr_stream inside a header or a payload (a
+ * cut-off document is not reported to on_document, as with
+ * bvnr_doc_stream_read), false if the stream had already failed. In pull mode
+ * it refuses, changing nothing, while fed bytes are left undrained.
+ *
+ * bvnr_frame_reader_count is the number of documents seen (parsed or handed
+ * out), bvnr_frame_reader_error the error that ended the stream (error_none
+ * while it has not).
+ */
+typedef struct bvnr_frame_reader_s bvnr_frame_reader_t;
+BVN_API bvnr_frame_reader_t* bvnr_frame_reader_create(
+	const bvnr_doc_stream_opts_t* opts);
+BVN_API bvnr_frame_reader_t* bvnr_frame_reader_create_pull(
+	uint64_t max_document_size);
+BVN_API void bvnr_frame_reader_destroy(bvnr_frame_reader_t* fr);
+BVN_API bool bvnr_frame_reader_feed(bvnr_frame_reader_t* fr,
+	const void* buf, uint64_t len);
+BVN_API int  bvnr_frame_reader_next(bvnr_frame_reader_t* fr,
+	const uint8_t** doc, uint64_t* len);
+BVN_API bool bvnr_frame_reader_finish(bvnr_frame_reader_t* fr);
+BVN_API error_code_t bvnr_frame_reader_error(const bvnr_frame_reader_t* fr);
+BVN_API uint64_t bvnr_frame_reader_count(const bvnr_frame_reader_t* fr);
+
+/*
  * ===========================================================================
  * 3. Octet multiplexing (out-of-band channel convention, cross-chunk)
  * ===========================================================================
@@ -201,7 +275,11 @@ typedef bool (*bvnr_mux_on_msg_fn)(void* userdata, uint64_t channel,
 typedef struct bvnr_demux_s bvnr_demux_t;
 
 /* Create a demultiplexer. on_message is invoked with each fully reassembled
- * message. max_message bounds a single reassembled message (0 selects
+ * message; `data` is valid for the duration of the call only (a message that
+ * lies whole in one octet chunk is passed straight from the chunk, without a
+ * copy). It may be NULL: a push-fed demux is then drained with bvnr_demux_next,
+ * and one installed on a reader drops the messages. max_message bounds a single
+ * reassembled message (0 selects
  * BVNR_MUX_DEFAULT_MAX); a larger declared length is rejected as a desync.
  *
  * The demultiplexer owns one reassembly buffer per channel it has seen; each
@@ -243,8 +321,81 @@ BVN_API bool bvnr_demux_on_event(void* demux, bvnr_event_t ev, bvnr_data_t* d);
 
 /* Last demux error (error_none if clean). error_octet_stream_out_of_sync marks
  * a framing desync; error_value_out_of_range an oversized message; other codes
- * map to the failure observed. */
+ * map to the failure observed. On a push-fed demux, when the demux itself has
+ * none, it is the error of its reader -- the document around the mux stream
+ * was malformed, cut off, or refused by a limit. */
 BVN_API error_code_t bvnr_demux_error(const bvnr_demux_t* dm);
+
+/*
+ * Push-fed demultiplexing: the demux owns a push-fed reader (bvnr_open_read_feed)
+ * and is handed the bytes of the DOCUMENT that carries the mux stream, in
+ * pieces of any size. The key scope, max_message, the 4096-channel limit and
+ * every error code are those of bvnr_demux_on_event; the result is the same as
+ * installing it on a reader of the whole buffer.
+ *
+ * bvnr_demux_open_feed starts a document (call it again for the next one; the
+ * channels and their buffers are kept, the error and all progress reset).
+ * `flags` is copied: its limits and callbacks apply to the document, and its
+ * on_verified, if any, sees EVERY event -- the values before and after the mux
+ * stream as well as the stream's chunks -- before the demux does, so a stream
+ * can be preceded by ordinary values describing it:
+ *
+ *     .meta = { .codec = "av1"; .rate = <float:32,Hz> 30.0; };
+ *     .media = <octet stream carrying the channels>;
+ *
+ * Its userdata is passed to its own callbacks, as usual.
+ *
+ * With an on_message callback (bvnr_demux_create), bvnr_demux_feed delivers
+ * every message the bytes complete before it returns, and the buffer may be
+ * reused then. Without one, bvnr_demux_feed only references the bytes, and the
+ * caller drains them with bvnr_demux_next until it returns BVNR_NEXT_NONE; the
+ * bytes must stay valid until then, and feeding again before that returns false
+ * and changes nothing. bvnr_demux_next returns
+ *
+ *   BVNR_NEXT_MESSAGE  item->channel, item->data, item->length: a message. One
+ *                      that lies whole in the fed buffer is handed out from it
+ *                      without a copy; one split across chunks or feeds is
+ *                      reassembled in the channel's buffer.
+ *   BVNR_NEXT_EVENT    item->event, item->value: a document event (only when
+ *                      opened with deliver_events). Every verified event except
+ *                      the mux stream's chunks, in document order and in order
+ *                      with the messages: the values before the stream, its
+ *                      ev_octet_stream_start, its messages, its
+ *                      ev_octet_stream_end, the values after it, and ev_stream_end
+ *                      once finished. The bvnr_data_t is a copy (its conv.num and
+ *                      conv.den are NULL; conv.text is kept).
+ *   BVNR_NEXT_NONE     the fed bytes are used up.
+ *   BVNR_NEXT_ERROR    the stream failed: bvnr_demux_error says why (events queued
+ *                      before the failure are still handed out first).
+ *
+ * Everything an item points to is valid until the next call on the demux.
+ * bvnr_demux_next on a demux with an on_message callback, or one not opened for
+ * feeding, returns BVNR_NEXT_ERROR.
+ *
+ * bvnr_demux_feed returns false once the stream has failed. bvnr_demux_finish
+ * declares end of input and returns what bvnr_read would for the document: true
+ * when it is complete -- check bvnr_demux_error even then, for a message the
+ * stream's end cut short (error_octet_stream_truncated) -- and false when it is
+ * not. In pull mode it refuses, changing nothing, while fed bytes are left
+ * undrained; after it, bvnr_demux_next hands out the closing events.
+ *
+ * bvnr_demux_get_reader gives the fed reader, for the error position, the
+ * recovery counters and the declared version (NULL before bvnr_demux_open_feed).
+ * Do not install bvnr_demux_on_event of a push-fed demux on another reader.
+ */
+typedef struct bvnr_demux_item_s {
+	uint64_t		channel;
+	const uint8_t*		data;
+	uint64_t		length;
+	bvnr_event_t		event;
+	const bvnr_data_t*	value;
+} bvnr_demux_item_t;
+BVN_API bool bvnr_demux_open_feed(bvnr_demux_t* dm,
+	const bvnr_read_flags_t* flags, bool deliver_events);
+BVN_API bool bvnr_demux_feed(bvnr_demux_t* dm, const void* buf, uint64_t len);
+BVN_API int  bvnr_demux_next(bvnr_demux_t* dm, bvnr_demux_item_t* item);
+BVN_API bool bvnr_demux_finish(bvnr_demux_t* dm);
+BVN_API const bvnr_reader_t* bvnr_demux_get_reader(const bvnr_demux_t* dm);
 
 /*
  * ===========================================================================

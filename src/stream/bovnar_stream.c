@@ -354,6 +354,15 @@ typedef struct demux_channel_s {
 	uint8_t		lvhave;		/* bytes accumulated into lvbuf so far */
 } demux_channel_t;
 
+/* One document event held for bvnr_demux_next. The byte fields of `d` are
+ * copied into the demux's arena and kept as offsets, since the arena may move
+ * while it grows; they become pointers again when the event is handed out. */
+typedef struct demux_event_s {
+	bvnr_event_t	ev;
+	bvnr_data_t	d;
+	size_t		data_off, frac_off, usrc_off, conv_off;
+} demux_event_t;
+
 struct bvnr_demux_s {
 	bvnr_mux_on_msg_fn	on_message;
 	void*			userdata;
@@ -372,6 +381,34 @@ struct bvnr_demux_s {
 	char*			key;
 	uint32_t		key_len;
 	bool			key_match;
+	/*
+	 * Push-fed mode (bvnr_demux_open_feed): the demux owns a fed reader and
+	 * sits on its on_verified, behind the caller's own callback (user_flags).
+	 * Without an on_message callback it is drained with bvnr_demux_next: a mux
+	 * chunk pauses the reader (bvn_lex_pause) and is held in chunk/chunk_len,
+	 * where it stays valid until the reader resumes, and its messages are cut
+	 * out of it one call at a time. With deliver_events, every other event of
+	 * the document is copied into `events` for bvnr_demux_next as well.
+	 */
+	bvnr_reader_t*		reader;
+	bvnr_read_flags_t	user_flags;
+	bool			feeding;
+	bool			deliver_events;
+	bool			failed;
+	bool			finished;
+	bool			has_chunk;
+	uint32_t		chunk_chan;
+	const uint8_t*		chunk;
+	uint32_t		chunk_len;
+	uint32_t		chunk_pos;
+	demux_event_t*		events;
+	uint32_t		ev_count;
+	uint32_t		ev_head;
+	uint32_t		ev_cap;
+	uint8_t*		arena;
+	size_t			arena_len;
+	size_t			arena_cap;
+	bvnr_data_t		shown;
 };
 
 #define BVNR_DEMUX_MAX_CHANNELS  4096u
@@ -395,6 +432,9 @@ void bvnr_demux_destroy(bvnr_demux_t* dm)
 		free(dm->chans[i].buf);
 	free(dm->chans);
 	free(dm->key);
+	bvnr_reader_destroy(dm->reader);
+	free(dm->events);
+	free(dm->arena);
 	free(dm);
 }
 
@@ -426,7 +466,12 @@ bool bvnr_demux_set_key(bvnr_demux_t* dm, const char* key)
 
 error_code_t bvnr_demux_error(const bvnr_demux_t* dm)
 {
-	return dm ? dm->error : error_invalid_argument;
+	if (!dm) return error_invalid_argument;
+	/* In feed mode the read itself can fail -- a malformed document around
+	 * the mux stream -- and that is the error when the demux has none. */
+	if (dm->error == error_none && dm->feeding)
+		return bvnr_reader_get_error(dm->reader);
+	return dm->error;
 }
 
 static demux_channel_t* demux_get_channel(bvnr_demux_t* dm, uint64_t channel)
@@ -453,17 +498,22 @@ static demux_channel_t* demux_get_channel(bvnr_demux_t* dm, uint64_t channel)
 }
 
 /*
- * Consume one chunk fragment belonging to `c`. The fragment is a slice of the
- * channel's logical stream: when no message is active it begins with a
- * varint(msg_len); thereafter it is raw message data. Loops so a fragment that
- * completes one message and starts the next is handled (a future packed
- * producer), though bvnr_mux_send never packs.
+ * Cut the next message for `c` out of a chunk fragment, from *pos. The
+ * fragment is a slice of the channel's logical stream: when no message is
+ * active it begins with a varint(msg_len); thereafter it is raw message data.
+ * Returns 1 with the message in *msg and *msg_len, 0 when the fragment is used up
+ * without completing one (the progress is kept in `c` for the next chunk),
+ * and -1 on a desync, an oversized length or an allocation failure.
+ *
+ * A message that lies whole in the fragment is handed out where it lies; only
+ * one that spans chunks is reassembled in the channel's buffer. Either way it
+ * is valid until the demux moves on.
  */
-static bool demux_feed(bvnr_demux_t* dm, demux_channel_t* c,
-	const uint8_t* frag, uint32_t fraglen)
+static int demux_take(bvnr_demux_t* dm, demux_channel_t* c,
+	const uint8_t* frag, uint32_t fraglen, uint32_t* pos,
+	const uint8_t** msg, uint64_t* msg_len)
 {
-	uint32_t pos = 0;
-	while (pos < fraglen) {
+	while (*pos < fraglen) {
 		if (!c->active) {
 			/* Accumulate the message-length varint, which may itself span
 			 * chunk boundaries: pull continuation bytes into the per-channel
@@ -472,34 +522,42 @@ static bool demux_feed(bvnr_demux_t* dm, demux_channel_t* c,
 			 * whole within one chunk — it is the routing prefix and is read by
 			 * the caller before this function; see bvnr_demux_on_event.) */
 			bool terminated = false;
-			while (pos < fraglen) {
-				uint8_t b = frag[pos++];
+			while (*pos < fraglen) {
+				uint8_t b = frag[(*pos)++];
 				if (c->lvhave >= 10u) {   /* >10 bytes can't fit a uint64 */
 					dm->error = error_octet_stream_out_of_sync;
-					return false;
+					return -1;
 				}
 				c->lvbuf[c->lvhave++] = b;
 				if (!(b & 0x80u)) { terminated = true; break; }
 			}
 			if (!terminated)
-				return true;   /* fragment ended mid-varint: resume next chunk */
+				return 0;   /* fragment ended mid-varint: resume next chunk */
 			uint64_t need = 0;
 			uint32_t used = bvn_varint_decode(c->lvbuf, c->lvhave, &need);
 			/* The accumulated run ends exactly at the terminator, so a clean
 			 * varint consumes every buffered byte; any mismatch (used==0 from an
 			 * overlong 10th byte, or a short decode) is a malformed encoding. */
 			if (used != c->lvhave) {
-				dm->error = error_octet_stream_out_of_sync; return false;
+				dm->error = error_octet_stream_out_of_sync; return -1;
 			}
 			c->lvhave = 0;
 			if (need > dm->max_message) {
-				dm->error = error_value_out_of_range; return false;
+				dm->error = error_value_out_of_range; return -1;
 			}
 			/* SIZE_MAX guard for 32-bit hosts where the uint64 declared length
 			 * can exceed size_t (parity with the doc-stream path); a caller may
 			 * have set max_message above SIZE_MAX. */
 			if (need > (uint64_t)SIZE_MAX) {
-				dm->error = error_value_out_of_range; return false;
+				dm->error = error_value_out_of_range; return -1;
+			}
+			if ((uint64_t)(fraglen - *pos) >= need) {
+				/* Whole in this chunk: no copy. A zero-length message gets
+				 * a pointer into the chunk too, so it is never NULL. */
+				*msg     = frag + *pos;
+				*msg_len = need;
+				*pos    += (uint32_t)need;
+				return 1;
 			}
 			c->need   = need;
 			c->have   = 0;
@@ -509,18 +567,11 @@ static bool demux_feed(bvnr_demux_t* dm, demux_channel_t* c,
 			 * let a single tiny chunk (varint channel + varint len) force an
 			 * allocation of up to max_message — a large memory-amplification
 			 * vector. Instead the buffer grows with the data that actually
-			 * arrives (below), so memory is bounded by real bytes received.
-			 * A zero-length message still needs a non-NULL 1-byte buffer so
-			 * on_message never receives NULL. */
-			if (need == 0 && !c->buf) {
-				c->buf = (uint8_t*)malloc(1u);
-				if (!c->buf) { dm->error = error_invalid_argument; return false; }
-				c->cap = 1u;
-			}
+			 * arrives (below), so memory is bounded by real bytes received. */
 		}
 		uint64_t remaining = c->need - c->have;
-		uint32_t take = (fraglen - pos) < remaining
-			? (fraglen - pos) : (uint32_t)remaining;
+		uint32_t take = (fraglen - *pos) < remaining
+			? (fraglen - *pos) : (uint32_t)remaining;
 		if (take) {
 			/* Grow geometrically toward the data on hand, never past the
 			 * declared length (and never shrinking a larger prior buffer). */
@@ -539,24 +590,62 @@ static bool demux_feed(bvnr_demux_t* dm, demux_channel_t* c,
 				 * (overflow-safe: a plain comparison, not a doubling). */
 				if (newcap > c->need) newcap = c->need;
 				uint8_t* nb = (uint8_t*)realloc(c->buf, (size_t)newcap);
-				if (!nb) { dm->error = error_invalid_argument; return false; }
+				if (!nb) { dm->error = error_invalid_argument; return -1; }
 				c->buf = nb;
 				c->cap = newcap;
 			}
-			memcpy(c->buf + c->have, frag + pos, take);
+			memcpy(c->buf + c->have, frag + *pos, take);
 			c->have += take;
-			pos     += take;
+			*pos    += take;
 		}
 		if (c->have == c->need) {
 			c->active = false;
-			if (dm->on_message &&
-			    !dm->on_message(dm->userdata, c->channel, c->buf, c->need)) {
-				dm->error = error_scanner_callback_failed;
-				return false;
-			}
+			*msg      = c->buf;
+			*msg_len  = c->need;
+			return 1;
 		}
 	}
-	return true;
+	return 0;
+}
+
+/* Every message a fragment completes, to on_message. Loops so a fragment that
+ * completes one message and starts the next is handled (a packed producer),
+ * though bvnr_mux_send never packs. */
+static bool demux_feed(bvnr_demux_t* dm, demux_channel_t* c,
+	const uint8_t* frag, uint32_t fraglen)
+{
+	uint32_t pos = 0;
+	for (;;) {
+		const uint8_t* msg;
+		uint64_t msg_len;
+		int rc = demux_take(dm, c, frag, fraglen, &pos, &msg, &msg_len);
+		if (rc < 0) return false;
+		if (rc == 0) return true;
+		if (dm->on_message &&
+		    !dm->on_message(dm->userdata, c->channel, msg, msg_len)) {
+			dm->error = error_scanner_callback_failed;
+			return false;
+		}
+	}
+}
+
+/* The chunk's routing prefix: which channel it belongs to. NULL (with the
+ * error latched) for a malformed varint or a 4097th channel. */
+static demux_channel_t* demux_chunk_channel(bvnr_demux_t* dm,
+	const bvnr_data_t* d, uint32_t* used)
+{
+	uint64_t channel = 0;
+	*used = bvn_varint_decode((const uint8_t*)d->data, d->length, &channel);
+	if (!*used) { dm->error = error_octet_stream_out_of_sync; return NULL; }
+	return demux_get_channel(dm, channel);
+}
+
+/* Is this event a chunk of a multiplexed octet stream? */
+static bool demux_is_mux_chunk(const bvnr_demux_t* dm, bvnr_event_t ev,
+	const bvnr_data_t* d)
+{
+	return ev == ev_data && dm->in_octet && d &&
+	       d->type == token_is_octet_stream;
 }
 
 bool bvnr_demux_on_event(void* demux, bvnr_event_t ev, bvnr_data_t* d)
@@ -606,19 +695,522 @@ bool bvnr_demux_on_event(void* demux, bvnr_event_t ev, bvnr_data_t* d)
 		}
 		return true;
 	case ev_data:
-		if (dm->in_octet && d && d->type == token_is_octet_stream) {
-			const uint8_t* p = (const uint8_t*)d->data;
-			uint64_t channel = 0;
-			uint32_t used = bvn_varint_decode(p, d->length, &channel);
-			if (!used) { dm->error = error_octet_stream_out_of_sync; return false; }
-			demux_channel_t* c = demux_get_channel(dm, channel);
+		if (demux_is_mux_chunk(dm, ev, d)) {
+			uint32_t used;
+			demux_channel_t* c = demux_chunk_channel(dm, d, &used);
 			if (!c) return false;
-			return demux_feed(dm, c, p + used, d->length - used);
+			return demux_feed(dm, c, (const uint8_t*)d->data + used,
+					  d->length - used);
 		}
 		return true;
 	default:
 		return true;
 	}
+}
+
+/* ---- demultiplexer: push-fed mode ----------------------------------------*/
+
+/* Copy `n` bytes into the arena; *off receives where, SIZE_MAX for "none". */
+static bool demux_arena_put(bvnr_demux_t* dm, const void* p, size_t n,
+	size_t* off)
+{
+	*off = SIZE_MAX;
+	if (!p) return true;
+	if (dm->arena_len + n > dm->arena_cap) {
+		size_t nc = dm->arena_cap ? dm->arena_cap : 4096u;
+		while (nc < dm->arena_len + n) {
+			if (nc > SIZE_MAX / 2u) return false;
+			nc *= 2u;
+		}
+		uint8_t* na = (uint8_t*)realloc(dm->arena, nc);
+		if (!na) return false;
+		dm->arena     = na;
+		dm->arena_cap = nc;
+	}
+	if (n) memcpy(dm->arena + dm->arena_len, p, n);
+	*off = dm->arena_len;
+	dm->arena_len += n;
+	return true;
+}
+
+static bool demux_queue_event(bvnr_demux_t* dm, bvnr_event_t ev,
+	const bvnr_data_t* d)
+{
+	if (dm->ev_count == dm->ev_cap) {
+		uint32_t nc = dm->ev_cap ? dm->ev_cap * 2u : 64u;
+		demux_event_t* ne = (demux_event_t*)realloc(dm->events,
+			(size_t)nc * sizeof(*ne));
+		if (!ne) return false;
+		dm->events = ne;
+		dm->ev_cap = nc;
+	}
+	demux_event_t* e = &dm->events[dm->ev_count];
+	memset(e, 0, sizeof(*e));
+	e->ev = ev;
+	if (d) e->d = *d;
+	/* The conversion's exact rational lives in the reader's scratch and is
+	 * not carried over; its rendered text is. */
+	e->d.conv.num = NULL;
+	e->d.conv.den = NULL;
+	if (!demux_arena_put(dm, d ? d->data : NULL, d ? d->length : 0,
+			     &e->data_off) ||
+	    !demux_arena_put(dm, d ? d->frac_data : NULL,
+			     d ? d->frac_length : 0, &e->frac_off) ||
+	    !demux_arena_put(dm, d ? d->unit_source : NULL,
+			     d ? d->unit_source_length : 0, &e->usrc_off) ||
+	    !demux_arena_put(dm, d ? d->conv.text : NULL,
+			     d && d->conv.text ? (size_t)d->conv.length + 1u : 0,
+			     &e->conv_off))
+		return false;
+	dm->ev_count++;
+	return true;
+}
+
+/*
+ * The fed reader's on_verified. The caller's own callback sees every event
+ * first, unchanged. Then the demux keeps its scope state; a mux chunk is
+ * either demultiplexed on the spot (on_message set) or held, with the reader
+ * paused, for bvnr_demux_next; and with deliver_events every other event is
+ * queued for bvnr_demux_next too.
+ */
+static bool demux_feed_on_verified(void* ud, bvnr_event_t ev, bvnr_data_t* d)
+{
+	bvnr_demux_t* dm = (bvnr_demux_t*)ud;
+	if (dm->user_flags.on_verified &&
+	    !dm->user_flags.on_verified(dm->user_flags.userdata, ev, d))
+		return false;
+	if (dm->on_message)
+		return bvnr_demux_on_event(dm, ev, d);
+	if (demux_is_mux_chunk(dm, ev, d)) {
+		uint32_t used;
+		demux_channel_t* c = demux_chunk_channel(dm, d, &used);
+		if (!c) return false;
+		dm->has_chunk  = true;
+		dm->chunk_chan = (uint32_t)(c - dm->chans);
+		dm->chunk      = (const uint8_t*)d->data;
+		dm->chunk_len  = d->length;
+		dm->chunk_pos  = used;
+		bvn_lex_pause(dm->reader);
+		return true;
+	}
+	if (!bvnr_demux_on_event(dm, ev, d))
+		return false;
+	if (dm->deliver_events && !demux_queue_event(dm, ev, d)) {
+		dm->error = error_invalid_argument;
+		return false;
+	}
+	return true;
+}
+
+static bool demux_feed_on_unverified(void* ud, bvnr_event_t ev,
+	bvnr_data_t* d)
+{
+	bvnr_demux_t* dm = (bvnr_demux_t*)ud;
+	return dm->user_flags.on_unverified(dm->user_flags.userdata, ev, d);
+}
+static void demux_feed_on_error(void* ud, error_code_t err, uint64_t line,
+	uint64_t column, uint32_t byte, uint64_t offset)
+{
+	bvnr_demux_t* dm = (bvnr_demux_t*)ud;
+	dm->user_flags.on_error(dm->user_flags.userdata, err, line, column,
+				byte, offset);
+}
+static bool demux_feed_want_unit(void* ud, const bvnr_data_t* d,
+	value_unit_t* want, uint32_t* want_base)
+{
+	bvnr_demux_t* dm = (bvnr_demux_t*)ud;
+	return dm->user_flags.want_unit(dm->user_flags.userdata, d, want,
+					want_base);
+}
+
+bool bvnr_demux_open_feed(bvnr_demux_t* dm, const bvnr_read_flags_t* flags,
+	bool deliver_events)
+{
+	if (!dm) return false;
+	if (!dm->reader && !(dm->reader = bvnr_reader_create()))
+		return false;
+	bvnr_read_flags_t f;
+	if (flags)
+		f = *flags;
+	else
+		memset(&f, 0, sizeof(f));
+	dm->user_flags  = f;
+	/* The reader has one userdata for all its callbacks, and it is the
+	 * demux; the caller's callbacks are called through it with theirs. */
+	f.userdata      = dm;
+	f.on_verified   = demux_feed_on_verified;
+	f.on_unverified = f.on_unverified ? demux_feed_on_unverified : NULL;
+	f.on_error      = f.on_error ? demux_feed_on_error : NULL;
+	f.want_unit     = f.want_unit ? demux_feed_want_unit : NULL;
+	if (!bvnr_open_read_feed(dm->reader, NULL, &f))
+		return false;
+	/* A new document: whatever the last one left is gone, the channels and
+	 * their buffers stay. */
+	for (uint32_t i = 0; i < dm->nchans; i++) {
+		dm->chans[i].active = false;
+		dm->chans[i].have   = 0;
+		dm->chans[i].need   = 0;
+		dm->chans[i].lvhave = 0;
+	}
+	dm->error          = error_none;
+	dm->in_octet       = false;
+	dm->key_match      = false;
+	dm->feeding        = true;
+	dm->deliver_events = deliver_events && !dm->on_message;
+	dm->failed         = false;
+	dm->finished       = false;
+	dm->has_chunk      = false;
+	dm->ev_count = dm->ev_head = 0;
+	dm->arena_len = 0;
+	return true;
+}
+
+/* Pull mode with something not yet handed out: input the reader has not
+ * reached, a held chunk, or queued events. */
+static bool demux_undrained(const bvnr_demux_t* dm)
+{
+	return dm->has_chunk || dm->ev_head < dm->ev_count ||
+	       bvn_lex_feed_pending(&dm->reader->lex);
+}
+
+bool bvnr_demux_feed(bvnr_demux_t* dm, const void* buf, uint64_t len)
+{
+	if (!dm || !dm->feeding || dm->finished || dm->failed ||
+	    (!buf && len))
+		return false;
+	if (!dm->on_message) {
+		/* Pull mode reads lazily, in bvnr_demux_next, so that a message can
+		 * be handed out from this very buffer. */
+		if (demux_undrained(dm))
+			return false;
+		bvn_lex_feed_attach(dm->reader, (const uint8_t*)buf, len);
+		return true;
+	}
+	bvn_lex_feed_attach(dm->reader, (const uint8_t*)buf, len);
+	if (bvn_lex_feed_run(dm->reader) == BVN_FEED_ERROR) {
+		dm->failed = true;
+		return false;
+	}
+	return true;
+}
+
+int bvnr_demux_next(bvnr_demux_t* dm, bvnr_demux_item_t* item)
+{
+	if (!dm || !item || !dm->feeding || dm->on_message)
+		return BVNR_NEXT_ERROR;
+	for (;;) {
+		if (dm->ev_head < dm->ev_count) {
+			const demux_event_t* e = &dm->events[dm->ev_head++];
+			dm->shown = e->d;
+#define BVN_DM_AT(off) ((off) == SIZE_MAX ? NULL : (const void*)(dm->arena + (off)))
+			dm->shown.data        = BVN_DM_AT(e->data_off);
+			dm->shown.frac_data   = BVN_DM_AT(e->frac_off);
+			dm->shown.unit_source = BVN_DM_AT(e->usrc_off);
+			dm->shown.conv.text   = (const char*)BVN_DM_AT(e->conv_off);
+#undef BVN_DM_AT
+			memset(item, 0, sizeof(*item));
+			item->event = e->ev;
+			item->value = &dm->shown;
+			return BVNR_NEXT_EVENT;
+		}
+		if (dm->has_chunk) {
+			const uint8_t* msg;
+			uint64_t msg_len;
+			demux_channel_t* c = &dm->chans[dm->chunk_chan];
+			int rc = demux_take(dm, c, dm->chunk, dm->chunk_len,
+					    &dm->chunk_pos, &msg, &msg_len);
+			if (rc < 0) {
+				dm->failed    = true;
+				dm->has_chunk = false;
+				return BVNR_NEXT_ERROR;
+			}
+			if (rc > 0) {
+				memset(item, 0, sizeof(*item));
+				item->event   = ev_data;
+				item->channel = c->channel;
+				item->data    = msg;
+				item->length  = msg_len;
+				return BVNR_NEXT_MESSAGE;
+			}
+			dm->has_chunk = false;
+		}
+		/* Everything handed out is now past its "until the next call". */
+		dm->ev_count = dm->ev_head = 0;
+		dm->arena_len = 0;
+		if (dm->failed)
+			return BVNR_NEXT_ERROR;
+		if (!bvn_lex_feed_pending(&dm->reader->lex))
+			return BVNR_NEXT_NONE;
+		/* An error still lets the events queued before it out first. */
+		if (bvn_lex_feed_run(dm->reader) == BVN_FEED_ERROR)
+			dm->failed = true;
+	}
+}
+
+bool bvnr_demux_finish(bvnr_demux_t* dm)
+{
+	if (!dm || !dm->feeding || dm->finished)
+		return false;
+	if (!dm->on_message && !dm->failed && demux_undrained(dm))
+		return false;
+	dm->finished = true;
+	if (dm->failed)
+		return false;
+	if (!bvn_lex_feed_end(dm->reader)) {
+		dm->failed = true;
+		return false;
+	}
+	return true;
+}
+
+const bvnr_reader_t* bvnr_demux_get_reader(const bvnr_demux_t* dm)
+{
+	return dm && dm->feeding ? dm->reader : NULL;
+}
+
+/* ===========================================================================
+ * 2b. Push-fed frame reader
+ * =========================================================================== */
+
+struct bvnr_frame_reader_s {
+	/* Pull mode hands documents out through bvnr_frame_reader_next; parse
+	 * mode parses each with `reader` as bvnr_doc_stream_read does. */
+	bool			pull;
+	bvnr_doc_stream_opts_t	opts;
+	bvnr_read_flags_t	flags;
+	bool			has_flags;
+	uint64_t		cap;
+	bvnr_reader_t*		reader;
+	uint8_t			hdr[BVNR_FRAME_HEADER_SIZE];
+	uint32_t		hdr_have;
+	bool			in_payload;
+	uint64_t		len;
+	uint64_t		have;
+	/* Pull mode: the fed bytes not yet handed out, and the buffer a document
+	 * split across feeds is gathered in. */
+	const uint8_t*		in;
+	uint64_t		in_left;
+	uint8_t*		buf;
+	uint64_t		buf_cap;
+	uint64_t		count;
+	error_code_t		error;
+	bool			failed;
+	bool			finished;
+};
+
+static bvnr_frame_reader_t* frame_reader_new(uint64_t max_document_size)
+{
+	bvnr_frame_reader_t* fr = (bvnr_frame_reader_t*)calloc(1, sizeof(*fr));
+	if (!fr) return NULL;
+	fr->cap   = max_document_size ? max_document_size : BVNR_DOC_DEFAULT_MAX;
+	fr->error = error_none;
+	return fr;
+}
+
+bvnr_frame_reader_t* bvnr_frame_reader_create(
+	const bvnr_doc_stream_opts_t* opts)
+{
+	bvnr_frame_reader_t* fr = frame_reader_new(
+		opts ? opts->max_document_size : 0);
+	if (!fr) return NULL;
+	if (opts) {
+		fr->opts = *opts;
+		if (opts->flags) {
+			fr->flags     = *opts->flags;
+			fr->has_flags = true;
+		}
+	}
+	fr->reader = bvnr_reader_create();
+	if (!fr->reader) { free(fr); return NULL; }
+	return fr;
+}
+
+bvnr_frame_reader_t* bvnr_frame_reader_create_pull(uint64_t max_document_size)
+{
+	bvnr_frame_reader_t* fr = frame_reader_new(max_document_size);
+	if (fr) fr->pull = true;
+	return fr;
+}
+
+void bvnr_frame_reader_destroy(bvnr_frame_reader_t* fr)
+{
+	if (!fr) return;
+	bvnr_reader_destroy(fr->reader);
+	free(fr->buf);
+	free(fr);
+}
+
+static bool frame_fail(bvnr_frame_reader_t* fr, error_code_t err)
+{
+	fr->error  = err;
+	fr->failed = true;
+	return false;
+}
+
+/* Take header bytes from *p; true once the header is whole and accepted. */
+static bool frame_header(bvnr_frame_reader_t* fr, const uint8_t** p,
+	uint64_t* left)
+{
+	uint32_t take = BVNR_FRAME_HEADER_SIZE - fr->hdr_have;
+	if ((uint64_t)take > *left) take = (uint32_t)*left;
+	memcpy(fr->hdr + fr->hdr_have, *p, take);
+	fr->hdr_have += take;
+	*p    += take;
+	*left -= take;
+	if (fr->hdr_have < BVNR_FRAME_HEADER_SIZE)
+		return false;
+	fr->hdr_have = 0;
+	if (fr->hdr[0] != BVNR_FRAME_MAGIC0 || fr->hdr[1] != BVNR_FRAME_MAGIC1 ||
+	    fr->hdr[2] != BVNR_FRAME_MAGIC2 || fr->hdr[3] != BVNR_FRAME_MAGIC3)
+		return frame_fail(fr, error_unexpected_input_byte);
+	fr->len = bvn_get_u64le(fr->hdr + 4);
+	/* As in bvnr_doc_stream_read: the cap is always finite unless the caller
+	 * passed a huge one, and on a 32-bit host a pull-mode document must also
+	 * fit size_t to be gathered. */
+	if (fr->len > fr->cap || (fr->pull && fr->len > (uint64_t)SIZE_MAX))
+		return frame_fail(fr, error_value_out_of_range);
+	fr->have       = 0;
+	fr->in_payload = true;
+	return true;
+}
+
+/* Parse mode: one document is over. Reports it, then applies the sequence
+ * policy of bvnr_doc_stream_read. */
+static bool frame_document_done(bvnr_frame_reader_t* fr)
+{
+	bool ok = bvnr_read_finish(fr->reader);
+	error_code_t err = bvnr_reader_get_error(fr->reader);
+	uint64_t index = fr->count++;
+	fr->in_payload = false;
+	if (fr->opts.on_document &&
+	    !fr->opts.on_document(fr->opts.userdata, index, ok, err))
+		return frame_fail(fr, error_scanner_callback_failed);
+	if (!ok && !fr->opts.continue_past_failed)
+		return frame_fail(fr, err);
+	return true;
+}
+
+bool bvnr_frame_reader_feed(bvnr_frame_reader_t* fr, const void* buf,
+	uint64_t len)
+{
+	if (!fr || fr->failed || fr->finished || (!buf && len))
+		return false;
+	const uint8_t* p = (const uint8_t*)buf;
+	if (fr->pull) {
+		if (fr->in_left)
+			return false;
+		fr->in      = p;
+		fr->in_left = len;
+		return true;
+	}
+	while (len) {
+		if (!fr->in_payload) {
+			if (!frame_header(fr, &p, &len)) {
+				if (fr->failed) return false;
+				continue;
+			}
+			if (!bvnr_open_read_feed(fr->reader, NULL,
+					fr->has_flags ? &fr->flags : NULL))
+				return frame_fail(fr, error_invalid_argument);
+			/* A zero-length frame is an empty document, complete as
+			 * soon as its header is. */
+			if (!fr->len && !frame_document_done(fr))
+				return false;
+			continue;
+		}
+		uint64_t take = fr->len - fr->have;
+		if (take > len) take = len;
+		/* A document that has already failed reads to the end of its frame
+		 * regardless: the frame says where the next one starts. */
+		(void)bvnr_read_feed(fr->reader, p, take);
+		fr->have += take;
+		p   += take;
+		len -= take;
+		if (fr->have == fr->len && !frame_document_done(fr))
+			return false;
+	}
+	return true;
+}
+
+int bvnr_frame_reader_next(bvnr_frame_reader_t* fr, const uint8_t** doc,
+	uint64_t* len)
+{
+	if (!fr || !doc || !len || !fr->pull)
+		return BVNR_NEXT_ERROR;
+	for (;;) {
+		if (fr->failed)
+			return BVNR_NEXT_ERROR;
+		if (!fr->in_payload) {
+			if (!fr->in_left)
+				return BVNR_NEXT_NONE;
+			if (!frame_header(fr, &fr->in, &fr->in_left))
+				continue;
+		}
+		uint64_t want = fr->len - fr->have;
+		if (fr->have == 0 && fr->in_left >= want) {
+			/* Whole in the fed buffer: handed out where it lies. */
+			*doc = fr->len ? fr->in : (const uint8_t*)"";
+			*len = fr->len;
+			fr->in      += want;
+			fr->in_left -= want;
+			fr->in_payload = false;
+			fr->count++;
+			return BVNR_NEXT_DOCUMENT;
+		}
+		if (!fr->in_left)
+			return BVNR_NEXT_NONE;
+		uint64_t take = fr->in_left < want ? fr->in_left : want;
+		if (fr->have + take > fr->buf_cap) {
+			/* Grow with the bytes that actually arrived, never to the
+			 * declared length up front: the length is the sender's word. */
+			uint64_t nc = fr->buf_cap ? fr->buf_cap : 4096u;
+			while (nc < fr->have + take)
+				nc = nc > fr->len / 2u ? fr->len : nc * 2u;
+			uint8_t* nb = (uint8_t*)realloc(fr->buf, (size_t)nc);
+			if (!nb) {
+				frame_fail(fr, error_invalid_argument);
+				return BVNR_NEXT_ERROR;
+			}
+			fr->buf     = nb;
+			fr->buf_cap = nc;
+		}
+		memcpy(fr->buf + fr->have, fr->in, (size_t)take);
+		fr->have    += take;
+		fr->in      += take;
+		fr->in_left -= take;
+		if (fr->have == fr->len) {
+			*doc = fr->buf;
+			*len = fr->len;
+			fr->in_payload = false;
+			fr->count++;
+			return BVNR_NEXT_DOCUMENT;
+		}
+	}
+}
+
+bool bvnr_frame_reader_finish(bvnr_frame_reader_t* fr)
+{
+	if (!fr || fr->finished)
+		return false;
+	if (fr->pull && !fr->failed && fr->in_left)
+		return false;
+	fr->finished = true;
+	if (fr->failed)
+		return false;
+	/* A clean end is one on a frame boundary, before any header byte. */
+	if (fr->hdr_have || fr->in_payload)
+		return frame_fail(fr, error_got_incomplete_bvnr_stream);
+	return true;
+}
+
+error_code_t bvnr_frame_reader_error(const bvnr_frame_reader_t* fr)
+{
+	return fr ? fr->error : error_invalid_argument;
+}
+
+uint64_t bvnr_frame_reader_count(const bvnr_frame_reader_t* fr)
+{
+	return fr ? fr->count : 0;
 }
 
 /* ===========================================================================

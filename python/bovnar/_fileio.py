@@ -131,7 +131,7 @@ class PushSink:
     The bytes are copied out of the writer's buffer before they are handed
     over, so a file object that keeps a reference to what it was given (a
     user-written one may) never holds memory the writer reuses. ``flush``, when
-    the object has one, runs at ``Writer.finish()``.
+    the object has one, runs at ``Writer.flush()`` and ``Writer.finish()``.
     """
 
     __slots__ = ('handle', 'exc', '_push', '_flush')

@@ -149,9 +149,10 @@ class Writer:
                   unit_flags: int = 0, emit_version: bool = False) -> 'Writer':
         """Write to a socket (``sendall``) or a binary file object
         (``write``). The writer batches its output into a 64 KiB buffer and
-        pushes each full buffer, then the rest at :meth:`finish`, which also
-        calls the object's ``flush`` when it has one. An exception the object
-        raises is re-raised from the write call that pushed, unchanged."""
+        pushes each full buffer, then the rest at :meth:`flush` or
+        :meth:`finish`, which also call the object's ``flush`` when it has
+        one. An exception the object raises is re-raised from the write call
+        that pushed, unchanged."""
         sink = PushSink(stream)
         w = cls()
         w._stream = sink
@@ -230,6 +231,21 @@ class Writer:
         self._finished = True
         self._close_owned_fd()
         if not ok:
+            self._raise_error()
+
+    def flush(self) -> None:
+        """Hand everything written so far to the sink now, then call its
+        flush (the object's ``flush()`` for :meth:`to_stream`), instead of
+        when the 64 KiB buffer fills or at :meth:`finish`: what a consumer
+        reading live needs after each record.
+
+        Legal between any two writes, inside an open struct as well; the
+        bytes come out exactly as without it, since a separator owed to the
+        next value stays owed. A no-op for :meth:`to_mem` and after
+        :meth:`finish`."""
+        if self._ptr is None:
+            raise BovnarArgumentError("Writer has been destroyed")
+        if not self._lib.bvnr_write_flush(self._ptr):
             self._raise_error()
 
     def destroy(self) -> None:

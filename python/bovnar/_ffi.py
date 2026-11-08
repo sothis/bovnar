@@ -278,6 +278,9 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvnr_write_finish.restype  = c_bool
     lib.bvnr_write_finish.argtypes = [c_void_p]
 
+    lib.bvnr_write_flush.restype  = c_bool
+    lib.bvnr_write_flush.argtypes = [c_void_p]
+
     lib.bvnr_writer_get_error.restype  = c_int
     lib.bvnr_writer_get_error.argtypes = [c_void_p]
 

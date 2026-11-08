@@ -279,18 +279,15 @@ match Unit::parse("furlong per fortnight") {
   `dump_documents_to`, `load_documents_reader`, `mux_dump_to`,
   `mux_load_reader`, `embed_document_to` and `parse_embedded_reader` take
   any `std::io::Read` / `std::io::Write`; a path is read or written through
-  an opened `std::fs::File`. The C library takes no callback source or
-  sink, so they go through memory: the input is read in full (to one byte
-  past `max_file_size` when it is set, and at most 256 MiB for the DOM, the
-  cap of `bvn_dom_parse_fd`; `parse_reader` and the `stream` readers read
-  with no `max_file_size`, and the stream readers then apply
-  `max_document_size` and `max_message` as their in-memory twins do), and
-  the writer's document is written out by `finish`, from a memory sink of
-  `DEFAULT_MEM_CAP` bytes unless `to_writer_with` sets another; the other
-  writer twins build their output in memory and then write it out. A failing reader or writer is an
-  `Error::Io` with the code the C fd source or sink gives
-  (`reading_from_source_fd`, `writing_to_sink`). No file descriptor is
-  involved, so they work the same on Windows.
+  an opened `std::fs::File`. They stream through the C library's callback
+  sources and sinks: a reader parses as it pulls, so memory stays flat
+  however long the input, and a writer hands its output to the
+  `std::io::Write` in 64 KiB blocks, or at once with `Writer::flush`.
+  `DomDoc::parse_reader` alone still reads its input first (at most 256 MiB,
+  the cap of `bvn_dom_parse_fd`), since the DOM holds the whole document
+  anyway. A failing reader or writer is an `Error::Io` with the code the C
+  source or sink gives (`reading_from_source_fd`, `writing_to_sink`). No
+  file descriptor is involved, so they work the same on Windows.
 - **Exact numbers:** the `Quantity` accessors `decimal`, `fraction`,
   `fixed_point`, `stored_value` and `ieee_bits`; `Decimal` and
   `BigRational`, also as the `Value` variants `Decimal` and `Fraction`,
@@ -329,7 +326,13 @@ match Unit::parse("furlong per fortnight") {
   is written `-0`, which reads back as `0`. From the second trip on the JSON
   is stable.
 - **Streams:** `stream` frames several documents, multiplexes octet
-  channels and embeds documents in documents.
+  channels and embeds documents in documents, a whole input or output at a
+  time. For streams that never end, `codec` writes and reads the framing and
+  the multiplexed channels incrementally in pure Rust, with no allocation per
+  message once warm, a peek to route or skip a message, and a preamble of text
+  values before the stream; `live` feeds documents, frame streams and
+  multiplexed streams of any shape to the C reader in pieces of any size.
+  doc/14 §4.8 and §4.9 have the details.
 - **Threads:** `Reader`, `Writer` and `DomDoc` are `Send` but not `Sync`: as
   `bovnar.h` (THREADING) allows, each can be moved to another thread, and
   distinct ones can be used on distinct threads, but one object must not be

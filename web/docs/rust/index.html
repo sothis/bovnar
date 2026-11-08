@@ -2891,7 +2891,7 @@ named: <code>BINARY</code>, <code>OCTAL</code>, <code>DECIMAL</code>, <code>HEX<
 </code></pre></div>
 
 <p><code>finish()</code> verifies that the struct depth is zero; an unclosed struct fails with
-<code>Error::Write</code> (<code>GotIncompleteBvnrStream</code>).</p>
+<code>Error::Argument</code> before the C library is asked to finish.</p>
 <p>Two more kinds of value go into an open writer, whatever it writes to:</p>
 <table>
 <thead>

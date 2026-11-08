@@ -25002,7 +25002,7 @@ fn main() -> Result<(), bovnar::Error> {
 ```
 
 `finish()` verifies that the struct depth is zero; an unclosed struct fails with
-`Error::Write` (`GotIncompleteBvnrStream`).
+`Error::Argument` before the C library is asked to finish.
 
 Two more kinds of value go into an open writer, whatever it writes to:
 

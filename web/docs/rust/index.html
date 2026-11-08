@@ -76,6 +76,7 @@ enums are Rust enums, and an error carries the library's error kind.</p>
 <li>4.6 <a href="#46-streaming--framing-bovnarstream">Streaming / framing (<code>bovnar::stream</code>)</a></li>
 <li>4.7 <a href="#47-files-and-io-streams-stdioread--write">Files and I/O streams (<code>std::io::Read</code> / <code>Write</code>)</a></li>
 <li>4.8 <a href="#48-live-streams-the-framing-codec-bovnarcodec">Live streams: the framing codec (<code>bovnar::codec</code>)</a></li>
+<li>4.9 <a href="#49-live-documents-through-c-bovnarlive">Live documents through C (<code>bovnar::live</code>)</a></li>
 </ul>
 </li>
 <li><a href="#5-unit-helpers">Unit helpers</a><ul>
@@ -744,7 +745,7 @@ pass it in.</p>
 <span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">(),</span><span class="w"> </span><span class="nb">Box</span><span class="o">&lt;</span><span class="k">dyn</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">error</span><span class="p">::</span><span class="n">Error</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">env</span><span class="p">::</span><span class="n">temp_dir</span><span class="p">().</span><span class="n">join</span><span class="p">(</span><span class="fm">format!</span><span class="p">(</span><span class="s">&quot;bovnar-doc-{}.bvnr&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">process</span><span class="p">::</span><span class="n">id</span><span class="p">()));</span>
 
-<span class="w">    </span><span class="c1">// Write: the document reaches the file when finish() is called</span>
+<span class="w">    </span><span class="c1">// Write: the document streams into the file, the rest on finish()</span>
 <span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">w</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Writer</span><span class="p">::</span><span class="n">to_writer</span><span class="p">(</span><span class="n">std</span><span class="p">::</span><span class="n">fs</span><span class="p">::</span><span class="n">File</span><span class="p">::</span><span class="n">create</span><span class="p">(</span><span class="o">&amp;</span><span class="n">path</span><span class="p">)</span><span class="o">?</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
 <span class="w">    </span><span class="n">w</span><span class="p">.</span><span class="n">write_uint</span><span class="p">(</span><span class="s">&quot;port&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">443</span><span class="p">,</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span><span class="w"> </span><span class="n">Base</span><span class="p">::</span><span class="n">DECIMAL</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
 <span class="w">    </span><span class="n">w</span><span class="p">.</span><span class="n">finish</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
@@ -864,26 +865,37 @@ pass it in.</p>
 </tr>
 </tbody>
 </table>
-<p><strong>They go through memory.</strong> The C library takes no callback source or sink, so
-nothing is streamed incrementally. A reader's input is read in full first —
-to one byte past <code>ReadOptions::max_file_size</code> when that is set, so a document over
-the cap fails with <code>file_too_long</code> at the same offset as <code>read_mem</code> reports, and
-to at most <code>DOM_READ_MAX_BYTES</code> (256 MiB, the cap of <code>bvn_dom_parse_fd</code>) for the
-DOM — and then parsed as <code>read_mem</code> parses it, so the events are the same. The
-plain-value twins (<code>parse_reader</code>, <code>parse_typed_reader</code>) and the <code>stream</code> readers
-read their input to its end with no cap; <code>load_documents_reader</code> and
-<code>mux_load_reader</code> then apply <code>max_document_size</code> and <code>max_message</code> in the parse,
-as their in-memory twins do. The <code>stream</code> writers and <code>write_to</code> serialise first,
-so nothing reaches <code>out</code> when serialising fails; then they write once and flush. A writer puts its
-document together in a memory sink of <code>DEFAULT_MEM_CAP</code> (4 MiB) bytes, or the
-<code>cap</code> of <code>to_writer_with</code>, and <strong><code>finish()</code> writes it to <code>out</code> once and flushes
-it</strong>: nothing reaches <code>out</code> before then. Writing past the cap fails with
-<code>sink_buffer_exhausted</code>, as with <code>Writer::to_mem</code>. <code>out</code> must be
+<p><strong>They stream.</strong> A reader twin hands its <code>Read</code> to the C library as a callback
+source (<code>bvnr_source_from_callback</code>): the library pulls from it as it parses, so
+the events of what has arrived are delivered while the rest is still to come,
+and memory stays flat however long the input is. The results are those of the
+in-memory twin for the same bytes, <code>file_too_long</code> at the same offset for a
+document over <code>ReadOptions::max_file_size</code> and the <code>max_document_size</code> and
+<code>max_message</code> of <code>load_documents_reader</code> and <code>mux_load_reader</code> included. The
+input is read until it reports its end (<code>Ok(0)</code>), so these suit a file, a pipe
+or a blocking socket; for input that is handed over when it arrives, use the
+fed readers of <a href="#49-live-documents-through-c-bovnarlive">§4.9</a>. Only the DOM
+reads its input into memory first, up to <code>DOM_READ_MAX_BYTES</code> (256 MiB, the cap
+of <code>bvn_dom_parse_fd</code>), because it builds the whole document anyway.</p>
+<p>A writer twin, and <code>Writer::to_writer</code>, push the document into <code>out</code> through a
+callback sink (<code>bvnr_sink_to_callback</code>) as it is serialised: the C writer
+batches its output as it does for an fd, so <code>out</code> receives 64 KiB blocks as
+they fill and the rest on <code>finish()</code>, which then flushes <code>out</code> once. The bytes
+are those of the in-memory twin. Since output leaves as it is made, a value
+that cannot be serialised part-way through leaves the blocks before it in
+<code>out</code> (a value that is not a struct at all leaves nothing), and a <code>to_writer</code>
+writer dropped unfinished drops what it still holds. <code>to_writer</code> has no cap on
+the document's size; <code>to_writer_with(out, cap, …)</code> keeps <code>cap</code> as one, and
+writing past it fails with <code>sink_buffer_exhausted</code>, as with <code>Writer::to_mem</code>.
+<code>Writer::get_output()</code> is empty for such a writer. <code>out</code> must be
 <code>Send + 'static</code>; the writer stays <code>Send</code> (<a href="#14-threads">§14</a>).</p>
-<p>A failing <code>input</code> or <code>out</code> is an <code>Error::Io</code> (<a href="#13-error-handling">§13</a>) with the
-code the C library gives an unreadable fd source or unwritable fd sink
-(<code>reading_from_source_fd</code>, <code>writing_to_sink</code>); no event is delivered for a reader
-that failed, because nothing is parsed before the input has been read. No file
+<p>Short reads and writes are continued and <code>Interrupted</code> is retried. A failing
+<code>input</code> or <code>out</code> is an <code>Error::Io</code> (<a href="#13-error-handling">§13</a>) with the code the
+C library gives an unreadable fd source or unwritable fd sink
+(<code>reading_from_source_fd</code>, <code>writing_to_sink</code>), after the events of what had
+arrived, and a <code>to_writer</code> writer reports it from every later call too. A panic
+inside <code>input</code> or <code>out</code> reaches the caller, as one in an event handler does
+(<a href="#13-error-handling">§13</a>); it never unwinds through the C library. No file
 descriptor is involved, so these work the same on Windows.</p>
 <h3 id="48-live-streams-the-framing-codec-bovnarcodec">4.8 Live streams: the framing codec (<code>bovnar::codec</code>)</h3>
 <p>The <code>stream</code> functions of <a href="#46-streaming--framing-bovnarstream">§4.6</a> work on
@@ -1180,6 +1192,369 @@ larger than the cache, every chunk header a 400 KB message has is a cache
 miss, which puts peek and forward at about 145 ns for it, and small messages
 are read as fast as memory delivers them: about 25 ns to read a 150-byte one
 and 29 ns to peek at and skip it. The other figures move little.</p>
+<h3 id="49-live-documents-through-c-bovnarlive">4.9 Live documents through C (<code>bovnar::live</code>)</h3>
+<p>The codec of <a href="#48-live-streams-the-framing-codec-bovnarcodec">§4.8</a> reads the
+framing; it does not parse documents. <code>bovnar::live</code> wraps the C library's
+push-fed readers (<a href="https://www.bovnar.io/docs/streaming/">Streaming</a> §8) for that: they are
+<em>handed</em> bytes in pieces of any size, as they come from a non-blocking socket,
+an event loop, a frame or another document's octet stream, and are told
+separately when the input is over. Each keeps one C object for its whole life,
+so an endless stream costs one setup, and whatever the cuts, the events, values
+and errors are exactly those the batch functions give for the whole input.</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Over</th>
+<th>What comes out</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DocumentFeed</code></td>
+<td><code>bvnr_open_read_feed</code></td>
+<td>the events of <code>Reader::read_mem</code>, from each <code>feed</code> and <code>finish</code></td>
+</tr>
+<tr>
+<td><code>ValueFeed</code></td>
+<td>the same</td>
+<td>each top-level assignment as a <code>Value</code> once it is complete</td>
+</tr>
+<tr>
+<td><code>ValueBuilder</code></td>
+<td>—</td>
+<td>the same from events you hand it (those of a <code>Demux</code>, say)</td>
+</tr>
+<tr>
+<td><code>EmbeddedFeed</code></td>
+<td><code>DocumentFeed</code></td>
+<td>the documents embedded under a key of another document, as their chunks arrive</td>
+</tr>
+<tr>
+<td><code>FrameParser</code></td>
+<td><code>bvnr_frame_reader_create</code></td>
+<td>the events and the result of every framed document</td>
+</tr>
+<tr>
+<td><code>FramePull</code></td>
+<td><code>bvnr_frame_reader_create_pull</code></td>
+<td>each framed document's bytes</td>
+</tr>
+<tr>
+<td><code>Demux</code></td>
+<td><code>bvnr_demux_open_feed</code>, <code>bvnr_demux_next</code></td>
+<td>a multiplexed stream's messages, and the document's own events in order with them</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Documents.</strong> <code>DocumentFeed::new(&amp;options)</code> takes the <code>ReadOptions</code> of a
+<code>Reader</code> (and <code>set_unit_policy</code> its policy). <code>feed(bytes, handler)</code> delivers the
+events those bytes complete before it returns, so the buffer can be reused at
+once; running out of input is never an error there. <code>finish(handler)</code> declares
+the end: a document cut off fails there, with the code and position
+<code>read_mem</code> reports. <code>reset()</code> starts the next document on the same reader. An
+error ends the document, and every later <code>feed</code> or <code>finish</code> returns it until
+<code>reset()</code>. <code>ValueFeed</code> does the same and appends to a <code>Vec</code> each assignment the
+bytes complete, those before an error included: a scalar, a struct or an octet
+stream with its last event, an array (which a <code>/</code> may still continue) with the
+event after it. A key assigned twice comes twice, and nothing is kept once it is
+handed out, so an endless document is read in constant memory.</p>
+<div class="codehilite"><pre><span></span><code><span class="k">use</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">live</span><span class="p">::</span><span class="n">ValueFeed</span><span class="p">;</span>
+<span class="k">use</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::{</span><span class="n">ReadOptions</span><span class="p">,</span><span class="w"> </span><span class="n">Value</span><span class="p">};</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">(),</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">Error</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// An endless document arriving from a socket, cut anywhere</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">pieces</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="o">&amp;</span><span class="p">[</span><span class="kt">u8</span><span class="p">];</span><span class="w"> </span><span class="mi">4</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s">b&quot;.temp = 21&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">b&quot;.5; .unit = </span><span class="se">\&quot;</span><span class="s">C</span><span class="se">\&quot;</span><span class="s">; .te&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">b&quot;mp = 22.0;&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">b&quot; .tag = [1, 2];&quot;</span><span class="p">];</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">feed</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ValueFeed</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ReadOptions</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">got</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Vec</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="n">piece</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">pieces</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">feed</span><span class="p">.</span><span class="n">feed</span><span class="p">(</span><span class="n">piece</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">got</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">got</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="w"> </span><span class="p">(</span><span class="s">&quot;temp&quot;</span><span class="p">.</span><span class="n">to_string</span><span class="p">(),</span><span class="w"> </span><span class="n">Value</span><span class="p">::</span><span class="n">Float</span><span class="p">(</span><span class="mf">21.5</span><span class="p">)));</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">got</span><span class="p">.</span><span class="n">len</span><span class="p">(),</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;the array may still go on&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="n">feed</span><span class="p">.</span><span class="n">finish</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">got</span><span class="p">)</span><span class="o">?</span><span class="p">;</span><span class="w"> </span><span class="c1">// the end of the document completes it</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">got</span><span class="p">[</span><span class="mi">3</span><span class="p">].</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;tag&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Frames.</strong> <code>FramePull</code> hands out each framed document's bytes, to be parsed
+by a reused <code>DocumentFeed</code> or <code>ValueFeed</code> (or <code>parse</code>); <code>codec::FrameReader</code>
+does the same in pure Rust. <code>FrameParser::new(&amp;options, continue_past_failed,
+max_document_size)</code> parses every document as <code>stream::load_documents</code> does,
+streaming each frame's payload into one reused reader so that a frame is never
+held whole: <code>feed(bytes, on_event, on_document)</code> calls <code>on_document(index,
+result)</code> for each document it completes. A bad magic is
+<code>unexpected_input_byte</code>, a frame over the cap <code>value_out_of_range</code>, a stream
+that does not end on a frame boundary <code>got_incomplete_bvnr_stream</code> at <code>finish</code>.</p>
+<div class="codehilite"><pre><span></span><code><span class="k">use</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">live</span><span class="p">::{</span><span class="n">FramePull</span><span class="p">,</span><span class="w"> </span><span class="n">ValueFeed</span><span class="p">};</span>
+<span class="k">use</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::{</span><span class="n">ReadOptions</span><span class="p">,</span><span class="w"> </span><span class="n">stream</span><span class="p">};</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">(),</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">Error</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">wire</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">stream</span><span class="p">::</span><span class="n">frame_documents</span><span class="p">(</span><span class="o">&amp;</span><span class="p">[</span><span class="o">&amp;</span><span class="s">b&quot;.id = 1;&quot;</span><span class="p">[</span><span class="o">..</span><span class="p">],</span><span class="w"> </span><span class="s">b&quot;.id = 2;&quot;</span><span class="p">])</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">frames</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">FramePull</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">values</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ValueFeed</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ReadOptions</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Vec</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="n">piece</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">wire</span><span class="p">.</span><span class="n">chunks</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">piece</span><span class="p">;</span>
+<span class="w">        </span><span class="k">while</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="n">doc</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">frames</span><span class="p">.</span><span class="n">next</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">input</span><span class="p">)</span><span class="o">?</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">values</span><span class="p">.</span><span class="n">reset</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+<span class="w">            </span><span class="n">values</span><span class="p">.</span><span class="n">feed</span><span class="p">(</span><span class="n">doc</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">ids</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">            </span><span class="n">values</span><span class="p">.</span><span class="n">finish</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">ids</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">frames</span><span class="p">.</span><span class="n">finish</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">ids</span><span class="p">.</span><span class="n">len</span><span class="p">(),</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span>
+<span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Multiplexed streams.</strong> <code>Demux::new(&amp;DemuxOptions { max_message, key,
+deliver_events, read })</code> reads the document that carries the stream, with the
+key scope, <code>max_message</code>, the 4096-channel limit and every error of
+<code>stream::mux_load</code>. Each <code>next</code> returns a <code>DemuxItem::Message { channel,
+payload }</code> or, with <code>deliver_events</code>, a <code>DemuxItem::Event</code> for every event but
+the stream's chunks, in document order: the metadata before the stream comes
+out before its first message, and a <code>ValueBuilder</code> makes values of it. After
+<code>finish()</code>, <code>next</code> on an empty slice hands out the closing events; <code>reset()</code>
+starts the next document, keeping the channels and their buffers.</p>
+<div class="codehilite"><pre><span></span><code><span class="k">use</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">live</span><span class="p">::{</span><span class="n">Demux</span><span class="p">,</span><span class="w"> </span><span class="n">DemuxItem</span><span class="p">,</span><span class="w"> </span><span class="n">DemuxOptions</span><span class="p">,</span><span class="w"> </span><span class="n">ValueBuilder</span><span class="p">};</span>
+<span class="k">use</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">Writer</span><span class="p">;</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">(),</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">Error</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Metadata, the stream, and a value after it, as a C writer writes them</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">w</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Writer</span><span class="p">::</span><span class="n">to_mem</span><span class="p">(</span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">w</span><span class="p">.</span><span class="n">begin_struct</span><span class="p">(</span><span class="s">&quot;meta&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">w</span><span class="p">.</span><span class="n">write_string</span><span class="p">(</span><span class="s">&quot;codec&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;av1&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">w</span><span class="p">.</span><span class="n">end_struct</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">w</span><span class="p">.</span><span class="n">mux_begin</span><span class="p">(</span><span class="s">&quot;media&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">w</span><span class="p">.</span><span class="n">mux_send</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">b&quot;key frame&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">w</span><span class="p">.</span><span class="n">mux_send</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s">b&quot;audio&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">w</span><span class="p">.</span><span class="n">mux_end</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">w</span><span class="p">.</span><span class="n">write_bool</span><span class="p">(</span><span class="s">&quot;complete&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="n">w</span><span class="p">.</span><span class="n">finish</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">wire</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">get_output</span><span class="p">().</span><span class="n">to_vec</span><span class="p">();</span>
+
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">options</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DemuxOptions</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">key</span><span class="p">:</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="s">&quot;media&quot;</span><span class="p">.</span><span class="n">into</span><span class="p">()),</span><span class="w"> </span><span class="n">deliver_events</span><span class="p">:</span><span class="w"> </span><span class="nc">true</span><span class="p">,</span><span class="w"> </span><span class="o">..</span><span class="n">DemuxOptions</span><span class="p">::</span><span class="n">default</span><span class="p">()</span><span class="w"> </span><span class="p">};</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">demux</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Demux</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="o">&amp;</span><span class="n">options</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">meta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ValueBuilder</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="kc">false</span><span class="p">);</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">messages</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Vec</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="n">piece</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">wire</span><span class="p">.</span><span class="n">chunks</span><span class="p">(</span><span class="mi">6</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">piece</span><span class="p">;</span>
+<span class="w">        </span><span class="k">while</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="n">item</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">demux</span><span class="p">.</span><span class="n">next</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">input</span><span class="p">)</span><span class="o">?</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="k">match</span><span class="w"> </span><span class="n">item</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="n">DemuxItem</span><span class="p">::</span><span class="n">Event</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">meta</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="o">&amp;</span><span class="n">e</span><span class="p">.</span><span class="n">data</span><span class="p">()),</span>
+<span class="w">                </span><span class="n">DemuxItem</span><span class="p">::</span><span class="n">Message</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">channel</span><span class="p">,</span><span class="w"> </span><span class="n">payload</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                    </span><span class="k">if</span><span class="w"> </span><span class="n">messages</span><span class="p">.</span><span class="n">is_empty</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                        </span><span class="c1">// Everything before the stream is here already</span>
+<span class="w">                        </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">meta</span><span class="p">.</span><span class="n">drain</span><span class="p">().</span><span class="n">next</span><span class="p">().</span><span class="n">map</span><span class="p">(</span><span class="o">|</span><span class="p">(</span><span class="n">k</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="p">)</span><span class="o">|</span><span class="w"> </span><span class="n">k</span><span class="p">).</span><span class="n">as_deref</span><span class="p">(),</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="s">&quot;meta&quot;</span><span class="p">));</span>
+<span class="w">                    </span><span class="p">}</span>
+<span class="w">                    </span><span class="n">messages</span><span class="p">.</span><span class="n">push</span><span class="p">((</span><span class="n">channel</span><span class="p">,</span><span class="w"> </span><span class="n">payload</span><span class="p">.</span><span class="n">to_vec</span><span class="p">()));</span>
+<span class="w">                </span><span class="p">}</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">demux</span><span class="p">.</span><span class="n">finish</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="n">item</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">demux</span><span class="p">.</span><span class="n">next</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="o">&amp;</span><span class="p">[][</span><span class="o">..</span><span class="p">])</span><span class="o">?</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="n">DemuxItem</span><span class="p">::</span><span class="n">Event</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">item</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">meta</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="o">&amp;</span><span class="n">e</span><span class="p">.</span><span class="n">data</span><span class="p">());</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">messages</span><span class="p">,</span><span class="w"> </span><span class="p">[(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">b&quot;key frame&quot;</span><span class="p">.</span><span class="n">to_vec</span><span class="p">()),</span><span class="w"> </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s">b&quot;audio&quot;</span><span class="p">.</span><span class="n">to_vec</span><span class="p">())]);</span>
+<span class="w">    </span><span class="fm">assert!</span><span class="p">(</span><span class="n">meta</span><span class="p">.</span><span class="n">drain</span><span class="p">().</span><span class="n">any</span><span class="p">(</span><span class="o">|</span><span class="p">(</span><span class="n">k</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="p">)</span><span class="o">|</span><span class="w"> </span><span class="n">k</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s">&quot;complete&quot;</span><span class="p">));</span>
+<span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Draining.</strong> <code>FramePull::next</code> and <code>Demux::next</code> take <code>&amp;mut &amp;[u8]</code>, the bytes
+not yet read, as the codec's readers do, and return one item per call. An item
+that lies whole in the input is borrowed from it without a copy; one that spans
+pieces or chunks is gathered in a buffer the reader keeps and reuses. Either way
+it borrows the reader until the next call, which the borrow checker enforces.
+The C object keeps a pointer into the bytes until they are drained, so pass the
+same slice to every call until one returns <code>None</code> (which empties it): the slice
+is not shortened meanwhile, another one is refused with an <code>Error::Argument</code>, and
+so is <code>finish()</code> while bytes are left. A warm <code>Demux</code> or <code>FramePull</code> allocates
+nothing per message or document.</p>
+<p><strong>Embedded documents.</strong> <code>Writer::embed_document(key, doc)</code> puts a document into
+an open writer (<a href="#115-struct-helpers">§11.5</a>), one after another into a
+<code>to_writer</code> stream if you like. To read them while the outer document arrives,
+hand its events to an <code>EmbeddedFeed</code>: it feeds each embedded document's chunks
+to one reused <code>DocumentFeed</code> as they come and returns the document's value, or
+its error, when its octet stream closes; <code>stream::parse_embedded</code> gathers the
+bytes and starts a reader for every document instead.</p>
+<div class="codehilite"><pre><span></span><code><span class="k">use</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">live</span><span class="p">::{</span><span class="n">DocumentFeed</span><span class="p">,</span><span class="w"> </span><span class="n">EmbeddedFeed</span><span class="p">};</span>
+<span class="k">use</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::{</span><span class="n">EventData</span><span class="p">,</span><span class="w"> </span><span class="n">ReadOptions</span><span class="p">,</span><span class="w"> </span><span class="n">Value</span><span class="p">,</span><span class="w"> </span><span class="n">Writer</span><span class="p">};</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">(),</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">Error</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">w</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Writer</span><span class="p">::</span><span class="n">to_mem</span><span class="p">(</span><span class="mi">4096</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="mi">1</span><span class="o">..=</span><span class="mi">3</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">w</span><span class="p">.</span><span class="n">embed_document</span><span class="p">(</span><span class="s">&quot;payload&quot;</span><span class="p">,</span><span class="w"> </span><span class="fm">format!</span><span class="p">(</span><span class="s">&quot;.n = {n};&quot;</span><span class="p">).</span><span class="n">as_bytes</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">w</span><span class="p">.</span><span class="n">finish</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">outer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">w</span><span class="p">.</span><span class="n">get_output</span><span class="p">().</span><span class="n">to_vec</span><span class="p">();</span>
+
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">embedded</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">EmbeddedFeed</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="s">&quot;payload&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">docs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Vec</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">on_event</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">|</span><span class="n">d</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="nc">EventData</span><span class="o">&lt;&#39;</span><span class="nb">_</span><span class="o">&gt;|</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">docs</span><span class="p">.</span><span class="n">extend</span><span class="p">(</span><span class="n">embedded</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="n">d</span><span class="p">));</span>
+<span class="w">        </span><span class="kc">true</span>
+<span class="w">    </span><span class="p">};</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">feed</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DocumentFeed</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="o">&amp;</span><span class="n">ReadOptions</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="n">piece</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">outer</span><span class="p">.</span><span class="n">chunks</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">feed</span><span class="p">.</span><span class="n">feed</span><span class="p">(</span><span class="n">piece</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">on_event</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">feed</span><span class="p">.</span><span class="n">finish</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">on_event</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">docs</span><span class="p">.</span><span class="n">len</span><span class="p">(),</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">docs</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="nb">Ok</span><span class="p">(</span><span class="n">Value</span><span class="p">::</span><span class="n">Struct</span><span class="p">(</span><span class="fm">vec!</span><span class="p">[(</span><span class="s">&quot;n&quot;</span><span class="p">.</span><span class="n">into</span><span class="p">(),</span><span class="w"> </span><span class="n">Value</span><span class="p">::</span><span class="n">Int</span><span class="p">(</span><span class="mi">3</span><span class="p">))])));</span>
+<span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong><code>live::Demux</code> or <code>codec::MuxReader</code>?</strong> Both read a multiplexed stream as it
+arrives, with the C demultiplexer's limits and error codes.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><code>codec::MuxReader</code></th>
+<th><code>live::Demux</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Implementation</td>
+<td>pure Rust, no C call per message</td>
+<td>the C parser over the whole document</td>
+</tr>
+<tr>
+<td>Document shape</td>
+<td>one octet stream, after an optional text preamble, ending the document</td>
+<td>any: values before and after the stream, other octet streams beside it (<code>key</code>)</td>
+</tr>
+<tr>
+<td>The values around the stream</td>
+<td>the preamble's bytes, parsed on request</td>
+<td>every event, in order with the messages</td>
+</tr>
+<tr>
+<td>Limits and policy</td>
+<td><code>max_message</code>, the preamble cap</td>
+<td><code>max_message</code> and every <code>ReadOptions</code> limit, unit policies</td>
+</tr>
+<tr>
+<td>Extras</td>
+<td>peek, skip and forward a message without gathering it</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Use it for</td>
+<td>a dedicated stream, a router or a relay</td>
+<td>documents of any other shape, or when the values around the stream matter</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Errors</strong> are those of the batch functions for the same input, as
+<code>Error::Parse</code>: with a position when the document failed, the demultiplexer's
+code alone (<code>octet_stream_out_of_sync</code>, <code>value_out_of_range</code>,
+<code>octet_stream_truncated</code>) when the stream did, as <code>mux_load</code> reports them. A
+frame reader's errors carry no position, as <code>load_documents</code>' do not. A panic in
+a handler reaches the caller, as for <code>Reader</code> (<a href="#13-error-handling">§13</a>).</p>
+<p><strong>What it costs</strong>, from <code>cargo bench --bench live</code>: a release build pinned to
+one core (<code>taskset -c 4</code>) of the same i7-2700K as §4.8, load average about 2;
+the median of three runs, each the median of nine passes. The input is a few
+MiB held in the cache; <em>pieces</em> feeds it in 1460-byte pieces, a TCP segment's
+payload, so most messages and documents straddle a feed. Per message:</p>
+<table>
+<thead>
+<tr>
+<th>Message</th>
+<th><code>Demux</code> whole</th>
+<th><code>Demux</code> pieces</th>
+<th>with <code>deliver_events</code></th>
+<th><code>mux_load</code></th>
+<th><code>MuxReader</code> whole</th>
+<th><code>MuxReader</code> pieces</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>150 B</td>
+<td>90 ns</td>
+<td>98 ns</td>
+<td>90 ns</td>
+<td>136 ns</td>
+<td>8 ns</td>
+<td>15 ns</td>
+</tr>
+<tr>
+<td>30 KB</td>
+<td>138 ns</td>
+<td>2.1 µs</td>
+<td>168 ns</td>
+<td>3.5 µs</td>
+<td>10 ns</td>
+<td>1.8 µs</td>
+</tr>
+<tr>
+<td>400 KB</td>
+<td>26 µs</td>
+<td>48 µs</td>
+<td>28 µs</td>
+<td>72 µs</td>
+<td>25 µs</td>
+<td>29 µs</td>
+</tr>
+</tbody>
+</table>
+<p>A message whole in the fed buffer is borrowed, so its cost does not grow with
+its size; one that straddles a feed or spans chunks is gathered, and copying it
+is most of the cost, in the codec as in the demux. <code>mux_load</code> copies every
+message into a <code>Vec</code>. The codec is about ten times cheaper per small message:
+no C call and no grammar. Per document (a struct of integers and strings per
+line, an octet stream every 512 lines), with the throughput in brackets:</p>
+<table>
+<thead>
+<tr>
+<th>Document</th>
+<th><code>DocumentFeed</code> whole</th>
+<th><code>DocumentFeed</code> pieces</th>
+<th><code>Reader::read_mem</code></th>
+<th><code>ValueFeed</code></th>
+<th><code>parse</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>196 B</td>
+<td>18 µs (11 MB/s)</td>
+<td>19 µs (10 MB/s)</td>
+<td>19 µs (11 MB/s)</td>
+<td>22 µs (9 MB/s)</td>
+<td>29 µs (7 MB/s)</td>
+</tr>
+<tr>
+<td>32 KB</td>
+<td>2.2 ms (14 MB/s)</td>
+<td>2.2 ms (14 MB/s)</td>
+<td>2.2 ms (15 MB/s)</td>
+<td>2.8 ms (12 MB/s)</td>
+<td>3.1 ms (10 MB/s)</td>
+</tr>
+<tr>
+<td>402 KB</td>
+<td>28 ms (14 MB/s)</td>
+<td>28 ms (14 MB/s)</td>
+<td>27 ms (15 MB/s)</td>
+<td>33 ms (12 MB/s)</td>
+<td>113 ms (4 MB/s)</td>
+</tr>
+</tbody>
+</table>
+<p>Feeding costs what reading the whole buffer costs, wherever the pieces are cut:
+the time is the parser's. <code>ValueFeed</code> hands each assignment out as it
+completes, where <code>parse</code> looks up every key in the document built so far,
+which is what costs it the most on a document of many keys.</p>
 <hr />
 <h2 id="5-unit-helpers">5. Unit helpers</h2>
 <p>The unit functions live in the <code>bovnar::units</code> module; <code>Unit</code> itself is at the
@@ -2376,11 +2751,11 @@ and <code>recovery_count()</code> is how to tell that any were (spec §13.4).</p
 </tr>
 <tr>
 <td><code>Writer::to_writer(out, pretty)</code></td>
-<td>Write to any <code>std::io::Write</code>: the document is put together in a memory sink of <code>DEFAULT_MEM_CAP</code> bytes and <code>finish()</code> writes it to <code>out</code> and flushes it</td>
+<td>Write to any <code>std::io::Write</code>: the document streams into <code>out</code> in 64 KiB blocks as it is written, the rest on <code>finish()</code>, which flushes <code>out</code>; no cap on its size</td>
 </tr>
 <tr>
 <td><code>Writer::to_writer_with(out, cap, pretty, unit_flags, emit_version)</code></td>
-<td><code>to_writer</code> with a sink of <code>cap</code> bytes, plus <code>unit_flags</code> and <code>emit_version</code> as in <code>to_mem_with</code></td>
+<td><code>to_writer</code> for a document of at most <code>cap</code> bytes (<code>sink_buffer_exhausted</code> past it), plus <code>unit_flags</code> and <code>emit_version</code> as in <code>to_mem_with</code></td>
 </tr>
 </tbody>
 </table>
@@ -2403,7 +2778,7 @@ the size until the output fits (up to 256 MiB).</p>
 <tbody>
 <tr>
 <td><code>w.get_output() -&gt; &amp;[u8]</code></td>
-<td>The document written so far</td>
+<td>The document written so far; empty for a <code>to_writer</code> writer, whose output has gone to its <code>std::io::Write</code></td>
 </tr>
 <tr>
 <td><code>Writer::bytes_written -&gt; u64</code></td>
@@ -2411,7 +2786,7 @@ the size until the output fits (up to 256 MiB).</p>
 </tr>
 <tr>
 <td><code>w.finish()</code></td>
-<td>Flush and seal the output. Fails with <code>Error::Write</code> if any struct is still open. For a <code>to_writer</code> writer it also writes the document to its <code>std::io::Write</code>, once</td>
+<td>Flush and seal the output. Fails with <code>Error::Write</code> if any struct is still open. For a <code>to_writer</code> writer it also pushes what the writer still holds to its <code>std::io::Write</code> and flushes it</td>
 </tr>
 </tbody>
 </table>
@@ -2512,6 +2887,29 @@ named: <code>BINARY</code>, <code>OCTAL</code>, <code>DECIMAL</code>, <code>HEX<
 
 <p><code>finish()</code> verifies that the struct depth is zero; an unclosed struct fails with
 <code>Error::Write</code> (<code>GotIncompleteBvnrStream</code>).</p>
+<p>Two more kinds of value go into an open writer, whatever it writes to:</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Writes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>w.embed_document(key, doc)</code></td>
+<td><code>.key = &lt;octets&gt;;</code> holding the document <code>doc</code> (<code>bvnr_embed_document</code>), for <code>stream::parse_embedded</code> or <code>live::EmbeddedFeed</code> to read back</td>
+</tr>
+<tr>
+<td><code>w.mux_begin(key)</code>, <code>w.mux_send(channel, payload)</code>, <code>w.mux_end()</code></td>
+<td>a multiplexed octet stream under <code>key</code> (<code>bvnr_mux_begin</code> / <code>_send</code> / <code>_end</code>), the bytes of <code>stream::mux_dump</code>; values written before it are read back before its first message, and the document may go on after it</td>
+</tr>
+</tbody>
+</table>
+<p>On a <code>to_writer</code> writer a message reaches <code>out</code> when the writer's 64 KiB block
+fills or the document is finished: there is no C call to push a block early.
+For a stream whose every message must go out at once, write it with
+<code>codec::MuxWriter</code> (<a href="#48-live-streams-the-framing-codec-bovnarcodec">§4.8</a>).</p>
 <h3 id="116-version-directive">11.6 Version directive</h3>
 <div class="codehilite"><pre><span></span><code><span class="k">use</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">Writer</span><span class="p">;</span>
 
@@ -2932,6 +3330,8 @@ or writer holds the whole parse or serialise state of one stream.</p>
 <span class="p">}</span>
 </code></pre></div>
 
+<p>The <code>live</code> readers (<a href="#49-live-documents-through-c-bovnarlive">§4.9</a>) are <code>Send</code>
+and not <code>Sync</code> too: each owns one C object for its stream.</p>
 <p><code>parse</code>, <code>parse_typed</code>, <code>to_string</code>, their <code>_reader</code> / <code>write_to</code> twins and the <code>units</code>, <code>currency</code> and <code>json</code>
 functions are free functions that build their own reader, writer or DOM for each
 call, so no two calls share an object and they can run on several threads at
@@ -2993,8 +3393,9 @@ with clang:</p>
 │   ├── dom.rs        # DomDoc, DomNode, DomType — random-access DOM
 │   ├── enums.rs      # Rust enums mirroring the C enums
 │   ├── error.rs      # Error, ErrorKind, Position
-│   ├── io.rs         # reads a caller&#39;s std::io::Read for read_reader / parse_reader
+│   ├── io.rs         # a caller&#39;s std::io::Read as a callback source for read_reader / parse_reader
 │   ├── json.rs       # from_json / to_json / detect (the CLI&#39;s `bovnar convert`)
+│   ├── live.rs       # DocumentFeed, ValueFeed, EmbeddedFeed, FrameParser, FramePull, Demux — fed reading through C
 │   ├── quantity.rs   # Quantity — typed, unit-annotated scalar for lossless round-trips
 │   ├── reader.rs     # Reader, ReadOptions, EventData, EventPayload, UnitPolicy, UnitRule
 │   ├── stream.rs     # framing, octet multiplexing, document-in-document
@@ -3002,7 +3403,7 @@ with clang:</p>
 │   ├── units.rs      # unit_to_si_factor, unit_convert_factor, etc.
 │   └── writer.rs     # Writer, Base, Signedness, EmitSpec
 ├── tests/            # one integration-test file per topic, plus smoke.rs
-├── benches/          # codec.rs: per-message figures of the framing codec (std only)
+├── benches/          # codec.rs, live.rs: per-message figures of the codec and the fed readers (std only)
 └── fuzz/             # cargo-fuzz targets
 </code></pre></div>
 
@@ -3071,8 +3472,12 @@ with clang:</p>
 <td>the incremental framing codec in pure Rust: <code>MuxWriter</code>, <code>MuxReader</code>, <code>FrameReader</code>, the frame writers</td>
 </tr>
 <tr>
+<td><code>src/live.rs</code></td>
+<td>fed reading through the C library: <code>DocumentFeed</code>, <code>ValueFeed</code>, <code>ValueBuilder</code>, <code>EmbeddedFeed</code>, <code>FrameParser</code>, <code>FramePull</code>, <code>Demux</code></td>
+</tr>
+<tr>
 <td><code>src/io.rs</code></td>
-<td>the <code>std::io::Read</code> and <code>Write</code> helpers behind the <code>_reader</code> and <code>_to</code> entry points</td>
+<td>the <code>std::io::Read</code> helpers behind the <code>_reader</code> entry points (the sinks of the <code>_to</code> ones are in <code>ffi.rs</code> and <code>writer.rs</code>)</td>
 </tr>
 <tr>
 <td><code>src/json.rs</code></td>

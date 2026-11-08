@@ -124,6 +124,12 @@ offset bvnr_doc_stream_opts_t.userdata 8 8
 offset bvnr_doc_stream_opts_t.on_document 16 8
 offset bvnr_doc_stream_opts_t.continue_past_failed 24 1
 offset bvnr_doc_stream_opts_t.max_document_size 32 8
+size bvnr_demux_item_t 40
+offset bvnr_demux_item_t.channel 0 8
+offset bvnr_demux_item_t.data 8 8
+offset bvnr_demux_item_t.length 16 8
+offset bvnr_demux_item_t.event 24 4
+offset bvnr_demux_item_t.value 32 8
 size bvn_gregorian_date_t 40
 offset bvn_gregorian_date_t.year 0 8
 offset bvn_gregorian_date_t.month 8 8
@@ -728,6 +734,11 @@ const BVNR_FRAME_MAGIC2 70
 const BVNR_FRAME_MAGIC3 49
 const BVNR_FRAME_HEADER_SIZE 12
 const BVNR_DOC_DEFAULT_MAX 268435456
+const BVNR_NEXT_ERROR -1
+const BVNR_NEXT_NONE 0
+const BVNR_NEXT_DOCUMENT 1
+const BVNR_NEXT_MESSAGE 1
+const BVNR_NEXT_EVENT 2
 const BVNR_MUX_MAX_MESSAGE 65516
 const BVNR_MUX_DEFAULT_MAX 67108864
 const BVN_MJD_OFFSET 678881
@@ -1010,14 +1021,28 @@ func bvnr_datetime_epoch_name const char * (value_type_spec_t)
 func bvnr_demux_create bvnr_demux_t * (bvnr_mux_on_msg_fn, void *, uint64_t)
 func bvnr_demux_destroy void (bvnr_demux_t *)
 func bvnr_demux_error error_code_t (const bvnr_demux_t *)
+func bvnr_demux_feed _Bool (bvnr_demux_t *, const void *, uint64_t)
+func bvnr_demux_finish _Bool (bvnr_demux_t *)
+func bvnr_demux_get_reader const bvnr_reader_t * (const bvnr_demux_t *)
+func bvnr_demux_next int (bvnr_demux_t *, bvnr_demux_item_t *)
 func bvnr_demux_on_event _Bool (void *, bvnr_event_t, bvnr_data_t *)
+func bvnr_demux_open_feed _Bool (bvnr_demux_t *, const bvnr_read_flags_t *, _Bool)
 func bvnr_demux_set_key _Bool (bvnr_demux_t *, const char *)
 func bvnr_doc_stream_read _Bool (bvnr_source_t *, const bvnr_doc_stream_opts_t *, uint64_t *)
 func bvnr_embed_document _Bool (bvnr_writer_t *, const char *, const void *, uint64_t)
+func bvnr_frame_reader_count uint64_t (const bvnr_frame_reader_t *)
+func bvnr_frame_reader_create bvnr_frame_reader_t * (const bvnr_doc_stream_opts_t *)
+func bvnr_frame_reader_create_pull bvnr_frame_reader_t * (uint64_t)
+func bvnr_frame_reader_destroy void (bvnr_frame_reader_t *)
+func bvnr_frame_reader_error error_code_t (const bvnr_frame_reader_t *)
+func bvnr_frame_reader_feed _Bool (bvnr_frame_reader_t *, const void *, uint64_t)
+func bvnr_frame_reader_finish _Bool (bvnr_frame_reader_t *)
+func bvnr_frame_reader_next int (bvnr_frame_reader_t *, const uint8_t * *, uint64_t *)
 func bvnr_frame_write _Bool (bvnr_sink_t *, const void *, uint64_t)
 func bvnr_mux_begin _Bool (bvnr_writer_t *, const char *)
 func bvnr_mux_end _Bool (bvnr_writer_t *)
 func bvnr_mux_send _Bool (bvnr_writer_t *, uint64_t, const void *, uint64_t)
+func bvnr_open_read_feed _Bool (bvnr_reader_t *, const bvnr_sink_t *, bvnr_read_flags_t *)
 func bvnr_open_read_mem _Bool (bvnr_reader_t *, const void *, uint64_t, void *, uint64_t, bvnr_read_flags_t *)
 func bvnr_open_read_source _Bool (bvnr_reader_t *, const bvnr_source_t *, const bvnr_sink_t *, bvnr_read_flags_t *)
 func bvnr_open_write_mem _Bool (bvnr_writer_t *, void *, uint64_t, _Bool, bvnr_write_flags_t *)
@@ -1025,6 +1050,8 @@ func bvnr_open_write_sink _Bool (bvnr_writer_t *, const bvnr_sink_t *, _Bool, bv
 func bvnr_parse_embedded _Bool (const void *, uint64_t, bvnr_read_flags_t *)
 func bvnr_peek_version _Bool (const void *, uint64_t, uint16_t *, uint16_t *)
 func bvnr_read _Bool (bvnr_reader_t *)
+func bvnr_read_feed _Bool (bvnr_reader_t *, const void *, uint64_t)
+func bvnr_read_finish _Bool (bvnr_reader_t *)
 func bvnr_reader_create bvnr_reader_t * (void)
 func bvnr_reader_destroy void (bvnr_reader_t *)
 func bvnr_reader_get_declared_version _Bool (const bvnr_reader_t *, uint16_t *, uint16_t *)
@@ -1037,10 +1064,14 @@ func bvnr_reader_get_recovery_count uint64_t (const bvnr_reader_t *)
 func bvnr_reader_get_skipped_bytes uint64_t (const bvnr_reader_t *)
 func bvnr_reader_set_unit_policy _Bool (bvnr_reader_t *, const bvnr_unit_policy_t *)
 func bvnr_sink_bytes_written uint64_t (const bvnr_sink_t *)
+func bvnr_sink_get_userdata void * (const bvnr_sink_t *)
+func bvnr_sink_to_callback void (bvnr_sink_t *, bvnr_push_fn, bvnr_flush_fn, void *)
 func bvnr_sink_to_fd void (bvnr_sink_t *, int)
 func bvnr_sink_to_mem void (bvnr_sink_t *, void *, uint64_t)
+func bvnr_source_from_callback void (bvnr_source_t *, bvnr_pull_fn, void *)
 func bvnr_source_from_fd void (bvnr_source_t *, int)
 func bvnr_source_from_mem void (bvnr_source_t *, const void *, uint64_t)
+func bvnr_source_get_userdata void * (const bvnr_source_t *)
 func bvnr_spec_version void (uint16_t *, uint16_t *)
 func bvnr_version uint32_t (void)
 func bvnr_version_string const char * (void)

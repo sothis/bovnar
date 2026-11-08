@@ -41,3 +41,10 @@ path = "fuzz_targets/codec.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "live"
+path = "fuzz_targets/live.rs"
+test = false
+doc = false
+bench = false

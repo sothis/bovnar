@@ -139,6 +139,12 @@ LP64), so there is no layout change and no `BVNR_ABI_MAJOR` bump.
 
 ### 5. Conformance
 
+**Status 2026-11-08:** a minimal shared set ships first (`tests/stream_vectors/`:
+a preamble plus mux stream, the same without preamble, a small frame stream,
+three invalid vectors), checked by the C demux, the Rust codec and
+`live::Demux`, the C and Rust writers byte for byte, and the CLI. It covers
+what the first consumer (Mumcord) relies on. **Still open:** the full set below.
+
 Shared vectors across C, Rust and Python, each side reading the others'
 output and `bovnar frames list` / `bovnar mux list` reading all of it:
 input split at every byte, a 65536-byte chunk (length field 0), messages over

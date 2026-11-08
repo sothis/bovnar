@@ -619,3 +619,55 @@ class TestSocketFeed:
         a.close()
         b.close()
         assert got == [Value('meta', {'codec': 'av1'}), (1, b'x' * 5000), (2, b'y')]
+
+
+# ---------------------------------------------------------------------------
+# Fixes from the streaming review
+# ---------------------------------------------------------------------------
+class TestReviewFixes:
+    def test_a_view_keeps_its_feed_alive(self):
+        # A reassembled message is viewed in the demux's own buffer: dropping
+        # the feed must not free that buffer under the view.
+        big = bytes(range(256)) * 800
+        dm = DemuxFeed(view=True)
+        first = next(iter(dm.feed(stream.mux_dump([(1, big)]))))
+        del dm
+        import gc
+        gc.collect()
+        assert bytes(first.payload) == big
+
+    def test_a_buffer_made_from_a_view_is_detected(self):
+        dm = DemuxFeed(view=True)
+        it = dm.feed(stream.mux_dump([(1, b'x' * 70000), (2, b'y' * 70000)]))
+        first = next(it)
+        held = memoryview(first.payload)          # no export on the view
+        with pytest.raises(BovnarArgumentError):
+            next(it)
+        assert bytes(held[:1]) == b'x'
+        del held
+        assert next(it).channel == 2              # the call can be repeated
+        dm.close()
+
+    def test_close_with_a_buffer_alive_defers_the_free(self):
+        fr = FrameFeed(view=True)
+        wire = stream.frame_documents([b'.a = 1;'])
+        it = fr.feed(bytearray(wire[:5]))
+        assert list(it) == []
+        doc = next(iter(fr.feed(bytearray(wire[5:]))))
+        held = memoryview(doc)
+        fr.close()                                # does not raise
+        assert bytes(held) == b'.a = 1;'
+        del held, doc
+
+    def test_a_failed_document_raises_from_the_iteration(self):
+        wire = stream.frame_documents([b'.a = 1;', b'.b = = 1;', b'.c = 3;'])
+        fr = FrameFeed(parse=True)
+        it = fr.feed(wire)                        # does not raise
+        assert next(it) == {'a': 1}
+        with pytest.raises(BovnarParseError):
+            next(it)
+        assert list(it) == []
+
+    def test_an_int_is_not_a_payload(self):
+        with pytest.raises(BovnarArgumentError):
+            stream.frame_documents([5])

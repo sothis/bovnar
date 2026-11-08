@@ -290,3 +290,57 @@ class TestSourcesAndSinks:
                 a.close()
                 b.close()
             assert got in (_OBJ, [{"a": 1}, {"b": 2}])
+
+
+class TestReviewFixes:
+    def test_a_readinto_that_overclaims_is_refused(self):
+        class Liar:
+            def readinto(self, b):
+                b[:6] = b'.a = 1'
+                return len(b) + 1000
+        with pytest.raises(BovnarArgumentError):
+            stream.load_documents(Liar())
+
+    def test_a_write_that_returns_none_took_everything(self):
+        class Collect:
+            def __init__(self):
+                self.data = []
+
+            def write(self, b):
+                self.data.append(b.decode('ascii', 'replace'))  # bytes, not a view
+        out = Collect()
+        bovnar.dump({'a': 1}, out)
+        assert bovnar.loads(''.join(out.data).encode()) == {'a': 1}
+
+    def test_a_write_that_takes_nothing_is_an_error(self):
+        class Stuck:
+            def write(self, b):
+                return 0
+        with pytest.raises(BovnarArgumentError):
+            bovnar.dump({'a': 1}, Stuck())
+
+    def test_frames_to_a_file_are_flushed(self):
+        class Buffered(io.BytesIO):
+            flushed = 0
+
+            def flush(self):
+                self.flushed += 1
+        out = Buffered()
+        stream.frame_documents([b'.a = 1;'], file=out)
+        assert out.flushed == 1
+
+    def test_a_transport_error_is_raised_once(self):
+        class Broken:
+            def write(self, b):
+                raise ConnectionResetError('gone')
+        mw = None
+        with pytest.raises(ConnectionResetError):
+            mw = stream.MuxWriter(Broken())
+        sink = Broken()
+        mw = stream.MuxWriter(sink, flush_each=False)
+        with pytest.raises(ConnectionResetError):
+            mw.send(1, b'x' * 70000)              # fills the 64 KiB block
+        with pytest.raises(bovnar.BovnarWriteError) as later:
+            mw.send(1, b'y')
+        assert isinstance(later.value.__cause__, ConnectionResetError)
+        mw.close()

@@ -111,6 +111,10 @@ class PullSource:
                         "the source is non-blocking and has no data yet; a "
                         "pull source cannot wait for it -- feed the bytes to "
                         "a DocumentFeed or DemuxFeed instead")
+                if type(n) is not int or not 0 <= n <= want:
+                    raise BovnarArgumentError(
+                        f"{type(obj).__name__} reported reading {n!r} bytes "
+                        f"into a buffer of {want}")
                 got[0] = n
                 return True
             except BaseException as exc:            # noqa: BLE001 (re-raised by the caller)
@@ -142,6 +146,9 @@ class PushSink:
         sendall = getattr(obj, 'sendall', None)
         write = getattr(obj, 'write', None)
         flush = getattr(obj, 'flush', None)
+        # Only a raw file object's None means "nothing taken, would block";
+        # a duck-typed writer that returns None has taken everything.
+        raw = isinstance(obj, io.RawIOBase)
         if sendall is None and write is None:
             raise BovnarArgumentError(
                 f"cannot write to {type(obj).__name__}: it has no sendall or "
@@ -153,13 +160,21 @@ class PushSink:
                 if sendall is not None:
                     sendall(data)
                     return True
-                view = memoryview(data)
-                while view:
-                    k = write(view)
+                # bytes for the first write, as a caller of write() expects;
+                # a memoryview of the rest only after a short write.
+                rest = data
+                while rest:
+                    k = write(rest)
                     if k is None:
-                        raise BlockingIOError(
-                            "the sink is non-blocking and took nothing")
-                    view = view[k:]
+                        if raw:
+                            raise BlockingIOError(
+                                "the sink is non-blocking and took nothing")
+                        return True
+                    if type(k) is not int or not 0 < k <= len(rest):
+                        raise BovnarArgumentError(
+                            f"{type(obj).__name__}.write() of {len(rest)} "
+                            f"bytes returned {k!r}")
+                    rest = memoryview(rest)[k:]
                 return True
             except BaseException as exc:            # noqa: BLE001 (re-raised by the caller)
                 if self.exc is None:

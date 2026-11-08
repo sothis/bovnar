@@ -904,13 +904,23 @@ class Writer:
 
     def _raise_error(self) -> None:
         # A stream writer's sink fails because its object raised; that
-        # exception is the error, not the error_writing_to_sink it became.
+        # exception is the error, not the error_writing_to_sink it became. It
+        # is raised once, from the call that pushed: a later call on the failed
+        # writer raises the latched BovnarWriteError, chained to it, so it does
+        # not look like a second failure of the transport.
+        cause = None
         if self._stream is not None and self._stream.exc is not None:
-            raise self._stream.exc
+            exc, self._stream.exc = self._stream.exc, None
+            self._stream_failure = exc
+            raise exc
+        if self._stream is not None:
+            cause = getattr(self, '_stream_failure', None)
         code   = ErrorCode(self._lib.bvnr_writer_get_error(self._ptr))
         offset = self._lib.bvnr_writer_get_error_offset(self._ptr)
         msg_b  = self._lib.bvn_error_to_string(int(code))
         msg    = msg_b.decode('utf-8') if msg_b else ''
+        if cause is not None:
+            raise BovnarWriteError(code, offset, msg) from cause
         raise BovnarWriteError(code, offset, msg)
 
 

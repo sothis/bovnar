@@ -54,6 +54,7 @@ callback source and sink instead of holding the whole input or output.
 """
 
 import ctypes
+import weakref
 from collections import deque
 from functools import lru_cache
 from typing import Iterable, NamedTuple
@@ -103,6 +104,10 @@ _NEXT_EVENT = 2
 def _as_bytes(x) -> bytes:
     if isinstance(x, str):
         return x.encode('utf-8')
+    # bytes(5) is five NUL bytes, never what a payload of 5 meant.
+    if isinstance(x, int):
+        raise BovnarArgumentError(
+            f"a payload is bytes-like or str, not {type(x).__name__}")
     return bytes(x)
 
 
@@ -135,6 +140,11 @@ def frame_documents(docs: Iterable[bytes], *, file=None) -> bytes | None:
                     raise out.exc
                 raise BovnarWriteError(ErrorCode.WRITING_TO_SINK,
                                        message="bvnr_frame_write failed")
+        # As the document dumpers do at finish: what the object buffers
+        # reaches its destination before this returns.
+        flush = getattr(file, 'flush', None)
+        if flush is not None:
+            flush()
         return None
     blobs = [_as_bytes(d) for d in docs]
     total = sum(12 + len(b) for b in blobs)
@@ -660,6 +670,8 @@ class _Feed:
         self._lib      = get_library()
         self._queue    = deque()
         self._view     = None
+        self._view_mem = None
+        self._failure  = None     # an error kept for the iteration to raise
         self._finished = False
         self._closed   = False
 
@@ -672,6 +684,9 @@ class _Feed:
             self._release()
         if self._queue:
             return self._queue.popleft()
+        if self._failure is not None:
+            exc, self._failure = self._failure, None
+            raise exc
         item = self._pull()
         if item is None:
             raise StopIteration
@@ -684,25 +699,45 @@ class _Feed:
     # -- memoryview lifetime -----------------------------------------------
     def _hand_out(self, ptr: int, n: int) -> memoryview:
         # Read-only, as a view of the fed bytes is: the memory is the demux's.
-        view = memoryview((ctypes.c_ubyte * n).from_address(ptr)).toreadonly() \
-            if n else memoryview(b'')
+        if not n:
+            view = memoryview(b'')
+        else:
+            mem = (ctypes.c_ubyte * n).from_address(ptr)
+            # Whatever is made from the view (memoryview(view),
+            # numpy.frombuffer(view)) keeps `mem` alive, and `mem` keeps the
+            # feed, so the C memory is not freed under it; the weak reference
+            # tells whether anything still points there.
+            mem._bvnr_owner = self
+            self._view_mem = weakref.ref(mem)
+            view = memoryview(mem).toreadonly()
         self._view = view
         return view
+
+    def _view_in_use(self) -> bool:
+        """Release the last view; true when something made from it is alive."""
+        try:
+            self._view.release()
+        except BufferError:
+            return True
+        self._view = None
+        if self._view_mem is not None and self._view_mem() is not None:
+            return True
+        self._view_mem = None
+        return False
 
     def _release(self) -> None:
         # The view is over memory C reuses at the next call. Releasing it makes
         # any later use of it raise ValueError instead of reading that memory.
-        # A buffer someone took FROM it (np.frombuffer, a second memoryview's
-        # export) would keep pointing there, so that is refused: the stream is
-        # left as it was, and the call can be repeated once the export is gone.
-        try:
-            self._view.release()
-        except BufferError:
+        # A buffer made FROM it (a held export, memoryview(view),
+        # numpy.frombuffer(view)) would keep pointing there, so the call is
+        # refused: the stream is left as it was, and the call can be repeated
+        # once that buffer is gone.
+        if self._view_in_use():
             raise BovnarArgumentError(
-                "the memoryview of the previous item is still exported (a "
-                "buffer was made from it and is alive); copy it with "
-                "bytes(view) and drop the buffer before the next call") from None
-        self._view = None
+                "a buffer made from the memoryview of the previous item is "
+                "still alive (memoryview(view), numpy.frombuffer(view), an "
+                "export); copy it with bytes(view) and drop the buffer before "
+                "the next call") from None
 
     # -- life cycle --------------------------------------------------------
     def _check_open(self) -> None:
@@ -713,13 +748,17 @@ class _Feed:
                 f"{type(self).__name__} has been finished")
 
     def close(self) -> None:
-        """Release the C object. Safe to call twice."""
+        """Release the C object. Safe to call twice.
+
+        While a buffer made from the last memoryview is still alive, the C
+        object is released when that buffer goes, not now: the feed is closed
+        either way."""
         if self._closed:
             return
-        if self._view is not None:
-            self._release()
         self._closed = True
         self._queue.clear()
+        if self._view is not None and self._view_in_use():
+            return
         self._destroy()
 
     def _destroy(self) -> None:
@@ -732,9 +771,10 @@ class _Feed:
         self.close()
 
     def __del__(self):
-        # Never raise from a finaliser, and free the C object even when a view
-        # is still out: the object is unreachable, so nothing can read it more.
-        if getattr(self, '_closed', True):
+        # Never raise from a finaliser. A view's memory keeps the feed alive
+        # (_hand_out), so when this runs nothing points into the C object any
+        # more, and it is freed whether or not close() was called.
+        if not hasattr(self, '_closed'):
             return
         self._view = None
         self._closed = True
@@ -935,7 +975,10 @@ class FrameFeed(_Feed):
         def on_document(_ud, index, ok, err):
             st = self._state
             try:
-                self._queue.append(st['parser'].result() if ok else None)
+                # Without continue_past_failed a failed document is the
+                # stream's error, not an item.
+                if ok or self._continue:
+                    self._queue.append(st['parser'].result() if ok else None)
                 if not ok and st['index'] is None:
                     st['index'], st['err'] = int(index), int(err)
                 st['parser'] = new_parser()
@@ -978,7 +1021,14 @@ class FrameFeed(_Feed):
             return self
         buf = data if isinstance(data, bytes) else _held_bytes(data)
         ok = self._lib.bvnr_frame_reader_feed(self._fr, buf, len(buf))
-        self._check_parse(ok)
+        # The documents this feed completed before the stream's error come
+        # out first; the iteration that reaches the error raises it. (An
+        # exception from a callback is not the stream's: it propagates now.)
+        try:
+            self._check_parse(ok)
+        except BovnarParseError as exc:
+            if self._failure is None:
+                self._failure = exc
         return self
 
     def _check_parse(self, ok: bool) -> None:

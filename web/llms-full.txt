@@ -16388,7 +16388,9 @@ Two kinds, chosen when it is created:
   `bvnr_doc_stream_read` parses it with the same `opts` — the same events through
   `opts->flags`, the same `on_document` calls, `continue_past_failed` and
   `max_document_size`. Each payload is streamed into a reused push-fed reader as
-  its bytes arrive, so a frame is never buffered whole, however large.
+  its bytes arrive, so a frame is never buffered whole, however large; the
+  reader keeps its buffers from one document to the next, so once warm the
+  frame reader allocates nothing per document.
 - **Pull** (`bvnr_frame_reader_create_pull`): the documents are handed out as
   bytes by `bvnr_frame_reader_next`, for the caller to parse as it likes. A
   document whose frame lies whole in the fed buffer is handed out from that
@@ -16762,9 +16764,26 @@ point.
 A message that fits one chunk and arrives in one feed is handed out without
 touching its bytes, which is why the 30 KB column falls by a factor of thirty.
 Fed in small pieces, a chunk is gathered before it is passed on, and a message
-split over chunks is reassembled: one copy each. `bvnr_mux_send`,
+split over chunks is reassembled: one copy each.
+
+Per framed document, a 43-byte one and a 30 KB one of numbers and strings:
+
+| Path | 43 B | 30 KB |
+|------|-----:|------:|
+| `bvnr_doc_stream_read` (2.0.2: the reader's buffers and the payload allocated per document) | 5.6 µs | 757 µs |
+| `bvnr_doc_stream_read` (buffers kept across documents) | 2.4 µs | 758 µs |
+| parsing frame reader, one feed | 2.2 µs | 766 µs |
+| parsing frame reader, 1460 B feeds | 2.3 µs | 764 µs |
+
+Re-opening a reader for the next document used to free its frame stack and
+scratch buffers and allocate them again, about 120 KB zeroed, and to copy the
+13 KB unit policy out of the validator and back while clearing it: more than a
+small document costs to parse, and the frame reader paid it too (5.5 µs for the
+43-byte document). A 30 KB document is dominated by its parse. `bvnr_mux_send`,
 `bvnr_demux_next` and `bvnr_frame_reader_next` allocate nothing per message once
-warm (`tests/bovnar_alloc_test.c`).
+warm, nor the parsing frame reader and a re-opened fed demux per document; a
+`bvnr_doc_stream_read` call allocates the same whatever the number of documents
+(`tests/bovnar_alloc_test.c`).
 
 ---
 

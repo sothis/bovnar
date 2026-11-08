@@ -230,6 +230,18 @@ API and implements spec 1.2.
   that has itself failed is still not pushed again. `bvnr_feed_test` now
   requires the callback sink's bytes to equal the memory sink's for every
   corpus document, finished or not (doc/08 §2.9).
+- **The single-file amalgamation builds under clang with `-Werror`.**
+  `bvnr_amalgam_smoke` and `bvnr_profile_configs` compile `dist/bovnar.c`
+  with `-Wall -Wextra -Wconversion -Werror` and no suppressions, as an
+  integrator would, and clang 21 refused it in two ways GCC does not. The
+  conversion rows `gen_profiles.py` writes for the profiles' opaque units
+  left the three π fields out (`-Wmissing-field-initializers`); they now
+  spell out `NULL, NULL, 0`, as `gen_units.py` does. And with every internal
+  header in one translation unit, clang flagged the `static inline` helpers
+  that only the tests or the CLI call (`-Wunused-function`): the float
+  parsers in `bvn_float_impl.h` and `bvn_set_binary_stdio`. They are marked
+  `BVN_MAYBE_UNUSED`. No behaviour changes; the WebAssembly module differs
+  only in its embedded source fingerprint.
 
 ## [2.0.2] - 2026-11-04
 

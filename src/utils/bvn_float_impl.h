@@ -34,6 +34,22 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
+/*
+ * Marks a static inline helper that not every translation unit calls. In the
+ * single-file amalgamation (dist/bovnar.c) every internal header lands in one
+ * translation unit, and clang's -Wunused-function then flags each helper that
+ * only the tests or the CLI use; GCC stays silent for those. Defined in each
+ * internal header that needs it, so neither has to include the other.
+ */
+#ifndef BVN_MAYBE_UNUSED
+#if defined(__GNUC__) || defined(__clang__)
+#define BVN_MAYBE_UNUSED __attribute__((unused))
+#else
+#define BVN_MAYBE_UNUSED
+#endif
+#endif
+
 #define BVN_FLOAT_INT_WORDS 64u
 static inline bvn_int_t bvni_local_init(uint32_t *buf, uint32_t words)
 {
@@ -385,7 +401,7 @@ typedef struct {
 	int man_bits;
 	int bias;
 } BinFmt;
-static inline void to_ieee_binary(bvn_float_ctx_t *ctx, const PNum *p, const BinFmt *f,
+BVN_MAYBE_UNUSED static inline void to_ieee_binary(bvn_float_ctx_t *ctx, const PNum *p, const BinFmt *f,
 								   uint32_t *bits, int bits32)
 {
 	int pbits = f->man_bits;
@@ -810,7 +826,7 @@ static inline void to_ieee_decimal(bvn_float_ctx_t *ctx, const PNum *p, const De
 		bits[sign_pos / 32] |= (1u << (sign_pos % 32));
 	}
 }
-static inline void to_fixed_point(bvn_float_ctx_t *ctx,
+BVN_MAYBE_UNUSED static inline void to_fixed_point(bvn_float_ctx_t *ctx,
 								   const PNum *p, int total_bits, int frac_bits,
 								   uint32_t *bits, int bits32)
 {
@@ -872,7 +888,7 @@ static inline void to_fixed_point(bvn_float_ctx_t *ctx,
  * engine yields a canonical (positive) NaN, but bovnar's encoders and tests
  * treat "-nan" as sign-set, so the rerouted binary parsers restore it.
  */
-static inline bool bvnf_leading_minus(const char *s)
+BVN_MAYBE_UNUSED static inline bool bvnf_leading_minus(const char *s)
 {
 	if (!s) return false;
 	while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r') s++;
@@ -932,7 +948,7 @@ static inline uint16_t bvn_float_parse_bin16(const char *s)
 #if defined(__FLT16_MAX__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
-static inline _Float16 bvn_float_parse_f16(const char *s)
+BVN_MAYBE_UNUSED static inline _Float16 bvn_float_parse_f16(const char *s)
 {
 	union { uint16_t u; _Float16 f; } c;
 	c.u = bvn_float_parse_bin16(s); return c.f;
@@ -945,7 +961,7 @@ static inline uint32_t bvn_float_parse_bin32(const char *s)
 	bvn_float_strtoieee_bin(s, 10u, 8u, 23u, 127, b, 1);
 	return b[0];
 }
-static inline float bvn_float_parse_f32(const char *s)
+BVN_MAYBE_UNUSED static inline float bvn_float_parse_f32(const char *s)
 {
 	union { uint32_t u; float f; } c;
 	c.u = bvn_float_parse_bin32(s); return c.f;
@@ -956,12 +972,12 @@ static inline uint64_t bvn_float_parse_bin64(const char *s)
 	bvn_float_strtoieee_bin(s, 10u, 11u, 52u, 1023, b, 2);
 	return (uint64_t)b[0] | ((uint64_t)b[1] << 32);
 }
-static inline double bvn_float_parse_f64(const char *s)
+BVN_MAYBE_UNUSED static inline double bvn_float_parse_f64(const char *s)
 {
 	union { uint64_t u; double f; } c;
 	c.u = bvn_float_parse_bin64(s); return c.f;
 }
-static inline void bvn_float_parse_bin128(const char *s, uint32_t out[4])
+BVN_MAYBE_UNUSED static inline void bvn_float_parse_bin128(const char *s, uint32_t out[4])
 {
 	bvn_float_strtoieee_bin(s, 10u, 15u, 112u, 16383, out, 4);
 }
@@ -975,7 +991,7 @@ static inline _Float128 bvn_float_parse_f128(const char *s)
 }
 #pragma GCC diagnostic pop
 #endif
-static inline void bvn_float_parse_bin256(const char *s, uint32_t out[8])
+BVN_MAYBE_UNUSED static inline void bvn_float_parse_bin256(const char *s, uint32_t out[8])
 {
 	bvn_float_strtoieee_bin(s, 10u, 19u, 236u, 262143, out, 8);
 }
@@ -1044,7 +1060,7 @@ static inline void bvn_float_parse_dec256(const char *s, uint32_t out[8])
 	DecFmt f = {256, 20, 235, 611867, 70};
 	to_ieee_decimal(&ctx, &p, &f, out, 8);
 }
-static inline int16_t bvn_float_parse_fix16(const char *s, int frac)
+BVN_MAYBE_UNUSED static inline int16_t bvn_float_parse_fix16(const char *s, int frac)
 {
 	int16_t out = 0;
 	bvn_float_t *f = bvn_float_alloc(bvnf_fix_prec(16, frac, s));
@@ -1054,7 +1070,7 @@ static inline int16_t bvn_float_parse_fix16(const char *s, int frac)
 	bvn_float_free(f);
 	return out;
 }
-static inline int32_t bvn_float_parse_fix32(const char *s, int frac)
+BVN_MAYBE_UNUSED static inline int32_t bvn_float_parse_fix32(const char *s, int frac)
 {
 	int32_t out = 0;
 	bvn_float_t *f = bvn_float_alloc(bvnf_fix_prec(32, frac, s));
@@ -1064,7 +1080,7 @@ static inline int32_t bvn_float_parse_fix32(const char *s, int frac)
 	bvn_float_free(f);
 	return out;
 }
-static inline int64_t bvn_float_parse_fix64(const char *s, int frac)
+BVN_MAYBE_UNUSED static inline int64_t bvn_float_parse_fix64(const char *s, int frac)
 {
 	int64_t out = 0;
 	bvn_float_t *f = bvn_float_alloc(bvnf_fix_prec(64, frac, s));
@@ -1074,7 +1090,7 @@ static inline int64_t bvn_float_parse_fix64(const char *s, int frac)
 	bvn_float_free(f);
 	return out;
 }
-static inline void bvn_float_parse_fix128(const char *s, int frac, uint32_t out[4])
+BVN_MAYBE_UNUSED static inline void bvn_float_parse_fix128(const char *s, int frac, uint32_t out[4])
 {
 	out[0] = out[1] = out[2] = out[3] = 0u;
 	bvn_float_t *f = bvn_float_alloc(bvnf_fix_prec(128, frac, s));
@@ -1083,7 +1099,7 @@ static inline void bvn_float_parse_fix128(const char *s, int frac, uint32_t out[
 		bvn_float_to_fix128(f, (uint32_t)frac, out);
 	bvn_float_free(f);
 }
-static inline void bvn_float_parse_fix256(const char *s, int frac, uint32_t out[8])
+BVN_MAYBE_UNUSED static inline void bvn_float_parse_fix256(const char *s, int frac, uint32_t out[8])
 {
 	for (int i = 0; i < 8; i++) out[i] = 0u;
 	bvn_float_t *f = bvn_float_alloc(bvnf_fix_prec(256, frac, s));

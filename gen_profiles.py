@@ -657,7 +657,8 @@ def gen_conv_rows(profiles):
             nm = "bu_" + a["name"]
             out.append("\t[BVN_SLOT_%s(%-18s] = { %-18s 1.0, "
                        "{0, 0, 0, 0, 0, 0, 0}, false, "
-                       "0.0, \"1\", \"1\", \"0\", \"1\", true },\n"
+                       "0.0, \"1\", \"1\", \"0\", \"1\", true, "
+                       "NULL, NULL, 0 },\n"
                        % (p.cname.upper(), nm + ")", nm + ","))
     return "".join(out)
 

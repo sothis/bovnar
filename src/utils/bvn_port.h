@@ -131,11 +131,26 @@ __declspec(dllimport) int __stdcall SetConsoleCP(unsigned int wCodePageID);
 #define BVN_O_RDONLY (O_RDONLY | O_BINARY)
 
 /*
+ * Marks a static inline helper that not every translation unit calls. In the
+ * single-file amalgamation (dist/bovnar.c) every internal header lands in one
+ * translation unit, and clang's -Wunused-function then flags each helper that
+ * only the tests or the CLI use; GCC stays silent for those. Defined in each
+ * internal header that needs it, so neither has to include the other.
+ */
+#ifndef BVN_MAYBE_UNUSED
+#if defined(__GNUC__) || defined(__clang__)
+#define BVN_MAYBE_UNUSED __attribute__((unused))
+#else
+#define BVN_MAYBE_UNUSED
+#endif
+#endif
+
+/*
  * Put the standard streams into binary mode so the CLI's byte stream is not
  * mangled by CRLF translation, and switch the Windows console to UTF-8. No-op
  * on POSIX. Call once at program start, before any fd or stdio I/O.
  */
-static inline void bvn_set_binary_stdio(void)
+BVN_MAYBE_UNUSED static inline void bvn_set_binary_stdio(void)
 {
 #if defined(_WIN32)
 	(void)_setmode(_fileno(stdin),  _O_BINARY);

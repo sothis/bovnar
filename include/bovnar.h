@@ -1021,6 +1021,53 @@ BVN_API bool bvnr_open_read_mem(
  * opened, returns false (the latter setting error_invalid_argument) rather than
  * faulting. Returns false on the first error unless continue_on_error is set. */
 BVN_API bool bvnr_read(bvnr_reader_t* r);
+/*
+ * Push-fed reading, for input that arrives when it arrives: a non-blocking
+ * socket, an event loop, a binding that receives bytes from elsewhere. Where
+ * bvnr_read PULLS until its source says end of input, a fed reader is HANDED
+ * bytes, any number of times and in pieces of any size, and is told separately
+ * when the document is over:
+ *
+ *     bvnr_open_read_feed(r, NULL, &flags);
+ *     while (more input)  if (!bvnr_read_feed(r, buf, n)) break;
+ *     ok = bvnr_read_finish(r);
+ *
+ * The callbacks receive exactly the events, in the same order, that bvnr_read
+ * delivers for the concatenation of everything fed, wherever the pieces were
+ * cut -- inside a token, a UTF-8 sequence or an octet-stream chunk alike -- and
+ * every error is reported with the same code and position. All lexer and
+ * validator state is kept between feeds; nothing is buffered beyond what one
+ * token or one octet chunk needs, so memory stays flat over an endless stream.
+ *
+ * bvnr_open_read_feed arms `r` the way bvnr_open_read_source does (it may be a
+ * reader used before; the unit policy survives), with no source; `src_mirror`
+ * is optional and receives the bytes as they are consumed. bvnr_read on a fed
+ * reader returns false with error_invalid_argument.
+ *
+ * bvnr_read_feed lexes `len` bytes of `buf` (NULL is allowed for len 0) and
+ * returns once they are consumed; the caller may reuse the buffer then. The
+ * first call delivers ev_stream_start. It returns false when the read has
+ * ended in an error -- the same errors at the same bytes as bvnr_read, a
+ * consumer callback's abort, max_file_size -- and true otherwise, including
+ * after errors recovered under continue_on_error. Running out of input is never
+ * a feed error: a document cut off in the middle is reported by finish.
+ *
+ * bvnr_read_finish declares end of input. It returns what bvnr_read would
+ * return: true for a complete document (ev_stream_end delivered), false with
+ * error_got_incomplete_bvnr_stream for one cut off inside a value or a struct,
+ * error_read_complete_chunk_failed inside an octet stream, and so on.
+ *
+ * After an error or a finish the read is over: further feed and finish calls
+ * return false and leave the error getters as they were. Re-open the reader to
+ * read another document. A feed or finish on a reader that was not opened with
+ * bvnr_open_read_feed returns false with error_invalid_argument, as does a feed
+ * with a NULL buffer and a non-zero length (which also ends the read).
+ */
+BVN_API bool bvnr_open_read_feed(
+	bvnr_reader_t* r, const bvnr_sink_t* src_mirror,
+	bvnr_read_flags_t* options);
+BVN_API bool bvnr_read_feed(bvnr_reader_t* r, const void* buf, uint64_t len);
+BVN_API bool bvnr_read_finish(bvnr_reader_t* r);
 typedef struct bvnr_canon_observer_s bvnr_canon_observer_t;
 BVN_API bvnr_canon_observer_t* bvnr_canon_observer_create(
 	const bvnr_sink_t* sink, bool pretty);

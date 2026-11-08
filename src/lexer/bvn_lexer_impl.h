@@ -318,8 +318,35 @@ typedef struct bvnr_lexer_s {
 	 * text_bytes + octet_bytes is the stream offset the scanner has reached,
 	 * which is what an error position has to be (see bvn_last_text_offset). */
 	uint64_t		octet_bytes;
-	/* bvn_lex_run met max_file_size and is reading the last bytes it allows. */
-	bool			file_cap_hit;
+	/*
+	 * The octet-stream framing, as a state machine of its own so that it can
+	 * stop at any byte and resume with the next buffer: os_phase is which field
+	 * of [0x01][len_lo][len_hi][payload] or the closing 0x00 comes next. A
+	 * chunk's payload that arrives in pieces is gathered into str_data;
+	 * os_have counts it. One that lies whole in the input is handed to the
+	 * validator where it lies. Active while next_state is octet_stream_intro.
+	 */
+	uint8_t			os_phase;
+	uint8_t			os_len_lo;
+	uint32_t		os_chunk_len;
+	uint32_t		os_have;
+	/*
+	 * Push-fed reading (bvnr_open_read_feed). feed_ptr/feed_left are the bytes
+	 * handed over and not yet lexed; win_ptr/win_left the part of them already
+	 * counted into processed_bytes (and cut at max_file_size: win_over_cap) but
+	 * not consumed, which is non-empty only after a pause. pause_req is set by
+	 * an internal consumer (the feed-mode demux) from inside a chunk callback,
+	 * and stops the lexer right after that chunk.
+	 */
+	bool			feed_mode;
+	bool			feed_begun;
+	bool			feed_ended;
+	bool			win_over_cap;
+	bool			pause_req;
+	const uint8_t*		feed_ptr;
+	uint64_t		feed_left;
+	const uint8_t*		win_ptr;
+	uint32_t		win_left;
 	uint8_t			utf8_need;
 	uint8_t			utf8_lo;
 	uint8_t			utf8_hi;
@@ -437,6 +464,22 @@ bvn_verdir_t bvn_parse_version_directive(
 bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src, const bvnr_sink_t* dbg_sink, bvnr_read_flags_t* opts);
 void bvn_lex_destroy(bvnr_lexer_t* l);
 bool bvn_lex_run(bvnr_reader_t* r);
+/* Push-fed lexing, the engine behind bvnr_read_feed / bvnr_read_finish.
+ * bvn_lex_feed_attach hands over bytes by reference; bvn_lex_feed_run lexes
+ * them and returns one of the codes below. A consumer that calls bvn_lex_pause
+ * from inside an octet-chunk callback makes it return BVN_FEED_PAUSED right
+ * after that chunk, with the rest of the attached bytes kept for the next run
+ * (the chunk's data stays valid until then). bvn_lex_feed_end is end of input:
+ * the same end-of-document checks bvnr_read makes, then ev_stream_end. */
+enum { BVN_FEED_ERROR = -1, BVN_FEED_DRAINED = 0, BVN_FEED_PAUSED = 1 };
+void bvn_lex_feed_attach(bvnr_reader_t* r, const uint8_t* data, uint64_t len);
+int  bvn_lex_feed_run(bvnr_reader_t* r);
+bool bvn_lex_feed_end(bvnr_reader_t* r);
+void bvn_lex_pause(bvnr_reader_t* r);
+static inline bool bvn_lex_feed_pending(const bvnr_lexer_t* l)
+{
+	return l->feed_left != 0 || l->win_left != 0 || l->win_over_cap;
+}
 bool bvn_action_set_state                 (bvnr_reader_t* p);
 bool bvn_action_ignore_whitespace         (bvnr_reader_t* p);
 bool bvn_action_comment_intro             (bvnr_reader_t* p);

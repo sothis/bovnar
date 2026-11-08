@@ -28,6 +28,8 @@
 #include "bvn_io_impl.h"
 #include "bvn_lexer_impl.h"
 #include "bvn_val_impl.h"
+/* bvnr_lexer_t.os_phase: the octet-stream field read next (bvn_lex_octet). */
+enum { BVN_OS_TAG = 0, BVN_OS_LEN_LO, BVN_OS_LEN_HI, BVN_OS_PAYLOAD };
 /*
  * ===========================================================================
  * Lexer / tokenizer
@@ -1514,8 +1516,8 @@ bool bvn_action_reference_index_close(bvnr_reader_t* p)
 /*
  * Entry to a binary octet stream. This only flips the state and signals the
  * validator; the actual length-prefixed binary framing is read out-of-band by
- * bvn_read_octet_stream because that data is not text and must bypass the
- * UTF-8/whitespace machinery entirely (see the main loop in bvn_lex_run).
+ * bvn_lex_octet because that data is not text and must bypass the
+ * UTF-8/whitespace machinery entirely (see bvn_lex_window).
  */
 bool bvn_action_octet_stream_intro(bvnr_reader_t* p)
 {
@@ -1533,6 +1535,7 @@ bool bvn_action_octet_stream_intro(bvnr_reader_t* p)
 	}
 	p->lex.token_type = token_is_octet_stream;
 	p->lex.next_state = octet_stream_intro;
+	p->lex.os_phase   = BVN_OS_TAG;
 	return bvn_val_receive_event(p, ev_octet_stream_start);
 }
 bool bvn_action_struct_intro(bvnr_reader_t* p)
@@ -2052,17 +2055,12 @@ bool bvn_action_to_inline_unit_outro(bvnr_reader_t* p)
 	p->lex.next_state = inline_unit_outro;
 	return true;
 }
-typedef struct {
-	bvnr_reader_t* p;
-	const uint8_t*  resid;
-	uint32_t        resid_left;
-} octet_source_t;
 /* processed_bytes counts bytes PULLED, and the text loop adds a whole buffer
- * before lexing any of it, so the residual bytes handed to the octet reader are
- * already counted but not yet consumed. Reporting processed_bytes alone made the
- * error offset depend on the feed chunking -- the same desynced byte was blamed
- * on offset 4022 when the document arrived in one buffer and on 32 when it
- * trickled in 8 bytes at a time. Subtracting what is still unconsumed gives the
+ * before lexing any of it, so the bytes the octet reader has not reached yet
+ * are already counted. Reporting processed_bytes alone made the error offset
+ * depend on the feed chunking -- the same desynced byte was blamed on offset
+ * 4022 when the document arrived in one buffer and on 32 when it trickled in 8
+ * bytes at a time. Subtracting what is still unconsumed (resid_left) gives the
  * position the octet reader has actually reached, which is the same number
  * whatever the chunking. */
 static inline void bvn_capture_os_error(bvnr_reader_t* p, error_code_t err,
@@ -2090,148 +2088,125 @@ static inline bool bvn_os_abort(bvnr_reader_t* p, uint32_t resid_left)
  * ---------------------------------------------------------------------------
  * An octet stream is raw binary framed as repeated [0x01][len_lo][len_hi]
  * [len bytes] chunks terminated by a 0x00 tag. Because the framing is binary,
- * it is read directly from the source here rather than through the text state
- * machine. When the text loop hands control over, some bytes of the next chunk
- * may already sit in the text buffer; those "residual" bytes are consumed
- * first (src->resid) before pulling more from the underlying source, and any
- * bytes left over after the stream ends are returned so the text loop can
- * resume exactly where the binary data stopped.
+ * it is read here rather than through the text state machine, from the same
+ * input buffers the text loop is handed: the text loop stops at the opening
+ * 0x00 and the rest of its buffer comes here, and whatever is left after the
+ * closing 0x00 goes back to the text loop.
+ *
+ * It is a state machine (os_phase) rather than a loop that pulls until a chunk
+ * is complete, so that it can stop at the end of any buffer and pick up with
+ * the next: that is what lets the push-fed reader be handed a stream in pieces
+ * of any size, and what makes a pull reader and a fed one deliver the same
+ * chunks. A chunk whose payload lies whole in the buffer goes to the validator
+ * straight from it; one split across buffers is gathered into str_data first.
  */
-
-/*
- * Fill `output` with exactly `length` bytes, drawing first from the residual
- * buffer then from the source, looping over short reads. Also mirrors bytes to
- * the debug sink and enforces the file-size cap, so the binary path honours the
- * same limits and tee behaviour as the text path.
- */
-static bool bvn_os_read_exact(
-	octet_source_t* src, void* output, uint32_t length)
+static inline bool bvn_os_mirror(bvnr_reader_t* p, const uint8_t* data,
+	uint32_t from, uint32_t to, uint32_t len)
 {
-	bvnr_reader_t* p   = src->p;
-	uint8_t*        buf = (uint8_t*)output;
-	uint32_t from_resid = (src->resid_left < length)
-		? src->resid_left : length;
-	if (from_resid) {
-		const uint8_t* taken = src->resid;
-		memcpy(buf, src->resid, from_resid);
-		/* Account for the bytes before the sink push, so an error captured
-		 * inside it reports the position we have actually reached. */
-		src->resid      += from_resid;
-		src->resid_left -= from_resid;
-		if (p->lex.use_dbg) {
-			if (!bvn_sink_push(&p->lex.src_dbg, taken, from_resid)) {
-				bvn_capture_os_error(p, error_writing_to_sink,
-						     src->resid_left);
-				bvn_notify_error(p);
-				return false;
-			}
-		}
-	}
-	uint32_t need = length - from_resid;
-	if (!need) {
-		p->lex.octet_bytes += (uint64_t)length;
+	if (!p->lex.use_dbg || to == from)
 		return true;
-	}
-	uint32_t total = 0, got;
-	while (total != need) {
-		if (p->lex.file_cap_hit) {
-			/* bvn_lex_run already cut this document at max_file_size. */
-			bvn_capture_os_error(p, error_file_too_long, src->resid_left);
-			p->val.error_offset = p->lex.max_file_size;
-			bvn_notify_error(p);
-			return false;
-		}
-		bool pulled = bvn_source_pull(&p->lex.src,
-				buf + from_resid + total, need - total, &got);
-		if (!pulled || !got) {
-			/* A source that FAILED is an I/O error, as it is outside a
-			 * stream; only end of input is a truncated stream. */
-			bvn_capture_os_error(p, pulled
-				? error_read_complete_chunk_failed
-				: error_reading_from_source_fd,
-				src->resid_left);
-			bvn_notify_error(p);
-			return false;
-		}
-		p->lex.processed_bytes += (uint64_t)got;
-		if (p->lex.max_file_size &&
-			p->lex.processed_bytes > p->lex.max_file_size) {
-			bvn_capture_os_error(p, error_file_too_long,
-					     src->resid_left);
-			/* The first byte over the cap, whatever the size of the pull
-			 * that crossed it -- see bvn_lex_run. */
-			p->val.error_offset = p->lex.max_file_size;
-			bvn_notify_error(p);
-			return false;
-		}
-		if (p->lex.use_dbg) {
-			if (!bvn_sink_push(&p->lex.src_dbg,
-							  buf + from_resid + total, got)) {
-				bvn_capture_os_error(p, error_writing_to_sink,
-						     src->resid_left);
-				bvn_notify_error(p);
-				return false;
-			}
-		}
-		total += got;
-	}
-	p->lex.octet_bytes += (uint64_t)length;
-	return true;
+	if (bvn_sink_push(&p->lex.src_dbg, data + from, to - from))
+		return true;
+	bvn_capture_os_error(p, error_writing_to_sink, len - to);
+	bvn_notify_error(p);
+	return false;
 }
 /*
- * Drive the chunk loop: read a tag, and on 0x01 read the 16-bit little-endian
- * length (where 0 means the maximal 65536, since 0-length chunks are useless)
- * and forward that many bytes to the validator; on 0x00 emit the stream-end
- * event and stop. Any other tag is a framing desync. *out_leftover reports how
- * many residual bytes were not consumed so the caller can rewind the text loop.
+ * Consume octet-stream bytes from data[0..len): chunks go to the validator as
+ * they complete, and the closing 0x00 emits ev_octet_stream_end and hands back
+ * to the text loop (next_state becomes octet_stream_outro). *used is how many
+ * bytes were consumed: all of them, unless the stream ended inside the buffer
+ * or a consumer asked to pause after a chunk (pause_req, push-fed mode only;
+ * it stays set for bvn_lex_feed_run to see).
  */
-static bool bvn_read_octet_stream(
-	bvnr_reader_t* p, const uint8_t* resid, uint32_t resid_len,
-	uint32_t* out_leftover)
+static bool bvn_lex_octet(bvnr_reader_t* p, const uint8_t* data, uint32_t len,
+	uint32_t* used)
 {
-	octet_source_t src = { .p = p, .resid = resid, .resid_left = resid_len };
-	/* Zero-init the framing scratch: bvn_os_read_exact fills these on every
-	 * success path for the library's own sources, but pull is a caller-supplied
-	 * callback (bvnr_open_read_source) — a buggy one returning true without
-	 * writing must not leave us reading an indeterminate tag/length. */
-	uint8_t  tag = 0, lenbuf[2] = { 0, 0 };
-	uint32_t chunklen;
-	for (;;) {
-		if (!bvn_os_read_exact(&src, &tag, 1))
-			return false;
-		if (tag == 0x00) {
-			p->lex.token_type = token_is_unknown;
-			p->lex.str_len    = 0;
-			if (!bvn_val_receive_event(p, ev_octet_stream_end))
-				return bvn_os_abort(p, src.resid_left);
-			p->lex.next_state = octet_stream_outro;
-			*out_leftover = src.resid_left;
-			return true;
+	bvnr_lexer_t* l = &p->lex;
+	uint32_t pos = 0, mirrored = 0;
+	while (pos < len) {
+		switch (l->os_phase) {
+		case BVN_OS_TAG: {
+			uint8_t tag = data[pos++];
+			l->octet_bytes += 1u;
+			if (tag == 0x00) {
+				if (!bvn_os_mirror(p, data, mirrored, pos, len))
+					return false;
+				l->token_type = token_is_unknown;
+				l->str_len    = 0;
+				if (!bvn_val_receive_event(p, ev_octet_stream_end))
+					return bvn_os_abort(p, len - pos);
+				l->next_state = octet_stream_outro;
+				*used = pos;
+				return true;
+			}
+			if (tag != 0x01) {
+				bvn_capture_os_error(p, error_octet_stream_out_of_sync,
+						     len - pos);
+				/* The tag has been consumed, so the position reached is
+				 * one past it; the error is the tag itself, and it is a
+				 * single byte, so it is reported the way every text error
+				 * is -- its own offset, and the byte. */
+				if (p->val.error_offset > 0)
+					p->val.error_offset -= 1u;
+				p->val.error_byte = (uint32_t)tag;
+				bvn_notify_error(p);
+				return false;
+			}
+			l->os_phase = BVN_OS_LEN_LO;
+			break;
 		}
-		if (tag != 0x01) {
-			bvn_capture_os_error(p, error_octet_stream_out_of_sync,
-					     src.resid_left);
-			/* The tag has been consumed, so the position reached is one past
-			 * it; the error is the tag itself, and it is a single byte, so it
-			 * is reported the way every text error is -- its own offset, and
-			 * the byte. (It used to be offset + 1 and byte 0.) */
-			if (p->val.error_offset > 0)
-				p->val.error_offset -= 1u;
-			p->val.error_byte = (uint32_t)tag;
-			bvn_notify_error(p);
-			return false;
+		case BVN_OS_LEN_LO:
+			l->os_len_lo = data[pos++];
+			l->os_phase  = BVN_OS_LEN_HI;
+			break;
+		case BVN_OS_LEN_HI:
+			l->os_chunk_len = (uint32_t)l->os_len_lo |
+					  ((uint32_t)data[pos++] << 8);
+			/* 0 is the maximal 65536: an empty chunk would be useless. */
+			if (!l->os_chunk_len)
+				l->os_chunk_len = 65536u;
+			l->octet_bytes += 2u;
+			l->os_have  = 0;
+			l->os_phase = BVN_OS_PAYLOAD;
+			break;
+		default: {
+			uint32_t want  = l->os_chunk_len - l->os_have;
+			uint32_t avail = len - pos;
+			const uint8_t* chunk;
+			if (l->os_have == 0 && avail >= want) {
+				chunk = data + pos;
+				pos  += want;
+			} else {
+				uint32_t take = avail < want ? avail : want;
+				memcpy(l->str_data + l->os_have, data + pos, take);
+				l->os_have += take;
+				pos        += take;
+				if (l->os_have < l->os_chunk_len)
+					break;
+				chunk = l->str_data;
+			}
+			l->octet_bytes += (uint64_t)l->os_chunk_len;
+			l->os_phase = BVN_OS_TAG;
+			/* The mirror receives the bytes before the consumer sees the
+			 * chunk they make up, as it always has. */
+			if (!bvn_os_mirror(p, data, mirrored, pos, len))
+				return false;
+			mirrored = pos;
+			if (!bvn_val_receive_octet_chunk(p, chunk, l->os_chunk_len))
+				return bvn_os_abort(p, len - pos);
+			if (l->pause_req) {
+				*used = pos;
+				return true;
+			}
+			break;
 		}
-		if (!bvn_os_read_exact(&src, lenbuf, 2))
-			return false;
-		chunklen = (uint32_t)lenbuf[0]
-				 | ((uint32_t)lenbuf[1] << 8);
-		if (!chunklen)
-			chunklen = 65536u;
-		if (!bvn_os_read_exact(&src, p->lex.str_data, chunklen))
-			return false;
-		if (!bvn_val_receive_octet_chunk(p, p->lex.str_data, chunklen))
-			return bvn_os_abort(p, src.resid_left);
+		}
 	}
+	if (!bvn_os_mirror(p, data, mirrored, pos, len))
+		return false;
+	*used = pos;
+	return true;
 }
 /*
  * Classify a UTF-8 leading byte: how many continuation bytes follow (`need`)
@@ -2616,7 +2591,7 @@ static inline uint32_t bvn_try_bulk_ws(
  * the byte's action. On a per-byte error it either aborts or, under
  * continue_on_error, enters resync and keeps going. The one place it returns
  * early mid-buffer is when an octet-stream intro is hit: *consumed marks where
- * binary framing takes over so the caller can switch to bvn_read_octet_stream.
+ * binary framing takes over so the caller can switch to bvn_lex_octet.
  */
 static bool bvn_interpret_input_buffer(
 	bvnr_reader_t* p, const uint8_t* data, uint32_t len,
@@ -2940,17 +2915,224 @@ bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	return true;
 }
 /*
+ * Lex one window of input, text and octet stream alike, until it is used up.
+ * processed_bytes already counts the whole window (the error offsets of
+ * bvn_capture_os_error rely on it). The text loop yields at an octet stream's
+ * opening 0x00 and the octet reader at its closing one, so a window may switch
+ * between them any number of times. It stops early only when a consumer
+ * paused the push-fed reader after a chunk (pause_req, left set for
+ * bvn_lex_feed_run); *consumed is then where.
+ */
+static bool bvn_lex_window(bvnr_reader_t* r, const uint8_t* data, uint32_t nb,
+	uint32_t* consumed)
+{
+	bvnr_lexer_t* l = &r->lex;
+	uint32_t off = 0, used;
+	while (off < nb) {
+		if (l->next_state == octet_stream_intro) {
+			if (!bvn_lex_octet(r, data + off, nb - off, &used))
+				return false;
+			off += used;
+			if (l->pause_req)
+				break;
+			continue;
+		}
+		if (!bvn_interpret_input_buffer(r, data + off, nb - off, &used))
+			return false;
+		if (l->use_dbg && used &&
+		    !bvn_sink_push(&l->src_dbg, data + off, used)) {
+			bvn_set_eof_error(r, error_writing_to_sink);
+			bvn_notify_error(r);
+			return false;
+		}
+		off += used;
+	}
+	*consumed = off;
+	return true;
+}
+/*
+ * The document went past max_file_size: everything up to the cap has been read
+ * and delivered, and this is the error at the first byte over it. The offset
+ * names that byte, which is the NEXT character (unless it continues one
+ * already begun), so the column is that character's -- as
+ * error_text_data_too_long reports it -- not the last one read. Inside an
+ * octet stream there is no character, and the position is the octet reader's.
+ */
+static void bvn_lex_cap_error(bvnr_reader_t* r)
+{
+	bvnr_lexer_t* l = &r->lex;
+	if (l->next_state == octet_stream_intro) {
+		bvn_capture_os_error(r, error_file_too_long, 0);
+		r->val.error_offset = l->max_file_size;
+	} else {
+		bvn_set_eof_error(r, error_file_too_long);
+	}
+	bvn_notify_error(r);
+}
+/*
+ * Cut a window at max_file_size. The cap used to be tested against whole pulled
+ * buffers, before any byte of the buffer that crossed it was read -- so where a
+ * too-long document stopped, what had been delivered by then, and the offset
+ * reported all depended on how the bytes happened to arrive: 150 bytes under a
+ * cap of 70 gave no events and offset 150 from a memory buffer, and seventy
+ * parsed bytes and offset 71 from a source handing over one byte at a time
+ * (which could also meet an earlier syntax error first, and report that
+ * instead). Read exactly what the cap allows, then refuse at the first byte
+ * over it: the same events and the same position whatever the chunking.
+ * Returns true when the window was cut; it is then the last one.
+ */
+static bool bvn_lex_cut_at_cap(bvnr_lexer_t* l, uint32_t* nb)
+{
+	if (!l->max_file_size ||
+	    l->processed_bytes + (uint64_t)*nb <= l->max_file_size)
+		return false;
+	*nb = (l->processed_bytes < l->max_file_size)
+		? (uint32_t)(l->max_file_size - l->processed_bytes) : 0u;
+	return true;
+}
+/*
+ * End of input: decide whether the document ended cleanly (only legal at a
+ * top-level value boundary with no open structs) or is truncated/incomplete,
+ * then close the stream for the validator. Shared by bvnr_read, which gets
+ * here from an empty pull, and bvnr_read_finish.
+ */
+static bool bvn_lex_eof(bvnr_reader_t* r)
+{
+	bvnr_lexer_t* l = &r->lex;
+	if (l->next_state == octet_stream_intro) {
+		/* Input ended inside an octet stream: a chunk, or the closing tag,
+		 * is missing. */
+		bvn_capture_os_error(r, error_read_complete_chunk_failed, 0);
+		bvn_notify_error(r);
+		return false;
+	}
+	/*
+	 * End of input inside a multi-byte sequence. Every other place such a
+	 * sequence can be cut short is refused already, because the byte after it
+	 * is not a continuation byte -- but a comment may run to end of input, and
+	 * there nothing came after it: ".a = 1; #<c3>" was accepted, where the same
+	 * bytes followed by a newline are error_invalid_utf8_byte. Asked only where
+	 * the document would otherwise be accepted; elsewhere a truncated document
+	 * stays error_got_incomplete_bvnr_stream.
+	 */
+	bool eof_in_first_comment =
+		l->next_state == first_comment_intro ||
+		l->next_state == first_comment_after_ef ||
+		l->next_state == first_comment_after_ef_bb;
+	bool eof_acceptable =
+		((l->next_state == value_outro ||
+		  l->next_state == undefined   ||
+		  l->next_state == first_bom   ||
+		  eof_in_first_comment) ||
+		 ((l->next_state == comment_intro ||
+		   l->next_state == ignore_comment_byte) &&
+		  l->last_state == value_outro)) &&
+		!l->struct_nesting_level;
+	if (eof_acceptable && l->utf8_need != 0u) {
+		bvn_set_eof_error(r, error_invalid_utf8_byte);
+		bvn_notify_error(r);
+		if (!l->continue_on_error)
+			return false;
+		/* Nothing is left to resynchronise on: the comment, and the
+		 * document, end here. Reported and counted like any other
+		 * recovered error. */
+		l->utf8_need = 0;
+		++l->recovery_count;
+		/* As bvn_recover_in_comment does: the cut-short sequence's lead byte
+		 * is the skipped byte (§13.2), and a read that ends true reports no
+		 * position (§13.4). */
+		++l->skipped_bytes;
+		r->val.error_line   = 0;
+		r->val.error_column = 0;
+		r->val.error_byte   = 0;
+		r->val.error_offset = 0;
+		if (eof_in_first_comment)
+			l->next_state = first_comment_intro;
+	}
+	if ((l->next_state == value_outro ||
+	     l->next_state == undefined   ||
+	     l->next_state == first_bom   ||
+	     l->next_state == first_comment_intro) &&
+	    !l->struct_nesting_level) {
+		/* first_comment_intro: a document that is nothing but a leading
+		 * comment terminated by EOF (no trailing newline) is a valid empty
+		 * document — the EBNF comment production ends on CR | LF | EOF.
+		 * Without this a comment-only file missing its final newline wrongly
+		 * reported error_got_incomplete_bvnr_stream.
+		 *
+		 * That comment may be the VERSION DIRECTIVE, though, and
+		 * bvn_action_first_comment_outro is the only place it gets parsed.
+		 * Accepting straight from here skipped it, so "#!bovnar 99.9" with no
+		 * trailing newline passed even under strict_version. Close the comment
+		 * properly first. */
+		if (l->next_state == first_comment_intro &&
+		    !bvn_action_first_comment_outro(r)) {
+			bvn_set_eof_error(r, r->val.last_error != error_none
+				? r->val.last_error
+				: error_invalid_spec_version);
+			bvn_notify_error(r);
+			/* A malformed directive is recovered from under
+			 * continue_on_error when a newline follows it; one that runs to
+			 * end of input is the same error and is recovered the same way.
+			 * An unsupported version, or any directive error under
+			 * strict_version, still ends the read. */
+			if (!l->continue_on_error || l->strict_version ||
+			    r->val.last_error != error_invalid_spec_version)
+				return false;
+			++l->recovery_count;
+			r->val.error_line   = 0;
+			r->val.error_column = 0;
+			r->val.error_byte   = 0;
+			r->val.error_offset = 0;
+		}
+		r->val.last_error = error_none;
+	} else if ((l->next_state == comment_intro ||
+		    l->next_state == ignore_comment_byte) &&
+		   l->last_state == value_outro &&
+		   !l->struct_nesting_level) {
+		r->val.last_error = error_none;
+	} else {
+		if (l->next_state == resync ||
+		    l->next_state == resync_dot ||
+		    l->next_state == resync_string ||
+		    l->next_state == resync_string_escape ||
+		    l->next_state == resync_comment) {
+			/* Recovery that never found a boundary: everything from the
+			 * error to the end of the document was discarded, and it is
+			 * counted like any other skip. */
+			if (l->text_bytes > l->resync_start_bytes)
+				l->skipped_bytes +=
+					l->text_bytes - l->resync_start_bytes;
+		}
+		bvn_set_eof_error(r, error_got_incomplete_bvnr_stream);
+		bvn_notify_error(r);
+		return false;
+	}
+	if (!bvn_val_receive_event(r, ev_stream_end)) {
+		bvn_set_error_pos(r, 0, l->processed_bytes);
+		bvn_notify_error(r);
+		return false;
+	}
+	return true;
+}
+/* The first event. An abort from the consumer at the first or the last event
+ * is reported like any other (doc/03 §13.1); it used to skip on_error. */
+static bool bvn_lex_start(bvnr_reader_t* r)
+{
+	if (bvn_val_receive_event(r, ev_stream_start))
+		return true;
+	bvn_set_error_pos(r, 0, 0);
+	bvn_notify_error(r);
+	return false;
+}
+/*
  * Top-level read loop: pull buffer, lex it, repeat until EOF.
  *
  * Two source modes are handled. For an in-memory source the lexer walks the
  * caller's buffer directly in <=1 MiB windows (no copy into stack_data) — the
- * zero-copy fast path that motivated exposing bvn_pull_mem. For an fd source
- * it reads into a stack buffer. At EOF the next_state is inspected to decide
- * whether the stream ended cleanly (only legal at a top-level value boundary
- * with no open structs) or is truncated/incomplete; mid-resync EOF is also a
- * truncation. The octet-stream intro is the one place the text loop yields to
- * the binary reader and then resumes at the returned offset. stream_start /
- * stream_end events bracket the whole run for the validator.
+ * zero-copy fast path that motivated exposing bvn_pull_mem. Any other source
+ * is read into a stack buffer. An empty pull is end of input (bvn_lex_eof).
+ * stream_start / stream_end events bracket the whole run for the validator.
  */
 #define BVN_MEM_CHUNK_MAX (1u << 20)
 bool bvn_lex_run(bvnr_reader_t* r)
@@ -2958,17 +3140,11 @@ bool bvn_lex_run(bvnr_reader_t* r)
 	bvnr_lexer_t* l = &r->lex;
 	uint8_t stack_data[BOVN_READ_BUFFER_SIZE];
 	const uint8_t* data;
-	uint32_t nb, off, consumed;
-	uint32_t os_leftover;
+	uint32_t nb, consumed;
 	bvn_source_impl_t* src_impl = bvn_source_impl(&l->src);
 	bool is_mem_src = (src_impl->pull == bvn_pull_mem);
-	/* An abort from the consumer at the first or the last event is reported
-	 * like any other (doc/03 §13.1); it used to skip on_error. */
-	if (!bvn_val_receive_event(r, ev_stream_start)) {
-		bvn_set_error_pos(r, 0, 0);
-		bvn_notify_error(r);
+	if (!bvn_lex_start(r))
 		return false;
-	}
 	for (;;) {
 		if (is_mem_src) {
 			uint64_t avail = src_impl->mem_left;
@@ -2984,188 +3160,96 @@ bool bvn_lex_run(bvnr_reader_t* r)
 			}
 		} else if (!bvn_source_pull(&l->src, stack_data,
 		                            BOVN_READ_BUFFER_SIZE, &nb)) {
-			bvn_set_eof_error(r, error_reading_from_source_fd);
+			if (l->next_state == octet_stream_intro)
+				bvn_capture_os_error(r,
+					error_reading_from_source_fd, 0);
+			else
+				bvn_set_eof_error(r,
+					error_reading_from_source_fd);
 			bvn_notify_error(r);
 			return false;
 		} else {
 			data = stack_data;
 		}
-		if (!nb) {
-			/*
-			 * End of input inside a multi-byte sequence. Every other place
-			 * such a sequence can be cut short is refused already, because
-			 * the byte after it is not a continuation byte -- but a comment
-			 * may run to end of input, and there nothing came after it:
-			 * ".a = 1; #<c3>" was accepted, where the same bytes followed by
-			 * a newline are error_invalid_utf8_byte. Asked only where the
-			 * document would otherwise be accepted; elsewhere a truncated
-			 * document stays error_got_incomplete_bvnr_stream.
-			 */
-			bool eof_in_first_comment =
-				l->next_state == first_comment_intro ||
-				l->next_state == first_comment_after_ef ||
-				l->next_state == first_comment_after_ef_bb;
-			bool eof_acceptable =
-				((l->next_state == value_outro ||
-				  l->next_state == undefined   ||
-				  l->next_state == first_bom   ||
-				  eof_in_first_comment) ||
-				 ((l->next_state == comment_intro ||
-				   l->next_state == ignore_comment_byte) &&
-				  l->last_state == value_outro)) &&
-				!l->struct_nesting_level;
-			if (eof_acceptable && l->utf8_need != 0u) {
-				bvn_set_eof_error(r, error_invalid_utf8_byte);
-				bvn_notify_error(r);
-				if (!l->continue_on_error)
-					return false;
-				/* Nothing is left to resynchronise on: the comment, and the
-				 * document, end here. Reported and counted like any other
-				 * recovered error. */
-				l->utf8_need = 0;
-				++l->recovery_count;
-				/* As bvn_recover_in_comment does: the cut-short sequence's
-				 * lead byte is the skipped byte (§13.2), and a read that ends
-				 * true reports no position (§13.4). */
-				++l->skipped_bytes;
-				r->val.error_line   = 0;
-				r->val.error_column = 0;
-				r->val.error_byte   = 0;
-				r->val.error_offset = 0;
-				if (eof_in_first_comment)
-					l->next_state = first_comment_intro;
-			}
-			if ((l->next_state == value_outro ||
-				 l->next_state == undefined   ||
-				 l->next_state == first_bom   ||
-				 l->next_state == first_comment_intro) &&
-				!l->struct_nesting_level) {
-				/* first_comment_intro: a document that is nothing but a
-				 * leading comment terminated by EOF (no trailing newline)
-				 * is a valid empty document — the EBNF comment production
-				 * ends on CR | LF | EOF. Without this a comment-only file
-				 * missing its final newline wrongly reported
-				 * error_got_incomplete_bvnr_stream.
-				 *
-				 * That comment may be the VERSION DIRECTIVE, though, and
-				 * bvn_action_first_comment_outro is the only place it gets
-				 * parsed. Accepting straight from here skipped it, so
-				 * "#!bovnar 99.9" with no trailing newline passed even under
-				 * strict_version. Close the comment properly first. */
-				if (l->next_state == first_comment_intro &&
-				    !bvn_action_first_comment_outro(r)) {
-					bvn_set_eof_error(r, r->val.last_error != error_none
-						? r->val.last_error
-						: error_invalid_spec_version);
-					bvn_notify_error(r);
-					/* A malformed directive is recovered from under
-					 * continue_on_error when a newline follows it; one that
-					 * runs to end of input is the same error and is
-					 * recovered the same way. An unsupported version, or
-					 * any directive error under strict_version, still ends
-					 * the read. */
-					if (!l->continue_on_error || l->strict_version ||
-					    r->val.last_error != error_invalid_spec_version)
-						return false;
-					++l->recovery_count;
-					r->val.error_line   = 0;
-					r->val.error_column = 0;
-					r->val.error_byte   = 0;
-					r->val.error_offset = 0;
-				}
-				r->val.last_error = error_none;
-				break;
-			}
-			if ((l->next_state == comment_intro ||
-				 l->next_state == ignore_comment_byte) &&
-				l->last_state == value_outro &&
-				!l->struct_nesting_level) {
-				r->val.last_error = error_none;
-				break;
-			}
-			if (l->next_state == resync ||
-				l->next_state == resync_dot ||
-				l->next_state == resync_string ||
-				l->next_state == resync_string_escape ||
-				l->next_state == resync_comment) {
-				/* Recovery that never found a boundary: everything from the
-				 * error to the end of the document was discarded, and it is
-				 * counted like any other skip. */
-				if (l->text_bytes > l->resync_start_bytes)
-					l->skipped_bytes +=
-						l->text_bytes - l->resync_start_bytes;
-				bvn_set_eof_error(r, error_got_incomplete_bvnr_stream);
-				bvn_notify_error(r);
-				return false;
-			}
-			bvn_set_eof_error(r, error_got_incomplete_bvnr_stream);
-			bvn_notify_error(r);
-			return false;
-		}
-		/*
-		 * max_file_size. The cap used to be tested against whole pulled
-		 * buffers, before any byte of the buffer that crossed it was read --
-		 * so where a too-long document stopped, what had been delivered by
-		 * then, and the offset reported all depended on how the bytes
-		 * happened to arrive: 150 bytes under a cap of 70 gave no events and
-		 * offset 150 from a memory buffer, and seventy parsed bytes and
-		 * offset 71 from a source handing over one byte at a time (which
-		 * could also meet an earlier syntax error first, and report that
-		 * instead). Read exactly what the cap allows, then refuse at the
-		 * first byte over it: the same events and the same position whatever
-		 * the chunking.
-		 */
-		bool over_cap = false;
-		if (l->max_file_size &&
-			l->processed_bytes + (uint64_t)nb > l->max_file_size) {
-			nb = (l->processed_bytes < l->max_file_size)
-				? (uint32_t)(l->max_file_size - l->processed_bytes) : 0u;
-			over_cap = true;
-			/* The octet reader pulls for itself once its residual runs
-			 * out, and the bytes cut off here are gone from the source. */
-			l->file_cap_hit = true;
-		}
+		if (!nb)
+			return bvn_lex_eof(r);
+		bool over_cap = bvn_lex_cut_at_cap(l, &nb);
 		l->processed_bytes += (uint64_t)nb;
-		off = 0;
-		while (off < nb) {
-			uint32_t text_start = off;
-			if (!bvn_interpret_input_buffer(r, data + off,
-											nb - off, &consumed))
-				return false;
-			off += consumed;
-			if (l->use_dbg && consumed) {
-				if (!bvn_sink_push(&l->src_dbg,
-								  data + text_start,
-								  consumed)) {
-					bvn_set_eof_error(r,
-						error_writing_to_sink);
-					bvn_notify_error(r);
-					return false;
-				}
-			}
-			if (l->next_state == octet_stream_intro) {
-				if (!bvn_read_octet_stream(r,
-					data + off, nb - off, &os_leftover))
-					return false;
-				off = nb - os_leftover;
-			}
-		}
+		if (!bvn_lex_window(r, data, nb, &consumed))
+			return false;
 		if (over_cap) {
-			bvn_set_eof_error(r, error_file_too_long);
-			/* The offset names the first byte over the cap, which is the
-			 * NEXT character (unless it continues one already begun), so the
-			 * column is that character's -- as error_text_data_too_long
-			 * reports it -- not the last one read. */
-			if (l->utf8_need == 0)
-				r->val.error_column = l->column + 1u;
-			bvn_notify_error(r);
+			bvn_lex_cap_error(r);
 			return false;
 		}
 	}
-	if (!bvn_val_receive_event(r, ev_stream_end)) {
-		bvn_set_error_pos(r, 0, l->processed_bytes);
-		bvn_notify_error(r);
-		return false;
+}
+/*
+ * ---------------------------------------------------------------------------
+ * Push-fed lexing
+ * ---------------------------------------------------------------------------
+ * The same windows as bvn_lex_run, taken from bytes the caller hands over
+ * instead of from a pull. Nothing in the text state machine or the octet
+ * reader depends on where a buffer ends, which is why a document fed in pieces
+ * of any size produces exactly the events bvnr_read produces for the whole of
+ * it; what bvn_lex_run does at an empty pull happens at bvn_lex_feed_end.
+ */
+void bvn_lex_feed_attach(bvnr_reader_t* r, const uint8_t* data, uint64_t len)
+{
+	r->lex.feed_ptr  = data;
+	r->lex.feed_left = len;
+}
+void bvn_lex_pause(bvnr_reader_t* r)
+{
+	r->lex.pause_req = true;
+}
+int bvn_lex_feed_run(bvnr_reader_t* r)
+{
+	bvnr_lexer_t* l = &r->lex;
+	if (!l->feed_begun) {
+		l->feed_begun = true;
+		if (!bvn_lex_start(r))
+			return BVN_FEED_ERROR;
 	}
-	return true;
+	for (;;) {
+		if (!l->win_left && !l->win_over_cap) {
+			if (!l->feed_left)
+				return BVN_FEED_DRAINED;
+			uint32_t nb = l->feed_left > (uint64_t)BVN_MEM_CHUNK_MAX
+				? BVN_MEM_CHUNK_MAX : (uint32_t)l->feed_left;
+			l->win_ptr       = l->feed_ptr;
+			l->feed_ptr     += nb;
+			l->feed_left    -= nb;
+			l->win_over_cap  = bvn_lex_cut_at_cap(l, &nb);
+			if (l->win_over_cap)
+				l->feed_left = 0;
+			l->win_left = nb;
+			l->processed_bytes += (uint64_t)nb;
+		}
+		if (l->win_left) {
+			uint32_t used;
+			if (!bvn_lex_window(r, l->win_ptr, l->win_left, &used))
+				return BVN_FEED_ERROR;
+			l->win_ptr  += used;
+			l->win_left -= used;
+			if (l->pause_req) {
+				l->pause_req = false;
+				return BVN_FEED_PAUSED;
+			}
+		}
+		if (l->win_over_cap) {
+			l->win_over_cap = false;
+			bvn_lex_cap_error(r);
+			return BVN_FEED_ERROR;
+		}
+	}
+}
+bool bvn_lex_feed_end(bvnr_reader_t* r)
+{
+	bvnr_lexer_t* l = &r->lex;
+	if (!l->feed_begun) {
+		l->feed_begun = true;
+		if (!bvn_lex_start(r))
+			return false;
+	}
+	return bvn_lex_eof(r);
 }

@@ -2468,6 +2468,67 @@ bool bvnr_open_read_source(
 	bvn_val_init(&r->val, options);
 	return true;
 }
+/*
+ * Arm a reader for push-fed input: no source, the caller hands over bytes with
+ * bvnr_read_feed and ends the document with bvnr_read_finish. Everything else
+ * -- limits, callbacks, the mirror, re-arming a used reader -- is
+ * bvnr_open_read_source's. A fed reader has no pull, so bvnr_read refuses it.
+ */
+bool bvnr_open_read_feed(
+	bvnr_reader_t* r, const bvnr_sink_t* dbg_sink, bvnr_read_flags_t* options)
+{
+	if (!r)
+		return false;
+	bvn_lex_destroy(&r->lex);
+	memset(&r->lex, 0, sizeof(r->lex));
+	if (!bvn_lex_init(&r->lex, NULL, dbg_sink, options))
+		return false;
+	bvn_val_init(&r->val, options);
+	r->lex.feed_mode = true;
+	return true;
+}
+/*
+ * Not a fed reader, or one whose read is already over. The error is latched
+ * only for the first: after an error or a finish the getters must keep
+ * describing how the read ended.
+ */
+static bool bvn_feed_usable(bvnr_reader_t* r)
+{
+	if (!r)
+		return false;
+	if (!r->lex.feed_mode) {
+		r->val.last_error = error_invalid_argument;
+		return false;
+	}
+	return !r->lex.feed_ended;
+}
+bool bvnr_read_feed(bvnr_reader_t* r, const void* buf, uint64_t len)
+{
+	if (!bvn_feed_usable(r))
+		return false;
+	if ((!buf && len) || bvn_lex_feed_pending(&r->lex)) {
+		r->val.last_error = error_invalid_argument;
+		r->lex.feed_ended = true;
+		return false;
+	}
+	bvn_lex_feed_attach(r, (const uint8_t*)buf, len);
+	if (bvn_lex_feed_run(r) == BVN_FEED_ERROR) {
+		r->lex.feed_ended = true;
+		return false;
+	}
+	return true;
+}
+bool bvnr_read_finish(bvnr_reader_t* r)
+{
+	if (!bvn_feed_usable(r))
+		return false;
+	r->lex.feed_ended = true;
+	if (bvn_lex_feed_pending(&r->lex)) {
+		r->val.last_error = error_invalid_argument;
+		return false;
+	}
+	return bvn_lex_feed_end(r);
+}
 bool bvnr_open_read_mem(
 	bvnr_reader_t* r, const void* buf, uint64_t len,
 	void* dbg_buf, uint64_t dbg_cap,

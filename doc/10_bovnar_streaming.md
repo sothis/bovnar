@@ -37,7 +37,8 @@ capabilities are sub-protocols carried in or around them.
     - 3.3 [CLI](#33-cli)
 4. [Document-in-document](#4-document-in-document)
 5. [Python bindings](#5-python-bindings)
-6. [Composition](#6-composition)
+6. [Rust bindings](#6-rust-bindings)
+7. [Composition](#7-composition)
 
 - [See also](#see-also)
 
@@ -326,7 +327,29 @@ and `python/tests/test_stream.py`.
 
 ---
 
-## 6. Composition
+## 6. Rust bindings
+
+The Rust crate has the same batch functions in `bovnar::stream`
+(`frame_documents`, `load_documents`, `mux_dump`, `mux_load`,
+`embed_document`, `parse_embedded`), over the C functions above. Like
+Python's, they work on whole buffers.
+
+For a stream that never ends, `bovnar::codec` writes and reads the framing of
+§2 and the multiplexing of §3 incrementally, in pure Rust: `MuxWriter` and
+`MuxReader`, `write_frame` and `FrameReader`. The writer's output is byte for
+byte that of `bvnr_mux_send` and `bvnr_frame_write`; the reader is fed bytes in
+pieces of any size, keeps the demultiplexer's limits and error codes, hands a
+message out without a copy when it lies whole in the input, and can peek at a
+message's channel, length and first bytes to skip it or forward its chunks
+unchanged. A multiplexed stream may open with a **preamble**, ordinary text
+values in the same document before the stream's assignment
+(`.meta = { … }; .media = <octet stream>;`). Nothing is allocated per message
+once the reader's buffers have grown. See
+[Rust Bindings §4.8](14_bovnar_rust_bindings.md#48-live-streams-the-framing-codec-bovnarcodec).
+
+---
+
+## 7. Composition
 
 The four compose cleanly because they live at different layers:
 

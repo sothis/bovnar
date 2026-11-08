@@ -25,6 +25,139 @@ has not moved on (tags always). `.github/scripts/runner-shortage.sh REPO RUN
 [ATTEMPT]` prints its verdict for any run. It takes effect from its first push
 to main; its first real use is the evidence it works.
 
+## Open — incremental streaming for Rust and Python (asked 2026-11-08)
+
+The streaming layer of doc/10 (frames, octet multiplexing,
+document-in-document, endless streams) is batch-only in both bindings.
+`bovnar::stream` (`mux_dump`, `mux_load`, `load_documents`,
+`embed_document`, their `*_to` and `*_reader` twins) and `bovnar.stream`
+build the whole output in memory, or read their input to the end before
+parsing it. So neither can serve a stream that never ends (a socket, a pipe,
+a live feed), and every call pays its setup again. The C layer does not
+close the gap on its own either:
+
+- A pull callback cannot say "no data yet". An empty pull is end of input
+  (`bvn_src_read_exact`, `bvn_lex_run`), so a short feed reads as a
+  truncated frame or document. The fd backend avoids this only by waiting
+  through `EAGAIN`.
+- There is no public way to build a source or sink from
+  `bvnr_pull_fn`/`bvnr_push_fn`, and the callbacks get no user pointer. The
+  reader and writer copy the source or sink (`l->src = *src`), so a user
+  pointer has to live inside the blob.
+- The hot path allocates and copies. `bvnr_mux_send` mallocs and frees a
+  64 KiB chunk on every message, the demux copies every message into a
+  per-channel buffer, and `bvnr_doc_stream_read` mallocs every frame.
+
+The goal is a generic, fast streaming API, split by job: the message framing
+in pure Rust (it is small and has to cost nanoseconds), and live document
+parsing plus callback I/O in C, which the bindings wrap. Shared vectors keep
+the two implementations of the wire convention in step.
+
+### 1. Rust: a pure-Rust framing codec in the crate
+
+The octet chunk of spec §9 plus the two LEB128 varints of doc/10 §3, with no
+FFI and no allocation per message. A prototype exists (Mumcord/mumcord PR
+#682, `crates/bovnar-mux`, `#![forbid(unsafe_code)]`): byte-identical to
+`bvnr_mux_send` on shared vectors, 9–34 ns per message to write and to peek,
+0 allocations per message. It is the starting point, and its numbers are the
+targets.
+
+- **`MuxWriter`**: the octet-stream opener, then per message the chunk
+  header and the channel and length varints, written into a caller buffer
+  next to the borrowed payload (ready for a vectored write), and finally the
+  terminator. It splits messages over 64 KiB as `bvnr_mux_send` does, with
+  the channel varint leading every chunk.
+- **`MuxReader`**: fed bytes in arbitrary pieces, it returns
+  `(channel, &[u8])`. The slice is borrowed when the message is contiguous in
+  the input; otherwise the message is reassembled into a per-channel buffer
+  that is reused. Unlike the prototype it accepts **every** valid stream:
+  packed chunks (several messages in one chunk) and interleaved channels.
+  The C demux's limits and errors stay: `max_message`, the 4096-channel
+  limit, out of sync, and truncated at the end.
+- **Peek / skip**: read the next message's channel, its length and its first
+  payload bytes without touching the rest, then skip or forward it whole. This
+  is for forwarders that route or filter by channel.
+- **Frames**: the same incremental writer and reader for `BVF1` frames,
+  handing each complete document's bytes to the caller (or to item 3's
+  parser), with `max_document_size` as in `bvnr_doc_stream_read`.
+
+### 2. C: callback I/O and live feeding
+
+ABI additions only. The user pointer fits in the existing 64-byte
+`bvnr_source_t`/`bvnr_sink_t` (the private layouts are 32 and 48 bytes on
+LP64), so there is no layout change and no `BVNR_ABI_MAJOR` bump.
+
+- **Callback source and sink**: constructors next to `bvnr_source_from_fd`
+  and `_from_mem` that take a pull or push function, an optional flush and a
+  user pointer, and a getter for that pointer inside the callback. A callback
+  sink keeps `is_mem` false, so a failing socket reports
+  `error_writing_to_sink` and the writer's buffer stays in use.
+- **Push-fed document reader**: a reader that is fed bytes (`feed`) and keeps
+  its lexer state across feeds, with an explicit `finish`. Truncation is a
+  `finish` result, never a feed result. Events go through the existing
+  callbacks.
+- **Push-fed frame reader and demux** on top of it, with a pull-style "next
+  message" or "next document" call as well as the callbacks, so a binding
+  that pays for every callback (Python's ctypes) can drain a whole feed in
+  one loop. A message that lies wholly inside the fed buffer is handed out
+  from that buffer without a copy, valid until the next call.
+- **`bvnr_mux_send` without an allocation per message**: the chunk buffer
+  moves onto the writer or a mux session that outlives one send.
+- Each addition gets C tests, a `python3 check_abi.py --update`, and the
+  regeneration order under "Setup" (WASM, HTML docs, LLM views, `web/de/`).
+
+### 3. Rust: live documents through C
+
+- `std::io::Read`/`Write` sources and sinks for documents through item 2's
+  callback source and sink, so the `*_reader`/`*_to` twins stream instead of
+  going through memory.
+- A feed-mode document parser over item 2's push-fed reader, one handle per
+  stream and reused, for an endless document or for each frame from item 1.
+- Embedded documents on a live stream: write one into an open writer; read
+  one by feeding its octet chunks to a reused parser, not a new reader per
+  call as `bvnr_parse_embedded` does.
+
+### 4. Python: wrap the C feed API
+
+- Feed objects for frames, demux and documents over item 2, drained with the
+  pull-style calls so there is no ctypes callback per message. Messages come
+  out as `bytes`, or as a `memoryview` valid until the next call.
+- File-like objects and sockets as sources and sinks.
+- Expectations stated in the docs: per-message cost in Python is in the
+  microseconds (interpreter and ctypes), not nanoseconds. The benchmark shows
+  the real figure.
+
+### 5. Conformance
+
+Shared vectors across C, Rust and Python, each side reading the others'
+output and `bovnar frames list` / `bovnar mux list` reading all of it:
+input split at every byte, a 65536-byte chunk (length field 0), messages over
+64 KiB, the terminator, packed chunks, interleaved channels, a length varint
+split across chunks, 4096 channels and the 4097th, truncation, desync, and a
+failed document among good ones. Fuzz targets for the Rust `MuxReader` and
+the C feed readers.
+
+### 6. Benchmarks
+
+Per-message write, peek and full read for ~150 B, ~30 KB and ~400 KB
+(multi-chunk) messages, release build, one core, next to the batch functions:
+Rust codec, the C feed path, and Python. Targets for the Rust codec: ≤ 50 ns
+to write and to peek, 0 allocations per message once warm. The figures go in
+the docs.
+
+### 7. Docs
+
+doc/10 (layers and the new API), doc/14 (Rust), doc/09 and doc/10 §5
+(Python), with one example each; the read/write API doc for the C additions;
+a CHANGELOG entry.
+
+### Order
+
+1 first: it is self-contained and the prototype exists. Then 2, then 3 and 4
+on top of it, with 5–7 alongside each step. The batch functions stay as they
+are. Everything adds API and removes none, so this is a minor release with an
+export-only ABI addition.
+
 ## 2.0.1 — released earlier the same day
 
 `v2.0.1` is tagged on be88c9a. The tag's CI run published everything: the

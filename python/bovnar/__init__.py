@@ -72,7 +72,7 @@ from ._bigint import (int_from_text as _int_from_text,
 
 __all__ = [
     'BvnFloat',
-    'loads', 'dumps', 'dom_parse',
+    'loads', 'dumps', 'load', 'dump', 'dom_parse',
     'version', 'spec_version', 'peek_version',
     'currency', 'stream',
     'unit_factor', 'unit_to_str', 'parse_unit',
@@ -174,6 +174,29 @@ def loads(data: bytes | bytearray | str | memoryview,
     with Reader() as r:
         r.read_mem(
             data,
+            on_verified=parser.on_event,
+            max_file_size=max_file_size,
+            continue_on_error=continue_on_error,
+        )
+    return parser.result()
+
+
+def load(stream,
+         *,
+         typed: bool = False,
+         max_file_size: int = 0,
+         continue_on_error: bool = False) -> dict:
+    """Parse a BVNR document read from a socket or a binary file object.
+
+    :func:`loads` for a stream: the same options and the same result, but the
+    bytes are pulled as the parse needs them instead of being read whole first
+    (see :meth:`Reader.read_stream`). The document ends where the object
+    reports end of input. An exception the object raises is re-raised as it is.
+    """
+    parser = _TypedDictParser() if typed else _DictParser()
+    with Reader() as r:
+        r.read_stream(
+            stream,
             on_verified=parser.on_event,
             max_file_size=max_file_size,
             continue_on_error=continue_on_error,
@@ -285,6 +308,25 @@ def dumps(obj: dict, *, pretty: bool = True) -> bytes:
                 cap *= 2
             else:
                 raise
+
+
+def dump(obj: dict, stream, *, pretty: bool = True) -> None:
+    """Serialise a dict as :func:`dumps` does, writing it to a socket or a
+    binary file object as it goes (see :meth:`Writer.to_stream`).
+
+    The bytes written are exactly the bytes ``dumps(obj, pretty=pretty)``
+    returns. What differs is a failure: ``dumps`` returns nothing, while here
+    the part written before a refused value (every full 64 KiB the writer
+    pushed) has already reached the stream.
+    """
+    if not isinstance(obj, dict):
+        raise BovnarArgumentError("dump() requires a dict at the top level")
+    need_version = (1, 2) if _uses_spec_1_2(obj) else \
+                   (1, 1) if _uses_spec_1_1(obj) else None
+    with Writer.to_stream(stream, pretty=pretty) as w:
+        if need_version:
+            w.write_version(*need_version)
+        _emit_dict(w, obj)
 
 
 def dom_parse(data: bytes | bytearray | str | memoryview,

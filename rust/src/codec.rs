@@ -116,7 +116,8 @@ pub const FRAME_MAGIC: [u8; 4] = *b"BVF1";
 /// channel and length varints.
 pub const MAX_CHUNK_HEADER: usize = 3 + 2 * MAX_VARINT;
 
-// Cut::header copies whole varint buffers into a header buffer of this size.
+// Cut::header encodes both varints into a header buffer of this size, each
+// into ten bytes of room.
 const _: () = assert!(MAX_CHUNK_HEADER >= 3 + MAX_VARINT + MAX_VARINT);
 
 /// The default cap of [`MuxReader::with_max_preamble`]: the text before a
@@ -137,18 +138,17 @@ const TERMINATOR: &[u8] = b"\0;";
 
 /// Unsigned LEB128 into `out`; returns its length.
 #[inline]
-fn varint_encode(mut v: u64, out: &mut [u8]) -> usize {
-    let mut n = 0;
-    loop {
-        let byte = (v & 0x7F) as u8;
-        v >>= 7;
-        if v == 0 {
-            out[n] = byte;
+fn varint_encode(mut v: u64, out: &mut [u8; MAX_VARINT]) -> usize {
+    // Over the array rather than by index: no bounds check per byte.
+    for (n, byte) in out.iter_mut().enumerate() {
+        if v < 0x80 {
+            *byte = v as u8;
             return n + 1;
         }
-        out[n] = byte | 0x80;
-        n += 1;
+        *byte = v as u8 | 0x80;
+        v >>= 7;
     }
+    unreachable!("a u64 is at most ten groups of seven bits")
 }
 
 /// Decodes the varint at the start of `buf` as `bvn_varint_decode` does:
@@ -157,13 +157,17 @@ fn varint_encode(mut v: u64, out: &mut [u8]) -> usize {
 /// tenth byte may carry only the lowest bit).
 #[inline(always)]
 fn varint_decode(buf: &[u8]) -> std::result::Result<Option<(u64, usize)>, ()> {
-    // Channels and short lengths are one byte.
-    if let Some(&b) = buf.first()
-        && b < 0x80
-    {
-        return Ok(Some((u64::from(b), 1)));
+    // Channels are one byte, and the length of a message that fits one chunk
+    // is at most three.
+    let low = |b: u8| u64::from(b & 0x7F);
+    match *buf {
+        [b0, ..] if b0 < 0x80 => Ok(Some((u64::from(b0), 1))),
+        [b0, b1, ..] if b1 < 0x80 => Ok(Some((low(b0) | u64::from(b1) << 7, 2))),
+        [b0, b1, b2, ..] if b2 < 0x80 => {
+            Ok(Some((low(b0) | low(b1) << 7 | u64::from(b2) << 14, 3)))
+        }
+        _ => varint_decode_long(buf),
     }
-    varint_decode_long(buf)
 }
 
 fn varint_decode_long(buf: &[u8]) -> std::result::Result<Option<(u64, usize)>, ()> {
@@ -231,9 +235,8 @@ fn check_key(key: &str) -> Result<()> {
 /// filled to 65536 bytes before the next begins.
 #[derive(Clone, Copy)]
 struct Cut {
-    channel: [u8; MAX_VARINT],
+    channel: u64,
     channel_len: usize,
-    length: [u8; MAX_VARINT],
     length_len: usize,
     len: usize,
 }
@@ -241,16 +244,12 @@ struct Cut {
 impl Cut {
     #[inline]
     fn new(channel: u64, len: usize) -> Self {
-        let mut cut = Cut {
-            channel: [0; MAX_VARINT],
-            channel_len: 0,
-            length: [0; MAX_VARINT],
-            length_len: 0,
+        Cut {
+            channel,
+            channel_len: varint_len(channel),
+            length_len: varint_len(len as u64),
             len,
-        };
-        cut.channel_len = varint_encode(channel, &mut cut.channel);
-        cut.length_len = varint_encode(len as u64, &mut cut.length);
-        cut
+        }
     }
 
     /// Payload bytes in the chunk that starts at payload offset `pos`.
@@ -264,49 +263,105 @@ impl Cut {
         (self.len - pos).min(room)
     }
 
-    /// Writes the header of the chunk at payload offset `pos`, carrying
-    /// `take` payload bytes, into `out`; returns its length.
+    /// Writes the header of the chunk at payload offset `pos` to the front
+    /// of `out`; returns its length and how many payload bytes the chunk
+    /// carries.
+    ///
+    /// The bytes go straight to where they are wanted. A header put together
+    /// byte by byte elsewhere and then copied is read back wider than it was
+    /// written, which the CPU cannot forward from its store buffer: that
+    /// stall cost more than the rest of the message.
     #[inline]
-    fn header(&self, pos: usize, take: usize, out: &mut [u8; MAX_CHUNK_HEADER]) -> usize {
+    fn header(&self, pos: usize, out: &mut [u8; MAX_CHUNK_HEADER]) -> (usize, usize) {
+        let take = self.take(pos);
         let varints = self.channel_len + if pos == 0 { self.length_len } else { 0 };
         // 65536 wraps to the 0x0000 that stands for it.
         let body = ((varints + take) as u32 as u16).to_le_bytes();
         out[0] = 0x01;
         out[1] = body[0];
         out[2] = body[1];
-        // Whole ten-byte copies: of a fixed size they are a few moves, where a
-        // copy of the varint's own length is a call to memcpy. The bytes past
-        // the varint are overwritten or not part of the header.
-        out[3..3 + MAX_VARINT].copy_from_slice(&self.channel);
+        varint_encode(self.channel, varint_room(out, 3));
         if pos == 0 {
-            let at = 3 + self.channel_len;
-            out[at..at + MAX_VARINT].copy_from_slice(&self.length);
+            varint_encode(self.len as u64, varint_room(out, 3 + self.channel_len));
         }
-        3 + varints
+        (3 + varints, take)
     }
 
     fn chunks(&self) -> usize {
-        let first = self.take(0);
-        let rest = self.len - first;
+        let rest = self.len - self.take(0);
         1 + rest.div_ceil(CHUNK_SIZE - self.channel_len)
     }
 }
 
+/// The length of `v` as a varint: one byte per seven bits, at least one.
+#[inline]
+fn varint_len(v: u64) -> usize {
+    (64 - (v | 1).leading_zeros() as usize).div_ceil(7)
+}
+
+/// The ten bytes of `header` from `at` on, where a varint goes.
+#[inline]
+fn varint_room(header: &mut [u8; MAX_CHUNK_HEADER], at: usize) -> &mut [u8; MAX_VARINT] {
+    header[at..]
+        .first_chunk_mut()
+        .expect("MAX_CHUNK_HEADER leaves room for both varints")
+}
+
+/// Appends the header of the chunk at payload offset `pos` to `out`, written
+/// in place (see [`Cut::header`]); returns the payload bytes the chunk
+/// carries.
+#[inline]
+fn push_header(out: &mut Vec<u8>, cut: &Cut, pos: usize) -> usize {
+    let at = out.len();
+    out.resize(at + MAX_CHUNK_HEADER, 0);
+    let room = out[at..].first_chunk_mut().expect("just made room");
+    let (n, take) = cut.header(pos, room);
+    out.truncate(at + n);
+    take
+}
+
+/// [`push_header`] for a chunk after the first, whose header is the tag, the
+/// length and the channel varint. With a channel varint of at most five
+/// bytes that fits a word, and one store of it replaces zeroing room first.
+#[inline]
+fn push_later_header(out: &mut Vec<u8>, cut: &Cut, pos: usize) -> usize {
+    if cut.channel_len > 5 {
+        return push_header(out, cut, pos);
+    }
+    let take = cut.take(pos);
+    let body = u64::from((cut.channel_len + take) as u32 as u16);
+    let word = 0x01 | body << 8 | varint_bits(cut.channel) << 24;
+    let at = out.len();
+    out.extend_from_slice(&word.to_le_bytes());
+    out.truncate(at + 3 + cut.channel_len);
+    take
+}
+
+/// `v` as a varint in the low bytes of a word, the first byte lowest: for a
+/// `v` of at most 56 bits, whose varint fits.
+#[inline]
+fn varint_bits(mut v: u64) -> u64 {
+    let mut bits = 0;
+    let mut shift = 0;
+    while v >= 0x80 {
+        bits |= u64::from(v as u8 | 0x80) << shift;
+        v >>= 7;
+        shift += 8;
+    }
+    bits | v << shift
+}
+
 /// Appends the chunks of one message, as `bvnr_mux_send` writes them.
+#[inline]
 fn encode_into(out: &mut Vec<u8>, channel: u64, payload: &[u8]) {
     let cut = Cut::new(channel, payload.len());
     out.reserve(payload.len() + cut.chunks() * MAX_CHUNK_HEADER);
-    let mut header = [0; MAX_CHUNK_HEADER];
-    let mut pos = 0;
-    loop {
-        let take = cut.take(pos);
-        let n = cut.header(pos, take, &mut header);
-        out.extend_from_slice(&header[..n]);
+    let mut pos = push_header(out, &cut, 0);
+    out.extend_from_slice(&payload[..pos]);
+    while pos < payload.len() {
+        let take = push_later_header(out, &cut, pos);
         out.extend_from_slice(&payload[pos..pos + take]);
         pos += take;
-        if pos == payload.len() {
-            return;
-        }
     }
 }
 
@@ -495,27 +550,20 @@ impl MuxWriter {
     pub fn encode<'a>(&self, head: &'a mut Vec<u8>, channel: u64, payload: &'a [u8]) -> Parts<'a> {
         let cut = Cut::new(channel, payload.len());
         head.clear();
-        let mut header = [0; MAX_CHUNK_HEADER];
-        let mut pos = 0;
-        let mut chunks = 0;
-        loop {
-            let take = cut.take(pos);
-            let n = cut.header(pos, take, &mut header);
-            head.extend_from_slice(&header[..n]);
+        let mut pos = push_header(head, &cut, 0);
+        let mut chunks = 1;
+        while pos < payload.len() {
+            pos += push_later_header(head, &cut, pos);
             chunks += 1;
-            pos += take;
-            if pos == payload.len() {
-                break;
-            }
         }
         Parts {
-            cut,
             head,
             payload,
-            head_pos: 0,
-            payload_pos: 0,
+            head_rest: head,
+            payload_rest: payload,
+            next: 3 + cut.channel_len + cut.length_len,
+            later: 3 + cut.channel_len,
             pending: 0,
-            done: false,
             left: 2 * chunks - usize::from(payload.is_empty()),
         }
     }
@@ -540,8 +588,7 @@ impl MuxWriter {
         let mut header = [0; MAX_CHUNK_HEADER];
         let mut pos = 0;
         loop {
-            let take = cut.take(pos);
-            let n = cut.header(pos, take, &mut header);
+            let (n, take) = cut.header(pos, &mut header);
             let mut bufs = [
                 IoSlice::new(&header[..n]),
                 IoSlice::new(&payload[pos..pos + take]),
@@ -561,22 +608,17 @@ impl MuxWriter {
 /// payload slice; no part is ever empty.
 #[derive(Clone, Debug)]
 pub struct Parts<'a> {
-    cut: Cut,
     head: &'a [u8],
     payload: &'a [u8],
-    head_pos: usize,
-    payload_pos: usize,
+    /// The headers and the payload bytes not yet handed out.
+    head_rest: &'a [u8],
+    payload_rest: &'a [u8],
+    /// The length of the next header, and of each header after the first.
+    next: usize,
+    later: usize,
+    /// The payload bytes of the current chunk, the next part when not 0.
     pending: usize,
-    done: bool,
     left: usize,
-}
-
-impl std::fmt::Debug for Cut {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Cut")
-            .field("len", &self.len)
-            .finish_non_exhaustive()
-    }
 }
 
 impl<'a> Parts<'a> {
@@ -597,27 +639,20 @@ impl<'a> Iterator for Parts<'a> {
     #[inline]
     fn next(&mut self) -> Option<&'a [u8]> {
         if self.pending > 0 {
-            let part = &self.payload[self.payload_pos..self.payload_pos + self.pending];
-            self.payload_pos += self.pending;
+            let (part, rest) = self.payload_rest.split_at(self.pending);
+            self.payload_rest = rest;
             self.pending = 0;
             self.left -= 1;
             return Some(part);
         }
-        if self.done {
+        if self.head_rest.is_empty() {
             return None;
         }
-        let take = self.cut.take(self.payload_pos);
-        let n = 3
-            + self.cut.channel_len
-            + if self.head_pos == 0 {
-                self.cut.length_len
-            } else {
-                0
-            };
-        let part = &self.head[self.head_pos..self.head_pos + n];
-        self.head_pos += n;
-        self.pending = take;
-        self.done = self.payload_pos + take == self.payload.len();
+        let (part, rest) = self.head_rest.split_at(self.next);
+        self.head_rest = rest;
+        // What a chunk under this header holds of the payload (Cut::take).
+        self.pending = self.payload_rest.len().min(CHUNK_SIZE + 3 - self.next);
+        self.next = self.later;
         self.left -= 1;
         Some(part)
     }
@@ -749,10 +784,10 @@ struct Channel {
 }
 
 impl Channel {
-    fn new(id: u64) -> Self {
+    fn new(id: u64, buf: Vec<u8>) -> Self {
         Channel {
             id,
-            buf: Vec::new(),
+            buf,
             need: 0,
             have: 0,
             active: false,
@@ -765,13 +800,38 @@ impl Channel {
 
 /// A message start whose chunk header was read straight from the input: the
 /// input was left at the chunk's tag, so the message can still be handed on
-/// as the input's own bytes.
+/// as the input's own bytes. Its channel is left as it was, with nothing
+/// open, until the message turns out not to lie whole in the input.
 #[derive(Clone, Copy, Debug)]
 struct Fresh {
+    channel: u64,
+    len: u64,
     /// Tag, length and both varints.
     header: usize,
-    /// The chunk's length field.
-    chunk: usize,
+    /// Where the chunk ends, from its tag.
+    end: usize,
+}
+
+/// A chunk at the front of the input that starts a message on a channel with
+/// nothing open, and carries nothing but that message: all of it, or its
+/// first part.
+#[derive(Clone, Copy, Debug)]
+struct Start {
+    cur: usize,
+    channel: u64,
+    len: u64,
+    /// Tag, length and both varints.
+    header: usize,
+    /// Where the chunk ends, from its tag.
+    end: usize,
+}
+
+impl Start {
+    /// Whether the chunk holds all of the message.
+    #[inline]
+    fn whole(&self) -> bool {
+        self.len == (self.end - self.header) as u64
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -886,6 +946,9 @@ pub struct MuxReader {
     /// The channel of the current chunk.
     cur: usize,
     channels: Vec<Channel>,
+    /// The buffers of the channels of earlier streams, kept by
+    /// [`reset`](Self::reset) for the channels of the next.
+    spare: Vec<Vec<u8>>,
     index: HashMap<u64, u32, BuildHasherDefault<ChannelHasher>>,
     /// The channel found last, checked before the index.
     last: usize,
@@ -921,6 +984,7 @@ impl MuxReader {
             channel_varint_len: 0,
             cur: 0,
             channels: Vec::new(),
+            spare: Vec::new(),
             index: HashMap::default(),
             last: usize::MAX,
             small: [0; SMALL_CHANNELS],
@@ -1045,6 +1109,11 @@ impl MuxReader {
     /// Makes the reader ready for a new stream, keeping its options and the
     /// capacity of its message buffers.
     pub fn reset(&mut self) {
+        let mut spare = std::mem::take(&mut self.spare);
+        spare.extend(self.channels.drain(..).map(|c| c.buf));
+        let channels = std::mem::take(&mut self.channels);
+        let mut index = std::mem::take(&mut self.index);
+        index.clear();
         *self = MuxReader {
             max_message: self.max_message,
             filter: self.filter.take(),
@@ -1053,6 +1122,9 @@ impl MuxReader {
             text: std::mem::take(&mut self.text),
             head: std::mem::take(&mut self.head),
             wire: std::mem::take(&mut self.wire),
+            channels,
+            spare,
+            index,
             ..Self::new()
         };
         self.key.clear();
@@ -1068,6 +1140,24 @@ impl MuxReader {
     /// open is delivered here too, as its payload, unless it was skipped.
     #[inline]
     pub fn read<'s, 'a: 's>(&'s mut self, input: &mut &'a [u8]) -> Result<Option<Message<'s>>> {
+        // The common case first, straight from the input: a chunk that holds
+        // one whole message.
+        let buf: &'a [u8] = input;
+        if self.ready()
+            && let Some(s) = self.start(buf)?
+            && s.whole()
+        {
+            let (bytes, rest) = buf.split_at(s.end);
+            *input = rest;
+            return Ok(Some(Message {
+                channel: s.channel,
+                payload: &bytes[s.header..],
+            }));
+        }
+        self.read_general(input)
+    }
+
+    fn read_general<'s, 'a: 's>(&'s mut self, input: &mut &'a [u8]) -> Result<Option<Message<'s>>> {
         loop {
             match self.advance(input, None)? {
                 Found::Nothing => return Ok(None),
@@ -1129,6 +1219,52 @@ impl MuxReader {
         input: &mut &'a [u8],
         head: usize,
     ) -> Result<Option<Item<'s>>> {
+        // The common case first, straight from the input: the message peeked
+        // at last lies whole in it, and the next chunk starts a message.
+        let mut buf: &'a [u8] = input;
+        if let Pending::Peeked { fresh: Some(f) } = self.pending
+            && let Some(n) = settled(buf, &f, self.decision)
+        {
+            let (bytes, rest) = buf.split_at(n);
+            buf = rest;
+            *input = rest;
+            self.pending = Pending::None;
+            match std::mem::take(&mut self.decision) {
+                Decision::Skip => {}
+                Decision::Deliver => {
+                    return Ok(Some(Item::Message(Message {
+                        channel: f.channel,
+                        payload: &bytes[f.header..],
+                    })));
+                }
+                Decision::Forward => {
+                    return Ok(Some(Item::Wire(Wire {
+                        channel: f.channel,
+                        len: f.len,
+                        bytes,
+                    })));
+                }
+            }
+        }
+        if self.ready()
+            && let Some(s) = self.start(buf)?
+        {
+            let head = self.begin_peek(s, buf, head);
+            return Ok(Some(Item::Peek(Peek {
+                channel: s.channel,
+                len: s.len,
+                head,
+                decision: &mut self.decision,
+            })));
+        }
+        self.next_item_general(input, head)
+    }
+
+    fn next_item_general<'s, 'a: 's>(
+        &'s mut self,
+        input: &mut &'a [u8],
+        head: usize,
+    ) -> Result<Option<Item<'s>>> {
         Ok(match self.advance(input, Some(head))? {
             Found::Nothing => None,
             Found::Message { channel, src } => Some(Item::Message(Message {
@@ -1155,6 +1291,67 @@ impl MuxReader {
         })
     }
 
+    /// Whether the reader is between chunks with nothing to finish first.
+    #[inline]
+    fn ready(&self) -> bool {
+        self.state == State::Tag && matches!(self.pending, Pending::None) && self.error.is_none()
+    }
+
+    /// The chunk at the front of `buf`, if it is all there and starts a
+    /// message as [`Start`] describes. `None`, with nothing changed but the
+    /// channel registered, sends any other chunk the general way, which also
+    /// reports the errors.
+    #[inline(always)]
+    fn start(&mut self, buf: &[u8]) -> Result<Option<Start>> {
+        let [0x01, lo, hi, rest @ ..] = buf else {
+            return Ok(None);
+        };
+        let n = chunk_len(*lo, *hi);
+        let Some(body) = rest.get(..n) else {
+            return Ok(None);
+        };
+        let Ok(Some((channel, channel_len))) = varint_decode(body) else {
+            return Ok(None);
+        };
+        let Ok(Some((len, length_len))) = varint_decode(&body[channel_len..]) else {
+            return Ok(None);
+        };
+        let header = 3 + channel_len + length_len;
+        let first = (n + 3 - header) as u64;
+        if len < first || len > self.max_message || usize::try_from(len).is_err() {
+            return Ok(None);
+        }
+        let cur = self.channel(channel)?;
+        let c = &self.channels[cur];
+        if c.active || c.varint_len > 0 {
+            return Ok(None);
+        }
+        Ok(Some(Start {
+            cur,
+            channel,
+            len,
+            header,
+            end: 3 + n,
+        }))
+    }
+
+    /// Stops at the message `s` starts, leaving `buf` at its chunk's tag;
+    /// returns its first bytes, up to `head`.
+    #[inline]
+    fn begin_peek<'a>(&mut self, s: Start, buf: &'a [u8], head: usize) -> &'a [u8] {
+        self.cur = s.cur;
+        self.pending = Pending::Peeked {
+            fresh: Some(Fresh {
+                channel: s.channel,
+                len: s.len,
+                header: s.header,
+                end: s.end,
+            }),
+        };
+        let first = &buf[s.header..s.end];
+        &first[..head.min(first.len())]
+    }
+
     fn resolve<'s, 'a: 's>(&'s self, src: Src<'a>) -> &'s [u8] {
         match src {
             Src::Input(s) => s,
@@ -1171,7 +1368,7 @@ impl MuxReader {
     }
 
     /// The index of channel `id`, registering it on first sight.
-    #[inline]
+    #[inline(always)]
     fn channel(&mut self, id: u64) -> Result<usize> {
         if let Some(&slot) = self.small.get(id as usize)
             && slot > 0
@@ -1183,6 +1380,14 @@ impl MuxReader {
         {
             return Ok(self.last);
         }
+        self.channel_indexed(id)
+    }
+
+    /// [`channel`](Self::channel) for an id it has not just seen and that
+    /// is not small: out of line, so that the common case stays small enough
+    /// to be inlined.
+    #[inline(never)]
+    fn channel_indexed(&mut self, id: u64) -> Result<usize> {
         let i = match self.index.get(&id) {
             Some(&i) => i as usize,
             None => {
@@ -1190,7 +1395,9 @@ impl MuxReader {
                     return Err(self.fail(ErrorCode::OctetStreamOutOfSync));
                 }
                 let i = self.channels.len();
-                self.channels.push(Channel::new(id));
+                let mut buf = self.spare.pop().unwrap_or_default();
+                buf.clear();
+                self.channels.push(Channel::new(id, buf));
                 match self.small.get_mut(id as usize) {
                     // Below MAX_CHANNELS, so the index fits.
                     Some(slot) => *slot = i as u16 + 1,
@@ -1289,7 +1496,6 @@ impl MuxReader {
     }
 
     /// Reads on until something is found or `input` is used up.
-    #[inline]
     fn advance<'a>(&mut self, input: &mut &'a [u8], peek: Option<usize>) -> Result<Found<'a>> {
         if let Some(e) = &self.error {
             return Err(e.clone());
@@ -1312,9 +1518,22 @@ impl MuxReader {
             match self.state {
                 State::Tag => match b {
                     0x01 if buf.len() >= 3 => {
-                        if let Some((used, found)) = self.whole_chunk(buf, peek)? {
-                            *input = &buf[used..];
-                            return Ok(found);
+                        if let Some(s) = self.start(buf)? {
+                            if let Some(head) = peek {
+                                let head = self.begin_peek(s, buf, head);
+                                return Ok(Found::Peek {
+                                    channel: s.channel,
+                                    len: s.len,
+                                    src: Src::Input(head),
+                                });
+                            }
+                            if s.whole() {
+                                *input = &buf[s.end..];
+                                return Ok(Found::Message {
+                                    channel: s.channel,
+                                    src: Src::Input(&buf[s.header..s.end]),
+                                });
+                            }
                         }
                         self.chunk_left = chunk_len(buf[1], buf[2]);
                         tag = Some(buf);
@@ -1399,8 +1618,10 @@ impl MuxReader {
                             self.state = State::Tag;
                             self.pending = Pending::Peeked {
                                 fresh: Some(Fresh {
+                                    channel,
+                                    len,
                                     header,
-                                    chunk: header - 3 + self.chunk_left - used,
+                                    end: header + self.chunk_left - used,
                                 }),
                             };
                             return Ok(Found::Peek {
@@ -1430,71 +1651,11 @@ impl MuxReader {
         }
     }
 
-    /// The common case, read straight from the input: a whole chunk that
-    /// holds exactly one whole message, on a channel with nothing open. A
-    /// message that is read hands over its payload; one that is peeked at is
-    /// left in the input as a fresh start. `None`, with nothing changed but
-    /// the channel registered, sends any other chunk the general way, which
-    /// also reports the errors.
-    #[inline]
-    fn whole_chunk<'a>(
-        &mut self,
-        buf: &'a [u8],
-        peek: Option<usize>,
-    ) -> Result<Option<(usize, Found<'a>)>> {
-        let n = chunk_len(buf[1], buf[2]);
-        let Some(body) = buf.get(3..3 + n) else {
-            return Ok(None);
-        };
-        let Ok(Some((id, channel_len))) = varint_decode(body) else {
-            return Ok(None);
-        };
-        let rest = &body[channel_len..];
-        let Ok(Some((need, length_len))) = varint_decode(rest) else {
-            return Ok(None);
-        };
-        let payload = &rest[length_len..];
-        if need != payload.len() as u64 || need > self.max_message {
-            return Ok(None);
-        }
-        let cur = self.channel(id)?;
-        let c = &mut self.channels[cur];
-        if c.active || c.varint_len > 0 {
-            return Ok(None);
-        }
-        let Some(head) = peek else {
-            let found = Found::Message {
-                channel: id,
-                src: Src::Input(payload),
-            };
-            return Ok(Some((3 + n, found)));
-        };
-        c.active = true;
-        c.need = need;
-        c.have = 0;
-        c.decision = Decision::Deliver;
-        c.buf.clear();
-        self.cur = cur;
-        self.pending = Pending::Peeked {
-            fresh: Some(Fresh {
-                header: 3 + channel_len + length_len,
-                chunk: n,
-            }),
-        };
-        let found = Found::Peek {
-            channel: id,
-            len: need,
-            src: Src::Input(&payload[..head.min(payload.len())]),
-        };
-        Ok(Some((0, found)))
-    }
-
     /// Reads `piece`, the next bytes of the current chunk's fragment, as
     /// `demux_feed` does: a length varint where no message is open, then
     /// message bytes, any number of messages. Returns how much of `piece` it
     /// took. `tag` is the input from the chunk's tag on when the header was
     /// read from it unbroken and `piece` starts the fragment.
-    #[inline]
     fn fragment<'a>(
         &mut self,
         piece: &'a [u8],
@@ -1556,36 +1717,37 @@ impl MuxReader {
                 if need > self.max_message || usize::try_from(need).is_err() {
                     return Err(self.fail(ErrorCode::ValueOutOfRange));
                 }
+                // The first bytes come from this chunk only: another
+                // channel's chunk may follow it.
+                let target = peek.map(|head| head.min(need as usize).min(self.chunk_left - pos));
+                let avail = piece.len() - pos;
+                if let Some(target) = target
+                    && avail >= target
+                    && let Some(at) = tag
+                    && start == 0
+                    && old == 0
+                {
+                    // A fresh start: the channel stays idle (see Fresh).
+                    let fresh = FragFound::Fresh {
+                        at,
+                        channel: c.id,
+                        len: need,
+                        head: &piece[pos..pos + target],
+                    };
+                    return Ok((pos, fresh));
+                }
                 c.active = true;
                 c.need = need;
                 c.have = 0;
                 c.decision = Decision::Deliver;
                 c.buf.clear();
-                if let Some(head) = peek {
-                    // The first bytes come from this chunk only: another
-                    // channel's chunk may follow it.
-                    let target = head.min(need as usize).min(self.chunk_left - pos);
-                    let avail = piece.len() - pos;
+                if let Some(target) = target {
                     if avail >= target {
-                        let head = &piece[pos..pos + target];
-                        let (channel, len) = (c.id, need);
-                        if let Some(at) = tag
-                            && start == 0
-                            && old == 0
-                        {
-                            let fresh = FragFound::Fresh {
-                                at,
-                                channel,
-                                len,
-                                head,
-                            };
-                            return Ok((pos, fresh));
-                        }
                         self.pending = Pending::Peeked { fresh: None };
                         let found = Found::Peek {
-                            channel,
-                            len,
-                            src: Src::Input(head),
+                            channel: c.id,
+                            len: need,
+                            src: Src::Input(&piece[pos..pos + target]),
                         };
                         return Ok((pos, FragFound::Found(found)));
                     }
@@ -1670,34 +1832,31 @@ impl MuxReader {
         if let Some(f) = fresh {
             // The input is still at the message's first chunk: when the
             // message is all there, it is handed over or passed over at once.
-            let first_payload = f.chunk - (f.header - 3);
-            let c = &mut self.channels[cur];
-            let (channel, len) = (c.id, c.need);
-            let whole = match decision {
-                Decision::Deliver => (first_payload as u64 == len && input.len() >= 3 + f.chunk)
-                    .then_some(3 + f.chunk),
-                _ => raw_span(input, 3 + f.chunk, first_payload, channel, len),
-            };
-            if let Some(n) = whole {
-                c.active = false;
+            if let Some(n) = settled(input, &f, decision) {
                 let (bytes, rest) = input.split_at(n);
                 *input = rest;
                 return Ok(match decision {
                     Decision::Deliver => Found::Message {
-                        channel,
+                        channel: f.channel,
                         src: Src::Input(&bytes[f.header..]),
                     },
                     Decision::Skip => Found::Nothing,
                     Decision::Forward => Found::Wire {
-                        channel,
-                        len,
+                        channel: f.channel,
+                        len: f.len,
                         src: Src::Input(bytes),
                     },
                 });
             }
+            // It is not: the channel is inside it from here on.
+            let c = &mut self.channels[cur];
+            c.active = true;
+            c.need = f.len;
+            c.have = 0;
+            c.buf.clear();
             *input = &input[f.header..];
-            self.chunk_left = first_payload;
-            self.state = if first_payload == 0 {
+            self.chunk_left = f.end - f.header;
+            self.state = if self.chunk_left == 0 {
                 State::Tag
             } else {
                 State::Fragment
@@ -1783,6 +1942,22 @@ fn chunk_len(lo: u8, hi: u8) -> usize {
     match u16::from_le_bytes([lo, hi]) {
         0 => CHUNK_SIZE,
         n => usize::from(n),
+    }
+}
+
+/// The wire bytes at the front of `input` of the message `f` peeked at, when
+/// they are all there and `decision` takes them as they are: one chunk that
+/// holds all of it, or, unless it is delivered (and so gathered), the run of
+/// chunks [`raw_span`] finds.
+#[inline]
+fn settled(input: &[u8], f: &Fresh, decision: Decision) -> Option<usize> {
+    let first = f.end - f.header;
+    if f.len == first as u64 {
+        (input.len() >= f.end).then_some(f.end)
+    } else if decision == Decision::Deliver {
+        None
+    } else {
+        raw_span(input, f.end, first, f.channel, f.len)
     }
 }
 
@@ -2007,9 +2182,25 @@ mod tests {
 
     #[test]
     fn varints_round_trip_and_refuse_overlong() {
-        for v in [0, 1, 127, 128, 300, 1 << 35, u64::MAX - 1, u64::MAX] {
+        for v in [
+            0,
+            1,
+            127,
+            128,
+            300,
+            (1 << 35) - 1,
+            1 << 35,
+            1 << 55,
+            u64::MAX - 1,
+            u64::MAX,
+        ] {
             let mut buf = [0; MAX_VARINT];
             let n = varint_encode(v, &mut buf);
+            assert_eq!(varint_len(v), n, "{v}");
+            if n <= 8 {
+                assert_eq!(varint_bits(v).to_le_bytes()[..n], buf[..n], "{v}");
+                assert_eq!(varint_bits(v) >> (8 * n - 1) >> 1, 0, "{v}");
+            }
             assert_eq!(varint_decode(&buf[..n]), Ok(Some((v, n))), "{v}");
             assert_eq!(varint_decode(&buf[..n - 1]), Ok(None), "{v}");
         }

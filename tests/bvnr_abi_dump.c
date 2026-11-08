@@ -173,6 +173,13 @@ int main(void)
 	ABI_FIELD(bvnr_doc_stream_opts_t, continue_past_failed);
 	ABI_FIELD(bvnr_doc_stream_opts_t, max_document_size);
 
+	ABI_STRUCT(bvnr_demux_item_t);
+	ABI_FIELD(bvnr_demux_item_t, channel);
+	ABI_FIELD(bvnr_demux_item_t, data);
+	ABI_FIELD(bvnr_demux_item_t, length);
+	ABI_FIELD(bvnr_demux_item_t, event);
+	ABI_FIELD(bvnr_demux_item_t, value);
+
 	ABI_STRUCT(bvn_dom_entry_t);
 	ABI_FIELD(bvn_dom_entry_t, key);
 	ABI_FIELD(bvn_dom_entry_t, value);

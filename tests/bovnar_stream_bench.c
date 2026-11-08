@@ -29,16 +29,20 @@
  *   demux read    bvnr_read with bvnr_demux_on_event (the batch path);
  *   demux feed    the push-fed demux, callback mode (on_message) and pull mode
  *                 (bvnr_demux_next), fed the whole document at once and in
- *                 1460-byte and 64-byte pieces.
+ *                 1460-byte and 64-byte pieces;
+ *   frames        per framed document: bvnr_doc_stream_read and the parsing
+ *                 frame reader, fed the whole stream at once and in 1460-byte
+ *                 pieces.
  *
- * Messages of 150 B, 30 KB and 400 KB (the last spans seven chunks). Not a
- * test: it is built with the others and run by hand,
+ * Messages of 150 B, 30 KB and 400 KB (the last spans seven chunks); framed
+ * documents of about 50 B and 30 KB. Not a test: it is built with the others
+ * and run by hand,
  *
  *     ./build/tests/bvnr_stream_bench [seconds-per-cell]
  *
  * Compiled with -DBVNR_BENCH_BATCH_ONLY it uses only the API that predates the
- * fed demux, so the same source measures a library from before it (for the
- * before/after figures of bvnr_mux_send).
+ * fed demux and the frame reader, so the same source measures a library from
+ * before them (for the before/after figures of bvnr_mux_send).
  */
 
 #if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
@@ -176,6 +180,127 @@ static void bench_feed(cell_t* c, double budget, uint64_t piece, bool pull)
 }
 #endif
 
+/* ---- framed documents ---------------------------------------------------*/
+
+typedef struct {
+	uint8_t* stream;
+	uint64_t stream_len;
+	uint32_t docs;
+	uint64_t doc_len;
+} frames_t;
+
+static bool count_value(void* ud, bvnr_event_t ev, bvnr_data_t* d)
+{
+	(void)ud;
+	g_sink += (uint64_t)ev + (d ? d->length : 0);
+	return true;
+}
+
+/* `docs` copies of one document, each in its own frame. */
+static void frames_build(frames_t* f, const char* doc, uint64_t doc_len,
+	uint32_t docs)
+{
+	uint64_t cap = (uint64_t)docs * (doc_len + BVNR_FRAME_HEADER_SIZE);
+	f->stream  = xmalloc((size_t)cap);
+	f->docs    = docs;
+	f->doc_len = doc_len;
+	bvnr_sink_t sink;
+	bvnr_sink_to_mem(&sink, f->stream, cap);
+	for (uint32_t i = 0; i < docs; i++)
+		bvnr_frame_write(&sink, doc, doc_len);
+	f->stream_len = bvnr_sink_bytes_written(&sink);
+}
+
+static void frames_report(const char* what, const frames_t* f, double secs,
+	uint64_t rounds)
+{
+	double per = secs / ((double)rounds * (double)f->docs);
+	double mbs = (double)f->stream_len * (double)rounds / secs / 1e6;
+	printf("  %-34s %8llu B  %10.1f ns/doc  %9.1f MB/s\n", what,
+	       (unsigned long long)f->doc_len, per * 1e9, mbs);
+}
+
+static void frames_opts(bvnr_doc_stream_opts_t* o, bvnr_read_flags_t* fl)
+{
+	memset(fl, 0, sizeof(*fl));
+	fl->on_verified = count_value;
+	memset(o, 0, sizeof(*o));
+	o->flags = fl;
+}
+
+static void bench_doc_stream(const frames_t* f, double budget)
+{
+	bvnr_read_flags_t fl;
+	bvnr_doc_stream_opts_t o;
+	frames_opts(&o, &fl);
+	uint64_t rounds; double secs;
+	bvnr_source_t src;
+	BENCH(budget, &rounds, &secs,
+	      bvnr_source_from_mem(&src, f->stream, f->stream_len);
+	      bvnr_doc_stream_read(&src, &o, NULL));
+	frames_report("bvnr_doc_stream_read", f, secs, rounds);
+}
+
+#if !defined(BVNR_BENCH_BATCH_ONLY)
+static void frames_feed(const frames_t* f, const bvnr_doc_stream_opts_t* o,
+	uint64_t piece)
+{
+	bvnr_frame_reader_t* fr = bvnr_frame_reader_create(o);
+	for (uint64_t at = 0; at < f->stream_len; at += piece) {
+		uint64_t n = f->stream_len - at < piece ? f->stream_len - at : piece;
+		bvnr_frame_reader_feed(fr, f->stream + at, n);
+	}
+	bvnr_frame_reader_finish(fr);
+	g_sink += bvnr_frame_reader_count(fr);
+	bvnr_frame_reader_destroy(fr);
+}
+
+static void bench_frame_reader(const frames_t* f, double budget,
+	uint64_t piece)
+{
+	bvnr_read_flags_t fl;
+	bvnr_doc_stream_opts_t o;
+	frames_opts(&o, &fl);
+	uint64_t rounds; double secs;
+	BENCH(budget, &rounds, &secs,
+	      frames_feed(f, &o, piece ? piece : f->stream_len));
+	frames_report(piece ? "frame reader, 1460 B pieces"
+			    : "frame reader, whole buffer", f, secs, rounds);
+}
+#endif
+
+/* About 30 KB of assignments, numbers and strings alternating. */
+static uint64_t large_doc(char* out, uint64_t cap)
+{
+	uint64_t n = 0;
+	for (uint32_t i = 0; n + 64 < cap && n < 30000; i++)
+		n += (uint64_t)snprintf(out + n, (size_t)(cap - n),
+			i & 1 ? ".k%u = \"value %u\";\n" : ".k%u = %u;\n",
+			i, i * 7919u);
+	return n;
+}
+
+static void bench_frames(double budget)
+{
+	static const char small[] = ".id = 12345; .name = \"sensor-7\"; .t = 21.5;";
+	static char large[32768];
+	const char* docs[2] = { small, large };
+	uint64_t lens[2] = { sizeof(small) - 1, large_doc(large, sizeof(large)) };
+	static const uint32_t counts[2] = { 20000, 200 };
+	for (int s = 0; s < 2; s++) {
+		frames_t f;
+		frames_build(&f, docs[s], lens[s], counts[s]);
+		printf("%u framed documents of %llu bytes\n", f.docs,
+		       (unsigned long long)f.doc_len);
+		bench_doc_stream(&f, budget);
+#if !defined(BVNR_BENCH_BATCH_ONLY)
+		bench_frame_reader(&f, budget, 0);
+		bench_frame_reader(&f, budget, 1460);
+#endif
+		free(f.stream);
+	}
+}
+
 int main(int argc, char** argv)
 {
 	double budget = argc > 1 ? atof(argv[1]) : 0.5;
@@ -208,6 +333,7 @@ int main(int argc, char** argv)
 #endif
 		free(c.doc);
 	}
+	bench_frames(budget);
 	free(g_payload);
 	return g_sink == 42 ? 1 : 0;
 }

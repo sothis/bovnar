@@ -23,6 +23,7 @@
  */
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -121,13 +122,19 @@ void bvn_val_init(bvnr_validator_t* v, bvnr_read_flags_t* opts)
 	 * The unit policy is the one thing carried across: it is set through its own
 	 * call rather than through the flags, describes the CONSUMER rather than the
 	 * document, and a caller who set it once and then opened a second document
-	 * would have no way to notice it had been silently dropped. Saving it here
+	 * would have no way to notice it had been silently dropped. Keeping it here
 	 * is also what lets bvnr_reader_set_unit_policy be called either side of the
-	 * open. */
-	bvn_unit_policy_state_t saved_policy = v->policy;
+	 * open.
+	 *
+	 * Everything else is zeroed around it rather than the policy being copied
+	 * out and back: it is 13 KB, and that round trip, on every open, cost a
+	 * reader fed one small framed document after another more than its
+	 * parse. */
 	bvn_val_free(v);
-	memset(v, 0, sizeof(*v));
-	v->policy = saved_policy;
+	size_t pol_at  = offsetof(bvnr_validator_t, policy);
+	size_t pol_end = pol_at + sizeof(v->policy);
+	memset(v, 0, pol_at);
+	memset((uint8_t*)v + pol_end, 0, sizeof(*v) - pol_end);
 	v->value_type             = BVN_TYPE_PLAIN;
 	v->parsed_unit            = BVN_UNIT_NO_PREFIX(bu_none);
 	v->inferred_default_vtype = BVN_TYPE_PLAIN;
@@ -2446,8 +2453,9 @@ bool bvnr_reader_get_declared_version(
 	return true;
 }
 /*
- * Bind a reader to a source and arm it for bvnr_read. Tears down any previous
- * lexer state first so a single reader can be reused for many documents.
+ * Bind a reader to a source and arm it for bvnr_read. Clears any previous
+ * lexer state first so a single reader can be reused for many documents; its
+ * buffers are kept (bvn_lex_reset), so a re-open allocates nothing.
  * Requires a source with a real pull function (a zeroed/uninitialised source is
  * rejected rather than crashing). The optional dbg_sink tees raw input for the
  * canonicaliser. bvnr_open_read_mem is a thin convenience wrapper that builds a
@@ -2459,8 +2467,7 @@ bool bvnr_open_read_source(
 {
 	if (!r)
 		return false;
-	bvn_lex_destroy(&r->lex);
-	memset(&r->lex, 0, sizeof(r->lex));
+	bvn_lex_reset(&r->lex);
 	if (!src || !bvn_source_impl_c(src)->pull)
 		return false;
 	if (!bvn_lex_init(&r->lex, src, dbg_sink, options))
@@ -2479,8 +2486,7 @@ bool bvnr_open_read_feed(
 {
 	if (!r)
 		return false;
-	bvn_lex_destroy(&r->lex);
-	memset(&r->lex, 0, sizeof(r->lex));
+	bvn_lex_reset(&r->lex);
 	if (!bvn_lex_init(&r->lex, NULL, dbg_sink, options))
 		return false;
 	bvn_val_init(&r->val, options);

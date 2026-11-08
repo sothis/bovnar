@@ -181,7 +181,9 @@ Two kinds, chosen when it is created:
   `bvnr_doc_stream_read` parses it with the same `opts` — the same events through
   `opts->flags`, the same `on_document` calls, `continue_past_failed` and
   `max_document_size`. Each payload is streamed into a reused push-fed reader as
-  its bytes arrive, so a frame is never buffered whole, however large.
+  its bytes arrive, so a frame is never buffered whole, however large; the
+  reader keeps its buffers from one document to the next, so once warm the
+  frame reader allocates nothing per document.
 - **Pull** (`bvnr_frame_reader_create_pull`): the documents are handed out as
   bytes by `bvnr_frame_reader_next`, for the caller to parse as it likes. A
   document whose frame lies whole in the fed buffer is handed out from that
@@ -466,6 +468,45 @@ for `max_document_size` and `max_message`, `0` selects their finite defaults
 value there to raise them. See [Python Bindings](09_bovnar_python_bindings.md)
 and `python/tests/test_stream.py`.
 
+**Sockets and file objects.** The loaders (`load_documents`, `mux_load`, and
+`bovnar.load` for one document) also take a socket or a binary file object and
+read it to its end through a callback source (§8.1), parsing as they pull; the
+dumpers take a `file=` and write through a callback sink. `mux_dump(...,
+preamble={...})` writes the values that describe the stream before it opens
+(§3.4).
+
+**Live streams** (§7) are read with three feed objects over the push-fed C
+readers, each handed bytes in pieces of any size: `DocumentFeed` (§8.2: a
+document's events, or each top-level value once it is complete), `FrameFeed`
+(§2.4: each document's bytes, or each document parsed) and `DemuxFeed` (§3.4:
+`(channel, payload)` per message, and with `values=True` the values before and
+after the mux stream, in document order). `DemuxFeed` and the unparsed
+`FrameFeed` drain with `bvnr_demux_next` / `bvnr_frame_reader_next`, one plain
+call per item and no callback (§8.3); a payload is `bytes`, or with
+`view=True` a `memoryview` valid until the next call, which the feed then
+releases:
+
+```python
+from bovnar import stream
+
+with stream.DemuxFeed(key="media", values=True) as dm:
+    for chunk in chunks:                          # whatever recv() returned
+        for item in dm.feed(chunk):
+            if isinstance(item, stream.Value):    # .meta before the first message
+                on_meta(item.key, item.value)
+            else:
+                on_frame(item.channel, item.payload)
+    dm.finish()                                   # raises if cut off part-way
+```
+
+The limits and error codes are those of the batch functions. A message costs
+microseconds in Python — the interpreter and ctypes, not the C path of §8.4:
+about 3 µs for a 150-byte message and 7 µs for a 30 KB one fed whole, against
+5 µs and 36 µs through `mux_load`'s callback, on the machine of §8.4. The
+figures, and what feeding in small pieces costs, are in
+[Python Bindings §4.7](09_bovnar_python_bindings.md#47-live-streams-feeding-in-pieces)
+(`python/bench/bench_stream.py`).
+
 ---
 
 ## 6. Rust bindings
@@ -577,9 +618,26 @@ point.
 A message that fits one chunk and arrives in one feed is handed out without
 touching its bytes, which is why the 30 KB column falls by a factor of thirty.
 Fed in small pieces, a chunk is gathered before it is passed on, and a message
-split over chunks is reassembled: one copy each. `bvnr_mux_send`,
+split over chunks is reassembled: one copy each.
+
+Per framed document, a 43-byte one and a 30 KB one of numbers and strings:
+
+| Path | 43 B | 30 KB |
+|------|-----:|------:|
+| `bvnr_doc_stream_read` (2.0.2: the reader's buffers and the payload allocated per document) | 5.6 µs | 757 µs |
+| `bvnr_doc_stream_read` (buffers kept across documents) | 2.4 µs | 758 µs |
+| parsing frame reader, one feed | 2.2 µs | 766 µs |
+| parsing frame reader, 1460 B feeds | 2.3 µs | 764 µs |
+
+Re-opening a reader for the next document used to free its frame stack and
+scratch buffers and allocate them again, about 120 KB zeroed, and to copy the
+13 KB unit policy out of the validator and back while clearing it: more than a
+small document costs to parse, and the frame reader paid it too (5.5 µs for the
+43-byte document). A 30 KB document is dominated by its parse. `bvnr_mux_send`,
 `bvnr_demux_next` and `bvnr_frame_reader_next` allocate nothing per message once
-warm (`tests/bovnar_alloc_test.c`).
+warm, nor the parsing frame reader and a re-opened fed demux per document; a
+`bvnr_doc_stream_read` call allocates the same whatever the number of documents
+(`tests/bovnar_alloc_test.c`).
 
 ---
 
@@ -592,7 +650,8 @@ warm (`tests/bovnar_alloc_test.c`).
 - `include/bovnar_stream.h` — full declarations and per-function contracts
 - `tests/bovnar_stream_test.c` — round-trip tests for all four capabilities
 - `tests/bovnar_feed_test.c` — the push-fed readers and callback I/O against the batch functions
-- `python/bovnar/stream.py` — Python bindings; `python/tests/test_stream.py`
+- `python/bovnar/stream.py` — Python bindings; `python/tests/test_stream.py`,
+  `test_stream_io.py`, `test_stream_feed.py`
 
 ---
 

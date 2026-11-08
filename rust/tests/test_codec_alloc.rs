@@ -119,6 +119,20 @@ fn no_allocation_per_message_once_warm() {
         reader.finish().unwrap();
         assert_eq!(n, 0, "reading in pieces of {piece}");
 
+        // A reset keeps the buffers: the next stream reads without warming
+        // them again.
+        reader.reset();
+        let n = allocations_in(|| {
+            for part in messages.chunks(piece) {
+                let mut input = part;
+                while let Some(m) = reader.read(&mut input).unwrap() {
+                    std::hint::black_box(m.payload.len());
+                }
+            }
+        });
+        reader.finish().unwrap();
+        assert_eq!(n, 0, "reading again after reset, in pieces of {piece}");
+
         // Peek and skip, and peek and forward.
         for forward in [false, true] {
             let mut reader = MuxReader::new();

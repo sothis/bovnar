@@ -25,8 +25,11 @@
 /*
  * The hot paths of the streaming layer allocate nothing per message once
  * warm: bvnr_mux_send (whose 64 KiB chunk used to be malloc'd and freed on
- * every call), and the pull-style drains of a fed demux and frame reader for
- * messages and documents that lie whole in the fed buffer.
+ * every call), the pull-style drains of a fed demux and frame reader for
+ * messages and documents that lie whole in the fed buffer, and every path that
+ * re-opens a reader for the next document -- the parsing frame reader,
+ * bvnr_doc_stream_read and a fed demux -- which used to allocate the reader's
+ * frame stack and scratch buffers again (about 120 KB) for each one.
  *
  * Counted by interposing malloc/calloc/realloc on glibc, where the library's
  * calls bind to the executable's definitions. Elsewhere, and under
@@ -194,6 +197,86 @@ int main(void)
 		 "documents", docs);
 	expect_none(what, count_end());
 	bvnr_frame_reader_destroy(fr);
+
+	/* Parsing frame reader: one document after another, each re-opening the
+	 * reader. Documents with nested arrays, an octet stream, a version
+	 * directive, a failure, under continue_past_failed. */
+	static const char* const fdocs[] = {
+		".id = 1; .name = \"doc\"; .t = 21.5;",
+		".m = [[1,2]/[3,4]]; .s = { .a = [1, [2, 3]]; };",
+		"#!bovnar 1.1\n.t = 2026-06-15;",
+		".bad = @;",
+		"",
+	};
+	uint8_t blob[64] = { 0 };
+	static uint8_t octet_doc[256];
+	bvnr_writer_t* ow = bvnr_writer_create();
+	bvnr_open_write_mem(ow, octet_doc, sizeof(octet_doc), false, NULL);
+	bvnr_embed_document(ow, "blob", blob, sizeof(blob));
+	bvnr_write_finish(ow);
+	uint64_t octet_len = bvnr_writer_bytes_written(ow);
+	bvnr_writer_destroy(ow);
+	/* Every sixth document is the octet one; the first six are the warm-up,
+	 * so they include the largest frame. */
+	bvnr_sink_to_mem(&sink, frames, 8u << 20);
+	uint64_t warm_len = 0;
+	for (int i = 0; i < 1200; i++) {
+		const void* d = i % 6 == 5 ? (const void*)octet_doc : fdocs[i % 6];
+		uint64_t n = i % 6 == 5 ? octet_len : strlen(fdocs[i % 6]);
+		bvnr_frame_write(&sink, d, n);
+		if (i == 5) warm_len = bvnr_sink_bytes_written(&sink);
+	}
+	frames_len = bvnr_sink_bytes_written(&sink);
+	bvnr_doc_stream_opts_t fo;
+	memset(&fo, 0, sizeof(fo));
+	fo.continue_past_failed = true;
+	fr = bvnr_frame_reader_create(&fo);
+	bvnr_frame_reader_feed(fr, frames, warm_len);     /* warm: the reader */
+	count_begin();
+	bvnr_frame_reader_feed(fr, frames + warm_len, frames_len - warm_len);
+	unsigned long a = count_end();
+	snprintf(what, sizeof(what), "parsing frame reader, %llu documents",
+		 (unsigned long long)(bvnr_frame_reader_count(fr) - 6u));
+	expect_none(what, a);
+	if (!bvnr_frame_reader_finish(fr) ||
+	    bvnr_frame_reader_count(fr) != 1200u) {
+		printf("  parsing frame reader did not read the stream\n");
+		g_failures++;
+	}
+	bvnr_frame_reader_destroy(fr);
+
+	/* bvnr_doc_stream_read: its reader and payload buffer are per call, so
+	 * the count must not depend on how many documents the stream holds. */
+	unsigned long per_call[2];
+	for (int k = 0; k < 2; k++) {
+		bvnr_source_t src;
+		bvnr_source_from_mem(&src, frames, k ? frames_len : warm_len);
+		uint64_t n = 0;
+		count_begin();
+		bvnr_doc_stream_read(&src, &fo, &n);
+		per_call[k] = count_end();
+		if (n != (k ? 1200u : 6u)) {
+			printf("  bvnr_doc_stream_read did not read the stream\n");
+			g_failures++;
+		}
+	}
+	printf("  %-58s %lu, %lu allocations\n",
+	       "bvnr_doc_stream_read of 6, of 1200 documents",
+	       per_call[0], per_call[1]);
+	if (per_call[0] != per_call[1]) g_failures++;
+
+	/* A fed demux re-opened for the next document. */
+	dm = bvnr_demux_create(NULL, NULL, 0);
+	for (int round = 0; round < 3; round++) {
+		if (round == 2) count_begin();
+		bvnr_demux_open_feed(dm, NULL, false);
+		bvnr_demux_feed(dm, small, small_len);
+		while (bvnr_demux_next(dm, &it) == BVNR_NEXT_MESSAGE)
+			;
+		bvnr_demux_finish(dm);
+	}
+	expect_none("bvnr_demux_open_feed and a document, re-opened", count_end());
+	bvnr_demux_destroy(dm);
 
 	/* The fed document reader itself, across feeds. */
 	bvnr_reader_t* r = bvnr_reader_create();

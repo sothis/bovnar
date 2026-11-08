@@ -10,10 +10,16 @@
 //! MiB that stay in the cache, as the bytes of a socket read are, and once a
 //! stream far larger than the cache.
 //!
+//! The readers read one stream that never ends, as a live one does: it is
+//! opened once, and every pass feeds it the same messages again. Opening a
+//! stream is not a per-message cost, and a pass of eight 400 KB messages
+//! would otherwise count it eight times over.
+//!
 //! - write: `MuxWriter::encode`, the chunk headers into a reused buffer and
 //!   the parts handed out for a vectored write (the payload is not touched);
 //! - write+copy: `MuxWriter::write_message` into a reused `Vec`;
-//! - peek+skip: `MuxReader::next_item`, the peek, and `Peek::skip`;
+//! - peek+skip: `MuxReader::next_item`, a peek at the channel and the first
+//!   payload byte, and `Peek::skip`;
 //! - forward: the same with `Peek::forward`, the wire bytes borrowed;
 //! - read: `MuxReader::read`; a message that spans chunks is gathered (copied);
 //! - mux_dump, mux_load: the batch functions, through the C library.
@@ -92,13 +98,11 @@ fn table(label: &str, stream_bytes: usize, batch: bool) {
             }
         });
 
-        let mut out = Vec::new();
-        mux.begin(&mut out);
+        // The messages alone: the body of a stream, fed again and again.
+        let mut data = Vec::new();
         for i in 0..n {
-            mux.write_message(&mut out, channel(i), &payloads[i % 4]);
+            mux.write_message(&mut data, channel(i), &payloads[i % 4]);
         }
-        mux.finish(&mut out);
-        let data = out;
         let mut scratch = Vec::with_capacity(data.len());
         let write_copy = median(n, reps, || {
             scratch.clear();
@@ -108,16 +112,19 @@ fn table(label: &str, stream_bytes: usize, batch: bool) {
             black_box(&scratch);
         });
 
+        // One reader for the three, in the same stream: each pass leaves it
+        // between two messages.
         let mut reader = MuxReader::new();
+        let mut opener = mux.opener();
+        assert!(reader.read(&mut opener).expect("a valid opener").is_none());
         let mut route = |forward: bool| {
-            reader.reset();
             let mut input = &data[..];
             let mut count = 0usize;
-            while let Some(item) = reader.next_item(&mut input, 4).expect("a valid stream") {
+            while let Some(item) = reader.next_item(&mut input, 1).expect("a valid stream") {
                 match item {
                     Item::Peek(p) if forward => p.forward(),
                     Item::Peek(p) => {
-                        black_box(p.head);
+                        black_box((p.channel, p.head.first()));
                         p.skip();
                     }
                     Item::Wire(w) => {
@@ -127,15 +134,12 @@ fn table(label: &str, stream_bytes: usize, batch: bool) {
                     Item::Message(_) => unreachable!("every message is decided"),
                 }
             }
-            assert!(reader.is_done());
             assert_eq!(count, if forward { n } else { 0 });
         };
         let peek = median(n, reps, || route(false));
         let forward = median(n, reps, || route(true));
 
-        let mut reader = MuxReader::new();
         let read = median(n, reps, || {
-            reader.reset();
             let mut input = &data[..];
             let mut count = 0usize;
             while let Some(m) = reader.read(&mut input).expect("a valid stream") {

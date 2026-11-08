@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Generator, IO, Sequence
 
 from ._ffi import get_library
+from ._fileio import PullSource
 from .enums import Event, ErrorCode
 from .exceptions import BovnarParseError, BovnarArgumentError
 from .structs import (
@@ -489,7 +490,39 @@ class Reader:
 
         src = BvnrSource()
         self._lib.bvnr_source_from_fd(ctypes.byref(src), fd)
+        self._read_source(src, flags, cb_refs)
 
+    def read_stream(self,
+                    stream,
+                    *,
+                    on_verified: Callable | None = None,
+                    on_unverified: Callable | None = None,
+                    max_file_size: int = 0,
+                    continue_on_error: bool = False,
+                    strict_version: bool = False,
+                    text_only: bool = False,
+                    want_unit: Callable | None = None,
+                    want_unit_allow_nonterminating: bool = False,
+                    max_conversion_length: int = 0) -> None:
+        """Parse a document pulled from a socket or a binary file object.
+
+        The keyword parameters are those of :meth:`read_mem`. The bytes are
+        pulled as the parse needs them (``recv_into``, ``readinto1``,
+        ``readinto`` or ``read``), so the document is never held whole, and it
+        ends where the object reports end of input. An exception the object
+        raises is re-raised from here, unchanged.
+        """
+        self._check_open()
+        self._check_not_busy()
+        source = PullSource(stream)
+        flags, cb_refs = self._build_flags(
+            on_verified, on_unverified, max_file_size, continue_on_error,
+            strict_version, text_only, want_unit,
+            want_unit_allow_nonterminating, max_conversion_length
+        )
+        self._read_source(source.handle, flags, cb_refs, source)
+
+    def _read_source(self, src, flags, cb_refs, source=None) -> None:
         ok = self._run_read(lambda: self._lib.bvnr_open_read_source(
             self._ptr,
             ctypes.byref(src),
@@ -497,12 +530,14 @@ class Reader:
             ctypes.byref(flags),
         ))
 
-        cb_exc = None
+        # The transport's own exception first: it is what stopped the read.
+        cb_exc = source.exc if source is not None else None
         for cb in cb_refs:
+            if cb_exc is not None:
+                break
             st = getattr(cb, '_bvnr_state', None)
             if st is not None and st.get('exc') is not None:
                 cb_exc = st['exc']
-                break
 
         del cb_refs
         if cb_exc is not None:

@@ -157,42 +157,47 @@ static int bvn_src_read_exact(bvnr_source_t* src, uint8_t* buf, uint64_t n)
 }
 
 /*
- * Read exactly `len` bytes from `src` into a freshly malloc'd buffer (caller
- * frees), growing the buffer geometrically rather than allocating `len`
- * up-front. `len` comes from the frame header and is therefore attacker-
- * controlled, so a pre-allocation of the declared size would let a tiny crafted
- * header force a large allocation before any payload arrives (a memory-
- * amplification vector). Growing with the data that actually arrives bounds the
- * allocation by real bytes received. Returns 1 and *out on success, 0 with
- * *out=NULL for len==0, and -1 on short stream / I/O / OOM (buffer freed).
+ * Read exactly `len` bytes from `src` into *buf, which holds *cap bytes and is
+ * kept from one frame to the next (the caller frees it), growing it
+ * geometrically rather than allocating `len` up-front. `len` comes from the
+ * frame header and is therefore attacker-controlled, so a pre-allocation of the
+ * declared size would let a tiny crafted header force a large allocation before
+ * any payload arrives (a memory-amplification vector). Growing with the data
+ * that actually arrives bounds the allocation by real bytes received -- now by
+ * the largest frame actually received so far, since a buffer that has grown is
+ * kept. A fresh buffer grows exactly as the per-frame one it replaces did:
+ * min(len, 4096), then doubling, clamped to len. Returns 1 on success and -1 on
+ * short stream / I/O / OOM (the buffer is kept for the caller to free).
  */
 static int bvn_src_read_exact_grow(
-	bvnr_source_t* src, uint64_t len, uint8_t** out)
+	bvnr_source_t* src, uint64_t len, uint8_t** buf, uint64_t* cap)
 {
-	*out = NULL;
-	if (len == 0) return 1;
-	uint64_t cap = len < 4096u ? len : 4096u;
-	uint8_t* buf = (uint8_t*)malloc((size_t)cap);
-	if (!buf) return -1;
 	uint64_t total = 0;
 	while (total < len) {
-		if (total == cap) {
+		if (total == *cap) {
 			/* Double, but clamp to len before cap*2 could overflow uint64
 			 * (reachable only in unlimited-cap mode with a huge len). */
-			uint64_t ncap = (cap > len / 2u) ? len : cap * 2u;
-			uint8_t* nb = (uint8_t*)realloc(buf, (size_t)ncap);
-			if (!nb) { free(buf); return -1; }
-			buf = nb;
-			cap = ncap;
+			uint64_t ncap;
+			if (*cap > len / 2u) {
+				ncap = len;
+			} else {
+				ncap = *cap * 2u;
+				if (ncap < 4096u) ncap = 4096u;
+				if (ncap > len) ncap = len;
+			}
+			uint8_t* nb = (uint8_t*)realloc(*buf, (size_t)ncap);
+			if (!nb) return -1;
+			*buf = nb;
+			*cap = ncap;
 		}
-		uint64_t room = cap - total;
+		uint64_t end  = *cap < len ? *cap : len;
+		uint64_t room = end - total;
 		uint32_t want = room > (1u << 30) ? (1u << 30) : (uint32_t)room;
 		uint32_t got  = 0;
-		if (!bvn_source_pull(src, buf + total, want, &got)) { free(buf); return -1; }
-		if (!got) { free(buf); return -1; }   /* EOF before len: truncation */
+		if (!bvn_source_pull(src, *buf + total, want, &got)) return -1;
+		if (!got) return -1;   /* EOF before len: truncation */
 		total += got;
 	}
-	*out = buf;
 	return 1;
 }
 
@@ -209,6 +214,10 @@ bool bvnr_doc_stream_read(
 	uint64_t index = 0;
 	bvnr_reader_t* r = bvnr_reader_create();
 	if (!r) return false;
+	/* One payload buffer for the whole sequence, as there is one reader: a
+	 * buffer per frame was an allocation per document. */
+	uint8_t* buf = NULL;
+	uint64_t buf_cap = 0;
 
 	bool result = true;
 	for (;;) {
@@ -230,16 +239,14 @@ bool bvnr_doc_stream_read(
 		/* SIZE_MAX guard for 32-bit hosts where uint64 len can exceed size_t. */
 		if (len > (uint64_t)SIZE_MAX) { result = false; break; }
 
-		uint8_t* buf = NULL;
-		if (len && bvn_src_read_exact_grow(src, len, &buf) != 1) {
+		if (len && bvn_src_read_exact_grow(src, len, &buf, &buf_cap) != 1) {
 			result = false; break;
 		}
 
-		bool ok = bvnr_open_read_mem(r, buf ? buf : (const void*)"", len,
+		bool ok = bvnr_open_read_mem(r, len ? buf : (const void*)"", len,
 					NULL, 0, opts ? opts->flags : NULL)
 			&& bvnr_read(r);
 		error_code_t err = bvnr_reader_get_error(r);
-		free(buf);
 
 		/* Count the document the moment it has been read and parsed, *before*
 		 * any abort path. This keeps *out_count consistent across both ways a
@@ -264,6 +271,7 @@ bool bvnr_doc_stream_read(
 		}
 	}
 
+	free(buf);
 	bvnr_reader_destroy(r);
 	if (out_count) *out_count = index;
 	return result;

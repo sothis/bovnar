@@ -260,7 +260,9 @@ reader is <strong>fed</strong> instead (§8), and keeps one reader for the whole
   <code>bvnr_doc_stream_read</code> parses it with the same <code>opts</code> — the same events through
   <code>opts-&gt;flags</code>, the same <code>on_document</code> calls, <code>continue_past_failed</code> and
   <code>max_document_size</code>. Each payload is streamed into a reused push-fed reader as
-  its bytes arrive, so a frame is never buffered whole, however large.</li>
+  its bytes arrive, so a frame is never buffered whole, however large; the
+  reader keeps its buffers from one document to the next, so once warm the
+  frame reader allocates nothing per document.</li>
 <li><strong>Pull</strong> (<code>bvnr_frame_reader_create_pull</code>): the documents are handed out as
   bytes by <code>bvnr_frame_reader_next</code>, for the caller to parse as it likes. A
   document whose frame lies whole in the fed buffer is handed out from that
@@ -503,6 +505,41 @@ for <code>max_document_size</code> and <code>max_message</code>, <code>0</code> 
 (<code>BVNR_DOC_DEFAULT_MAX</code> / <code>BVNR_MUX_DEFAULT_MAX</code>), so pass an explicit large
 value there to raise them. See <a href="https://www.bovnar.io/docs/python/">Python Bindings</a>
 and <code>python/tests/test_stream.py</code>.</p>
+<p><strong>Sockets and file objects.</strong> The loaders (<code>load_documents</code>, <code>mux_load</code>, and
+<code>bovnar.load</code> for one document) also take a socket or a binary file object and
+read it to its end through a callback source (§8.1), parsing as they pull; the
+dumpers take a <code>file=</code> and write through a callback sink. <code>mux_dump(...,
+preamble={...})</code> writes the values that describe the stream before it opens
+(§3.4).</p>
+<p><strong>Live streams</strong> (§7) are read with three feed objects over the push-fed C
+readers, each handed bytes in pieces of any size: <code>DocumentFeed</code> (§8.2: a
+document's events, or each top-level value once it is complete), <code>FrameFeed</code>
+(§2.4: each document's bytes, or each document parsed) and <code>DemuxFeed</code> (§3.4:
+<code>(channel, payload)</code> per message, and with <code>values=True</code> the values before and
+after the mux stream, in document order). <code>DemuxFeed</code> and the unparsed
+<code>FrameFeed</code> drain with <code>bvnr_demux_next</code> / <code>bvnr_frame_reader_next</code>, one plain
+call per item and no callback (§8.3); a payload is <code>bytes</code>, or with
+<code>view=True</code> a <code>memoryview</code> valid until the next call, which the feed then
+releases:</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">stream</span>
+
+<span class="k">with</span> <span class="n">stream</span><span class="o">.</span><span class="n">DemuxFeed</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="s2">&quot;media&quot;</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">as</span> <span class="n">dm</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">chunks</span><span class="p">:</span>                          <span class="c1"># whatever recv() returned</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">dm</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="n">chunk</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">stream</span><span class="o">.</span><span class="n">Value</span><span class="p">):</span>    <span class="c1"># .meta before the first message</span>
+                <span class="n">on_meta</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">key</span><span class="p">,</span> <span class="n">item</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">on_frame</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">channel</span><span class="p">,</span> <span class="n">item</span><span class="o">.</span><span class="n">payload</span><span class="p">)</span>
+    <span class="n">dm</span><span class="o">.</span><span class="n">finish</span><span class="p">()</span>                                   <span class="c1"># raises if cut off part-way</span>
+</code></pre></div>
+
+<p>The limits and error codes are those of the batch functions. A message costs
+microseconds in Python — the interpreter and ctypes, not the C path of §8.4:
+about 3 µs for a 150-byte message and 7 µs for a 30 KB one fed whole, against
+5 µs and 36 µs through <code>mux_load</code>'s callback, on the machine of §8.4. The
+figures, and what feeding in small pieces costs, are in
+<a href="https://www.bovnar.io/docs/python/#47-live-streams-feeding-in-pieces">Python Bindings §4.7</a>
+(<code>python/bench/bench_stream.py</code>).</p>
 <hr />
 <h2 id="6-rust-bindings">6. Rust bindings</h2>
 <p>The Rust crate has the same batch functions in <code>bovnar::stream</code>
@@ -649,9 +686,48 @@ point.</p>
 <p>A message that fits one chunk and arrives in one feed is handed out without
 touching its bytes, which is why the 30 KB column falls by a factor of thirty.
 Fed in small pieces, a chunk is gathered before it is passed on, and a message
-split over chunks is reassembled: one copy each. <code>bvnr_mux_send</code>,
+split over chunks is reassembled: one copy each.</p>
+<p>Per framed document, a 43-byte one and a 30 KB one of numbers and strings:</p>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th style="text-align: right;">43 B</th>
+<th style="text-align: right;">30 KB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bvnr_doc_stream_read</code> (2.0.2: the reader's buffers and the payload allocated per document)</td>
+<td style="text-align: right;">5.6 µs</td>
+<td style="text-align: right;">757 µs</td>
+</tr>
+<tr>
+<td><code>bvnr_doc_stream_read</code> (buffers kept across documents)</td>
+<td style="text-align: right;">2.4 µs</td>
+<td style="text-align: right;">758 µs</td>
+</tr>
+<tr>
+<td>parsing frame reader, one feed</td>
+<td style="text-align: right;">2.2 µs</td>
+<td style="text-align: right;">766 µs</td>
+</tr>
+<tr>
+<td>parsing frame reader, 1460 B feeds</td>
+<td style="text-align: right;">2.3 µs</td>
+<td style="text-align: right;">764 µs</td>
+</tr>
+</tbody>
+</table>
+<p>Re-opening a reader for the next document used to free its frame stack and
+scratch buffers and allocate them again, about 120 KB zeroed, and to copy the
+13 KB unit policy out of the validator and back while clearing it: more than a
+small document costs to parse, and the frame reader paid it too (5.5 µs for the
+43-byte document). A 30 KB document is dominated by its parse. <code>bvnr_mux_send</code>,
 <code>bvnr_demux_next</code> and <code>bvnr_frame_reader_next</code> allocate nothing per message once
-warm (<code>tests/bovnar_alloc_test.c</code>).</p>
+warm, nor the parsing frame reader and a re-opened fed demux per document; a
+<code>bvnr_doc_stream_read</code> call allocates the same whatever the number of documents
+(<code>tests/bovnar_alloc_test.c</code>).</p>
 <hr />
 <h2 id="see-also">See also</h2>
 <ul>
@@ -662,7 +738,8 @@ warm (<code>tests/bovnar_alloc_test.c</code>).</p>
 <li><code>include/bovnar_stream.h</code> — full declarations and per-function contracts</li>
 <li><code>tests/bovnar_stream_test.c</code> — round-trip tests for all four capabilities</li>
 <li><code>tests/bovnar_feed_test.c</code> — the push-fed readers and callback I/O against the batch functions</li>
-<li><code>python/bovnar/stream.py</code> — Python bindings; <code>python/tests/test_stream.py</code></li>
+<li><code>python/bovnar/stream.py</code> — Python bindings; <code>python/tests/test_stream.py</code>,
+  <code>test_stream_io.py</code>, <code>test_stream_feed.py</code></li>
 </ul>
 <hr />
 <p><em>End of Bovnar — Streaming, Framing &amp; Multiplexing (Bovnar spec 1.2).</em></p>

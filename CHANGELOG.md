@@ -54,10 +54,38 @@ API and implements spec 1.2.
   ordinary metadata values (`.meta = {…}; .media = <stream>;`) that a consumer
   has before the first message. A message that lies whole in the fed buffer is
   handed out from it.
+- **Python: live streams.** `bovnar.stream.DocumentFeed`, `FrameFeed` and
+  `DemuxFeed` wrap the push-fed reader, frame reader and demux: each is handed
+  bytes in pieces of any size, and `feed()` returns the object, which iterates
+  over what those bytes completed. `DocumentFeed` gives the events
+  `Reader.read_mem` gives for the whole document, or each top-level value as a
+  `Value(key, value)` once it is complete (not kept afterwards, so an endless
+  document costs flat memory). `DemuxFeed` gives `Message(channel, payload)`
+  per message, drained with `bvnr_demux_next` and no ctypes callback, and with
+  `values=True` the values before and after the mux stream in document order,
+  so metadata ahead of the stream arrives before the first message.
+  `FrameFeed` gives each document's bytes, or each document parsed as
+  `load_documents` parses it. Limits and error codes are those of the batch
+  functions. A payload is `bytes`, or with `view=True` a read-only
+  `memoryview` valid until the next call, which the feed then releases so a
+  late use raises instead of reading reused memory. A message costs
+  microseconds (doc/09 §4.7, `python/bench/bench_stream.py`).
+- **Python: sockets and file objects as sources and sinks.**
+  `Reader.read_stream`, `Writer.to_stream`, and `bovnar.load` / `bovnar.dump`
+  beside `loads` / `dumps`, over the callback source and sink;
+  `stream.load_documents` and `stream.mux_load` take a socket or binary file
+  object in place of bytes, and `frame_documents`, `dump_documents`,
+  `mux_dump` and `embed_document` a `file=`. The input is pulled as it is
+  parsed and the output pushed through the writer's 64 KiB buffer; the results
+  are those of the in-memory calls. An exception the object raises comes out
+  of the call unchanged.
+- **Python: `mux_dump(..., preamble={...})`** writes ordinary values before
+  the mux stream opens, for a reader to have before the first message.
 - **`bvnr_stream_bench`**, a benchmark of `bvnr_mux_send` and the demux, batch
-  and fed (`tests/bovnar_stream_bench.c`, built but not a test; figures in
-  doc/10 §8.4), and `bvnr_alloc_test`, which counts allocations on glibc: none
-  per message on those paths once warm.
+  and fed, and of framed documents through `bvnr_doc_stream_read` and the
+  parsing frame reader (`tests/bovnar_stream_bench.c`, built but not a test;
+  figures in doc/10 §8.4), and `bvnr_alloc_test`, which counts allocations on
+  glibc: none per message or document on those paths once warm.
 - **A framing codec for live streams in the Rust crate: `bovnar::codec`.**
   `bovnar::stream` builds its output in memory and reads its input to the
   end, so it cannot serve a stream that never ends. The new module writes and
@@ -85,6 +113,19 @@ API and implements spec 1.2.
 
 ### Changed
 
+- **Re-opening a reader allocates nothing.** `bvnr_open_read_*` freed the
+  reader's array-frame stack and scratch buffers and allocated them again, about
+  120 KB zeroed, for every document, and copied the 13 KB unit policy out of the
+  validator and back while clearing it. A reader now keeps its buffers, zeroes
+  only the frames the last document wrote, and is cleared around the policy.
+  Every path that reads document after document through one reader gains: the
+  parsing frame reader and a re-opened fed demux allocate nothing per document
+  once warm, and `bvnr_doc_stream_read` also keeps one payload buffer for the
+  whole sequence instead of one per frame. Events, errors and positions are
+  unchanged: `bvnr_feed_test` reads every document after every other, under
+  every pair of settings, and a frame stream cut at every byte, against a reader
+  fresh from `bvnr_reader_create`. A 43-byte framed document went from about 5.5
+  to 2.3 µs (doc/10 §8.4).
 - **`bvnr_mux_send` allocates nothing per call.** Its 64 KiB chunk buffer used
   to be malloc'd and freed on every message; it now belongs to the writer,
   allocated on the first send and kept across re-opens. The output is byte for

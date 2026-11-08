@@ -28,19 +28,37 @@ Python bindings for the bovnar streaming/framing layer (bovnar_stream.h):
   * Octet multiplexing  – mux_dump / mux_load (cross-chunk reassembly in C).
   * Document-in-document – embed_document / parse_embedded.
 
+and, for input that arrives in pieces (bvnr_open_read_feed and the push-fed
+frame reader and demux):
+
+  * DocumentFeed – one document fed in pieces: its events, or its top-level
+                   values as each one completes.
+  * FrameFeed    – a frame stream fed in pieces: each document's bytes, or
+                   each document parsed.
+  * DemuxFeed    – a multiplexed document fed in pieces: (channel, payload) per
+                   message, and the values before and after the mux stream.
+
 These wrap the C functions directly, so behaviour (framing, varint reassembly,
 the memory-amplification guards, the strict-vs-resilient document policy) matches
 the native library exactly. See doc/10_bovnar_streaming.md for the conventions.
+
+The loaders also take a socket or a binary file object in place of bytes, and
+the dumpers a ``file=`` to write to; both then stream through the C library's
+callback source and sink instead of holding the whole input or output.
 """
 
 import ctypes
-from typing import Iterable
+from collections import deque
+from functools import lru_cache
+from typing import Iterable, NamedTuple
 
 from ._ffi import get_library
-from .enums import ErrorCode
+from ._fileio import PullSource, PushSink, is_stream
+from .enums import ErrorCode, Event
 from .exceptions import BovnarParseError, BovnarWriteError, BovnarArgumentError
 from .structs import (
-    BvnrSink, BvnrSource, BvnrReadFlags, BvnrDocStreamOpts,
+    BvnrSink, BvnrSource, BvnrReadFlags, BvnrDocStreamOpts, BvnrData,
+    BvnrDemuxItem,
     EVENT_CALLBACK_FUNC, ON_DOCUMENT_FUNC, MUX_ON_MSG_FUNC, ON_ERROR_FUNC,
 )
 from .reader import Reader
@@ -60,7 +78,19 @@ __all__ = [
     'frame_documents', 'dump_documents', 'load_documents',
     'mux_dump', 'mux_load',
     'embed_document', 'parse_embedded',
+    'DocumentFeed', 'FrameFeed', 'DemuxFeed',
+    'Message', 'Value', 'DocumentEvent',
 ]
+
+# Builds a NamedTuple without its Python-level __new__: a third of the cost of a
+# message on the hot path otherwise.
+_tuple_new = tuple.__new__
+
+# bvnr_frame_reader_next / bvnr_demux_next results (bovnar_stream.h); any
+# other value is BVNR_NEXT_ERROR.
+_NEXT_NONE  = 0
+_NEXT_ITEM  = 1     # BVNR_NEXT_DOCUMENT, BVNR_NEXT_MESSAGE
+_NEXT_EVENT = 2
 
 
 def _as_bytes(x) -> bytes:
@@ -81,10 +111,24 @@ def _void_copy(data: bytes):
 # Multi-document record framing
 # ===========================================================================
 
-def frame_documents(docs: Iterable[bytes]) -> bytes:
+def frame_documents(docs: Iterable[bytes], *, file=None) -> bytes | None:
     """Wrap each already-serialised document in a length-prefixed frame and
-    return the concatenated frame stream (``"BVF1" + u64 len + payload`` each)."""
-    lib   = get_library()
+    return the concatenated frame stream (``"BVF1" + u64 len + payload`` each).
+
+    With ``file`` (a socket or a binary file object) each frame is written
+    there as it is made, and nothing is returned."""
+    lib = get_library()
+    if file is not None:
+        out = PushSink(file)
+        for d in docs:
+            b = _as_bytes(d)
+            dptr, _keep = _void_copy(b)
+            if not lib.bvnr_frame_write(ctypes.byref(out.handle), dptr, len(b)):
+                if out.exc is not None:
+                    raise out.exc
+                raise BovnarWriteError(ErrorCode.WRITING_TO_SINK,
+                                       message="bvnr_frame_write failed")
+        return None
     blobs = [_as_bytes(d) for d in docs]
     total = sum(12 + len(b) for b in blobs)
     out   = (ctypes.c_char * (total if total else 1))()
@@ -98,10 +142,13 @@ def frame_documents(docs: Iterable[bytes]) -> bytes:
     return bytes(out[:total])
 
 
-def dump_documents(objs: Iterable[dict], *, pretty: bool = True) -> bytes:
-    """Serialise each dict (via :func:`bovnar.dumps`) and frame the results."""
+def dump_documents(objs: Iterable[dict], *, pretty: bool = True,
+                   file=None) -> bytes | None:
+    """Serialise each dict (via :func:`bovnar.dumps`) and frame the results;
+    with ``file``, write each frame there as it is made (see
+    :func:`frame_documents`)."""
     from . import dumps  # deferred: avoids an import cycle with the package root
-    return frame_documents(dumps(o, pretty=pretty) for o in objs)
+    return frame_documents((dumps(o, pretty=pretty) for o in objs), file=file)
 
 
 def load_documents(data,
@@ -115,10 +162,16 @@ def load_documents(data,
     raises :class:`BovnarParseError`. With ``continue_past_failed=True`` every
     frame is processed and a failed document is represented by ``None`` in the
     returned list. ``typed=True`` wraps scalars in :class:`bovnar.Quantity`.
+
+    ``data`` may also be a socket or a binary file object, read until it
+    reports end of input; the frames are then parsed as they are pulled, never
+    gathered first. For a stream that does not end, use :class:`FrameFeed`.
     """
     from . import _DictParser, _TypedDictParser  # deferred (import cycle)
     lib  = get_library()
-    data = _as_bytes(data)
+    source = PullSource(data) if is_stream(data) else None
+    if source is None:
+        data = _as_bytes(data)
 
     def _new_parser():
         return _TypedDictParser() if typed else _DictParser()
@@ -162,14 +215,19 @@ def load_documents(data,
     opts.continue_past_failed = continue_past_failed
     opts.max_document_size    = max_document_size
 
-    src = BvnrSource()
-    dptr, _keep = _void_copy(data)
-    lib.bvnr_source_from_mem(ctypes.byref(src), dptr, len(data))
+    if source is not None:
+        src = source.handle
+    else:
+        src = BvnrSource()
+        dptr, _keep = _void_copy(data)
+        lib.bvnr_source_from_mem(ctypes.byref(src), dptr, len(data))
 
     out_count = ctypes.c_uint64(0)
     ok = lib.bvnr_doc_stream_read(ctypes.byref(src), ctypes.byref(opts),
                                   ctypes.byref(out_count))
 
+    if source is not None and source.exc is not None:
+        raise source.exc
     cb_state = getattr(cb_event, '_bvnr_state', None)
     if cb_state is not None and cb_state.get('exc') is not None:
         raise cb_state['exc']
@@ -190,11 +248,22 @@ def load_documents(data,
 # Octet multiplexing
 # ===========================================================================
 
-def mux_dump(messages: Iterable[tuple], *, key: str = 'mux') -> bytes:
+def mux_dump(messages: Iterable[tuple], *, key: str = 'mux',
+             preamble: dict | None = None, file=None) -> bytes | None:
     """Serialise ``(channel:int, payload:bytes)`` messages as one multiplexed
     octet-stream document under ``key``. Channels may repeat and interleave;
     messages of any size are split across octet chunks and reassembled by
-    :func:`mux_load`."""
+    :func:`mux_load`.
+
+    ``preamble`` is a dict written as ordinary values before the stream opens
+    -- what the stream is, say ``{"meta": {"codec": "av1"}}`` -- for a reader
+    to have before the first message: :class:`DemuxFeed` with ``values=True``
+    hands it over first. :func:`bovnar.loads` reads it as ordinary values,
+    beside the stream's raw bytes under ``key``.
+
+    With ``file`` (a socket or a binary file object) the document is written
+    there, through the writer's 64 KiB buffer, and nothing is returned."""
+    from . import _emit_dict, _uses_spec_1_1, _uses_spec_1_2  # deferred (import cycle)
     lib  = get_library()
     msgs = [(int(ch), _as_bytes(p)) for ch, p in messages]
     # The channel crosses the FFI as a uint64_t, and ctypes wraps an
@@ -204,8 +273,38 @@ def mux_dump(messages: Iterable[tuple], *, key: str = 'mux') -> bytes:
         if not 0 <= ch < (1 << 64):
             raise BovnarArgumentError(
                 f"mux channel {ch} is outside the unsigned 64-bit range")
+    if preamble is not None and not isinstance(preamble, dict):
+        raise BovnarArgumentError("mux_dump() preamble must be a dict")
+    need_version = None
+    if preamble:
+        need_version = (1, 2) if _uses_spec_1_2(preamble) else \
+                       (1, 1) if _uses_spec_1_1(preamble) else None
+    kb = key.encode('utf-8')
+
+    def write(w):
+        if need_version:
+            w.write_version(*need_version)
+        if preamble:
+            _emit_dict(w, preamble)
+        if not lib.bvnr_mux_begin(w._ptr, kb):
+            w._raise_error()
+        for ch, payload in msgs:
+            dptr, _keep = _void_copy(payload)
+            if not lib.bvnr_mux_send(w._ptr, ch, dptr, len(payload)):
+                w._raise_error()
+        if not lib.bvnr_mux_end(w._ptr):
+            w._raise_error()
+        w.finish()
+
+    if file is not None:
+        w = Writer.to_stream(file, pretty=False)
+        try:
+            write(w)
+        finally:
+            w.destroy()
+        return None
+
     total = sum(len(p) for _, p in msgs)
-    kb    = key.encode('utf-8')
     # Output is the payload plus octet-chunk framing (a few bytes per 64 KiB
     # chunk); start with a tight over-estimate and grow on exhaustion so large
     # or many-chunk messages cannot overflow a fixed guess.
@@ -215,15 +314,7 @@ def mux_dump(messages: Iterable[tuple], *, key: str = 'mux') -> bytes:
     while True:
         w = Writer.to_mem(cap=cap, pretty=False)
         try:
-            if not lib.bvnr_mux_begin(w._ptr, kb):
-                w._raise_error()
-            for ch, payload in msgs:
-                dptr, _keep = _void_copy(payload)
-                if not lib.bvnr_mux_send(w._ptr, ch, dptr, len(payload)):
-                    w._raise_error()
-            if not lib.bvnr_mux_end(w._ptr):
-                w._raise_error()
-            w.finish()
+            write(w)
             return w.get_output()
         except BovnarWriteError as exc:
             if exc.code == ErrorCode.SINK_BUFFER_EXHAUSTED and cap < cap_max:
@@ -241,9 +332,16 @@ def mux_load(data, *, max_message: int = 0, key: str | None = None) -> list:
     By default every octet stream in the document is treated as multiplexed.
     Pass ``key`` to scope the demux to streams opened under that key only, so a
     document mixing a mux stream with ordinary binary octet payloads ignores the
-    latter (mirrors ``bvnr_demux_set_key``)."""
+    latter (mirrors ``bvnr_demux_set_key``).
+
+    ``data`` may also be a socket or a binary file object, read until it
+    reports end of input and demultiplexed as it is pulled. For a stream that
+    does not end, or to read the values around the mux stream, use
+    :class:`DemuxFeed`."""
     lib  = get_library()
-    data = _as_bytes(data)
+    source = PullSource(data) if is_stream(data) else None
+    if source is None:
+        data = _as_bytes(data)
 
     results: list = []
     state = {'exc': None}
@@ -282,26 +380,22 @@ def mux_load(data, *, max_message: int = 0, key: str | None = None) -> list:
         flags.max_struct_nesting = 255
         flags.on_verified        = cb_ev
 
-        dptr, _keep = _void_copy(data)
-        ok = lib.bvnr_open_read_mem(rptr, dptr, len(data), None, 0,
-                                    ctypes.byref(flags)) and lib.bvnr_read(rptr)
+        if source is not None:
+            ok = lib.bvnr_open_read_source(rptr, ctypes.byref(source.handle),
+                                           None, ctypes.byref(flags))
+        else:
+            dptr, _keep = _void_copy(data)
+            ok = lib.bvnr_open_read_mem(rptr, dptr, len(data), None, 0,
+                                        ctypes.byref(flags))
+        ok = ok and lib.bvnr_read(rptr)
 
+        if source is not None and source.exc is not None:
+            raise source.exc
         if state['exc'] is not None:
             raise state['exc']
         derr = lib.bvnr_demux_error(dm)
         if derr != int(ErrorCode.NONE):
-            # Name the error the demultiplexer reported. Every code used to be
-            # called a "demux desync", including a stream that ended part-way
-            # through a message (octet_stream_truncated) and an oversized one
-            # (value_out_of_range); only octet_stream_out_of_sync is a desync.
-            code = ErrorCode(derr)
-            msg_b = lib.bvn_error_to_string(int(code))
-            what = msg_b.decode('utf-8') if msg_b else code.name.lower()
-            if code == ErrorCode.OCTET_STREAM_OUT_OF_SYNC:
-                what = f"demux desync ({what})"
-            else:
-                what = f"demux error: {what}"
-            raise BovnarParseError(code, message=what)
+            raise _demux_error(lib, derr)
         if not ok:
             raise BovnarParseError(
                 ErrorCode(lib.bvnr_reader_get_error(rptr)),
@@ -312,16 +406,51 @@ def mux_load(data, *, max_message: int = 0, key: str | None = None) -> list:
         lib.bvnr_demux_destroy(dm)
 
 
+def _demux_error(lib, err: int, reader=None) -> BovnarParseError:
+    """The BovnarParseError for a demux error code, with the position of the
+    reader under a push-fed demux when the error is the reader's own."""
+    # Name the error the demultiplexer reported. Every code used to be called
+    # a "demux desync", including a stream that ended part-way through a
+    # message (octet_stream_truncated) and an oversized one
+    # (value_out_of_range); only octet_stream_out_of_sync is a desync.
+    code = ErrorCode(err)
+    msg_b = lib.bvn_error_to_string(int(code))
+    what = msg_b.decode('utf-8') if msg_b else code.name.lower()
+    if code == ErrorCode.OCTET_STREAM_OUT_OF_SYNC:
+        what = f"demux desync ({what})"
+    else:
+        what = f"demux error: {what}"
+    if reader and lib.bvnr_reader_get_error(reader) == err:
+        return BovnarParseError(
+            code, lib.bvnr_reader_get_error_line(reader),
+            lib.bvnr_reader_get_error_column(reader),
+            lib.bvnr_reader_get_error_offset(reader),
+            lib.bvnr_reader_get_error_byte(reader), what)
+    return BovnarParseError(code, message=what)
+
+
 # ===========================================================================
 # Document-in-document
 # ===========================================================================
 
-def embed_document(inner, *, key: str = 'payload', pretty: bool = True) -> bytes:
+def embed_document(inner, *, key: str = 'payload', pretty: bool = True,
+                   file=None) -> bytes | None:
     """Return a complete document that embeds ``inner`` (raw document bytes) as
-    the octet-stream payload of ``key``."""
+    the octet-stream payload of ``key``; with ``file`` (a socket or a binary
+    file object), write it there and return nothing."""
     lib   = get_library()
     inner = _as_bytes(inner)
     kb    = key.encode('utf-8')
+    if file is not None:
+        w = Writer.to_stream(file, pretty=pretty)
+        try:
+            dptr, _keep = _void_copy(inner)
+            if not lib.bvnr_embed_document(w._ptr, kb, dptr, len(inner)):
+                w._raise_error()
+            w.finish()
+        finally:
+            w.destroy()
+        return None
     # As in mux_dump: payload + per-chunk octet framing; grow on exhaustion.
     cap     = len(inner) + len(inner) // 4000 + len(kb) + 8192
     cap_max = max(256 * 1024 * 1024, len(inner) * 2 + 1024 * 1024)
@@ -390,3 +519,740 @@ def parse_embedded(inner, *, typed: bool = False) -> dict:
         raise BovnarParseError(ErrorCode.GOT_INCOMPLETE_BVNR_STREAM,
                                message="embedded document parse error")
     return parser.result()
+
+
+# ===========================================================================
+# Push-fed reading: documents, frames and multiplexed streams in pieces
+# ===========================================================================
+#
+# The C feed API keeps all parse state between feeds, so input can arrive in
+# pieces of any size -- from a non-blocking socket, an event loop, a queue --
+# and nothing is lost or misread where a piece was cut. DocumentFeed and the
+# parsing FrameFeed are driven by the reader's callbacks, one ctypes call per
+# event, as Reader is. DemuxFeed and the pulling FrameFeed are drained with
+# bvnr_demux_next / bvnr_frame_reader_next instead: one plain call per item and
+# no callback, which is what keeps a message in the microseconds.
+
+class Message(NamedTuple):
+    """One demultiplexed message. A tuple, so ``channel, payload = item``."""
+    channel: int
+    payload: 'bytes | memoryview'
+
+
+class Value(NamedTuple):
+    """A top-level value of the document, handed over once it is complete."""
+    key: str
+    value: object
+
+
+class DocumentEvent(NamedTuple):
+    """One verified reader event, as a Reader callback receives it: the event
+    and a BvnrData the binding owns (``None`` for the events that carry none)."""
+    event: Event
+    data: 'BvnrData | None'
+
+
+@lru_cache(maxsize=None)
+def _top_level_class(base):
+    """A dict parser that reports each top-level value as it completes and
+    then drops it, so an endless document of values costs flat memory."""
+
+    class _TopLevel(base):
+        def __init__(self) -> None:
+            super().__init__()
+            self.completed: list = []
+            self._opening = False
+            self._open_key = None
+
+        def _done(self, key, value) -> None:
+            self._doc.pop(key, None)
+            self.completed.append(Value(key, value))
+
+        def _push_value(self, value) -> None:
+            at_top = len(self._scope_stack) == 1
+            key = self._current_key
+            super()._push_value(value)
+            if at_top and key is not None:
+                if self._opening:           # a struct: complete at its end
+                    self._open_key = key
+                else:
+                    self._done(key, value)
+
+        def _commit_sealed(self, arr, value) -> None:
+            at_top = len(self._scope_stack) == 1
+            super()._commit_sealed(arr, value)
+            if at_top and arr.parent_key is not None:
+                self._done(arr.parent_key, value)
+
+        def on_event(self, ev, data) -> bool:
+            if ev == Event.STRUCT_START:
+                self._opening = True
+                try:
+                    return super().on_event(ev, data)
+                finally:
+                    self._opening = False
+            if ev == Event.STRUCT_END:
+                was_nested = len(self._scope_stack) > 1
+                ok = super().on_event(ev, data)
+                if (was_nested and len(self._scope_stack) == 1
+                        and self._open_key is not None):
+                    key, self._open_key = self._open_key, None
+                    self._done(key, self._doc[key])
+                return ok
+            if ev == Event.STREAM_END:
+                # An array is sealed by whatever follows it; at the end of the
+                # document nothing does.
+                self._maybe_seal_array()
+            return super().on_event(ev, data)
+
+    return _TopLevel
+
+
+def _top_level_parser(typed: bool):
+    from . import _DictParser, _TypedDictParser  # deferred (import cycle)
+    return _top_level_class(_TypedDictParser if typed else _DictParser)()
+
+
+def _held_bytes(data) -> bytes:
+    """The bytes of one feed, as an object nobody can change while C reads it.
+
+    A pulled feed is only referenced by C until it is drained, so a bytearray
+    the caller refills (the usual recv_into loop) is copied; bytes are used as
+    they are."""
+    if isinstance(data, bytes):
+        return data
+    if isinstance(data, (bytearray, memoryview)):
+        return bytes(data)
+    if isinstance(data, str):
+        return data.encode('utf-8')
+    raise BovnarArgumentError(
+        f"feed() takes bytes, bytearray or memoryview, not {type(data).__name__}")
+
+
+def _flags_255(max_file_size: int) -> BvnrReadFlags:
+    flags = BvnrReadFlags()
+    flags.max_file_size      = max_file_size
+    flags.max_array_nesting  = 255
+    flags.max_struct_nesting = 255
+    return flags
+
+
+class _Feed:
+    """What the three feeds share: the item queue, the iterator protocol, the
+    memoryview a pulled item may be handed out as, and closing."""
+
+    def __init__(self) -> None:
+        self._lib      = get_library()
+        self._queue    = deque()
+        self._view     = None
+        self._finished = False
+        self._closed   = False
+
+    # -- iteration ---------------------------------------------------------
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self._view is not None:
+            self._release()
+        if self._queue:
+            return self._queue.popleft()
+        item = self._pull()
+        if item is None:
+            raise StopIteration
+        return item
+
+    def _pull(self):
+        """The next item C has for the fed bytes, or None."""
+        return None
+
+    # -- memoryview lifetime -----------------------------------------------
+    def _hand_out(self, ptr: int, n: int) -> memoryview:
+        # Read-only, as a view of the fed bytes is: the memory is the demux's.
+        view = memoryview((ctypes.c_ubyte * n).from_address(ptr)).toreadonly() \
+            if n else memoryview(b'')
+        self._view = view
+        return view
+
+    def _release(self) -> None:
+        # The view is over memory C reuses at the next call. Releasing it makes
+        # any later use of it raise ValueError instead of reading that memory.
+        # A buffer someone took FROM it (np.frombuffer, a second memoryview's
+        # export) would keep pointing there, so that is refused: the stream is
+        # left as it was, and the call can be repeated once the export is gone.
+        try:
+            self._view.release()
+        except BufferError:
+            raise BovnarArgumentError(
+                "the memoryview of the previous item is still exported (a "
+                "buffer was made from it and is alive); copy it with "
+                "bytes(view) and drop the buffer before the next call") from None
+        self._view = None
+
+    # -- life cycle --------------------------------------------------------
+    def _check_open(self) -> None:
+        if self._closed:
+            raise BovnarArgumentError(f"{type(self).__name__} has been closed")
+        if self._finished:
+            raise BovnarArgumentError(
+                f"{type(self).__name__} has been finished")
+
+    def close(self) -> None:
+        """Release the C object. Safe to call twice."""
+        if self._closed:
+            return
+        if self._view is not None:
+            self._release()
+        self._closed = True
+        self._queue.clear()
+        self._destroy()
+
+    def _destroy(self) -> None:
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()
+
+    def __del__(self):
+        # Never raise from a finaliser, and free the C object even when a view
+        # is still out: the object is unreachable, so nothing can read it more.
+        if getattr(self, '_closed', True):
+            return
+        self._view = None
+        self._closed = True
+        try:
+            self._destroy()
+        except Exception:                           # noqa: BLE001 (finaliser)
+            pass
+
+
+# ---------------------------------------------------------------------------
+# DocumentFeed
+# ---------------------------------------------------------------------------
+
+class DocumentFeed(_Feed):
+    """One document, fed in pieces of any size (``bvnr_open_read_feed``).
+
+    ``feed(data)`` hands over the next piece and ``finish()`` says the
+    document is over; each returns the feed itself, which iterates over the
+    items that call completed:
+
+    * with ``events=True`` (the default) a :class:`DocumentEvent` per verified
+      event: the events, and the ``BvnrData`` they carry, that
+      ``Reader.read_mem(data, on_verified=...)`` delivers for the whole
+      document, wherever it was cut;
+    * with ``values=True`` a :class:`Value` per top-level value, once it is
+      complete -- at its end for a scalar, a struct or an octet stream, at the
+      next key for an array. A value handed over is not kept, so an endless
+      document of values costs flat memory; ``dict(v for v in items if
+      isinstance(v, Value))`` is what :func:`bovnar.loads` returns. An octet
+      stream is gathered whole first: for one that does not end, use the
+      events, or a :class:`DemuxFeed` for a multiplexed one.
+
+    Running out of input is never an error; ``finish()`` raises
+    ``BovnarParseError`` for a document cut off part-way, as ``Reader`` does.
+    Any other error raises from the ``feed()`` whose bytes hit it, with the
+    position the reader reports, and the items that call had completed are
+    dropped. An exception from ``want_unit`` is re-raised unchanged. The keyword
+    options are those of :meth:`Reader.read_mem`.
+    """
+
+    def __init__(self, *,
+                 events: bool = True,
+                 values: bool = False,
+                 typed: bool = False,
+                 max_file_size: int = 0,
+                 continue_on_error: bool = False,
+                 strict_version: bool = False,
+                 text_only: bool = False,
+                 want_unit=None,
+                 want_unit_allow_nonterminating: bool = False,
+                 max_conversion_length: int = 0) -> None:
+        super().__init__()
+        self._reader = Reader()
+        self._events = events
+        self._parser = _top_level_parser(typed) if values else None
+        self._flags, self._cb_refs = self._reader._build_flags(
+            self._on_event, None, max_file_size, continue_on_error,
+            strict_version, text_only, want_unit,
+            want_unit_allow_nonterminating, max_conversion_length)
+        if not self._lib.bvnr_open_read_feed(self._reader._ptr, None,
+                                             ctypes.byref(self._flags)):
+            self._reader._raise_error()
+
+    def _on_event(self, ev, data) -> bool:
+        if self._events:
+            self._queue.append(DocumentEvent(ev, data))
+        parser = self._parser
+        if parser is not None:
+            parser.on_event(ev, data)
+            if parser.completed:
+                self._queue.extend(parser.completed)
+                parser.completed.clear()
+        return True
+
+    def _check(self, ok: bool, queued: int) -> None:
+        for cb in self._cb_refs:
+            st = getattr(cb, '_bvnr_state', None)
+            if st is not None and st.get('exc') is not None:
+                exc, st['exc'] = st['exc'], None
+                self._drop_after(queued)
+                raise exc
+        if not ok:
+            self._drop_after(queued)
+            self._reader._raise_error()
+
+    def _drop_after(self, queued: int) -> None:
+        while len(self._queue) > queued:
+            self._queue.pop()
+
+    def feed(self, data) -> 'DocumentFeed':
+        """Parse the next piece of the document (bytes-like; it may be reused
+        once this returns) and return the feed, iterating over what it
+        completed."""
+        self._check_open()
+        buf = data if isinstance(data, bytes) else _held_bytes(data)
+        queued = len(self._queue)
+        ok = self._lib.bvnr_read_feed(self._reader._ptr, buf, len(buf))
+        self._check(ok, queued)
+        return self
+
+    def finish(self) -> 'DocumentFeed':
+        """Declare the end of the document; raises if it is incomplete."""
+        self._check_open()
+        queued = len(self._queue)
+        ok = self._lib.bvnr_read_finish(self._reader._ptr)
+        self._finished = True
+        self._check(ok, queued)
+        return self
+
+    @property
+    def recovery_count(self) -> int:
+        """How often a ``continue_on_error`` read recovered (Reader's)."""
+        return self._reader.recovery_count
+
+    @property
+    def skipped_bytes(self) -> int:
+        """Bytes a recovering read discarded (Reader's)."""
+        return self._reader.skipped_bytes
+
+    @property
+    def declared_version(self):
+        """The ``#!bovnar M.N`` the document declared, or ``None``."""
+        return self._reader.declared_version
+
+    def _destroy(self) -> None:
+        self._reader.close()
+
+
+# ---------------------------------------------------------------------------
+# FrameFeed
+# ---------------------------------------------------------------------------
+
+class FrameFeed(_Feed):
+    """A ``BVF1`` frame stream (:func:`frame_documents`), fed in pieces of any
+    size; one C frame reader for the whole stream, however long.
+
+    ``feed(data)`` returns the feed, which iterates over the documents those
+    bytes completed:
+
+    * by default each document's bytes (``bytes``, or with ``view=True`` a
+      ``memoryview`` valid until the next call on the feed, see
+      :class:`DemuxFeed`), drained with ``bvnr_frame_reader_next``, for the
+      caller to parse as it likes;
+    * with ``parse=True`` each document parsed to a dict, exactly as
+      :func:`load_documents` parses it (``typed``, ``continue_past_failed``,
+      ``None`` for a failed document), each payload streamed into one reused
+      reader as it arrives, so a frame is never held whole.
+
+    ``max_document_size`` is that of :func:`load_documents` (``0`` selects
+    ``BVNR_DOC_DEFAULT_MAX``). A failed document (without
+    ``continue_past_failed``) raises ``BovnarParseError`` with its own code, as
+    there; a bad magic and a declared length over the cap raise it with the
+    frame reader's codes, ``UNEXPECTED_INPUT_BYTE`` and ``VALUE_OUT_OF_RANGE``,
+    which :func:`load_documents` reports alike as
+    ``GOT_INCOMPLETE_BVNR_STREAM``. Running out of input is never an error, and
+    ``finish()`` raises for a stream cut inside a frame.
+
+    Unparsed, the fed bytes stay referenced until the documents are drained,
+    and feeding again before then raises ``BovnarArgumentError``.
+    """
+
+    def __init__(self, *,
+                 parse: bool = False,
+                 typed: bool = False,
+                 continue_past_failed: bool = False,
+                 max_document_size: int = 0,
+                 view: bool = False) -> None:
+        super().__init__()
+        self._fr     = None
+        self._fed    = None
+        self._parse  = parse
+        self._as_view = view
+        self._continue = continue_past_failed
+        lib = self._lib
+        if not parse:
+            if typed or continue_past_failed:
+                raise BovnarArgumentError(
+                    "typed and continue_past_failed apply to parse=True")
+            self._fr = lib.bvnr_frame_reader_create_pull(max_document_size)
+            if not self._fr:
+                raise MemoryError("bvnr_frame_reader_create_pull() returned NULL")
+            self._doc = ctypes.c_void_p()
+            self._len = ctypes.c_uint64()
+            self._doc_ref = ctypes.byref(self._doc)
+            self._len_ref = ctypes.byref(self._len)
+            return
+        if view:
+            raise BovnarArgumentError("view applies to parse=False")
+
+        from . import _DictParser, _TypedDictParser  # deferred (import cycle)
+        new_parser = _TypedDictParser if typed else _DictParser
+        self._state = {'exc': None, 'parser': new_parser(),
+                       'index': None, 'err': None}
+
+        def on_event(ev, d):
+            return self._state['parser'].on_event(ev, d)
+
+        def on_document(_ud, index, ok, err):
+            st = self._state
+            try:
+                self._queue.append(st['parser'].result() if ok else None)
+                if not ok and st['index'] is None:
+                    st['index'], st['err'] = int(index), int(err)
+                st['parser'] = new_parser()
+                return True
+            except BaseException as exc:           # noqa: BLE001 (re-raised by feed)
+                if st['exc'] is None:
+                    st['exc'] = exc
+                return False
+
+        self._cb_event = Reader._wrap_callback(on_event)
+        self._cb_doc   = ON_DOCUMENT_FUNC(on_document)
+        flags = _flags_255(BVNR_FILESIZE_UNLIMITED)
+        flags.on_verified       = self._cb_event
+        flags.continue_on_error = False            # strict per-document parsing
+        opts = BvnrDocStreamOpts()
+        opts.flags                = ctypes.pointer(flags)
+        opts.on_document          = self._cb_doc
+        opts.continue_past_failed = continue_past_failed
+        opts.max_document_size    = max_document_size
+        self._fr = lib.bvnr_frame_reader_create(ctypes.byref(opts))
+        if not self._fr:
+            raise MemoryError("bvnr_frame_reader_create() returned NULL")
+
+    def feed(self, data) -> 'FrameFeed':
+        """Hand over the next piece of the frame stream and return the feed,
+        iterating over the documents it completed."""
+        self._check_open()
+        if self._view is not None:
+            self._release()
+        if not self._parse:
+            if self._fed is not None:
+                raise BovnarArgumentError(
+                    "the previous feed has not been drained; iterate the "
+                    "FrameFeed to its end before feeding it again")
+            buf = _held_bytes(data)
+            if buf:
+                if not self._lib.bvnr_frame_reader_feed(self._fr, buf, len(buf)):
+                    self._raise_error()
+                self._fed = buf
+            return self
+        buf = data if isinstance(data, bytes) else _held_bytes(data)
+        ok = self._lib.bvnr_frame_reader_feed(self._fr, buf, len(buf))
+        self._check_parse(ok)
+        return self
+
+    def _check_parse(self, ok: bool) -> None:
+        cb_state = getattr(self._cb_event, '_bvnr_state', None)
+        for st in (cb_state, self._state):
+            if st is not None and st.get('exc') is not None:
+                exc, st['exc'] = st['exc'], None
+                raise exc
+        if not ok:
+            self._raise_error()
+
+    def _raise_error(self):
+        # A failed document without continue_past_failed ends the stream with
+        # that document's own error code; say which document it was, as
+        # load_documents does.
+        code = ErrorCode(self._lib.bvnr_frame_reader_error(self._fr))
+        if code == ErrorCode.NONE:
+            code = ErrorCode.GOT_INCOMPLETE_BVNR_STREAM
+        st = getattr(self, '_state', None)
+        if (st is not None and not self._continue
+                and st['err'] == int(code)):
+            raise BovnarParseError(
+                code, message=f"document {st['index']} failed to parse")
+        msg_b = self._lib.bvn_error_to_string(int(code))
+        raise BovnarParseError(
+            code, message="frame stream: " + (msg_b.decode('utf-8') if msg_b
+                                               else code.name.lower()))
+
+    def _pull(self):
+        if self._fed is None:
+            return None
+        rc = self._lib.bvnr_frame_reader_next(self._fr, self._doc_ref,
+                                              self._len_ref)
+        if rc == _NEXT_ITEM:
+            n = self._len.value
+            if self._as_view:
+                return self._hand_out(self._doc.value, n)
+            return ctypes.string_at(self._doc.value, n) if n else b''
+        self._fed = None
+        if rc == _NEXT_NONE:
+            return None
+        self._raise_error()
+
+    def finish(self) -> 'FrameFeed':
+        """Declare the end of the stream; raises if it stopped inside a frame."""
+        self._check_open()
+        if self._view is not None:
+            self._release()
+        if self._fed is not None:
+            raise BovnarArgumentError(
+                "the last feed has not been drained; iterate the FrameFeed to "
+                "its end before finishing it")
+        ok = self._lib.bvnr_frame_reader_finish(self._fr)
+        self._finished = True
+        if self._parse:
+            self._check_parse(ok)
+        elif not ok:
+            self._raise_error()
+        return self
+
+    @property
+    def count(self) -> int:
+        """Documents seen so far (parsed or handed out)."""
+        return self._lib.bvnr_frame_reader_count(self._fr) if self._fr else 0
+
+    def _destroy(self) -> None:
+        if self._fr:
+            self._lib.bvnr_frame_reader_destroy(self._fr)
+            self._fr = None
+        self._fed = None
+
+
+# ---------------------------------------------------------------------------
+# DemuxFeed
+# ---------------------------------------------------------------------------
+
+class DemuxFeed(_Feed):
+    """A document carrying a multiplexed octet stream (:func:`mux_dump`), fed
+    in pieces of any size and drained with ``bvnr_demux_next``: one plain C
+    call per item and no callback.
+
+    ``feed(data)`` returns the feed, which iterates, in document order, over
+    what the bytes completed:
+
+    * a :class:`Message` ``(channel, payload)`` per message;
+    * with ``values=True``, a :class:`Value` per top-level value of the
+      document around the stream (as :class:`DocumentFeed` hands them over),
+      so a preamble such as ``.meta = { .codec = "av1"; };`` arrives before the
+      first message, and whatever follows the stream after the last one. The
+      mux stream itself is not a value;
+    * with ``events=True``, a :class:`DocumentEvent` per event of the document
+      except the mux stream's chunks: the values' events, the stream's
+      ``OCTET_STREAM_START`` and ``OCTET_STREAM_END``, ``STREAM_END``.
+
+    ``key``, ``max_message`` (``0`` selects ``BVNR_MUX_DEFAULT_MAX``), the
+    4096-channel limit and every error are those of :func:`mux_load`, raised
+    as the same ``BovnarParseError`` codes, from the iteration that reaches
+    them (the items before them come out first), or from ``finish()``.
+    ``max_file_size`` caps the document (``0``: no cap).
+
+    The fed bytes are referenced until the feed is drained (iterated until it
+    stops), and feeding again before that raises ``BovnarArgumentError``. A
+    payload is ``bytes`` by default. With ``view=True`` it is a read-only
+    ``memoryview`` of the demux's memory instead -- the fed bytes for a message
+    that lay whole in one chunk, the channel's buffer otherwise -- which saves
+    the copy and is valid ONLY until the next call on the feed (the next item,
+    ``feed``, ``finish`` or ``close``). The feed releases it then, so a late use
+    raises ``ValueError``; ``bytes(view)`` keeps a copy. A slice or a buffer
+    taken from it is not released with it and must not outlive it either; one
+    that holds an export makes the next call raise ``BovnarArgumentError``.
+
+    ``finish()`` declares the end of the document and raises for one cut off
+    part-way or for a message the stream's end cut short; the feed then
+    iterates over the closing items.
+    """
+
+    def __init__(self, *,
+                 key: str | None = None,
+                 max_message: int = 0,
+                 values: bool = False,
+                 events: bool = False,
+                 typed: bool = False,
+                 view: bool = False,
+                 max_file_size: int = 0) -> None:
+        super().__init__()
+        self._dm = None
+        lib = self._lib
+        dm = lib.bvnr_demux_create(MUX_ON_MSG_FUNC(), None, max_message)
+        if not dm:
+            raise MemoryError("bvnr_demux_create() returned NULL")
+        self._dm = dm
+        self._key = key.encode('utf-8') if key is not None else None
+        if self._key is not None and not lib.bvnr_demux_set_key(dm, self._key):
+            raise MemoryError("bvnr_demux_set_key() failed")
+        if not lib.bvnr_demux_open_feed(dm, ctypes.byref(_flags_255(max_file_size)),
+                                        values or events):
+            raise MemoryError("bvnr_demux_open_feed() failed")
+        self._fed     = None
+        self._fed_at  = 0
+        self._as_view = view
+        self._events  = events
+        self._parser  = _top_level_parser(typed) if values else None
+        self._last_key = None
+        self._in_mux  = False
+        self._item    = BvnrDemuxItem()
+        self._item_ref = ctypes.byref(self._item)
+        self._next    = lib.bvnr_demux_next
+
+    def feed(self, data) -> 'DemuxFeed':
+        """Hand over the next piece of the document and return the feed,
+        iterating over what it completed. Drain it before feeding again."""
+        if self._closed or self._finished:
+            self._check_open()
+        if self._view is not None:
+            self._release()
+        if self._fed is not None or self._queue:
+            raise BovnarArgumentError(
+                "the previous feed has not been drained; iterate the DemuxFeed "
+                "to its end before feeding it again")
+        buf = data if type(data) is bytes else _held_bytes(data)
+        if buf:
+            if not self._lib.bvnr_demux_feed(self._dm, buf, len(buf)):
+                self._raise_error()
+            self._fed = buf
+            # The address is wanted only when a message is handed out, and a
+            # cast costs more than the rest of a small feed: found on demand.
+            self._fed_at = None
+        return self
+
+    def __next__(self):
+        # The per-message path, kept flat: everything else is _resume's.
+        if self._view is not None:
+            self._release()
+        if self._queue:
+            return self._queue.popleft()
+        fed = self._fed
+        if fed is None:
+            raise StopIteration
+        rc = self._next(self._dm, self._item_ref)
+        if rc == _NEXT_ITEM and not self._as_view:
+            item = self._item
+            n = item.length
+            if not n:
+                return _tuple_new(Message, (item.channel, b''))
+            # A message that lay whole in the fed bytes is a slice of them, far
+            # cheaper than a string_at call; one reassembled in the channel's
+            # buffer is copied from there.
+            at = item.data - self._fed_address()
+            if 0 <= at <= len(fed) - n:
+                return _tuple_new(Message, (item.channel, fed[at:at + n]))
+            return _tuple_new(Message, (item.channel,
+                                        ctypes.string_at(item.data, n)))
+        item = self._resume(rc, self._as_view)
+        if item is None:
+            raise StopIteration
+        return item
+
+    def _resume(self, rc: int, as_view: bool):
+        """Handle what bvnr_demux_next has just answered `rc`, then go on until
+        there is an item to hand out (None when the fed bytes are used up)."""
+        item, queue = self._item, self._queue
+        while True:
+            if rc == _NEXT_ITEM:
+                return Message(item.channel, self._payload(item, as_view))
+            if rc == _NEXT_EVENT:
+                self._on_event(item)
+                if queue:
+                    return queue.popleft()
+            elif rc == _NEXT_NONE:
+                self._fed = None
+                return None
+            else:
+                self._fed = None
+                self._raise_error()
+            rc = self._next(self._dm, self._item_ref)
+
+    def _fed_address(self) -> int:
+        at = self._fed_at
+        if at is None:
+            at = self._fed_at = ctypes.cast(self._fed, ctypes.c_void_p).value
+        return at
+
+    def _payload(self, item, as_view: bool):
+        n = item.length
+        if not as_view:
+            return ctypes.string_at(item.data, n) if n else b''
+        at = (item.data or 0) - self._fed_address()
+        if n and 0 <= at <= len(self._fed) - n:
+            view = memoryview(self._fed)[at:at + n]
+            self._view = view
+            return view
+        return self._hand_out(item.data, n)
+
+    def _on_event(self, item) -> None:
+        ev = Event(item.event)
+        data = Reader._snapshot(item.value.contents) if item.value else None
+        # Which octet stream is the mux stream, as the C demux decides it: every
+        # one without a key, else the one opened under the key. Its two events
+        # are not a value of the document.
+        edge = False
+        if ev == Event.ASSIGNMENT_START:
+            self._last_key = data.raw_bytes() if data is not None else None
+        elif ev == Event.OCTET_STREAM_START:
+            edge = self._in_mux = (self._key is None or
+                                   self._last_key == self._key)
+        elif ev == Event.OCTET_STREAM_END and self._in_mux:
+            edge, self._in_mux = True, False
+        if self._events:
+            self._queue.append(DocumentEvent(ev, data))
+        parser = self._parser
+        if parser is not None and not edge:
+            parser.on_event(ev, data)
+            if parser.completed:
+                self._queue.extend(parser.completed)
+                parser.completed.clear()
+
+    def _raise_error(self):
+        lib = self._lib
+        raise _demux_error(lib, lib.bvnr_demux_error(self._dm),
+                           lib.bvnr_demux_get_reader(self._dm))
+
+    def finish(self) -> 'DemuxFeed':
+        """Declare the end of the document and return the feed, iterating over
+        the closing items; raises if the document or a message is incomplete."""
+        self._check_open()
+        if self._view is not None:
+            self._release()
+        if self._fed is not None or self._queue:
+            raise BovnarArgumentError(
+                "the last feed has not been drained; iterate the DemuxFeed to "
+                "its end before finishing it")
+        lib = self._lib
+        ok = lib.bvnr_demux_finish(self._dm)
+        self._finished = True
+        err = lib.bvnr_demux_error(self._dm)
+        if not ok or err != int(ErrorCode.NONE):
+            if err == int(ErrorCode.NONE):
+                err = int(ErrorCode.GOT_INCOMPLETE_BVNR_STREAM)
+            raise _demux_error(lib, err, lib.bvnr_demux_get_reader(self._dm))
+        # The closing events are drained now, while the demux is known good;
+        # a message cannot complete at the finish, so none is held as a view.
+        self._fed, self._fed_at = b'', 0
+        while (it := self._resume(self._next(self._dm, self._item_ref),
+                                  False)) is not None:
+            self._queue.append(it)
+        return self
+
+    def _destroy(self) -> None:
+        if self._dm:
+            self._lib.bvnr_demux_destroy(self._dm)
+            self._dm = None
+        self._fed = None

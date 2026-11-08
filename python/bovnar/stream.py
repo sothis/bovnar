@@ -1128,7 +1128,9 @@ class DemuxFeed(_Feed):
             if not self._lib.bvnr_demux_feed(self._dm, buf, len(buf)):
                 self._raise_error()
             self._fed = buf
-            self._fed_at = ctypes.cast(buf, ctypes.c_void_p).value
+            # The address is wanted only when a message is handed out, and a
+            # cast costs more than the rest of a small feed: found on demand.
+            self._fed_at = None
         return self
 
     def __next__(self):
@@ -1149,7 +1151,7 @@ class DemuxFeed(_Feed):
             # A message that lay whole in the fed bytes is a slice of them, far
             # cheaper than a string_at call; one reassembled in the channel's
             # buffer is copied from there.
-            at = item.data - self._fed_at
+            at = item.data - self._fed_address()
             if 0 <= at <= len(fed) - n:
                 return _tuple_new(Message, (item.channel, fed[at:at + n]))
             return _tuple_new(Message, (item.channel,
@@ -1178,11 +1180,17 @@ class DemuxFeed(_Feed):
                 self._raise_error()
             rc = self._next(self._dm, self._item_ref)
 
+    def _fed_address(self) -> int:
+        at = self._fed_at
+        if at is None:
+            at = self._fed_at = ctypes.cast(self._fed, ctypes.c_void_p).value
+        return at
+
     def _payload(self, item, as_view: bool):
         n = item.length
         if not as_view:
             return ctypes.string_at(item.data, n) if n else b''
-        at = (item.data or 0) - self._fed_at
+        at = (item.data or 0) - self._fed_address()
         if n and 0 <= at <= len(self._fed) - n:
             view = memoryview(self._fed)[at:at + n]
             self._view = view

@@ -710,7 +710,7 @@ message that lies whole in `input` is borrowed from it; one that spans pieces
 or chunks is gathered in a buffer per channel that is reused. The slice is
 valid until the next call. `finish()` checks that the input ended after the
 document's `;` (or before its first byte); `reset()` readies the reader for
-another stream. The reader reads every valid octet region, not only what
+another stream, keeping the buffers it has grown. The reader reads every valid octet region, not only what
 `bvnr_mux_send` writes: several messages packed into one chunk, channels
 interleaved chunk by chunk, a length varint split across chunks.
 
@@ -826,28 +826,32 @@ fn main() -> Result<(), bovnar::Error> {
 ```
 
 **Cost per message**, from `cargo bench --bench codec`: a release build pinned
-to one core (`taskset -c 2`) of an Intel Core i7-2700K (2011), whose clock
+to one core (`taskset -c 3`) of an Intel Core i7-2700K (2011), whose clock
 scales with load. Each figure is the median of seven runs (each run the median
 of nine passes over at least 64 MiB of messages), and in brackets the fastest
 run. The stream is a few MiB held in the cache, as the bytes of a socket read
-are when the reader sees them. A 400 KB message spans seven chunks.
+are when the reader sees them; it is opened once and fed the same messages
+every pass, as a live stream is fed, so opening it is not counted. A 400 KB
+message spans seven chunks.
 
 | Message | write | write + copy | peek + skip | forward | read | `mux_dump` | `mux_load` |
 |---|---|---|---|---|---|---|---|
-| 150 B | 24 ns (18) | 41 ns (26) | 58 ns (29) | 64 ns (35) | 32 ns (18) | 485 ns (272) | 269 ns (146) |
-| 30 KB | 25 ns (19) | 2.0 µs (1.5) | 60 ns (32) | 69 ns (37) | 35 ns (19) | 10.2 µs (8.4) | 8.1 µs (5.7) |
-| 400 KB | 100 ns (74) | 30 µs (21) | 174 ns (106) | 185 ns (110) | 47 µs (28) | 150 µs (136) | 128 µs (97) |
+| 150 B | 8.6 ns (8.4) | 28 ns (27) | 14 ns (12) | 15 ns (14) | 8.9 ns (8.1) | 274 ns (268) | 150 ns (146) |
+| 30 KB | 8.9 ns (8.6) | 1.6 µs (1.5) | 13 ns (13) | 15 ns (14) | 8.9 ns (8.8) | 8.8 µs (8.3) | 7.2 µs (5.2) |
+| 400 KB | 39 ns (38) | 24 µs (22) | 55 ns (55) | 57 ns (56) | 27 µs (23) | 118 µs (110) | 110 µs (86) |
 
 *write* is `encode` (the headers only, for a vectored write); *write + copy* is
 `write_message` into a reused `Vec`; *peek + skip* and *forward* are
-`next_item` with a 4-byte head and the decision, the forwarded chunks borrowed
-from the input; *read* is `read`, which gathers (copies) a message that spans
+`next_item`, a look at the channel and the first payload byte, and the
+decision, the forwarded chunks borrowed from the input; *read* is `read`, which gathers (copies) a message that spans
 chunks, so the 400 KB one; *mux_dump* and *mux_load* are the batch functions
 through the C library, for comparison. Counted in instructions, which the
-clock does not move, a 150-byte message is about 150 to write, 200 to read and
-340 to peek at and skip. From a stream much larger than the cache, every chunk
-header a 400 KB message has is a cache miss, which puts peek and forward at
-about 230 ns for it; the other figures move little.
+clock does not move, a 150-byte message is about 145 to write, 120 to read and
+140 to peek at and skip, the benchmark's loop included. From a stream much
+larger than the cache, every chunk header a 400 KB message has is a cache
+miss, which puts peek and forward at about 145 ns for it, and small messages
+are read as fast as memory delivers them: about 25 ns to read a 150-byte one
+and 29 ns to peek at and skip it. The other figures move little.
 
 ---
 

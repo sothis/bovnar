@@ -169,6 +169,12 @@ target_link_libraries(bvnr_feed_test PRIVATE bvnr_static)
 target_compile_options(bvnr_alloc_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_alloc_test PRIVATE bvnr_static)
 
+# Per-message cost of bvnr_mux_send and the demux, batch and push-fed. Built so
+# that it keeps compiling, but not a test: run it by hand (see its header).
+add_executable(bvnr_stream_bench tests/bovnar_stream_bench.c)
+target_compile_options(bvnr_stream_bench PRIVATE ${BVNR_C_FLAGS})
+target_link_libraries(bvnr_stream_bench PRIVATE bvnr_static)
+
 target_compile_options(bvnr_high_severity_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_high_severity_test PRIVATE bvnr_static)
 

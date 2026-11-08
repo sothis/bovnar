@@ -157,13 +157,17 @@ fn varint_encode(mut v: u64, out: &mut [u8; MAX_VARINT]) -> usize {
 /// tenth byte may carry only the lowest bit).
 #[inline(always)]
 fn varint_decode(buf: &[u8]) -> std::result::Result<Option<(u64, usize)>, ()> {
-    // Channels and short lengths are one byte.
-    if let Some(&b) = buf.first()
-        && b < 0x80
-    {
-        return Ok(Some((u64::from(b), 1)));
+    // Channels are one byte, and the length of a message that fits one chunk
+    // is at most three.
+    let low = |b: u8| u64::from(b & 0x7F);
+    match *buf {
+        [b0, ..] if b0 < 0x80 => Ok(Some((u64::from(b0), 1))),
+        [b0, b1, ..] if b1 < 0x80 => Ok(Some((low(b0) | u64::from(b1) << 7, 2))),
+        [b0, b1, b2, ..] if b2 < 0x80 => {
+            Ok(Some((low(b0) | low(b1) << 7 | u64::from(b2) << 14, 3)))
+        }
+        _ => varint_decode_long(buf),
     }
-    varint_decode_long(buf)
 }
 
 fn varint_decode_long(buf: &[u8]) -> std::result::Result<Option<(u64, usize)>, ()> {
@@ -796,13 +800,38 @@ impl Channel {
 
 /// A message start whose chunk header was read straight from the input: the
 /// input was left at the chunk's tag, so the message can still be handed on
-/// as the input's own bytes.
+/// as the input's own bytes. Its channel is left as it was, with nothing
+/// open, until the message turns out not to lie whole in the input.
 #[derive(Clone, Copy, Debug)]
 struct Fresh {
+    channel: u64,
+    len: u64,
     /// Tag, length and both varints.
     header: usize,
-    /// The chunk's length field.
-    chunk: usize,
+    /// Where the chunk ends, from its tag.
+    end: usize,
+}
+
+/// A chunk at the front of the input that starts a message on a channel with
+/// nothing open, and carries nothing but that message: all of it, or its
+/// first part.
+#[derive(Clone, Copy, Debug)]
+struct Start {
+    cur: usize,
+    channel: u64,
+    len: u64,
+    /// Tag, length and both varints.
+    header: usize,
+    /// Where the chunk ends, from its tag.
+    end: usize,
+}
+
+impl Start {
+    /// Whether the chunk holds all of the message.
+    #[inline]
+    fn whole(&self) -> bool {
+        self.len == (self.end - self.header) as u64
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -1099,6 +1128,24 @@ impl MuxReader {
     /// open is delivered here too, as its payload, unless it was skipped.
     #[inline]
     pub fn read<'s, 'a: 's>(&'s mut self, input: &mut &'a [u8]) -> Result<Option<Message<'s>>> {
+        // The common case first, straight from the input: a chunk that holds
+        // one whole message.
+        let buf: &'a [u8] = input;
+        if self.ready()
+            && let Some(s) = self.start(buf)?
+            && s.whole()
+        {
+            let (bytes, rest) = buf.split_at(s.end);
+            *input = rest;
+            return Ok(Some(Message {
+                channel: s.channel,
+                payload: &bytes[s.header..],
+            }));
+        }
+        self.read_general(input)
+    }
+
+    fn read_general<'s, 'a: 's>(&'s mut self, input: &mut &'a [u8]) -> Result<Option<Message<'s>>> {
         loop {
             match self.advance(input, None)? {
                 Found::Nothing => return Ok(None),
@@ -1160,6 +1207,52 @@ impl MuxReader {
         input: &mut &'a [u8],
         head: usize,
     ) -> Result<Option<Item<'s>>> {
+        // The common case first, straight from the input: the message peeked
+        // at last lies whole in it, and the next chunk starts a message.
+        let mut buf: &'a [u8] = input;
+        if let Pending::Peeked { fresh: Some(f) } = self.pending
+            && let Some(n) = settled(buf, &f, self.decision)
+        {
+            let (bytes, rest) = buf.split_at(n);
+            buf = rest;
+            *input = rest;
+            self.pending = Pending::None;
+            match std::mem::take(&mut self.decision) {
+                Decision::Skip => {}
+                Decision::Deliver => {
+                    return Ok(Some(Item::Message(Message {
+                        channel: f.channel,
+                        payload: &bytes[f.header..],
+                    })));
+                }
+                Decision::Forward => {
+                    return Ok(Some(Item::Wire(Wire {
+                        channel: f.channel,
+                        len: f.len,
+                        bytes,
+                    })));
+                }
+            }
+        }
+        if self.ready()
+            && let Some(s) = self.start(buf)?
+        {
+            let head = self.begin_peek(s, buf, head);
+            return Ok(Some(Item::Peek(Peek {
+                channel: s.channel,
+                len: s.len,
+                head,
+                decision: &mut self.decision,
+            })));
+        }
+        self.next_item_general(input, head)
+    }
+
+    fn next_item_general<'s, 'a: 's>(
+        &'s mut self,
+        input: &mut &'a [u8],
+        head: usize,
+    ) -> Result<Option<Item<'s>>> {
         Ok(match self.advance(input, Some(head))? {
             Found::Nothing => None,
             Found::Message { channel, src } => Some(Item::Message(Message {
@@ -1186,6 +1279,67 @@ impl MuxReader {
         })
     }
 
+    /// Whether the reader is between chunks with nothing to finish first.
+    #[inline]
+    fn ready(&self) -> bool {
+        self.state == State::Tag && matches!(self.pending, Pending::None) && self.error.is_none()
+    }
+
+    /// The chunk at the front of `buf`, if it is all there and starts a
+    /// message as [`Start`] describes. `None`, with nothing changed but the
+    /// channel registered, sends any other chunk the general way, which also
+    /// reports the errors.
+    #[inline(always)]
+    fn start(&mut self, buf: &[u8]) -> Result<Option<Start>> {
+        let [0x01, lo, hi, rest @ ..] = buf else {
+            return Ok(None);
+        };
+        let n = chunk_len(*lo, *hi);
+        let Some(body) = rest.get(..n) else {
+            return Ok(None);
+        };
+        let Ok(Some((channel, channel_len))) = varint_decode(body) else {
+            return Ok(None);
+        };
+        let Ok(Some((len, length_len))) = varint_decode(&body[channel_len..]) else {
+            return Ok(None);
+        };
+        let header = 3 + channel_len + length_len;
+        let first = (n + 3 - header) as u64;
+        if len < first || len > self.max_message || usize::try_from(len).is_err() {
+            return Ok(None);
+        }
+        let cur = self.channel(channel)?;
+        let c = &self.channels[cur];
+        if c.active || c.varint_len > 0 {
+            return Ok(None);
+        }
+        Ok(Some(Start {
+            cur,
+            channel,
+            len,
+            header,
+            end: 3 + n,
+        }))
+    }
+
+    /// Stops at the message `s` starts, leaving `buf` at its chunk's tag;
+    /// returns its first bytes, up to `head`.
+    #[inline]
+    fn begin_peek<'a>(&mut self, s: Start, buf: &'a [u8], head: usize) -> &'a [u8] {
+        self.cur = s.cur;
+        self.pending = Pending::Peeked {
+            fresh: Some(Fresh {
+                channel: s.channel,
+                len: s.len,
+                header: s.header,
+                end: s.end,
+            }),
+        };
+        let first = &buf[s.header..s.end];
+        &first[..head.min(first.len())]
+    }
+
     fn resolve<'s, 'a: 's>(&'s self, src: Src<'a>) -> &'s [u8] {
         match src {
             Src::Input(s) => s,
@@ -1202,7 +1356,7 @@ impl MuxReader {
     }
 
     /// The index of channel `id`, registering it on first sight.
-    #[inline]
+    #[inline(always)]
     fn channel(&mut self, id: u64) -> Result<usize> {
         if let Some(&slot) = self.small.get(id as usize)
             && slot > 0
@@ -1214,6 +1368,14 @@ impl MuxReader {
         {
             return Ok(self.last);
         }
+        self.channel_indexed(id)
+    }
+
+    /// [`channel`](Self::channel) for an id it has not just seen and that
+    /// is not small: out of line, so that the common case stays small enough
+    /// to be inlined.
+    #[inline(never)]
+    fn channel_indexed(&mut self, id: u64) -> Result<usize> {
         let i = match self.index.get(&id) {
             Some(&i) => i as usize,
             None => {
@@ -1320,7 +1482,6 @@ impl MuxReader {
     }
 
     /// Reads on until something is found or `input` is used up.
-    #[inline]
     fn advance<'a>(&mut self, input: &mut &'a [u8], peek: Option<usize>) -> Result<Found<'a>> {
         if let Some(e) = &self.error {
             return Err(e.clone());
@@ -1343,9 +1504,22 @@ impl MuxReader {
             match self.state {
                 State::Tag => match b {
                     0x01 if buf.len() >= 3 => {
-                        if let Some((used, found)) = self.whole_chunk(buf, peek)? {
-                            *input = &buf[used..];
-                            return Ok(found);
+                        if let Some(s) = self.start(buf)? {
+                            if let Some(head) = peek {
+                                let head = self.begin_peek(s, buf, head);
+                                return Ok(Found::Peek {
+                                    channel: s.channel,
+                                    len: s.len,
+                                    src: Src::Input(head),
+                                });
+                            }
+                            if s.whole() {
+                                *input = &buf[s.end..];
+                                return Ok(Found::Message {
+                                    channel: s.channel,
+                                    src: Src::Input(&buf[s.header..s.end]),
+                                });
+                            }
                         }
                         self.chunk_left = chunk_len(buf[1], buf[2]);
                         tag = Some(buf);
@@ -1430,8 +1604,10 @@ impl MuxReader {
                             self.state = State::Tag;
                             self.pending = Pending::Peeked {
                                 fresh: Some(Fresh {
+                                    channel,
+                                    len,
                                     header,
-                                    chunk: header - 3 + self.chunk_left - used,
+                                    end: header + self.chunk_left - used,
                                 }),
                             };
                             return Ok(Found::Peek {
@@ -1461,71 +1637,11 @@ impl MuxReader {
         }
     }
 
-    /// The common case, read straight from the input: a whole chunk that
-    /// holds exactly one whole message, on a channel with nothing open. A
-    /// message that is read hands over its payload; one that is peeked at is
-    /// left in the input as a fresh start. `None`, with nothing changed but
-    /// the channel registered, sends any other chunk the general way, which
-    /// also reports the errors.
-    #[inline]
-    fn whole_chunk<'a>(
-        &mut self,
-        buf: &'a [u8],
-        peek: Option<usize>,
-    ) -> Result<Option<(usize, Found<'a>)>> {
-        let n = chunk_len(buf[1], buf[2]);
-        let Some(body) = buf.get(3..3 + n) else {
-            return Ok(None);
-        };
-        let Ok(Some((id, channel_len))) = varint_decode(body) else {
-            return Ok(None);
-        };
-        let rest = &body[channel_len..];
-        let Ok(Some((need, length_len))) = varint_decode(rest) else {
-            return Ok(None);
-        };
-        let payload = &rest[length_len..];
-        if need != payload.len() as u64 || need > self.max_message {
-            return Ok(None);
-        }
-        let cur = self.channel(id)?;
-        let c = &mut self.channels[cur];
-        if c.active || c.varint_len > 0 {
-            return Ok(None);
-        }
-        let Some(head) = peek else {
-            let found = Found::Message {
-                channel: id,
-                src: Src::Input(payload),
-            };
-            return Ok(Some((3 + n, found)));
-        };
-        c.active = true;
-        c.need = need;
-        c.have = 0;
-        c.decision = Decision::Deliver;
-        c.buf.clear();
-        self.cur = cur;
-        self.pending = Pending::Peeked {
-            fresh: Some(Fresh {
-                header: 3 + channel_len + length_len,
-                chunk: n,
-            }),
-        };
-        let found = Found::Peek {
-            channel: id,
-            len: need,
-            src: Src::Input(&payload[..head.min(payload.len())]),
-        };
-        Ok(Some((0, found)))
-    }
-
     /// Reads `piece`, the next bytes of the current chunk's fragment, as
     /// `demux_feed` does: a length varint where no message is open, then
     /// message bytes, any number of messages. Returns how much of `piece` it
     /// took. `tag` is the input from the chunk's tag on when the header was
     /// read from it unbroken and `piece` starts the fragment.
-    #[inline]
     fn fragment<'a>(
         &mut self,
         piece: &'a [u8],
@@ -1587,36 +1703,37 @@ impl MuxReader {
                 if need > self.max_message || usize::try_from(need).is_err() {
                     return Err(self.fail(ErrorCode::ValueOutOfRange));
                 }
+                // The first bytes come from this chunk only: another
+                // channel's chunk may follow it.
+                let target = peek.map(|head| head.min(need as usize).min(self.chunk_left - pos));
+                let avail = piece.len() - pos;
+                if let Some(target) = target
+                    && avail >= target
+                    && let Some(at) = tag
+                    && start == 0
+                    && old == 0
+                {
+                    // A fresh start: the channel stays idle (see Fresh).
+                    let fresh = FragFound::Fresh {
+                        at,
+                        channel: c.id,
+                        len: need,
+                        head: &piece[pos..pos + target],
+                    };
+                    return Ok((pos, fresh));
+                }
                 c.active = true;
                 c.need = need;
                 c.have = 0;
                 c.decision = Decision::Deliver;
                 c.buf.clear();
-                if let Some(head) = peek {
-                    // The first bytes come from this chunk only: another
-                    // channel's chunk may follow it.
-                    let target = head.min(need as usize).min(self.chunk_left - pos);
-                    let avail = piece.len() - pos;
+                if let Some(target) = target {
                     if avail >= target {
-                        let head = &piece[pos..pos + target];
-                        let (channel, len) = (c.id, need);
-                        if let Some(at) = tag
-                            && start == 0
-                            && old == 0
-                        {
-                            let fresh = FragFound::Fresh {
-                                at,
-                                channel,
-                                len,
-                                head,
-                            };
-                            return Ok((pos, fresh));
-                        }
                         self.pending = Pending::Peeked { fresh: None };
                         let found = Found::Peek {
-                            channel,
-                            len,
-                            src: Src::Input(head),
+                            channel: c.id,
+                            len: need,
+                            src: Src::Input(&piece[pos..pos + target]),
                         };
                         return Ok((pos, FragFound::Found(found)));
                     }
@@ -1701,34 +1818,31 @@ impl MuxReader {
         if let Some(f) = fresh {
             // The input is still at the message's first chunk: when the
             // message is all there, it is handed over or passed over at once.
-            let first_payload = f.chunk - (f.header - 3);
-            let c = &mut self.channels[cur];
-            let (channel, len) = (c.id, c.need);
-            let whole = match decision {
-                Decision::Deliver => (first_payload as u64 == len && input.len() >= 3 + f.chunk)
-                    .then_some(3 + f.chunk),
-                _ => raw_span(input, 3 + f.chunk, first_payload, channel, len),
-            };
-            if let Some(n) = whole {
-                c.active = false;
+            if let Some(n) = settled(input, &f, decision) {
                 let (bytes, rest) = input.split_at(n);
                 *input = rest;
                 return Ok(match decision {
                     Decision::Deliver => Found::Message {
-                        channel,
+                        channel: f.channel,
                         src: Src::Input(&bytes[f.header..]),
                     },
                     Decision::Skip => Found::Nothing,
                     Decision::Forward => Found::Wire {
-                        channel,
-                        len,
+                        channel: f.channel,
+                        len: f.len,
                         src: Src::Input(bytes),
                     },
                 });
             }
+            // It is not: the channel is inside it from here on.
+            let c = &mut self.channels[cur];
+            c.active = true;
+            c.need = f.len;
+            c.have = 0;
+            c.buf.clear();
             *input = &input[f.header..];
-            self.chunk_left = first_payload;
-            self.state = if first_payload == 0 {
+            self.chunk_left = f.end - f.header;
+            self.state = if self.chunk_left == 0 {
                 State::Tag
             } else {
                 State::Fragment
@@ -1814,6 +1928,22 @@ fn chunk_len(lo: u8, hi: u8) -> usize {
     match u16::from_le_bytes([lo, hi]) {
         0 => CHUNK_SIZE,
         n => usize::from(n),
+    }
+}
+
+/// The wire bytes at the front of `input` of the message `f` peeked at, when
+/// they are all there and `decision` takes them as they are: one chunk that
+/// holds all of it, or, unless it is delivered (and so gathered), the run of
+/// chunks [`raw_span`] finds.
+#[inline]
+fn settled(input: &[u8], f: &Fresh, decision: Decision) -> Option<usize> {
+    let first = f.end - f.header;
+    if f.len == first as u64 {
+        (input.len() >= f.end).then_some(f.end)
+    } else if decision == Decision::Deliver {
+        None
+    } else {
+        raw_span(input, f.end, first, f.channel, f.len)
     }
 }
 

@@ -3343,8 +3343,7 @@ mod abi_tests {
             "compiling bvnr_abi_dump.c with {cmd:?} failed"
         );
         let out = Command::new(&exe).output().expect("run bvnr_abi_dump");
-        let mut text = String::from_utf8(out.stdout).unwrap();
-        text.push_str(&supplement(&compiler, repo, out_dir));
+        let text = String::from_utf8(out.stdout).unwrap();
 
         let mut c: HashMap<(String, String), (usize, usize)> = HashMap::new();
         for line in text.lines() {
@@ -3364,61 +3363,6 @@ mod abi_tests {
         }
 
         c
-    }
-
-    /// Public structs the shared generator does not print yet, with their
-    /// fields: the crate mirrors them, so it measures them itself, with the
-    /// same compiler and the same output format. A struct that
-    /// tests/bvnr_abi_dump.c lists as well is simply measured twice.
-    const SUPPLEMENT: &[(&str, &[&str])] = &[(
-        "bvnr_demux_item_t",
-        &["channel", "data", "length", "event", "value"],
-    )];
-
-    /// Compiles and runs a generator for [`SUPPLEMENT`]; its manifest lines.
-    fn supplement(compiler: &cc::Tool, repo: &Path, out_dir: &Path) -> String {
-        let mut src = String::from(
-            "#include <stddef.h>\n#include <stdio.h>\n#include \"bovnar_stream.h\"\n\
-             int main(void)\n{\n",
-        );
-        for (st, fields) in SUPPLEMENT {
-            src.push_str(&format!(
-                "\tprintf(\"STRUCT {st} %zu\\n\", sizeof({st}));\n"
-            ));
-            for f in *fields {
-                src.push_str(&format!(
-                    "\tprintf(\"FIELD {st} {f} %zu %zu\\n\", offsetof({st}, {f}), \
-                     sizeof((({st}*)0)->{f}));\n"
-                ));
-            }
-        }
-        src.push_str("\treturn 0;\n}\n");
-        let c_file = out_dir.join("bvnr_abi_supplement.c");
-        std::fs::write(&c_file, src).unwrap();
-        let exe = out_dir.join(if cfg!(windows) {
-            "bvnr_abi_supplement.exe"
-        } else {
-            "bvnr_abi_supplement"
-        });
-        let mut cmd = compiler.to_command();
-        if compiler.is_like_msvc() {
-            cmd.arg("/I")
-                .arg(repo.join("include"))
-                .arg(&c_file)
-                .arg(format!("/Fo{}\\", out_dir.display()))
-                .arg(format!("/Fe{}", exe.display()));
-        } else {
-            cmd.arg("-std=c99")
-                .arg("-I")
-                .arg(repo.join("include"))
-                .arg(&c_file)
-                .arg("-o")
-                .arg(&exe);
-        }
-        let status = cmd.status().expect("run the C compiler");
-        assert!(status.success(), "compiling {c_file:?} with {cmd:?} failed");
-        let out = Command::new(&exe).output().expect("run the supplement");
-        String::from_utf8(out.stdout).unwrap()
     }
 
     #[test]

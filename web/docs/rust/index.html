@@ -23,7 +23,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <meta property="article:published_time" content="2026-11-03">
-<meta property="article:modified_time" content="2026-11-04">
+<meta property="article:modified_time" content="2026-11-08">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar Rust Bindings">
@@ -33,7 +33,7 @@
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=535fc13f09d4">
 <link rel="alternate" type="text/markdown" href="/doc/14_bovnar_rust_bindings.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Rust Bindings", "description": "The Bovnar Rust crate: parse/to_string, the streaming reader and writer, the DOM, Quantity and the exact numbers, and JSON conversion.", "url": "https://www.bovnar.io/docs/rust/", "mainEntityOfPage": "https://www.bovnar.io/docs/rust/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-11-03", "dateModified": "2026-11-04", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}, "isAccessibleForFree": true, "license": "https://creativecommons.org/licenses/by/4.0/", "copyrightHolder": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Rust Bindings", "item": "https://www.bovnar.io/docs/rust/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Rust Bindings", "description": "The Bovnar Rust crate: parse/to_string, the streaming reader and writer, the DOM, Quantity and the exact numbers, and JSON conversion.", "url": "https://www.bovnar.io/docs/rust/", "mainEntityOfPage": "https://www.bovnar.io/docs/rust/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-11-03", "dateModified": "2026-11-08", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}, "isAccessibleForFree": true, "license": "https://creativecommons.org/licenses/by/4.0/", "copyrightHolder": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Rust Bindings", "item": "https://www.bovnar.io/docs/rust/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
@@ -49,7 +49,9 @@
 2.0.2, format spec 1.2).</p>
 <p>The crate is a thin wrapper around the C library: <code>build.rs</code> compiles the C
 sources into the crate, so there is no system library to install and nothing is
-looked up at run time. The API stays close to the C library's own shapes:
+looked up at run time. One module is not a wrapper: <code>bovnar::codec</code>, the
+incremental framing codec for live streams, is pure Rust
+(<a href="#48-live-streams-the-framing-codec-bovnarcodec">§4.8</a>). The API stays close to the C library's own shapes:
 <code>parse</code> / <code>to_string</code> over a dynamic <code>Value</code>, <code>Reader</code> callbacks, <code>Writer</code> calls
 and a random-access DOM. There is no serde integration, no builder and no typed
 deserialisation. Where Rust's types can say more at no cost, they do: the C
@@ -73,6 +75,7 @@ enums are Rust enums, and an error carries the library's error kind.</p>
 <li>4.5 <a href="#45-low-level-writer">Low-level writer</a></li>
 <li>4.6 <a href="#46-streaming--framing-bovnarstream">Streaming / framing (<code>bovnar::stream</code>)</a></li>
 <li>4.7 <a href="#47-files-and-io-streams-stdioread--write">Files and I/O streams (<code>std::io::Read</code> / <code>Write</code>)</a></li>
+<li>4.8 <a href="#48-live-streams-the-framing-codec-bovnarcodec">Live streams: the framing codec (<code>bovnar::codec</code>)</a></li>
 </ul>
 </li>
 <li><a href="#5-unit-helpers">Unit helpers</a><ul>
@@ -882,6 +885,297 @@ code the C library gives an unreadable fd source or unwritable fd sink
 (<code>reading_from_source_fd</code>, <code>writing_to_sink</code>); no event is delivered for a reader
 that failed, because nothing is parsed before the input has been read. No file
 descriptor is involved, so these work the same on Windows.</p>
+<h3 id="48-live-streams-the-framing-codec-bovnarcodec">4.8 Live streams: the framing codec (<code>bovnar::codec</code>)</h3>
+<p>The <code>stream</code> functions of <a href="#46-streaming--framing-bovnarstream">§4.6</a> work on
+whole buffers. <code>bovnar::codec</code> does the same two wire conventions — octet
+multiplexing and <code>BVF1</code> frames (<a href="https://www.bovnar.io/docs/streaming/">Streaming</a> §2 and §3)
+— on a live stream: the writer hands out each message's bytes as it is sent,
+and the reader is fed bytes in pieces of any size, as they arrive from a
+socket or a pipe, and hands out each message as soon as its last byte is in.
+The module is pure Rust (<code>#![forbid(unsafe_code)]</code>): no message goes through
+the C library, and nothing is allocated per message once the reader's buffers
+have grown to the largest message.</p>
+<div class="codehilite"><pre><span></span><code><span class="k">use</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">codec</span><span class="p">::{</span><span class="n">MuxReader</span><span class="p">,</span><span class="w"> </span><span class="n">MuxWriter</span><span class="p">};</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">(),</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">Error</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// A stream under the key &quot;media&quot; that opens with ordinary values</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">mux</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MuxWriter</span><span class="p">::</span><span class="n">with_preamble</span><span class="p">(</span><span class="s">b&quot;.meta = { .codec = </span><span class="se">\&quot;</span><span class="s">av1</span><span class="se">\&quot;</span><span class="s">; .rate = 30; };&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;media&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">wire</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Vec</span><span class="p">::</span><span class="n">new</span><span class="p">();</span><span class="w"> </span><span class="c1">// stands in for a socket</span>
+<span class="w">    </span><span class="n">wire</span><span class="p">.</span><span class="n">extend_from_slice</span><span class="p">(</span><span class="n">mux</span><span class="p">.</span><span class="n">opener</span><span class="p">());</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">head</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Vec</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">channel</span><span class="p">,</span><span class="w"> </span><span class="n">frame</span><span class="p">)</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="p">[(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="s">b&quot;key frame&quot;</span><span class="p">[</span><span class="o">..</span><span class="p">]),</span><span class="w"> </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s">b&quot;audio&quot;</span><span class="p">),</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">b&quot;delta&quot;</span><span class="p">)]</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Only the chunk headers are written, into `head`; the frame is</span>
+<span class="w">        </span><span class="c1">// borrowed, ready for a vectored write</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="n">part</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">mux</span><span class="p">.</span><span class="n">encode</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">head</span><span class="p">,</span><span class="w"> </span><span class="n">channel</span><span class="p">,</span><span class="w"> </span><span class="n">frame</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">wire</span><span class="p">.</span><span class="n">extend_from_slice</span><span class="p">(</span><span class="n">part</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">wire</span><span class="p">.</span><span class="n">extend_from_slice</span><span class="p">(</span><span class="n">mux</span><span class="p">.</span><span class="n">terminator</span><span class="p">());</span>
+
+<span class="w">    </span><span class="c1">// The C library reads the same bytes</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">bovnar</span><span class="p">::</span><span class="n">stream</span><span class="p">::</span><span class="n">mux_load</span><span class="p">(</span><span class="o">&amp;</span><span class="n">wire</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="s">&quot;media&quot;</span><span class="p">))</span><span class="o">?</span><span class="p">.</span><span class="n">len</span><span class="p">(),</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Fed in pieces, as from a socket</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">reader</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MuxReader</span><span class="p">::</span><span class="n">with_options</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="s">&quot;media&quot;</span><span class="p">))</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">received</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Vec</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="n">piece</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">wire</span><span class="p">.</span><span class="n">chunks</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">piece</span><span class="p">;</span>
+<span class="w">        </span><span class="k">while</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="n">m</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">reader</span><span class="p">.</span><span class="n">read</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">input</span><span class="p">)</span><span class="o">?</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">received</span><span class="p">.</span><span class="n">push</span><span class="p">((</span><span class="n">m</span><span class="p">.</span><span class="n">channel</span><span class="p">,</span><span class="w"> </span><span class="n">m</span><span class="p">.</span><span class="n">payload</span><span class="p">.</span><span class="n">to_vec</span><span class="p">()));</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">reader</span><span class="p">.</span><span class="n">finish</span><span class="p">()</span><span class="o">?</span><span class="p">;</span><span class="w"> </span><span class="c1">// the input ended where a stream may end</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">received</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span><span class="w"> </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s">b&quot;audio&quot;</span><span class="p">.</span><span class="n">to_vec</span><span class="p">()));</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">meta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">reader</span><span class="p">.</span><span class="n">preamble_value</span><span class="p">(</span><span class="kc">false</span><span class="p">)</span><span class="o">?</span><span class="p">.</span><span class="n">expect</span><span class="p">(</span><span class="s">&quot;the stream is open&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">meta</span><span class="p">,</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">parse</span><span class="p">(</span><span class="s">b&quot;.meta = { .codec = </span><span class="se">\&quot;</span><span class="s">av1</span><span class="se">\&quot;</span><span class="s">; .rate = 30; };&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">);</span>
+<span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Writing.</strong> <code>MuxWriter::new(key)</code> or <code>MuxWriter::with_preamble(preamble,
+key)</code> validates the key (1 to 255 bytes, the identifier rules of spec §4.2:
+what the C writer accepts and a reader at its defaults reads) and the
+preamble, once. A stream is <code>opener()</code>, the messages, then <code>terminator()</code>;
+<code>begin(&amp;mut vec)</code> and <code>finish(&amp;mut vec)</code> append them to a <code>Vec</code>. Each message
+is one of:</p>
+<table>
+<thead>
+<tr>
+<th>Call</th>
+<th>What it writes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>encode(&amp;mut head, channel, payload)</code></td>
+<td>only the chunk headers, into <code>head</code> (cleared, then reused); returns <code>Parts</code>, an iterator over the message's wire bytes in order — header, payload slice, header, … — for a vectored write</td>
+</tr>
+<tr>
+<td><code>write_message(&amp;mut vec, channel, payload)</code></td>
+<td>the whole message, appended to a <code>Vec</code></td>
+</tr>
+<tr>
+<td><code>write_message_to(&amp;mut out, channel, payload)</code></td>
+<td>the whole message to any <code>std::io::Write</code>, one vectored write per chunk, nothing allocated; <code>out</code> is not flushed</td>
+</tr>
+</tbody>
+</table>
+<p>A message is cut into chunks exactly as <code>bvnr_mux_send</code> cuts it (a message of
+at most <code>stream::BVNR_MUX_MAX_MESSAGE</code> bytes is one chunk), so the bytes are
+those of <code>stream::mux_dump</code> for the same key and messages.</p>
+<p><strong>Reading.</strong> <code>MuxReader::read(&amp;mut input)</code> takes <code>input: &amp;mut &amp;[u8]</code>, the bytes
+not yet read, reads from its front and returns the next complete message as
+<code>Message { channel, payload }</code>. <code>None</code> means every byte of <code>input</code> was taken
+(an unfinished message is kept inside the reader), so the buffer can be
+refilled; after a message, call again with the same slice until <code>None</code>. A
+message that lies whole in <code>input</code> is borrowed from it; one that spans pieces
+or chunks is gathered in a buffer per channel that is reused. The slice is
+valid until the next call. <code>finish()</code> checks that the input ended after the
+document's <code>;</code> (or before its first byte); <code>reset()</code> readies the reader for
+another stream. The reader reads every valid octet region, not only what
+<code>bvnr_mux_send</code> writes: several messages packed into one chunk, channels
+interleaved chunk by chunk, a length varint split across chunks.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MuxReader::with_options(max_message, key)</code></td>
+<td><code>max_message</code> 0 is 64 MiB, as for <code>mux_load</code>; with <code>key</code>, a stream under another key is an <code>Error::Argument</code> naming both (<code>bvnr_demux_set_key</code> would ignore it, but this reader reads one stream)</td>
+</tr>
+<tr>
+<td><code>.with_max_preamble(bytes)</code></td>
+<td>64 KiB of text before the octet stream, preamble and opening assignment together; more is <code>text_data_too_long</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Peek, skip, forward.</strong> For a router or relay, <code>next_item(&amp;mut input, n)</code>
+also stops at the start of each message with <code>Item::Peek</code>, holding its
+channel, its declared length and its first <code>n</code> bytes; nothing else of the
+message has been read. Drop the peek to receive the message as
+<code>Item::Message</code>, call <code>skip()</code> to have its bytes passed over as they arrive,
+or <code>forward()</code> to receive it as <code>Item::Wire</code>: whole chunks carrying that
+message alone, which can be written into any other multiplexed stream between
+two messages. When those chunks lie consecutive in the input, <code>Wire::bytes</code>
+is the input itself, not copied; otherwise the reader gathers the message and
+writes it out again as <code>MuxWriter</code> would.</p>
+<div class="codehilite"><pre><span></span><code><span class="k">use</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">codec</span><span class="p">::{</span><span class="n">Item</span><span class="p">,</span><span class="w"> </span><span class="n">MuxReader</span><span class="p">,</span><span class="w"> </span><span class="n">MuxWriter</span><span class="p">};</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">(),</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">Error</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">mux</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MuxWriter</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="s">&quot;mux&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">inbound</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Vec</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+<span class="w">    </span><span class="n">mux</span><span class="p">.</span><span class="n">begin</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">inbound</span><span class="p">);</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">channel</span><span class="p">,</span><span class="w"> </span><span class="n">msg</span><span class="p">)</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="p">[(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="s">b&quot;for the relay&quot;</span><span class="p">[</span><span class="o">..</span><span class="p">]),</span><span class="w"> </span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="s">b&quot;local only&quot;</span><span class="p">),</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">b&quot;again&quot;</span><span class="p">)]</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">mux</span><span class="p">.</span><span class="n">write_message</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">inbound</span><span class="p">,</span><span class="w"> </span><span class="n">channel</span><span class="p">,</span><span class="w"> </span><span class="n">msg</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">mux</span><span class="p">.</span><span class="n">finish</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">inbound</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Forward channel 1, drop the rest, decided on the peek alone</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">reader</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MuxReader</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">outbound</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mux</span><span class="p">.</span><span class="n">opener</span><span class="p">().</span><span class="n">to_vec</span><span class="p">();</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">inbound</span><span class="p">[</span><span class="o">..</span><span class="p">];</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="n">item</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">reader</span><span class="p">.</span><span class="n">next_item</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">input</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="o">?</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">match</span><span class="w"> </span><span class="n">item</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">Item</span><span class="p">::</span><span class="n">Peek</span><span class="p">(</span><span class="n">p</span><span class="p">)</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">p</span><span class="p">.</span><span class="n">channel</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">p</span><span class="p">.</span><span class="n">forward</span><span class="p">(),</span>
+<span class="w">            </span><span class="n">Item</span><span class="p">::</span><span class="n">Peek</span><span class="p">(</span><span class="n">p</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">p</span><span class="p">.</span><span class="n">skip</span><span class="p">(),</span>
+<span class="w">            </span><span class="n">Item</span><span class="p">::</span><span class="n">Wire</span><span class="p">(</span><span class="n">w</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">outbound</span><span class="p">.</span><span class="n">extend_from_slice</span><span class="p">(</span><span class="n">w</span><span class="p">.</span><span class="n">bytes</span><span class="p">),</span>
+<span class="w">            </span><span class="n">Item</span><span class="p">::</span><span class="n">Message</span><span class="p">(</span><span class="n">_</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="fm">unreachable!</span><span class="p">(</span><span class="s">&quot;every message was decided&quot;</span><span class="p">),</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">outbound</span><span class="p">.</span><span class="n">extend_from_slice</span><span class="p">(</span><span class="n">mux</span><span class="p">.</span><span class="n">terminator</span><span class="p">());</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">relayed</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">stream</span><span class="p">::</span><span class="n">mux_load</span><span class="p">(</span><span class="o">&amp;</span><span class="n">outbound</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nb">None</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">relayed</span><span class="p">,</span><span class="w"> </span><span class="p">[(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">b&quot;for the relay&quot;</span><span class="p">.</span><span class="n">to_vec</span><span class="p">()),</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">b&quot;again&quot;</span><span class="p">.</span><span class="n">to_vec</span><span class="p">())]);</span>
+<span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>The preamble.</strong> Text before the stream's assignment — complete statements,
+a <code>#!bovnar</code> directive first if needed — lets a stream carry ordinary values
+about itself in the same document. <code>with_preamble</code> checks it once with the
+full parser; it must be text, so an octet stream in it is <code>octet_stream_forbidden</code>
+(a reader takes the document's first <code>0x00</code> for the stream's opener). The
+reader gathers the text up to that <code>0x00</code>, requires it to end with the
+assignment <code>.KEY =</code>, checks the preamble with the full parser (once per
+stream; a bare <code>.KEY=</code> or <code>.KEY =</code> skips the check), and then reads the octet
+stream in pure Rust. <code>read_preamble(&amp;mut input)</code> reads only up to the opener
+and returns the preamble, so it can be acted on before any message;
+<code>preamble()</code> returns it afterwards and <code>preamble_value(typed)</code> parses it into
+a <code>Value</code>. A C-written document with values before <code>bvnr_mux_begin</code> reads the
+same way.</p>
+<p><strong>What the reader reads.</strong> A preamble (possibly empty), one octet stream as
+the value of the document's last assignment, <code>;</code>, then only whitespace. A
+statement after the stream, or any other byte after the <code>;</code>, is
+<code>unexpected_input_byte</code>: the codec reads multiplexed streams, not the
+grammar. Parse a general document with <code>stream::mux_load</code> or a <code>Reader</code>.</p>
+<p><strong>Errors</strong> are <code>Error::Parse</code> with the code the C demultiplexer gives
+(<code>mux_load</code> gives the same code for the same input), and they are latched:</p>
+<table>
+<thead>
+<tr>
+<th>Condition</th>
+<th>Code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A chunk tag other than <code>0x01</code>/<code>0x00</code>, a channel varint not whole in its chunk, a varint over 10 bytes or 64 bits, a 4097th distinct channel</td>
+<td><code>octet_stream_out_of_sync</code></td>
+</tr>
+<tr>
+<td>A declared length over <code>max_message</code></td>
+<td><code>value_out_of_range</code></td>
+</tr>
+<tr>
+<td>The octet stream closes inside a message or its length</td>
+<td><code>octet_stream_truncated</code></td>
+</tr>
+<tr>
+<td><code>finish()</code> inside the octet stream</td>
+<td><code>read_complete_chunk_failed</code></td>
+</tr>
+<tr>
+<td><code>finish()</code> before the stream opened, or before its <code>;</code></td>
+<td><code>got_incomplete_bvnr_stream</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Frames.</strong> <code>codec::frame_header(len)</code>, <code>write_frame(&amp;mut vec, doc)</code> and
+<code>write_frame_to(&amp;mut out, doc)</code> (one vectored write, no copy) write what
+<code>bvnr_frame_write</code> writes. <code>FrameReader::read(&amp;mut input)</code> returns each
+complete document's bytes, borrowed when whole in the input, gathered
+otherwise; parse each with <code>parse</code>, a <code>Reader</code> or <code>DomDoc</code>.
+<code>FrameReader::with_max_document_size(n)</code> caps a document (0 is 256 MiB, as in
+<code>bvnr_doc_stream_read</code>; the buffer only grows with bytes that arrived). A bad
+magic is <code>unexpected_input_byte</code>, a length over the cap <code>value_out_of_range</code>,
+and <code>finish()</code> inside a frame <code>got_incomplete_bvnr_stream</code>.</p>
+<div class="codehilite"><pre><span></span><code><span class="k">use</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">codec</span><span class="p">::{</span><span class="n">FrameReader</span><span class="p">,</span><span class="w"> </span><span class="n">write_frame</span><span class="p">};</span>
+
+<span class="k">fn</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">(),</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">Error</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">wire</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Vec</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+<span class="w">    </span><span class="n">write_frame</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">wire</span><span class="p">,</span><span class="w"> </span><span class="s">b&quot;.id = 1;&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="n">write_frame</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">wire</span><span class="p">,</span><span class="w"> </span><span class="s">b&quot;.id = 2;&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">wire</span><span class="p">,</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">stream</span><span class="p">::</span><span class="n">frame_documents</span><span class="p">(</span><span class="o">&amp;</span><span class="p">[</span><span class="s">&quot;.id = 1;&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;.id = 2;&quot;</span><span class="p">])</span><span class="o">?</span><span class="p">);</span>
+
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">reader</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">FrameReader</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+<span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">ids</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Vec</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="n">piece</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">wire</span><span class="p">.</span><span class="n">chunks</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">piece</span><span class="p">;</span>
+<span class="w">        </span><span class="k">while</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="n">doc</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">reader</span><span class="p">.</span><span class="n">read</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">input</span><span class="p">)</span><span class="o">?</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">ids</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="n">bovnar</span><span class="p">::</span><span class="n">parse</span><span class="p">(</span><span class="n">doc</span><span class="p">)</span><span class="o">?</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">reader</span><span class="p">.</span><span class="n">finish</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+<span class="w">    </span><span class="fm">assert_eq!</span><span class="p">(</span><span class="n">ids</span><span class="p">.</span><span class="n">len</span><span class="p">(),</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span>
+<span class="w">    </span><span class="nb">Ok</span><span class="p">(())</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Cost per message</strong>, from <code>cargo bench --bench codec</code>: a release build pinned
+to one core (<code>taskset -c 2</code>) of an Intel Core i7-2700K (2011), whose clock
+scales with load. Each figure is the median of seven runs (each run the median
+of nine passes over at least 64 MiB of messages), and in brackets the fastest
+run. The stream is a few MiB held in the cache, as the bytes of a socket read
+are when the reader sees them. A 400 KB message spans seven chunks.</p>
+<table>
+<thead>
+<tr>
+<th>Message</th>
+<th>write</th>
+<th>write + copy</th>
+<th>peek + skip</th>
+<th>forward</th>
+<th>read</th>
+<th><code>mux_dump</code></th>
+<th><code>mux_load</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>150 B</td>
+<td>24 ns (18)</td>
+<td>41 ns (26)</td>
+<td>58 ns (29)</td>
+<td>64 ns (35)</td>
+<td>32 ns (18)</td>
+<td>485 ns (272)</td>
+<td>269 ns (146)</td>
+</tr>
+<tr>
+<td>30 KB</td>
+<td>25 ns (19)</td>
+<td>2.0 µs (1.5)</td>
+<td>60 ns (32)</td>
+<td>69 ns (37)</td>
+<td>35 ns (19)</td>
+<td>10.2 µs (8.4)</td>
+<td>8.1 µs (5.7)</td>
+</tr>
+<tr>
+<td>400 KB</td>
+<td>100 ns (74)</td>
+<td>30 µs (21)</td>
+<td>174 ns (106)</td>
+<td>185 ns (110)</td>
+<td>47 µs (28)</td>
+<td>150 µs (136)</td>
+<td>128 µs (97)</td>
+</tr>
+</tbody>
+</table>
+<p><em>write</em> is <code>encode</code> (the headers only, for a vectored write); <em>write + copy</em> is
+<code>write_message</code> into a reused <code>Vec</code>; <em>peek + skip</em> and <em>forward</em> are
+<code>next_item</code> with a 4-byte head and the decision, the forwarded chunks borrowed
+from the input; <em>read</em> is <code>read</code>, which gathers (copies) a message that spans
+chunks, so the 400 KB one; <em>mux_dump</em> and <em>mux_load</em> are the batch functions
+through the C library, for comparison. Counted in instructions, which the
+clock does not move, a 150-byte message is about 150 to write, 200 to read and
+340 to peek at and skip. From a stream much larger than the cache, every chunk
+header a 400 KB message has is a cache miss, which puts peek and forward at
+about 230 ns for it; the other figures move little.</p>
 <hr />
 <h2 id="5-unit-helpers">5. Unit helpers</h2>
 <p>The unit functions live in the <code>bovnar::units</code> module; <code>Unit</code> itself is at the
@@ -2656,7 +2950,8 @@ cargo<span class="w"> </span><span class="nb">test</span><span class="w"> </span
 (one file per topic — <code>test_units.rs</code>, <code>test_dom.rs</code>, <code>test_stream.rs</code> and so
 on — plus <code>smoke.rs</code>) and the documentation examples. The ABI check is three
 unit tests in <code>src/ffi.rs</code>, because the C structs it compares against are
-private.</p>
+private. <code>test_codec_alloc.rs</code> installs a counting global allocator to show that
+the codec allocates nothing per message, so it is a test binary of its own.</p>
 <p><code>test_writers_agree</code> compares <code>to_string</code> with the C CLI's <code>pretty-print</code>, so it
 is <code>#[ignore]</code>d unless the CLI is built at <code>&lt;repo&gt;/build/bovnar</code>:</p>
 <div class="codehilite"><pre><span></span><code>cmake<span class="w"> </span>-B<span class="w"> </span>build<span class="w"> </span>.<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>cmake<span class="w"> </span>--build<span class="w"> </span>build<span class="w"> </span>--target<span class="w"> </span>bovnar
@@ -2668,8 +2963,10 @@ cmake --build build &amp;&amp; ctest --test-dir build</code>. That suite also pa
 <code>bovnar</code> code block of this document (<code>ctest -R bvnr_doc</code>).</p>
 <p><code>rust/fuzz/</code> holds <a href="https://github.com/rust-fuzz/cargo-fuzz">cargo-fuzz</a> targets
 (nightly toolchain): <code>parse</code> (the streaming parsers and a write-back round
-trip), <code>dom</code> (parse and walk every node) and <code>json_roundtrip</code> (<code>from_json</code> and
-<code>to_json</code> until the JSON is stable). Instrument the C library too by building it
+trip), <code>dom</code> (parse and walk every node), <code>json_roundtrip</code> (<code>from_json</code> and
+<code>to_json</code> until the JSON is stable) and <code>codec</code> (<code>MuxReader</code> and <code>FrameReader</code>
+fed in pieces, against themselves and against the C library's <code>mux_load</code> and
+<code>load_documents</code>). Instrument the C library too by building it
 with clang:</p>
 <div class="codehilite"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>rust/fuzz
 <span class="nv">CC</span><span class="o">=</span>clang<span class="w"> </span><span class="nv">CFLAGS</span><span class="o">=</span><span class="s2">&quot;-fsanitize=fuzzer-no-link,address&quot;</span><span class="w"> </span><span class="se">\</span>
@@ -2686,6 +2983,7 @@ with clang:</p>
 │   ├── lib.rs        # parse() / parse_typed() / to_string() / write_array() — public API
 │   ├── ffi.rs        # the C declarations; the only `unsafe` code
 │   ├── bvnfloat.rs   # BvnFloat: arbitrary-precision float + IEEE binary/decimal/fixed encoders
+│   ├── codec.rs      # MuxWriter, MuxReader, FrameReader — the pure-Rust framing codec
 │   ├── currency.rs   # ISO 4217 / crypto currency metadata (read from the C catalogue)
 │   ├── decimal.rs    # Decimal: an exact decimal number (sign, coefficient, exponent)
 │   ├── dom.rs        # DomDoc, DomNode, DomType — random-access DOM
@@ -2700,6 +2998,7 @@ with clang:</p>
 │   ├── units.rs      # unit_to_si_factor, unit_convert_factor, etc.
 │   └── writer.rs     # Writer, Base, Signedness, EmitSpec
 ├── tests/            # one integration-test file per topic, plus smoke.rs
+├── benches/          # codec.rs: per-message figures of the framing codec (std only)
 └── fuzz/             # cargo-fuzz targets
 </code></pre></div>
 
@@ -2762,6 +3061,10 @@ with clang:</p>
 <tr>
 <td><code>src/stream.rs</code></td>
 <td>framing, multiplexing and document-in-document, with their <code>Read</code> / <code>Write</code> twins</td>
+</tr>
+<tr>
+<td><code>src/codec.rs</code></td>
+<td>the incremental framing codec in pure Rust: <code>MuxWriter</code>, <code>MuxReader</code>, <code>FrameReader</code>, the frame writers</td>
 </tr>
 <tr>
 <td><code>src/io.rs</code></td>

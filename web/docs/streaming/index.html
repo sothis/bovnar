@@ -110,12 +110,13 @@ capabilities are sub-protocols carried in or around them.</p>
 </li>
 <li><a href="#4-document-in-document">Document-in-document</a></li>
 <li><a href="#5-python-bindings">Python bindings</a></li>
-<li><a href="#6-composition">Composition</a></li>
-<li><a href="#7-live-streams-callback-io-and-push-fed-reading">Live streams: callback I/O and push-fed reading</a><ul>
-<li>7.1 <a href="#71-callback-sources-and-sinks">Callback sources and sinks</a></li>
-<li>7.2 <a href="#72-the-push-fed-document-reader">The push-fed document reader</a></li>
-<li>7.3 <a href="#73-draining-without-a-callback-per-item">Draining without a callback per item</a></li>
-<li>7.4 <a href="#74-what-it-costs">What it costs</a></li>
+<li><a href="#6-rust-bindings">Rust bindings</a></li>
+<li><a href="#7-composition">Composition</a></li>
+<li><a href="#8-live-streams-callback-io-and-push-fed-reading">Live streams: callback I/O and push-fed reading</a><ul>
+<li>8.1 <a href="#81-callback-sources-and-sinks">Callback sources and sinks</a></li>
+<li>8.2 <a href="#82-the-push-fed-document-reader">The push-fed document reader</a></li>
+<li>8.3 <a href="#83-draining-without-a-callback-per-item">Draining without a callback per item</a></li>
+<li>8.4 <a href="#84-what-it-costs">What it costs</a></li>
 <li><a href="#see-also">See also</a></li>
 </ul>
 </li>
@@ -242,7 +243,7 @@ bovnar<span class="w"> </span>frames<span class="w"> </span>list<span class="w">
 <h3 id="24-push-fed-frame-reading">2.4 Push-fed frame reading</h3>
 <p><code>bvnr_doc_stream_read</code> pulls from a source until it ends. For a frame stream
 that arrives in pieces — a non-blocking socket, an event loop — the frame
-reader is <strong>fed</strong> instead (§7), and keeps one reader for the whole stream:</p>
+reader is <strong>fed</strong> instead (§8), and keeps one reader for the whole stream:</p>
 <div class="codehilite"><pre><span></span><code><span class="n">bvnr_frame_reader_t</span><span class="o">*</span><span class="w"> </span><span class="nf">bvnr_frame_reader_create</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_doc_stream_opts_t</span><span class="o">*</span><span class="w"> </span><span class="n">opts</span><span class="p">);</span>
 <span class="n">bvnr_frame_reader_t</span><span class="o">*</span><span class="w"> </span><span class="nf">bvnr_frame_reader_create_pull</span><span class="p">(</span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">max_document_size</span><span class="p">);</span>
 <span class="kt">void</span><span class="w">         </span><span class="nf">bvnr_frame_reader_destroy</span><span class="p">(</span><span class="n">bvnr_frame_reader_t</span><span class="o">*</span><span class="w"> </span><span class="n">fr</span><span class="p">);</span>
@@ -383,7 +384,7 @@ the metadata with the normal writer, then opens the stream:</p>
 <div class="codehilite"><pre><code class="language-bovnar">.meta = { .codec = &quot;av1&quot;; .rate = &lt;float:32,Hz&gt; 30.0; };
 .media = \x00 …chunks… \x00;</code></pre></div>
 <p>A consumer reading that live hands the bytes to a <strong>push-fed demux</strong>: it owns a
-push-fed reader (§7.2), keeps the key scope, <code>max_message</code>, the 4096-channel
+push-fed reader (§8.2), keeps the key scope, <code>max_message</code>, the 4096-channel
 limit and every error code of <code>bvnr_demux_on_event</code>, and the result is the same
 as installing that on a reader of the whole buffer.</p>
 <div class="codehilite"><pre><span></span><code><span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_demux_open_feed</span><span class="p">(</span><span class="n">bvnr_demux_t</span><span class="o">*</span><span class="w"> </span><span class="n">dm</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_read_flags_t</span><span class="o">*</span><span class="w"> </span><span class="n">flags</span><span class="p">,</span>
@@ -418,7 +419,7 @@ message:</p>
 </code></pre></div>
 
 <p><strong>Pulled</strong> (no <code>on_message</code>): the fed bytes are drained with <code>bvnr_demux_next</code>,
-one plain call per item and no callback at all (§7.3). Opened with
+one plain call per item and no callback at all (§8.3). Opened with
 <code>deliver_events</code>, the document's own events come out of the same loop, in
 document order and in order with the messages — the metadata values, the mux
 stream's <code>ev_octet_stream_start</code>, its messages, its <code>ev_octet_stream_end</code>, the
@@ -503,7 +504,25 @@ for <code>max_document_size</code> and <code>max_message</code>, <code>0</code> 
 value there to raise them. See <a href="https://www.bovnar.io/docs/python/">Python Bindings</a>
 and <code>python/tests/test_stream.py</code>.</p>
 <hr />
-<h2 id="6-composition">6. Composition</h2>
+<h2 id="6-rust-bindings">6. Rust bindings</h2>
+<p>The Rust crate has the same batch functions in <code>bovnar::stream</code>
+(<code>frame_documents</code>, <code>load_documents</code>, <code>mux_dump</code>, <code>mux_load</code>,
+<code>embed_document</code>, <code>parse_embedded</code>), over the C functions above. Like
+Python's, they work on whole buffers.</p>
+<p>For a stream that never ends, <code>bovnar::codec</code> writes and reads the framing of
+§2 and the multiplexing of §3 incrementally, in pure Rust: <code>MuxWriter</code> and
+<code>MuxReader</code>, <code>write_frame</code> and <code>FrameReader</code>. The writer's output is byte for
+byte that of <code>bvnr_mux_send</code> and <code>bvnr_frame_write</code>; the reader is fed bytes in
+pieces of any size, keeps the demultiplexer's limits and error codes, hands a
+message out without a copy when it lies whole in the input, and can peek at a
+message's channel, length and first bytes to skip it or forward its chunks
+unchanged. A multiplexed stream may open with a <strong>preamble</strong>, ordinary text
+values in the same document before the stream's assignment
+(<code>.meta = { … }; .media = &lt;octet stream&gt;;</code>). Nothing is allocated per message
+once the reader's buffers have grown. See
+<a href="https://www.bovnar.io/docs/rust/#48-live-streams-the-framing-codec-bovnarcodec">Rust Bindings §4.8</a>.</p>
+<hr />
+<h2 id="7-composition">7. Composition</h2>
 <p>The four compose cleanly because they live at different layers:</p>
 <ul>
 <li>A <strong>frame stream</strong> (2) can carry documents that each <strong>embed</strong> sub-documents (4).</li>
@@ -515,14 +534,14 @@ and <code>python/tests/test_stream.py</code>.</p>
 <p>Because each is a thin application over the public event API, you can also write
 your own consumer/producer at the same seam without touching the core.</p>
 <hr />
-<h2 id="7-live-streams-callback-io-and-push-fed-reading">7. Live streams: callback I/O and push-fed reading</h2>
+<h2 id="8-live-streams-callback-io-and-push-fed-reading">8. Live streams: callback I/O and push-fed reading</h2>
 <p>Everything above reads from a <code>bvnr_source_t</code> that is <em>pulled</em> until it ends.
 That fits a file and a blocking socket. It does not fit a stream that never
 ends and arrives when it arrives — a non-blocking socket in an event loop, a
 binding that is handed bytes — because a pull that returns nothing <em>is</em> end of
 input: a short feed would read as a truncated document. This section is the
 other way in.</p>
-<h3 id="71-callback-sources-and-sinks">7.1 Callback sources and sinks</h3>
+<h3 id="81-callback-sources-and-sinks">8.1 Callback sources and sinks</h3>
 <p><code>bvnr_source_from_callback(s, pull, userdata)</code> and
 <code>bvnr_sink_to_callback(s, push, flush, userdata)</code> put the caller's own transport
 behind a source or sink, usable everywhere an fd or memory one is
@@ -533,7 +552,7 @@ it; the callback reads it back with <code>bvnr_source_get_userdata</code> /
 <code>bvnr_sink_get_userdata</code>. A callback sink fails as a transport does
 (<code>error_writing_to_sink</code>), and the writer batches into its 64 KiB buffer before
 pushing.</p>
-<h3 id="72-the-push-fed-document-reader">7.2 The push-fed document reader</h3>
+<h3 id="82-the-push-fed-document-reader">8.2 The push-fed document reader</h3>
 <p><code>bvnr_open_read_feed</code>, <code>bvnr_read_feed</code>, <code>bvnr_read_finish</code>
 (<a href="https://www.bovnar.io/docs/api/#115-push-fed-reading-bvnr_open_read_feed">doc/08 §1.15</a>):
 the caller hands over bytes in pieces of any size and says when the document is
@@ -547,7 +566,7 @@ already resumed at any byte, and the octet-stream framing — which used to pull
 until a chunk was complete — is now a state machine of its own that stops at the
 end of any buffer, so both readers share every line of it. A chunk that lies
 whole in the input reaches the callbacks straight from it.</p>
-<h3 id="73-draining-without-a-callback-per-item">7.3 Draining without a callback per item</h3>
+<h3 id="83-draining-without-a-callback-per-item">8.3 Draining without a callback per item</h3>
 <p>A caller that pays for every callback — a binding calling back through an FFI —
 drains a feed in one loop instead: <code>bvnr_frame_reader_next</code> hands out documents,
 <code>bvnr_demux_next</code> messages and, with <code>deliver_events</code>, the document's events.
@@ -556,7 +575,7 @@ item, <code>BVNR_NEXT_NONE</code> when the fed bytes are used up, and <code>BVNR
 the stream failed. Items point into the fed buffer where they lie whole in it,
 into the reader's own buffers otherwise, and are valid until the next call; the
 fed buffer must stay valid until the drain has returned <code>BVNR_NEXT_NONE</code>.</p>
-<h3 id="74-what-it-costs">7.4 What it costs</h3>
+<h3 id="84-what-it-costs">8.4 What it costs</h3>
 <p>Measured with <code>bvnr_stream_bench</code> (<code>tests/bovnar_stream_bench.c</code>), release
 build, one core of an Intel i7-2700K (3.5 GHz, 2011); per message, the 400 KB
 message spanning seven chunks. Figures move with the machine; the ratios are the

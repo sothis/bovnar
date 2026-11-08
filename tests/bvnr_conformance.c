@@ -266,7 +266,10 @@ typedef struct {
 	error_code_t error;
 	uint64_t     error_line;
 	uint64_t     error_column;
+	uint64_t     error_offset;
+	uint32_t     error_byte;
 	uint64_t     recovery_count;
+	uint64_t     skipped_bytes;
 	evlog_t      log;
 } parse_result_t;
 
@@ -275,8 +278,11 @@ static void parse_result_free(parse_result_t *r)
 	evlog_free(&r->log);
 }
 
-static parse_result_t ref_parse(
+/* With cuts == NULL the input is read with bvnr_read; otherwise it is fed to
+ * a push-fed reader in pieces ending at cuts[0..ncuts) (--feed). */
+static parse_result_t ref_parse_cut(
 	const void *input, uint32_t input_len,
+	const uint32_t *cuts, uint32_t ncuts,
 	bool continue_on_error,
 	uint16_t max_id_len,
 	uint16_t max_str_len,
@@ -316,15 +322,30 @@ static parse_result_t ref_parse(
 		return r;
 	}
 
-	r.opened = bvnr_open_read_mem(reader, input, (uint64_t)input_len,
-	                              NULL, 0, &flags);
-	if (r.opened)
-		r.parse_ok = bvnr_read(reader);
+	if (!cuts) {
+		r.opened = bvnr_open_read_mem(reader, input, (uint64_t)input_len,
+		                              NULL, 0, &flags);
+		if (r.opened)
+			r.parse_ok = bvnr_read(reader);
+	} else {
+		r.opened = bvnr_open_read_feed(reader, NULL, &flags);
+		bool alive = r.opened;
+		uint32_t at = 0;
+		for (uint32_t i = 0; alive && i < ncuts; i++) {
+			alive = bvnr_read_feed(reader,
+				(const uint8_t *)input + at, cuts[i] - at);
+			at = cuts[i];
+		}
+		r.parse_ok = alive && bvnr_read_finish(reader);
+	}
 
 	r.error          = bvnr_reader_get_error(reader);
 	r.error_line     = bvnr_reader_get_error_line(reader);
 	r.error_column   = bvnr_reader_get_error_column(reader);
+	r.error_offset   = bvnr_reader_get_error_offset(reader);
+	r.error_byte     = bvnr_reader_get_error_byte(reader);
 	r.recovery_count = bvnr_reader_get_recovery_count(reader);
+	r.skipped_bytes  = bvnr_reader_get_skipped_bytes(reader);
 	bvnr_reader_destroy(reader);
 
 	if (ctx.last_error != error_none && r.error == error_none)
@@ -332,6 +353,24 @@ static parse_result_t ref_parse(
 
 	r.log = ctx.log;
 	return r;
+}
+
+static parse_result_t ref_parse(
+	const void *input, uint32_t input_len,
+	bool continue_on_error,
+	uint16_t max_id_len,
+	uint16_t max_str_len,
+	uint16_t max_num_len,
+	uint16_t max_sym_len,
+	uint16_t max_ref_len,
+	uint8_t  max_struct_nesting,
+	uint8_t  max_array_nesting,
+	uint64_t max_array_items)
+{
+	return ref_parse_cut(input, input_len, NULL, 0, continue_on_error,
+	                     max_id_len, max_str_len, max_num_len, max_sym_len,
+	                     max_ref_len, max_struct_nesting, max_array_nesting,
+	                     max_array_items);
 }
 
 static parse_result_t ref_parse_str_flags(
@@ -2356,6 +2395,81 @@ static void run_self_test(const cf_case_t *tc)
 }
 
 /* =========================================================================
+ * Feed equivalence (--feed)
+ * =========================================================================
+ * Every case's input, fed to a push-fed reader cut at every position and in
+ * single bytes, must produce the same event log, result, error, position and
+ * recovery counters as bvnr_read on the whole buffer -- whatever the case
+ * expects, valid or not. The case's own expectation is the self-test's job. */
+
+static parse_result_t feed_parse(const cf_case_t *tc, const void *input,
+                                 uint32_t len, const uint32_t *cuts,
+                                 uint32_t ncuts)
+{
+	return ref_parse_cut(input, len, cuts, ncuts, tc->continue_on_error,
+	                     tc->max_id_len, tc->max_str_len, tc->max_num_len,
+	                     tc->max_sym_len, tc->max_ref_len,
+	                     tc->max_struct_nesting, tc->max_array_nesting,
+	                     tc->max_array_items);
+}
+
+static bool feed_same(const parse_result_t *a, const parse_result_t *b)
+{
+	return a->opened == b->opened && a->parse_ok == b->parse_ok &&
+	       a->error == b->error && a->error_line == b->error_line &&
+	       a->error_column == b->error_column &&
+	       a->error_offset == b->error_offset &&
+	       a->error_byte == b->error_byte &&
+	       a->recovery_count == b->recovery_count &&
+	       a->skipped_bytes == b->skipped_bytes &&
+	       !a->log.oom && !b->log.oom && a->log.used == b->log.used &&
+	       (a->log.used == 0 ||
+	        memcmp(a->log.buf, b->log.buf, a->log.used) == 0);
+}
+
+static void run_feed_test(const cf_case_t *tc)
+{
+	const void *input = tc->input_bin ? (const void *)tc->input_bin
+	                                  : (const void *)tc->input;
+	uint32_t    len   = tc->input_bin ? tc->input_bin_len
+	                                  : (uint32_t)strlen(tc->input);
+	uint32_t *cuts = malloc(((size_t)len + 2u) * sizeof(*cuts));
+	if (!cuts) {
+		tap_fail(tc->id, tc->description, "out of memory");
+		return;
+	}
+	parse_result_t ref = feed_parse(tc, input, len, NULL, 0);
+	char detail[256];
+	detail[0] = '\0';
+	for (uint32_t k = 0; k <= len && !detail[0]; k++) {
+		cuts[0] = k;
+		cuts[1] = len;
+		parse_result_t got = feed_parse(tc, input, len, cuts, 2);
+		if (!feed_same(&got, &ref))
+			snprintf(detail, sizeof(detail),
+			         "fed in two pieces cut at %" PRIu32
+			         " differs from bvnr_read", k);
+		parse_result_free(&got);
+	}
+	if (!detail[0]) {
+		for (uint32_t k = 0; k < len; k++)
+			cuts[k] = k + 1u;
+		parse_result_t got = feed_parse(tc, input, len, cuts,
+		                                len ? len : 0);
+		if (!feed_same(&got, &ref))
+			snprintf(detail, sizeof(detail),
+			         "fed one byte at a time differs from bvnr_read");
+		parse_result_free(&got);
+	}
+	if (detail[0])
+		tap_fail(tc->id, tc->description, detail);
+	else
+		tap_ok(tc->id, tc->description);
+	parse_result_free(&ref);
+	free(cuts);
+}
+
+/* =========================================================================
  * IUT test runner
  * ========================================================================= */
 #ifndef _WIN32
@@ -2503,6 +2617,10 @@ static void usage(const char *prog)
 	        "                           octet_streams, units, unit_profile,\n"
 	        "                           special_numbers, roundtrip, recovery,\n"
 	        "                           comments, whitespace, homogeneity\n"
+	        "  --feed           Instead of the expectations, check that every\n"
+	        "                   case fed to bvnr_read_feed in pieces (cut at\n"
+	        "                   every byte, and byte by byte) reads exactly as\n"
+	        "                   bvnr_read reads it whole\n"
 	        "  --list           List all test case IDs and descriptions\n"
 	        "  --verbose        Print additional diagnostic information\n"
 	        "  --help           Show this help and exit\n"
@@ -2515,6 +2633,7 @@ int main(int argc, char **argv)
 {
 	const char *iut_path    = NULL;
 	bool        list_only   = false;
+	bool        feed        = false;
 
 	for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--iut") == 0 && i + 1 < argc) {
@@ -2523,6 +2642,8 @@ int main(int argc, char **argv)
 			g_filter_group = argv[++i];
 		} else if (strcmp(argv[i], "--list") == 0) {
 			list_only = true;
+		} else if (strcmp(argv[i], "--feed") == 0) {
+			feed = true;
 		} else if (strcmp(argv[i], "--verbose") == 0) {
 			g_verbose = true;
 		} else if (strcmp(argv[i], "--help") == 0 ||
@@ -2579,11 +2700,13 @@ int main(int argc, char **argv)
 			const cf_case_t *tc = &g_cases[i];
 			if (strcmp(tc->group, groups[g]) != 0)
 				continue;
+			if (feed)
+				run_feed_test(tc);
 #ifndef _WIN32
-			if (iut_path)
+			else if (iut_path)
 				run_iut_test(tc, iut_path);
-			else
 #endif
+			else
 				run_self_test(tc);
 		}
 		tap_subtest_end(groups[g]);

@@ -48,6 +48,8 @@ add_executable(bvnr_writer_test          tests/bovnar_writer_test.c)
 add_executable(bvnr_extended_reader_test tests/bovnar_extended_reader_test.c)
 add_executable(bvnr_utils_test           tests/bovnar_utils_test.c)
 add_executable(bvnr_stream_test          tests/bovnar_stream_test.c)
+add_executable(bvnr_feed_test            tests/bovnar_feed_test.c)
+add_executable(bvnr_alloc_test           tests/bovnar_alloc_test.c)
 add_executable(bvnr_high_severity_test   tests/bovnar_high_severity_test.c)
 add_executable(bvnr_currency_test        tests/bovnar_currency_test.c)
 
@@ -160,6 +162,12 @@ endif()
 
 target_compile_options(bvnr_stream_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_stream_test PRIVATE bvnr_static)
+
+target_compile_options(bvnr_feed_test PRIVATE ${BVNR_C_FLAGS})
+target_link_libraries(bvnr_feed_test PRIVATE bvnr_static)
+
+target_compile_options(bvnr_alloc_test PRIVATE ${BVNR_C_FLAGS})
+target_link_libraries(bvnr_alloc_test PRIVATE bvnr_static)
 
 target_compile_options(bvnr_high_severity_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_high_severity_test PRIVATE bvnr_static)
@@ -340,6 +348,22 @@ add_test(NAME bvnr_stream_test COMMAND bvnr_stream_test)
 set_tests_properties(bvnr_stream_test PROPERTIES
     LABELS "unit;stream")
 
+# The push-fed readers against bvnr_read, the frame reader against
+# bvnr_doc_stream_read and the fed demux against bvnr_demux_on_event, with every
+# file under examples/ in the corpus.
+add_test(NAME bvnr_feed_test
+    COMMAND bvnr_feed_test ${CMAKE_CURRENT_SOURCE_DIR}/examples)
+set_tests_properties(bvnr_feed_test PROPERTIES
+    LABELS "unit;stream;feed"
+    TIMEOUT 600)
+
+# No allocation per message on the streaming hot paths. Counting needs glibc
+# without ASan; anywhere else the test exits 77 and is reported as skipped.
+add_test(NAME bvnr_alloc_test COMMAND bvnr_alloc_test)
+set_tests_properties(bvnr_alloc_test PROPERTIES
+    LABELS "unit;stream"
+    SKIP_RETURN_CODE 77)
+
 add_test(NAME bvnr_high_severity_test COMMAND bvnr_high_severity_test)
 set_tests_properties(bvnr_high_severity_test PROPERTIES
     LABELS "unit;high_severity")
@@ -395,6 +419,15 @@ add_test(NAME bvnr_conformance_self
 set_tests_properties(bvnr_conformance_self PROPERTIES
     LABELS   "conformance;self"
     TIMEOUT  60
+    FAIL_REGULAR_EXPRESSION "not ok|conformance tests FAILED")
+
+# Feed equivalence: every case's input fed to the push-fed reader, cut at every
+# byte and byte by byte, reads exactly as bvnr_read reads it whole.
+add_test(NAME bvnr_conformance_feed
+    COMMAND bvnr_conformance --feed)
+set_tests_properties(bvnr_conformance_feed PROPERTIES
+    LABELS   "conformance;feed"
+    TIMEOUT  300
     FAIL_REGULAR_EXPRESSION "not ok|conformance tests FAILED")
 
 # IUT self-test: conformance suite driven through the reference IUT adapter.
@@ -1431,7 +1464,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 191)   # 129 base + rust_build_sync + canonical_keeps_meaning + interval_array + bench_iterations_zero + sitemap + convert_wide_int + unit_source + 3 for examples/unit_profiles.bvnr + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier) + cli_regressions + wasm_native_shape + abi_baseline + crate_provenance
+set(BVNR_EXPECTED_TEST_COUNT 194)   # 132 base + rust_build_sync + canonical_keeps_meaning + interval_array + bench_iterations_zero + sitemap + convert_wide_int + unit_source + 3 for examples/unit_profiles.bvnr + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier) + cli_regressions + wasm_native_shape + abi_baseline + crate_provenance
                                     #             + citation
                                     #         + profiles_off_build
                                     # + om_test + cf_test

@@ -1081,9 +1081,9 @@ static bool frame_on_document(void* ud, uint64_t index, bool ok,
 }
 
 static void frame_opts(frame_ref_t* f, bvnr_read_flags_t* fl, bool resilient,
-	uint64_t max_doc, bvnr_doc_stream_opts_t* o)
+	uint64_t max_doc, int cfg, bvnr_doc_stream_opts_t* o)
 {
-	cfg_flags(CFG_PLAIN, 0, &f->rec, fl);
+	cfg_flags(cfg, 0, &f->rec, fl);
 	memset(o, 0, sizeof(*o));
 	o->flags = fl;
 	o->userdata = f;
@@ -1098,6 +1098,7 @@ typedef struct {
 	bool           resilient;
 	uint64_t       max_doc;
 	uint32_t       veto_at;
+	int            cfg;        /* the reader configuration, CFG_PLAIN by default */
 	frame_ref_t    ref;
 	bool           ref_ok;
 	uint64_t       ref_count;
@@ -1114,7 +1115,7 @@ static void frame_try(void* ctx, const size_t* cuts, size_t ncuts,
 	got.veto_at = fc->veto_at;
 	bvnr_read_flags_t fl;
 	bvnr_doc_stream_opts_t o;
-	frame_opts(&got, &fl, fc->resilient, fc->max_doc, &o);
+	frame_opts(&got, &fl, fc->resilient, fc->max_doc, fc->cfg, &o);
 	bvnr_frame_reader_t* fr = bvnr_frame_reader_create(&o);
 	bool alive = true;
 	size_t at = 0;
@@ -1191,7 +1192,7 @@ static void frame_reference(frame_case_t* fc)
 	fc->ref.veto_at = fc->veto_at;
 	bvnr_read_flags_t fl;
 	bvnr_doc_stream_opts_t o;
-	frame_opts(&fc->ref, &fl, fc->resilient, fc->max_doc, &o);
+	frame_opts(&fc->ref, &fl, fc->resilient, fc->max_doc, fc->cfg, &o);
 	bvnr_source_t src;
 	bvnr_source_from_mem(&src, fc->stream, fc->n);
 	fc->ref_ok = bvnr_doc_stream_read(&src, &o, &fc->ref_count);
@@ -1310,6 +1311,264 @@ static void test_frame_reader(void)
 
 	buf_free(&stream); buf_free(&expect);
 	buf_free(&big); buf_free(&big_expect);
+}
+
+/* ---------------------------------------------------------------------------
+ * Reuse: nothing one document leaves in a reader reaches the next.
+ *
+ * A re-opened reader keeps its buffers (the frame stack, the scratch), so
+ * every path that reads document after document through one reader -- the
+ * parsing frame reader, bvnr_doc_stream_read, a fed demux, a caller re-opening
+ * its own -- depends on the open clearing everything else: the version
+ * directive, the limits and flags, the error and its position, the recovery
+ * counters, the array frames a document left half written. Each check here
+ * reads a document on a reader that has just read another, under other
+ * settings, and requires the record a reader fresh from bvnr_reader_create
+ * produces for it.
+ * ------------------------------------------------------------------------- */
+
+/* Settings: a configuration of cfg_flags, and an array-nesting limit (0: the
+ * default), so a document can be read under a smaller or a larger frame stack
+ * than the one before it. */
+static const uint8_t REUSE_NESTING[] = { 0, 2, 255 };
+#define REUSE_NNEST (sizeof(REUSE_NESTING) / sizeof(REUSE_NESTING[0]))
+#define REUSE_NVAR  ((size_t)CFG__COUNT * REUSE_NNEST)
+
+/* Read one document on `rd` under setting `var`: from memory (piece 0), or
+ * fed in pieces of `piece` bytes (SIZE_MAX: one piece). */
+static void read_on(bvnr_reader_t* rd, const uint8_t* doc, size_t n,
+	size_t var, size_t piece, rec_t* r)
+{
+	memset(r, 0, sizeof(*r));
+	bvnr_read_flags_t f;
+	cfg_flags((int)(var / REUSE_NNEST), n, r, &f);
+	f.max_array_nesting = REUSE_NESTING[var % REUSE_NNEST];
+	bvnr_sink_t mirror;
+	bvnr_sink_to_callback(&mirror, mirror_push, NULL, &r->mirror);
+	r->feeds_ok = true;
+	if (!piece) {
+		bvnr_source_t src;
+		bvnr_source_from_mem(&src, doc, n);
+		r->ok = bvnr_open_read_source(rd, &src, &mirror, &f) &&
+			bvnr_read(rd);
+	} else {
+		bool alive = bvnr_open_read_feed(rd, &mirror, &f);
+		for (size_t at = 0; alive && at < n; at += piece) {
+			size_t len = n - at < piece ? n - at : piece;
+			alive = bvnr_read_feed(rd, doc + at, len);
+			if (!alive) r->feeds_ok = false;
+		}
+		r->ok = alive && bvnr_read_finish(rd);
+	}
+	rec_finish(r, rd);
+}
+
+static void read_fresh(const uint8_t* doc, size_t n, size_t var, rec_t* r)
+{
+	bvnr_reader_t* rd = bvnr_reader_create();
+	read_on(rd, doc, n, var, 0, r);
+	bvnr_reader_destroy(rd);
+}
+
+/* Documents that each set something the next must not inherit. */
+static const struct { const char* name; const char* s; size_t n; } REUSE_DOCS[] = {
+	{ "v11",          LIT("#!bovnar 1.1\n.t = 2026-06-15;\n") },
+	{ "no_version",   LIT(".t = 2026-06-15;\n") },
+	{ "v12",          LIT("#!bovnar 1.2\n.u = <float:64,ucum:m/s> 1.5;\n") },
+	{ "v12_unsaid",   LIT(".u = <float:64,ucum:m/s> 1.5;\n") },
+	{ "comment_v11",  LIT("# first\n#!bovnar 1.1\n.t = 2026-06-15;\n") },
+	{ "v99",          LIT("#!bovnar 9.9\n.a = 1;\n") },
+	{ "v_eof",        LIT("#!bovnar 1.1") },
+	{ "deep_cut",     LIT(".deep = [[[[[1,2]/[3,4]]]]") },
+	{ "dims",         LIT(".m = [1,2]/[3,4];\n.n = [[1,2,3]/[4,5,6]];\n") },
+	{ "dims_wide",    LIT(".m = [1,2,3]/[4,5,6];\n") },
+	{ "recover",      LIT(".a = 1;\n.b = @;\n.c = [1,2;\n.d = 3;\n") },
+	{ "struct_cut",   LIT(".s = { .a = [1, 2]; .t = { .b = 2;") },
+	{ "units",        LIT(".l = 1.5 km;\n.y = <float:64,k~g> 9.81;\n.x = <uint:8> 255;\n") },
+	{ "bom",          LIT("\xEF\xBB\xBF.x = 1;\n") },
+	{ "empty",        LIT("") },
+	{ "string_cut",   LIT(".s = \"unterminated") },
+	{ "utf8_cut",     LIT(".a = 1; #\xc3") },
+	{ "octet",        LIT(".b = \x00\x01\x02\x00hi\x00;\n.c = 1;\n") },
+	{ "octet_cut",    LIT(".b = \x00\x01\x09\x00hi") },
+};
+#define REUSE_NDOCS (sizeof(REUSE_DOCS) / sizeof(REUSE_DOCS[0]))
+
+static void test_reader_reuse(void)
+{
+	printf("reader reuse: a re-opened reader reads as a fresh one\n");
+	/* The fresh reader's record of every document under every setting. */
+	static rec_t ref[REUSE_NDOCS][REUSE_NVAR];
+	for (size_t b = 0; b < REUSE_NDOCS; b++)
+		for (size_t v = 0; v < REUSE_NVAR; v++)
+			read_fresh((const uint8_t*)REUSE_DOCS[b].s, REUSE_DOCS[b].n,
+				   v, &ref[b][v]);
+
+	/* Every ordered pair of documents, every pair of settings: A, then B on
+	 * the same reader, from memory and fed whole -- and fed one byte at a
+	 * time when the settings are the same. */
+	bvnr_reader_t* rd = bvnr_reader_create();
+	uint64_t pairs = 0, mism = 0;
+	for (size_t a = 0; a < REUSE_NDOCS; a++)
+	for (size_t b = 0; b < REUSE_NDOCS; b++)
+	for (size_t va = 0; va < REUSE_NVAR; va++)
+	for (size_t vb = 0; vb < REUSE_NVAR; vb++) {
+		static const size_t pieces[] = { 0, SIZE_MAX, 1 };
+		for (size_t pi = 0; pi < 3; pi++) {
+			if (pi == 2 && va != vb) continue;
+			rec_t ra, rb;
+			read_on(rd, (const uint8_t*)REUSE_DOCS[a].s, REUSE_DOCS[a].n,
+				va, (a + b) & 1 ? SIZE_MAX : 0, &ra);
+			read_on(rd, (const uint8_t*)REUSE_DOCS[b].s, REUSE_DOCS[b].n,
+				vb, pieces[pi], &rb);
+			char how[96];
+			snprintf(how, sizeof(how), "after %s (setting %zu), %s",
+				 REUSE_DOCS[a].name, va,
+				 pi == 0 ? "from memory" : pi == 1 ? "fed whole"
+							      : "fed bytewise");
+			if (!rec_same(&rb, &ref[b][vb], REUSE_DOCS[b].name,
+				      (int)vb, how))
+				mism++;
+			pairs++;
+			rec_free(&ra);
+			rec_free(&rb);
+		}
+	}
+	printf("  %" PRIu64 " documents read after another\n", pairs);
+	ASSERT_EQ_UINT(mism, 0, "a re-opened reader matches a fresh one");
+
+	/* The whole corpus, one document after another on one reader, under
+	 * each configuration, alternately from memory and fed. */
+	mism = 0;
+	for (int cfg = 0; cfg < CFG__COUNT; cfg++) {
+		size_t var = (size_t)cfg * REUSE_NNEST;
+		for (size_t di = 0; di < g_ndocs; di++) {
+			const doc_t* d = &g_docs[di];
+			rec_t got, want;
+			read_on(rd, d->data, d->len, var, di & 1 ? 4096 : 0, &got);
+			read_fresh(d->data, d->len, var, &want);
+			if (!rec_same(&got, &want, d->name, cfg, "corpus in a row"))
+				mism++;
+			rec_free(&got);
+			rec_free(&want);
+		}
+	}
+	ASSERT_EQ_UINT(mism, 0, "the corpus read in a row on one reader");
+	bvnr_reader_destroy(rd);
+
+	for (size_t b = 0; b < REUSE_NDOCS; b++)
+		for (size_t v = 0; v < REUSE_NVAR; v++)
+			rec_free(&ref[b][v]);
+}
+
+/* The frame reference with a fresh reader per document: what parse mode and
+ * bvnr_doc_stream_read must report, whatever their reader kept. */
+static void frame_reference_fresh(frame_case_t* fc, const buf_t* docs)
+{
+	memset(&fc->ref, 0, sizeof(fc->ref));
+	fc->ref.veto_at = fc->veto_at;
+	bvnr_read_flags_t fl;
+	bvnr_doc_stream_opts_t o;
+	frame_opts(&fc->ref, &fl, fc->resilient, fc->max_doc, fc->cfg, &o);
+	fc->ref_ok = true;
+	fc->ref_count = 0;
+	for (size_t at = 0; at < docs->n; ) {
+		uint64_t len;
+		memcpy(&len, docs->p + at, sizeof(len));
+		const uint8_t* doc = docs->p + at + sizeof(len);
+		at += sizeof(len) + (size_t)len;
+		bvnr_reader_t* rd = bvnr_reader_create();
+		bool ok = bvnr_open_read_mem(rd, len ? doc : (const void*)"", len,
+					     NULL, 0, &fl) && bvnr_read(rd);
+		error_code_t err = bvnr_reader_get_error(rd);
+		bvnr_reader_destroy(rd);
+		uint64_t index = fc->ref_count++;
+		if (!frame_on_document(&fc->ref, index, ok, err) ||
+		    (!ok && !fc->resilient)) {
+			fc->ref_ok = false;
+			break;
+		}
+	}
+}
+
+static void test_frame_isolation(void)
+{
+	printf("frame reader: consecutive documents are independent\n");
+	/* Ordered so that each document would read differently if the one
+	 * before it leaked: a datetime after a 1.1 directive and then without
+	 * one, a profile unit with and without 1.2, a directive after a plain
+	 * first comment, arrays after arrays left open, a failure (recovered
+	 * under CFG_RECOVER) before good documents, an octet stream (refused
+	 * under CFG_TEXT_ONLY) between text ones. */
+	static const struct { const char* s; size_t n; } D[] = {
+		{ LIT("#!bovnar 1.1\n.t = 2026-06-15;") },
+		{ LIT(".t = 2026-06-15;") },
+		{ LIT(".bad = @; .after = [1, 2];") },
+		{ LIT(".ok = 1;") },
+		{ LIT(".deep = [[[[1,2]/[3") },
+		{ LIT(".m = [1,2,3]/[4,5,6];") },
+		{ LIT("#!bovnar 1.2\n.u = <float:64,ucum:m/s> 1.5;") },
+		{ LIT(".u = <float:64,ucum:m/s> 1.5;") },
+		{ LIT("# a comment\n.c = 1;") },
+		{ LIT("#!bovnar 1.1\n.t = 2026-06-15;") },
+		{ LIT(".b = \x00\x01\x02\x00hi\x00; .c = 1;") },
+		{ LIT("#!bovnar 9.9\n.v = 1;") },
+		{ LIT(".s = { .x = 1; .y = [1, 2]; ") },
+		{ LIT(".z = 3;") },
+		{ LIT("") },
+		{ LIT(".a = 1; #\xc3") },
+		{ LIT(".last = [1, [2, 3]];") },
+	};
+	buf_t stream = {0}, docs = {0};
+	for (size_t i = 0; i < sizeof(D) / sizeof(D[0]); i++)
+		frame_add(&stream, &docs, D[i].s, D[i].n);
+
+	static const int cfgs[] = { CFG_PLAIN, CFG_RECOVER, CFG_STRICT,
+				    CFG_TEXT_ONLY };
+	uint64_t mism = 0, ds_mism = 0;
+	for (size_t ci = 0; ci < sizeof(cfgs) / sizeof(cfgs[0]); ci++) {
+		for (int resilient = 0; resilient < 2; resilient++) {
+			frame_case_t fc = { .stream = stream.p, .n = stream.n,
+				.resilient = resilient != 0, .cfg = cfgs[ci],
+				.name = "isolation" };
+			frame_reference_fresh(&fc, &docs);
+			if (resilient)
+				ASSERT_EQ_UINT(fc.ref_count,
+					sizeof(D) / sizeof(D[0]),
+					"continue_past_failed reads every document");
+			/* Every two-piece cut, single bytes, random pieces. */
+			for_partitions(stream.n, 29u + ci, frame_try, &fc);
+			mism += fc.mismatches;
+
+			/* bvnr_doc_stream_read against the same reference. */
+			frame_ref_t got;
+			memset(&got, 0, sizeof(got));
+			bvnr_read_flags_t fl;
+			bvnr_doc_stream_opts_t o;
+			frame_opts(&got, &fl, fc.resilient, 0, fc.cfg, &o);
+			bvnr_source_t src;
+			bvnr_source_from_mem(&src, stream.p, stream.n);
+			uint64_t count = 0;
+			bool ok = bvnr_doc_stream_read(&src, &o, &count);
+			if (ok != fc.ref_ok || count != fc.ref_count ||
+			    !buf_eq(&got.docs, &fc.ref.docs) ||
+			    !buf_eq(&got.rec.log, &fc.ref.rec.log)) {
+				ds_mism++;
+				fprintf(stderr, "  MISMATCH doc_stream cfg %d "
+					"resilient %d\n", cfgs[ci], resilient);
+			}
+			buf_free(&got.docs);
+			rec_free(&got.rec);
+			buf_free(&fc.ref.docs);
+			rec_free(&fc.ref.rec);
+		}
+	}
+	ASSERT_EQ_UINT(mism, 0,
+		"parse mode matches a fresh reader per document, cut anywhere");
+	ASSERT_EQ_UINT(ds_mism, 0,
+		"bvnr_doc_stream_read matches a fresh reader per document");
+	buf_free(&stream);
+	buf_free(&docs);
 }
 
 /* ---------------------------------------------------------------------------
@@ -1914,6 +2173,8 @@ int main(int argc, char** argv)
 	test_feed_prefixes();
 	test_feed_endless();
 	test_frame_reader();
+	test_reader_reuse();
+	test_frame_isolation();
 	test_demux_feed();
 	test_mux_send_vector();
 

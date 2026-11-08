@@ -628,8 +628,9 @@ of `bvn_dom_parse_fd`), because it builds the whole document anyway.
 A writer twin, and `Writer::to_writer`, push the document into `out` through a
 callback sink (`bvnr_sink_to_callback`) as it is serialised: the C writer
 batches its output as it does for an fd, so `out` receives 64 KiB blocks as
-they fill and the rest on `finish()`, which then flushes `out` once. The bytes
-are those of the in-memory twin. Since output leaves as it is made, a value
+they fill and the rest on `finish()`, which then flushes `out` once; a
+`to_writer` writer also hands over what it holds whenever `flush()` is called
+([§11.5](#115-struct-helpers)). The bytes are those of the in-memory twin. Since output leaves as it is made, a value
 that cannot be serialised part-way through leaves the blocks before it in
 `out` (a value that is not a struct at all leaves nothing), and a `to_writer`
 writer dropped unfinished drops what it still holds. `to_writer` has no cap on
@@ -2183,7 +2184,7 @@ The column and the byte offset of the error are on the `Error` itself — see
 |---|---|
 | `Writer::to_mem(cap, pretty)` | Write to an in-process buffer of `cap` bytes; `pretty` indents the output. Writing past `cap` fails with `sink_buffer_exhausted` (`DEFAULT_MEM_CAP` is 4 MiB) |
 | `Writer::to_mem_with(cap, pretty, unit_flags, emit_version)` | `to_mem` with two more settings: `unit_flags` ([`UnitFlags`](#53-unitflags)) rewrite units on output, `emit_version` leads the document with `#!bovnar <major>.<minor>` |
-| `Writer::to_writer(out, pretty)` | Write to any `std::io::Write`: the document streams into `out` in 64 KiB blocks as it is written, the rest on `finish()`, which flushes `out`; no cap on its size |
+| `Writer::to_writer(out, pretty)` | Write to any `std::io::Write`: the document streams into `out` in 64 KiB blocks as it is written, the rest on `flush()` or `finish()`, which flush `out`; no cap on its size |
 | `Writer::to_writer_with(out, cap, pretty, unit_flags, emit_version)` | `to_writer` for a document of at most `cap` bytes (`sink_buffer_exhausted` past it), plus `unit_flags` and `emit_version` as in `to_mem_with` |
 
 See [§4.7](#47-files-and-io-streams-stdioread--write) for the I/O writer. Every writer accepts structs and arrays nested up to **255** deep,
@@ -2202,6 +2203,7 @@ the size until the output fits (up to 256 MiB).
 |---|---|
 | `w.get_output() -> &[u8]` | The document written so far; empty for a `to_writer` writer, whose output has gone to its `std::io::Write` |
 | `Writer::bytes_written -> u64` | Number of bytes written |
+| `w.flush()` | Hand over what is written so far without ending the document (`bvnr_write_flush`): a `to_writer` writer pushes what it holds to its `std::io::Write` and flushes it once; a `to_mem` writer does nothing. See [§11.5](#115-struct-helpers) |
 | `w.finish()` | Flush and seal the output. Fails with `Error::Write` if any struct is still open. For a `to_writer` writer it also pushes what the writer still holds to its `std::io::Write` and flushes it |
 
 There is no `destroy()`: dropping the `Writer` releases the C object.
@@ -2348,9 +2350,61 @@ Two more kinds of value go into an open writer, whatever it writes to:
 | `w.mux_begin(key)`, `w.mux_send(channel, payload)`, `w.mux_end()` | a multiplexed octet stream under `key` (`bvnr_mux_begin` / `_send` / `_end`), the bytes of `stream::mux_dump`; values written before it are read back before its first message, and the document may go on after it |
 
 On a `to_writer` writer a message reaches `out` when the writer's 64 KiB block
-fills or the document is finished: there is no C call to push a block early.
-For a stream whose every message must go out at once, write it with
-`codec::MuxWriter` ([§4.8](#48-live-streams-the-framing-codec-bovnarcodec)).
+fills, when the document is finished, or at `w.flush()` (`bvnr_write_flush`),
+which writes out what the block holds and then calls `out.flush()`, once per
+call. A consumer that needs each message as it is sent — a `live::Demux` at the
+other end of a socket — gets it by a `flush()` after each `mux_send`. It is
+legal between any two writer calls, inside an open struct, array or mux stream
+too, and it changes only when the bytes leave, never which: a document flushed
+after every call is byte for byte the one written without a flush. It allocates
+nothing. A failing `out` is an `Error::Io` with `writing_to_sink`, from the
+`flush()` and from every call after it; on a `to_mem` writer `flush()` does
+nothing.
+
+```rust
+use std::io::Read;
+use bovnar::live::{Demux, DemuxItem, DemuxOptions};
+use bovnar::Writer;
+
+fn main() -> Result<(), bovnar::Error> {
+    let (mut rx, tx) = std::io::pipe().expect("pipe");
+    let mut w = Writer::to_writer(tx, false)?;
+    w.begin_struct("meta")?;
+    w.write_string("codec", "av1")?;
+    w.end_struct()?;
+    w.mux_begin("media")?;
+    w.mux_send(1, b"key frame")?;
+    w.flush()?; // the metadata and the first message leave now
+
+    // The other end has the message while the document is still open
+    let options = DemuxOptions { key: Some("media".into()), ..DemuxOptions::default() };
+    let mut demux = Demux::new(&options)?;
+    let mut buf = [0u8; 4096];
+    let mut first = None;
+    while first.is_none() {
+        let n = rx.read(&mut buf).expect("read");
+        let mut input = &buf[..n];
+        while let Some(item) = demux.next(&mut input)? {
+            if let DemuxItem::Message { channel, payload } = item {
+                first = Some((channel, payload.to_vec()));
+            }
+        }
+    }
+    assert_eq!(first, Some((1, b"key frame".to_vec())));
+    w.mux_end()?;
+    w.finish()
+}
+```
+
+Two writers produce a multiplexed stream message by message, byte for byte the
+same for the same messages:
+
+| | `Writer` with `mux_send` and `flush` | `codec::MuxWriter` ([§4.8](#48-live-streams-the-framing-codec-bovnarcodec)) |
+|---|---|---|
+| Implementation | the C writer: a C call per send and per flush, each message copied into the writer's 64 KiB buffer | pure Rust, no C call; the chunk headers can be handed out next to the borrowed payload for a vectored write |
+| Document shape | any: the stream is one value, with values of every kind before and after it, each one checked as the writer checks every value | a text preamble, the stream, and nothing after it |
+| Destination | a `to_writer` writer's `std::io::Write`, flushed by `flush()` | a `Vec` or any `std::io::Write`, which the caller flushes |
+| Use it for | a stream inside a larger document, or when the writer already writes the rest | a dedicated stream, a router or a relay |
 
 ### 11.6 Version directive
 

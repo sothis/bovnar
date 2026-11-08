@@ -571,6 +571,15 @@ with the messages, so the metadata before a stream is there before its first
 message. `EmbeddedFeed` reads the documents embedded in a live document (§4)
 by feeding their chunks to one reused reader, and a `Writer` takes
 `embed_document` and `mux_begin` / `mux_send` / `mux_end` mid-document.
+
+Either writer sends a stream message by message. A `Writer` into a
+`std::io::Write` (`Writer::to_writer`) batches into the C writer's 64 KiB buffer,
+and `Writer::flush` (`bvnr_write_flush`, §8.5) hands over what it holds and
+flushes the destination, so a `flush` after each `mux_send` gives a consumer
+every message as it is sent, inside a document that may hold any values before
+and after the stream. `codec::MuxWriter` writes the same bytes with no C call,
+for a stream that is the whole document after its preamble, and leaves the
+flushing to the caller.
 `MuxReader` stays the fast path for a stream that is one octet stream; `Demux`
 takes a document of any shape — values after the stream, other octet streams
 beside it, every reader limit. See
@@ -741,7 +750,8 @@ At the other end a push-fed demux (§3.4) hands out `.meta` before the first
 message and each message as soon as its last byte arrives, so message N is
 there before message N+1 is sent (`tests/bovnar_feed_test.c` runs exactly this,
 with the writer's sink feeding the demux). A failed push or flush latches like
-any writer error.
+any writer error. The bindings wrap it: `Writer.flush()` and
+`stream.MuxWriter` in Python (§5), `Writer::flush` in Rust (§6).
 
 There is no "flush after every message" option on `bvnr_mux_send`: it would
 need a field in `bvnr_write_flags_t` or a second send function, and the call

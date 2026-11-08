@@ -478,6 +478,32 @@ fn what_follows_the_document() {
         kind(&c_load(&[&c[..], b"x"].concat())),
         Some(ErrorCode::UnexpectedInputByte)
     );
+    // Whitespace (all six ws-chars) and comments before and after the `;`,
+    // read as the C lexer reads them, split at every byte.
+    let body = &c[..c.len() - 1];
+    assert_eq!(c.last(), Some(&b';'));
+    for (before, after) in [
+        (&b" "[..], &b""[..]),
+        (b"\x0b\x0c", b"\x0b\x0c"),
+        (b" # before\n", b""),
+        (b"#\r", b"# after"),
+        (b"", b"\n# one\n# two\n"),
+    ] {
+        let doc = [body, before, b";", after].concat();
+        let want = c_load(&doc).unwrap();
+        assert_eq!(want, [(1, b"x".to_vec())], "{doc:?}");
+        for cut in 0..=doc.len() {
+            let mut reader = MuxReader::new();
+            assert_eq!(
+                read_parts(&mut reader, &[&doc[..cut], &doc[cut..]]).unwrap(),
+                want
+            );
+        }
+    }
+    // A control byte in such a comment is refused, as C refuses it.
+    let bad = [body, b";# \x01\n"].concat();
+    assert_eq!(kind(&read_all(&bad)), Some(ErrorCode::UnexpectedInputByte));
+    assert_eq!(kind(&read_all(&bad)), kind(&c_load(&bad)));
     // The C writer's pretty form.
     let pretty = [&b".mux = \0"[..], &c[6..], b"\n"].concat();
     assert_eq!(read_all(&pretty).unwrap(), c_load(&pretty).unwrap());
@@ -507,6 +533,35 @@ fn the_4096_channel_limit() {
     again.extend(msgs(10));
     let again_doc = stream::mux_dump(&again, "mux").unwrap();
     assert_eq!(read_all(&again_doc).unwrap(), again);
+}
+
+#[test]
+fn channels_that_differ_above_32_bits_stay_apart() {
+    // On a 32-bit target, a table indexed by `id as usize` would read channel
+    // 2^32 + 1 as channel 1.
+    let high = (1u64 << 32) | 1;
+    let packed = raw_doc(&[
+        chunk(high, &framed(b"x")),
+        chunk(1, &[framed(b"a"), framed(b"b")].concat()),
+    ]);
+    let want: Msgs = vec![
+        (high, b"x".to_vec()),
+        (1, b"a".to_vec()),
+        (1, b"b".to_vec()),
+    ];
+    assert_eq!(c_load(&packed).unwrap(), want);
+    assert_eq!(read_all(&packed).unwrap(), want);
+    // Interleaved: channel 1's message is continued after the other's.
+    let mut first = varint(5);
+    first.extend_from_slice(b"ab");
+    let split = raw_doc(&[
+        chunk(1, &first),
+        chunk(high, &framed(b"xy")),
+        chunk(1, b"cde"),
+    ]);
+    let want: Msgs = vec![(high, b"xy".to_vec()), (1, b"abcde".to_vec())];
+    assert_eq!(c_load(&split).unwrap(), want);
+    assert_eq!(read_all(&split).unwrap(), want);
 }
 
 #[test]
@@ -1035,4 +1090,21 @@ fn frame_limits_and_errors() {
             );
         }
     }
+}
+
+#[test]
+fn a_call_after_a_peek_without_the_rest_of_the_input_is_refused() {
+    let c = stream::mux_dump(&[(1, b"payload".to_vec())], "mux").unwrap();
+    let mut reader = MuxReader::new();
+    let mut input = &c[..];
+    loop {
+        match reader.next_item(&mut input, 4).unwrap() {
+            Some(Item::Peek(_)) => break,
+            Some(_) => {}
+            None => panic!("no peek"),
+        }
+    }
+    // Not the rest of the input: refused, not a slice out of bounds.
+    let r = reader.next_item(&mut &[][..], 4);
+    assert!(matches!(r, Err(Error::Argument { .. })), "{r:?}");
 }

@@ -877,3 +877,88 @@ fn an_embedded_feed_reads_what_parse_embedded_reads() {
         }
     }
 }
+
+#[test]
+fn an_embedded_feed_starts_afresh_with_each_outer_document() {
+    // The first outer document is cut off inside the embedded stream.
+    let mut w = Writer::to_mem(4096, false).unwrap();
+    w.embed_document("payload", b".a = 1;").unwrap();
+    w.finish().unwrap();
+    let first = w.get_output().to_vec();
+    let cut = &first[..first.len() - 4];
+    // The second has another octet stream before the embedded one.
+    let mut w = Writer::to_mem(4096, false).unwrap();
+    w.write_octets("other", b"zz").unwrap();
+    w.embed_document("payload", b".b = 2;").unwrap();
+    w.finish().unwrap();
+    let second = w.get_output().to_vec();
+
+    let mut embedded = EmbeddedFeed::new("payload", false).unwrap();
+    let mut outer = DocumentFeed::new(&ReadOptions::default()).unwrap();
+    let mut got = Vec::new();
+    let mut on_event = |d: &EventData<'_>| {
+        got.extend(embedded.push(d));
+        true
+    };
+    outer.feed(cut, &mut on_event).unwrap();
+    assert!(outer.finish(&mut on_event).is_err());
+    outer.reset().unwrap();
+    outer.feed(&second, &mut on_event).unwrap();
+    outer.finish(&mut on_event).unwrap();
+    assert_eq!(got.len(), 1, "{got:?}");
+    assert_eq!(got[0], stream::parse_embedded(b".b = 2;", false));
+}
+
+#[test]
+fn a_finished_demux_refuses_more_input() {
+    let doc = mux_document(&[(1, b"x".to_vec())], "mux");
+    let mut demux = Demux::new(&DemuxOptions::default()).unwrap();
+    let mut input = &doc[..];
+    while demux.next(&mut input).unwrap().is_some() {}
+    demux.finish().unwrap();
+    let more = b".late = 1;";
+    let mut input = &more[..];
+    assert!(matches!(
+        demux.next(&mut input),
+        Err(Error::Argument { .. })
+    ));
+    assert_eq!(input, &more[..], "the input is left untouched");
+    assert!(demux.next(&mut &[][..]).unwrap().is_none());
+}
+
+#[test]
+fn values_built_from_demux_events_include_the_streams_key() {
+    let mut w = Writer::to_mem(4096, false).unwrap();
+    w.write_string("codec", "av1").unwrap();
+    w.mux_begin("media").unwrap();
+    w.mux_send(1, b"frame").unwrap();
+    w.mux_end().unwrap();
+    w.finish().unwrap();
+    let doc = w.get_output().to_vec();
+    let options = DemuxOptions {
+        deliver_events: true,
+        ..DemuxOptions::default()
+    };
+    let mut demux = Demux::new(&options).unwrap();
+    let mut values = ValueBuilder::new(false);
+    let mut input = &doc[..];
+    while let Some(item) = demux.next(&mut input).unwrap() {
+        if let DemuxItem::Event(e) = item {
+            values.push(&e.data());
+        }
+    }
+    demux.finish().unwrap();
+    while let Some(item) = demux.next(&mut &[][..]).unwrap() {
+        if let DemuxItem::Event(e) = item {
+            values.push(&e.data());
+        }
+    }
+    let got: Vec<_> = values.drain().collect();
+    assert_eq!(
+        got,
+        [
+            ("codec".to_string(), Value::String("av1".into())),
+            ("media".to_string(), Value::Bytes(Vec::new())),
+        ]
+    );
+}

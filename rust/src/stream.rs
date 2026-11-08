@@ -14,13 +14,19 @@
 //! [`BVNR_FILESIZE_UNLIMITED`]) and the in-memory twin's
 //! `max_document_size` and `max_message`, and returns what its in-memory
 //! twin returns for the same bytes; it reads until its input reports its end.
-//! A writer twin writes as it serialises, in 64 KiB blocks, and flushes at
-//! the end; its output is byte for byte its in-memory twin's, but a failure
+//! A writer twin writes as it serialises and flushes at the end: a document
+//! writer ([`mux_dump_to`], [`embed_document_to`]) in 64 KiB blocks, a frame
+//! writer ([`frame_documents_to`], [`dump_documents_to`]) one write for each
+//! frame header and one for each payload, so give it a
+//! [`std::io::BufWriter`] for many small frames on an unbuffered file or
+//! socket. Its output is byte for byte its in-memory twin's, but a failure
 //! part-way leaves what was already written. A failing reader or writer is
 //! an [`Error::Io`] with `reading_from_source_fd` or `writing_to_sink`, also
 //! when the bytes before the failure would already have failed to parse;
 //! short reads and writes are continued, `Interrupted` is retried, and a
-//! panic in either reaches the caller.
+//! panic in either reaches the caller. `WouldBlock` is not retried: it is a
+//! failure like any other, so a non-blocking input belongs in
+//! [`crate::live`].
 
 use std::cell::RefCell;
 

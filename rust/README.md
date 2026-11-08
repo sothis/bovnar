@@ -280,8 +280,8 @@ match Unit::parse("furlong per fortnight") {
   `mux_load_reader`, `embed_document_to` and `parse_embedded_reader` take
   any `std::io::Read` / `std::io::Write`; a path is read or written through
   an opened `std::fs::File`. They stream through the C library's callback
-  sources and sinks: a reader parses as it pulls, so memory stays flat
-  however long the input, and a writer hands its output to the
+  sources and sinks: a reader parses as it pulls, so the input is never held
+  whole, and a writer hands its output to the
   `std::io::Write` in 64 KiB blocks, or at once with `Writer::flush`.
   `DomDoc::parse_reader` alone still reads its input first (at most 256 MiB,
   the cap of `bvn_dom_parse_fd`), since the DOM holds the whole document
@@ -333,7 +333,8 @@ match Unit::parse("furlong per fortnight") {
   values before the stream; `live` feeds documents, frame streams and
   multiplexed streams of any shape to the C reader in pieces of any size.
   doc/14 §4.8 and §4.9 have the details.
-- **Threads:** `Reader`, `Writer` and `DomDoc` are `Send` but not `Sync`: as
+- **Threads:** `Reader`, `Writer`, `DomDoc` and the `live` readers are `Send`
+  but not `Sync`: as
   `bovnar.h` (THREADING) allows, each can be moved to another thread, and
   distinct ones can be used on distinct threads, but one object must not be
   shared.
@@ -360,8 +361,10 @@ match Unit::parse("furlong per fortnight") {
 
 `fuzz/` holds [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz) targets
 (nightly toolchain): `parse` (the streaming parsers and a write-back round
-trip), `dom` (parse and walk every node) and `json_roundtrip` (`from_json`
-and `to_json` until the JSON is stable). Instrument the C library too by
+trip), `dom` (parse and walk every node), `json_roundtrip` (`from_json`
+and `to_json` until the JSON is stable), `codec` (the pure-Rust `MuxReader`
+and `FrameReader` fed in pieces, against the C library) and `live` (the fed
+readers of `live` in pieces, against the batch functions). Instrument the C library too by
 building it with clang:
 
 ```sh

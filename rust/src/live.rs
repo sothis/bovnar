@@ -28,13 +28,13 @@
 //!
 //! [`DocumentFeed`], [`ValueFeed`] and [`FrameParser`] deliver what a feed
 //! completes before the feed returns, so the bytes may be reused at once.
-//! [`FramePull`] and [`Demux`] are drained instead: `next` takes `&mut &[u8]`,
-//! the bytes not yet read, as [`crate::codec`]'s readers do, and returns one
-//! item per call, borrowed from the input when it lies whole there, else from
-//! a buffer the reader keeps. The item is valid until the next call (the
-//! borrow checker holds you to it). Pass the same slice to every call until
-//! one returns `None`, which empties it; until then the slice is not
-//! shortened, and another one is refused.
+//! [`FramePull`] and [`Demux`] are drained instead: `next` takes `&mut &[u8]`
+//! and returns one item per call, borrowed from the input when it lies whole
+//! there, else from a buffer the reader keeps. The item is valid until the
+//! next call (the borrow checker holds you to it). Unlike the readers of
+//! [`crate::codec`], which advance the slice past each item they return, these
+//! leave it as it is until a call returns `None`, which empties it: pass the
+//! same slice to every call until then, as another one is refused.
 //!
 //! # [`Demux`] or [`crate::codec::MuxReader`]?
 //!
@@ -44,8 +44,8 @@
 //! preamble. It is the fast path for a dedicated stream, and it can peek at a
 //! message and skip or forward it. `Demux` runs the full C parser over the
 //! whole document: values before the stream *and after it*, several octet
-//! streams of which one is multiplexed ([`DemuxOptions::key`]), unit
-//! policies and every limit of [`crate::ReadOptions`], and the document's
+//! streams of which one is multiplexed ([`DemuxOptions::key`]), every limit
+//! of [`crate::ReadOptions`], and the document's
 //! events in order with the messages. Use it for documents of any other
 //! shape, or when the values around the stream matter.
 
@@ -231,7 +231,9 @@ impl DocumentFeed {
 /// handed out as each assignment completes, so that an endless document is
 /// read in constant memory. Feed it the events of a [`DocumentFeed`], or the
 /// [`DemuxEvent`]s of a [`Demux`] to have the metadata before a stream
-/// as values before the first message.
+/// as values before the first message. A [`Demux`] withholds the mux
+/// stream's chunks but not its start and end, so the builder hands out the
+/// stream's own key too, as an empty [`Value::Bytes`], once the stream ends.
 ///
 /// A scalar, a struct or an octet stream is complete with its last event;
 /// an array, which a `/` may still continue, with the event after it (the
@@ -412,6 +414,13 @@ impl EmbeddedFeed {
     pub fn push(&mut self, event: &EventData<'_>) -> Option<Result<Value>> {
         use crate::Event as E;
         match event.event {
+            // A new outer document (a reused feed after one that failed or
+            // was cut off inside the keyed stream) starts outside it.
+            E::StreamStart => {
+                self.key_match = false;
+                self.inside = false;
+                self.error = None;
+            }
             E::AssignmentStart => self.key_match = event.raw == &*self.key,
             E::OctetStreamStart if self.key_match => {
                 self.inside = true;
@@ -512,9 +521,9 @@ impl FrameParser {
         }
     }
 
-    /// Declares the end of the stream: an error unless it ended on a frame
-    /// boundary (`got_incomplete_bvnr_stream`; the cut-off document is not
-    /// reported) or the stream had failed.
+    /// Declares the end of the stream: an error when it ended inside a
+    /// frame (`got_incomplete_bvnr_stream`; the cut-off document is not
+    /// reported), or the stream's error when it had failed.
     pub fn finish(&mut self) -> Result<()> {
         if self.finished {
             return Err(Error::argument("the frame stream is finished"));
@@ -597,8 +606,9 @@ impl FramePull {
         }
     }
 
-    /// Declares the end of the stream: an error unless it ended on a frame
-    /// boundary (`got_incomplete_bvnr_stream`) or after the stream failed.
+    /// Declares the end of the stream: an error when it ended inside a
+    /// frame (`got_incomplete_bvnr_stream`), or the stream's error when it
+    /// had failed.
     /// Refused, changing nothing, while fed bytes are left to drain.
     pub fn finish(&mut self) -> Result<()> {
         if self.finished {
@@ -780,10 +790,16 @@ impl Demux {
 
     /// The next message or event whose last byte `input` holds; `None` once
     /// `input` is used up, which empties it. After [`finish`](Self::finish),
-    /// pass an empty slice to have the closing events. The stream's error
+    /// pass an empty slice to have the closing events; more input is then an
+    /// [`Error::Argument`] and is left untouched. The stream's error
     /// ends it: this and every later call return it, after the events read
     /// before it.
     pub fn next<'s, 'a: 's>(&'s mut self, input: &mut &'a [u8]) -> Result<Option<DemuxItem<'s>>> {
+        if self.finished && !input.is_empty() {
+            return Err(Error::argument(
+                "the document is finished; pass an empty slice for the closing events, or reset()",
+            ));
+        }
         let fed = if self.finished { None } else { Some(*input) };
         match self.handle.next(fed) {
             Next::Item(RawItem::Message(channel, payload)) => {
@@ -845,6 +861,9 @@ impl Demux {
 fn demux_error(code: i32, reader: Option<ffi::ReaderError>) -> Error {
     match reader {
         Some(r) if r.code == code && code != 0 => reader_error(r),
+        // A call the C demux refused without a stream error: it is not open
+        // for feeding (a reset that failed).
+        _ if code == 0 => Error::argument("the demux is not open; reset() it"),
         _ => Error::parse_code(code),
     }
 }

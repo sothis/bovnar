@@ -579,3 +579,14 @@ fn a_live_writer_writes_mux_streams_and_embedded_documents() {
         Err(Error::Argument { .. })
     ));
 }
+
+#[test]
+fn a_finish_that_panicked_keeps_failing() {
+    let mut o = Partial::new(usize::MAX, 0);
+    o.panic_at = Some(0);
+    let mut w = Writer::to_writer(o, false).unwrap();
+    w.write_string("a", "b").unwrap();
+    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| w.finish()));
+    assert!(r.is_err(), "the panic reaches the caller");
+    assert!(w.finish().is_err(), "a second finish fails too");
+}

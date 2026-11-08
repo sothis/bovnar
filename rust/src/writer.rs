@@ -211,9 +211,12 @@ impl Writer {
     }
 
     /// [`Writer::to_writer`] for a document of at most `cap` bytes, with the
-    /// output options [`Writer::to_mem_with`] takes. Writing past `cap` fails
-    /// with `sink_buffer_exhausted`, as with [`Writer::to_mem`]; what `out`
-    /// holds then is the output up to the last 64 KiB block that fitted.
+    /// output options [`Writer::to_mem_with`] takes. Output past `cap` fails
+    /// with `sink_buffer_exhausted`, as with [`Writer::to_mem`], but only when
+    /// it is pushed to `out`: the write that fills a 64 KiB block past the
+    /// cap, or the [`Writer::flush`] or [`Writer::finish`] that pushes it, is
+    /// the call that fails. What `out` holds then is the output up to the
+    /// last push that fitted.
     pub fn to_writer_with(
         out: impl std::io::Write + Send + 'static,
         cap: usize,
@@ -594,9 +597,10 @@ impl Writer {
     }
 
     /// Completes the document. Fails while a struct is still open. A
-    /// [`Writer::to_writer`] writer then writes the document to its
-    /// [`std::io::Write`], once. A finish that failed keeps failing: a
-    /// second call returns the same error.
+    /// [`Writer::to_writer`] writer then writes what its 64 KiB block still
+    /// holds to its [`std::io::Write`] and flushes it. A finish that failed
+    /// keeps failing: a second call returns the same error, also after a
+    /// panic in the destination.
     pub fn finish(&mut self) -> Result<()> {
         if let Some(e) = &self.finish_error {
             return Err(e.clone());
@@ -611,11 +615,17 @@ impl Writer {
             )));
         }
         self.finished = true;
-        let r = self.check(ffi::WriterHandle::finish);
-        if let Err(e) = &r {
-            self.finish_error = Some(e.clone());
+        // The error is kept before a panic in the sink is resumed, so a
+        // finish that panicked fails again on the next call.
+        let ok = self.handle.finish();
+        if !ok {
+            self.finish_error = Some(self.error());
         }
-        r
+        self.handle.resume_sink_panic();
+        match &self.finish_error {
+            Some(e) => Err(e.clone()),
+            None => Ok(()),
+        }
     }
 
     /// Hands everything written so far to the destination now

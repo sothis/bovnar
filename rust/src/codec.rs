@@ -6,7 +6,8 @@
 //! This module does the same two wire conventions of doc/10 §2 and §3 on a
 //! live stream instead: a writer hands out each message's bytes as soon as it
 //! is sent, and a reader is fed bytes in pieces of any size and hands out each
-//! message as soon as its last byte arrives. Neither calls into C, and neither
+//! message as soon as its last byte arrives. No message goes through C (only
+//! a preamble is checked with the C parser, once per stream), and neither
 //! allocates per message once its buffers have grown to the largest message.
 //!
 //! # Octet multiplexing
@@ -39,9 +40,11 @@
 //! on to the octet stream, which never goes through C.
 //!
 //! **What the reader reads.** A document of a preamble (possibly empty), one
-//! octet stream as the value of its last assignment, `;`, and then only
-//! whitespace. An octet stream in the preamble, a statement after the
-//! stream, or any byte but whitespace after the `;` is an error. To pull a
+//! octet stream as the value of its last assignment (`.KEY =`, whitespace
+//! around the `=` but no comment between it and the stream), `;`, and then
+//! only whitespace and comments, which may also come before the `;`. An
+//! octet stream in the preamble, a statement after the stream, or any other
+//! byte after it is an error. To pull a
 //! multiplexed stream out of a general document, parse it with
 //! [`crate::stream::mux_load`] or [`crate::Reader`].
 //!
@@ -59,9 +62,11 @@
 //! | The preamble does not parse | the parser's [`Error::Parse`] |
 //! | The stream is under another key than [`MuxReader::with_options`] asked for | `UnexpectedInputByte`, as an [`Error::Argument`] naming both keys |
 //!
-//! But for the last two rows, these are the codes [`crate::stream::mux_load`]
-//! gives for the same input. An error is latched: every later call returns it
-//! again.
+//! The first five rows are the codes [`crate::stream::mux_load`] gives for
+//! the same input. The rest are the codec's own: it reads this one shape,
+//! where `mux_load` parses any document, and accepts one without an octet
+//! stream, one with statements after it, or one under any key. An error is
+//! latched: every later call returns it again.
 //!
 //! # Frames
 //!
@@ -444,10 +449,12 @@ impl MuxWriter {
     /// [`Error::Argument`] with `octet_stream_forbidden`, because a reader
     /// takes the first `0x00` of the document for the stream's opener. It is
     /// checked once, here, with the full parser ([`crate::parse`]); a
-    /// preamble that does not parse is that parse error, and one that would
-    /// swallow the stream's assignment (it ends inside a comment) is an
-    /// [`Error::Argument`]. Messages are not affected: they never go through
-    /// the C library.
+    /// preamble that does not parse is that parse error, also one that ends
+    /// inside a comment and so would swallow the stream's assignment (the
+    /// parser refuses the opening `0x00` inside the comment). Messages are not
+    /// affected: they never go through the C library. A preamble longer than
+    /// [`DEFAULT_MAX_PREAMBLE`] is written, but a [`MuxReader`] reads it only
+    /// with a larger cap ([`MuxReader::with_max_preamble`]).
     ///
     /// ```
     /// use bovnar::codec::{MuxReader, MuxWriter};
@@ -528,7 +535,7 @@ impl MuxWriter {
     /// Only the headers are written; the payload is borrowed.
     ///
     /// A message of at most [`crate::stream::BVNR_MUX_MAX_MESSAGE`] bytes is
-    /// one chunk, so two parts. A longer one is cut as `bvnr_mux_send` cuts
+    /// one chunk, so two parts (one for an empty message). A longer one is cut as `bvnr_mux_send` cuts
     /// it: every chunk filled to 65536 bytes, the channel varint leading each.
     /// `head` grows to the largest message's headers and then stays.
     ///
@@ -541,8 +548,17 @@ impl MuxWriter {
     /// let mut head = Vec::new();
     /// socket.write_all(mux.opener())?;
     /// let parts = mux.encode(&mut head, 7, b"payload");
-    /// let slices: Vec<IoSlice<'_>> = parts.map(IoSlice::new).collect();
-    /// socket.write_vectored(&slices)?;
+    /// let mut slices: Vec<IoSlice<'_>> = parts.map(IoSlice::new).collect();
+    /// // A vectored write may take only part of the message: go on until it
+    /// // is all written (write_message_to does this for you).
+    /// let mut rest = &mut slices[..];
+    /// while !rest.is_empty() {
+    ///     let n = socket.write_vectored(rest)?;
+    ///     if n == 0 {
+    ///         return Err(std::io::Error::from(std::io::ErrorKind::WriteZero).into());
+    ///     }
+    ///     IoSlice::advance_slices(&mut rest, n);
+    /// }
     /// socket.write_all(mux.terminator())?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -764,8 +780,12 @@ enum State {
     Fragment,
     /// After the closing `0x00`, expects `;`.
     Semicolon,
-    /// The document is complete; only whitespace may follow.
+    /// Inside a comment before the `;`.
+    SemicolonComment,
+    /// The document is complete; only whitespace and comments may follow.
     Done,
+    /// Inside a comment after the `;`.
+    DoneComment,
 }
 
 /// One channel's reassembly state (`demux_channel_t`).
@@ -909,8 +929,12 @@ impl Hasher for ChannelHasher {
 /// first bytes whether to receive, skip or forward it.
 ///
 /// Memory: one buffer per channel, grown to that channel's largest message
-/// that did not lie whole in the input, plus small fixed state. Nothing is
-/// allocated for a message once those buffers are large enough.
+/// that did not lie whole in the input; a chunk header or message start
+/// gathered for a peek (at most one chunk, 64 KiB); the preamble's text (at
+/// most the preamble cap); and for [`next_item`](Self::next_item), the
+/// largest forwarded message that had to be rewritten (at most
+/// `max_message`). Nothing is allocated for a message once those buffers are
+/// large enough.
 ///
 /// ```
 /// use bovnar::codec::MuxReader;
@@ -1082,7 +1106,7 @@ impl MuxReader {
     /// Whether the document is complete: the octet stream and the assignment
     /// are closed.
     pub fn is_done(&self) -> bool {
-        self.state == State::Done && self.error.is_none()
+        matches!(self.state, State::Done | State::DoneComment) && self.error.is_none()
     }
 
     /// Checks that the input ended where a stream may end: after the
@@ -1097,8 +1121,11 @@ impl MuxReader {
         }
         let code = match self.state {
             State::Text if self.text.is_empty() => return Ok(()),
-            State::Done => return Ok(()),
-            State::Text | State::Semicolon => ErrorCode::GotIncompleteBvnrStream,
+            // A comment ends at the end of input.
+            State::Done | State::DoneComment => return Ok(()),
+            State::Text | State::Semicolon | State::SemicolonComment => {
+                ErrorCode::GotIncompleteBvnrStream
+            }
             State::Tag | State::Len0 | State::Len1(_) | State::Channel | State::Fragment => {
                 ErrorCode::ReadCompleteChunkFailed
             }
@@ -1186,6 +1213,11 @@ impl MuxReader {
     /// whole and consecutive in the input passed to the call after the peek,
     /// they are returned as they are, with no copy, as soon as that call
     /// starts.
+    ///
+    /// The call after a peek must be given the rest of the same input, as
+    /// the peek left it: a peek may leave the input at the chunk it read the
+    /// message's start from. Another slice is an [`Error::Argument`] when it
+    /// is too short to be that rest.
     ///
     /// ```
     /// use bovnar::codec::{Item, MuxReader, MuxWriter};
@@ -1370,10 +1402,13 @@ impl MuxReader {
     /// The index of channel `id`, registering it on first sight.
     #[inline(always)]
     fn channel(&mut self, id: u64) -> Result<usize> {
-        if let Some(&slot) = self.small.get(id as usize)
-            && slot > 0
-        {
-            return Ok(usize::from(slot) - 1);
+        // Compared as u64: `id as usize` would alias ids modulo 2^32 on a
+        // 32-bit target.
+        if id < SMALL_CHANNELS as u64 {
+            let slot = self.small[id as usize];
+            if slot > 0 {
+                return Ok(usize::from(slot) - 1);
+            }
         }
         if let Some(c) = self.channels.get(self.last)
             && c.id == id
@@ -1398,12 +1433,11 @@ impl MuxReader {
                 let mut buf = self.spare.pop().unwrap_or_default();
                 buf.clear();
                 self.channels.push(Channel::new(id, buf));
-                match self.small.get_mut(id as usize) {
+                if id < SMALL_CHANNELS as u64 {
                     // Below MAX_CHANNELS, so the index fits.
-                    Some(slot) => *slot = i as u16 + 1,
-                    None => {
-                        self.index.insert(id, i as u32);
-                    }
+                    self.small[id as usize] = i as u16 + 1;
+                } else {
+                    self.index.insert(id, i as u32);
                 }
                 i
             }
@@ -1485,11 +1519,22 @@ impl MuxReader {
         Ok(())
     }
 
-    /// One byte after the octet stream: its `;`, then only whitespace.
+    /// One byte after the octet stream: its `;`, with whitespace and
+    /// comments before and after it, as the C lexer reads them.
     fn end_byte(&mut self, b: u8) -> Result<()> {
+        use State as S;
         match (self.state, b) {
-            (State::Semicolon, b';') => self.state = State::Done,
-            (State::Done, b' ' | b'\t' | b'\r' | b'\n') => {}
+            (S::SemicolonComment, b'\n' | b'\r') => self.state = S::Semicolon,
+            (S::DoneComment, b'\n' | b'\r') => self.state = S::Done,
+            // A comment's body takes any byte but the control bytes.
+            (S::SemicolonComment | S::DoneComment, 0x00..=0x08 | 0x0E..=0x1F | 0x7F) => {
+                return Err(self.fail(ErrorCode::UnexpectedInputByte));
+            }
+            (S::SemicolonComment | S::DoneComment, _) => {}
+            (S::Semicolon, b';') => self.state = S::Done,
+            (S::Semicolon, b'#') => self.state = S::SemicolonComment,
+            (S::Done, b'#') => self.state = S::DoneComment,
+            (S::Semicolon | S::Done, b) if is_space(b) => {}
             _ => return Err(self.fail(ErrorCode::UnexpectedInputByte)),
         }
         Ok(())
@@ -1643,7 +1688,7 @@ impl MuxReader {
                     }
                 }
                 State::Text => self.read_text(input)?,
-                State::Semicolon | State::Done => {
+                State::Semicolon | State::SemicolonComment | State::Done | State::DoneComment => {
                     *input = &buf[1..];
                     self.end_byte(b)?;
                 }
@@ -1830,6 +1875,17 @@ impl MuxReader {
         }
         let cur = self.cur;
         if let Some(f) = fresh {
+            // A peek read the chunk's header from the input and left the input
+            // at its tag; a call with a shorter slice did not pass that input
+            // back. Refused (and latched: the peek has been used up) rather
+            // than sliced out of bounds.
+            if input.len() < f.header {
+                let e = Error::argument(
+                    "after a peek, the next call must be given the rest of the same input",
+                );
+                self.error = Some(e.clone());
+                return Err(e);
+            }
             // The input is still at the message's first chunk: when the
             // message is all there, it is handed over or passed over at once.
             if let Some(n) = settled(input, &f, decision) {
@@ -1896,7 +1952,7 @@ enum FragFound<'a> {
 /// whitespace around the `=`. Returns where the preamble ends (at the `.`)
 /// and where the key lies.
 fn split_opener(text: &[u8]) -> Option<(usize, std::ops::Range<usize>)> {
-    let space = |b: u8| matches!(b, b' ' | b'\t' | b'\r' | b'\n');
+    let space = is_space;
     let mut end = text.len();
     while end > 0 && space(text[end - 1]) {
         end -= 1;
@@ -1936,6 +1992,11 @@ fn check_document(text: &[u8], key: &[u8]) -> Result<()> {
         "the preamble must be complete statements: the assignment that opens the \
          stream does not follow it (does the preamble end inside a comment?)",
     ))
+}
+
+/// Bovnar whitespace (`ws-char`): HT, LF, VT, FF, CR and space.
+fn is_space(b: u8) -> bool {
+    matches!(b, b'\t' | b'\n' | 0x0B | 0x0C | b'\r' | b' ')
 }
 
 fn chunk_len(lo: u8, hi: u8) -> usize {

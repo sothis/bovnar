@@ -340,6 +340,7 @@ bvnr_write_float_dec_unit
 bvnr_write_float_fix
 bvnr_write_float_fix_unit
 bvnr_write_float_unit
+bvnr_write_flush
 bvnr_write_null
 bvnr_write_plain
 bvnr_write_sint

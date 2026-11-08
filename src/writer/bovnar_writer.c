@@ -3007,6 +3007,41 @@ bool bvnr_write_finish(bvnr_writer_t* w)
 	w->ser.finished = true;
 	return true;
 }
+/*
+ * Hand everything written so far to the sink, then call the sink's flush, so a
+ * live consumer has it now rather than when the 64 KiB buffer fills or the
+ * document finishes. The writer's state is untouched: a separator still owed
+ * (the ';' after a value, the ',' before the next array element) is owed to
+ * the NEXT write, exactly as without the flush, so flushing anywhere between
+ * two calls -- inside a struct, an array or an open mux stream -- never changes
+ * the bytes, only when they leave. A memory sink holds every byte already and
+ * an fd sink writes straight through below the buffer, so for them only the
+ * buffer is drained; a callback sink's flush, when it has one, is the caller's
+ * own (a socket's TCP_NODELAY push, a file object's flush()).
+ */
+bool bvnr_write_flush(bvnr_writer_t* w)
+{
+	if (!w) return false;
+	if (w->val.last_error != error_none)
+		return false;
+	/* After the finish there is nothing buffered: it flushed the sink. */
+	if (w->ser.finished)
+		return true;
+	bvn_sink_impl_t* si = bvn_sink_impl(&w->ser.sink);
+	if (!si->push)
+		return bvn_writer_set_error(w, error_invalid_argument);
+	w->ser.ser_error = error_none;
+	if (!bvn_ser_flush_wbuf(&w->ser))
+		return bvn_writer_set_error(w, w->ser.ser_error != error_none
+			? w->ser.ser_error
+			: si->is_mem ? error_sink_buffer_exhausted
+			             : error_writing_to_sink);
+	if (si->flush && !si->flush(&w->ser.sink))
+		return bvn_writer_set_error(w, si->is_mem
+			? error_sink_buffer_exhausted
+			: error_writing_to_sink);
+	return true;
+}
 error_code_t bvnr_writer_get_error(const bvnr_writer_t* w)
 {
 	if (!w) return error_invalid_argument;

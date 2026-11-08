@@ -214,7 +214,7 @@ void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint64_t cap)
  * on the sink on purpose: a failing transport is error_writing_to_sink, not a
  * full buffer, and the writer keeps batching into its 64 KiB buffer instead of
  * pushing every separator on its own. flush may be NULL; the writer calls it
- * from bvnr_write_finish when it is set.
+ * from bvnr_write_flush and bvnr_write_finish when it is set.
  */
 void bvnr_source_from_callback(bvnr_source_t* s, bvnr_pull_fn pull,
 	void* userdata)

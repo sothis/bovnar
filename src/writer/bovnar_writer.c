@@ -55,8 +55,9 @@
  *      be coaxed into emitting a stream the reader would reject.
  *   2. bvn_ser_serialize_event — actually format the bytes.
  *
- * Output buffering: for an fd sink, bytes are accumulated in wbuf and flushed
- * in BVN_SER_WBUF_SIZE chunks to amortise write() syscalls; for a memory sink
+ * Output buffering: for an fd or callback sink, bytes are accumulated in wbuf
+ * and flushed in BVN_SER_WBUF_SIZE chunks to amortise write() syscalls, or
+ * early by bvnr_write_flush for a live consumer; for a memory sink
  * the wbuf is bypassed and bytes are copied straight in (bvn_ser_push). Errors
  * are sticky — once w->val.last_error is set, every further call short-circuits
  * — so callers can write a whole document and check once at bvnr_write_finish.

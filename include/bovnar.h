@@ -979,9 +979,9 @@ BVN_API void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint64_t cap);
  * push must take all `len` bytes or return false. A failure is reported as
  * error_writing_to_sink -- a callback sink is never mistaken for a full memory
  * buffer -- and the writer batches output into its 64 KiB buffer before pushing,
- * as it does for an fd. flush may be NULL; when set, bvnr_write_finish calls it
- * after the last push, and a false return fails the finish with
- * error_writing_to_sink.
+ * as it does for an fd; bvnr_write_flush pushes it early. flush may be NULL;
+ * when set, bvnr_write_flush and bvnr_write_finish call it after their last
+ * push, and a false return fails them with error_writing_to_sink.
  *
  * `userdata` is stored inside the handle. The reader and writer work on a COPY
  * of the source or sink they are given, so the callback must not compare the

@@ -542,6 +542,30 @@ MUX_ON_MSG_FUNC = ctypes.CFUNCTYPE(
     ctypes.c_uint64,
 )
 
+#   bool (*bvnr_pull_fn)(bvnr_source_t* s, void* buf, uint32_t want, uint32_t* got)
+#   bool (*bvnr_push_fn)(bvnr_sink_t* s, const void* buf, uint32_t len)
+#   bool (*bvnr_flush_fn)(bvnr_sink_t* s)
+# The handle is typed void* here: the binding's callbacks are closures over
+# their file object and never look at it, and a POINTER(BvnrSource) argument
+# would build a ctypes object on every call for nothing.
+PULL_FUNC = ctypes.CFUNCTYPE(
+    ctypes.c_bool,
+    ctypes.c_void_p,
+    ctypes.c_void_p,
+    ctypes.c_uint32,
+    ctypes.POINTER(ctypes.c_uint32),
+)
+PUSH_FUNC = ctypes.CFUNCTYPE(
+    ctypes.c_bool,
+    ctypes.c_void_p,
+    ctypes.c_void_p,
+    ctypes.c_uint32,
+)
+FLUSH_FUNC = ctypes.CFUNCTYPE(
+    ctypes.c_bool,
+    ctypes.c_void_p,
+)
+
 class BvnrSource(ctypes.Structure):
     _fields_ = [('_opaque', ctypes.c_uint64 * _OPAQUE_WORDS)]
 
@@ -793,6 +817,18 @@ class BvnrDocStreamOpts(ctypes.Structure):
         ('on_document',          ON_DOCUMENT_FUNC),
         ('continue_past_failed', ctypes.c_bool),
         ('max_document_size',    ctypes.c_uint64),
+    ]
+
+class BvnrDemuxItem(ctypes.Structure):
+    """Mirror of bvnr_demux_item_t (bovnar_stream.h), filled by
+    bvnr_demux_next. Everything it points to belongs to the demux and is valid
+    until the next call on it."""
+    _fields_ = [
+        ('channel', ctypes.c_uint64),
+        ('data',    ctypes.c_void_p),
+        ('length',  ctypes.c_uint64),
+        ('event',   ctypes.c_int),
+        ('value',   ctypes.POINTER(BvnrData)),
     ]
 
 class BvnDomEntry(ctypes.Structure):

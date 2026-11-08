@@ -31,8 +31,9 @@ from .structs import (
     BvnrReadFlags, BvnrWriteFlags,
     BvnrData, ValueTypeSpec, ValueUnit, ValueUnitPrefix,
     BvnrUnitTarget, BvnrUnitRule, BvnrUnitPolicy,
-    BvnDomEntry, BvnrDocStreamOpts,
+    BvnDomEntry, BvnrDocStreamOpts, BvnrDemuxItem,
     EVENT_CALLBACK_FUNC, ON_ERROR_FUNC, ON_DOCUMENT_FUNC, MUX_ON_MSG_FUNC,
+    PULL_FUNC, PUSH_FUNC, FLUSH_FUNC,
 )
 from .exceptions import BovnarLibraryNotFound
 
@@ -168,6 +169,9 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvnr_source_from_mem.restype  = None
     lib.bvnr_source_from_mem.argtypes = [P(BvnrSource), c_void_p, c_uint64]
 
+    lib.bvnr_source_from_callback.restype  = None
+    lib.bvnr_source_from_callback.argtypes = [P(BvnrSource), PULL_FUNC, c_void_p]
+
     lib.bvnr_open_read_source.restype  = c_bool
     lib.bvnr_open_read_source.argtypes = [
         c_void_p, P(BvnrSource), P(BvnrSink), P(BvnrReadFlags),
@@ -180,6 +184,15 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
 
     lib.bvnr_read.restype  = c_bool
     lib.bvnr_read.argtypes = [c_void_p]
+
+    lib.bvnr_open_read_feed.restype  = c_bool
+    lib.bvnr_open_read_feed.argtypes = [c_void_p, P(BvnrSink), P(BvnrReadFlags)]
+
+    lib.bvnr_read_feed.restype  = c_bool
+    lib.bvnr_read_feed.argtypes = [c_void_p, c_void_p, c_uint64]
+
+    lib.bvnr_read_finish.restype  = c_bool
+    lib.bvnr_read_finish.argtypes = [c_void_p]
 
     lib.bvnr_reader_get_error.restype  = c_int
     lib.bvnr_reader_get_error.argtypes = [c_void_p]
@@ -241,6 +254,10 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
 
     lib.bvnr_sink_to_mem.restype  = None
     lib.bvnr_sink_to_mem.argtypes = [P(BvnrSink), c_void_p, c_uint64]
+
+    lib.bvnr_sink_to_callback.restype  = None
+    lib.bvnr_sink_to_callback.argtypes = [P(BvnrSink), PUSH_FUNC, FLUSH_FUNC,
+                                          c_void_p]
 
     lib.bvnr_sink_bytes_written.restype  = c_uint64
     lib.bvnr_sink_bytes_written.argtypes = [P(BvnrSink)]
@@ -574,6 +591,30 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
         P(BvnrSource), P(BvnrDocStreamOpts), P(c_uint64),
     ]
 
+    lib.bvnr_frame_reader_create.restype  = c_void_p
+    lib.bvnr_frame_reader_create.argtypes = [P(BvnrDocStreamOpts)]
+
+    lib.bvnr_frame_reader_create_pull.restype  = c_void_p
+    lib.bvnr_frame_reader_create_pull.argtypes = [c_uint64]
+
+    lib.bvnr_frame_reader_destroy.restype  = None
+    lib.bvnr_frame_reader_destroy.argtypes = [c_void_p]
+
+    lib.bvnr_frame_reader_feed.restype  = c_bool
+    lib.bvnr_frame_reader_feed.argtypes = [c_void_p, c_void_p, c_uint64]
+
+    lib.bvnr_frame_reader_next.restype  = c_int
+    lib.bvnr_frame_reader_next.argtypes = [c_void_p, P(c_void_p), P(c_uint64)]
+
+    lib.bvnr_frame_reader_finish.restype  = c_bool
+    lib.bvnr_frame_reader_finish.argtypes = [c_void_p]
+
+    lib.bvnr_frame_reader_error.restype  = c_int
+    lib.bvnr_frame_reader_error.argtypes = [c_void_p]
+
+    lib.bvnr_frame_reader_count.restype  = c_uint64
+    lib.bvnr_frame_reader_count.argtypes = [c_void_p]
+
     lib.bvnr_mux_begin.restype  = c_bool
     lib.bvnr_mux_begin.argtypes = [c_void_p, c_char_p]
 
@@ -597,6 +638,21 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
 
     lib.bvnr_demux_error.restype  = c_int
     lib.bvnr_demux_error.argtypes = [c_void_p]
+
+    lib.bvnr_demux_open_feed.restype  = c_bool
+    lib.bvnr_demux_open_feed.argtypes = [c_void_p, P(BvnrReadFlags), c_bool]
+
+    lib.bvnr_demux_feed.restype  = c_bool
+    lib.bvnr_demux_feed.argtypes = [c_void_p, c_void_p, c_uint64]
+
+    lib.bvnr_demux_next.restype  = c_int
+    lib.bvnr_demux_next.argtypes = [c_void_p, P(BvnrDemuxItem)]
+
+    lib.bvnr_demux_finish.restype  = c_bool
+    lib.bvnr_demux_finish.argtypes = [c_void_p]
+
+    lib.bvnr_demux_get_reader.restype  = c_void_p
+    lib.bvnr_demux_get_reader.argtypes = [c_void_p]
 
     lib.bvnr_embed_document.restype  = c_bool
     lib.bvnr_embed_document.argtypes = [c_void_p, c_char_p, c_void_p, c_uint64]

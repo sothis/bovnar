@@ -43,6 +43,7 @@ _MIRRORS = {
     S.BvnrSource:         ("bvnr_source_t", True),
     S.BvnrSink:           ("bvnr_sink_t", True),
     S.BvnrDocStreamOpts:  ("bvnr_doc_stream_opts_t", False),
+    S.BvnrDemuxItem:      ("bvnr_demux_item_t", False),
     S.BvnDomEntry:        ("bvn_dom_entry_t", False),
 }
 
@@ -54,6 +55,7 @@ _MIRRORS = {
 _FIELD_CHECKED = {
     "value_type_spec_t", "value_unit_prefix_t", "value_unit_component_t",
     "value_unit_t", "bvnr_data_t", "bvnr_converted_t", "bvnr_doc_stream_opts_t",
+    "bvnr_demux_item_t",
     "bvn_dom_entry_t", "bvnr_read_flags_t", "bvnr_write_flags_t",
     "bvnr_unit_target_t", "bvnr_unit_rule_t", "bvnr_unit_policy_t",
 }

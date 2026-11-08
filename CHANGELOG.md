@@ -153,6 +153,22 @@ API and implements spec 1.2.
   measures `bvnr_demux_item_t`. doc/14 §4.9 has the API, the choice between
   `live::Demux` and `codec::MuxReader`, and the figures of
   `rust/benches/live.rs`.
+- **Shared streaming vectors.** `tests/stream_vectors/` holds one set of wire
+  vectors for the C library and the Rust crate, written by
+  `tests/gen_stream_vectors.py` from the wire conventions alone and listed with
+  their expected outcome in `manifest.bvnr`: multiplexed streams with and
+  without a preamble of text values (messages of 150 B, 30 KB and 400 KB, an
+  empty one, one filling a 65536-byte chunk, two channels interleaved), a frame
+  stream, and three malformed streams. The C demultiplexer (batch and fed),
+  `bovnar::codec::MuxReader`, `FrameReader` and `bovnar::live::Demux` read
+  every vector wherever it is cut, `bvnr_mux_send` and `codec::MuxWriter`
+  (preamble included) write the well-formed ones byte for byte, as do
+  `bvnr_frame_write` and `codec::write_frame`, and `bovnar mux list` /
+  `frames list` accept or refuse each. New CTest tests:
+  `bvnr_stream_vectors_test`, `bvnr_stream_vectors_fresh` (the committed files
+  are a fresh generation) and the `bvnr_cli_vectors_*` group; the Python
+  bindings read them in `python/tests/test_stream_vectors.py`. doc/10 §9. This
+  is the minimal set; the full one is still to come.
 
 ### Changed
 

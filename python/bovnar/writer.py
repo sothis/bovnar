@@ -25,6 +25,7 @@
 import ctypes
 
 from ._ffi import get_library
+from ._fileio import PushSink
 from ._bigint import int_repr, int_to_decimal
 from .enums import (
     Event, TokenType, ValueTypeFamily,
@@ -51,6 +52,7 @@ class Writer:
         self._ptr      = None
         self._lib      = get_library()
         self._sink     = None
+        self._stream   = None
         self._buf      = None
         self._buf_cap  = 0
         self._finished = False
@@ -135,6 +137,28 @@ class Writer:
         ok = w._lib.bvnr_open_write_sink(
             w._ptr,
             ctypes.byref(sink),
+            pretty,
+            ctypes.byref(flags),
+        )
+        if not ok:
+            w._raise_error()
+        return w
+
+    @classmethod
+    def to_stream(cls, stream, *, pretty: bool = True,
+                  unit_flags: int = 0, emit_version: bool = False) -> 'Writer':
+        """Write to a socket (``sendall``) or a binary file object
+        (``write``). The writer batches its output into a 64 KiB buffer and
+        pushes each full buffer, then the rest at :meth:`finish`, which also
+        calls the object's ``flush`` when it has one. An exception the object
+        raises is re-raised from the write call that pushed, unchanged."""
+        sink = PushSink(stream)
+        w = cls()
+        w._stream = sink
+        flags = cls._make_flags(unit_flags, emit_version)
+        ok = w._lib.bvnr_open_write_sink(
+            w._ptr,
+            ctypes.byref(sink.handle),
             pretty,
             ctypes.byref(flags),
         )
@@ -863,6 +887,10 @@ class Writer:
         self._write_scalar(key, family_name, vt, vu, val)
 
     def _raise_error(self) -> None:
+        # A stream writer's sink fails because its object raised; that
+        # exception is the error, not the error_writing_to_sink it became.
+        if self._stream is not None and self._stream.exc is not None:
+            raise self._stream.exc
         code   = ErrorCode(self._lib.bvnr_writer_get_error(self._ptr))
         offset = self._lib.bvnr_writer_get_error_offset(self._ptr)
         msg_b  = self._lib.bvn_error_to_string(int(code))

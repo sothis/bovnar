@@ -31,12 +31,17 @@ Python bindings for the bovnar streaming/framing layer (bovnar_stream.h):
 These wrap the C functions directly, so behaviour (framing, varint reassembly,
 the memory-amplification guards, the strict-vs-resilient document policy) matches
 the native library exactly. See doc/10_bovnar_streaming.md for the conventions.
+
+The loaders also take a socket or a binary file object in place of bytes, and
+the dumpers a ``file=`` to write to; both then stream through the C library's
+callback source and sink instead of holding the whole input or output.
 """
 
 import ctypes
 from typing import Iterable
 
 from ._ffi import get_library
+from ._fileio import PullSource, PushSink, is_stream
 from .enums import ErrorCode
 from .exceptions import BovnarParseError, BovnarWriteError, BovnarArgumentError
 from .structs import (
@@ -81,10 +86,24 @@ def _void_copy(data: bytes):
 # Multi-document record framing
 # ===========================================================================
 
-def frame_documents(docs: Iterable[bytes]) -> bytes:
+def frame_documents(docs: Iterable[bytes], *, file=None) -> bytes | None:
     """Wrap each already-serialised document in a length-prefixed frame and
-    return the concatenated frame stream (``"BVF1" + u64 len + payload`` each)."""
-    lib   = get_library()
+    return the concatenated frame stream (``"BVF1" + u64 len + payload`` each).
+
+    With ``file`` (a socket or a binary file object) each frame is written
+    there as it is made, and nothing is returned."""
+    lib = get_library()
+    if file is not None:
+        out = PushSink(file)
+        for d in docs:
+            b = _as_bytes(d)
+            dptr, _keep = _void_copy(b)
+            if not lib.bvnr_frame_write(ctypes.byref(out.handle), dptr, len(b)):
+                if out.exc is not None:
+                    raise out.exc
+                raise BovnarWriteError(ErrorCode.WRITING_TO_SINK,
+                                       message="bvnr_frame_write failed")
+        return None
     blobs = [_as_bytes(d) for d in docs]
     total = sum(12 + len(b) for b in blobs)
     out   = (ctypes.c_char * (total if total else 1))()
@@ -98,10 +117,13 @@ def frame_documents(docs: Iterable[bytes]) -> bytes:
     return bytes(out[:total])
 
 
-def dump_documents(objs: Iterable[dict], *, pretty: bool = True) -> bytes:
-    """Serialise each dict (via :func:`bovnar.dumps`) and frame the results."""
+def dump_documents(objs: Iterable[dict], *, pretty: bool = True,
+                   file=None) -> bytes | None:
+    """Serialise each dict (via :func:`bovnar.dumps`) and frame the results;
+    with ``file``, write each frame there as it is made (see
+    :func:`frame_documents`)."""
     from . import dumps  # deferred: avoids an import cycle with the package root
-    return frame_documents(dumps(o, pretty=pretty) for o in objs)
+    return frame_documents((dumps(o, pretty=pretty) for o in objs), file=file)
 
 
 def load_documents(data,
@@ -115,10 +137,16 @@ def load_documents(data,
     raises :class:`BovnarParseError`. With ``continue_past_failed=True`` every
     frame is processed and a failed document is represented by ``None`` in the
     returned list. ``typed=True`` wraps scalars in :class:`bovnar.Quantity`.
+
+    ``data`` may also be a socket or a binary file object, read until it
+    reports end of input; the frames are then parsed as they are pulled, never
+    gathered first.
     """
     from . import _DictParser, _TypedDictParser  # deferred (import cycle)
     lib  = get_library()
-    data = _as_bytes(data)
+    source = PullSource(data) if is_stream(data) else None
+    if source is None:
+        data = _as_bytes(data)
 
     def _new_parser():
         return _TypedDictParser() if typed else _DictParser()
@@ -162,14 +190,19 @@ def load_documents(data,
     opts.continue_past_failed = continue_past_failed
     opts.max_document_size    = max_document_size
 
-    src = BvnrSource()
-    dptr, _keep = _void_copy(data)
-    lib.bvnr_source_from_mem(ctypes.byref(src), dptr, len(data))
+    if source is not None:
+        src = source.handle
+    else:
+        src = BvnrSource()
+        dptr, _keep = _void_copy(data)
+        lib.bvnr_source_from_mem(ctypes.byref(src), dptr, len(data))
 
     out_count = ctypes.c_uint64(0)
     ok = lib.bvnr_doc_stream_read(ctypes.byref(src), ctypes.byref(opts),
                                   ctypes.byref(out_count))
 
+    if source is not None and source.exc is not None:
+        raise source.exc
     cb_state = getattr(cb_event, '_bvnr_state', None)
     if cb_state is not None and cb_state.get('exc') is not None:
         raise cb_state['exc']
@@ -190,11 +223,15 @@ def load_documents(data,
 # Octet multiplexing
 # ===========================================================================
 
-def mux_dump(messages: Iterable[tuple], *, key: str = 'mux') -> bytes:
+def mux_dump(messages: Iterable[tuple], *, key: str = 'mux',
+             file=None) -> bytes | None:
     """Serialise ``(channel:int, payload:bytes)`` messages as one multiplexed
     octet-stream document under ``key``. Channels may repeat and interleave;
     messages of any size are split across octet chunks and reassembled by
-    :func:`mux_load`."""
+    :func:`mux_load`.
+
+    With ``file`` (a socket or a binary file object) the document is written
+    there, through the writer's 64 KiB buffer, and nothing is returned."""
     lib  = get_library()
     msgs = [(int(ch), _as_bytes(p)) for ch, p in messages]
     # The channel crosses the FFI as a uint64_t, and ctypes wraps an
@@ -204,8 +241,28 @@ def mux_dump(messages: Iterable[tuple], *, key: str = 'mux') -> bytes:
         if not 0 <= ch < (1 << 64):
             raise BovnarArgumentError(
                 f"mux channel {ch} is outside the unsigned 64-bit range")
+    kb = key.encode('utf-8')
+
+    def write(w):
+        if not lib.bvnr_mux_begin(w._ptr, kb):
+            w._raise_error()
+        for ch, payload in msgs:
+            dptr, _keep = _void_copy(payload)
+            if not lib.bvnr_mux_send(w._ptr, ch, dptr, len(payload)):
+                w._raise_error()
+        if not lib.bvnr_mux_end(w._ptr):
+            w._raise_error()
+        w.finish()
+
+    if file is not None:
+        w = Writer.to_stream(file, pretty=False)
+        try:
+            write(w)
+        finally:
+            w.destroy()
+        return None
+
     total = sum(len(p) for _, p in msgs)
-    kb    = key.encode('utf-8')
     # Output is the payload plus octet-chunk framing (a few bytes per 64 KiB
     # chunk); start with a tight over-estimate and grow on exhaustion so large
     # or many-chunk messages cannot overflow a fixed guess.
@@ -215,15 +272,7 @@ def mux_dump(messages: Iterable[tuple], *, key: str = 'mux') -> bytes:
     while True:
         w = Writer.to_mem(cap=cap, pretty=False)
         try:
-            if not lib.bvnr_mux_begin(w._ptr, kb):
-                w._raise_error()
-            for ch, payload in msgs:
-                dptr, _keep = _void_copy(payload)
-                if not lib.bvnr_mux_send(w._ptr, ch, dptr, len(payload)):
-                    w._raise_error()
-            if not lib.bvnr_mux_end(w._ptr):
-                w._raise_error()
-            w.finish()
+            write(w)
             return w.get_output()
         except BovnarWriteError as exc:
             if exc.code == ErrorCode.SINK_BUFFER_EXHAUSTED and cap < cap_max:
@@ -241,9 +290,14 @@ def mux_load(data, *, max_message: int = 0, key: str | None = None) -> list:
     By default every octet stream in the document is treated as multiplexed.
     Pass ``key`` to scope the demux to streams opened under that key only, so a
     document mixing a mux stream with ordinary binary octet payloads ignores the
-    latter (mirrors ``bvnr_demux_set_key``)."""
+    latter (mirrors ``bvnr_demux_set_key``).
+
+    ``data`` may also be a socket or a binary file object, read until it
+    reports end of input and demultiplexed as it is pulled."""
     lib  = get_library()
-    data = _as_bytes(data)
+    source = PullSource(data) if is_stream(data) else None
+    if source is None:
+        data = _as_bytes(data)
 
     results: list = []
     state = {'exc': None}
@@ -282,26 +336,22 @@ def mux_load(data, *, max_message: int = 0, key: str | None = None) -> list:
         flags.max_struct_nesting = 255
         flags.on_verified        = cb_ev
 
-        dptr, _keep = _void_copy(data)
-        ok = lib.bvnr_open_read_mem(rptr, dptr, len(data), None, 0,
-                                    ctypes.byref(flags)) and lib.bvnr_read(rptr)
+        if source is not None:
+            ok = lib.bvnr_open_read_source(rptr, ctypes.byref(source.handle),
+                                           None, ctypes.byref(flags))
+        else:
+            dptr, _keep = _void_copy(data)
+            ok = lib.bvnr_open_read_mem(rptr, dptr, len(data), None, 0,
+                                        ctypes.byref(flags))
+        ok = ok and lib.bvnr_read(rptr)
 
+        if source is not None and source.exc is not None:
+            raise source.exc
         if state['exc'] is not None:
             raise state['exc']
         derr = lib.bvnr_demux_error(dm)
         if derr != int(ErrorCode.NONE):
-            # Name the error the demultiplexer reported. Every code used to be
-            # called a "demux desync", including a stream that ended part-way
-            # through a message (octet_stream_truncated) and an oversized one
-            # (value_out_of_range); only octet_stream_out_of_sync is a desync.
-            code = ErrorCode(derr)
-            msg_b = lib.bvn_error_to_string(int(code))
-            what = msg_b.decode('utf-8') if msg_b else code.name.lower()
-            if code == ErrorCode.OCTET_STREAM_OUT_OF_SYNC:
-                what = f"demux desync ({what})"
-            else:
-                what = f"demux error: {what}"
-            raise BovnarParseError(code, message=what)
+            raise _demux_error(lib, derr)
         if not ok:
             raise BovnarParseError(
                 ErrorCode(lib.bvnr_reader_get_error(rptr)),
@@ -312,16 +362,51 @@ def mux_load(data, *, max_message: int = 0, key: str | None = None) -> list:
         lib.bvnr_demux_destroy(dm)
 
 
+def _demux_error(lib, err: int, reader=None) -> BovnarParseError:
+    """The BovnarParseError for a demux error code, with the position of the
+    reader under a push-fed demux when the error is the reader's own."""
+    # Name the error the demultiplexer reported. Every code used to be called
+    # a "demux desync", including a stream that ended part-way through a
+    # message (octet_stream_truncated) and an oversized one
+    # (value_out_of_range); only octet_stream_out_of_sync is a desync.
+    code = ErrorCode(err)
+    msg_b = lib.bvn_error_to_string(int(code))
+    what = msg_b.decode('utf-8') if msg_b else code.name.lower()
+    if code == ErrorCode.OCTET_STREAM_OUT_OF_SYNC:
+        what = f"demux desync ({what})"
+    else:
+        what = f"demux error: {what}"
+    if reader and lib.bvnr_reader_get_error(reader) == err:
+        return BovnarParseError(
+            code, lib.bvnr_reader_get_error_line(reader),
+            lib.bvnr_reader_get_error_column(reader),
+            lib.bvnr_reader_get_error_offset(reader),
+            lib.bvnr_reader_get_error_byte(reader), what)
+    return BovnarParseError(code, message=what)
+
+
 # ===========================================================================
 # Document-in-document
 # ===========================================================================
 
-def embed_document(inner, *, key: str = 'payload', pretty: bool = True) -> bytes:
+def embed_document(inner, *, key: str = 'payload', pretty: bool = True,
+                   file=None) -> bytes | None:
     """Return a complete document that embeds ``inner`` (raw document bytes) as
-    the octet-stream payload of ``key``."""
+    the octet-stream payload of ``key``; with ``file`` (a socket or a binary
+    file object), write it there and return nothing."""
     lib   = get_library()
     inner = _as_bytes(inner)
     kb    = key.encode('utf-8')
+    if file is not None:
+        w = Writer.to_stream(file, pretty=pretty)
+        try:
+            dptr, _keep = _void_copy(inner)
+            if not lib.bvnr_embed_document(w._ptr, kb, dptr, len(inner)):
+                w._raise_error()
+            w.finish()
+        finally:
+            w.destroy()
+        return None
     # As in mux_dump: payload + per-chunk octet framing; grow on exhaustion.
     cap     = len(inner) + len(inner) // 4000 + len(kb) + 8192
     cap_max = max(256 * 1024 * 1024, len(inner) * 2 + 1024 * 1024)
@@ -390,3 +475,4 @@ def parse_embedded(inner, *, typed: bool = False) -> dict:
         raise BovnarParseError(ErrorCode.GOT_INCOMPLETE_BVNR_STREAM,
                                message="embedded document parse error")
     return parser.result()
+

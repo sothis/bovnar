@@ -50,6 +50,9 @@
 #include <string.h>
 #if !defined(_WIN32)
 #  include <dirent.h>
+#  include <errno.h>
+#  include <fcntl.h>
+#  include <unistd.h>
 #endif
 #include "bovnar.h"
 #include "bovnar_stream.h"
@@ -2068,14 +2071,13 @@ static const uint64_t MUXVEC_CH[] = {
 static const uint64_t MUXVEC_LEN[] = {
 	0, 1, 127, 128, 65516, 65517, 65522, 65535, 65536, 65537, 131077, 400000 };
 
-static uint64_t muxvec_write(uint8_t* out, size_t cap)
+/* The vector into an opened writer, flushed after every send or not. */
+static uint64_t muxvec_send(bvnr_writer_t* w, bool flush)
 {
 	/* Each message starts up to 6 bytes in, so the payload has room. */
 	uint8_t* payload = xmalloc(400008);
 	for (size_t i = 0; i < 400008; i++)
 		payload[i] = (uint8_t)(i * 2654435761u >> 13);
-	bvnr_writer_t* w = bvnr_writer_create();
-	bvnr_open_write_mem(w, out, cap, false, NULL);
 	bvnr_mux_begin(w, "mux");
 	size_t nl = sizeof(MUXVEC_LEN) / sizeof(MUXVEC_LEN[0]);
 	size_t nc = sizeof(MUXVEC_CH) / sizeof(MUXVEC_CH[0]);
@@ -2083,11 +2085,19 @@ static uint64_t muxvec_write(uint8_t* out, size_t cap)
 	for (size_t i = 0; ok && i < nl; i++)
 		for (size_t j = 0; ok && j < nc; j++)
 			ok = bvnr_mux_send(w, MUXVEC_CH[j], payload + (i + j) % 7,
-					   MUXVEC_LEN[i]);
+					   MUXVEC_LEN[i]) &&
+			     (!flush || bvnr_write_flush(w));
 	ok = ok && bvnr_mux_end(w) && bvnr_write_finish(w);
-	uint64_t n = ok ? bvnr_writer_bytes_written(w) : 0;
-	bvnr_writer_destroy(w);
 	free(payload);
+	return ok ? bvnr_writer_bytes_written(w) : 0;
+}
+
+static uint64_t muxvec_write(uint8_t* out, size_t cap)
+{
+	bvnr_writer_t* w = bvnr_writer_create();
+	bvnr_open_write_mem(w, out, cap, false, NULL);
+	uint64_t n = muxvec_send(w, false);
+	bvnr_writer_destroy(w);
 	return n;
 }
 
@@ -2157,7 +2167,422 @@ static void test_mux_send_vector(void)
 		memcmp(open + 1, want.p, want.n) == 0 && open[1 + want.n] == 0x00,
 		"the chunks follow the wire convention");
 	buf_free(&want);
+
+	/* Live: through a callback sink, flushed after every send. */
+	cb_sink_t cs;
+	memset(&cs, 0, sizeof(cs));
+	bvnr_sink_t sink;
+	bvnr_sink_to_callback(&sink, cb_push, cb_flush, &cs);
+	bvnr_writer_t* w = bvnr_writer_create();
+	bvnr_open_write_sink(w, &sink, false, NULL);
+	uint64_t live = muxvec_send(w, true);
+	bvnr_writer_destroy(w);
+	ASSERT_TRUE(live == n && cs.out.n == n && memcmp(cs.out.p, out, n) == 0,
+		"flushed after every send, the vector is the same");
+	ASSERT_EQ_UINT(cs.flushes, 1u + sizeof(MUXVEC_LEN) / sizeof(MUXVEC_LEN[0])
+		* (sizeof(MUXVEC_CH) / sizeof(MUXVEC_CH[0])),
+		"one sink flush per send, and the finish's");
+	buf_free(&cs.out);
 	free(out);
+}
+
+/* ---------------------------------------------------------------------------
+ * bvnr_write_flush: live writing. A flush moves bytes out of the writer's
+ * buffer and changes nothing else, so every corpus document replayed through
+ * a writer comes out the same whether it is flushed after no event, after
+ * every event or after any single one -- and after each flush the sink holds
+ * every byte written so far.
+ * ------------------------------------------------------------------------- */
+#define FLUSH_NEVER  (-2L)
+#define FLUSH_EVERY  (-1L)
+
+typedef struct {
+	bvnr_writer_t* w;
+	cb_sink_t*     cs;          /* NULL for a memory sink */
+	long           flush_at;    /* an event index, FLUSH_NEVER, FLUSH_EVERY */
+	long           index;
+	bool           flush_failed;   /* a flush of a healthy writer failed */
+	bool           held_back;      /* bytes left in the buffer after a flush */
+} replay_t;
+
+static bool replay_event(void* ud, bvnr_event_t ev, bvnr_data_t* d)
+{
+	replay_t* r = ud;
+	bool ok = bvnr_write_event(r->w, ev, d);
+	long i = r->index++;
+	if (ok && (r->flush_at == FLUSH_EVERY || r->flush_at == i)) {
+		if (!bvnr_write_flush(r->w))
+			r->flush_failed = true;
+		if (r->cs && r->cs->out.n != bvnr_writer_bytes_written(r->w))
+			r->held_back = true;
+	}
+	return ok;
+}
+
+typedef struct {
+	buf_t        out;
+	bool         read_ok, finish_ok;
+	error_code_t err;
+	uint64_t     err_offset;
+	long         events;
+	uint64_t     flushes;
+	bool         flush_failed, held_back;
+} replay_res_t;
+
+/* Read `doc` and write every verified event again, into a callback sink, or
+ * into a memory sink of `mem_cap` bytes when mem_cap is not 0. */
+static void replay_doc(const doc_t* doc, bool pretty, long flush_at,
+	uint64_t mem_cap, replay_res_t* res)
+{
+	memset(res, 0, sizeof(*res));
+	cb_sink_t cs;
+	memset(&cs, 0, sizeof(cs));
+	bvnr_writer_t* w = bvnr_writer_create();
+	uint8_t* mem = NULL;
+	if (mem_cap) {
+		mem = xmalloc((size_t)mem_cap);
+		bvnr_open_write_mem(w, mem, mem_cap, pretty, NULL);
+	} else {
+		bvnr_sink_t sink;
+		bvnr_sink_to_callback(&sink, cb_push, cb_flush, &cs);
+		bvnr_open_write_sink(w, &sink, pretty, NULL);
+	}
+	replay_t r = { w, mem_cap ? NULL : &cs, flush_at, 0, false, false };
+	bvnr_read_flags_t f;
+	memset(&f, 0, sizeof(f));
+	f.userdata    = &r;
+	f.on_verified = replay_event;
+	bvnr_reader_t* rd = bvnr_reader_create();
+	res->read_ok = bvnr_open_read_mem(rd, doc->data, doc->len, NULL, 0, &f) &&
+		       bvnr_read(rd);
+	bvnr_reader_destroy(rd);
+	res->finish_ok  = bvnr_write_finish(w);
+	res->err        = bvnr_writer_get_error(w);
+	res->err_offset = bvnr_writer_get_error_offset(w);
+	res->events       = r.index;
+	res->flush_failed = r.flush_failed;
+	res->held_back    = r.held_back;
+	if (mem_cap) {
+		buf_put(&res->out, mem, (size_t)bvnr_writer_bytes_written(w));
+		free(mem);
+	} else {
+		res->out = cs.out;
+		res->flushes = cs.flushes;
+	}
+	bvnr_writer_destroy(w);
+}
+
+/* `a` matches the memory-sink run `mem`: the same result, and its sink got
+ * what the memory sink holds. Whole when the finish succeeded; when it failed
+ * on an incomplete document, a prefix, because bvnr_write_finish does not push
+ * what is still buffered when it is the finish that finds the error. */
+static bool replay_same(const replay_res_t* a, const replay_res_t* mem)
+{
+	bool whole = buf_eq(&a->out, &mem->out);
+	bool prefix = a->out.n <= mem->out.n &&
+		      (a->out.n == 0 || memcmp(a->out.p, mem->out.p, a->out.n) == 0);
+	return (a->finish_ok ? whole : prefix) &&
+	       a->read_ok == mem->read_ok && a->finish_ok == mem->finish_ok &&
+	       a->err == mem->err && a->err_offset == mem->err_offset &&
+	       a->events == mem->events;
+}
+
+/* Every single flush point is tried for documents of at most this many
+ * events; flushing at all of them at once covers the rest. */
+#define FLUSH_EACH_MAX 400
+
+static void test_write_flush_identity(void)
+{
+	printf("bvnr_write_flush: the same bytes, flushed anywhere\n");
+	unsigned long runs = 0;
+	for (size_t i = 0; i < g_ndocs; i++) {
+		const doc_t* doc = &g_docs[i];
+		for (int pretty = 0; pretty < 2; pretty++) {
+			replay_res_t ref, every, mem, one;
+			replay_doc(doc, pretty, FLUSH_NEVER, 0, &ref);
+			replay_doc(doc, pretty, FLUSH_EVERY, 0, &every);
+			/* The unpushed rest of a failed finish is under 64 KiB. */
+			uint64_t cap = (uint64_t)ref.out.n * 2u + 2u * 65536u;
+			replay_doc(doc, pretty, FLUSH_EVERY, cap, &mem);
+			char msg[160];
+			snprintf(msg, sizeof(msg), "%s (%s): flushed after every "
+				 "event", doc->name, pretty ? "pretty" : "compact");
+			ASSERT_TRUE(replay_same(&every, &mem) &&
+				    buf_eq(&every.out, &mem.out), msg);
+			ASSERT_TRUE(!every.flush_failed && !every.held_back &&
+				    !mem.flush_failed, msg);
+			snprintf(msg, sizeof(msg), "%s (%s): never flushed",
+				 doc->name, pretty ? "pretty" : "compact");
+			ASSERT_TRUE(replay_same(&ref, &mem), msg);
+			runs += 3;
+			if (ref.events <= FLUSH_EACH_MAX) {
+				bool all_same = true, clean = true;
+				for (long k = 0; k < ref.events; k++) {
+					replay_doc(doc, pretty, k, 0, &one);
+					all_same = all_same && replay_same(&one, &mem);
+					clean = clean && !one.flush_failed && !one.held_back;
+					buf_free(&one.out);
+					runs++;
+				}
+				snprintf(msg, sizeof(msg), "%s (%s): flushed after any "
+					 "one event", doc->name,
+					 pretty ? "pretty" : "compact");
+				ASSERT_TRUE(all_same && clean, msg);
+			}
+			buf_free(&ref.out);
+			buf_free(&every.out);
+			buf_free(&mem.out);
+		}
+	}
+	printf("  %lu replays of %zu documents\n", runs, g_ndocs);
+}
+
+/* A writer whose sink is a fed demux: what a socket does between two
+ * processes, in one. Every push goes straight into the demux. */
+typedef struct {
+	bvnr_demux_t* dm;
+	bool          feed_failed;
+	uint64_t      msgs;
+	uint64_t      last_ch, last_len;
+	uint8_t*      last;        /* a copy of the last message */
+	uint64_t      last_cap;
+	bool          meta_done;   /* the preamble struct has been read */
+	bool          msg_before_meta;
+	uint64_t      flushes;
+} live_t;
+
+static bool live_push(bvnr_sink_t* s, const void* p, uint32_t n)
+{
+	live_t* l = bvnr_sink_get_userdata(s);
+	if (!bvnr_demux_feed(l->dm, p, n))
+		l->feed_failed = true;
+	return true;
+}
+
+static bool live_flush(bvnr_sink_t* s)
+{
+	live_t* l = bvnr_sink_get_userdata(s);
+	l->flushes++;
+	return true;
+}
+
+static bool live_on_msg(void* ud, uint64_t ch, const uint8_t* p, uint64_t n)
+{
+	live_t* l = ud;
+	if (!l->meta_done) l->msg_before_meta = true;
+	if (n > l->last_cap) {
+		l->last = xrealloc(l->last, (size_t)n);
+		l->last_cap = n;
+	}
+	if (n) memcpy(l->last, p, (size_t)n);
+	l->msgs++;
+	l->last_ch = ch;
+	l->last_len = n;
+	return true;
+}
+
+static bool live_on_verified(void* ud, bvnr_event_t ev, bvnr_data_t* d)
+{
+	(void)d;
+	if (ev == ev_struct_end)
+		((live_t*)ud)->meta_done = true;
+	return true;
+}
+
+static void test_write_flush_live(void)
+{
+	printf("bvnr_write_flush: each message reaches a live demux when sent\n");
+	static const uint64_t lens[] = {
+		150, 0, 1, 3000, 65516, 65536, 70000, 150, 200000, 7 };
+	const size_t nmsg = sizeof(lens) / sizeof(lens[0]);
+	uint8_t* payload = xmalloc(200016);
+	for (size_t i = 0; i < 200016; i++)
+		payload[i] = (uint8_t)(i * 2654435761u >> 9);
+
+	for (int pretty = 0; pretty < 2; pretty++) {
+		live_t l;
+		memset(&l, 0, sizeof(l));
+		l.dm = bvnr_demux_create(live_on_msg, &l, 0);
+		bvnr_demux_set_key(l.dm, "media");
+		bvnr_read_flags_t fl;
+		memset(&fl, 0, sizeof(fl));
+		fl.on_verified = live_on_verified;
+		fl.userdata = &l;
+		ASSERT_TRUE(bvnr_demux_open_feed(l.dm, &fl, false), "open feed");
+
+		bvnr_sink_t sink;
+		bvnr_sink_to_callback(&sink, live_push, live_flush, &l);
+		bvnr_writer_t* w = bvnr_writer_create();
+		bvnr_open_write_sink(w, &sink, pretty, NULL);
+		bvnr_write_struct_start(w, "meta");
+		bvnr_write_string(w, "codec", "av1");
+		bvnr_write_float_unit(w, "rate", 32, 30.0,
+			BVN_UNIT_NO_PREFIX(bu_hertz));
+		bvnr_write_struct_end(w);
+		ASSERT_TRUE(bvnr_mux_begin(w, "media"), "mux_begin");
+		ASSERT_TRUE(bvnr_write_flush(w), "flush after mux_begin");
+		ASSERT_TRUE(l.meta_done, "the preamble is read before the first "
+			    "message is sent");
+		ASSERT_EQ_UINT(l.msgs, 0, "no message yet");
+
+		bool in_step = true, same = true;
+		for (size_t m = 0; m < nmsg; m++) {
+			const uint8_t* p = payload + m % 13;
+			ASSERT_TRUE(bvnr_mux_send(w, m % 3, p, lens[m]), "send");
+			if (m == 0)
+				ASSERT_EQ_UINT(l.msgs, 0, "a small message waits in the "
+					       "buffer until the flush");
+			ASSERT_TRUE(bvnr_write_flush(w), "flush after send");
+			in_step = in_step && l.msgs == m + 1;
+			same = same && l.last_ch == m % 3 && l.last_len == lens[m] &&
+			       (lens[m] == 0 ||
+				memcmp(l.last, p, (size_t)lens[m]) == 0);
+		}
+		ASSERT_TRUE(in_step, "message N arrives before message N+1 is sent");
+		ASSERT_TRUE(same, "each message arrives whole and unchanged");
+		ASSERT_TRUE(!l.msg_before_meta, "the preamble came first");
+		ASSERT_EQ_UINT(l.flushes, nmsg + 1, "the sink's flush ran per flush");
+		ASSERT_TRUE(bvnr_mux_end(w) && bvnr_write_finish(w), "end, finish");
+		ASSERT_TRUE(bvnr_demux_finish(l.dm) && !l.feed_failed &&
+			    bvnr_demux_error(l.dm) == error_none,
+			    "the demux reads a complete document");
+		bvnr_writer_destroy(w);
+		bvnr_demux_destroy(l.dm);
+		free(l.last);
+	}
+	free(payload);
+}
+
+static void test_write_flush_edges(void)
+{
+	printf("bvnr_write_flush: errors, memory and fd sinks\n");
+	ASSERT_TRUE(!bvnr_write_flush(NULL), "NULL writer");
+	bvnr_writer_t* w = bvnr_writer_create();
+	ASSERT_TRUE(!bvnr_write_flush(w), "a writer with no sink");
+	ASSERT_EQ_UINT(bvnr_writer_get_error(w), error_invalid_argument,
+		"no sink is error_invalid_argument");
+
+	/* Flush counts, a sink without a flush callback, after the finish. */
+	cb_sink_t cs;
+	memset(&cs, 0, sizeof(cs));
+	bvnr_sink_t sink;
+	bvnr_sink_to_callback(&sink, cb_push, cb_flush, &cs);
+	ASSERT_TRUE(bvnr_open_write_sink(w, &sink, false, NULL), "open");
+	ASSERT_TRUE(bvnr_write_flush(w), "flush before any output");
+	ASSERT_EQ_UINT(cs.pushes, 0, "nothing to push");
+	ASSERT_EQ_UINT(cs.flushes, 1, "the sink's flush still runs");
+	write_sample(w);
+	ASSERT_TRUE(bvnr_write_flush(w), "flush");
+	ASSERT_EQ_UINT(cs.pushes, 1, "one push");
+	ASSERT_EQ_UINT(cs.out.n, bvnr_writer_bytes_written(w), "all pushed");
+	ASSERT_TRUE(bvnr_write_flush(w), "flush again");
+	ASSERT_EQ_UINT(cs.pushes, 1, "an empty buffer is not pushed");
+	ASSERT_TRUE(bvnr_write_finish(w), "finish");
+	uint64_t pushes = cs.pushes, flushes = cs.flushes;
+	ASSERT_TRUE(bvnr_write_flush(w), "flush after the finish");
+	ASSERT_TRUE(cs.pushes == pushes && cs.flushes == flushes,
+		"after the finish a flush does nothing");
+	ASSERT_EQ_UINT(bvnr_writer_get_error(w), error_none, "and latches nothing");
+	buf_free(&cs.out);
+
+	memset(&cs, 0, sizeof(cs));
+	bvnr_sink_to_callback(&sink, cb_push, NULL, &cs);
+	ASSERT_TRUE(bvnr_open_write_sink(w, &sink, false, NULL), "re-open");
+	write_sample(w);
+	ASSERT_TRUE(bvnr_write_flush(w), "flush without a flush callback");
+	ASSERT_EQ_UINT(cs.out.n, bvnr_writer_bytes_written(w), "pushed");
+	buf_free(&cs.out);
+
+	/* A refused push: the error latches, with the offset of the bytes. */
+	memset(&cs, 0, sizeof(cs));
+	cs.fail_after = 10;
+	bvnr_sink_to_callback(&sink, cb_push, cb_flush, &cs);
+	ASSERT_TRUE(bvnr_open_write_sink(w, &sink, false, NULL), "re-open");
+	write_sample(w);
+	uint64_t at = bvnr_writer_bytes_written(w);
+	ASSERT_TRUE(!bvnr_write_flush(w), "a refused push fails the flush");
+	ASSERT_EQ_UINT(bvnr_writer_get_error(w), error_writing_to_sink,
+		"refused push is error_writing_to_sink");
+	ASSERT_EQ_UINT(bvnr_writer_get_error_offset(w), at,
+		"the offset is where the output stood");
+	ASSERT_EQ_UINT(cs.flushes, 0, "no sink flush after a failed push");
+	ASSERT_TRUE(!bvnr_write_uint(w, "more", 8, 1), "the error is latched");
+	ASSERT_TRUE(!bvnr_write_flush(w), "a second flush fails at once");
+	ASSERT_EQ_UINT(cs.pushes, 1, "and pushes nothing");
+	ASSERT_TRUE(!bvnr_write_finish(w), "the finish fails");
+	ASSERT_EQ_UINT(bvnr_writer_get_error(w), error_writing_to_sink,
+		"the first error stays");
+	buf_free(&cs.out);
+
+	/* A refused flush callback. */
+	memset(&cs, 0, sizeof(cs));
+	cs.flush_fails = true;
+	bvnr_sink_to_callback(&sink, cb_push, cb_flush, &cs);
+	ASSERT_TRUE(bvnr_open_write_sink(w, &sink, false, NULL), "re-open");
+	write_sample(w);
+	ASSERT_TRUE(!bvnr_write_flush(w), "a refused flush fails the flush");
+	ASSERT_EQ_UINT(bvnr_writer_get_error(w), error_writing_to_sink,
+		"refused flush is error_writing_to_sink");
+	ASSERT_TRUE(cs.flushes == 1 && cs.out.n == bvnr_writer_bytes_written(w),
+		"the bytes were pushed before the sink's flush");
+	buf_free(&cs.out);
+
+	/* A memory sink: nothing to do, nothing changes. */
+	uint8_t ref[512], mem[512];
+	bvnr_open_write_mem(w, ref, sizeof(ref), true, NULL);
+	write_sample(w);
+	bvnr_write_finish(w);
+	uint64_t ref_n = bvnr_writer_bytes_written(w);
+	bvnr_open_write_mem(w, mem, sizeof(mem), true, NULL);
+	ASSERT_TRUE(bvnr_write_flush(w), "memory sink: flush before output");
+	bvnr_write_uint(w, "id", 32, 7);
+	uint64_t before = bvnr_writer_bytes_written(w);
+	ASSERT_TRUE(bvnr_write_flush(w), "memory sink: flush");
+	ASSERT_EQ_UINT(bvnr_writer_bytes_written(w), before,
+		"memory sink: the count does not move");
+	bvnr_write_string(w, "name", "caf\xc3\xa9");
+	bvnr_write_struct_start(w, "s");
+	ASSERT_TRUE(bvnr_write_flush(w), "memory sink: flush inside a struct");
+	bvnr_write_bool(w, "f", true);
+	bvnr_write_struct_end(w);
+	ASSERT_TRUE(bvnr_write_finish(w), "memory sink: finish");
+	ASSERT_TRUE(bvnr_writer_bytes_written(w) == ref_n &&
+		    memcmp(ref, mem, (size_t)ref_n) == 0,
+		"memory sink: the same bytes");
+	/* A full memory sink fails the write; the flush reports the latch. */
+	bvnr_open_write_mem(w, mem, 4, false, NULL);
+	ASSERT_TRUE(!bvnr_write_uint(w, "value", 32, 12345), "full buffer");
+	ASSERT_TRUE(!bvnr_write_flush(w), "memory sink: flush after the error");
+	ASSERT_EQ_UINT(bvnr_writer_get_error(w), error_sink_buffer_exhausted,
+		"memory sink: the error is the write's");
+
+#if !defined(_WIN32)
+	/* An fd sink: the bytes are in the pipe after the flush, not before. */
+	int fds[2];
+	ASSERT_TRUE(pipe(fds) == 0, "pipe");
+	fcntl(fds[0], F_SETFL, fcntl(fds[0], F_GETFL) | O_NONBLOCK);
+	bvnr_sink_t fd_sink;
+	bvnr_sink_to_fd(&fd_sink, fds[1]);
+	ASSERT_TRUE(bvnr_open_write_sink(w, &fd_sink, true, NULL), "open fd");
+	write_sample(w);
+	uint8_t got[1024];
+	ssize_t n0 = read(fds[0], got, sizeof(got));
+	ASSERT_TRUE(n0 < 0 && (errno == EAGAIN || errno == EWOULDBLOCK),
+		"fd sink: nothing in the pipe before the flush");
+	ASSERT_TRUE(bvnr_write_flush(w), "fd sink: flush");
+	ssize_t n1 = read(fds[0], got, sizeof(got));
+	ASSERT_TRUE(n1 > 0 && (uint64_t)n1 == bvnr_writer_bytes_written(w),
+		"fd sink: everything written is in the pipe");
+	ASSERT_TRUE(bvnr_write_finish(w), "fd sink: finish");
+	ssize_t n2 = read(fds[0], got + (n1 > 0 ? n1 : 0),
+			  sizeof(got) - (size_t)(n1 > 0 ? n1 : 0));
+	ASSERT_TRUE(n1 > 0 && n2 > 0 && (uint64_t)(n1 + n2) == ref_n &&
+		    memcmp(got, ref, (size_t)ref_n) == 0,
+		"fd sink: flushed and finished, the same bytes");
+	close(fds[0]);
+	close(fds[1]);
+#endif
+	bvnr_writer_destroy(w);
 }
 
 int main(int argc, char** argv)
@@ -2177,6 +2602,9 @@ int main(int argc, char** argv)
 	test_frame_isolation();
 	test_demux_feed();
 	test_mux_send_vector();
+	test_write_flush_identity();
+	test_write_flush_live();
+	test_write_flush_edges();
 
 	for (size_t i = 0; i < g_ndocs; i++) {
 		free(g_docs[i].name);

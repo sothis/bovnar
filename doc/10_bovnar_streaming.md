@@ -484,7 +484,7 @@ dumpers take a `file=` and write through a callback sink. `mux_dump(...,
 preamble={...})` writes the values that describe the stream before it opens
 (§3.4).
 
-**Live streams** (§7) are read with three feed objects over the push-fed C
+**Live streams** (§8) are read with three feed objects over the push-fed C
 readers, each handed bytes in pieces of any size: `DocumentFeed` (§8.2: a
 document's events, or each top-level value once it is complete), `FrameFeed`
 (§2.4: each document's bytes, or each document parsed) and `DemuxFeed` (§3.4:
@@ -505,7 +505,9 @@ with stream.DemuxFeed(key="media", values=True) as dm:
                 on_meta(item.key, item.value)
             else:
                 on_frame(item.channel, item.payload)
-    dm.finish()                                   # raises if cut off part-way
+    for item in dm.finish():                      # raises if cut off part-way
+        if isinstance(item, stream.Value):        # values that end the document
+            on_meta(item.key, item.value)
 ```
 
 The limits and error codes are those of the batch functions. A message costs

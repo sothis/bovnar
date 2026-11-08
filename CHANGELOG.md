@@ -88,7 +88,8 @@ API and implements spec 1.2.
   `stream.load_documents` and `stream.mux_load` take a socket or binary file
   object in place of bytes, and `frame_documents`, `dump_documents`,
   `mux_dump` and `embed_document` a `file=`. The input is pulled as it is
-  parsed and the output pushed through the writer's 64 KiB buffer; the results
+  parsed and the output pushed through the writer's 64 KiB buffer (the frame
+  dumpers write each frame as it is made, then flush the object); the results
   are those of the in-memory calls. An exception the object raises comes out
   of the call unchanged.
 - **Python: `mux_dump(..., preamble={...})`** writes ordinary values before
@@ -191,8 +192,8 @@ API and implements spec 1.2.
   whole sequence instead of one per frame. Events, errors and positions are
   unchanged: `bvnr_feed_test` reads every document after every other, under
   every pair of settings, and a frame stream cut at every byte, against a reader
-  fresh from `bvnr_reader_create`. A 43-byte framed document went from about 5.5
-  to 2.3 µs (doc/10 §8.4).
+  fresh from `bvnr_reader_create`. `bvnr_doc_stream_read` reads a 43-byte framed
+  document in about 2.4 µs instead of 2.0.2's 5.6 µs (doc/10 §8.4).
 - **The Rust crate's `std::io` entry points stream.** `parse_reader`,
   `Reader::read_reader`, `write_to`, `Writer::to_writer` and the `*_reader` /
   `*_to` twins of `bovnar::stream` went through memory: a reader twin read its
@@ -242,6 +243,12 @@ API and implements spec 1.2.
   parsers in `bvn_float_impl.h` and `bvn_set_binary_stdio`. They are marked
   `BVN_MAYBE_UNUSED`. No behaviour changes; the WebAssembly module differs
   only in its embedded source fingerprint.
+- **`bvnr_mux_send` latches its own refusals.** A NULL payload with a non-zero
+  length (and a failure to allocate its chunk buffer) returned false without
+  setting a writer error, so a caller that checks only at the end lost the
+  message while `bvnr_write_flush` and `bvnr_write_finish` succeeded. It now
+  sets `error_invalid_argument` like any writer error, the first error kept,
+  and refuses at once after an earlier one.
 
 ## [2.0.2] - 2026-11-04
 

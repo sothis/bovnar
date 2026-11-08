@@ -418,9 +418,19 @@ stream and are handed bytes in pieces of any size, cut anywhere:
 
 | Object | Fed | Hands out |
 |---|---|---|
-| `DocumentFeed` | one document | `DocumentEvent(event, data)` per verified event, as a `Reader` callback receives it; with `values=True`, `Value(key, value)` per top-level value once it is complete |
+| `DocumentFeed` | one document | `DocumentEvent(event, data)` per verified event, as a `Reader` callback receives it; with `values=True`, `Value(key, value)` per top-level value once it is complete as well (`events=False` for the values alone) |
 | `DemuxFeed` | a document carrying a mux stream | `Message(channel, payload)` per message; with `values=True` the values before and after the stream, in document order; with `events=True` the document's events |
 | `FrameFeed` | a `BVF1` frame stream | each document's bytes; with `parse=True` each document parsed, as `load_documents` parses it |
+
+The options besides those: `DocumentFeed` takes `Reader.read_mem`'s, `typed`
+and `max_file_size`; `DemuxFeed(key=None, max_message=0, typed=False,
+view=False, max_file_size=0)`; `FrameFeed(parse=False, typed=False,
+continue_past_failed=False, max_document_size=0, view=False)`, where `typed`
+and `continue_past_failed` need `parse=True` and `view` needs `parse=False`
+(otherwise `BovnarArgumentError`). `DemuxFeed`'s `key=None` demultiplexes every
+octet stream of the document, as `mux_load` does, while `mux_dump` and
+`MuxWriter` write under `key="mux"`: a document with any other octet stream —
+a `bytes` value in the preamble, say — needs `key=` on the reader.
 
 `feed(data)` returns the object itself, which iterates over what those bytes
 completed, and `finish()` says the input is over. Running out of input is never
@@ -431,8 +441,10 @@ that `FrameFeed` names a framing error the C frame reader's way (a bad magic is
 `UNEXPECTED_INPUT_BYTE`, a frame over `max_document_size` `VALUE_OUT_OF_RANGE`)
 where `load_documents` reports either as `GOT_INCOMPLETE_BVNR_STREAM`.
 `DocumentFeed` raises from the `feed()` whose bytes hit the error, with the
-reader's position, and `DemuxFeed` and `FrameFeed` from the iteration that
-reaches it, after the items before it. Each is a context manager that frees
+reader's position, and drops what that feed had completed; `DemuxFeed` and
+`FrameFeed` raise from the iteration that reaches it, after the items before
+it (an exception from one of your own callbacks comes out of the call it was
+raised in). `finish()` raises at once. Each is a context manager that frees
 its C object.
 
 A stream that starts with metadata hands it over before the first message:
@@ -504,10 +516,12 @@ chunk, a reassembly buffer otherwise — which saves a copy per message and is
 valid **only until the next call on the feed**: the next item, `feed()`,
 `finish()` or `close()`. The feed releases the view then, so using it later
 raises `ValueError` rather than reading memory that has been reused. Copy what
-must be kept with `bytes(view)`. A slice of the view, or a buffer taken from it
-(`numpy.frombuffer`), is not released with it and must not outlive it either;
-while such a buffer holds an export, the next call raises `BovnarArgumentError`
-and leaves the stream as it was.
+must be kept with `bytes(view)`. A buffer made from the view —
+`memoryview(view)`, a slice of it, `numpy.frombuffer(view)`, a held export — is
+not released with it, so while one is alive the next call raises
+`BovnarArgumentError` and leaves the stream as it was; drop it and the call can
+be repeated. Such a buffer also keeps the feed's C memory alive: `close()` then
+closes the feed but frees that memory only when the buffer goes.
 
 ```python
 dm = stream.DemuxFeed(view=True)
@@ -551,8 +565,10 @@ where there is one to save, from a few kilobytes up.
 ### 4.8 Live streams: writing a message at a time
 
 `mux_dump(..., file=)` and `dump_documents(..., file=)` take every message or
-document at once, and the writer behind them gathers its output in a 64 KiB
-buffer, so a reader at the other end of a socket sees nothing until it fills.
+document at once. The writer behind `mux_dump` (and `embed_document`) gathers
+its output in a 64 KiB buffer, so a reader at the other end of a socket sees
+nothing until it fills; `dump_documents` and `frame_documents` write each frame
+as it is made and call the object's `flush()` once at the end.
 Two objects in `bovnar.stream` write as the messages come instead, each handing
 what it writes to the socket or file before it returns:
 
@@ -562,8 +578,9 @@ what it writes to the socket or file before it returns:
 | `FrameWriter(file, *, flush_each=True)` | a `BVF1` frame stream, as `frame_documents` writes it | `write(document_bytes)` or `dump(obj)`: one framed document |
 
 `file` is a socket (`sendall`) or a binary file object (`write`). `MuxWriter`
-writes the preamble and opens the stream when it is made, and with
-`flush_each=True` it calls `bvnr_write_flush` after every send: the message goes
+writes the preamble and opens the stream when it is made (handing them to the
+object at once with `flush_each=True`), and with `flush_each=True` it calls
+`bvnr_write_flush` after every send: the message goes
 to the object, then the object's `flush()` runs when it has one, so a
 `DemuxFeed` at the other end has message N before message N+1 is sent. With
 `flush_each=False` it batches into the 64 KiB buffer, and `flush()` hands over
@@ -601,8 +618,11 @@ with stream.MuxWriter(sock, key="media", preamble={"meta": meta}) as mux:
         mux.send(channel, frame)        # on the wire when send returns
 ```
 
-`FrameWriter` frames each document as it is written; a frame stream has no
-terminator, so `close()` only flushes the object:
+`FrameWriter` frames each document as it is written and hands it to the object
+at once, as frames are never batched; its `flush_each` only says whether the
+object's `flush()` follows each document. A frame stream has no terminator, so
+`close()` only flushes the object. `MuxWriter.bytes_written` and
+`FrameWriter.count` say how much has been written:
 
 ```python
 out = io.BytesIO()
@@ -1996,7 +2016,8 @@ tests/
 ├── test_reader.py, test_writer.py       # Reader and Writer
 ├── test_stream.py                       # framing, mux, document-in-document
 ├── test_stream_io.py                    # sockets and file objects as sources and sinks
-├── test_stream_feed.py                  # DocumentFeed, FrameFeed, DemuxFeed, the wire vectors
+├── test_stream_feed.py                  # DocumentFeed, FrameFeed, DemuxFeed
+├── test_stream_vectors.py               # the shared wire vectors of doc/10 §9
 ├── test_stream_live.py                  # Writer.flush, MuxWriter, FrameWriter
 ├── test_dom.py, test_dom_vs_loads_parity.py   # the DOM, and its agreement with loads()
 ├── test_write_array.py, test_array_parser.py, test_array_roundtrip_fidelity.py

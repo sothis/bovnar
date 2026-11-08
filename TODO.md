@@ -27,6 +27,13 @@ to main; its first real use is the evidence it works.
 
 ## Open — incremental streaming for Rust and Python (asked 2026-11-08)
 
+**Status 2026-11-08:** items 1–4, 6 and 7 have shipped on main (unreleased:
+`bovnar::codec`, `bovnar::live`, the C callback sources and sinks, the push-fed
+reader, frame reader and demux, `bvnr_write_flush`, the Python feeds and live
+writers, the benchmarks and the docs). What is still open is the full vector set
+of item 5. The paragraphs below describe the state before the work, as the plan
+was written.
+
 The streaming layer of doc/10 (frames, octet multiplexing,
 document-in-document, endless streams) is batch-only in both bindings.
 `bovnar::stream` (`mux_dump`, `mux_load`, `load_documents`,
@@ -94,8 +101,8 @@ and the C reference.
 ### 2. C: callback I/O and live feeding
 
 ABI additions only. The user pointer fits in the existing 64-byte
-`bvnr_source_t`/`bvnr_sink_t` (the private layouts are 32 and 48 bytes on
-LP64), so there is no layout change and no `BVNR_ABI_MAJOR` bump.
+`bvnr_source_t`/`bvnr_sink_t` (the private layouts were 32 and 48 bytes on
+LP64, and are 40 and 56 with the user pointer), so there is no layout change and no `BVNR_ABI_MAJOR` bump.
 
 - **Callback source and sink**: constructors next to `bvnr_source_from_fd`
   and `_from_mem` that take a pull or push function, an optional flush and a
@@ -142,7 +149,9 @@ LP64), so there is no layout change and no `BVNR_ABI_MAJOR` bump.
 **Status 2026-11-08:** a minimal shared set ships first (`tests/stream_vectors/`:
 a preamble plus mux stream, the same without preamble, a small frame stream,
 three invalid vectors), checked by the C demux, the Rust codec and
-`live::Demux`, the C and Rust writers byte for byte, and the CLI. It covers
+`live::Demux`, the Python feeds, the C and Rust writers byte for byte, and the
+CLI. The fuzz targets have shipped too: `codec` and `live` under `rust/fuzz/`,
+and `bvnr_fuzz_feed` for the C feed readers. It covers
 what the first consumer (Mumcord) relies on. **Still open:** the full set below.
 
 Shared vectors across C, Rust and Python, each side reading the others'
@@ -150,8 +159,7 @@ output and `bovnar frames list` / `bovnar mux list` reading all of it:
 input split at every byte, a 65536-byte chunk (length field 0), messages over
 64 KiB, the terminator, packed chunks, interleaved channels, a length varint
 split across chunks, 4096 channels and the 4097th, truncation, desync, and a
-failed document among good ones. Fuzz targets for the Rust `MuxReader` and
-the C feed readers.
+failed document among good ones.
 
 ### 6. Benchmarks
 

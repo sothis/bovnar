@@ -84,7 +84,14 @@ void bvnr_writer_destroy(bvnr_writer_t* w)
 	if (!w) return;
 	free(w->ser.ser_value_text);
 	bvnr_reader_destroy(w->usrc_probe);
+	free(w->mux_chunk);
 	free(w);
+}
+uint8_t* bvn_writer_mux_chunk(bvnr_writer_t* w)
+{
+	if (!w->mux_chunk)
+		w->mux_chunk = (uint8_t*)malloc(65536u);
+	return w->mux_chunk;
 }
 /*
  * Record the first error and the byte offset it occurred at (flushed bytes plus
@@ -2731,9 +2738,11 @@ static void bvn_writer_init(bvnr_writer_t* w, bvnr_write_flags_t* opts)
 	 * before opening would have no way to notice it had been dropped. */
 	bvn_unit_policy_state_t saved_policy = w->val.policy;
 	bvnr_reader_t* saved_probe = w->usrc_probe;
+	uint8_t* saved_chunk = w->mux_chunk;
 	memset(w, 0, sizeof(*w));
 	w->val.policy = saved_policy;
 	w->usrc_probe = saved_probe;
+	w->mux_chunk  = saved_chunk;
 	w->ser.pretty = false;
 	w->ser.indent = 0;
 	w->ser.need_semi = false;

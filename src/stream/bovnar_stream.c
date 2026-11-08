@@ -36,6 +36,7 @@
 #include "bovnar.h"
 #include "bovnar_stream.h"
 #include "bvn_io_impl.h"
+#include "bvn_val_impl.h"
 
 /* ===========================================================================
  * Shared little helpers
@@ -289,7 +290,9 @@ bool bvnr_mux_begin(bvnr_writer_t* w, const char* key)
  * The logical stream for the message is varint(len) ++ data. Each chunk is
  * varint(channel) ++ fragment; the length varint always rides in the first
  * chunk (it is tiny and the fragment capacity is ~64 KiB, so it is never
- * split). One reusable 64 KiB chunk buffer is filled and emitted per iteration.
+ * split). The 64 KiB chunk buffer belongs to the writer and is reused by every
+ * send: it used to be malloc'd and freed on each call, which for small messages
+ * cost more than the message.
  */
 bool bvnr_mux_send(bvnr_writer_t* w, uint64_t channel,
 	const void* data, uint64_t len)
@@ -301,7 +304,7 @@ bool bvnr_mux_send(bvnr_writer_t* w, uint64_t channel,
 	uint32_t lvlen  = bvn_varint_encode(len, lenvar);
 	uint32_t fragcap = 65536u - chlen;   /* logical bytes per chunk after channel id */
 
-	uint8_t* chunk = (uint8_t*)malloc(65536u);
+	uint8_t* chunk = bvn_writer_mux_chunk(w);
 	if (!chunk) return false;
 
 	const uint8_t* dp = (const uint8_t*)data;
@@ -328,8 +331,6 @@ bool bvnr_mux_send(bvnr_writer_t* w, uint64_t channel,
 		d.length = off;
 		ok = bvnr_write_event(w, ev_data, &d);
 	} while (ok && dpos < len);
-
-	free(chunk);
 	return ok;
 }
 

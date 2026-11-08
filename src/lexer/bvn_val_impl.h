@@ -337,6 +337,9 @@ struct bvnr_writer_s {
 	uint8_t			usrc_ok_len;
 	uint8_t			usrc_ok[BVNR_UNIT_SOURCE_MAX + 1u];
 	value_unit_t		usrc_ok_unit;
+	/* bvnr_mux_send's 64 KiB chunk, allocated on first use and kept for the
+	 * writer's life (across re-opens), so a send costs no allocation. */
+	uint8_t*		mux_chunk;
 };
 /* Does `u` satisfy the policy's require_unit / require_dimension_of? Shared by
  * the reader and the writer so the two cannot drift into meaning different
@@ -372,4 +375,5 @@ bool bvn_ser_flush_wbuf(bvnr_serializer_t* s);
 bool bvn_ser_finish_stream(bvnr_serializer_t* s);
 bool bvn_ser_emit_version(bvnr_serializer_t* s, uint16_t major, uint16_t minor);
 bool bvn_writer_set_error(bvnr_writer_t* w, error_code_t err);
+uint8_t* bvn_writer_mux_chunk(bvnr_writer_t* w);
 #endif

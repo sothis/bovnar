@@ -180,9 +180,15 @@ BVN_API bool bvnr_doc_stream_read(
 /* Default reassembly cap for bvnr_demux_create's max_message=0. */
 #define BVNR_MUX_DEFAULT_MAX   (64u * 1024u * 1024u)
 
-/* Open an octet stream under `key` to carry multiplexed channels. */
+/* Open an octet stream under `key` to carry multiplexed channels. The stream is
+ * one value of an ordinary document: whatever the writer wrote before it -- a
+ * `.meta = { ... };` describing the stream, say -- is read back as ordinary
+ * values ahead of the first message, and the document may go on after
+ * bvnr_mux_end. */
 BVN_API bool bvnr_mux_begin(bvnr_writer_t* w, const char* key);
-/* Send one message on `channel`, split across as many octet chunks as needed. */
+/* Send one message on `channel`, split across as many octet chunks as needed.
+ * The chunk is staged in a buffer the writer allocates on the first send and
+ * keeps, so a send allocates nothing. */
 BVN_API bool bvnr_mux_send(bvnr_writer_t* w, uint64_t channel,
 	const void* data, uint64_t len);
 /* Close the multiplexed octet stream. */

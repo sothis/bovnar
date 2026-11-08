@@ -38,6 +38,12 @@ frame reader and demux):
   * DemuxFeed    – a multiplexed document fed in pieces: (channel, payload) per
                    message, and the values before and after the mux stream.
 
+and for output that leaves as it is made (bvnr_write_flush):
+
+  * MuxWriter    – a multiplexed document written a message at a time, each
+                   handed to the socket or file as it is sent.
+  * FrameWriter  – a frame stream written a document at a time.
+
 These wrap the C functions directly, so behaviour (framing, varint reassembly,
 the memory-amplification guards, the strict-vs-resilient document policy) matches
 the native library exactly. See doc/10_bovnar_streaming.md for the conventions.
@@ -79,6 +85,7 @@ __all__ = [
     'mux_dump', 'mux_load',
     'embed_document', 'parse_embedded',
     'DocumentFeed', 'FrameFeed', 'DemuxFeed',
+    'MuxWriter', 'FrameWriter',
     'Message', 'Value', 'DocumentEvent',
 ]
 
@@ -263,31 +270,14 @@ def mux_dump(messages: Iterable[tuple], *, key: str = 'mux',
 
     With ``file`` (a socket or a binary file object) the document is written
     there, through the writer's 64 KiB buffer, and nothing is returned."""
-    from . import _emit_dict, _uses_spec_1_1, _uses_spec_1_2  # deferred (import cycle)
     lib  = get_library()
-    msgs = [(int(ch), _as_bytes(p)) for ch, p in messages]
-    # The channel crosses the FFI as a uint64_t, and ctypes wraps an
-    # out-of-range int without a word: channel -1 was written as 2**64-1, and
-    # the reader then reported a channel the producer never used.
-    for ch, _ in msgs:
-        if not 0 <= ch < (1 << 64):
-            raise BovnarArgumentError(
-                f"mux channel {ch} is outside the unsigned 64-bit range")
+    msgs = [(_mux_channel(ch), _as_bytes(p)) for ch, p in messages]
     if preamble is not None and not isinstance(preamble, dict):
         raise BovnarArgumentError("mux_dump() preamble must be a dict")
-    need_version = None
-    if preamble:
-        need_version = (1, 2) if _uses_spec_1_2(preamble) else \
-                       (1, 1) if _uses_spec_1_1(preamble) else None
     kb = key.encode('utf-8')
 
     def write(w):
-        if need_version:
-            w.write_version(*need_version)
-        if preamble:
-            _emit_dict(w, preamble)
-        if not lib.bvnr_mux_begin(w._ptr, kb):
-            w._raise_error()
+        _mux_open(w, kb, preamble)
         for ch, payload in msgs:
             dptr, _keep = _void_copy(payload)
             if not lib.bvnr_mux_send(w._ptr, ch, dptr, len(payload)):
@@ -323,6 +313,31 @@ def mux_dump(messages: Iterable[tuple], *, key: str = 'mux',
             raise
         finally:
             w.destroy()
+
+
+def _mux_channel(channel) -> int:
+    ch = channel if type(channel) is int else int(channel)
+    # The channel crosses the FFI as a uint64_t, and ctypes wraps an
+    # out-of-range int without a word: channel -1 was written as 2**64-1, and
+    # the reader then reported a channel the producer never used.
+    if not 0 <= ch < (1 << 64):
+        raise BovnarArgumentError(
+            f"mux channel {ch} is outside the unsigned 64-bit range")
+    return ch
+
+
+def _mux_open(w: Writer, key: bytes, preamble: dict | None) -> None:
+    """The preamble's values, behind the version directive they need, then
+    the opener of the mux stream under ``key``."""
+    from . import _emit_dict, _uses_spec_1_1, _uses_spec_1_2  # deferred (import cycle)
+    if preamble:
+        need = (1, 2) if _uses_spec_1_2(preamble) else \
+               (1, 1) if _uses_spec_1_1(preamble) else None
+        if need:
+            w.write_version(*need)
+        _emit_dict(w, preamble)
+    if not w._lib.bvnr_mux_begin(w._ptr, key):
+        w._raise_error()
 
 
 def mux_load(data, *, max_message: int = 0, key: str | None = None) -> list:
@@ -1256,3 +1271,210 @@ class DemuxFeed(_Feed):
             self._lib.bvnr_demux_destroy(self._dm)
             self._dm = None
         self._fed = None
+
+
+# ===========================================================================
+# Live writing
+# ===========================================================================
+
+class MuxWriter:
+    """A multiplexed stream written live to a socket or a binary file
+    object, one message at a time: what :func:`mux_dump` writes, for messages
+    that are not known in advance.
+
+    The document opens when the writer is made: ``preamble`` (a dict of
+    ordinary values, as for :func:`mux_dump`) and then the octet stream under
+    ``key``. ``send(channel, payload)`` writes one message. With
+    ``flush_each=True`` (the default) each one is handed to the object at
+    once (``bvnr_write_flush``: its ``sendall`` or ``write``, then its
+    ``flush`` when it has one), the preamble before the first, so a
+    :class:`DemuxFeed` at the other end has message N before message N+1 is
+    sent. With ``flush_each=False`` the writer gathers its output into a
+    64 KiB buffer and :meth:`flush` hands over what has gathered.
+    :meth:`close`, or leaving the ``with`` block normally, ends the stream and
+    the document; the object itself is left open. The bytes are those
+    :func:`mux_dump` writes for the same messages and preamble, however often
+    they were flushed.
+
+    An exception the object raises is re-raised, unchanged, from the call
+    that pushed. The writer has failed then, and :meth:`close` only releases
+    it. Leaving the ``with`` block by an exception does the same: the stream
+    is not ended, so a reader sees it cut off rather than complete.
+    """
+
+    def __init__(self, file, *, key: str = 'mux',
+                 preamble: dict | None = None,
+                 flush_each: bool = True) -> None:
+        self._w = None
+        self._closed = True
+        if preamble is not None and not isinstance(preamble, dict):
+            raise BovnarArgumentError("MuxWriter() preamble must be a dict")
+        kb = key.encode('utf-8')
+        w = Writer.to_stream(file, pretty=False)
+        self._w = w
+        lib = w._lib
+        try:
+            _mux_open(w, kb, preamble)
+            if flush_each:
+                w.flush()
+        except BaseException:
+            w.destroy()
+            self._w = None
+            raise
+        self._closed = False
+        self._lib = lib
+        self._ptr = w._ptr
+        self._send = lib.bvnr_mux_send
+        self._flush = lib.bvnr_write_flush if flush_each else None
+
+    def send(self, channel: int, payload) -> None:
+        """Write one message on ``channel`` (an unsigned 64-bit int); a
+        payload of any size is split over octet chunks as needed."""
+        if self._closed:
+            raise BovnarArgumentError("MuxWriter has been closed")
+        ch = _mux_channel(channel)
+        data = payload if type(payload) is bytes else _as_bytes(payload)
+        if not self._send(self._ptr, ch, data, len(data)):
+            self._w._raise_error()
+        flush = self._flush
+        if flush is not None and not flush(self._ptr):
+            self._w._raise_error()
+
+    def flush(self) -> None:
+        """Hand everything written so far to the object now, then call its
+        ``flush`` when it has one."""
+        if self._closed:
+            raise BovnarArgumentError("MuxWriter has been closed")
+        self._w.flush()
+
+    @property
+    def bytes_written(self) -> int:
+        """Bytes of the document so far, handed over or still buffered."""
+        if self._w is None:
+            raise BovnarArgumentError("MuxWriter has been closed")
+        return self._w.bytes_written
+
+    def close(self) -> None:
+        """End the stream and the document, flush, and release the writer.
+        After a failure it only releases it. Safe to call twice."""
+        if self._closed:
+            return
+        self._closed = True
+        w = self._w
+        try:
+            if self._lib.bvnr_writer_get_error(self._ptr) == 0:
+                if not self._lib.bvnr_mux_end(self._ptr):
+                    w._raise_error()
+                w.finish()
+        finally:
+            self._release()
+
+    def _release(self) -> None:
+        self._closed = True
+        if self._w is not None:
+            self._w.destroy()
+            self._w = None
+
+    def __enter__(self) -> 'MuxWriter':
+        return self
+
+    def __exit__(self, exc_type, *_) -> None:
+        if exc_type is None:
+            self.close()
+        else:
+            self._release()
+
+    def __del__(self) -> None:
+        try:
+            self._release()
+        except Exception:                           # noqa: BLE001 (finaliser)
+            pass
+
+
+class FrameWriter:
+    """A frame stream written live to a socket or a binary file object, one
+    document at a time: what :func:`frame_documents` and
+    :func:`dump_documents` write, for documents that are not known in
+    advance.
+
+    ``write(document)`` frames the bytes of one serialised document and
+    ``dump(obj)`` serialises a dict first (:func:`bovnar.dumps`). Each frame
+    goes to the object as it is made, header then document, and with
+    ``flush_each=True`` (the default) the object's ``flush`` follows when it
+    has one, so a :class:`FrameFeed` at the other end has each document
+    before the next is written. A frame stream needs no terminator: every
+    document written is complete, and :meth:`close` (or leaving the ``with``
+    block) only flushes the object, which is left open.
+
+    An exception the object raises is re-raised, unchanged, from the call
+    that pushed. A frame may then be half written, so the writer refuses
+    further documents.
+    """
+
+    def __init__(self, file, *, flush_each: bool = True) -> None:
+        self._sink = PushSink(file)
+        self._sink_ref = ctypes.byref(self._sink.handle)
+        flush = getattr(file, 'flush', None)
+        self._flush_obj = flush
+        self._flush_each = flush if flush_each else None
+        self._write = get_library().bvnr_frame_write
+        self._failed = False
+        self._closed = False
+        self._count = 0
+
+    @property
+    def count(self) -> int:
+        """The number of documents written."""
+        return self._count
+
+    def write(self, document) -> None:
+        """Write one serialised document (bytes, or str as UTF-8) as a
+        frame."""
+        if self._closed or self._failed:
+            raise BovnarArgumentError(
+                "FrameWriter has been closed" if self._closed else
+                "FrameWriter failed part-way through a frame")
+        data = document if type(document) is bytes else _as_bytes(document)
+        if not self._write(self._sink_ref, data, len(data)):
+            self._failed = True
+            exc, self._sink.exc = self._sink.exc, None
+            if exc is not None:
+                raise exc
+            raise BovnarWriteError(ErrorCode.WRITING_TO_SINK,
+                                   message="bvnr_frame_write failed")
+        self._count += 1
+        flush = self._flush_each
+        if flush is not None:
+            try:
+                flush()
+            except BaseException:
+                self._failed = True
+                raise
+
+    def dump(self, obj: dict, *, pretty: bool = True) -> None:
+        """Serialise ``obj`` with :func:`bovnar.dumps` and write it as a
+        frame."""
+        from . import dumps  # deferred: avoids an import cycle with the package root
+        self.write(dumps(obj, pretty=pretty))
+
+    def flush(self) -> None:
+        """Call the object's ``flush`` when it has one."""
+        if self._closed:
+            raise BovnarArgumentError("FrameWriter has been closed")
+        if self._flush_obj is not None:
+            self._flush_obj()
+
+    def close(self) -> None:
+        """Flush the object and refuse further documents. Safe to call
+        twice."""
+        if self._closed:
+            return
+        self._closed = True
+        if self._flush_obj is not None and not self._failed:
+            self._flush_obj()
+
+    def __enter__(self) -> 'FrameWriter':
+        return self
+
+    def __exit__(self, *_) -> None:
+        self.close()

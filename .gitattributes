@@ -11,6 +11,10 @@
 # convention; a tool that needs to enforce that should do it, not the filter.
 *.bvnr -text
 
+# BVF1 frame streams (the shared vectors in tests/stream_vectors/): a binary
+# header before each document, so binary in every respect.
+*.bvf binary
+
 # GitHub Linguist: classify and (once the language is accepted upstream)
 # highlight .bvnr files as "Bovnar". Until github/linguist ships the language,
 # linguist-language is a harmless no-op; see dist/linguist/ for the submission.

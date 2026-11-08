@@ -2947,37 +2947,50 @@ bool bvnr_write_version(bvnr_writer_t* w, uint16_t major, uint16_t minor)
 	return true;
 }
 /*
+ * The failing end of bvnr_write_finish: whatever is still buffered goes to the
+ * sink, as described below. The error, its code and its offset are latched
+ * already; a push or flush failing here must not replace them, so its result
+ * is not looked at. The offset stays right either way: it counts pushed plus
+ * buffered bytes, and the push only moves bytes from one to the other.
+ */
+static bool bvn_writer_fail_finish(bvnr_writer_t* w)
+{
+	if (w->val.last_error != error_writing_to_sink &&
+	    w->val.last_error != error_sink_buffer_exhausted &&
+	    bvn_sink_impl(&w->ser.sink)->push &&
+	    bvn_ser_flush_wbuf(&w->ser)) {
+		bvn_sink_impl_t* si = bvn_sink_impl(&w->ser.sink);
+		if (si->flush)
+			(void)si->flush(&w->ser.sink);
+	}
+	return false;
+}
+/*
  * Close out the document: refuse if any struct/array is still open (that would
  * be a truncated stream), emit the trailing ';' if one is pending, flush the
  * write buffer and the sink, and latch finished so no further events are
  * accepted. Must be called for output to be complete — the final separator and
  * any buffered bytes are only guaranteed on disk after this returns true.
  *
- * After an error it returns false and still hands the sink what was written up
- * to the error: a memory sink holds those bytes already, and an fd sink used to
- * keep whatever its 64 KiB buffer happened to hold back, so the same document
- * left an arbitrary block-aligned prefix of it -- or nothing -- depending on
- * where the error fell. A sink that has itself failed is not pushed again.
+ * When it fails it still hands the sink what was written up to the error --
+ * after an earlier error, and when it is the finish that finds the document
+ * incomplete: a memory sink holds those bytes already, and an fd or callback
+ * sink used to keep whatever its 64 KiB buffer happened to hold back, so the
+ * same document left an arbitrary block-aligned prefix of it -- or nothing --
+ * depending on where the error fell. A sink that has itself failed is not
+ * pushed again.
  */
 bool bvnr_write_finish(bvnr_writer_t* w)
 {
 	if (!w) return false;
-	if (w->val.last_error != error_none) {
-		if (w->val.last_error != error_writing_to_sink &&
-		    w->val.last_error != error_sink_buffer_exhausted &&
-		    bvn_sink_impl(&w->ser.sink)->push &&
-		    bvn_ser_flush_wbuf(&w->ser)) {
-			bvn_sink_impl_t* si = bvn_sink_impl(&w->ser.sink);
-			if (si->flush)
-				(void)si->flush(&w->ser.sink);
-		}
-		return false;
-	}
+	if (w->val.last_error != error_none)
+		return bvn_writer_fail_finish(w);
 	/* A spelling handed over and never used: the value it was meant for took
 	 * no unit, and it was the last one. */
 	if (w->val.unit_src_len) {
 		w->val.unit_src_len = 0;
-		return bvn_writer_set_error(w, error_unit_mismatch);
+		bvn_writer_set_error(w, error_unit_mismatch);
+		return bvn_writer_fail_finish(w);
 	}
 	/* An assignment still waiting for its value, or an unclosed annotation, is
 	 * just as incomplete as an unclosed struct — it leaves ".k=" or ".k=<" in the
@@ -2986,8 +2999,10 @@ bool bvnr_write_finish(bvnr_writer_t* w)
 	 * the same thing. */
 	if (w->ser.struct_depth > 0 || w->ser.array_depth > 0 ||
 	    w->ser.w_awaiting_value || w->ser.w_in_annotation ||
-	    w->ser.in_octet_stream || w->ser.w_after_dim)
-		return bvn_writer_set_error(w, error_got_incomplete_bvnr_stream);
+	    w->ser.in_octet_stream || w->ser.w_after_dim) {
+		bvn_writer_set_error(w, error_got_incomplete_bvnr_stream);
+		return bvn_writer_fail_finish(w);
+	}
 	w->ser.ser_error = error_none;
 	if (!bvn_ser_finish_stream(&w->ser)) {
 		if (w->ser.ser_error != error_none)

@@ -208,6 +208,21 @@ API and implements spec 1.2.
   documented as valid for the call only. Demultiplexing 30 KB messages with
   `bvnr_read` and `bvnr_demux_on_event` went from about 7.2 µs to 0.25 µs each.
 
+### Fixed
+
+- **A failing `bvnr_write_finish` hands the sink everything written, also
+  when it is the finish that finds the document incomplete.** After an earlier
+  error it already pushed what its 64 KiB buffer held, but when the finish
+  itself found an open struct, array, assignment, annotation or octet stream
+  (`error_got_incomplete_bvnr_stream`), or a unit spelling no value took
+  (`error_unit_mismatch`), it returned at once, so an fd or callback sink held
+  only the blocks pushed so far — a prefix of what a memory sink holds, or
+  nothing. It now pushes the rest and calls the sink's flush in that case too;
+  the result, the error code and the error offset are unchanged, and a sink
+  that has itself failed is still not pushed again. `bvnr_feed_test` now
+  requires the callback sink's bytes to equal the memory sink's for every
+  corpus document, finished or not (doc/08 §2.9).
+
 ## [2.0.2] - 2026-11-04
 
 ### Added

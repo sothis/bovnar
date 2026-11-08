@@ -2273,15 +2273,13 @@ static void replay_doc(const doc_t* doc, bool pretty, long flush_at,
 }
 
 /* `a` matches the memory-sink run `mem`: the same result, and its sink got
- * what the memory sink holds. Whole when the finish succeeded; when it failed
- * on an incomplete document, a prefix, because bvnr_write_finish does not push
- * what is still buffered when it is the finish that finds the error. */
+ * exactly what the memory sink holds -- also when the finish failed, on an
+ * earlier error or on a document it found incomplete (a read that stopped
+ * part-way), because a failing bvnr_write_finish still pushes what is
+ * buffered. */
 static bool replay_same(const replay_res_t* a, const replay_res_t* mem)
 {
-	bool whole = buf_eq(&a->out, &mem->out);
-	bool prefix = a->out.n <= mem->out.n &&
-		      (a->out.n == 0 || memcmp(a->out.p, mem->out.p, a->out.n) == 0);
-	return (a->finish_ok ? whole : prefix) &&
+	return buf_eq(&a->out, &mem->out) &&
 	       a->read_ok == mem->read_ok && a->finish_ok == mem->finish_ok &&
 	       a->err == mem->err && a->err_offset == mem->err_offset &&
 	       a->events == mem->events;
@@ -2301,8 +2299,10 @@ static void test_write_flush_identity(void)
 			replay_res_t ref, every, mem, one;
 			replay_doc(doc, pretty, FLUSH_NEVER, 0, &ref);
 			replay_doc(doc, pretty, FLUSH_EVERY, 0, &every);
-			/* The unpushed rest of a failed finish is under 64 KiB. */
-			uint64_t cap = (uint64_t)ref.out.n * 2u + 2u * 65536u;
+			/* Room for what the callback sink got and one byte more: a
+			 * memory sink that had to hold more would run out, and the
+			 * comparison below would fail. */
+			uint64_t cap = (uint64_t)ref.out.n + 1u;
 			replay_doc(doc, pretty, FLUSH_EVERY, cap, &mem);
 			char msg[160];
 			snprintf(msg, sizeof(msg), "%s (%s): flushed after every "
@@ -2585,6 +2585,162 @@ static void test_write_flush_edges(void)
 	bvnr_writer_destroy(w);
 }
 
+/* ---------------------------------------------------------------------------
+ * bvnr_write_finish on a document it finds incomplete: it fails, and still
+ * hands the sink everything written, as it does after an earlier error. An fd
+ * or callback sink used to keep only what its 64 KiB buffer had pushed, a
+ * prefix of what a memory sink holds.
+ * ------------------------------------------------------------------------- */
+enum { STOP_STRUCT, STOP_KEY, STOP_ANNOTATION, STOP_MUX, STOP_SPELLING,
+       STOP_COUNT };
+
+static void write_key(bvnr_writer_t* w, const char* key)
+{
+	bvnr_data_t d;
+	memset(&d, 0, sizeof(d));
+	d.type   = token_is_identifier;
+	d.data   = key;
+	d.length = (uint32_t)strlen(key);
+	bvnr_write_event(w, ev_assignment_start, &d);
+}
+
+/* A document that stops part-way in the way `stop` names, after `filler`
+ * bytes of complete values (enough to pass the 64 KiB buffer, so that the
+ * sink has had a push before the finish). */
+static void write_stopped(bvnr_writer_t* w, int stop, size_t filler)
+{
+	static char text[4097];
+	memset(text, 'x', sizeof(text) - 1u);
+	for (size_t n = 0; n < filler; n += sizeof(text) - 1u)
+		bvnr_write_string(w, "t", text);
+	switch (stop) {
+	case STOP_STRUCT:
+		bvnr_write_struct_start(w, "s");
+		bvnr_write_bool(w, "f", true);
+		break;
+	case STOP_KEY:
+		write_key(w, "k");
+		break;
+	case STOP_ANNOTATION: {
+		bvnr_data_t d;
+		memset(&d, 0, sizeof(d));
+		write_key(w, "k");
+		d.type = token_is_type;
+		d.value_type.family = vt_uint;
+		d.value_type.width  = 8;
+		bvnr_write_event(w, ev_type_annotation_start, &d);
+		bvnr_write_event(w, ev_type_annotation_type_family, &d);
+		break;
+	}
+	case STOP_MUX:
+		bvnr_mux_begin(w, "media");
+		bvnr_mux_send(w, 1, "frame", 5);
+		break;
+	case STOP_SPELLING:
+		/* A complete document, but a unit spelling was handed over for a
+		 * value that never came: the finish reports error_unit_mismatch. */
+		bvnr_write_uint(w, "n", 8, 1);
+		bvnr_writer_set_unit_source(w, "km", 2);
+		break;
+	}
+}
+
+static void test_write_finish_incomplete(void)
+{
+	printf("bvnr_write_finish: an incomplete document still reaches the sink\n");
+	static const error_code_t want[STOP_COUNT] = {
+		error_got_incomplete_bvnr_stream, error_got_incomplete_bvnr_stream,
+		error_got_incomplete_bvnr_stream, error_got_incomplete_bvnr_stream,
+		error_unit_mismatch };
+	static const size_t fillers[] = { 0, 100, 70000 };
+	const uint64_t cap = 1u << 20;
+	uint8_t* mem = xmalloc((size_t)cap);
+	for (int stop = 0; stop < STOP_COUNT; stop++) {
+		for (size_t f = 0; f < sizeof(fillers) / sizeof(fillers[0]); f++) {
+			char msg[160];
+			snprintf(msg, sizeof(msg), "stop %d after %zu bytes", stop,
+				 fillers[f]);
+			bvnr_writer_t* wm = bvnr_writer_create();
+			bvnr_open_write_mem(wm, mem, cap, false, NULL);
+			write_stopped(wm, stop, fillers[f]);
+			bool mem_ok = bvnr_write_finish(wm);
+			uint64_t mem_n = bvnr_writer_bytes_written(wm);
+
+			cb_sink_t cs;
+			memset(&cs, 0, sizeof(cs));
+			bvnr_sink_t sink;
+			bvnr_sink_to_callback(&sink, cb_push, cb_flush, &cs);
+			bvnr_writer_t* w = bvnr_writer_create();
+			bvnr_open_write_sink(w, &sink, false, NULL);
+			write_stopped(w, stop, fillers[f]);
+			ASSERT_TRUE(bvnr_writer_get_error(w) == error_none, msg);
+			ASSERT_TRUE(!mem_ok && !bvnr_write_finish(w), msg);
+			ASSERT_EQ_UINT(bvnr_writer_get_error(w), want[stop], msg);
+			ASSERT_EQ_UINT(bvnr_writer_get_error(wm), want[stop], msg);
+			ASSERT_EQ_UINT(bvnr_writer_get_error_offset(w),
+				bvnr_writer_get_error_offset(wm), msg);
+			ASSERT_TRUE(cs.out.n == mem_n &&
+				    memcmp(cs.out.p, mem, (size_t)mem_n) == 0, msg);
+			ASSERT_EQ_UINT(cs.flushes, 1, msg);
+			/* A second finish keeps the first error and pushes nothing. */
+			uint32_t pushes = cs.pushes;
+			ASSERT_TRUE(!bvnr_write_finish(w), msg);
+			ASSERT_EQ_UINT(bvnr_writer_get_error(w), want[stop], msg);
+			ASSERT_EQ_UINT(cs.pushes, pushes, msg);
+			buf_free(&cs.out);
+
+			/* A sink that refuses that last push: the error stays the
+			 * finish's own, at the same offset. */
+			if (mem_n % 65536u) {
+				memset(&cs, 0, sizeof(cs));
+				cs.fail_after = mem_n - 1u;
+				bvnr_sink_to_callback(&sink, cb_push, cb_flush, &cs);
+				bvnr_open_write_sink(w, &sink, false, NULL);
+				write_stopped(w, stop, fillers[f]);
+				ASSERT_TRUE(!bvnr_write_finish(w), msg);
+				ASSERT_EQ_UINT(bvnr_writer_get_error(w), want[stop],
+					msg);
+				ASSERT_EQ_UINT(bvnr_writer_get_error_offset(w),
+					bvnr_writer_get_error_offset(wm), msg);
+				ASSERT_EQ_UINT(cs.flushes, 0, msg);
+				buf_free(&cs.out);
+			}
+			bvnr_writer_destroy(w);
+			bvnr_writer_destroy(wm);
+		}
+	}
+
+#if !defined(_WIN32)
+	/* An fd sink gets the whole of it too. */
+	int fds[2];
+	ASSERT_TRUE(pipe(fds) == 0, "pipe");
+	fcntl(fds[0], F_SETFL, fcntl(fds[0], F_GETFL) | O_NONBLOCK);
+	bvnr_writer_t* wm = bvnr_writer_create();
+	bvnr_open_write_mem(wm, mem, cap, false, NULL);
+	write_stopped(wm, STOP_STRUCT, 100);
+	bvnr_write_finish(wm);
+	uint64_t mem_n = bvnr_writer_bytes_written(wm);
+	bvnr_sink_t fd_sink;
+	bvnr_sink_to_fd(&fd_sink, fds[1]);
+	bvnr_writer_t* w = bvnr_writer_create();
+	bvnr_open_write_sink(w, &fd_sink, false, NULL);
+	write_stopped(w, STOP_STRUCT, 100);
+	ASSERT_TRUE(!bvnr_write_finish(w), "fd sink: the finish fails");
+	ASSERT_EQ_UINT(bvnr_writer_get_error(w),
+		error_got_incomplete_bvnr_stream, "fd sink: incomplete");
+	uint8_t got[8192];
+	ssize_t n = read(fds[0], got, sizeof(got));
+	ASSERT_TRUE(n > 0 && (uint64_t)n == mem_n &&
+		    memcmp(got, mem, (size_t)mem_n) == 0,
+		"fd sink: the bytes a memory sink holds");
+	close(fds[0]);
+	close(fds[1]);
+	bvnr_writer_destroy(w);
+	bvnr_writer_destroy(wm);
+#endif
+	free(mem);
+}
+
 int main(int argc, char** argv)
 {
 	corpus_builtin();
@@ -2605,6 +2761,7 @@ int main(int argc, char** argv)
 	test_write_flush_identity();
 	test_write_flush_live();
 	test_write_flush_edges();
+	test_write_finish_incomplete();
 
 	for (size_t i = 0; i < g_ndocs; i++) {
 		free(g_docs[i].name);

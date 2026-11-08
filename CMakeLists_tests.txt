@@ -497,11 +497,13 @@ if (BVNR_FUZZ_TEST)
     _bvnr_fuzz_test(bvnr_fuzz_reader reader ${BVNR_FUZZ_SMOKE_ITER} "fuzz;fuzz_smoke" 60)
     _bvnr_fuzz_test(bvnr_fuzz_dom    dom    ${BVNR_FUZZ_SMOKE_ITER} "fuzz;fuzz_smoke" 60)
     _bvnr_fuzz_test(bvnr_fuzz_utils  utils  ${BVNR_FUZZ_SMOKE_ITER} "fuzz;fuzz_smoke" 60)
+    _bvnr_fuzz_test(bvnr_fuzz_feed   feed   ${BVNR_FUZZ_SMOKE_ITER} "fuzz;fuzz_smoke" 120)
 
     _bvnr_fuzz_test(bvnr_fuzz_reader_deep    reader ${BVNR_FUZZ_DEEP_ITER}     "fuzz_deep"     600)
     _bvnr_fuzz_test(bvnr_fuzz_reader_thorough reader ${BVNR_FUZZ_THOROUGH_ITER} "fuzz_thorough" 300)
     _bvnr_fuzz_test(bvnr_fuzz_dom_deep        dom    ${BVNR_FUZZ_DEEP_ITER}     "fuzz_deep"     600)
     _bvnr_fuzz_test(bvnr_fuzz_utils_deep      utils  ${BVNR_FUZZ_DEEP_ITER}     "fuzz_deep"     600)
+    _bvnr_fuzz_test(bvnr_fuzz_feed_deep       feed   ${BVNR_FUZZ_DEEP_ITER}     "fuzz_deep"     900)
 
     add_executable(bvnr_fuzz_writer_test tests/bovnar_fuzz_writer.c)
     target_compile_definitions(bvnr_fuzz_writer_test PRIVATE FUZZ_STANDALONE)
@@ -663,6 +665,7 @@ if (BVNR_FUZZ_EXTERNAL)
     _bvnr_fuzz_external(reader tests/bovnar_fuzz_reader.c)
     _bvnr_fuzz_external(dom    tests/bovnar_fuzz_dom.c)
     _bvnr_fuzz_external(utils  tests/bovnar_fuzz_utils.c)
+    _bvnr_fuzz_external(feed   tests/bovnar_fuzz_feed.c)
 
     # Corpus seed generator: writes starter inputs under
     # <out>/{reader,dom,utils} (default ./corpus).  Plain tool, no
@@ -1464,7 +1467,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 194)   # 132 base + rust_build_sync + canonical_keeps_meaning + interval_array + bench_iterations_zero + sitemap + convert_wide_int + unit_source + 3 for examples/unit_profiles.bvnr + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier) + cli_regressions + wasm_native_shape + abi_baseline + crate_provenance
+set(BVNR_EXPECTED_TEST_COUNT 196)   # 134 base + rust_build_sync + canonical_keeps_meaning + interval_array + bench_iterations_zero + sitemap + convert_wide_int + unit_source + 3 for examples/unit_profiles.bvnr + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier) + cli_regressions + wasm_native_shape + abi_baseline + crate_provenance
                                     #             + citation
                                     #         + profiles_off_build
                                     # + om_test + cf_test

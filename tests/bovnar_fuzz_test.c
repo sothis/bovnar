@@ -37,6 +37,7 @@
 #include "bovnar.h"
 #include "bvn_internal_dims.h"
 #include "bovnar_dom.h"
+#include "bovnar_stream.h"
 
 #define MAX_BUF      8192u
 #define MAX_SEED     4096u
@@ -482,6 +483,21 @@ static const seed_entry_t CORPUS[] = {
 	S("#!bovnar 1.1"),
 	S("#!bovnar1.1\n.a = 1;\n"),
 	S("\xEF\xBB\xBF#!bovnar 1.1\n.a = 1;\n"),
+
+	/*
+	 * Streaming: a multiplexed octet stream after metadata (channel 1: a
+	 * packed chunk with two messages; channel 2: a length varint split
+	 * across two chunks), and frame streams, so the feed harness starts
+	 * from inputs its frame reader and demux can get into.
+	 */
+	B('.','m','=','"','x','"',';','.','x','=', 0x00,
+	  0x01, 0x07,0x00, 0x01, 0x02,'h','i', 0x01,'!', 0x00,
+	  0x01, 0x02,0x00, 0x02, 0x83,
+	  0x01, 0x05,0x00, 0x02, 0x01, 'a','b','c',
+	  0x00, ';', '.','t','=','1',';'),
+	B('B','V','F','1', 0x05,0,0,0,0,0,0,0, '.','a','=','1',';',
+	  'B','V','F','1', 0x00,0,0,0,0,0,0,0,
+	  'B','V','F','1', 0x04,0,0,0,0,0,0,0, '.','b','=','@'),
 };
 
 #undef S
@@ -901,6 +917,342 @@ static void harness_utils(const uint8_t *data, size_t len,
 	}
 }
 
+
+/*
+ * The push-fed readers. Each input is read three ways, each against its
+ * reference, with the feed cut into pieces derived from `cuts_seed`:
+ *
+ *   document  bvnr_read_feed vs bvnr_read: the same events (hashed, every
+ *             field), result, error, position and counters, or it traps;
+ *   frames    the input as a frame stream: bvnr_frame_reader in parse mode vs
+ *             bvnr_doc_stream_read (result and count), and in pull mode
+ *             (documents handed out, the same count);
+ *   demux     the input as a document carrying a mux stream: the fed demux,
+ *             callback and pull mode, vs bvnr_demux_on_event on a reader of
+ *             the whole buffer (messages hashed, demux error, read result).
+ */
+typedef struct {
+	uint64_t h;
+	uint32_t verified;
+	uint32_t abort_after;
+} feed_hash_t;
+
+static void fh_mix(feed_hash_t *fh, const void *p, size_t n)
+{
+	const uint8_t *b = p;
+	for (size_t i = 0; i < n; i++) {
+		fh->h ^= b[i];
+		fh->h *= UINT64_C(0x100000001b3);
+	}
+}
+
+static void fh_u64(feed_hash_t *fh, uint64_t v) { fh_mix(fh, &v, sizeof(v)); }
+
+static void fh_event(feed_hash_t *fh, uint8_t tag, bvnr_event_t ev,
+		     const bvnr_data_t *d)
+{
+	fh_mix(fh, &tag, 1);
+	fh_u64(fh, (uint64_t)ev);
+	if (!d) return;
+	fh_u64(fh, (uint64_t)d->type);
+	fh_u64(fh, (uint64_t)d->value_type.family);
+	fh_u64(fh, d->value_type.width);
+	fh_u64(fh, d->value_type.base);
+	fh_u64(fh, d->value_unit.num_components);
+	fh_u64(fh, d->length);
+	if (d->data && d->length) fh_mix(fh, d->data, d->length);
+	fh_u64(fh, d->unit_source_length);
+	if (d->unit_source && d->unit_source_length)
+		fh_mix(fh, d->unit_source, d->unit_source_length);
+}
+
+static bool feed_on_verified(void *ud, bvnr_event_t ev, bvnr_data_t *d)
+{
+	feed_hash_t *fh = ud;
+	fh_event(fh, 'v', ev, d);
+	if (fh->abort_after && ++fh->verified >= fh->abort_after)
+		return false;
+	return true;
+}
+
+static bool feed_on_unverified(void *ud, bvnr_event_t ev, bvnr_data_t *d)
+{
+	fh_event(ud, 'u', ev, d);
+	return true;
+}
+
+static void feed_on_error(void *ud, error_code_t err, uint64_t line,
+			  uint64_t col, uint32_t byte, uint64_t off)
+{
+	feed_hash_t *fh = ud;
+	fh_u64(fh, (uint64_t)err);
+	fh_u64(fh, line);
+	fh_u64(fh, col);
+	fh_u64(fh, byte);
+	fh_u64(fh, off);
+}
+
+typedef struct {
+	bool         ok;
+	error_code_t err;
+	uint64_t     line, col, off, rec, skip;
+	uint32_t     byte;
+	uint64_t     h;
+} feed_out_t;
+
+/* Piece ends for a buffer of len bytes: up to 64 cuts, at random. */
+static size_t feed_cuts(size_t len, uint64_t seed, size_t *cuts)
+{
+	prng_t rng;
+	prng_seed(&rng, seed);
+	size_t mode = (size_t)(prng_next(&rng) % 4u);
+	size_t n = 0, at = 0;
+	if (mode == 0 && len < 600) {
+		for (at = 1; at < len; at++) cuts[n++] = at;   /* single bytes */
+	} else {
+		size_t maxp = mode == 1 ? 3 : mode == 2 ? 64 : len / 2 + 1;
+		while (at < len && n < 63) {
+			at += 1 + (size_t)(prng_next(&rng) % maxp);
+			if (at >= len) break;
+			cuts[n++] = at;
+		}
+	}
+	cuts[n++] = len;
+	return n;
+}
+
+static void feed_flags(bvnr_read_flags_t *f, uint8_t cfg, feed_hash_t *fh,
+		       uint8_t abort_n, uint64_t len)
+{
+	memset(f, 0, sizeof(*f));
+	switch (cfg & 3u) {
+	case 1:
+		f->max_string_length = 8;
+		f->max_text_bytes    = 64;
+		f->max_struct_nesting = 4;
+		f->max_array_nesting  = 4;
+		break;
+	case 2:
+		f->max_file_size = len > 2 ? len / 2 : 1;
+		break;
+	case 3:
+		f->strict_version = true;
+		break;
+	default:
+		break;
+	}
+	f->continue_on_error = (cfg >> 2) & 1u;
+	f->userdata      = fh;
+	f->on_verified   = feed_on_verified;
+	f->on_unverified = feed_on_unverified;
+	f->on_error      = feed_on_error;
+	fh->abort_after  = (cfg & 8u) ? (uint32_t)abort_n + 1u : 0u;
+}
+
+static void feed_collect(feed_out_t *o, bvnr_reader_t *r, bool ok,
+			 const feed_hash_t *fh)
+{
+	o->ok   = ok;
+	o->err  = bvnr_reader_get_error(r);
+	o->line = bvnr_reader_get_error_line(r);
+	o->col  = bvnr_reader_get_error_column(r);
+	o->off  = bvnr_reader_get_error_offset(r);
+	o->byte = bvnr_reader_get_error_byte(r);
+	o->rec  = bvnr_reader_get_recovery_count(r);
+	o->skip = bvnr_reader_get_skipped_bytes(r);
+	o->h    = fh->h;
+}
+
+static bool feed_out_eq(const feed_out_t *a, const feed_out_t *b)
+{
+	return a->ok == b->ok && a->err == b->err && a->line == b->line &&
+	       a->col == b->col && a->off == b->off && a->byte == b->byte &&
+	       a->rec == b->rec && a->skip == b->skip && a->h == b->h;
+}
+
+static void feed_document(const uint8_t *data, size_t len, uint8_t cfg,
+			  uint8_t abort_n, const size_t *cuts, size_t ncuts)
+{
+	feed_out_t ref, got;
+	feed_hash_t fh = { UINT64_C(0xcbf29ce484222325), 0, 0 };
+	bvnr_read_flags_t f;
+	bvnr_reader_t *r = bvnr_reader_create();
+	if (!r) return;
+
+	feed_flags(&f, cfg, &fh, abort_n, len);
+	bool ok = bvnr_open_read_mem(r, data, len, NULL, 0, &f) && bvnr_read(r);
+	feed_collect(&ref, r, ok, &fh);
+
+	fh.h = UINT64_C(0xcbf29ce484222325);
+	fh.verified = 0;
+	feed_flags(&f, cfg, &fh, abort_n, len);
+	ok = bvnr_open_read_feed(r, NULL, &f);
+	size_t at = 0;
+	for (size_t i = 0; ok && i < ncuts; i++) {
+		ok = bvnr_read_feed(r, data + at, cuts[i] - at);
+		at = cuts[i];
+	}
+	ok = ok && bvnr_read_finish(r);
+	feed_collect(&got, r, ok, &fh);
+	bvnr_reader_destroy(r);
+	if (!feed_out_eq(&ref, &got)) __builtin_trap();
+}
+
+typedef struct { uint64_t count; } feed_docs_t;
+
+static bool feed_on_document(void *ud, uint64_t index, bool ok,
+			     error_code_t err)
+{
+	feed_docs_t *c = ud;
+	if ((unsigned)err >= (unsigned)BVN_ERROR_COUNT) __builtin_trap();
+	c->count += index + (ok ? 1u : 2u);
+	return true;
+}
+
+static void feed_frames(const uint8_t *data, size_t len, uint8_t cfg,
+			const size_t *cuts, size_t ncuts)
+{
+	bvnr_doc_stream_opts_t o;
+	feed_docs_t ref_docs = {0}, got_docs = {0};
+	memset(&o, 0, sizeof(o));
+	o.on_document = feed_on_document;
+	o.continue_past_failed = cfg & 1u;
+	o.max_document_size = (cfg & 2u) ? 64u : 0u;
+
+	o.userdata = &ref_docs;
+	bvnr_source_t src;
+	bvnr_source_from_mem(&src, data, len);
+	uint64_t ref_count = 0;
+	bool ref_ok = bvnr_doc_stream_read(&src, &o, &ref_count);
+
+	o.userdata = &got_docs;
+	bvnr_frame_reader_t *fr = bvnr_frame_reader_create(&o);
+	if (!fr) return;
+	bool ok = true;
+	size_t at = 0;
+	for (size_t i = 0; ok && i < ncuts; i++) {
+		ok = bvnr_frame_reader_feed(fr, data + at, cuts[i] - at);
+		at = cuts[i];
+	}
+	ok = ok && bvnr_frame_reader_finish(fr);
+	if (ok != ref_ok || bvnr_frame_reader_count(fr) != ref_count ||
+	    got_docs.count != ref_docs.count)
+		__builtin_trap();
+	bvnr_frame_reader_destroy(fr);
+
+	/* Pull mode hands out the same documents bvnr_doc_stream_read parsed. */
+	fr = bvnr_frame_reader_create_pull(o.max_document_size);
+	if (!fr) return;
+	ok = true;
+	at = 0;
+	uint64_t handed = 0;
+	for (size_t i = 0; ok && i < ncuts; i++) {
+		const uint8_t *doc;
+		uint64_t dl;
+		int rc;
+		ok = bvnr_frame_reader_feed(fr, data + at, cuts[i] - at);
+		at = cuts[i];
+		while (ok && (rc = bvnr_frame_reader_next(fr, &doc, &dl)) ==
+		       BVNR_NEXT_DOCUMENT) {
+			if (dl) (void)(doc[0] + doc[dl - 1]);
+			handed++;
+		}
+	}
+	(void)bvnr_frame_reader_finish(fr);
+	/* A strict reference stops at the first failed document; pull mode does
+	 * not parse, so it can only have seen as many or more. */
+	if (handed < (o.continue_past_failed ? ref_count : 0)) __builtin_trap();
+	bvnr_frame_reader_destroy(fr);
+}
+
+static bool feed_on_msg(void *ud, uint64_t ch, const uint8_t *p, uint64_t n)
+{
+	feed_hash_t *fh = ud;
+	fh_u64(fh, ch);
+	fh_u64(fh, n);
+	if (n) fh_mix(fh, p, (size_t)n);
+	return true;
+}
+
+static void feed_demux(const uint8_t *data, size_t len, uint8_t cfg,
+		       const size_t *cuts, size_t ncuts)
+{
+	const char *key = (cfg & 1u) ? "x" : NULL;
+	uint64_t maxm = (cfg & 2u) ? 16u : 0u;
+
+	feed_hash_t ref = { UINT64_C(0xcbf29ce484222325), 0, 0 };
+	bvnr_demux_t *dm = bvnr_demux_create(feed_on_msg, &ref, maxm);
+	if (!dm) return;
+	if (key) bvnr_demux_set_key(dm, key);
+	bvnr_read_flags_t f;
+	memset(&f, 0, sizeof(f));
+	f.userdata = dm;
+	f.on_verified = bvnr_demux_on_event;
+	bvnr_reader_t *r = bvnr_reader_create();
+	bool ref_ok = r && bvnr_open_read_mem(r, data, len, NULL, 0, &f) &&
+		      bvnr_read(r);
+	error_code_t ref_err = bvnr_demux_error(dm);
+	if (ref_err == error_none && r)
+		ref_err = bvnr_reader_get_error(r);
+	bvnr_reader_destroy(r);
+	bvnr_demux_destroy(dm);
+
+	/* Callback mode. */
+	feed_hash_t got = { UINT64_C(0xcbf29ce484222325), 0, 0 };
+	dm = bvnr_demux_create(feed_on_msg, &got, maxm);
+	if (!dm) return;
+	if (key) bvnr_demux_set_key(dm, key);
+	bool ok = bvnr_demux_open_feed(dm, NULL, false);
+	size_t at = 0;
+	for (size_t i = 0; ok && i < ncuts; i++) {
+		ok = bvnr_demux_feed(dm, data + at, cuts[i] - at);
+		at = cuts[i];
+	}
+	ok = ok && bvnr_demux_finish(dm);
+	if (ok != ref_ok || got.h != ref.h || bvnr_demux_error(dm) != ref_err)
+		__builtin_trap();
+	bvnr_demux_destroy(dm);
+
+	/* Pull mode, with the document's events. Up to its first failure it
+	 * delivers what the reference delivered. */
+	feed_hash_t pulled = { UINT64_C(0xcbf29ce484222325), 0, 0 };
+	dm = bvnr_demux_create(NULL, NULL, maxm);
+	if (!dm) return;
+	if (key) bvnr_demux_set_key(dm, key);
+	ok = bvnr_demux_open_feed(dm, NULL, (cfg & 4u) != 0);
+	at = 0;
+	bvnr_demux_item_t it;
+	for (size_t i = 0; ok && i <= ncuts; i++) {
+		int rc;
+		if (i < ncuts) {
+			ok = bvnr_demux_feed(dm, data + at, cuts[i] - at);
+			at = cuts[i];
+		} else {
+			ok = bvnr_demux_finish(dm);
+		}
+		while ((rc = bvnr_demux_next(dm, &it)) > 0) {
+			if (rc == BVNR_NEXT_MESSAGE)
+				feed_on_msg(&pulled, it.channel, it.data, it.length);
+			else if (!it.value)
+				__builtin_trap();
+		}
+		if (rc == BVNR_NEXT_ERROR) ok = false;
+	}
+	if (ok != ref_ok || pulled.h != ref.h || bvnr_demux_error(dm) != ref_err)
+		__builtin_trap();
+	bvnr_demux_destroy(dm);
+}
+
+static void harness_feed(const uint8_t *data, size_t len, uint8_t cfg,
+			 uint8_t abort_n, uint64_t cuts_seed)
+{
+	size_t cuts[MAX_BUF + 2];
+	size_t ncuts = feed_cuts(len, cuts_seed, cuts);
+	feed_document(data, len, cfg, abort_n, cuts, ncuts);
+	feed_frames(data, len, cfg, cuts, ncuts);
+	feed_demux(data, len, cfg, cuts, ncuts);
+}
+
 static const uint8_t READER_CFGS[] = {
 	0x00,
 	0x04,
@@ -913,7 +1265,8 @@ static const uint8_t READER_CFGS[] = {
 };
 #define N_READER_CFGS (sizeof(READER_CFGS) / sizeof(READER_CFGS[0]))
 
-typedef enum { HARNESS_READER, HARNESS_DOM, HARNESS_UTILS, HARNESS_ALL } harness_sel_t;
+typedef enum { HARNESS_READER, HARNESS_DOM, HARNESS_UTILS, HARNESS_FEED,
+	HARNESS_ALL } harness_sel_t;
 
 typedef struct {
 	harness_sel_t harness;
@@ -945,6 +1298,13 @@ static void run_seeds(const run_opts_t *opts)
 				printf("[dom] seed=%zu len=%zu\n", i, n);
 			set_crash_context("dom", (unsigned)i, d, n);
 			harness_dom(d, n);
+		}
+		if (opts->harness == HARNESS_FEED || opts->harness == HARNESS_ALL) {
+			for (size_t c = 0; c < N_READER_CFGS; c++) {
+				set_crash_context("feed", (unsigned)i, d, n);
+				harness_feed(d, n, READER_CFGS[c], (uint8_t)(i & 0xFF),
+					     (uint64_t)(i * 31u + c));
+			}
 		}
 		if (opts->harness == HARNESS_UTILS || opts->harness == HARNESS_ALL) {
 			for (uint8_t sel = 0; sel < N_UTIL_FUNCS; sel++) {
@@ -997,6 +1357,14 @@ static void run_mutations(const run_opts_t *opts)
 			set_crash_context("dom", (unsigned)iter, mbuf.data, mbuf.len);
 			harness_dom(mbuf.data, mbuf.len);
 		}
+		if (opts->harness == HARNESS_FEED || opts->harness == HARNESS_ALL) {
+			if (opts->verbose)
+				printf("[feed] iter=%zu cfg=0x%02x len=%zu\n",
+					   iter, cfg, mbuf.len);
+			set_crash_context("feed", (unsigned)iter, mbuf.data, mbuf.len);
+			harness_feed(mbuf.data, mbuf.len, cfg, abort_n,
+				     ((uint64_t)aux_a << 8 | aux_b) ^ (uint64_t)iter);
+		}
 		if (opts->harness == HARNESS_UTILS || opts->harness == HARNESS_ALL) {
 			set_crash_context("utils", (unsigned)iter, mbuf.data, mbuf.len);
 			harness_utils(mbuf.data, mbuf.len, sel, aux_a, aux_b, opts->verbose);
@@ -1014,7 +1382,7 @@ static void usage(const char *argv0)
 {
 	fprintf(stderr,
 		"Usage: %s [options]\n"
-		"  --harness  reader|dom|utils|all  (default: all)\n"
+		"  --harness  reader|dom|utils|feed|all  (default: all)\n"
 		"  --iterations N                   mutation rounds (default: 5000)\n"
 		"  --seed N                         PRNG seed; 0=time (default: 1)\n"
 		"  --verbose                        print progress and API calls being tested\n"
@@ -1046,6 +1414,7 @@ int main(int argc, char **argv)
 			if      (strcmp(argv[i], "reader") == 0) opts.harness = HARNESS_READER;
 			else if (strcmp(argv[i], "dom")    == 0) opts.harness = HARNESS_DOM;
 			else if (strcmp(argv[i], "utils")  == 0) opts.harness = HARNESS_UTILS;
+			else if (strcmp(argv[i], "feed")   == 0) opts.harness = HARNESS_FEED;
 			else if (strcmp(argv[i], "all")    == 0) opts.harness = HARNESS_ALL;
 			else { fprintf(stderr, "unknown harness: %s\n", argv[i]); return 2; }
 		} else if (strcmp(argv[i], "--iterations") == 0 && i + 1 < argc) {
@@ -1067,7 +1436,8 @@ int main(int argc, char **argv)
 	printf("[bvnr_fuzz] harness=%s  iterations=%zu  seed=%llu\n",
 		   opts.harness == HARNESS_READER ? "reader" :
 		   opts.harness == HARNESS_DOM    ? "dom"    :
-		   opts.harness == HARNESS_UTILS  ? "utils"  : "all",
+		   opts.harness == HARNESS_UTILS  ? "utils"  :
+		   opts.harness == HARNESS_FEED   ? "feed"   : "all",
 		   opts.iterations,
 		   (unsigned long long)opts.prng_seed);
 	fflush(stdout);

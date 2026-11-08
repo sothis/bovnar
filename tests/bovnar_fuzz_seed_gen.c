@@ -329,12 +329,14 @@ int main(int argc, char **argv)
 {
 	const char *base = argc > 1 ? argv[1] : "corpus";
 
-	char reader_dir[4096], dom_dir[4096], utils_dir[4096];
+	char reader_dir[4096], dom_dir[4096], utils_dir[4096], feed_dir[4096];
 	snprintf(reader_dir, sizeof(reader_dir), "%s/reader", base);
 	snprintf(dom_dir,    sizeof(dom_dir),    "%s/dom",    base);
 	snprintf(utils_dir,  sizeof(utils_dir),  "%s/utils",  base);
+	snprintf(feed_dir,   sizeof(feed_dir),   "%s/feed",   base);
 
-	if (mkdirp(reader_dir) || mkdirp(dom_dir) || mkdirp(utils_dir)) {
+	if (mkdirp(reader_dir) || mkdirp(dom_dir) || mkdirp(utils_dir) ||
+	    mkdirp(feed_dir)) {
 		fprintf(stderr, "Failed to create output directories: %s\n",
 				strerror(errno));
 		return 1;
@@ -345,7 +347,11 @@ int main(int argc, char **argv)
 	write_dom_seeds(dom_dir);
 	g_file_counter = 0;
 	write_utils_seeds(utils_dir);
+	/* The feed target takes the reader's input shape, [config][seed][doc]:
+	 * the seed byte picks where the feed is cut. */
+	g_file_counter = 0;
+	write_reader_seeds(feed_dir);
 
-	printf("\nDone. Corpus written to %s/{reader,dom,utils}/\n", base);
+	printf("\nDone. Corpus written to %s/{reader,dom,utils,feed}/\n", base);
 	return 0;
 }

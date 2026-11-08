@@ -212,6 +212,10 @@ if [[ $RUN_FUZZ -eq 1 ]]; then
         "$TESTS_DIR/bvnr_fuzz_test" \
         --harness utils --iterations "$FUZZ_ITER" --seed 42
 
+    run_test "bvnr_fuzz_test --harness feed" \
+        "$TESTS_DIR/bvnr_fuzz_test" \
+        --harness feed --iterations "$FUZZ_ITER" --seed 42
+
     SEED_FILE="${SCRATCH_DIR}/bvnr_fuzz_writer_seed.bin"
     printf 'X' > "$SEED_FILE"
 

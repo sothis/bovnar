@@ -54,6 +54,33 @@ API and implements spec 1.2.
   ordinary metadata values (`.meta = {…}; .media = <stream>;`) that a consumer
   has before the first message. A message that lies whole in the fed buffer is
   handed out from it.
+- **Python: live streams.** `bovnar.stream.DocumentFeed`, `FrameFeed` and
+  `DemuxFeed` wrap the push-fed reader, frame reader and demux: each is handed
+  bytes in pieces of any size, and `feed()` returns the object, which iterates
+  over what those bytes completed. `DocumentFeed` gives the events
+  `Reader.read_mem` gives for the whole document, or each top-level value as a
+  `Value(key, value)` once it is complete (not kept afterwards, so an endless
+  document costs flat memory). `DemuxFeed` gives `Message(channel, payload)`
+  per message, drained with `bvnr_demux_next` and no ctypes callback, and with
+  `values=True` the values before and after the mux stream in document order,
+  so metadata ahead of the stream arrives before the first message.
+  `FrameFeed` gives each document's bytes, or each document parsed as
+  `load_documents` parses it. Limits and error codes are those of the batch
+  functions. A payload is `bytes`, or with `view=True` a read-only
+  `memoryview` valid until the next call, which the feed then releases so a
+  late use raises instead of reading reused memory. A message costs
+  microseconds (doc/09 §4.7, `python/bench/bench_stream.py`).
+- **Python: sockets and file objects as sources and sinks.**
+  `Reader.read_stream`, `Writer.to_stream`, and `bovnar.load` / `bovnar.dump`
+  beside `loads` / `dumps`, over the callback source and sink;
+  `stream.load_documents` and `stream.mux_load` take a socket or binary file
+  object in place of bytes, and `frame_documents`, `dump_documents`,
+  `mux_dump` and `embed_document` a `file=`. The input is pulled as it is
+  parsed and the output pushed through the writer's 64 KiB buffer; the results
+  are those of the in-memory calls. An exception the object raises comes out
+  of the call unchanged.
+- **Python: `mux_dump(..., preamble={...})`** writes ordinary values before
+  the mux stream opens, for a reader to have before the first message.
 - **`bvnr_stream_bench`**, a benchmark of `bvnr_mux_send` and the demux, batch
   and fed, and of framed documents through `bvnr_doc_stream_read` and the
   parsing frame reader (`tests/bovnar_stream_bench.c`, built but not a test;

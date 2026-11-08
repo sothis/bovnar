@@ -467,6 +467,45 @@ for `max_document_size` and `max_message`, `0` selects their finite defaults
 value there to raise them. See [Python Bindings](09_bovnar_python_bindings.md)
 and `python/tests/test_stream.py`.
 
+**Sockets and file objects.** The loaders (`load_documents`, `mux_load`, and
+`bovnar.load` for one document) also take a socket or a binary file object and
+read it to its end through a callback source (§7.1), parsing as they pull; the
+dumpers take a `file=` and write through a callback sink. `mux_dump(...,
+preamble={...})` writes the values that describe the stream before it opens
+(§3.4).
+
+**Live streams** (§7) are read with three feed objects over the push-fed C
+readers, each handed bytes in pieces of any size: `DocumentFeed` (§7.2: a
+document's events, or each top-level value once it is complete), `FrameFeed`
+(§2.4: each document's bytes, or each document parsed) and `DemuxFeed` (§3.4:
+`(channel, payload)` per message, and with `values=True` the values before and
+after the mux stream, in document order). `DemuxFeed` and the unparsed
+`FrameFeed` drain with `bvnr_demux_next` / `bvnr_frame_reader_next`, one plain
+call per item and no callback (§7.3); a payload is `bytes`, or with
+`view=True` a `memoryview` valid until the next call, which the feed then
+releases:
+
+```python
+from bovnar import stream
+
+with stream.DemuxFeed(key="media", values=True) as dm:
+    for chunk in chunks:                          # whatever recv() returned
+        for item in dm.feed(chunk):
+            if isinstance(item, stream.Value):    # .meta before the first message
+                on_meta(item.key, item.value)
+            else:
+                on_frame(item.channel, item.payload)
+    dm.finish()                                   # raises if cut off part-way
+```
+
+The limits and error codes are those of the batch functions. A message costs
+microseconds in Python — the interpreter and ctypes, not the C path of §7.4:
+about 3 µs for a 150-byte message and 7 µs for a 30 KB one fed whole, against
+5 µs and 36 µs through `mux_load`'s callback, on the machine of §7.4. The
+figures, and what feeding in small pieces costs, are in
+[Python Bindings §4.7](09_bovnar_python_bindings.md#47-live-streams-feeding-in-pieces)
+(`python/bench/bench_stream.py`).
+
 ---
 
 ## 6. Composition
@@ -588,7 +627,8 @@ warm, nor the parsing frame reader and a re-opened fed demux per document; a
 - `include/bovnar_stream.h` — full declarations and per-function contracts
 - `tests/bovnar_stream_test.c` — round-trip tests for all four capabilities
 - `tests/bovnar_feed_test.c` — the push-fed readers and callback I/O against the batch functions
-- `python/bovnar/stream.py` — Python bindings; `python/tests/test_stream.py`
+- `python/bovnar/stream.py` — Python bindings; `python/tests/test_stream.py`,
+  `test_stream_io.py`, `test_stream_feed.py`
 
 ---
 

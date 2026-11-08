@@ -25,6 +25,7 @@ the C library; `import bovnar` itself never loads it.
     - 4.4 [DOM (random-access) API](#44-dom-random-access-api)
     - 4.5 [Low-level writer](#45-low-level-writer)
     - 4.6 [Streaming / framing (`bovnar.stream`)](#46-streaming--framing-bovnarstream)
+    - 4.7 [Live streams: feeding in pieces](#47-live-streams-feeding-in-pieces)
 5. [Unit helpers](#5-unit-helpers)
     - 5.1 [The unit-profile notations (spec 1.2)](#51-the-unit-profile-notations-spec-12)
     - 5.2 [Extended unit functions](#52-extended-unit-functions)
@@ -59,6 +60,7 @@ the C library; `import bovnar` itself never loads it.
     - 11.5 [`iter_mem(data, *, verified_only, max_file_size)`](#115-iter_memdata--verified_only-max_file_size)
     - 11.6 [Error-state properties](#116-error-state-properties)
     - 11.7 [`MAX_FILESIZE_BYTES`](#117-max_filesize_bytes)
+    - 11.8 [`read_stream`](#118-read_stream)
 12. [`Writer` reference](#12-writer-reference)
     - 12.1 [Construction class methods](#121-construction-class-methods)
     - 12.2 [Output retrieval](#122-output-retrieval)
@@ -215,6 +217,23 @@ writes the annotation either one needs to read back as itself.
 `dumps()` starts with a 4 MiB write buffer and doubles it automatically on
 overflow, up to 256 MiB.  The `cap` keyword argument that existed in earlier
 versions is no longer accepted.
+
+`bovnar.load(f)` and `bovnar.dump(obj, f)` are the two for a socket or a binary
+file object, with the same options and the same result: `load` pulls the bytes
+as the parse needs them and `dump` pushes the output through the writer's
+64 KiB buffer, so neither holds the whole document
+([`Reader.read_stream`](#118-read_stream), `Writer.to_stream`). The one
+difference is a failure on the way out: what `dump` pushed before a refused
+value has already reached the stream.
+
+```python
+import io
+
+buf = io.BytesIO()
+bovnar.dump({"sensor_id": 42, "label": "outdoor"}, buf)
+buf.getvalue() == bovnar.dumps({"sensor_id": 42, "label": "outdoor"})   # → True
+bovnar.load(io.BytesIO(buf.getvalue()))["label"]                        # → 'outdoor'
+```
 
 `dumps()` takes `None`, `bool`, `int` of any size, `float`, `str`, `Decimal`,
 a terminating `Fraction`, `bytes` / `bytearray` / `memoryview` (written as an
@@ -380,6 +399,153 @@ inner = stream.parse_embedded(bovnar.loads(outer)["payload"])   # {"v": 1}
 `parse_embedded` raises `BovnarParseError` carrying the inner document's own
 error code and position. `mux_dump` takes channels in the unsigned 64-bit
 range and raises `BovnarArgumentError` for anything outside it.
+
+`mux_dump(..., preamble={...})` writes a dict of ordinary values before the
+stream opens — what the stream is, read by a consumer before its first message
+(§4.7). `load_documents` and `mux_load` also take a socket or a binary file
+object in place of bytes and read it to its end, parsing as they pull;
+`frame_documents`, `dump_documents`, `mux_dump` and `embed_document` take a
+`file=` to write to instead of returning bytes. The results are those of the
+in-memory calls.
+
+### 4.7 Live streams: feeding in pieces
+
+The functions above take the whole input, or read a stream to its end. For
+input that arrives when it arrives — a non-blocking socket, an event loop, a
+queue — three objects in `bovnar.stream` each keep one C reader for the whole
+stream and are handed bytes in pieces of any size, cut anywhere:
+
+| Object | Fed | Hands out |
+|---|---|---|
+| `DocumentFeed` | one document | `DocumentEvent(event, data)` per verified event, as a `Reader` callback receives it; with `values=True`, `Value(key, value)` per top-level value once it is complete |
+| `DemuxFeed` | a document carrying a mux stream | `Message(channel, payload)` per message; with `values=True` the values before and after the stream, in document order; with `events=True` the document's events |
+| `FrameFeed` | a `BVF1` frame stream | each document's bytes; with `parse=True` each document parsed, as `load_documents` parses it |
+
+`feed(data)` returns the object itself, which iterates over what those bytes
+completed, and `finish()` says the input is over. Running out of input is never
+an error; `finish()` raises `BovnarParseError` for a document or frame cut off
+part-way. Every other error carries the code the batch function gives —
+`loads`, `mux_load`, a failed document's own code in `load_documents` — except
+that `FrameFeed` names a framing error the C frame reader's way (a bad magic is
+`UNEXPECTED_INPUT_BYTE`, a frame over `max_document_size` `VALUE_OUT_OF_RANGE`)
+where `load_documents` reports either as `GOT_INCOMPLETE_BVNR_STREAM`.
+`DocumentFeed` raises from the `feed()` whose bytes hit the error, with the
+reader's position, and `DemuxFeed` and `FrameFeed` from the iteration that
+reaches it, after the items before it. Each is a context manager that frees
+its C object.
+
+A stream that starts with metadata hands it over before the first message:
+
+```python
+from bovnar import stream
+
+doc = stream.mux_dump([(1, b"frame-1"), (2, b"audio"), (1, b"frame-2")],
+                      key="media", preamble={"meta": {"codec": "av1"}})
+doc += b".end = true;\n"
+
+items = []
+with stream.DemuxFeed(key="media", values=True) as dm:
+    for at in range(0, len(doc), 16):          # as a socket might deliver it
+        items.extend(dm.feed(doc[at:at + 16]))
+    items.extend(dm.finish())
+
+items[0]                             # → ('meta', {'codec': 'av1'})
+items[1]                             # → (1, b'frame-1')
+items[-1]                            # → ('end', True)
+isinstance(items[1], stream.Message) # → True
+```
+
+`Message`, `Value` and `DocumentEvent` are named tuples, so
+`channel, payload = item` works, and `isinstance` tells them apart. The key
+scope, `max_message` (0 selects `BVNR_MUX_DEFAULT_MAX`), the 4096-channel limit
+and the error codes are those of `mux_load`.
+
+A document that never ends is read a value at a time; a value handed over is
+not kept, so memory stays flat:
+
+```python
+values = stream.DocumentFeed(events=False, values=True)
+first  = list(values.feed(b'.reading = 1; .read'))
+second = list(values.feed(b'ing = 2; .x = [1, 2];'))
+last   = list(values.finish())
+first                                # → [('reading', 1)]
+second                               # → [('reading', 2)]
+last                                 # → [('x', [1, 2])]
+```
+
+A scalar, a struct or an octet stream is complete at its end; an array at the
+next key or the end of the document, because a further `/[…]` row would extend
+it. An octet stream in a `DocumentFeed` is gathered whole before it is handed
+over, so an endless one belongs in a `DemuxFeed` or is read by its events.
+`DocumentFeed` takes the options of `Reader.read_mem` (`continue_on_error`,
+`want_unit`, `max_file_size`, …), and its `typed=True` gives `Quantity`
+values as `loads(typed=True)` does.
+
+```python
+frames = stream.FrameFeed(parse=True)
+blob = stream.dump_documents([{"id": 1}, {"id": 2}])
+docs = list(frames.feed(blob[:30])) + list(frames.feed(blob[30:]))
+frames.finish()
+docs                                 # → [{'id': 1}, {'id': 2}]
+frames.count                         # → 2
+```
+
+**The fed bytes.** `DemuxFeed` and the unparsed `FrameFeed` are drained with
+`bvnr_demux_next` / `bvnr_frame_reader_next`, which point into the fed bytes:
+those are kept until the iteration has run to its end, and feeding again
+before then raises `BovnarArgumentError`. A `bytearray` is copied when fed, so
+the usual `recv_into` loop may refill it at once.
+
+**Memoryview payloads.** By default a payload is `bytes`. With `view=True`
+(`DemuxFeed`, unparsed `FrameFeed`) it is a read-only `memoryview` of the
+reader's own memory instead — the fed bytes for a message that lay whole in one
+chunk, a reassembly buffer otherwise — which saves a copy per message and is
+valid **only until the next call on the feed**: the next item, `feed()`,
+`finish()` or `close()`. The feed releases the view then, so using it later
+raises `ValueError` rather than reading memory that has been reused. Copy what
+must be kept with `bytes(view)`. A slice of the view, or a buffer taken from it
+(`numpy.frombuffer`), is not released with it and must not outlive it either;
+while such a buffer holds an export, the next call raises `BovnarArgumentError`
+and leaves the stream as it was.
+
+```python
+dm = stream.DemuxFeed(view=True)
+it = dm.feed(stream.mux_dump([(1, b"abc"), (2, b"def")]))
+first = next(it)
+kept = bytes(first.payload)
+second = next(it)                    # first.payload is released here
+kept                                 # → b'abc'
+try:
+    first.payload[0]
+except ValueError:
+    pass                             # a released view refuses every use
+dm.close()
+```
+
+**What it costs.** Every item crosses the ctypes boundary, so a message costs
+microseconds in Python, not the nanoseconds of the C path (doc/10 §7.4).
+`DemuxFeed` and the unparsed `FrameFeed` make one plain C call per item and no
+callback; `DocumentFeed`, the parsing `FrameFeed` and the batch `mux_load` call
+back into Python once per event or message. Measured with
+`python/bench/bench_stream.py` (CPython 3.14, one core of an Intel i7-2700K
+pinned with `taskset`, on a machine shared with other work: load average 3–4,
+so take the ratios rather than the digits), per message, median of seven runs:
+
+| Path | 150 B | 30 KB | 400 KB |
+|------|------:|------:|-------:|
+| `mux_load` (batch, one callback per message) | 4.8 µs | 36 µs | 383 µs |
+| `DemuxFeed`, whole buffer, `bytes` | 3.3 µs | 7.1 µs | 81 µs |
+| `DemuxFeed`, whole buffer, `memoryview` | 4.6 µs | 4.9 µs | 57 µs |
+| `DemuxFeed`, 1460 B pieces, `bytes` | 4.2 µs | 130 µs | 1.6 ms |
+| `DemuxFeed`, 1460 B pieces, `memoryview` | 5.7 µs | 131 µs | 1.6 ms |
+
+A small message costs a few microseconds whichever way it is read. A large one
+fed whole is sliced out of the fed bytes (or viewed in place) instead of
+copied through a callback, which is the factor of about five. Fed in
+1460-byte pieces — one TCP segment's payload — the cost is the feeds, a few
+microseconds each, twenty of them for a 30 KB message; read from a socket, take
+the largest `recv` the transport offers. A `memoryview` saves the copy only
+where there is one to save, from a few kilobytes up.
 
 ---
 
@@ -1434,6 +1600,20 @@ from bovnar import MAX_FILESIZE_BYTES   # 16 * 1024 * 1024  (16 MiB)
 
 Default `max_file_size` cap used by `Reader.read_file`.
 
+### 11.8 `read_stream`
+
+`read_stream(stream, *, …)` — the keyword parameters of `read_mem`, unchanged.
+
+Parse a document pulled from a socket (`recv_into`) or a binary file object
+(`readinto1`, `readinto` or `read`, in that order of preference; `readinto1`
+hands over what a pipe or a socket file has, instead of waiting until the
+reader's whole request is filled). A short read is fine, and an empty one is the
+end of the document. The bytes are pulled as the parse needs them, so the
+document is never held whole. An exception the object raises is re-raised from
+`read_stream` unchanged. A text-mode file is refused, and so is a non-blocking
+object with nothing to read yet: a pull cannot wait, so such a transport is fed
+to a `DocumentFeed` instead (§4.7).
+
 ---
 
 ## 12. `Writer` reference
@@ -1445,8 +1625,9 @@ Default `max_file_size` cap used by `Reader.read_file`.
 | `Writer.to_mem(buf=None, cap=4194304, *, pretty=True, unit_flags=0, emit_version=False)` | Write to an in-process buffer. `buf` may be a pre-allocated `bytearray`; when `None` an internal buffer of size `cap` is allocated. |
 | `Writer.to_fd(fd, *, pretty=True, unit_flags=0, emit_version=False)` | Write to an open POSIX file descriptor. |
 | `Writer.to_file(path, *, pretty=True, unit_flags=0, emit_version=False)` | Open `path` for writing (`O_WRONLY\|O_CREAT\|O_TRUNC`, mode `0o644`) and write to it; the fd is closed when the writer is finished or destroyed. |
+| `Writer.to_stream(stream, *, pretty=True, unit_flags=0, emit_version=False)` | Write to a socket (`sendall`) or a binary file object (`write`, repeated until it has taken every byte). Output is pushed a full 64 KiB buffer at a time and the rest at `finish()`, which then calls the object's `flush` if it has one. An exception the object raises is re-raised from the write call that pushed. |
 
-All three are used as context managers.  On clean exit (`exc_type is None`)
+All four are used as context managers.  On clean exit (`exc_type is None`)
 the context manager calls `finish()` automatically.
 
 `unit_flags` takes [`UnitFlags`](#53-unitflags) — `REDUCE` rewrites each unit
@@ -1695,8 +1876,9 @@ are skipped automatically when `numpy` / `pint` is not installed. Install
 
 ```
 bovnar/
-├── __init__.py      # loads() / dumps() / dom_parse() / unit helpers — public API
+├── __init__.py      # loads() / dumps() / load() / dump() / dom_parse() / unit helpers — public API
 ├── _ffi.py          # ctypes FFI: library discovery + argtypes/restype
+├── _fileio.py       # sockets and binary file objects as callback sources and sinks
 ├── _bigint.py       # int <-> digit text past CPython's 4300-digit int_max_str_digits limit
 ├── _bvnfloat.py     # BvnFloat: arbitrary-precision float + IEEE binary/decimal/fixed encoders
 ├── _numpy.py        # NumPy bridge: to_numpy/from_numpy/to_pint_array/array_to_bvnr (numpy optional)
@@ -1708,7 +1890,7 @@ bovnar/
 ├── exceptions.py    # BovnarError hierarchy
 ├── quantity.py      # Quantity — typed, unit-annotated scalar for lossless round-trips
 ├── reader.py        # Reader, EventPayload, UnitPolicy, UnitRule
-├── stream.py        # framing, octet multiplexing, document-in-document
+├── stream.py        # framing, octet multiplexing, document-in-document, the feeds
 ├── structs.py       # ctypes Structure/Union definitions + ValueUnitPrefix + make_* helpers
 ├── unit.py          # Unit — a ValueUnit with equality, hashing and its operations
 ├── units.py         # unit_to_si_factor, unit_convert_factor, etc.
@@ -1721,6 +1903,8 @@ tests/
 ├── test_version.py                      # library / spec version reporting
 ├── test_reader.py, test_writer.py       # Reader and Writer
 ├── test_stream.py                       # framing, mux, document-in-document
+├── test_stream_io.py                    # sockets and file objects as sources and sinks
+├── test_stream_feed.py                  # DocumentFeed, FrameFeed, DemuxFeed, the wire vectors
 ├── test_dom.py, test_dom_vs_loads_parity.py   # the DOM, and its agreement with loads()
 ├── test_write_array.py, test_array_parser.py, test_array_roundtrip_fidelity.py
 ├── test_roundtrip_property.py, test_writers_agree.py, test_dumps_directive.py
@@ -1735,6 +1919,9 @@ tests/
 ├── test_numpy_bridge.py, test_example_numpy_roundtrip.py      # need numpy
 ├── test_pint_bridge.py, test_pint_factor_parity.py            # need pint
 └── test_example_consistency.py          # the shipped examples
+
+bench/
+└── bench_stream.py                      # per-message cost of the fed demux, run by hand
 ```
 
 ---

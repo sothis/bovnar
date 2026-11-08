@@ -34,6 +34,19 @@ pub type WantUnitFn = extern "C" fn(*mut c_void, *const BvnrData, *mut ValueUnit
 pub type OnDocumentFn = extern "C" fn(*mut c_void, u64, bool, c_int) -> bool;
 /// `bvnr_mux_on_msg_fn`.
 pub type MuxOnMsgFn = extern "C" fn(*mut c_void, u64, *const c_void, u64) -> bool;
+/// `bvnr_pull_fn`.
+pub type PullFn = extern "C" fn(*mut BvnrSource, *mut c_void, u32, *mut u32) -> bool;
+/// `bvnr_push_fn`.
+pub type PushFn = extern "C" fn(*mut BvnrSink, *const c_void, u32) -> bool;
+/// `bvnr_flush_fn`.
+pub type FlushFn = extern "C" fn(*mut BvnrSink) -> bool;
+/// `BVNR_NEXT_ERROR`, `BVNR_NEXT_NONE`, `BVNR_NEXT_DOCUMENT` /
+/// `BVNR_NEXT_MESSAGE` and `BVNR_NEXT_EVENT` (`bovnar_stream.h`).
+pub const NEXT_ERROR: c_int = -1;
+pub const NEXT_NONE: c_int = 0;
+pub const NEXT_DOCUMENT: c_int = 1;
+pub const NEXT_MESSAGE: c_int = 1;
+pub const NEXT_EVENT: c_int = 2;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -198,6 +211,16 @@ pub struct BvnrDocStreamOpts {
     pub on_document: Option<OnDocumentFn>,
     pub continue_past_failed: bool,
     pub max_document_size: u64,
+}
+
+/// `bvnr_demux_item_t`: what `bvnr_demux_next` hands out.
+#[repr(C)]
+pub struct BvnrDemuxItem {
+    pub channel: u64,
+    pub data: *const u8,
+    pub length: u64,
+    pub event: c_int,
+    pub value: *const BvnrData,
 }
 
 #[repr(C)]
@@ -449,7 +472,7 @@ unsafe extern "C" {
     pub fn bvnr_mux_send(w: *mut c_void, channel: u64, data: *mut c_void, len: u64) -> bool;
     pub fn bvnr_mux_end(w: *mut c_void) -> bool;
     pub fn bvnr_demux_create(
-        on_message: MuxOnMsgFn,
+        on_message: Option<MuxOnMsgFn>,
         userdata: *mut c_void,
         max_message: u64,
     ) -> *mut c_void;
@@ -464,6 +487,39 @@ unsafe extern "C" {
         doc_len: u64,
     ) -> bool;
     pub fn bvnr_parse_embedded(doc: *mut c_void, doc_len: u64, flags: *mut BvnrReadFlags) -> bool;
+    pub fn bvnr_source_from_callback(s: *mut BvnrSource, pull: PullFn, userdata: *mut c_void);
+    pub fn bvnr_sink_to_callback(
+        s: *mut BvnrSink,
+        push: PushFn,
+        flush: Option<FlushFn>,
+        userdata: *mut c_void,
+    );
+    pub fn bvnr_source_get_userdata(s: *const BvnrSource) -> *mut c_void;
+    pub fn bvnr_sink_get_userdata(s: *const BvnrSink) -> *mut c_void;
+    pub fn bvnr_open_read_feed(
+        r: *mut c_void,
+        src_mirror: *const BvnrSink,
+        options: *mut BvnrReadFlags,
+    ) -> bool;
+    pub fn bvnr_read_feed(r: *mut c_void, buf: *const c_void, len: u64) -> bool;
+    pub fn bvnr_read_finish(r: *mut c_void) -> bool;
+    pub fn bvnr_frame_reader_create(opts: *const BvnrDocStreamOpts) -> *mut c_void;
+    pub fn bvnr_frame_reader_create_pull(max_document_size: u64) -> *mut c_void;
+    pub fn bvnr_frame_reader_destroy(fr: *mut c_void);
+    pub fn bvnr_frame_reader_feed(fr: *mut c_void, buf: *const c_void, len: u64) -> bool;
+    pub fn bvnr_frame_reader_next(fr: *mut c_void, doc: *mut *const u8, len: *mut u64) -> c_int;
+    pub fn bvnr_frame_reader_finish(fr: *mut c_void) -> bool;
+    pub fn bvnr_frame_reader_error(fr: *const c_void) -> c_int;
+    pub fn bvnr_frame_reader_count(fr: *const c_void) -> u64;
+    pub fn bvnr_demux_open_feed(
+        dm: *mut c_void,
+        flags: *const BvnrReadFlags,
+        deliver_events: bool,
+    ) -> bool;
+    pub fn bvnr_demux_feed(dm: *mut c_void, buf: *const c_void, len: u64) -> bool;
+    pub fn bvnr_demux_next(dm: *mut c_void, item: *mut BvnrDemuxItem) -> c_int;
+    pub fn bvnr_demux_finish(dm: *mut c_void) -> bool;
+    pub fn bvnr_demux_get_reader(dm: *const c_void) -> *const c_void;
     pub fn bvn_float_alloc(prec: u32) -> *mut c_void;
     pub fn bvn_float_free(f: *mut c_void);
     pub fn bvn_float_from_str(f: *mut c_void, s: *const c_char, base: u32) -> bool;
@@ -2197,7 +2253,7 @@ pub fn demux_read(
     // SAFETY: `messages` outlives the demux, which is destroyed below.
     let dm = unsafe {
         bvnr_demux_create(
-            on_message_trampoline,
+            Some(on_message_trampoline),
             (&raw mut messages).cast(),
             max_message,
         )
@@ -2309,6 +2365,7 @@ mod abi_tests {
         layout!(v, BvnrDocStreamOpts, "bvnr_doc_stream_opts_t" {
             flags, userdata, on_document, continue_past_failed, max_document_size,
         });
+        layout!(v, BvnrDemuxItem, "bvnr_demux_item_t" { channel, data, length, event, value });
         layout!(v, BvnDomEntry, "bvn_dom_entry_t" { key, value });
         layout!(v, BvnCurrencyInfo, "bvn_currency_info_t" {
             code, numeric_code, minor_unit, is_crypto, name,
@@ -2366,7 +2423,8 @@ mod abi_tests {
             "compiling bvnr_abi_dump.c with {cmd:?} failed"
         );
         let out = Command::new(&exe).output().expect("run bvnr_abi_dump");
-        let text = String::from_utf8(out.stdout).unwrap();
+        let mut text = String::from_utf8(out.stdout).unwrap();
+        text.push_str(&supplement(&compiler, repo, out_dir));
 
         let mut c: HashMap<(String, String), (usize, usize)> = HashMap::new();
         for line in text.lines() {
@@ -2386,6 +2444,61 @@ mod abi_tests {
         }
 
         c
+    }
+
+    /// Public structs the shared generator does not print yet, with their
+    /// fields: the crate mirrors them, so it measures them itself, with the
+    /// same compiler and the same output format. A struct that
+    /// tests/bvnr_abi_dump.c lists as well is simply measured twice.
+    const SUPPLEMENT: &[(&str, &[&str])] = &[(
+        "bvnr_demux_item_t",
+        &["channel", "data", "length", "event", "value"],
+    )];
+
+    /// Compiles and runs a generator for [`SUPPLEMENT`]; its manifest lines.
+    fn supplement(compiler: &cc::Tool, repo: &Path, out_dir: &Path) -> String {
+        let mut src = String::from(
+            "#include <stddef.h>\n#include <stdio.h>\n#include \"bovnar_stream.h\"\n\
+             int main(void)\n{\n",
+        );
+        for (st, fields) in SUPPLEMENT {
+            src.push_str(&format!(
+                "\tprintf(\"STRUCT {st} %zu\\n\", sizeof({st}));\n"
+            ));
+            for f in *fields {
+                src.push_str(&format!(
+                    "\tprintf(\"FIELD {st} {f} %zu %zu\\n\", offsetof({st}, {f}), \
+                     sizeof((({st}*)0)->{f}));\n"
+                ));
+            }
+        }
+        src.push_str("\treturn 0;\n}\n");
+        let c_file = out_dir.join("bvnr_abi_supplement.c");
+        std::fs::write(&c_file, src).unwrap();
+        let exe = out_dir.join(if cfg!(windows) {
+            "bvnr_abi_supplement.exe"
+        } else {
+            "bvnr_abi_supplement"
+        });
+        let mut cmd = compiler.to_command();
+        if compiler.is_like_msvc() {
+            cmd.arg("/I")
+                .arg(repo.join("include"))
+                .arg(&c_file)
+                .arg(format!("/Fo{}\\", out_dir.display()))
+                .arg(format!("/Fe{}", exe.display()));
+        } else {
+            cmd.arg("-std=c99")
+                .arg("-I")
+                .arg(repo.join("include"))
+                .arg(&c_file)
+                .arg("-o")
+                .arg(&exe);
+        }
+        let status = cmd.status().expect("run the C compiler");
+        assert!(status.success(), "compiling {c_file:?} with {cmd:?} failed");
+        let out = Command::new(&exe).output().expect("run the supplement");
+        String::from_utf8(out.stdout).unwrap()
     }
 
     #[test]

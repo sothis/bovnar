@@ -964,7 +964,40 @@ BVN_API void bvnr_source_from_fd(bvnr_source_t* s, int fd);
 BVN_API void bvnr_source_from_mem(bvnr_source_t* s, const void* buf, uint64_t len);
 BVN_API void bvnr_sink_to_fd(bvnr_sink_t* s, int fd);
 BVN_API void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint64_t cap);
-/* Bytes pushed into a bvnr_sink_to_mem sink. Counts only what the CALLER pushed:
+/*
+ * Sources and sinks over the caller's own transport: a socket, a TLS session, a
+ * file-like object in a binding. Usable everywhere an fd or memory source or
+ * sink is (bvnr_open_read_source, bvnr_open_write_sink, the reader's mirror, the
+ * canonicalising observer, bvnr_frame_write, bvnr_doc_stream_read).
+ *
+ * pull fills buf with up to `want` bytes and sets *got. Returning true with
+ * *got == 0 is END OF INPUT, not "nothing yet": a pull source has no way to say
+ * "later", so a transport that can run dry before its peer is done must block
+ * in pull, or be read with the push-fed reader (bvnr_open_read_feed) instead.
+ * Returning false is an I/O error (error_reading_from_source_fd).
+ *
+ * push must take all `len` bytes or return false. A failure is reported as
+ * error_writing_to_sink -- a callback sink is never mistaken for a full memory
+ * buffer -- and the writer batches output into its 64 KiB buffer before pushing,
+ * as it does for an fd. flush may be NULL; when set, bvnr_write_finish calls it
+ * after the last push, and a false return fails the finish with
+ * error_writing_to_sink.
+ *
+ * `userdata` is stored inside the handle. The reader and writer work on a COPY
+ * of the source or sink they are given, so the callback must not compare the
+ * pointer it receives with the caller's own handle; it recovers its context with
+ * bvnr_source_get_userdata / bvnr_sink_get_userdata on the pointer it was
+ * passed. Both getters return NULL for a NULL handle and for a handle that was
+ * not built by these constructors.
+ */
+BVN_API void bvnr_source_from_callback(bvnr_source_t* s, bvnr_pull_fn pull,
+	void* userdata);
+BVN_API void bvnr_sink_to_callback(bvnr_sink_t* s, bvnr_push_fn push,
+	bvnr_flush_fn flush, void* userdata);
+BVN_API void* bvnr_source_get_userdata(const bvnr_source_t* s);
+BVN_API void* bvnr_sink_get_userdata(const bvnr_sink_t* s);
+/* Bytes pushed into a bvnr_sink_to_mem or bvnr_sink_to_callback sink (for the
+ * latter, what its push accepted). Counts only what the CALLER pushed:
  * bvnr_open_write_sink() takes a copy of the sink, so writer output advances the
  * copy and this stays 0 for the writer's whole lifetime. For writer output use
  * bvnr_writer_bytes_written(), and read it before bvnr_writer_destroy(). */

@@ -57,20 +57,37 @@
 #else
 #  define BVN_MAY_ALIAS
 #endif
+/*
+ * `userdata` is the caller's pointer for a callback source or sink
+ * (bvnr_source_from_callback / bvnr_sink_to_callback). It has to live in the
+ * blob itself: the reader and writer copy the handle they are given (l->src =
+ * *src, w->ser.sink = *sink), so the callback only ever sees the copy, and
+ * bvnr_source_get_userdata / bvnr_sink_get_userdata read it back from there.
+ *
+ * Sizes, against the 64-byte blobs: source 40 (LP64/LLP64), 24 (ILP32 with
+ * 4-byte uint64 alignment, i386), 32 (ILP32 with 8-byte alignment: wasm32,
+ * arm32); sink 56, 40, 48. The checks below are what holds them to it.
+ */
 typedef struct bvn_source_impl_s {
 	bvnr_pull_fn	pull;
 	int		fd;
 	const uint8_t*	mem_ptr;
 	uint64_t	mem_left;
+	void*		userdata;
 } BVN_MAY_ALIAS bvn_source_impl_t;
 typedef struct bvn_sink_impl_s {
 	bvnr_push_fn	push;
 	bvnr_flush_fn	flush;
 	int		fd;
 	bool		is_mem;
+	/* A caller-supplied push: bvn_sink_push counts what it accepts into
+	 * mem_written, which the fd and memory backends do for themselves. The
+	 * writer's byte count and error offsets are read from there. */
+	bool		is_callback;
 	uint8_t*	mem_ptr;
 	uint64_t	mem_left;
 	uint64_t	mem_written;
+	void*		userdata;
 } BVN_MAY_ALIAS bvn_sink_impl_t;
 /*
  * Compile-time size guards: a negative array length is a hard error, so the
@@ -105,6 +122,11 @@ static inline bool bvn_source_pull(
 static inline bool bvn_sink_push(
 	bvnr_sink_t* s, const void* buf, uint32_t len)
 {
-	return bvn_sink_impl(s)->push(s, buf, len);
+	bvn_sink_impl_t* impl = bvn_sink_impl(s);
+	if (!impl->push(s, buf, len))
+		return false;
+	if (impl->is_callback)
+		impl->mem_written += len;
+	return true;
 }
 #endif

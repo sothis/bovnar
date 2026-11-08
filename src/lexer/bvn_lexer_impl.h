@@ -311,6 +311,17 @@ typedef struct bvnr_lexer_s {
 	uint8_t			array_nesting_level;
 	uint16_t		arr_used_max;
 	bvn_array_frame_t	*arr_frames;
+	/*
+	 * The heap outlives the document: a re-open (bvn_lex_reset, then
+	 * bvn_lex_init) keeps arr_frames and the scratch buffers instead of
+	 * freeing and allocating them again. arr_frames_cap is how many frames
+	 * arr_frames holds. Frames past arr_frames_dirty have not been written
+	 * since they were last zeroed, so a re-open zeroes only frames
+	 * [0, arr_frames_dirty]: what calloc gave a fresh reader, without wiping
+	 * the whole stack for a document that never opened an array.
+	 */
+	uint16_t		arr_frames_cap;
+	uint16_t		arr_frames_dirty;
 	uint64_t		processed_bytes;
 	uint64_t		text_bytes;
 	/* Bytes consumed by the octet-stream reader -- tags, lengths and payload,
@@ -462,6 +473,7 @@ typedef enum bvn_verdir_e {
 bvn_verdir_t bvn_parse_version_directive(
 	const uint8_t* s, uint32_t len, uint16_t* major, uint16_t* minor);
 bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src, const bvnr_sink_t* dbg_sink, bvnr_read_flags_t* opts);
+void bvn_lex_reset(bvnr_lexer_t* l);
 void bvn_lex_destroy(bvnr_lexer_t* l);
 bool bvn_lex_run(bvnr_reader_t* r);
 /* Push-fed lexing, the engine behind bvnr_read_feed / bvnr_read_finish.

@@ -1199,6 +1199,11 @@ bool bvn_action_array_intro(bvnr_reader_t* p)
 	 * arr_frames is sized max_array_nesting + 1.
 	 */
 	bvn_array_frame_t *child = &p->lex.arr_frames[level + 1u];
+	/* The deepest frame written so far, for the next re-open to zero
+	 * (bvn_lex_init). Every other frame write is at or below the nesting
+	 * level reached, so this is the one place that can raise it. */
+	if (level + 1u > p->lex.arr_frames_dirty)
+		p->lex.arr_frames_dirty = (uint16_t)(level + 1u);
 	child->in_dim_seq   = false;
 	child->dim_row_size = 0;
 	child->open_struct_level = p->lex.struct_nesting_level;
@@ -2845,16 +2850,40 @@ void bvn_lex_destroy(bvnr_lexer_t* l)
 	if (!l)
 		return;
 	free(l->arr_frames);
-	l->arr_frames = NULL;
+	l->arr_frames       = NULL;
+	l->arr_frames_cap   = 0;
+	l->arr_frames_dirty = 0;
 	free(l->str_data);
 	l->str_data         = NULL;
 	l->type_data        = NULL;
 	l->inline_unit_data = NULL;
 }
 /*
+ * Zero every field of the lexer except its heap, which bvn_lex_init reuses.
+ * A re-open used to free the frame stack and the scratch buffers and allocate
+ * them again -- about 120 KB, zeroed, per document, which cost a reader fed
+ * one small framed document after another more than the parse. Nothing a
+ * document leaves behind survives this but those bytes: the scratch buffers
+ * are written before they are read, as they were when freshly malloc'd, and
+ * bvn_lex_init zeroes every frame the last document may have touched.
+ */
+void bvn_lex_reset(bvnr_lexer_t* l)
+{
+	bvn_array_frame_t* frames = l->arr_frames;
+	uint16_t frames_cap       = l->arr_frames_cap;
+	uint16_t frames_dirty     = l->arr_frames_dirty;
+	uint8_t* bufs             = l->str_data;
+	memset(l, 0, sizeof(*l));
+	l->arr_frames       = frames;
+	l->arr_frames_cap   = frames_cap;
+	l->arr_frames_dirty = frames_dirty;
+	l->str_data         = bufs;
+}
+/*
  * Initialise a lexer: copy caller limits, falling back to the compiled-in
- * defaults for any left at zero, then allocate the array-frame stack and the
- * scratch buffers. The three scratch buffers are deliberately carved from one
+ * defaults for any left at zero, then provide the array-frame stack and the
+ * scratch buffers -- the ones a previous document left (bvn_lex_reset), or
+ * newly allocated. The three scratch buffers are deliberately carved from one
  * malloc to save two allocations and keep them in one cache-friendly block;
  * bvn_lex_destroy relies on this layout. An optional debug sink tees the raw
  * bytes consumed, used by the canonicaliser/observer tooling.
@@ -2863,7 +2892,7 @@ bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	const bvnr_sink_t* dbg_sink, bvnr_read_flags_t* opts)
 {
 	bvn_init_run_luts();
-	memset(l, 0, sizeof(*l));
+	bvn_lex_reset(l);
 	l->next_state  = undefined;
 	l->line        = 1;
 	if (src)
@@ -2899,15 +2928,35 @@ bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
 	/* max_file_size is deliberately NOT defaulted: 0 means "unlimited / endless"
 	 * (BVNR_FILESIZE_UNLIMITED). The cap checks below are guarded by a nonzero
 	 * max_file_size, so a 0 here accumulates no byte-count limit. */
-	l->arr_frames = calloc(l->max_array_nesting + 1u, sizeof(bvn_array_frame_t));
-	if (!l->arr_frames)
-		return false;
-	uint8_t* bufs = (uint8_t*)malloc(BVN_STR_BUF_CAP + BVN_TYPE_BUF_CAP +
-	                                 BVN_INLINE_UNIT_BUF_CAP);
-	if (!bufs) {
+	/* The stack must read as zero, as calloc returns it: a frame can be
+	 * consulted before this document writes it (frame 0's in_dim_seq when the
+	 * first array opens, say). A stack too small for this document's nesting
+	 * limit is replaced, never grown in place. */
+	uint32_t frames = (uint32_t)l->max_array_nesting + 1u;
+	if (l->arr_frames && frames <= l->arr_frames_cap) {
+		uint32_t dirty = (uint32_t)l->arr_frames_dirty + 1u;
+		if (dirty > l->arr_frames_cap)
+			dirty = l->arr_frames_cap;
+		memset(l->arr_frames, 0, dirty * sizeof(bvn_array_frame_t));
+	} else {
 		free(l->arr_frames);
-		l->arr_frames = NULL;
-		return false;
+		l->arr_frames_cap = 0;
+		l->arr_frames = calloc(frames, sizeof(bvn_array_frame_t));
+		if (!l->arr_frames) {
+			bvn_lex_destroy(l);
+			return false;
+		}
+		l->arr_frames_cap = (uint16_t)frames;
+	}
+	l->arr_frames_dirty = 0;
+	uint8_t* bufs = l->str_data;
+	if (!bufs) {
+		bufs = (uint8_t*)malloc(BVN_STR_BUF_CAP + BVN_TYPE_BUF_CAP +
+		                        BVN_INLINE_UNIT_BUF_CAP);
+		if (!bufs) {
+			bvn_lex_destroy(l);
+			return false;
+		}
 	}
 	l->str_data         = bufs;
 	l->type_data        = bufs + BVN_STR_BUF_CAP;

@@ -2446,8 +2446,9 @@ bool bvnr_reader_get_declared_version(
 	return true;
 }
 /*
- * Bind a reader to a source and arm it for bvnr_read. Tears down any previous
- * lexer state first so a single reader can be reused for many documents.
+ * Bind a reader to a source and arm it for bvnr_read. Clears any previous
+ * lexer state first so a single reader can be reused for many documents; its
+ * buffers are kept (bvn_lex_reset), so a re-open allocates nothing.
  * Requires a source with a real pull function (a zeroed/uninitialised source is
  * rejected rather than crashing). The optional dbg_sink tees raw input for the
  * canonicaliser. bvnr_open_read_mem is a thin convenience wrapper that builds a
@@ -2459,8 +2460,7 @@ bool bvnr_open_read_source(
 {
 	if (!r)
 		return false;
-	bvn_lex_destroy(&r->lex);
-	memset(&r->lex, 0, sizeof(r->lex));
+	bvn_lex_reset(&r->lex);
 	if (!src || !bvn_source_impl_c(src)->pull)
 		return false;
 	if (!bvn_lex_init(&r->lex, src, dbg_sink, options))
@@ -2479,8 +2479,7 @@ bool bvnr_open_read_feed(
 {
 	if (!r)
 		return false;
-	bvn_lex_destroy(&r->lex);
-	memset(&r->lex, 0, sizeof(r->lex));
+	bvn_lex_reset(&r->lex);
 	if (!bvn_lex_init(&r->lex, NULL, dbg_sink, options))
 		return false;
 	bvn_val_init(&r->val, options);

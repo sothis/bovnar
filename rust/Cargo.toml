@@ -49,3 +49,7 @@ cc = "1"
 [[bench]]
 name = "codec"
 harness = false
+
+[[bench]]
+name = "live"
+harness = false

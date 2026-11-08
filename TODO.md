@@ -68,8 +68,9 @@ The octet chunk of spec §9 plus the two LEB128 varints of doc/10 §3, with no
 FFI and no allocation per message. A prototype exists (Mumcord/mumcord PR
 #682, `crates/bovnar-mux`, `#![forbid(unsafe_code)]`): byte-identical to
 `bvnr_mux_send` on shared vectors, 9–34 ns per message to write and to peek,
-0 allocations per message. It is the starting point, and its numbers are the
-targets.
+0 allocations per message. Its numbers are the targets. Its code is not used:
+Mumcord is AGPL-3.0 and Bovnar is MIT, so the codec is written from the spec
+and the C reference.
 
 - **`MuxWriter`**: the octet-stream opener, then per message the chunk
   header and the channel and length varints, written into a caller buffer

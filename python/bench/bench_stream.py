@@ -25,6 +25,9 @@ Per-message cost of reading a multiplexed stream from Python: the batch
 stream.mux_load (one ctypes callback per message) next to stream.DemuxFeed
 (bvnr_demux_next, no callback), fed the whole document at once and in 1460-byte
 pieces (a TCP segment's payload), with payloads as bytes and as memoryviews.
+And of writing one: the batch stream.mux_dump next to stream.MuxWriter into a
+socket-like object that takes what it is sent (a socket minus the system
+call), batched and flushed after every message.
 
 Messages of 150 B, 30 KB and 400 KB (the last spans seven octet chunks), the
 same cells as tests/bovnar_stream_bench.c, whose C figures doc/10 §8.4 lists.
@@ -56,10 +59,9 @@ COUNTS = (20_000, 400, 30)
 PIECE  = 1460
 
 
-def make_document(size: int, count: int) -> bytes:
+def make_messages(size: int, count: int) -> list:
     payload = bytes((i * 2654435761 >> 11) & 0xFF for i in range(size + 64))
-    return stream.mux_dump((i % 4, payload[i % 64:i % 64 + size])
-                           for i in range(count))
+    return [(i % 4, payload[i % 64:i % 64 + size]) for i in range(count)]
 
 
 def run_batch(doc: bytes) -> int:
@@ -79,6 +81,24 @@ def run_feed(doc: bytes, piece: int, view: bool) -> int:
         for _ in dm.finish():
             pass
     return total
+
+
+class _Discard:
+    """A socket that takes every byte: sendall and nothing else."""
+
+    def sendall(self, data) -> None:
+        pass
+
+
+def run_dump(msgs: list) -> int:
+    return len(stream.mux_dump(msgs))
+
+
+def run_live(msgs: list, flush_each: bool) -> int:
+    with stream.MuxWriter(_Discard(), flush_each=flush_each) as mux:
+        for channel, payload in msgs:
+            mux.send(channel, payload)
+        return mux.bytes_written
 
 
 def per_message(fn, count: int, budget: float) -> float:
@@ -110,9 +130,16 @@ def main() -> int:
     print(f"Python {sys.version.split()[0]}, cpus {cpus}, "
           f"load average {os.getloadavg()[0]:.2f} at start")
     for size, count in zip(SIZES, COUNTS):
-        doc = make_document(size, count)
+        msgs = make_messages(size, count)
+        doc = stream.mux_dump(msgs)
         whole = len(doc)
         cells = [
+            ("mux_dump (batch, to bytes)",
+             lambda: run_dump(msgs)),
+            ("MuxWriter, batched",
+             lambda: run_live(msgs, False)),
+            ("MuxWriter, flushed per message",
+             lambda: run_live(msgs, True)),
             ("mux_load (batch, callback per message)",
              lambda: run_batch(doc)),
             ("DemuxFeed, whole buffer, bytes",

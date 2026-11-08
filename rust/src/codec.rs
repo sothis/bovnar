@@ -116,7 +116,8 @@ pub const FRAME_MAGIC: [u8; 4] = *b"BVF1";
 /// channel and length varints.
 pub const MAX_CHUNK_HEADER: usize = 3 + 2 * MAX_VARINT;
 
-// Cut::header copies whole varint buffers into a header buffer of this size.
+// Cut::header encodes both varints into a header buffer of this size, each
+// into ten bytes of room.
 const _: () = assert!(MAX_CHUNK_HEADER >= 3 + MAX_VARINT + MAX_VARINT);
 
 /// The default cap of [`MuxReader::with_max_preamble`]: the text before a
@@ -137,18 +138,17 @@ const TERMINATOR: &[u8] = b"\0;";
 
 /// Unsigned LEB128 into `out`; returns its length.
 #[inline]
-fn varint_encode(mut v: u64, out: &mut [u8]) -> usize {
-    let mut n = 0;
-    loop {
-        let byte = (v & 0x7F) as u8;
-        v >>= 7;
-        if v == 0 {
-            out[n] = byte;
+fn varint_encode(mut v: u64, out: &mut [u8; MAX_VARINT]) -> usize {
+    // Over the array rather than by index: no bounds check per byte.
+    for (n, byte) in out.iter_mut().enumerate() {
+        if v < 0x80 {
+            *byte = v as u8;
             return n + 1;
         }
-        out[n] = byte | 0x80;
-        n += 1;
+        *byte = v as u8 | 0x80;
+        v >>= 7;
     }
+    unreachable!("a u64 is at most ten groups of seven bits")
 }
 
 /// Decodes the varint at the start of `buf` as `bvn_varint_decode` does:
@@ -231,9 +231,8 @@ fn check_key(key: &str) -> Result<()> {
 /// filled to 65536 bytes before the next begins.
 #[derive(Clone, Copy)]
 struct Cut {
-    channel: [u8; MAX_VARINT],
+    channel: u64,
     channel_len: usize,
-    length: [u8; MAX_VARINT],
     length_len: usize,
     len: usize,
 }
@@ -241,16 +240,12 @@ struct Cut {
 impl Cut {
     #[inline]
     fn new(channel: u64, len: usize) -> Self {
-        let mut cut = Cut {
-            channel: [0; MAX_VARINT],
-            channel_len: 0,
-            length: [0; MAX_VARINT],
-            length_len: 0,
+        Cut {
+            channel,
+            channel_len: varint_len(channel),
+            length_len: varint_len(len as u64),
             len,
-        };
-        cut.channel_len = varint_encode(channel, &mut cut.channel);
-        cut.length_len = varint_encode(len as u64, &mut cut.length);
-        cut
+        }
     }
 
     /// Payload bytes in the chunk that starts at payload offset `pos`.
@@ -264,49 +259,105 @@ impl Cut {
         (self.len - pos).min(room)
     }
 
-    /// Writes the header of the chunk at payload offset `pos`, carrying
-    /// `take` payload bytes, into `out`; returns its length.
+    /// Writes the header of the chunk at payload offset `pos` to the front
+    /// of `out`; returns its length and how many payload bytes the chunk
+    /// carries.
+    ///
+    /// The bytes go straight to where they are wanted. A header put together
+    /// byte by byte elsewhere and then copied is read back wider than it was
+    /// written, which the CPU cannot forward from its store buffer: that
+    /// stall cost more than the rest of the message.
     #[inline]
-    fn header(&self, pos: usize, take: usize, out: &mut [u8; MAX_CHUNK_HEADER]) -> usize {
+    fn header(&self, pos: usize, out: &mut [u8; MAX_CHUNK_HEADER]) -> (usize, usize) {
+        let take = self.take(pos);
         let varints = self.channel_len + if pos == 0 { self.length_len } else { 0 };
         // 65536 wraps to the 0x0000 that stands for it.
         let body = ((varints + take) as u32 as u16).to_le_bytes();
         out[0] = 0x01;
         out[1] = body[0];
         out[2] = body[1];
-        // Whole ten-byte copies: of a fixed size they are a few moves, where a
-        // copy of the varint's own length is a call to memcpy. The bytes past
-        // the varint are overwritten or not part of the header.
-        out[3..3 + MAX_VARINT].copy_from_slice(&self.channel);
+        varint_encode(self.channel, varint_room(out, 3));
         if pos == 0 {
-            let at = 3 + self.channel_len;
-            out[at..at + MAX_VARINT].copy_from_slice(&self.length);
+            varint_encode(self.len as u64, varint_room(out, 3 + self.channel_len));
         }
-        3 + varints
+        (3 + varints, take)
     }
 
     fn chunks(&self) -> usize {
-        let first = self.take(0);
-        let rest = self.len - first;
+        let rest = self.len - self.take(0);
         1 + rest.div_ceil(CHUNK_SIZE - self.channel_len)
     }
 }
 
+/// The length of `v` as a varint: one byte per seven bits, at least one.
+#[inline]
+fn varint_len(v: u64) -> usize {
+    (64 - (v | 1).leading_zeros() as usize).div_ceil(7)
+}
+
+/// The ten bytes of `header` from `at` on, where a varint goes.
+#[inline]
+fn varint_room(header: &mut [u8; MAX_CHUNK_HEADER], at: usize) -> &mut [u8; MAX_VARINT] {
+    header[at..]
+        .first_chunk_mut()
+        .expect("MAX_CHUNK_HEADER leaves room for both varints")
+}
+
+/// Appends the header of the chunk at payload offset `pos` to `out`, written
+/// in place (see [`Cut::header`]); returns the payload bytes the chunk
+/// carries.
+#[inline]
+fn push_header(out: &mut Vec<u8>, cut: &Cut, pos: usize) -> usize {
+    let at = out.len();
+    out.resize(at + MAX_CHUNK_HEADER, 0);
+    let room = out[at..].first_chunk_mut().expect("just made room");
+    let (n, take) = cut.header(pos, room);
+    out.truncate(at + n);
+    take
+}
+
+/// [`push_header`] for a chunk after the first, whose header is the tag, the
+/// length and the channel varint. With a channel varint of at most five
+/// bytes that fits a word, and one store of it replaces zeroing room first.
+#[inline]
+fn push_later_header(out: &mut Vec<u8>, cut: &Cut, pos: usize) -> usize {
+    if cut.channel_len > 5 {
+        return push_header(out, cut, pos);
+    }
+    let take = cut.take(pos);
+    let body = u64::from((cut.channel_len + take) as u32 as u16);
+    let word = 0x01 | body << 8 | varint_bits(cut.channel) << 24;
+    let at = out.len();
+    out.extend_from_slice(&word.to_le_bytes());
+    out.truncate(at + 3 + cut.channel_len);
+    take
+}
+
+/// `v` as a varint in the low bytes of a word, the first byte lowest: for a
+/// `v` of at most 56 bits, whose varint fits.
+#[inline]
+fn varint_bits(mut v: u64) -> u64 {
+    let mut bits = 0;
+    let mut shift = 0;
+    while v >= 0x80 {
+        bits |= u64::from(v as u8 | 0x80) << shift;
+        v >>= 7;
+        shift += 8;
+    }
+    bits | v << shift
+}
+
 /// Appends the chunks of one message, as `bvnr_mux_send` writes them.
+#[inline]
 fn encode_into(out: &mut Vec<u8>, channel: u64, payload: &[u8]) {
     let cut = Cut::new(channel, payload.len());
     out.reserve(payload.len() + cut.chunks() * MAX_CHUNK_HEADER);
-    let mut header = [0; MAX_CHUNK_HEADER];
-    let mut pos = 0;
-    loop {
-        let take = cut.take(pos);
-        let n = cut.header(pos, take, &mut header);
-        out.extend_from_slice(&header[..n]);
+    let mut pos = push_header(out, &cut, 0);
+    out.extend_from_slice(&payload[..pos]);
+    while pos < payload.len() {
+        let take = push_later_header(out, &cut, pos);
         out.extend_from_slice(&payload[pos..pos + take]);
         pos += take;
-        if pos == payload.len() {
-            return;
-        }
     }
 }
 
@@ -495,27 +546,20 @@ impl MuxWriter {
     pub fn encode<'a>(&self, head: &'a mut Vec<u8>, channel: u64, payload: &'a [u8]) -> Parts<'a> {
         let cut = Cut::new(channel, payload.len());
         head.clear();
-        let mut header = [0; MAX_CHUNK_HEADER];
-        let mut pos = 0;
-        let mut chunks = 0;
-        loop {
-            let take = cut.take(pos);
-            let n = cut.header(pos, take, &mut header);
-            head.extend_from_slice(&header[..n]);
+        let mut pos = push_header(head, &cut, 0);
+        let mut chunks = 1;
+        while pos < payload.len() {
+            pos += push_later_header(head, &cut, pos);
             chunks += 1;
-            pos += take;
-            if pos == payload.len() {
-                break;
-            }
         }
         Parts {
-            cut,
             head,
             payload,
-            head_pos: 0,
-            payload_pos: 0,
+            head_rest: head,
+            payload_rest: payload,
+            next: 3 + cut.channel_len + cut.length_len,
+            later: 3 + cut.channel_len,
             pending: 0,
-            done: false,
             left: 2 * chunks - usize::from(payload.is_empty()),
         }
     }
@@ -540,8 +584,7 @@ impl MuxWriter {
         let mut header = [0; MAX_CHUNK_HEADER];
         let mut pos = 0;
         loop {
-            let take = cut.take(pos);
-            let n = cut.header(pos, take, &mut header);
+            let (n, take) = cut.header(pos, &mut header);
             let mut bufs = [
                 IoSlice::new(&header[..n]),
                 IoSlice::new(&payload[pos..pos + take]),
@@ -561,22 +604,17 @@ impl MuxWriter {
 /// payload slice; no part is ever empty.
 #[derive(Clone, Debug)]
 pub struct Parts<'a> {
-    cut: Cut,
     head: &'a [u8],
     payload: &'a [u8],
-    head_pos: usize,
-    payload_pos: usize,
+    /// The headers and the payload bytes not yet handed out.
+    head_rest: &'a [u8],
+    payload_rest: &'a [u8],
+    /// The length of the next header, and of each header after the first.
+    next: usize,
+    later: usize,
+    /// The payload bytes of the current chunk, the next part when not 0.
     pending: usize,
-    done: bool,
     left: usize,
-}
-
-impl std::fmt::Debug for Cut {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Cut")
-            .field("len", &self.len)
-            .finish_non_exhaustive()
-    }
 }
 
 impl<'a> Parts<'a> {
@@ -597,27 +635,20 @@ impl<'a> Iterator for Parts<'a> {
     #[inline]
     fn next(&mut self) -> Option<&'a [u8]> {
         if self.pending > 0 {
-            let part = &self.payload[self.payload_pos..self.payload_pos + self.pending];
-            self.payload_pos += self.pending;
+            let (part, rest) = self.payload_rest.split_at(self.pending);
+            self.payload_rest = rest;
             self.pending = 0;
             self.left -= 1;
             return Some(part);
         }
-        if self.done {
+        if self.head_rest.is_empty() {
             return None;
         }
-        let take = self.cut.take(self.payload_pos);
-        let n = 3
-            + self.cut.channel_len
-            + if self.head_pos == 0 {
-                self.cut.length_len
-            } else {
-                0
-            };
-        let part = &self.head[self.head_pos..self.head_pos + n];
-        self.head_pos += n;
-        self.pending = take;
-        self.done = self.payload_pos + take == self.payload.len();
+        let (part, rest) = self.head_rest.split_at(self.next);
+        self.head_rest = rest;
+        // What a chunk under this header holds of the payload (Cut::take).
+        self.pending = self.payload_rest.len().min(CHUNK_SIZE + 3 - self.next);
+        self.next = self.later;
         self.left -= 1;
         Some(part)
     }
@@ -2007,9 +2038,25 @@ mod tests {
 
     #[test]
     fn varints_round_trip_and_refuse_overlong() {
-        for v in [0, 1, 127, 128, 300, 1 << 35, u64::MAX - 1, u64::MAX] {
+        for v in [
+            0,
+            1,
+            127,
+            128,
+            300,
+            (1 << 35) - 1,
+            1 << 35,
+            1 << 55,
+            u64::MAX - 1,
+            u64::MAX,
+        ] {
             let mut buf = [0; MAX_VARINT];
             let n = varint_encode(v, &mut buf);
+            assert_eq!(varint_len(v), n, "{v}");
+            if n <= 8 {
+                assert_eq!(varint_bits(v).to_le_bytes()[..n], buf[..n], "{v}");
+                assert_eq!(varint_bits(v) >> (8 * n - 1) >> 1, 0, "{v}");
+            }
             assert_eq!(varint_decode(&buf[..n]), Ok(Some((v, n))), "{v}");
             assert_eq!(varint_decode(&buf[..n - 1]), Ok(None), "{v}");
         }

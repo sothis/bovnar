@@ -155,6 +155,12 @@ fn corpus() -> Vec<Msgs> {
     for len in [first - 1, first, first + 1, first + 65535, first + 65536] {
         sets.push(vec![(1, payload(len, len as u64)), (2, b"after".to_vec())]);
     }
+    // The longest channel varint a later chunk's header is written for as one
+    // word (five bytes), and the shortest it is not.
+    sets.push(vec![
+        ((1 << 35) - 1, payload(70_000, 13)),
+        (1 << 35, payload(70_000, 14)),
+    ]);
     sets.push(vec![
         (3, payload(400_000, 10)),
         (4, payload(150, 11)),

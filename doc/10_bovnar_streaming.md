@@ -514,7 +514,11 @@ figures, and what feeding in small pieces costs, are in
 The Rust crate has the same batch functions in `bovnar::stream`
 (`frame_documents`, `load_documents`, `mux_dump`, `mux_load`,
 `embed_document`, `parse_embedded`), over the C functions above. Like
-Python's, they work on whole buffers.
+Python's, they work on whole buffers. Their twins over `std::io::Read` and
+`Write` (`load_documents_reader`, `mux_dump_to`, …), like `Reader::read_reader`
+and `Writer::to_writer`, stream through the callback sources and sinks of §8.1:
+they parse as they read and write as they serialise, with the in-memory
+functions' results.
 
 For a stream that never ends, `bovnar::codec` writes and reads the framing of
 §2 and the multiplexing of §3 incrementally, in pure Rust: `MuxWriter` and
@@ -528,6 +532,23 @@ values in the same document before the stream's assignment
 (`.meta = { … }; .media = <octet stream>;`). Nothing is allocated per message
 once the reader's buffers have grown. See
 [Rust Bindings §4.8](14_bovnar_rust_bindings.md#48-live-streams-the-framing-codec-bovnarcodec).
+
+To parse documents as they arrive, `bovnar::live` wraps the push-fed readers of
+§8: `DocumentFeed` over `bvnr_open_read_feed` (and `ValueFeed`, which hands out
+each top-level assignment as a value once it is complete), `FrameParser` and
+`FramePull` over the two kinds of fed frame reader (§2.4), and `Demux` over the
+fed demultiplexer (§3.4). `FramePull` and `Demux` are drained like the codec's
+readers, one item per call, borrowed from the input without a copy where it lies
+whole there, and the borrow checker keeps an item from outliving the next call.
+With `deliver_events` the demux hands out the document's own events in order
+with the messages, so the metadata before a stream is there before its first
+message. `EmbeddedFeed` reads the documents embedded in a live document (§4)
+by feeding their chunks to one reused reader, and a `Writer` takes
+`embed_document` and `mux_begin` / `mux_send` / `mux_end` mid-document.
+`MuxReader` stays the fast path for a stream that is one octet stream; `Demux`
+takes a document of any shape — values after the stream, other octet streams
+beside it, every reader limit. See
+[Rust Bindings §4.9](14_bovnar_rust_bindings.md#49-live-documents-through-c-bovnarlive).
 
 ---
 

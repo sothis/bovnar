@@ -110,6 +110,27 @@ API and implements spec 1.2.
   functions by shared tests and a new `codec` fuzz target, and
   `rust/benches/codec.rs` measures it (doc/14 §4.8 has the figures). The
   batch functions are unchanged.
+- **Live documents in the Rust crate: `bovnar::live`.** The crate wraps the
+  push-fed C readers: `DocumentFeed` (`bvnr_open_read_feed`), which delivers
+  the events of `Reader::read_mem` from each piece it is fed, and `ValueFeed`
+  and `ValueBuilder`, which hand out each top-level assignment as a `Value`
+  once it is complete, so an endless document is read in constant memory;
+  `FrameParser` and `FramePull` over the fed frame reader in its two modes;
+  `Demux` over the fed demultiplexer, drained with `next` like the codec's
+  readers, with the document's own events in order with the messages
+  (`deliver_events`), so the metadata before a stream is there before its
+  first message; and `EmbeddedFeed`, which reads the documents embedded in a
+  live document by feeding their chunks to one reused reader. One C object
+  serves a whole stream. An item borrows the reader until the next call, the
+  input is checked to be the one being drained, and a warm demux or frame
+  pull allocates nothing per message (a counting-allocator test). The readers
+  give what the batch functions give for the whole input, wherever it is cut:
+  tests over `examples/`, `tests/` and `src/gendata/` fed a byte at a time and
+  cut at every position, and a `live` fuzz target. `Writer` gains
+  `embed_document` and `mux_begin` / `mux_send` / `mux_end`, and the ABI test
+  measures `bvnr_demux_item_t`. doc/14 §4.9 has the API, the choice between
+  `live::Demux` and `codec::MuxReader`, and the figures of
+  `rust/benches/live.rs`.
 
 ### Changed
 
@@ -126,6 +147,18 @@ API and implements spec 1.2.
   every pair of settings, and a frame stream cut at every byte, against a reader
   fresh from `bvnr_reader_create`. A 43-byte framed document went from about 5.5
   to 2.3 µs (doc/10 §8.4).
+- **The Rust crate's `std::io` entry points stream.** `parse_reader`,
+  `Reader::read_reader`, `write_to`, `Writer::to_writer` and the `*_reader` /
+  `*_to` twins of `bovnar::stream` went through memory: a reader twin read its
+  input to the end before parsing, and a writer built the whole document in a
+  buffer (4 MiB for `to_writer`). They now go through the callback source and
+  sink, parsing as they read and writing 64 KiB blocks as they serialise, with
+  the same results; a failing `Read` or `Write` is still an `Error::Io`, now
+  after the events it allowed, and a writer twin may leave the start of a
+  document in its output when a later value cannot be serialised.
+  `Writer::to_writer` has no size cap any more; `to_writer_with` keeps its
+  `cap` as one. `DomDoc::parse_reader` still reads its input first.
+
 - **`bvnr_mux_send` allocates nothing per call.** Its 64 KiB chunk buffer used
   to be malloc'd and freed on every message; it now belongs to the writer,
   allocated on the first send and kept across re-opens. The output is byte for

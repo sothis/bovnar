@@ -36,6 +36,7 @@ enums are Rust enums, and an error carries the library's error kind.
     - 4.6 [Streaming / framing (`bovnar::stream`)](#46-streaming--framing-bovnarstream)
     - 4.7 [Files and I/O streams (`std::io::Read` / `Write`)](#47-files-and-io-streams-stdioread--write)
     - 4.8 [Live streams: the framing codec (`bovnar::codec`)](#48-live-streams-the-framing-codec-bovnarcodec)
+    - 4.9 [Live documents through C (`bovnar::live`)](#49-live-documents-through-c-bovnarlive)
 5. [Unit helpers](#5-unit-helpers)
     - 5.1 [The unit-profile notations (spec 1.2)](#51-the-unit-profile-notations-spec-12)
     - 5.2 [Extended unit functions](#52-extended-unit-functions)
@@ -544,7 +545,7 @@ use bovnar::{Base, DomDoc, ReadOptions, Reader, Writer};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = std::env::temp_dir().join(format!("bovnar-doc-{}.bvnr", std::process::id()));
 
-    // Write: the document reaches the file when finish() is called
+    // Write: the document streams into the file, the rest on finish()
     let mut w = Writer::to_writer(std::fs::File::create(&path)?, false)?;
     w.write_uint("port", 443, 16, Base::DECIMAL)?;
     w.finish()?;
@@ -611,27 +612,39 @@ fn main() -> Result<(), bovnar::Error> {
 | `stream::embed_document(inner, key, pretty)` | `stream::embed_document_to(inner, key, pretty, out)` |
 | `stream::parse_embedded(inner, typed)` | `stream::parse_embedded_reader(input, typed)` |
 
-**They go through memory.** The C library takes no callback source or sink, so
-nothing is streamed incrementally. A reader's input is read in full first —
-to one byte past `ReadOptions::max_file_size` when that is set, so a document over
-the cap fails with `file_too_long` at the same offset as `read_mem` reports, and
-to at most `DOM_READ_MAX_BYTES` (256 MiB, the cap of `bvn_dom_parse_fd`) for the
-DOM — and then parsed as `read_mem` parses it, so the events are the same. The
-plain-value twins (`parse_reader`, `parse_typed_reader`) and the `stream` readers
-read their input to its end with no cap; `load_documents_reader` and
-`mux_load_reader` then apply `max_document_size` and `max_message` in the parse,
-as their in-memory twins do. The `stream` writers and `write_to` serialise first,
-so nothing reaches `out` when serialising fails; then they write once and flush. A writer puts its
-document together in a memory sink of `DEFAULT_MEM_CAP` (4 MiB) bytes, or the
-`cap` of `to_writer_with`, and **`finish()` writes it to `out` once and flushes
-it**: nothing reaches `out` before then. Writing past the cap fails with
-`sink_buffer_exhausted`, as with `Writer::to_mem`. `out` must be
+**They stream.** A reader twin hands its `Read` to the C library as a callback
+source (`bvnr_source_from_callback`): the library pulls from it as it parses, so
+the events of what has arrived are delivered while the rest is still to come,
+and memory stays flat however long the input is. The results are those of the
+in-memory twin for the same bytes, `file_too_long` at the same offset for a
+document over `ReadOptions::max_file_size` and the `max_document_size` and
+`max_message` of `load_documents_reader` and `mux_load_reader` included. The
+input is read until it reports its end (`Ok(0)`), so these suit a file, a pipe
+or a blocking socket; for input that is handed over when it arrives, use the
+fed readers of [§4.9](#49-live-documents-through-c-bovnarlive). Only the DOM
+reads its input into memory first, up to `DOM_READ_MAX_BYTES` (256 MiB, the cap
+of `bvn_dom_parse_fd`), because it builds the whole document anyway.
+
+A writer twin, and `Writer::to_writer`, push the document into `out` through a
+callback sink (`bvnr_sink_to_callback`) as it is serialised: the C writer
+batches its output as it does for an fd, so `out` receives 64 KiB blocks as
+they fill and the rest on `finish()`, which then flushes `out` once. The bytes
+are those of the in-memory twin. Since output leaves as it is made, a value
+that cannot be serialised part-way through leaves the blocks before it in
+`out` (a value that is not a struct at all leaves nothing), and a `to_writer`
+writer dropped unfinished drops what it still holds. `to_writer` has no cap on
+the document's size; `to_writer_with(out, cap, …)` keeps `cap` as one, and
+writing past it fails with `sink_buffer_exhausted`, as with `Writer::to_mem`.
+`Writer::get_output()` is empty for such a writer. `out` must be
 `Send + 'static`; the writer stays `Send` ([§14](#14-threads)).
 
-A failing `input` or `out` is an `Error::Io` ([§13](#13-error-handling)) with the
-code the C library gives an unreadable fd source or unwritable fd sink
-(`reading_from_source_fd`, `writing_to_sink`); no event is delivered for a reader
-that failed, because nothing is parsed before the input has been read. No file
+Short reads and writes are continued and `Interrupted` is retried. A failing
+`input` or `out` is an `Error::Io` ([§13](#13-error-handling)) with the code the
+C library gives an unreadable fd source or unwritable fd sink
+(`reading_from_source_fd`, `writing_to_sink`), after the events of what had
+arrived, and a `to_writer` writer reports it from every later call too. A panic
+inside `input` or `out` reaches the caller, as one in an event handler does
+([§13](#13-error-handling)); it never unwinds through the C library. No file
 descriptor is involved, so these work the same on Windows.
 
 ### 4.8 Live streams: the framing codec (`bovnar::codec`)
@@ -852,6 +865,249 @@ larger than the cache, every chunk header a 400 KB message has is a cache
 miss, which puts peek and forward at about 145 ns for it, and small messages
 are read as fast as memory delivers them: about 25 ns to read a 150-byte one
 and 29 ns to peek at and skip it. The other figures move little.
+
+### 4.9 Live documents through C (`bovnar::live`)
+
+The codec of [§4.8](#48-live-streams-the-framing-codec-bovnarcodec) reads the
+framing; it does not parse documents. `bovnar::live` wraps the C library's
+push-fed readers ([Streaming](10_bovnar_streaming.md) §8) for that: they are
+*handed* bytes in pieces of any size, as they come from a non-blocking socket,
+an event loop, a frame or another document's octet stream, and are told
+separately when the input is over. Each keeps one C object for its whole life,
+so an endless stream costs one setup, and whatever the cuts, the events, values
+and errors are exactly those the batch functions give for the whole input.
+
+| Type | Over | What comes out |
+|---|---|---|
+| `DocumentFeed` | `bvnr_open_read_feed` | the events of `Reader::read_mem`, from each `feed` and `finish` |
+| `ValueFeed` | the same | each top-level assignment as a `Value` once it is complete |
+| `ValueBuilder` | — | the same from events you hand it (those of a `Demux`, say) |
+| `EmbeddedFeed` | `DocumentFeed` | the documents embedded under a key of another document, as their chunks arrive |
+| `FrameParser` | `bvnr_frame_reader_create` | the events and the result of every framed document |
+| `FramePull` | `bvnr_frame_reader_create_pull` | each framed document's bytes |
+| `Demux` | `bvnr_demux_open_feed`, `bvnr_demux_next` | a multiplexed stream's messages, and the document's own events in order with them |
+
+**Documents.** `DocumentFeed::new(&options)` takes the `ReadOptions` of a
+`Reader` (and `set_unit_policy` its policy). `feed(bytes, handler)` delivers the
+events those bytes complete before it returns, so the buffer can be reused at
+once; running out of input is never an error there. `finish(handler)` declares
+the end: a document cut off fails there, with the code and position
+`read_mem` reports. `reset()` starts the next document on the same reader. An
+error ends the document, and every later `feed` or `finish` returns it until
+`reset()`. `ValueFeed` does the same and appends to a `Vec` each assignment the
+bytes complete, those before an error included: a scalar, a struct or an octet
+stream with its last event, an array (which a `/` may still continue) with the
+event after it. A key assigned twice comes twice, and nothing is kept once it is
+handed out, so an endless document is read in constant memory.
+
+```rust
+use bovnar::live::ValueFeed;
+use bovnar::{ReadOptions, Value};
+
+fn main() -> Result<(), bovnar::Error> {
+    // An endless document arriving from a socket, cut anywhere
+    let pieces: [&[u8]; 4] = [b".temp = 21", b".5; .unit = \"C\"; .te", b"mp = 22.0;", b" .tag = [1, 2];"];
+    let mut feed = ValueFeed::new(false, &ReadOptions::default())?;
+    let mut got = Vec::new();
+    for piece in pieces {
+        feed.feed(piece, &mut got)?;
+    }
+    assert_eq!(got[0], ("temp".to_string(), Value::Float(21.5)));
+    assert_eq!(got.len(), 3, "the array may still go on");
+    feed.finish(&mut got)?; // the end of the document completes it
+    assert_eq!(got[3].0, "tag");
+    Ok(())
+}
+```
+
+**Frames.** `FramePull` hands out each framed document's bytes, to be parsed
+by a reused `DocumentFeed` or `ValueFeed` (or `parse`); `codec::FrameReader`
+does the same in pure Rust. `FrameParser::new(&options, continue_past_failed,
+max_document_size)` parses every document as `stream::load_documents` does,
+streaming each frame's payload into one reused reader so that a frame is never
+held whole: `feed(bytes, on_event, on_document)` calls `on_document(index,
+result)` for each document it completes. A bad magic is
+`unexpected_input_byte`, a frame over the cap `value_out_of_range`, a stream
+that does not end on a frame boundary `got_incomplete_bvnr_stream` at `finish`.
+
+```rust
+use bovnar::live::{FramePull, ValueFeed};
+use bovnar::{ReadOptions, stream};
+
+fn main() -> Result<(), bovnar::Error> {
+    let wire = stream::frame_documents(&[&b".id = 1;"[..], b".id = 2;"])?;
+    let mut frames = FramePull::new(0)?;
+    let mut values = ValueFeed::new(false, &ReadOptions::default())?;
+    let mut ids = Vec::new();
+    for piece in wire.chunks(5) {
+        let mut input = piece;
+        while let Some(doc) = frames.next(&mut input)? {
+            values.reset()?;
+            values.feed(doc, &mut ids)?;
+            values.finish(&mut ids)?;
+        }
+    }
+    frames.finish()?;
+    assert_eq!(ids.len(), 2);
+    Ok(())
+}
+```
+
+**Multiplexed streams.** `Demux::new(&DemuxOptions { max_message, key,
+deliver_events, read })` reads the document that carries the stream, with the
+key scope, `max_message`, the 4096-channel limit and every error of
+`stream::mux_load`. Each `next` returns a `DemuxItem::Message { channel,
+payload }` or, with `deliver_events`, a `DemuxItem::Event` for every event but
+the stream's chunks, in document order: the metadata before the stream comes
+out before its first message, and a `ValueBuilder` makes values of it. After
+`finish()`, `next` on an empty slice hands out the closing events; `reset()`
+starts the next document, keeping the channels and their buffers.
+
+```rust
+use bovnar::live::{Demux, DemuxItem, DemuxOptions, ValueBuilder};
+use bovnar::Writer;
+
+fn main() -> Result<(), bovnar::Error> {
+    // Metadata, the stream, and a value after it, as a C writer writes them
+    let mut w = Writer::to_mem(1 << 16, false)?;
+    w.begin_struct("meta")?;
+    w.write_string("codec", "av1")?;
+    w.end_struct()?;
+    w.mux_begin("media")?;
+    w.mux_send(1, b"key frame")?;
+    w.mux_send(2, b"audio")?;
+    w.mux_end()?;
+    w.write_bool("complete", true)?;
+    w.finish()?;
+    let wire = w.get_output().to_vec();
+
+    let options = DemuxOptions { key: Some("media".into()), deliver_events: true, ..DemuxOptions::default() };
+    let mut demux = Demux::new(&options)?;
+    let mut meta = ValueBuilder::new(false);
+    let mut messages = Vec::new();
+    for piece in wire.chunks(6) {
+        let mut input = piece;
+        while let Some(item) = demux.next(&mut input)? {
+            match item {
+                DemuxItem::Event(e) => meta.push(&e.data()),
+                DemuxItem::Message { channel, payload } => {
+                    if messages.is_empty() {
+                        // Everything before the stream is here already
+                        assert_eq!(meta.drain().next().map(|(k, _)| k).as_deref(), Some("meta"));
+                    }
+                    messages.push((channel, payload.to_vec()));
+                }
+            }
+        }
+    }
+    demux.finish()?;
+    while let Some(item) = demux.next(&mut &[][..])? {
+        if let DemuxItem::Event(e) = item {
+            meta.push(&e.data());
+        }
+    }
+    assert_eq!(messages, [(1, b"key frame".to_vec()), (2, b"audio".to_vec())]);
+    assert!(meta.drain().any(|(k, _)| k == "complete"));
+    Ok(())
+}
+```
+
+**Draining.** `FramePull::next` and `Demux::next` take `&mut &[u8]`, the bytes
+not yet read, as the codec's readers do, and return one item per call. An item
+that lies whole in the input is borrowed from it without a copy; one that spans
+pieces or chunks is gathered in a buffer the reader keeps and reuses. Either way
+it borrows the reader until the next call, which the borrow checker enforces.
+The C object keeps a pointer into the bytes until they are drained, so pass the
+same slice to every call until one returns `None` (which empties it): the slice
+is not shortened meanwhile, another one is refused with an `Error::Argument`, and
+so is `finish()` while bytes are left. A warm `Demux` or `FramePull` allocates
+nothing per message or document.
+
+**Embedded documents.** `Writer::embed_document(key, doc)` puts a document into
+an open writer ([§11.5](#115-struct-helpers)), one after another into a
+`to_writer` stream if you like. To read them while the outer document arrives,
+hand its events to an `EmbeddedFeed`: it feeds each embedded document's chunks
+to one reused `DocumentFeed` as they come and returns the document's value, or
+its error, when its octet stream closes; `stream::parse_embedded` gathers the
+bytes and starts a reader for every document instead.
+
+```rust
+use bovnar::live::{DocumentFeed, EmbeddedFeed};
+use bovnar::{EventData, ReadOptions, Value, Writer};
+
+fn main() -> Result<(), bovnar::Error> {
+    let mut w = Writer::to_mem(4096, false)?;
+    for n in 1..=3 {
+        w.embed_document("payload", format!(".n = {n};").as_bytes())?;
+    }
+    w.finish()?;
+    let outer = w.get_output().to_vec();
+
+    let mut embedded = EmbeddedFeed::new("payload", false)?;
+    let mut docs = Vec::new();
+    let mut on_event = |d: &EventData<'_>| {
+        docs.extend(embedded.push(d));
+        true
+    };
+    let mut feed = DocumentFeed::new(&ReadOptions::default())?;
+    for piece in outer.chunks(4) {
+        feed.feed(piece, &mut on_event)?;
+    }
+    feed.finish(&mut on_event)?;
+    assert_eq!(docs.len(), 3);
+    assert_eq!(docs[2], Ok(Value::Struct(vec![("n".into(), Value::Int(3))])));
+    Ok(())
+}
+```
+
+**`live::Demux` or `codec::MuxReader`?** Both read a multiplexed stream as it
+arrives, with the C demultiplexer's limits and error codes.
+
+| | `codec::MuxReader` | `live::Demux` |
+|---|---|---|
+| Implementation | pure Rust, no C call per message | the C parser over the whole document |
+| Document shape | one octet stream, after an optional text preamble, ending the document | any: values before and after the stream, other octet streams beside it (`key`) |
+| The values around the stream | the preamble's bytes, parsed on request | every event, in order with the messages |
+| Limits and policy | `max_message`, the preamble cap | `max_message` and every `ReadOptions` limit, unit policies |
+| Extras | peek, skip and forward a message without gathering it | — |
+| Use it for | a dedicated stream, a router or a relay | documents of any other shape, or when the values around the stream matter |
+
+**Errors** are those of the batch functions for the same input, as
+`Error::Parse`: with a position when the document failed, the demultiplexer's
+code alone (`octet_stream_out_of_sync`, `value_out_of_range`,
+`octet_stream_truncated`) when the stream did, as `mux_load` reports them. A
+frame reader's errors carry no position, as `load_documents`' do not. A panic in
+a handler reaches the caller, as for `Reader` ([§13](#13-error-handling)).
+
+**What it costs**, from `cargo bench --bench live`: a release build pinned to
+one core (`taskset -c 4`) of the same i7-2700K as §4.8, load average about 2;
+the median of three runs, each the median of nine passes. The input is a few
+MiB held in the cache; *pieces* feeds it in 1460-byte pieces, a TCP segment's
+payload, so most messages and documents straddle a feed. Per message:
+
+| Message | `Demux` whole | `Demux` pieces | with `deliver_events` | `mux_load` | `MuxReader` whole | `MuxReader` pieces |
+|---|---|---|---|---|---|---|
+| 150 B | 90 ns | 98 ns | 90 ns | 136 ns | 8 ns | 15 ns |
+| 30 KB | 138 ns | 2.1 µs | 168 ns | 3.5 µs | 10 ns | 1.8 µs |
+| 400 KB | 26 µs | 48 µs | 28 µs | 72 µs | 25 µs | 29 µs |
+
+A message whole in the fed buffer is borrowed, so its cost does not grow with
+its size; one that straddles a feed or spans chunks is gathered, and copying it
+is most of the cost, in the codec as in the demux. `mux_load` copies every
+message into a `Vec`. The codec is about ten times cheaper per small message:
+no C call and no grammar. Per document (a struct of integers and strings per
+line, an octet stream every 512 lines), with the throughput in brackets:
+
+| Document | `DocumentFeed` whole | `DocumentFeed` pieces | `Reader::read_mem` | `ValueFeed` | `parse` |
+|---|---|---|---|---|---|
+| 196 B | 18 µs (11 MB/s) | 19 µs (10 MB/s) | 19 µs (11 MB/s) | 22 µs (9 MB/s) | 29 µs (7 MB/s) |
+| 32 KB | 2.2 ms (14 MB/s) | 2.2 ms (14 MB/s) | 2.2 ms (15 MB/s) | 2.8 ms (12 MB/s) | 3.1 ms (10 MB/s) |
+| 402 KB | 28 ms (14 MB/s) | 28 ms (14 MB/s) | 27 ms (15 MB/s) | 33 ms (12 MB/s) | 113 ms (4 MB/s) |
+
+Feeding costs what reading the whole buffer costs, wherever the pieces are cut:
+the time is the parser's. `ValueFeed` hands each assignment out as it
+completes, where `parse` looks up every key in the document built so far,
+which is what costs it the most on a document of many keys.
 
 ---
 
@@ -1927,8 +2183,8 @@ The column and the byte offset of the error are on the `Error` itself — see
 |---|---|
 | `Writer::to_mem(cap, pretty)` | Write to an in-process buffer of `cap` bytes; `pretty` indents the output. Writing past `cap` fails with `sink_buffer_exhausted` (`DEFAULT_MEM_CAP` is 4 MiB) |
 | `Writer::to_mem_with(cap, pretty, unit_flags, emit_version)` | `to_mem` with two more settings: `unit_flags` ([`UnitFlags`](#53-unitflags)) rewrite units on output, `emit_version` leads the document with `#!bovnar <major>.<minor>` |
-| `Writer::to_writer(out, pretty)` | Write to any `std::io::Write`: the document is put together in a memory sink of `DEFAULT_MEM_CAP` bytes and `finish()` writes it to `out` and flushes it |
-| `Writer::to_writer_with(out, cap, pretty, unit_flags, emit_version)` | `to_writer` with a sink of `cap` bytes, plus `unit_flags` and `emit_version` as in `to_mem_with` |
+| `Writer::to_writer(out, pretty)` | Write to any `std::io::Write`: the document streams into `out` in 64 KiB blocks as it is written, the rest on `finish()`, which flushes `out`; no cap on its size |
+| `Writer::to_writer_with(out, cap, pretty, unit_flags, emit_version)` | `to_writer` for a document of at most `cap` bytes (`sink_buffer_exhausted` past it), plus `unit_flags` and `emit_version` as in `to_mem_with` |
 
 See [§4.7](#47-files-and-io-streams-stdioread--write) for the I/O writer. Every writer accepts structs and arrays nested up to **255** deep,
 the same limit `Reader` and `parse()` read at. `unit_flags` takes
@@ -1944,9 +2200,9 @@ the size until the output fits (up to 256 MiB).
 
 | Method | Description |
 |---|---|
-| `w.get_output() -> &[u8]` | The document written so far |
+| `w.get_output() -> &[u8]` | The document written so far; empty for a `to_writer` writer, whose output has gone to its `std::io::Write` |
 | `Writer::bytes_written -> u64` | Number of bytes written |
-| `w.finish()` | Flush and seal the output. Fails with `Error::Write` if any struct is still open. For a `to_writer` writer it also writes the document to its `std::io::Write`, once |
+| `w.finish()` | Flush and seal the output. Fails with `Error::Write` if any struct is still open. For a `to_writer` writer it also pushes what the writer still holds to its `std::io::Write` and flushes it |
 
 There is no `destroy()`: dropping the `Writer` releases the C object.
 
@@ -2083,6 +2339,18 @@ fn main() -> Result<(), bovnar::Error> {
 
 `finish()` verifies that the struct depth is zero; an unclosed struct fails with
 `Error::Write` (`GotIncompleteBvnrStream`).
+
+Two more kinds of value go into an open writer, whatever it writes to:
+
+| Method | Writes |
+|---|---|
+| `w.embed_document(key, doc)` | `.key = <octets>;` holding the document `doc` (`bvnr_embed_document`), for `stream::parse_embedded` or `live::EmbeddedFeed` to read back |
+| `w.mux_begin(key)`, `w.mux_send(channel, payload)`, `w.mux_end()` | a multiplexed octet stream under `key` (`bvnr_mux_begin` / `_send` / `_end`), the bytes of `stream::mux_dump`; values written before it are read back before its first message, and the document may go on after it |
+
+On a `to_writer` writer a message reaches `out` when the writer's 64 KiB block
+fills or the document is finished: there is no C call to push a block early.
+For a stream whose every message must go out at once, write it with
+`codec::MuxWriter` ([§4.8](#48-live-streams-the-framing-codec-bovnarcodec)).
 
 ### 11.6 Version directive
 
@@ -2372,6 +2640,9 @@ fn main() -> Result<(), bovnar::Error> {
 }
 ```
 
+The `live` readers ([§4.9](#49-live-documents-through-c-bovnarlive)) are `Send`
+and not `Sync` too: each owns one C object for its stream.
+
 `parse`, `parse_typed`, `to_string`, their `_reader` / `write_to` twins and the `units`, `currency` and `json`
 functions are free functions that build their own reader, writer or DOM for each
 call, so no two calls share an object and they can run on several threads at
@@ -2446,8 +2717,9 @@ rust/
 │   ├── dom.rs        # DomDoc, DomNode, DomType — random-access DOM
 │   ├── enums.rs      # Rust enums mirroring the C enums
 │   ├── error.rs      # Error, ErrorKind, Position
-│   ├── io.rs         # reads a caller's std::io::Read for read_reader / parse_reader
+│   ├── io.rs         # a caller's std::io::Read as a callback source for read_reader / parse_reader
 │   ├── json.rs       # from_json / to_json / detect (the CLI's `bovnar convert`)
+│   ├── live.rs       # DocumentFeed, ValueFeed, EmbeddedFeed, FrameParser, FramePull, Demux — fed reading through C
 │   ├── quantity.rs   # Quantity — typed, unit-annotated scalar for lossless round-trips
 │   ├── reader.rs     # Reader, ReadOptions, EventData, EventPayload, UnitPolicy, UnitRule
 │   ├── stream.rs     # framing, octet multiplexing, document-in-document
@@ -2455,7 +2727,7 @@ rust/
 │   ├── units.rs      # unit_to_si_factor, unit_convert_factor, etc.
 │   └── writer.rs     # Writer, Base, Signedness, EmitSpec
 ├── tests/            # one integration-test file per topic, plus smoke.rs
-├── benches/          # codec.rs: per-message figures of the framing codec (std only)
+├── benches/          # codec.rs, live.rs: per-message figures of the codec and the fed readers (std only)
 └── fuzz/             # cargo-fuzz targets
 ```
 
@@ -2475,7 +2747,8 @@ rust/
 | `src/currency.rs` | currency metadata |
 | `src/stream.rs` | framing, multiplexing and document-in-document, with their `Read` / `Write` twins |
 | `src/codec.rs` | the incremental framing codec in pure Rust: `MuxWriter`, `MuxReader`, `FrameReader`, the frame writers |
-| `src/io.rs` | the `std::io::Read` and `Write` helpers behind the `_reader` and `_to` entry points |
+| `src/live.rs` | fed reading through the C library: `DocumentFeed`, `ValueFeed`, `ValueBuilder`, `EmbeddedFeed`, `FrameParser`, `FramePull`, `Demux` |
+| `src/io.rs` | the `std::io::Read` helpers behind the `_reader` entry points (the sinks of the `_to` ones are in `ffi.rs` and `writer.rs`) |
 | `src/json.rs` | JSON ⇄ BVNR, as the CLI's `bovnar convert` does it |
 | `src/lib.rs` | `parse`, `parse_typed`, `to_string`, the reader and writer twins, `write_array` and the crate-root re-exports |
 

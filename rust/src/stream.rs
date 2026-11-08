@@ -3,22 +3,31 @@
 //! documents into one byte stream, multiplexing binary messages over
 //! channels, and embedding one document inside another.
 //!
+//! These work on whole streams: they return everything at once, and suit a
+//! file or a finite transfer. For a stream that never ends, see
+//! [`crate::codec`].
+//!
 //! Each function has a twin over [`std::io::Read`] (`*_reader`) or
-//! [`std::io::Write`] (`*_to`). The C library has no callback source or
-//! sink, so these go through memory: a reader twin reads its input to the
-//! end first (no total cap: these reads run with `max_file_size`
-//! [`BVNR_FILESIZE_UNLIMITED`]) and then parses it as its in-memory twin
-//! does, `max_document_size` and `max_message` included; a writer twin
-//! builds the output in memory and then writes it out and flushes. A failing
-//! reader or writer is an [`Error::Io`] with `reading_from_source_fd` or
-//! `writing_to_sink`.
+//! [`std::io::Write`] (`*_to`) that streams through the library's callback
+//! source and sink instead of going through memory. A reader twin parses as
+//! it reads, with no total cap (`max_file_size`
+//! [`BVNR_FILESIZE_UNLIMITED`]) and the in-memory twin's
+//! `max_document_size` and `max_message`, and returns what its in-memory
+//! twin returns for the same bytes; it reads until its input reports its end.
+//! A writer twin writes as it serialises, in 64 KiB blocks, and flushes at
+//! the end; its output is byte for byte its in-memory twin's, but a failure
+//! part-way leaves what was already written. A failing reader or writer is
+//! an [`Error::Io`] with `reading_from_source_fd` or `writing_to_sink`, also
+//! when the bytes before the failure would already have failed to parse;
+//! short reads and writes are continued, `Interrupted` is retried, and a
+//! panic in either reaches the caller.
 
 use std::cell::RefCell;
 
 use crate::dict_parser::DictParser;
 use crate::enums::ErrorCode;
 use crate::error::{Error, Position, Result};
-use crate::ffi::{self, BvnrReadFlags, DemuxError};
+use crate::ffi::{self, BvnrReadFlags, BvnrSource, DemuxError, Handlers, ReaderHandle};
 use crate::io;
 use crate::reader::{EventData, wrap};
 use crate::writer;
@@ -51,9 +60,12 @@ pub fn frame_documents<D: AsRef<[u8]>>(docs: &[D]) -> Result<Vec<u8>> {
     ffi::frame_documents(&docs).ok_or_else(|| Error::argument("bvnr_frame_write failed"))
 }
 
-/// [`frame_documents`] into any [`std::io::Write`].
-pub fn frame_documents_to<D: AsRef<[u8]>>(docs: &[D], out: impl std::io::Write) -> Result<()> {
-    io::write_all(out, &frame_documents(docs)?)
+/// [`frame_documents`] into any [`std::io::Write`], one frame at a time.
+pub fn frame_documents_to<D: AsRef<[u8]>>(docs: &[D], mut out: impl std::io::Write) -> Result<()> {
+    docs.iter()
+        .try_for_each(|d| ffi::frame_write_to(d.as_ref(), &mut out))
+        .and_then(|()| out.flush())
+        .map_err(|e| Error::io(ErrorCode::WritingToSink, &e))
 }
 
 /// Serialises each value with [`to_string`] and frames the results.
@@ -65,9 +77,18 @@ pub fn dump_documents(values: &[Value], pretty: bool) -> Result<Vec<u8>> {
     frame_documents(&docs)
 }
 
-/// [`dump_documents`] into any [`std::io::Write`].
-pub fn dump_documents_to(values: &[Value], pretty: bool, out: impl std::io::Write) -> Result<()> {
-    io::write_all(out, &dump_documents(values, pretty)?)
+/// [`dump_documents`] into any [`std::io::Write`]: each document is
+/// serialised and framed in turn, so only one is in memory at a time.
+pub fn dump_documents_to(
+    values: &[Value],
+    pretty: bool,
+    mut out: impl std::io::Write,
+) -> Result<()> {
+    let io_error = |e: std::io::Error| Error::io(ErrorCode::WritingToSink, &e);
+    for v in values {
+        ffi::frame_write_to(&to_string(v, pretty)?, &mut out).map_err(io_error)?;
+    }
+    out.flush().map_err(io_error)
 }
 
 /// Parses a framed stream, one value per document (typed like
@@ -76,6 +97,17 @@ pub fn dump_documents_to(values: &[Value], pretty: bool, out: impl std::io::Writ
 /// first failure is the error. `max_document_size` 0 is the default cap.
 pub fn load_documents(
     data: &[u8],
+    typed: bool,
+    continue_past_failed: bool,
+    max_document_size: u64,
+) -> Result<Vec<Option<Value>>> {
+    ffi::with_mem_source(data, |src| {
+        load_from(src, typed, continue_past_failed, max_document_size)
+    })
+}
+
+fn load_from(
+    src: &mut BvnrSource,
     typed: bool,
     continue_past_failed: bool,
     max_document_size: u64,
@@ -102,7 +134,7 @@ pub fn load_documents(
         ..ffi::Handlers::default()
     };
     let (ok, _) = ffi::doc_stream_read(
-        data,
+        src,
         read_flags(),
         continue_past_failed,
         max_document_size,
@@ -117,26 +149,23 @@ pub fn load_documents(
 }
 
 /// [`load_documents`] over any [`std::io::Read`], such as a
-/// [`std::fs::File`]. Reads `input` to its end, so it suits a finite stream,
-/// not an endless one.
+/// [`std::fs::File`]. It returns once `input` has ended, so it suits a finite
+/// stream; for an endless one, see [`crate::codec::FrameReader`].
 pub fn load_documents_reader(
-    input: impl std::io::Read,
+    mut input: impl std::io::Read,
     typed: bool,
     continue_past_failed: bool,
     max_document_size: u64,
 ) -> Result<Vec<Option<Value>>> {
-    load_documents(
-        &io::read_capped(input, None)?,
-        typed,
-        continue_past_failed,
-        max_document_size,
-    )
+    io::from_reader(&mut input, |src| {
+        load_from(src, typed, continue_past_failed, max_document_size)
+    })
 }
 
 /// Multiplexes `(channel, payload)` messages into one document under `key`
 /// (conventionally `"mux"`).
 pub fn mux_dump<P: AsRef<[u8]>>(messages: &[(u64, P)], key: &str) -> Result<Vec<u8>> {
-    let msgs: Vec<(u64, &[u8])> = messages.iter().map(|(c, p)| (*c, p.as_ref())).collect();
+    let msgs = borrowed(messages);
     let total: usize = msgs.iter().map(|(_, p)| p.len()).sum();
     writer::grow_write(total + msgs.len() * 64 + key.len(), false, |w| {
         w.check(|h| h.mux(key, &msgs))
@@ -149,17 +178,31 @@ pub fn mux_dump_to<P: AsRef<[u8]>>(
     key: &str,
     out: impl std::io::Write,
 ) -> Result<()> {
-    io::write_all(out, &mux_dump(messages, key)?)
+    let msgs = borrowed(messages);
+    writer::stream_to(out, false, |w| w.check(|h| h.mux(key, &msgs)))
+}
+
+fn borrowed<P: AsRef<[u8]>>(messages: &[(u64, P)]) -> Vec<(u64, &[u8])> {
+    messages.iter().map(|(c, p)| (*c, p.as_ref())).collect()
 }
 
 /// The `(channel, payload)` messages of a multiplexed document, in order.
 /// `max_message` 0 is the default cap; `key` `None` accepts any.
 pub fn mux_load(data: &[u8], max_message: u64, key: Option<&str>) -> Result<Vec<(u64, Vec<u8>)>> {
+    mux_load_with(|r, f, h| r.read_mem(data, f, h), max_message, key)
+}
+
+/// [`mux_load`] of the document `read` reads.
+fn mux_load_with(
+    read: impl FnOnce(&mut ReaderHandle, BvnrReadFlags, &mut Handlers<'_>) -> bool,
+    max_message: u64,
+    key: Option<&str>,
+) -> Result<Vec<(u64, Vec<u8>)>> {
     let key = key
         .map(std::ffi::CString::new)
         .transpose()
         .map_err(|_| Error::argument("mux key contains a NUL byte"))?;
-    ffi::demux_read(data, read_flags(), max_message, key.as_deref()).map_err(|e| match e {
+    ffi::demux_read(read, read_flags(), max_message, key.as_deref()).map_err(|e| match e {
         DemuxError::Demux(code) => parse_error(code),
         DemuxError::Read(r) => Error::Parse {
             code: r.code,
@@ -174,13 +217,16 @@ pub fn mux_load(data: &[u8], max_message: u64, key: Option<&str>) -> Result<Vec<
     })
 }
 
-/// [`mux_load`] over any [`std::io::Read`]. Reads `input` to its end.
+/// [`mux_load`] over any [`std::io::Read`]. It returns once `input` has
+/// ended; for messages as they arrive, see [`crate::codec::MuxReader`].
 pub fn mux_load_reader(
-    input: impl std::io::Read,
+    mut input: impl std::io::Read,
     max_message: u64,
     key: Option<&str>,
 ) -> Result<Vec<(u64, Vec<u8>)>> {
-    mux_load(&io::read_capped(input, None)?, max_message, key)
+    io::from_reader(&mut input, |src| {
+        mux_load_with(|r, f, h| r.read_source(src, f, h), max_message, key)
+    })
 }
 
 /// Embeds the document `inner` under `key` (conventionally `"payload"`)
@@ -198,11 +244,20 @@ pub fn embed_document_to(
     pretty: bool,
     out: impl std::io::Write,
 ) -> Result<()> {
-    io::write_all(out, &embed_document(inner, key, pretty)?)
+    writer::stream_to(out, pretty, |w| w.check(|h| h.embed_document(key, inner)))
 }
 
 /// Parses an embedded document (the payload [`embed_document`] wrote).
 pub fn parse_embedded(inner: &[u8], typed: bool) -> Result<Value> {
+    parse_embedded_with(typed, |flags, h| Ok(ffi::parse_embedded(inner, flags, h)))
+}
+
+/// [`parse_embedded`] of the document `read` reads with the flags and
+/// handlers it is given.
+fn parse_embedded_with(
+    typed: bool,
+    read: impl FnOnce(BvnrReadFlags, &mut Handlers<'_>) -> Result<bool>,
+) -> Result<Value> {
     let mut parser = DictParser::new(typed);
     let (ok, first_error) = {
         let mut on_event = |d: &EventData<'_>| {
@@ -214,10 +269,7 @@ pub fn parse_embedded(inner: &[u8], typed: bool) -> Result<Value> {
             verified: Some(&mut verified),
             ..ffi::Handlers::default()
         };
-        (
-            ffi::parse_embedded(inner, read_flags(), &mut h),
-            h.first_error,
-        )
+        (read(read_flags(), &mut h)?, h.first_error)
     };
     if !ok {
         return Err(match first_error {
@@ -236,9 +288,12 @@ pub fn parse_embedded(inner: &[u8], typed: bool) -> Result<Value> {
     Ok(parser.result())
 }
 
-/// [`parse_embedded`] over any [`std::io::Read`]. Reads `input` to its end.
-pub fn parse_embedded_reader(input: impl std::io::Read, typed: bool) -> Result<Value> {
-    parse_embedded(&io::read_capped(input, None)?, typed)
+/// [`parse_embedded`] over any [`std::io::Read`], parsed as it is read.
+pub fn parse_embedded_reader(mut input: impl std::io::Read, typed: bool) -> Result<Value> {
+    parse_embedded_with(typed, |flags, h| {
+        let mut reader = ReaderHandle::new().ok_or(Error::OutOfMemory("bvnr_reader_create()"))?;
+        io::from_reader(&mut input, |src| Ok(reader.read_source(src, flags, h)))
+    })
 }
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 //! The streaming writer.
 
-use crate::enums::{Event, TokenType, ValueTypeFamily};
+use crate::enums::{ErrorCode, Event, TokenType, ValueTypeFamily};
 use crate::error::{Error, Result};
 use crate::ffi::{self, BvnrWriteFlags, ValueTypeSpec};
 use crate::quantity::Quantity;
@@ -142,8 +142,20 @@ pub enum Signedness {
     Auto,
 }
 
-/// A streaming BVNR writer into memory, or through memory into a
-/// [`std::io::Write`].
+/// Runs `write` on a writer whose output streams into `out`, then finishes
+/// it: the C writer pushes its 64 KiB blocks into `out` as they fill, the
+/// rest at the end, and then flushes `out`. For the `*_to` functions, whose
+/// `out` is borrowed for the one call.
+pub(crate) fn stream_to(
+    mut out: impl std::io::Write,
+    pretty: bool,
+    write: impl FnOnce(&mut Writer) -> Result<()>,
+) -> Result<()> {
+    let mut w = Writer::to_sink(ffi::PushState::scoped(), pretty, 0, false)?;
+    ffi::with_scoped_out(&mut out, || write(&mut w).and_then(|()| w.finish()))
+}
+
+/// A streaming BVNR writer into memory, or into a [`std::io::Write`].
 pub struct Writer {
     handle: ffi::WriterHandle,
     struct_depth: u32,
@@ -151,8 +163,6 @@ pub struct Writer {
     /// The error the first [`Writer::finish`] failed with, returned again by
     /// every later call instead of a success the output does not back.
     finish_error: Option<Error>,
-    /// Where [`Writer::finish`] sends the document, for [`Writer::to_writer`].
-    out: Option<Box<dyn std::io::Write + Send>>,
 }
 
 impl Writer {
@@ -171,13 +181,78 @@ impl Writer {
         unit_flags: u32,
         emit_version: bool,
     ) -> Result<Self> {
+        Self::open(unit_flags, emit_version, |h, flags| {
+            h.open_mem(cap, pretty, flags)
+        })
+    }
+
+    /// A writer whose document streams into any [`std::io::Write`], such as
+    /// a [`std::fs::File`] or a socket.
+    ///
+    /// The writer batches its output as it does for an fd: `out` receives it
+    /// in 64 KiB blocks as they fill, the rest on [`Writer::finish`], which
+    /// then flushes `out`. So `out` may hold the start of a document whose
+    /// writing later fails, and a document shorter than a block reaches `out`
+    /// only on [`Writer::finish`]; dropping the writer unfinished drops what
+    /// it holds. There is no cap on the document's size;
+    /// [`Writer::to_writer_with`] sets one. Every write is whole: a short
+    /// write or an `Interrupted` one is continued. A failing `out` is an
+    /// [`Error::Io`] with `writing_to_sink`, the code of a failing fd sink,
+    /// from the call whose output it refused and from every call after. A
+    /// panic in `out` reaches the caller of that call.
+    /// [`Writer::get_output`] is empty for such a writer.
+    pub fn to_writer(out: impl std::io::Write + Send + 'static, pretty: bool) -> Result<Self> {
+        Self::to_sink(
+            ffi::PushState::owned(Box::new(out), u64::MAX),
+            pretty,
+            0,
+            false,
+        )
+    }
+
+    /// [`Writer::to_writer`] for a document of at most `cap` bytes, with the
+    /// output options [`Writer::to_mem_with`] takes. Writing past `cap` fails
+    /// with `sink_buffer_exhausted`, as with [`Writer::to_mem`]; what `out`
+    /// holds then is the output up to the last 64 KiB block that fitted.
+    pub fn to_writer_with(
+        out: impl std::io::Write + Send + 'static,
+        cap: usize,
+        pretty: bool,
+        unit_flags: u32,
+        emit_version: bool,
+    ) -> Result<Self> {
+        Self::to_sink(
+            ffi::PushState::owned(Box::new(out), cap as u64),
+            pretty,
+            unit_flags,
+            emit_version,
+        )
+    }
+
+    /// A writer into the callback sink `state`.
+    pub(crate) fn to_sink(
+        state: ffi::PushState,
+        pretty: bool,
+        unit_flags: u32,
+        emit_version: bool,
+    ) -> Result<Self> {
+        Self::open(unit_flags, emit_version, |h, flags| {
+            h.open_sink(state, pretty, flags)
+        })
+    }
+
+    /// A fresh writer, opened by `open` with the crate's write flags.
+    fn open(
+        unit_flags: u32,
+        emit_version: bool,
+        open: impl FnOnce(&mut ffi::WriterHandle, BvnrWriteFlags) -> bool,
+    ) -> Result<Self> {
         let handle = ffi::WriterHandle::new().ok_or(Error::OutOfMemory("bvnr_writer_create()"))?;
         let mut w = Writer {
             handle,
             struct_depth: 0,
             finished: false,
             finish_error: None,
-            out: None,
         };
         let mut flags = BvnrWriteFlags::zeroed();
         // The writer matches what the reader reads: the 255-level cap in both
@@ -186,39 +261,9 @@ impl Writer {
         flags.max_array_nesting = 255;
         flags.unit_flags = unit_flags;
         flags.emit_version = emit_version;
-        if !w.handle.open_mem(cap, pretty, flags) {
+        if !open(&mut w.handle, flags) {
             return Err(w.error());
         }
-        Ok(w)
-    }
-
-    /// A writer whose document goes to any [`std::io::Write`], such as a
-    /// [`std::fs::File`].
-    ///
-    /// The C library writes to an fd or a fixed memory buffer only:
-    /// `bvnr_push_fn` exists, but `bovnar.h` has no constructor for a sink
-    /// that calls one (the sink layout is private to the library). So the
-    /// document is put together in a memory sink of [`DEFAULT_MEM_CAP`]
-    /// bytes, and [`Writer::finish`] writes it to `out` and flushes `out`.
-    /// Nothing reaches `out` before then. Writing past the cap fails with
-    /// `sink_buffer_exhausted`, as with [`Writer::to_mem`];
-    /// [`Writer::to_writer_with`] sets a larger one. A failing `out` is an
-    /// [`Error::Io`] with `writing_to_sink`, the code of a failing fd sink.
-    pub fn to_writer(out: impl std::io::Write + Send + 'static, pretty: bool) -> Result<Self> {
-        Self::to_writer_with(out, DEFAULT_MEM_CAP, pretty, 0, false)
-    }
-
-    /// [`Writer::to_writer`] with a sink of `cap` bytes and the output
-    /// options [`Writer::to_mem_with`] takes.
-    pub fn to_writer_with(
-        out: impl std::io::Write + Send + 'static,
-        cap: usize,
-        pretty: bool,
-        unit_flags: u32,
-        emit_version: bool,
-    ) -> Result<Self> {
-        let mut w = Self::to_mem_with(cap, pretty, unit_flags, emit_version)?;
-        w.out = Some(Box::new(out));
         Ok(w)
     }
 
@@ -483,6 +528,39 @@ impl Writer {
         self.event(Event::OctetStreamEnd, TokenType::Identifier, none, &[])
     }
 
+    /// `.key = <octets>;` where the octets are the document `doc`
+    /// (`bvnr_embed_document`), so that a reader can parse it back:
+    /// [`crate::stream::parse_embedded`]. On a [`Writer::to_writer`] writer this
+    /// embeds one document after another into a document that is still being
+    /// written.
+    pub fn embed_document(&mut self, key: &str, doc: &[u8]) -> Result<()> {
+        check_key(key)?;
+        self.check(|h| h.embed_document(key, doc))
+    }
+
+    /// Opens a multiplexed octet stream under `key` (`bvnr_mux_begin`): send
+    /// messages with [`Writer::mux_send`] and close it with
+    /// [`Writer::mux_end`]. Values written before it are read back before
+    /// the first message (doc/10 §3.4), and the document may go on after it.
+    pub fn mux_begin(&mut self, key: &str) -> Result<()> {
+        check_key(key)?;
+        self.check(|h| h.mux_begin(key))
+    }
+
+    /// One message on `channel` (`bvnr_mux_send`), split over as many octet
+    /// chunks as it needs. On a [`Writer::to_writer`] writer it reaches the
+    /// destination when the writer's 64 KiB block fills or the document is
+    /// finished; for a message to go out at once, write the stream with
+    /// [`crate::codec::MuxWriter`] instead.
+    pub fn mux_send(&mut self, channel: u64, payload: &[u8]) -> Result<()> {
+        self.check(|h| h.mux_send(channel, payload))
+    }
+
+    /// Closes the multiplexed octet stream (`bvnr_mux_end`).
+    pub fn mux_end(&mut self) -> Result<()> {
+        self.check(ffi::WriterHandle::mux_end)
+    }
+
     /// `.key = {` — close with [`Writer::end_struct`].
     pub fn begin_struct(&mut self, key: &str) -> Result<()> {
         self.assignment(key)?;
@@ -531,12 +609,7 @@ impl Writer {
             )));
         }
         self.finished = true;
-        let r = self
-            .check(ffi::WriterHandle::finish)
-            .and_then(|()| match self.out.take() {
-                Some(out) => crate::io::write_all(out, self.get_output()),
-                None => Ok(()),
-            });
+        let r = self.check(ffi::WriterHandle::finish);
         if let Err(e) = &r {
             self.finish_error = Some(e.clone());
         }
@@ -548,7 +621,8 @@ impl Writer {
         self.handle.bytes_written()
     }
 
-    /// The document written so far.
+    /// The document written so far; empty for a [`Writer::to_writer`]
+    /// writer, whose output has gone to its destination.
     pub fn get_output(&self) -> &[u8] {
         self.handle.output()
     }
@@ -698,16 +772,38 @@ impl Writer {
         &mut self,
         call: impl FnOnce(&mut ffi::WriterHandle) -> bool,
     ) -> Result<()> {
-        if call(&mut self.handle) {
-            Ok(())
-        } else {
-            Err(self.error())
-        }
+        let ok = call(&mut self.handle);
+        self.handle.resume_sink_panic();
+        if ok { Ok(()) } else { Err(self.error()) }
     }
 
+    /// The writer's error; for a callback sink that failed, what the
+    /// destination reported, or the cap it reached.
     fn error(&self) -> Error {
         let (code, offset) = self.handle.error();
+        if code == ErrorCode::WritingToSink as i32
+            && let Some(sink) = self.handle.sink()
+        {
+            if let Some(e) = sink.io_error() {
+                return Error::io(ErrorCode::WritingToSink, e);
+            }
+            if sink.exhausted() {
+                return Error::Write {
+                    code: ErrorCode::SinkBufferExhausted as i32,
+                    offset,
+                };
+            }
+        }
         Error::Write { code, offset }
+    }
+}
+
+/// A key the C mux and embedding calls can take: no NUL byte.
+fn check_key(key: &str) -> Result<()> {
+    if key.contains('\0') {
+        Err(Error::argument(format!("key {key:?} contains a NUL byte")))
+    } else {
+        Ok(())
     }
 }
 

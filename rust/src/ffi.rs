@@ -992,6 +992,28 @@ impl ReaderHandle {
         ok
     }
 
+    /// `bvnr_open_read_source` + `bvnr_read` over `src`, as [`read_mem`]
+    /// reads memory.
+    ///
+    /// [`read_mem`]: Self::read_mem
+    pub fn read_source(
+        &mut self,
+        src: &mut BvnrSource,
+        mut flags: BvnrReadFlags,
+        h: &mut Handlers<'_>,
+    ) -> bool {
+        h.install(&mut flags);
+        // SAFETY: the reader is live; `src`, `flags` and `h` outlive both
+        // calls (the reader copies the source), and nothing else touches `h`
+        // meanwhile.
+        let ok = unsafe {
+            bvnr_open_read_source(self.0.as_ptr(), src, std::ptr::null_mut(), &mut flags)
+                && bvnr_read(self.0.as_ptr())
+        };
+        h.resume();
+        ok
+    }
+
     /// `bvnr_reader_set_unit_policy`; `None` clears it.
     pub fn set_unit_policy(&mut self, policy: Option<&PolicySpec>) -> bool {
         let r = self.0.as_ptr();
@@ -1386,12 +1408,17 @@ impl<'a> Node<'a> {
     }
 }
 
-/// An owned `bvnr_writer_t` writing into a buffer it owns.
+/// An owned `bvnr_writer_t` writing into a buffer it owns, or into a
+/// callback sink.
 pub struct WriterHandle {
     ptr: std::ptr::NonNull<c_void>,
     /// The memory sink. Allocated once in `open_mem` and never resized, so the
     /// address the library holds stays valid until the writer is destroyed.
     buf: Vec<u8>,
+    /// The callback sink's state, from `Box::into_raw` (NULL for none). The
+    /// library holds the same pointer as the sink's user pointer, so it is
+    /// freed only after the writer is destroyed.
+    sink: *mut PushState,
 }
 
 impl WriterHandle {
@@ -1402,7 +1429,51 @@ impl WriterHandle {
         Some(WriterHandle {
             ptr,
             buf: Vec::new(),
+            sink: std::ptr::null_mut(),
         })
+    }
+
+    /// `bvnr_sink_to_callback` + `bvnr_open_write_sink`: the writer pushes
+    /// its output through `state` (in 64 KiB blocks, and the rest when it
+    /// finishes, then flushes).
+    pub fn open_sink(&mut self, state: PushState, pretty: bool, mut flags: BvnrWriteFlags) -> bool {
+        let state = Box::into_raw(Box::new(state));
+        let mut sink = blank_sink();
+        // SAFETY: the writer is live and copies the sink; its user pointer,
+        // `state`, is owned by this handle until after the writer is
+        // destroyed (an earlier one is released below, once the writer no
+        // longer holds it); `flags` is only read during the call.
+        let ok = unsafe {
+            bvnr_sink_to_callback(
+                &mut sink,
+                push_trampoline,
+                Some(flush_trampoline),
+                state.cast(),
+            );
+            bvnr_open_write_sink(self.ptr.as_ptr(), &mut sink, pretty, &mut flags)
+        };
+        let old = std::mem::replace(&mut self.sink, state);
+        if !old.is_null() {
+            // SAFETY: from Box::into_raw, released once; the writer now holds
+            // the new sink.
+            drop(unsafe { Box::from_raw(old) });
+        }
+        ok
+    }
+
+    /// The callback sink's state, when the writer was opened with one.
+    pub fn sink(&self) -> Option<&PushState> {
+        // SAFETY: NULL or the live state this handle owns; the library uses
+        // it only inside a call, which needs `&mut self`.
+        unsafe { self.sink.as_ref() }
+    }
+
+    /// Rethrows a panic the sink's writer raised during the last call.
+    pub fn resume_sink_panic(&mut self) {
+        // SAFETY: as for `sink`.
+        if let Some(payload) = unsafe { self.sink.as_mut() }.and_then(|s| s.panic.take()) {
+            std::panic::resume_unwind(payload);
+        }
     }
 
     /// `bvnr_open_write_mem` into a fresh buffer of `cap` bytes.
@@ -1490,19 +1561,37 @@ impl WriterHandle {
     /// `bvnr_mux_begin`, then `bvnr_mux_send` for each message, then
     /// `bvnr_mux_end`: a multiplexed stream under `key`.
     pub fn mux(&mut self, key: &str, messages: &[(u64, &[u8])]) -> bool {
+        self.mux_begin(key)
+            && messages.iter().all(|(ch, data)| self.mux_send(*ch, data))
+            && self.mux_end()
+    }
+
+    /// `bvnr_mux_begin`: opens a multiplexed stream under `key`.
+    pub fn mux_begin(&mut self, key: &str) -> bool {
         let Ok(key) = CString::new(key) else {
             return false;
         };
-        let w = self.ptr.as_ptr();
-        // SAFETY: the writer is live; `key` and every payload are valid for
-        // their call and only read.
+        // SAFETY: the writer is live; `key` is only read during the call.
+        unsafe { bvnr_mux_begin(self.ptr.as_ptr(), key.as_ptr()) }
+    }
+
+    /// `bvnr_mux_send`: one message on `channel`.
+    pub fn mux_send(&mut self, channel: u64, data: &[u8]) -> bool {
+        // SAFETY: the writer is live; `data` is only read during the call.
         unsafe {
-            bvnr_mux_begin(w, key.as_ptr())
-                && messages.iter().all(|(ch, data)| {
-                    bvnr_mux_send(w, *ch, data.as_ptr().cast_mut().cast(), data.len() as u64)
-                })
-                && bvnr_mux_end(w)
+            bvnr_mux_send(
+                self.ptr.as_ptr(),
+                channel,
+                data.as_ptr().cast_mut().cast(),
+                data.len() as u64,
+            )
         }
+    }
+
+    /// `bvnr_mux_end`: closes the multiplexed stream.
+    pub fn mux_end(&mut self) -> bool {
+        // SAFETY: the writer is live.
+        unsafe { bvnr_mux_end(self.ptr.as_ptr()) }
     }
 
     /// `bvnr_embed_document`: `doc` as a canonical embedded document under `key`.
@@ -1562,14 +1651,21 @@ impl WriterHandle {
 
 // SAFETY: bovnar.h (THREADING): a writer holds its whole serialise state and
 // the library writes no shared state after startup. The memory sink `buf` is
-// owned by this handle and moves with it (its heap address does not change).
+// owned by this handle and moves with it (its heap address does not change);
+// so is the callback sink's state, which is Send (an owned destination is
+// `Write + Send`, a scoped one is looked up on the calling thread).
 // Not Sync: two threads must not share one writer.
 unsafe impl Send for WriterHandle {}
 
 impl Drop for WriterHandle {
     fn drop(&mut self) {
-        // SAFETY: the writer is live and destroyed exactly once, before `buf`.
+        // SAFETY: the writer is live and destroyed exactly once, before `buf`
+        // and the sink state; destroying it pushes nothing.
         unsafe { bvnr_writer_destroy(self.ptr.as_ptr()) }
+        if !self.sink.is_null() {
+            // SAFETY: from Box::into_raw, released once, after the writer.
+            drop(unsafe { Box::from_raw(self.sink) });
+        }
     }
 }
 
@@ -2154,10 +2250,34 @@ pub fn frame_documents(docs: &[&[u8]]) -> Option<Vec<u8>> {
     ok.then_some(out)
 }
 
-/// `bvnr_doc_stream_read` over `data`: `h.verified` sees each document's
+/// `bvnr_frame_write` of `doc` into a callback sink over `out`, which is
+/// not flushed. The I/O error of a failed push, or `Other` when the library
+/// refused the frame; a panic in `out` is resumed.
+pub fn frame_write_to(doc: &[u8], out: &mut dyn std::io::Write) -> std::io::Result<()> {
+    let mut state = PushState::scoped();
+    let mut sink = blank_sink();
+    let ok = with_scoped_out(out, || {
+        // SAFETY: `state` outlives the sink, which is used only within this
+        // closure; `doc` is only read during the call.
+        unsafe {
+            bvnr_sink_to_callback(&mut sink, push_trampoline, None, (&raw mut state).cast());
+            bvnr_frame_write(&mut sink, doc.as_ptr().cast_mut().cast(), doc.len() as u64)
+        }
+    });
+    if let Some(payload) = state.panic.take() {
+        std::panic::resume_unwind(payload);
+    }
+    match state.error.take() {
+        Some(e) => Err(e),
+        None if ok => Ok(()),
+        None => Err(std::io::Error::other("bvnr_frame_write failed")),
+    }
+}
+
+/// `bvnr_doc_stream_read` over `src`: `h.verified` sees each document's
 /// events and `h.on_document` each document's end. Returns (ok, count).
 pub fn doc_stream_read(
-    data: &[u8],
+    src: &mut BvnrSource,
     mut flags: BvnrReadFlags,
     continue_past_failed: bool,
     max_document_size: u64,
@@ -2171,16 +2291,10 @@ pub fn doc_stream_read(
         continue_past_failed,
         max_document_size,
     };
-    let mut src = BvnrSource {
-        opaque: [0; OPAQUE_BYTES / 8],
-    };
     let mut count = 0;
-    // SAFETY: `data`, `flags`, `opts` and `h` outlive both calls, and nothing
-    // else touches `h` meanwhile; the source only reads `data`.
-    let ok = unsafe {
-        bvnr_source_from_mem(&mut src, data.as_ptr().cast_mut().cast(), data.len() as u64);
-        bvnr_doc_stream_read(&mut src, &mut opts, &mut count)
-    };
+    // SAFETY: `src`, `flags`, `opts` and `h` outlive the call, and nothing
+    // else touches `h` meanwhile.
+    let ok = unsafe { bvnr_doc_stream_read(src, &mut opts, &mut count) };
     h.resume();
     (ok, count)
 }
@@ -2241,9 +2355,11 @@ extern "C" fn on_message_trampoline(
 }
 
 /// A reader feeding `bvnr_demux_on_event`: the messages of a multiplexed
-/// stream, in order.
+/// stream, in order. `read` reads the document with the reader, the flags and
+/// the handlers it is given ([`ReaderHandle::read_mem`] or
+/// [`ReaderHandle::read_source`]).
 pub fn demux_read(
-    data: &[u8],
+    read: impl FnOnce(&mut ReaderHandle, BvnrReadFlags, &mut Handlers<'_>) -> bool,
     mut flags: BvnrReadFlags,
     max_message: u64,
     key: Option<&CStr>,
@@ -2281,7 +2397,7 @@ pub fn demux_read(
         ..Handlers::default()
     };
     flags.max_file_size = 0;
-    let ok = reader.read_mem(data, flags, &mut h);
+    let ok = read(&mut reader, flags, &mut h);
     // SAFETY: `dm` is live; it is destroyed exactly once, after its last use.
     let derr = unsafe {
         let e = bvnr_demux_error(dm);
@@ -2295,6 +2411,307 @@ pub fn demux_read(
     } else {
         Ok(messages)
     }
+}
+
+// ---------------------------------------------------------------------------
+// Callback sources and sinks: a `std::io::Read` or `Write` behind the
+// library's pull and push, so that a read or a write streams instead of
+// going through memory.
+
+/// A blank source for a `bvnr_source_from_*` constructor to fill in.
+fn blank_source() -> BvnrSource {
+    BvnrSource {
+        opaque: [0; OPAQUE_BYTES / 8],
+    }
+}
+
+/// A blank sink for a `bvnr_sink_to_*` constructor to fill in.
+fn blank_sink() -> BvnrSink {
+    BvnrSink {
+        opaque: [0; OPAQUE_BYTES / 8],
+    }
+}
+
+/// Runs `f` on a memory source over `data`.
+pub fn with_mem_source<R>(data: &[u8], f: impl FnOnce(&mut BvnrSource) -> R) -> R {
+    let mut src = blank_source();
+    // SAFETY: the source only reads `data`, which outlives every use of it:
+    // they end when `f` returns.
+    unsafe { bvnr_source_from_mem(&mut src, data.as_ptr().cast_mut().cast(), data.len() as u64) };
+    f(&mut src)
+}
+
+/// What [`pull_trampoline`] reaches through the source's user pointer.
+struct PullState<'a> {
+    input: &'a mut dyn std::io::Read,
+    /// How much of the library's buffer the next read is offered (see
+    /// [`PULL_MIN`]).
+    offer: usize,
+    error: Option<std::io::Error>,
+    panic: Option<Box<dyn std::any::Any + Send>>,
+}
+
+/// The smallest and largest slice a pull offers its `Read`. The bytes of the
+/// library's buffer have to be zeroed before a `Read` may see them, so a
+/// reader that returns a few bytes at a time (a socket, a pipe) is offered
+/// little, and one that fills what it is offered (a file) is offered twice as
+/// much next time, up to what the library asked for.
+const PULL_MIN: usize = 4096;
+const PULL_MAX: usize = 1 << 20;
+
+extern "C" fn pull_trampoline(
+    s: *mut BvnrSource,
+    buf: *mut c_void,
+    want: u32,
+    got: *mut u32,
+) -> bool {
+    // SAFETY: `s` is the reader's copy of a source `with_source` built, whose
+    // user pointer is the `PullState` it keeps alive and otherwise untouched
+    // until the read is over; `got` is writable.
+    let st = unsafe {
+        *got = 0;
+        &mut *bvnr_source_get_userdata(s).cast::<PullState<'_>>()
+    };
+    if st.error.is_some() || st.panic.is_some() {
+        return false;
+    }
+    let want = (want as usize).min(st.offer);
+    let out: &mut [u8] = if buf.is_null() || want == 0 {
+        &mut []
+    } else {
+        // SAFETY: the library hands over at least `want` writable bytes at
+        // `buf` for the call. They may be uninitialised, and a `Read` may look
+        // at the buffer it is given, so they are zeroed before the slice is
+        // made.
+        unsafe {
+            buf.cast::<u8>().write_bytes(0, want);
+            std::slice::from_raw_parts_mut(buf.cast::<u8>(), want)
+        }
+    };
+    let input = &mut st.input;
+    let read = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        loop {
+            match input.read(out) {
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+                r => break r,
+            }
+        }
+    }));
+    match read {
+        // `n <= want`, so it fits the u32 the library asked with.
+        Ok(Ok(n)) if n <= want => {
+            st.offer = if n == want {
+                (st.offer * 2).min(PULL_MAX)
+            } else if n < want / 4 {
+                (st.offer / 2).max(PULL_MIN)
+            } else {
+                st.offer
+            };
+            // SAFETY: `got` is writable.
+            unsafe { *got = n as u32 };
+            true
+        }
+        Ok(Ok(n)) => {
+            st.error = Some(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Read::read reported {n} bytes into a buffer of {want}"),
+            ));
+            false
+        }
+        Ok(Err(e)) => {
+            st.error = Some(e);
+            false
+        }
+        Err(payload) => {
+            st.panic = Some(payload);
+            false
+        }
+    }
+}
+
+/// Runs `f` on a source that pulls from `input`. A pull that failed makes
+/// the result the I/O error, whatever `f` returned (the library saw it as an
+/// unreadable source); a panic in `input` is resumed once `f` has returned.
+/// A read that is `Interrupted` is retried.
+pub fn with_source<R>(
+    input: &mut dyn std::io::Read,
+    f: impl FnOnce(&mut BvnrSource) -> R,
+) -> Result<R, std::io::Error> {
+    let mut state = PullState {
+        input,
+        offer: PULL_MIN,
+        error: None,
+        panic: None,
+    };
+    let mut src = blank_source();
+    // SAFETY: `state` outlives every use of `src` and of the copies the
+    // library makes of it, which end when `f` returns.
+    unsafe { bvnr_source_from_callback(&mut src, pull_trampoline, (&raw mut state).cast()) };
+    let result = f(&mut src);
+    if let Some(payload) = state.panic.take() {
+        std::panic::resume_unwind(payload);
+    }
+    match state.error.take() {
+        Some(e) => Err(e),
+        None => Ok(result),
+    }
+}
+
+/// Where a callback sink's bytes go.
+enum Out {
+    /// A writer the sink owns ([`crate::Writer::to_writer`]).
+    Owned(Box<dyn std::io::Write + Send>),
+    /// The writer of the innermost [`with_scoped_out`] running on this
+    /// thread, for a write that begins and ends inside one call.
+    Scoped,
+}
+
+thread_local! {
+    /// The writer [`with_scoped_out`] lends to the sinks of [`Out::Scoped`].
+    static SCOPED_OUT: std::cell::Cell<Option<*mut (dyn std::io::Write + 'static)>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// Runs `f` with `out` as the destination of every [`Out::Scoped`] sink on
+/// this thread, and takes it back when `f` returns or unwinds. A sink used
+/// outside such a call fails as a broken transport, so a writer that outlived
+/// its call can never reach a writer that is gone.
+pub fn with_scoped_out<R>(out: &mut dyn std::io::Write, f: impl FnOnce() -> R) -> R {
+    struct Restore(Option<*mut (dyn std::io::Write + 'static)>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            SCOPED_OUT.with(|c| c.set(self.0));
+        }
+    }
+    let raw: *mut (dyn std::io::Write + '_) = out;
+    // SAFETY: only the lifetime changes. The pointer is reachable through
+    // SCOPED_OUT only until `Restore` puts the previous value back, which
+    // happens before `out`'s borrow ends, on return and on unwinding alike;
+    // nothing else uses `out` meanwhile.
+    let raw = unsafe {
+        std::mem::transmute::<*mut (dyn std::io::Write + '_), *mut (dyn std::io::Write + 'static)>(
+            raw,
+        )
+    };
+    let _restore = Restore(SCOPED_OUT.with(|c| c.replace(Some(raw))));
+    f()
+}
+
+/// A callback sink's state: its destination, a cap on what it takes, and
+/// what went wrong, for the error the writer reports.
+pub struct PushState {
+    out: Out,
+    cap: u64,
+    pushed: u64,
+    error: Option<std::io::Error>,
+    exhausted: bool,
+    panic: Option<Box<dyn std::any::Any + Send>>,
+}
+
+impl PushState {
+    /// A sink into `out`, which it owns; `cap` bytes at most (`u64::MAX` for
+    /// no cap).
+    pub fn owned(out: Box<dyn std::io::Write + Send>, cap: u64) -> Self {
+        Self::new(Out::Owned(out), cap)
+    }
+
+    /// A sink into the writer of the [`with_scoped_out`] running at each push.
+    pub fn scoped() -> Self {
+        Self::new(Out::Scoped, u64::MAX)
+    }
+
+    fn new(out: Out, cap: u64) -> Self {
+        PushState {
+            out,
+            cap,
+            pushed: 0,
+            error: None,
+            exhausted: false,
+            panic: None,
+        }
+    }
+
+    /// The I/O error a push or the flush failed with.
+    pub fn io_error(&self) -> Option<&std::io::Error> {
+        self.error.as_ref()
+    }
+
+    /// Whether a push was refused because it would have passed the cap.
+    pub fn exhausted(&self) -> bool {
+        self.exhausted
+    }
+
+    /// Runs `f` on the destination, for a push of `len` bytes (0 for the
+    /// flush). The first failure is kept and every later call refused.
+    fn call(
+        &mut self,
+        len: u64,
+        f: impl FnOnce(&mut dyn std::io::Write) -> std::io::Result<()>,
+    ) -> bool {
+        if self.error.is_some() || self.exhausted || self.panic.is_some() {
+            return false;
+        }
+        if len > self.cap - self.pushed {
+            self.exhausted = true;
+            return false;
+        }
+        let unwind = |f: &mut dyn FnMut() -> std::io::Result<()>| {
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(f))
+        };
+        let mut f = Some(f);
+        let result = match &mut self.out {
+            Out::Owned(w) => unwind(&mut || f.take().map_or(Ok(()), |f| f(w.as_mut()))),
+            Out::Scoped => match SCOPED_OUT.with(std::cell::Cell::get) {
+                Some(w) => unwind(&mut || {
+                    // SAFETY: a pointer in SCOPED_OUT is the writer the
+                    // running `with_scoped_out` borrows, for as long as it is
+                    // there; nothing else uses it during the push.
+                    let w = unsafe { &mut *w };
+                    f.take().map_or(Ok(()), |f| f(w))
+                }),
+                None => Ok(Err(std::io::Error::new(
+                    std::io::ErrorKind::BrokenPipe,
+                    "the writer's destination was only lent for a call that has returned",
+                ))),
+            },
+        };
+        match result {
+            Ok(Ok(())) => {
+                self.pushed += len;
+                true
+            }
+            Ok(Err(e)) => {
+                self.error = Some(e);
+                false
+            }
+            Err(payload) => {
+                self.panic = Some(payload);
+                false
+            }
+        }
+    }
+}
+
+/// SAFETY: `s` must be a writer's copy of a sink `WriterHandle::open_sink`
+/// built, whose user pointer is the live `PushState` the handle owns.
+unsafe fn push_state<'a>(s: *mut BvnrSink) -> &'a mut PushState {
+    // SAFETY: guaranteed by the caller.
+    unsafe { &mut *bvnr_sink_get_userdata(s).cast::<PushState>() }
+}
+
+extern "C" fn push_trampoline(s: *mut BvnrSink, buf: *const c_void, len: u32) -> bool {
+    // SAFETY: `s` comes from `open_sink`; `buf` holds `len` bytes for the
+    // call.
+    let (st, data) = unsafe { (push_state(s), bytes(buf, len)) };
+    // A push must take every byte or fail: write_all retries short writes and
+    // `Interrupted`, and a writer that takes nothing is `WriteZero`.
+    st.call(u64::from(len), |w| w.write_all(data))
+}
+
+extern "C" fn flush_trampoline(s: *mut BvnrSink) -> bool {
+    // SAFETY: `s` comes from `open_sink`.
+    let st = unsafe { push_state(s) };
+    st.call(0, |w| w.flush())
 }
 
 /// Checks every mirrored struct against the C compiler's own layout, as printed by the upstream ABI manifest generator

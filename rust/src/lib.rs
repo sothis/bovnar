@@ -116,27 +116,44 @@ pub fn parse_typed(data: &[u8]) -> Result<Value> {
 
 /// [`parse`] over any [`std::io::Read`], such as a [`std::fs::File`].
 ///
-/// Reads `input` to its end and parses it as [`parse`] parses the bytes, as
-/// [`Reader::read_reader`] does with default [`ReadOptions`]: `max_file_size`
-/// is 0 there, so no cap applies. A failing `input` is an [`Error::Io`] with
-/// `reading_from_source_fd`.
+/// Parses `input` as it is read, as [`Reader::read_reader`] does with
+/// default [`ReadOptions`] (`max_file_size` is 0 there, so no cap applies),
+/// and gives what [`parse`] gives for the same bytes. A failing `input` is
+/// an [`Error::Io`] with `reading_from_source_fd`.
 pub fn parse_reader(input: impl std::io::Read) -> Result<Value> {
-    parse(&io::read_capped(input, None)?)
+    parse_input(input, false)
 }
 
 /// [`parse_typed`] over any [`std::io::Read`]. Reads `input` as
 /// [`parse_reader`] does.
 pub fn parse_typed_reader(input: impl std::io::Read) -> Result<Value> {
-    parse_typed(&io::read_capped(input, None)?)
+    parse_input(input, true)
 }
 
 fn parse_with(data: &[u8], typed: bool) -> Result<Value> {
+    collect(typed, |r, on_event| {
+        r.read_mem(data, &ReadOptions::default(), Some(on_event), None)
+    })
+}
+
+fn parse_input(input: impl std::io::Read, typed: bool) -> Result<Value> {
+    collect(typed, |r, on_event| {
+        r.read_reader(input, &ReadOptions::default(), Some(on_event), None)
+    })
+}
+
+/// The value of the document `read` reads with a fresh reader, delivering
+/// its events to the handler it is given.
+fn collect(
+    typed: bool,
+    read: impl FnOnce(&mut Reader, reader::EventHandler<'_>) -> Result<()>,
+) -> Result<Value> {
     let mut parser = dict_parser::DictParser::new(typed);
     let mut on_event = |d: &EventData<'_>| {
         parser.on_event(d);
         true
     };
-    Reader::new()?.read_mem(data, &ReadOptions::default(), Some(&mut on_event), None)?;
+    read(&mut Reader::new()?, &mut on_event)?;
     Ok(parser.result())
 }
 
@@ -147,6 +164,18 @@ fn parse_with(data: &[u8], typed: bool) -> Result<Value> {
 /// (multi-row ones as `/`-separated rows), integers of any width (`Int` and `BigInt`) and typed
 /// quantities.
 pub fn to_string(value: &Value, pretty: bool) -> Result<Vec<u8>> {
+    let (entries, version) = document(value)?;
+    writer::grow_write(writer::DEFAULT_MEM_CAP, pretty, |w| {
+        emit_document(w, entries, version)
+    })
+}
+
+/// A document's top-level entries and the minor spec version its directive
+/// must declare, if any.
+type Document<'v> = (&'v [(String, Value)], Option<u16>);
+
+/// The [`Document`] of a top-level struct.
+fn document(value: &Value) -> Result<Document<'_>> {
     let Value::Struct(entries) = value else {
         return Err(Error::argument(
             "to_string() requires a struct at the top level",
@@ -160,12 +189,14 @@ pub fn to_string(value: &Value, pretty: bool) -> Result<Vec<u8>> {
             version = version.max(spec_version_needed(q));
         }
     });
-    writer::grow_write(writer::DEFAULT_MEM_CAP, pretty, |w| {
-        if let Some(minor) = version {
-            w.write_version(1, minor)?;
-        }
-        emit_entries(w, entries)
-    })
+    Ok((entries, version))
+}
+
+fn emit_document(w: &mut Writer, entries: &[(String, Value)], version: Option<u16>) -> Result<()> {
+    if let Some(minor) = version {
+        w.write_version(1, minor)?;
+    }
+    emit_entries(w, entries)
 }
 
 fn emit_entries(w: &mut Writer, entries: &[(String, Value)]) -> Result<()> {
@@ -549,11 +580,16 @@ fn int_annotation(rows: &[Value]) -> Option<ValueTypeSpec> {
 
 /// [`to_string`] into any [`std::io::Write`], such as a [`std::fs::File`].
 ///
-/// The document is serialised in memory first, so nothing reaches `out` when
-/// serialising fails; then it is written to `out` and `out` is flushed. A
-/// failing `out` is an [`Error::Io`] with `writing_to_sink`.
+/// The document streams into `out` as it is serialised, in 64 KiB blocks,
+/// and `out` is flushed at the end, so memory stays flat however large
+/// `value` is; `out` receives exactly the bytes [`to_string`] returns. A value
+/// that cannot be serialised is refused with the error [`to_string`] gives,
+/// but `out` may by then hold the blocks before it (nothing, when the value
+/// is not a struct at all). A failing `out` is an [`Error::Io`] with
+/// `writing_to_sink`.
 pub fn write_to(value: &Value, pretty: bool, out: impl std::io::Write) -> Result<()> {
-    io::write_all(out, &to_string(value, pretty)?)
+    let (entries, version) = document(value)?;
+    writer::stream_to(out, pretty, |w| emit_document(w, entries, version))
 }
 
 /// Writes `.key = [<annotation>] rows;`: a flat

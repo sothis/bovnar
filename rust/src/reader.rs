@@ -360,10 +360,28 @@ impl From<&EventData<'_>> for EventPayload {
     }
 }
 
-/// The most input a read keeps in memory: `max_file_size`, or no limit when
-/// it is 0, as for the C reader.
-fn file_size_cap(options: &ReadOptions) -> Option<u64> {
-    (options.max_file_size != 0).then_some(options.max_file_size)
+impl ReadOptions {
+    /// The C read flags for these options, without callbacks.
+    pub(crate) fn flags(&self) -> BvnrReadFlags {
+        let mut flags = BvnrReadFlags::zeroed();
+        flags.max_file_size = self.max_file_size;
+        // A Reader opens at the 255-level cap in both directions, like the
+        // CLI and the DOM; zero would select the C default of 64.
+        flags.max_struct_nesting = 255;
+        flags.max_array_nesting = 255;
+        flags.continue_on_error = self.continue_on_error;
+        flags.strict_version = self.strict_version;
+        flags.text_only = self.text_only;
+        flags.want_unit_allow_nonterminating = self.want_unit_allow_nonterminating;
+        flags.max_conversion_length = self.max_conversion_length;
+        flags
+    }
+}
+
+/// Where a read takes its input from.
+enum Input<'a> {
+    Mem(&'a [u8]),
+    Read(&'a mut dyn std::io::Read),
 }
 
 /// A `want_unit` hook: the unit (and output base) to deliver a numeric value
@@ -394,7 +412,7 @@ impl Reader {
         on_verified: Option<EventHandler<'h>>,
         on_unverified: Option<EventHandler<'h>>,
     ) -> Result<()> {
-        self.read(data, options, on_verified, on_unverified, None)
+        self.read(Input::Mem(data), options, on_verified, on_unverified, None)
     }
 
     /// [`Reader::read_mem`] with a `want_unit` hook, which picks the unit
@@ -407,28 +425,44 @@ impl Reader {
         want_unit: WantUnit<'h>,
         on_verified: Option<EventHandler<'h>>,
     ) -> Result<()> {
-        self.read(data, options, on_verified, None, Some(want_unit))
+        self.read(
+            Input::Mem(data),
+            options,
+            on_verified,
+            None,
+            Some(want_unit),
+        )
     }
 
     /// [`Reader::read_mem`] over any [`std::io::Read`], such as a
-    /// [`std::fs::File`].
+    /// [`std::fs::File`] or a socket.
     ///
-    /// The input is read to its end first, or to the first byte over
-    /// `options.max_file_size` when that is set, and then parsed as
-    /// `read_fd` parses it: the same events, and `file_too_long` at the same
-    /// offset for a document over the cap. A failing `input` is an
-    /// [`Error::Io`] with `reading_from_source_fd`, the code an unreadable fd
-    /// gives; since nothing is parsed before the input is read, no event is
-    /// delivered then.
+    /// The input streams: the library pulls from `input` as it parses, in
+    /// pieces of up to 64 KiB, so the events of what has arrived are
+    /// delivered while the rest is still to come, and memory stays flat
+    /// however long the input is. The events and errors are those
+    /// `read_mem` gives for the same bytes, `file_too_long` at the same
+    /// offset for a document over `options.max_file_size` included. `input`
+    /// is read until it reports its end (`Ok(0)`), so a blocking source
+    /// suits it. Short reads are fine and
+    /// `Interrupted` is retried. A failing `input` is an [`Error::Io`] with
+    /// `reading_from_source_fd`, the code an unreadable fd gives, after the
+    /// events of what it had delivered. A panic in `input` reaches the
+    /// caller.
     pub fn read_reader<'h>(
         &mut self,
-        input: impl std::io::Read,
+        mut input: impl std::io::Read,
         options: &ReadOptions,
         on_verified: Option<EventHandler<'h>>,
         on_unverified: Option<EventHandler<'h>>,
     ) -> Result<()> {
-        let data = crate::io::read_capped(input, file_size_cap(options))?;
-        self.read(&data, options, on_verified, on_unverified, None)
+        self.read(
+            Input::Read(&mut input),
+            options,
+            on_verified,
+            on_unverified,
+            None,
+        )
     }
 
     /// [`Reader::read_mem_want_unit`] over any [`std::io::Read`]. Reads
@@ -436,13 +470,18 @@ impl Reader {
     /// [`Reader::read_reader`] does.
     pub fn read_reader_want_unit<'h>(
         &mut self,
-        input: impl std::io::Read,
+        mut input: impl std::io::Read,
         options: &ReadOptions,
         want_unit: WantUnit<'h>,
         on_verified: Option<EventHandler<'h>>,
     ) -> Result<()> {
-        let data = crate::io::read_capped(input, file_size_cap(options))?;
-        self.read(&data, options, on_verified, None, Some(want_unit))
+        self.read(
+            Input::Read(&mut input),
+            options,
+            on_verified,
+            None,
+            Some(want_unit),
+        )
     }
 
     /// Installs a unit policy for every following read; `None` clears it.
@@ -483,24 +522,13 @@ impl Reader {
 
     fn read<'h>(
         &mut self,
-        data: &[u8],
+        input: Input<'_>,
         options: &ReadOptions,
         on_verified: Option<EventHandler<'h>>,
         on_unverified: Option<EventHandler<'h>>,
         want_unit: Option<WantUnit<'h>>,
     ) -> Result<()> {
-        let mut flags = BvnrReadFlags::zeroed();
-        flags.max_file_size = options.max_file_size;
-        // Reader.read_mem opens at the 255-level cap in both directions, like
-        // the CLI and the DOM; zero would select the C default of 64.
-        flags.max_struct_nesting = 255;
-        flags.max_array_nesting = 255;
-        flags.continue_on_error = options.continue_on_error;
-        flags.strict_version = options.strict_version;
-        flags.text_only = options.text_only;
-        flags.want_unit_allow_nonterminating = options.want_unit_allow_nonterminating;
-        flags.max_conversion_length = options.max_conversion_length;
-
+        let flags = options.flags();
         let mut verified = on_verified.map(wrap);
         let mut unverified = on_unverified.map(wrap);
         let mut want = want_unit.map(|f| {
@@ -515,7 +543,13 @@ impl Reader {
             want_unit: want.as_mut().map(|f| f as ffi::WantUnit<'_>),
             ..ffi::Handlers::default()
         };
-        let ok = self.handle.read_mem(data, flags, &mut handlers);
+        let handle = &mut self.handle;
+        let ok = match input {
+            Input::Mem(data) => handle.read_mem(data, flags, &mut handlers),
+            Input::Read(input) => crate::io::from_reader(input, |src| {
+                Ok(handle.read_source(src, flags, &mut handlers))
+            })?,
+        };
         if ok { Ok(()) } else { Err(self.error()) }
     }
 
@@ -560,16 +594,20 @@ impl Reader {
     }
 
     fn error(&self) -> Error {
-        let e = self.handle.error();
-        Error::Parse {
-            code: e.code,
-            position: Some(Position {
-                line: e.line,
-                column: e.column,
-                offset: e.offset,
-                byte: e.byte,
-            }),
-        }
+        reader_error(self.handle.error())
+    }
+}
+
+/// A reader's error as a parse error with its position.
+pub(crate) fn reader_error(e: ffi::ReaderError) -> Error {
+    Error::Parse {
+        code: e.code,
+        position: Some(Position {
+            line: e.line,
+            column: e.column,
+            offset: e.offset,
+            byte: e.byte,
+        }),
     }
 }
 

@@ -1067,9 +1067,17 @@ fn frame_limits_and_errors() {
     let forged = codec::frame_header(256 * 1024 * 1024 + 1);
     let r = read_frames(&mut FrameReader::new(), &[&forged]);
     assert_eq!(r.unwrap_err().kind(), Some(ErrorCode::ValueOutOfRange));
+    // A length that fits usize everywhere, wasm32 included.
     let mut reader = FrameReader::with_max_document_size(u64::MAX);
-    let mut input = &codec::frame_header(1 << 40)[..];
+    let mut input = &codec::frame_header(u64::from(u32::MAX))[..];
     assert!(reader.read(&mut input).unwrap().is_none());
+    // One past usize is out of range even with no cap.
+    if let Some(over) = (usize::MAX as u64).checked_add(1) {
+        let mut reader = FrameReader::with_max_document_size(u64::MAX);
+        let mut input = &codec::frame_header(over)[..];
+        let e = reader.read(&mut input).unwrap_err();
+        assert_eq!(e.kind(), Some(ErrorCode::ValueOutOfRange));
+    }
     // Bad magic.
     let r = read_frames(&mut FrameReader::new(), &[b"BVF2\0\0\0\0\0\0\0\0"]);
     assert_eq!(r.unwrap_err().kind(), Some(ErrorCode::UnexpectedInputByte));

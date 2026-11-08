@@ -7,7 +7,6 @@
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 
-use bovnar::live::{Demux, DemuxItem, DemuxOptions, ValueBuilder};
 use bovnar::units::UnitFlags;
 use bovnar::writer::{EmitSpec, Signedness};
 use bovnar::{
@@ -295,6 +294,11 @@ fn a_flush_past_the_cap_is_sink_buffer_exhausted() {
 fn a_demux_across_a_socket_has_message_n_before_n_plus_1_is_sent() {
     use std::io::Read;
     use std::os::unix::net::UnixStream;
+    use std::sync::mpsc::{self, RecvTimeoutError};
+    use std::thread;
+    use std::time::Duration;
+
+    use bovnar::live::{Demux, DemuxItem, DemuxOptions, ValueBuilder};
 
     /// Reads what has arrived on `rx` without waiting for more.
     fn drain(rx: &mut UnixStream, into: &mut Vec<u8>) {
@@ -309,13 +313,45 @@ fn a_demux_across_a_socket_has_message_n_before_n_plus_1_is_sent() {
         }
     }
 
+    /// The far end of the socket, read on a thread of its own: a write larger
+    /// than the socket buffer (8 KiB on macOS) blocks until it is read, so
+    /// the writing thread cannot be the one that reads. Each probe answers
+    /// with what has arrived since the last answer, read after the probe came,
+    /// so it holds every byte the writer had handed over when it asked.
+    fn peer(
+        mut rx: UnixStream,
+    ) -> (
+        mpsc::Sender<()>,
+        mpsc::Receiver<Vec<u8>>,
+        thread::JoinHandle<()>,
+    ) {
+        rx.set_nonblocking(true).unwrap();
+        let (probe, probes) = mpsc::channel();
+        let (answer, answers) = mpsc::channel();
+        let reader = thread::spawn(move || {
+            let mut arrived = Vec::new();
+            loop {
+                drain(&mut rx, &mut arrived);
+                match probes.recv_timeout(Duration::from_millis(1)) {
+                    Ok(()) => {
+                        drain(&mut rx, &mut arrived);
+                        answer.send(std::mem::take(&mut arrived)).unwrap();
+                    }
+                    Err(RecvTimeoutError::Timeout) => {}
+                    Err(RecvTimeoutError::Disconnected) => return,
+                }
+            }
+        });
+        (probe, answers, reader)
+    }
+
     const LENS: [usize; 10] = [150, 0, 1, 3000, 65_516, 65_536, 70_000, 150, 120_000, 7];
     let payload: Vec<u8> = (0..120_016u32)
         .map(|i| (i.wrapping_mul(2_654_435_761) >> 9) as u8)
         .collect();
     for pretty in [false, true] {
-        let (tx, mut rx) = UnixStream::pair().unwrap();
-        rx.set_nonblocking(true).unwrap();
+        let (tx, rx) = UnixStream::pair().unwrap();
+        let (probe, answers, reader) = peer(rx);
         let mut w = Writer::to_writer(tx, pretty).unwrap();
         let options = DemuxOptions {
             key: Some("media".into()),
@@ -328,8 +364,8 @@ fn a_demux_across_a_socket_has_message_n_before_n_plus_1_is_sent() {
         let mut got: Vec<(u64, Vec<u8>)> = Vec::new();
         let mut pump =
             |wire: &mut Vec<u8>, got: &mut Vec<(u64, Vec<u8>)>, meta: &mut ValueBuilder| {
-                wire.clear();
-                drain(&mut rx, wire);
+                probe.send(()).unwrap();
+                *wire = answers.recv().unwrap();
                 let mut input = &wire[..];
                 while let Some(item) = demux.next(&mut input).unwrap() {
                     match item {
@@ -380,6 +416,8 @@ fn a_demux_across_a_socket_has_message_n_before_n_plus_1_is_sent() {
         w.finish().unwrap();
         drop(w);
         pump(&mut wire, &mut got, &mut meta);
+        drop(probe);
+        reader.join().unwrap();
         demux.finish().unwrap();
         assert_eq!(got.len(), LENS.len());
     }

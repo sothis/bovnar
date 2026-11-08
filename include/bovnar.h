@@ -1042,7 +1042,8 @@ BVN_API bool bvnr_read(bvnr_reader_t* r);
  * bvnr_open_read_feed arms `r` the way bvnr_open_read_source does (it may be a
  * reader used before; the unit policy survives), with no source; `src_mirror`
  * is optional and receives the bytes as they are consumed. bvnr_read on a fed
- * reader returns false with error_invalid_argument.
+ * reader returns false with error_invalid_argument (once the fed read is over,
+ * it returns false and leaves the error as it was).
  *
  * bvnr_read_feed lexes `len` bytes of `buf` (NULL is allowed for len 0) and
  * returns once they are consumed; the caller may reuse the buffer then. The
@@ -1396,7 +1397,10 @@ BVN_API bool bvnr_write_finish(bvnr_writer_t* w);
  * inside an open mux stream between bvnr_mux_send calls. It never changes the
  * bytes produced -- output flushed at every possible point is byte-identical to
  * output never flushed -- because a separator still owed to the next value
- * stays owed. It only moves when the bytes leave.
+ * stays owed. It only moves when the bytes leave. One consequence: a reader at
+ * the other end has a scalar value only with its `;`, which the NEXT write (or
+ * bvnr_write_finish) writes, so a flushed `.a = 1` is delivered one value
+ * late. A mux message needs nothing after it: its chunks are complete.
  *
  * For a memory sink it does nothing and succeeds (the bytes are in the buffer
  * already); for an fd sink it writes the buffer out; for a callback sink it

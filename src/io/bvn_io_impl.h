@@ -117,7 +117,12 @@ static inline const bvn_sink_impl_t* bvn_sink_impl_c(const bvnr_sink_t* s)
 static inline bool bvn_source_pull(
 	bvnr_source_t* s, void* buf, uint32_t want, uint32_t* got)
 {
-	return bvn_source_impl(s)->pull(s, buf, want, got);
+	/* A pull that claims more than it was asked for (a callback source's
+	 * bug) is an I/O error, not a licence to read past buf. */
+	*got = 0;
+	if (!bvn_source_impl(s)->pull(s, buf, want, got))
+		return false;
+	return *got <= want;
 }
 static inline bool bvn_sink_push(
 	bvnr_sink_t* s, const void* buf, uint32_t len)

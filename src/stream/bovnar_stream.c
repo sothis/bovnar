@@ -120,7 +120,7 @@ static bool bvn_sink_push_all(bvnr_sink_t* sink, const void* buf, uint64_t len)
 
 bool bvnr_frame_write(bvnr_sink_t* sink, const void* doc, uint64_t doc_len)
 {
-	if (!sink || (!doc && doc_len))
+	if (!sink || !bvn_sink_impl(sink)->push || (!doc && doc_len))
 		return false;
 	uint8_t hdr[BVNR_FRAME_HEADER_SIZE];
 	hdr[0] = BVNR_FRAME_MAGIC0;
@@ -305,15 +305,23 @@ bool bvnr_mux_begin(bvnr_writer_t* w, const char* key)
 bool bvnr_mux_send(bvnr_writer_t* w, uint64_t channel,
 	const void* data, uint64_t len)
 {
-	if (!w || (!data && len))
+	if (!w)
 		return false;
+	/* Its own refusals latch like any writer error, so a caller that checks
+	 * only at bvnr_write_finish does not lose a message unnoticed (the first
+	 * error is the one kept). */
+	if (bvnr_writer_get_error(w) != error_none)
+		return false;
+	if (!data && len)
+		return bvn_writer_set_error(w, error_invalid_argument);
 	uint8_t chvar[10], lenvar[10];
 	uint32_t chlen  = bvn_varint_encode(channel, chvar);
 	uint32_t lvlen  = bvn_varint_encode(len, lenvar);
 	uint32_t fragcap = 65536u - chlen;   /* logical bytes per chunk after channel id */
 
 	uint8_t* chunk = bvn_writer_mux_chunk(w);
-	if (!chunk) return false;
+	if (!chunk)
+		return bvn_writer_set_error(w, error_invalid_argument);
 
 	const uint8_t* dp = (const uint8_t*)data;
 	uint64_t dpos = 0;
@@ -420,6 +428,10 @@ struct bvnr_demux_s {
 };
 
 #define BVNR_DEMUX_MAX_CHANNELS  4096u
+/* Pull mode with deliver_events: the reader pauses once this many events, or
+ * this many of their bytes, wait to be handed out. */
+#define BVNR_DEMUX_EVENT_BATCH   64u
+#define BVNR_DEMUX_ARENA_BATCH   (64u * 1024u)
 
 bvnr_demux_t* bvnr_demux_create(bvnr_mux_on_msg_fn on_message,
 	void* userdata, uint64_t max_message)
@@ -476,7 +488,9 @@ error_code_t bvnr_demux_error(const bvnr_demux_t* dm)
 {
 	if (!dm) return error_invalid_argument;
 	/* In feed mode the read itself can fail -- a malformed document around
-	 * the mux stream -- and that is the error when the demux has none. */
+	 * the mux stream -- and that is the error when the demux has none. The
+	 * demux's own error comes first, as it does for a demux installed on a
+	 * reader of the whole buffer. */
 	if (dm->error == error_none && dm->feeding)
 		return bvnr_reader_get_error(dm->reader);
 	return dm->error;
@@ -803,9 +817,18 @@ static bool demux_feed_on_verified(void* ud, bvnr_event_t ev, bvnr_data_t* d)
 	}
 	if (!bvnr_demux_on_event(dm, ev, d))
 		return false;
-	if (dm->deliver_events && !demux_queue_event(dm, ev, d)) {
-		dm->error = error_invalid_argument;
-		return false;
+	if (dm->deliver_events) {
+		if (!demux_queue_event(dm, ev, d)) {
+			dm->error = error_invalid_argument;
+			return false;
+		}
+		/* Hand out what is queued before reading on, so that the queue holds
+		 * a batch and not every event of a large feed: a feed of small values
+		 * would otherwise be copied whole, at many times its size, before the
+		 * first bvnr_demux_next returned. */
+		if (dm->ev_count - dm->ev_head >= BVNR_DEMUX_EVENT_BATCH ||
+		    dm->arena_len >= BVNR_DEMUX_ARENA_BATCH)
+			bvn_lex_pause(dm->reader);
 	}
 	return true;
 }
@@ -910,7 +933,10 @@ int bvnr_demux_next(bvnr_demux_t* dm, bvnr_demux_item_t* item)
 		if (dm->ev_head < dm->ev_count) {
 			const demux_event_t* e = &dm->events[dm->ev_head++];
 			dm->shown = e->d;
-#define BVN_DM_AT(off) ((off) == SIZE_MAX ? NULL : (const void*)(dm->arena + (off)))
+/* Nothing allocated yet means every byte field so far was empty: such a field
+ * is still a valid pointer, as the reader passed it. */
+#define BVN_DM_AT(off) ((off) == SIZE_MAX ? NULL : \
+	dm->arena ? (const void*)(dm->arena + (off)) : (const void*)"")
 			dm->shown.data        = BVN_DM_AT(e->data_off);
 			dm->shown.frac_data   = BVN_DM_AT(e->frac_off);
 			dm->shown.unit_source = BVN_DM_AT(e->usrc_off);
@@ -928,6 +954,10 @@ int bvnr_demux_next(bvnr_demux_t* dm, bvnr_demux_item_t* item)
 			int rc = demux_take(dm, c, dm->chunk, dm->chunk_len,
 					    &dm->chunk_pos, &msg, &msg_len);
 			if (rc < 0) {
+				/* The reader ends as it does when on_message mode's
+				 * callback refuses the chunk, so its error position is
+				 * the same in both modes. */
+				bvn_lex_abort_paused(dm->reader);
 				dm->failed    = true;
 				dm->has_chunk = false;
 				return BVNR_NEXT_ERROR;

@@ -2825,6 +2825,12 @@ static bool bvn_interpret_input_buffer(
 			*consumed = idx + 1;
 			return true;
 		}
+		/* A consumer of the push-fed reader asked to stop after the event
+		 * this byte delivered (pause_req, left set for bvn_lex_feed_run). */
+		if (l->pause_req) {
+			*consumed = idx + 1;
+			return true;
+		}
 	}
 	*consumed = len;
 	return true;
@@ -2969,7 +2975,7 @@ bool bvn_lex_init(bvnr_lexer_t* l, const bvnr_source_t* src,
  * bvn_capture_os_error rely on it). The text loop yields at an octet stream's
  * opening 0x00 and the octet reader at its closing one, so a window may switch
  * between them any number of times. It stops early only when a consumer
- * paused the push-fed reader after a chunk (pause_req, left set for
+ * paused the push-fed reader after an event (pause_req, left set for
  * bvn_lex_feed_run); *consumed is then where.
  */
 static bool bvn_lex_window(bvnr_reader_t* r, const uint8_t* data, uint32_t nb,
@@ -2991,10 +2997,17 @@ static bool bvn_lex_window(bvnr_reader_t* r, const uint8_t* data, uint32_t nb,
 		if (l->use_dbg && used &&
 		    !bvn_sink_push(&l->src_dbg, data + off, used)) {
 			bvn_set_eof_error(r, error_writing_to_sink);
+			/* At the end of the bytes the mirror refused, where the lexer
+			 * is, as the octet path reports it -- not at the end of the
+			 * window, which is wherever the input happened to be cut. */
+			r->val.error_offset = l->processed_bytes -
+				(uint64_t)(nb - off - used);
 			bvn_notify_error(r);
 			return false;
 		}
 		off += used;
+		if (l->pause_req)
+			break;
 	}
 	*consumed = off;
 	return true;
@@ -3251,6 +3264,19 @@ void bvn_lex_pause(bvnr_reader_t* r)
 {
 	r->lex.pause_req = true;
 }
+void bvn_lex_abort_paused(bvnr_reader_t* r)
+{
+	bvnr_lexer_t* l = &r->lex;
+	/* Where the chunk callback would have refused it: right after the chunk,
+	 * which is where the pause left the octet reader. */
+	r->val.last_error = error_scanner_callback_failed;
+	(void)bvn_os_abort(r, l->win_left);
+	l->feed_left    = 0;
+	l->win_left     = 0;
+	l->win_over_cap = false;
+	l->pause_req    = false;
+	l->feed_ended   = true;
+}
 int bvn_lex_feed_run(bvnr_reader_t* r)
 {
 	bvnr_lexer_t* l = &r->lex;
@@ -3300,5 +3326,8 @@ bool bvn_lex_feed_end(bvnr_reader_t* r)
 		if (!bvn_lex_start(r))
 			return false;
 	}
-	return bvn_lex_eof(r);
+	bool ok = bvn_lex_eof(r);
+	/* Nothing runs after the end, so a pause asked for there is moot. */
+	l->pause_req = false;
+	return ok;
 }

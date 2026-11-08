@@ -219,6 +219,7 @@ void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint64_t cap)
 void bvnr_source_from_callback(bvnr_source_t* s, bvnr_pull_fn pull,
 	void* userdata)
 {
+	if (!s) return;
 	memset(s, 0, sizeof(*s));
 	bvn_source_impl_t* impl = bvn_source_impl(s);
 	impl->pull     = pull;
@@ -227,6 +228,7 @@ void bvnr_source_from_callback(bvnr_source_t* s, bvnr_pull_fn pull,
 void bvnr_sink_to_callback(bvnr_sink_t* s, bvnr_push_fn push,
 	bvnr_flush_fn flush, void* userdata)
 {
+	if (!s) return;
 	memset(s, 0, sizeof(*s));
 	bvn_sink_impl_t* impl = bvn_sink_impl(s);
 	impl->push        = push;

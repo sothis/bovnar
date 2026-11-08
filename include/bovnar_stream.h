@@ -147,7 +147,10 @@ BVN_API bool bvnr_doc_stream_read(
  * calling back through an FFI -- can drain everything one feed made available
  * in a single loop of plain calls.
  */
-#define BVNR_NEXT_ERROR      (-1)  /* the stream failed; see the *_error getter */
+#define BVNR_NEXT_ERROR      (-1)  /* the stream failed; see the *_error getter
+                                    * (a NULL argument, or a call on a reader or
+                                    * demux of the other mode, returns it too and
+                                    * leaves that getter as it was) */
 #define BVNR_NEXT_NONE       0     /* nothing more until more input is fed */
 #define BVNR_NEXT_DOCUMENT   1     /* bvnr_frame_reader_next: a document */
 #define BVNR_NEXT_MESSAGE    1     /* bvnr_demux_next: a multiplexed message */
@@ -282,7 +285,8 @@ typedef struct bvnr_demux_s bvnr_demux_t;
  * copy). It may be NULL: a push-fed demux is then drained with bvnr_demux_next,
  * and one installed on a reader drops the messages. max_message bounds a single
  * reassembled message (0 selects
- * BVNR_MUX_DEFAULT_MAX); a larger declared length is rejected as a desync.
+ * BVNR_MUX_DEFAULT_MAX); a larger declared length is refused with
+ * error_value_out_of_range.
  *
  * The demultiplexer owns one reassembly buffer per channel it has seen; each
  * buffer grows to that channel's largest message and is retained for reuse until
@@ -325,7 +329,11 @@ BVN_API bool bvnr_demux_on_event(void* demux, bvnr_event_t ev, bvnr_data_t* d);
  * a framing desync; error_value_out_of_range an oversized message; other codes
  * map to the failure observed. On a push-fed demux, when the demux itself has
  * none, it is the error of its reader -- the document around the mux stream
- * was malformed, cut off, or refused by a limit. */
+ * was malformed, cut off, or refused by a limit. The demux's own error comes
+ * first, as for a demux installed on a reader: a message cut short
+ * (error_octet_stream_truncated, which does not fail the read) is still the
+ * answer when the document fails later on, so when the feed or finish has
+ * returned false, bvnr_reader_get_error(bvnr_demux_get_reader(dm)) says why. */
 BVN_API error_code_t bvnr_demux_error(const bvnr_demux_t* dm);
 
 /*

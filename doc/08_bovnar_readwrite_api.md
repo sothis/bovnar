@@ -956,7 +956,7 @@ after) a binary or multiplexed octet stream — `.meta = { .codec = "av1"; };`
 then `.media = <octet stream>` — and a fed reader delivers them as it reads
 them, before the first chunk of the stream. For a multiplexed stream, the
 push-fed demultiplexer (`bvnr_demux_open_feed`, [doc/10
-§3.2](10_bovnar_streaming.md#32-api)) does this with the reader built in: the
+§3.4](10_bovnar_streaming.md#34-push-fed-demultiplexing-with-metadata-before-the-stream)) does this with the reader built in: the
 metadata goes to your `on_verified`, or comes out of `bvnr_demux_next` as events
 ahead of the messages.
 
@@ -1655,8 +1655,8 @@ Hand everything written so far to the sink now, then call the sink's flush
 callback if it has one. For an fd or callback sink the writer gathers output
 in its 64 KiB buffer (§2.9), so a consumer at the other end of a socket would
 otherwise see nothing until the buffer fills or the document finishes; a
-producer that streams — a mux message per `bvnr_mux_send`, a record per event —
-calls this after each one to hand it over at once.
+producer that streams a mux message per `bvnr_mux_send` calls this after each
+one to hand it over at once.
 
 It is legal between any two writer calls: inside an open struct or array, and
 inside an open mux stream between `bvnr_mux_send` calls. It changes only *when*
@@ -1664,6 +1664,14 @@ the bytes leave, never which bytes: a separator still owed to the next value
 (the `;` after a value, the `,` before the next array element) stays owed, so
 output flushed at every possible point is byte-identical to output never
 flushed.
+
+A value is complete for a reader only with what ends it, so that owed `;`
+matters to a live consumer: after `bvnr_write_uint(w, "a", 64, 1)` and a flush
+the consumer has `.a=<uint:64>1`, and its fed reader delivers the value when the
+next write (or `bvnr_write_finish`) sends the `;`. A stream of records written
+as top-level values therefore arrives one record late. A mux message has no
+such tail: its chunks are complete when `bvnr_mux_send` returns, so a flush
+after each send hands every message over at once.
 
 | Sink | What it does |
 |---|---|

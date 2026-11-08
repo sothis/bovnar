@@ -2741,6 +2741,204 @@ static void test_write_finish_incomplete(void)
 	free(mem);
 }
 
+/* ---- fixes from the streaming review ----------------------------------- */
+
+static bool mux_on_msg_nop(void* ud, uint64_t ch, const uint8_t* p,
+	uint64_t n)
+{
+	(void)ud; (void)ch; (void)p; (void)n;
+	return true;
+}
+
+static bool count_events(void* ud, bvnr_event_t ev, bvnr_data_t* d)
+{
+	(void)ev; (void)d;
+	(*(uint64_t*)ud)++;
+	return true;
+}
+
+/* A pulled demux with deliver_events hands events out in batches: the reader
+ * stops once a batch is queued, instead of lexing (and copying) the whole fed
+ * buffer before the first bvnr_demux_next returns. */
+static void test_demux_event_batches(void)
+{
+	buf_t doc = {0};
+	buf_put(&doc, LIT(".a = ["));
+	for (int i = 0; i < 20000; i++)
+		buf_put(&doc, LIT("1,"));
+	buf_put(&doc, LIT("1];"));
+	uint64_t seen = 0;
+	bvnr_read_flags_t fl;
+	memset(&fl, 0, sizeof(fl));
+	fl.on_verified = count_events;
+	fl.userdata = &seen;
+	bvnr_demux_t* dm = bvnr_demux_create(NULL, NULL, 0);
+	ASSERT_TRUE(bvnr_demux_open_feed(dm, &fl, true), "batches: open");
+	ASSERT_TRUE(bvnr_demux_feed(dm, doc.p, doc.n), "batches: feed");
+	bvnr_demux_item_t it;
+	ASSERT_EQ_UINT(bvnr_demux_next(dm, &it), BVNR_NEXT_EVENT,
+		"batches: an event first");
+	ASSERT_TRUE(seen <= 256, "batches: the reader stopped after a batch");
+	uint64_t events = 1;
+	int rc;
+	while ((rc = bvnr_demux_next(dm, &it)) == BVNR_NEXT_EVENT)
+		events++;
+	ASSERT_EQ_UINT(rc, BVNR_NEXT_NONE, "batches: drained");
+	ASSERT_TRUE(bvnr_demux_finish(dm), "batches: finish");
+	while (bvnr_demux_next(dm, &it) == BVNR_NEXT_EVENT)
+		events++;
+	ASSERT_EQ_UINT(events, seen, "batches: every event handed out");
+	bvnr_demux_destroy(dm);
+	buf_free(&doc);
+}
+
+/* An error the pulled demux finds in bvnr_demux_next ends its reader at the
+ * position the callback demux reports. */
+static void test_demux_pull_error_position(void)
+{
+	static const uint8_t doc[] = ".m = \x00\x01\x07\x00\x01\x05hello\x00;";
+	size_t n = sizeof(doc) - 1;
+	bvnr_demux_t* cb = bvnr_demux_create(mux_on_msg_nop, NULL, 4);
+	bvnr_demux_open_feed(cb, NULL, false);
+	ASSERT_TRUE(!bvnr_demux_feed(cb, doc, n), "pull error: callback fails");
+	const bvnr_reader_t* cr = bvnr_demux_get_reader(cb);
+
+	bvnr_demux_t* dm = bvnr_demux_create(NULL, NULL, 4);
+	bvnr_demux_open_feed(dm, NULL, false);
+	ASSERT_TRUE(bvnr_demux_feed(dm, doc, n), "pull error: feed");
+	bvnr_demux_item_t it;
+	ASSERT_EQ_UINT(bvnr_demux_next(dm, &it), BVNR_NEXT_ERROR,
+		"pull error: next fails");
+	const bvnr_reader_t* pr = bvnr_demux_get_reader(dm);
+	ASSERT_EQ_UINT(bvnr_demux_error(dm), error_value_out_of_range,
+		"pull error: the demux's code");
+	ASSERT_EQ_UINT(bvnr_demux_error(dm), bvnr_demux_error(cb),
+		"pull error: the same code in both modes");
+	ASSERT_EQ_UINT(bvnr_reader_get_error(pr), bvnr_reader_get_error(cr),
+		"pull error: the same reader error");
+	ASSERT_EQ_UINT(bvnr_reader_get_error(pr), error_scanner_callback_failed,
+		"pull error: the reader was aborted");
+	ASSERT_EQ_UINT(bvnr_reader_get_error_offset(pr),
+		bvnr_reader_get_error_offset(cr), "pull error: the same offset");
+	ASSERT_EQ_UINT(bvnr_reader_get_error_column(pr),
+		bvnr_reader_get_error_column(cr), "pull error: the same column");
+	ASSERT_TRUE(!bvnr_demux_finish(dm), "pull error: finish fails");
+	bvnr_demux_destroy(dm);
+	bvnr_demux_destroy(cb);
+}
+
+/* A message cut short by the stream's end does not fail the read; when the
+ * document then fails, that failure is the error. */
+static void test_demux_truncation_then_failure(void)
+{
+	static const uint8_t doc[] =
+		".m = \x00\x01\x04\x00\x01\x09hi\x00;\n.x = = 1;\n";
+	bvnr_demux_t* dm = bvnr_demux_create(mux_on_msg_nop, NULL, 0);
+	bvnr_demux_open_feed(dm, NULL, false);
+	bool ok = bvnr_demux_feed(dm, doc, sizeof(doc) - 1) &&
+		  bvnr_demux_finish(dm);
+	ASSERT_TRUE(!ok, "truncated+failed: the read fails");
+	const bvnr_reader_t* rd = bvnr_demux_get_reader(dm);
+	ASSERT_TRUE(bvnr_reader_get_error(rd) != error_none,
+		"truncated+failed: the reader failed");
+	/* The demux's own error comes first, as on a reader of the whole
+	 * buffer; the reader says why the read failed. */
+	ASSERT_EQ_UINT(bvnr_demux_error(dm), error_octet_stream_truncated,
+		"truncated+failed: the demux's error, as in batch mode");
+	ASSERT_EQ_UINT(bvnr_reader_get_error(rd), error_unexpected_input_byte,
+		"truncated+failed: the reader's error");
+	/* The truncation alone is still reported, with a read that succeeds. */
+	static const uint8_t cut[] = ".m = \x00\x01\x04\x00\x01\x09hi\x00;\n";
+	bvnr_demux_open_feed(dm, NULL, false);
+	ok = bvnr_demux_feed(dm, cut, sizeof(cut) - 1) && bvnr_demux_finish(dm);
+	ASSERT_TRUE(ok, "truncated: the read succeeds");
+	ASSERT_EQ_UINT(bvnr_demux_error(dm), error_octet_stream_truncated,
+		"truncated: reported");
+	bvnr_demux_destroy(dm);
+}
+
+/* An empty field of a queued event is an empty string, not NULL. */
+static void test_demux_empty_event_field(void)
+{
+	bvnr_demux_t* dm = bvnr_demux_create(NULL, NULL, 0);
+	bvnr_demux_open_feed(dm, NULL, true);
+	ASSERT_TRUE(bvnr_demux_feed(dm, ".", 1), "empty field: feed");
+	bvnr_demux_item_t it;
+	ASSERT_EQ_UINT(bvnr_demux_next(dm, &it), BVNR_NEXT_EVENT,
+		"empty field: stream start");
+	ASSERT_EQ_UINT(it.event, ev_stream_start, "empty field: the event");
+	ASSERT_TRUE(it.value && (it.value->data || !it.value->length),
+		"empty field: a consistent value");
+	bvnr_demux_destroy(dm);
+}
+
+/* bvnr_mux_send's own refusals latch as writer errors. */
+static void test_mux_send_latches(void)
+{
+	uint8_t out[256];
+	bvnr_writer_t* w = bvnr_writer_create();
+	bvnr_open_write_mem(w, out, sizeof(out), false, NULL);
+	ASSERT_TRUE(bvnr_mux_begin(w, "mux"), "mux latch: begin");
+	ASSERT_TRUE(!bvnr_mux_send(w, 1, NULL, 3), "mux latch: NULL data");
+	ASSERT_EQ_UINT(bvnr_writer_get_error(w), error_invalid_argument,
+		"mux latch: latched");
+	ASSERT_TRUE(!bvnr_mux_send(w, 1, "abc", 3), "mux latch: sticky");
+	ASSERT_TRUE(!bvnr_write_finish(w), "mux latch: finish fails");
+	bvnr_writer_destroy(w);
+}
+
+/* A pull that claims more bytes than it was asked for is an I/O error. */
+static bool lying_pull(bvnr_source_t* s, void* out, uint32_t want,
+	uint32_t* got)
+{
+	(void)s;
+	memset(out, ' ', want);
+	*got = want + 1000u;
+	return true;
+}
+
+static void test_pull_overclaim(void)
+{
+	bvnr_source_t src;
+	bvnr_source_from_callback(&src, lying_pull, NULL);
+	bvnr_reader_t* r = bvnr_reader_create();
+	ASSERT_TRUE(bvnr_open_read_source(r, &src, NULL, NULL),
+		"overclaim: open");
+	ASSERT_TRUE(!bvnr_read(r), "overclaim: refused");
+	ASSERT_EQ_UINT(bvnr_reader_get_error(r), error_reading_from_source_fd,
+		"overclaim: an I/O error");
+	bvnr_reader_destroy(r);
+	bvnr_source_from_callback(&src, lying_pull, NULL);
+	uint64_t count = 0;
+	ASSERT_TRUE(!bvnr_doc_stream_read(&src, NULL, &count),
+		"overclaim: frames refused");
+	/* NULL handles are ignored rather than written through. */
+	bvnr_source_from_callback(NULL, lying_pull, NULL);
+	bvnr_sink_to_callback(NULL, NULL, NULL, NULL);
+	bvnr_sink_t sink;
+	bvnr_sink_to_callback(&sink, NULL, NULL, NULL);
+	ASSERT_TRUE(!bvnr_frame_write(&sink, "x", 1),
+		"overclaim: a sink without push is refused");
+}
+
+/* After a fed read has ended, bvnr_read leaves its error alone. */
+static void test_read_on_finished_feed(void)
+{
+	bvnr_reader_t* r = bvnr_reader_create();
+	bvnr_open_read_feed(r, NULL, NULL);
+	bvnr_read_feed(r, LIT(".a = "));
+	ASSERT_TRUE(!bvnr_read_finish(r), "finished feed: cut off");
+	error_code_t err = bvnr_reader_get_error(r);
+	ASSERT_TRUE(!bvnr_read(r), "finished feed: bvnr_read refused");
+	ASSERT_EQ_UINT(bvnr_reader_get_error(r), err,
+		"finished feed: error kept");
+	bvnr_open_read_feed(r, NULL, NULL);
+	ASSERT_TRUE(!bvnr_read(r), "open feed: bvnr_read refused");
+	ASSERT_EQ_UINT(bvnr_reader_get_error(r), error_invalid_argument,
+		"open feed: invalid argument");
+	bvnr_reader_destroy(r);
+}
+
 int main(int argc, char** argv)
 {
 	corpus_builtin();
@@ -2762,6 +2960,13 @@ int main(int argc, char** argv)
 	test_write_flush_live();
 	test_write_flush_edges();
 	test_write_finish_incomplete();
+	test_demux_event_batches();
+	test_demux_pull_error_position();
+	test_demux_truncation_then_failure();
+	test_demux_empty_event_field();
+	test_mux_send_latches();
+	test_pull_overclaim();
+	test_read_on_finished_feed();
 
 	for (size_t i = 0; i < g_ndocs; i++) {
 		free(g_docs[i].name);

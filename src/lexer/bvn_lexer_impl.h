@@ -346,8 +346,9 @@ typedef struct bvnr_lexer_s {
 	 * handed over and not yet lexed; win_ptr/win_left the part of them already
 	 * counted into processed_bytes (and cut at max_file_size: win_over_cap) but
 	 * not consumed, which is non-empty only after a pause. pause_req is set by
-	 * an internal consumer (the feed-mode demux) from inside a chunk callback,
-	 * and stops the lexer right after that chunk.
+	 * an internal consumer (the feed-mode demux) from inside an event callback,
+	 * and stops the lexer right after the byte that delivered the event (for
+	 * an octet chunk, right after the chunk).
 	 */
 	bool			feed_mode;
 	bool			feed_begun;
@@ -479,15 +480,20 @@ bool bvn_lex_run(bvnr_reader_t* r);
 /* Push-fed lexing, the engine behind bvnr_read_feed / bvnr_read_finish.
  * bvn_lex_feed_attach hands over bytes by reference; bvn_lex_feed_run lexes
  * them and returns one of the codes below. A consumer that calls bvn_lex_pause
- * from inside an octet-chunk callback makes it return BVN_FEED_PAUSED right
- * after that chunk, with the rest of the attached bytes kept for the next run
- * (the chunk's data stays valid until then). bvn_lex_feed_end is end of input:
+ * from inside an event callback makes it return BVN_FEED_PAUSED right after
+ * that event, with the rest of the attached bytes kept for the next run (an
+ * octet chunk's data stays valid until then). bvn_lex_feed_end is end of input:
  * the same end-of-document checks bvnr_read makes, then ev_stream_end. */
 enum { BVN_FEED_ERROR = -1, BVN_FEED_DRAINED = 0, BVN_FEED_PAUSED = 1 };
 void bvn_lex_feed_attach(bvnr_reader_t* r, const uint8_t* data, uint64_t len);
 int  bvn_lex_feed_run(bvnr_reader_t* r);
 bool bvn_lex_feed_end(bvnr_reader_t* r);
 void bvn_lex_pause(bvnr_reader_t* r);
+/* The consumer that paused the reader after an octet chunk refuses that chunk
+ * after all: the reader ends as it would have had the chunk callback returned
+ * false (error_scanner_callback_failed at the same position, on_error called),
+ * and the input still attached is dropped. */
+void bvn_lex_abort_paused(bvnr_reader_t* r);
 static inline bool bvn_lex_feed_pending(const bvnr_lexer_t* l)
 {
 	return l->feed_left != 0 || l->win_left != 0 || l->win_over_cap;

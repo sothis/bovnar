@@ -53,6 +53,15 @@ in pure Rust (it is small and has to cost nanoseconds), and live document
 parsing plus callback I/O in C, which the bindings wrap. Shared vectors keep
 the two implementations of the wire convention in step.
 
+**Metadata before the stream** is a requirement on every layer (C, Rust and
+Python): a stream document may start with ordinary text values, then open
+the mux key, for example `.meta = { .codec = "av1"; .rate = <float:32,Hz>
+30.0; }; .media = \x00 … \x00;`. Writers take that preamble, and readers
+hand it over (raw bytes or parsed values) before the first message. Because
+a NUL byte cannot occur in Bovnar text, the first `0x00` of a text-only
+preamble is the mux opener, so the Rust codec can find the boundary without
+a full parse and parse the preamble once per stream.
+
 ### 1. Rust: a pure-Rust framing codec in the crate
 
 The octet chunk of spec §9 plus the two LEB128 varints of doc/10 §3, with no

@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Generator, IO, Sequence
 
 from ._ffi import get_library
-from ._fileio import PullSource
+from ._fileio import PullSource, push_sink, is_stream
 from .enums import Event, ErrorCode
 from .exceptions import BovnarParseError, BovnarArgumentError
 from .structs import (
@@ -502,6 +502,7 @@ class Reader:
                  on_unverified: Callable | None = None,
                  want_unit: Callable | None = None,
                  on_error: Callable | None = None,
+                 mirror=None,
                  **options) -> None:
         """Parse a document held in memory.
 
@@ -512,6 +513,16 @@ class Reader:
         a :class:`BovnarParseError` with its position -- under
         ``continue_on_error`` the errors it recovers from, which are reported
         nowhere else, and the one that ends a read.
+
+        ``mirror`` -- a writable binary file object, a socket or a
+        ``bytearray`` (appended to) -- receives every byte the reader
+        consumes: the input mirror of ``bvnr_open_read_source``, a debugging
+        aid. The bytes reach it a piece at a time, each once the reader has
+        parsed it -- a buffer pulled (up to 64 KiB), a piece fed, an
+        octet-stream chunk -- so a read that fails or is stopped has mirrored
+        the input up to the start of the piece it stopped in. An exception
+        the object raises ends the read and is re-raised from here,
+        unchanged.
 
         The other keywords are the read options of :data:`READ_OPTIONS`, each
         ``0`` / ``False`` by default: the limits ``max_file_size`` (0: no
@@ -536,6 +547,13 @@ class Reader:
             options)
 
         buf = (ctypes.c_char * len(data)).from_buffer_copy(data)
+        if mirror is not None:
+            # bvnr_open_read_mem mirrors into a fixed buffer only; a memory
+            # source with a callback sink is the same read.
+            src = BvnrSource()
+            self._lib.bvnr_source_from_mem(ctypes.byref(src), buf, len(data))
+            self._read_source(src, flags, cb_refs, mirror=mirror, keep=buf)
+            return
         ok = self._run_read(lambda: self._lib.bvnr_open_read_mem(
             self._ptr,
             buf, len(data),
@@ -563,6 +581,7 @@ class Reader:
                 on_unverified: Callable | None = None,
                 want_unit: Callable | None = None,
                 on_error: Callable | None = None,
+                mirror=None,
                 **options) -> None:
         """Parse a document read from file descriptor ``fd``; the keywords
         are those of :meth:`read_mem`."""
@@ -577,7 +596,7 @@ class Reader:
 
         src = BvnrSource()
         self._lib.bvnr_source_from_fd(ctypes.byref(src), fd)
-        self._read_source(src, flags, cb_refs)
+        self._read_source(src, flags, cb_refs, mirror=mirror)
 
     def read_stream(self,
                     stream,
@@ -586,6 +605,7 @@ class Reader:
                     on_unverified: Callable | None = None,
                     want_unit: Callable | None = None,
                     on_error: Callable | None = None,
+                    mirror=None,
                     **options) -> None:
         """Parse a document pulled from a socket or a binary file object.
 
@@ -601,18 +621,25 @@ class Reader:
             'read_stream', on_verified, on_unverified, want_unit, on_error,
             options)
         source = PullSource(stream)
-        self._read_source(source.handle, flags, cb_refs, source)
+        self._read_source(source.handle, flags, cb_refs, source, mirror=mirror)
 
-    def _read_source(self, src, flags, cb_refs, source=None) -> None:
+    def _read_source(self, src, flags, cb_refs, source=None, mirror=None,
+                     keep=None) -> None:
+        # `keep`: the memory a memory source reads, alive until the read is.
+        sink = push_sink(mirror) if mirror is not None else None
         ok = self._run_read(lambda: self._lib.bvnr_open_read_source(
             self._ptr,
             ctypes.byref(src),
-            None,
+            ctypes.byref(sink.handle) if sink is not None else None,
             ctypes.byref(flags),
         ))
+        del keep
 
-        # The transport's own exception first: it is what stopped the read.
+        # The transports' own exceptions first: they are what stopped the
+        # read.
         cb_exc = source.exc if source is not None else None
+        if cb_exc is None and sink is not None:
+            cb_exc = sink.exc
         for cb in cb_refs:
             if cb_exc is not None:
                 break
@@ -633,6 +660,7 @@ class Reader:
                   on_unverified: Callable | None = None,
                   want_unit: Callable | None = None,
                   on_error: Callable | None = None,
+                  mirror=None,
                   max_file_size: int = MAX_FILESIZE_BYTES,
                   **options) -> None:
         """Parse the file at ``path``; the keywords are those of
@@ -649,6 +677,7 @@ class Reader:
                 on_unverified=on_unverified,
                 want_unit=want_unit,
                 on_error=on_error,
+                mirror=mirror,
                 max_file_size=max_file_size,
                 **options,
             )
@@ -782,3 +811,175 @@ class Reader:
         return None
 
 
+
+
+# ===========================================================================
+# Canonical form
+# ===========================================================================
+
+_canon_on_event = None
+
+
+def _canon_callback(lib):
+    """bvnr_canon_observer_on_event itself as the reader's on_verified: a
+    ctypes function pointer to the C function, so the observer is fed with no
+    Python call per event."""
+    global _canon_on_event
+    if _canon_on_event is None:
+        addr = ctypes.cast(lib.bvnr_canon_observer_on_event, ctypes.c_void_p)
+        _canon_on_event = EVENT_CALLBACK_FUNC(addr.value)
+    return _canon_on_event
+
+
+class _VersionSniffer:
+    """Finds a leading ``#!bovnar M.N`` in the bytes a stream hands over and
+    gives it to the observer before the reader sees them -- the bytes of the
+    directive's line all arrive before any value can, so the directive is
+    set before output begins. bvnr_peek_version decides, on the bytes up to
+    the end of that line."""
+
+    _WS = b' \t\n\r\x0b\x0c'
+    _CAP = 1 << 16
+
+    def __init__(self, lib, obs) -> None:
+        self._lib = lib
+        self._obs = obs
+        self._head = bytearray()
+        self.done = False
+
+    def on_pull(self, buf: int, n: int) -> None:
+        if self.done:
+            return
+        if n == 0:
+            self._decide()
+            return
+        self._head += ctypes.string_at(buf, n)
+        head = self._head
+        if len(head) < 3 and b'\xef\xbb\xbf'.startswith(head):
+            return                                  # a BOM, perhaps
+        i = 3 if head[:3] == b'\xef\xbb\xbf' else 0
+        while i < len(head) and head[i] in self._WS:
+            i += 1
+        if i == len(head):
+            if len(head) > self._CAP:
+                self._decide()
+            return
+        if head[i] != 0x23:                         # not '#': no directive
+            self.done = True
+            return
+        if (b'\n' in head[i:] or b'\r' in head[i:]
+                or len(head) > self._CAP):
+            self._decide()
+
+    def _decide(self) -> None:
+        self.done = True
+        _set_version(self._lib, self._obs, bytes(self._head))
+        self._head = bytearray()
+
+
+def _set_version(lib, obs, data: bytes) -> None:
+    maj, mn = ctypes.c_uint16(0), ctypes.c_uint16(0)
+    if lib.bvnr_peek_version(data, len(data), ctypes.byref(maj),
+                             ctypes.byref(mn)):
+        lib.bvnr_canon_observer_set_version(obs, maj.value, mn.value)
+
+
+def _canonicalize(where: str, data, out, pretty: bool, options: dict) -> None:
+    lib = get_library()
+    flags = read_flags(where, options)
+    sink = push_sink(out)
+    obs = lib.bvnr_canon_observer_create(ctypes.byref(sink.handle),
+                                         bool(pretty))
+    if not obs:
+        raise MemoryError("bvnr_canon_observer_create() returned NULL")
+    reader = Reader()
+    try:
+        flags.on_verified = _canon_callback(lib)
+        flags.userdata = obs
+        # The first error a continue_on_error read recovered from: on_error
+        # runs only for an error, so it costs nothing on a clean document.
+        first = []
+
+        def _c_on_error(_ud, err, line, column, byte, offset) -> None:
+            if not first:
+                first.append((int(err), int(line), int(column), int(offset),
+                              int(byte)))
+        on_error = ON_ERROR_FUNC(_c_on_error)
+        flags.on_error = on_error
+
+        source = keep = None
+        src = BvnrSource()
+        if is_stream(data):
+            sniffer = _VersionSniffer(lib, obs)
+            source = PullSource(data, on_pull=sniffer.on_pull)
+            src = source.handle
+        else:
+            try:
+                if isinstance(data, str):
+                    raise TypeError
+                # Any bytes-like object, in memory order; bytes(5) would be
+                # five zero bytes.
+                data = memoryview(data).tobytes()
+            except TypeError:
+                raise BovnarArgumentError(
+                    f"{where}() takes a bytes-like object or a binary "
+                    f"stream, not {type(data).__name__}") from None
+            _set_version(lib, obs, data)
+            keep = (ctypes.c_char * len(data)).from_buffer_copy(data)
+            lib.bvnr_source_from_mem(ctypes.byref(src), keep, len(data))
+        ok = reader._run_read(lambda: lib.bvnr_open_read_source(
+            reader._ptr, ctypes.byref(src), None, ctypes.byref(flags)))
+        for exc in (source.exc if source is not None else None, sink.exc):
+            if exc is not None:
+                raise exc
+        if not ok:
+            reader._raise_error()
+        if lib.bvnr_reader_get_recovery_count(reader._ptr) and first:
+            # doc/08 §3.6: the observer writes what it is fed, and a
+            # recovered error leaves a statement without its value, so the
+            # output would not be a document anyone can read.
+            code, line, column, offset, byte = first[0]
+            raise _parse_error(
+                lib, code, line, column, offset, byte,
+                prefix="the document has no canonical form: the read "
+                       "recovered from an error, and the output would not "
+                       "be readable: ")
+        if not lib.bvnr_canon_observer_finish(obs):
+            if sink.exc is not None:
+                raise sink.exc
+            raise BovnarParseError(ErrorCode.WRITING_TO_SINK,
+                                   message="bvnr_canon_observer_finish failed")
+    finally:
+        lib.bvnr_canon_observer_destroy(obs)
+        reader.close()
+
+
+def canonicalize(data, *, pretty: bool = False, **options) -> bytes:
+    """``data`` -- bytes, or a socket or binary file object read to its end
+    -- in canonical form: the document re-serialised from its verified
+    events by the canonicalising observer (``bvnr_canon_observer_*``), the
+    form ``bovnar events -d`` prints (``-p`` with ``pretty=True``). The
+    compact form is one line with no spaces outside literals; two documents
+    that differ only in layout, comments and the spelling of separators
+    canonicalise to the same bytes, and canonicalising the output again
+    gives it back unchanged.
+
+    A leading ``#!bovnar M.N`` directive is kept. The keywords are the read
+    options of :meth:`Reader.read_mem` (:data:`READ_OPTIONS`); a document
+    the reader refuses raises ``BovnarParseError``. Under
+    ``continue_on_error`` a document the reader had to recover from raises
+    it too, with the first error recovered from: the observer writes what
+    it is fed, and the gap a recovery leaves would make the output
+    unreadable (doc/08 §3.6)."""
+    out = bytearray()
+    _canonicalize('canonicalize', data, out, pretty, options)
+    return bytes(out)
+
+
+def canonicalize_to(data, out, *, pretty: bool = False, **options) -> None:
+    """:func:`canonicalize` into ``out``: a writable binary file object, a
+    socket or a ``bytearray`` (appended to). The output reaches ``out`` in
+    64 KiB pieces as it is made, so neither the document nor its canonical
+    form is held whole when ``data`` is a stream; after an error ``out`` may
+    hold the start of the output."""
+    _canonicalize('canonicalize_to', data, out, pretty, options)

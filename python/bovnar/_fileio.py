@@ -87,7 +87,9 @@ class PullSource:
 
     __slots__ = ('handle', 'exc', '_cb')
 
-    def __init__(self, obj) -> None:
+    def __init__(self, obj, on_pull=None) -> None:
+        # on_pull(buf_address, n) sees every pull's bytes before the reader
+        # does (the canonicaliser sniffs the version directive with it).
         _refuse_text(obj)
         self.exc = None
         recv_into = getattr(obj, 'recv_into', None)
@@ -116,6 +118,8 @@ class PullSource:
                     raise BovnarArgumentError(
                         f"{type(obj).__name__} reported reading {n!r} bytes "
                         f"into a buffer of {want}")
+                if on_pull is not None:
+                    on_pull(buf, n)
                 got[0] = n
                 return True
             except BaseException as exc:            # noqa: BLE001 (re-raised by the caller)
@@ -218,3 +222,24 @@ class PushSink:
         self.handle = BvnrSink()
         get_library().bvnr_sink_to_callback(ctypes.byref(self.handle),
                                             self._push, self._flush, None)
+
+
+class _AppendTo:
+    """A bytearray as a file object: write() appends, and takes everything."""
+
+    __slots__ = ('_buf',)
+
+    def __init__(self, buf: bytearray) -> None:
+        self._buf = buf
+
+    def write(self, data) -> int:
+        self._buf += data
+        return len(data)
+
+
+def push_sink(obj) -> PushSink:
+    """A PushSink into a writable binary file object, a socket, or a
+    bytearray (appended to)."""
+    if isinstance(obj, bytearray):
+        return PushSink(_AppendTo(obj))
+    return PushSink(obj)

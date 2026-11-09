@@ -45,10 +45,11 @@ pub use ffi::ValueTypeSpec;
 pub use quantity::ExactNumber;
 pub use quantity::Quantity;
 pub use reader::{
-    EventData, EventPayload, ReadHandlers, ReadOptions, Reader, UnitPolicy, UnitRule,
+    EventData, EventPayload, ReadHandlers, ReadOptions, Reader, UnitPolicy, UnitRule, canonicalize,
+    canonicalize_reader,
 };
 pub use unit::{MAX_UNIT_COMPONENTS, Unit, UnitComponent};
-pub use writer::{Base, EmitSpec, Signedness, Writer};
+pub use writer::{Base, EmitSpec, Signedness, WriteObserver, WriteOptions, Writer};
 
 use writer::needs_annotation;
 

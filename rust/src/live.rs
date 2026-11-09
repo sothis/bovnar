@@ -54,8 +54,40 @@ use std::ffi::CString;
 use crate::dict_parser::DictParser;
 use crate::error::{Error, Result};
 use crate::ffi::{self, DemuxItem as RawItem, Next};
-use crate::reader::{EventData, EventHandler, ReadOptions, UnitPolicy, reader_error, wrap};
+use crate::reader::{
+    EventData, EventHandler, ReadHandlers, ReadOptions, UnitPolicy, hooks_of, reader_error,
+    with_handlers,
+};
 use crate::{ErrorCode, Value};
+
+/// The error of a call that needs a callback the C object of a document (or
+/// of a frame stream) was not started with.
+fn hooks_fixed() -> Error {
+    Error::argument(
+        "the C reader takes its callbacks when a document starts (a frame stream: when it \
+         starts): pass on_unverified and want_unit from the first call on it, or reset() first",
+    )
+}
+
+/// A mirror a feed owns, which [`DocumentFeed::take_mirror`] hands back as
+/// its own type.
+trait AnyWrite: std::io::Write + Send {
+    fn as_write(&mut self) -> &mut dyn std::io::Write;
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any>;
+    fn type_of(&self) -> std::any::TypeId;
+}
+
+impl<W: std::io::Write + Send + 'static> AnyWrite for W {
+    fn as_write(&mut self) -> &mut dyn std::io::Write {
+        self
+    }
+    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
+        self
+    }
+    fn type_of(&self) -> std::any::TypeId {
+        std::any::TypeId::of::<W>()
+    }
+}
 
 /// Where a fed document is.
 #[derive(Clone, Debug, PartialEq)]
@@ -102,7 +134,23 @@ pub struct DocumentFeed {
     handle: ffi::FeedHandle,
     options: ReadOptions,
     state: State,
+    /// The callbacks the C reader of the current document calls, and
+    /// whether a call has fed it yet: until then a call needing others
+    /// re-opens it.
+    hooks: ffi::Hooks,
+    started: bool,
+    /// The mirror ([`DocumentFeed::set_mirror`]), and the sink lent it for
+    /// each call; the sink outlives the reader, which holds a copy of it.
+    mirror: Option<Box<dyn AnyWrite>>,
+    lent: Option<ffi::LentSink>,
 }
+
+/// What a feed hands the C reader for its events, the default: on_verified.
+const VERIFIED: ffi::Hooks = ffi::Hooks {
+    verified: true,
+    unverified: false,
+    want_unit: false,
+};
 
 impl DocumentFeed {
     /// A parser with `options`, ready for the first document.
@@ -112,9 +160,57 @@ impl DocumentFeed {
             handle,
             options: options.clone(),
             state: State::Open,
+            hooks: VERIFIED,
+            started: false,
+            mirror: None,
+            lent: None,
         };
         feed.reset()?;
         Ok(feed)
+    }
+
+    /// Mirrors every byte the reader consumes into `mirror`, each piece fed
+    /// once the reader has parsed it (`src_mirror`, a debugging aid; see
+    /// [`crate::Reader::read_mem_mirror`]), from the next document on: this
+    /// starts it, as [`reset`](Self::reset) does, and the mirror stays for
+    /// every document after until [`take_mirror`](Self::take_mirror). A
+    /// failing `mirror` fails the document with an [`Error::Io`] with
+    /// `writing_to_sink`; a panic in it reaches the caller of the feed.
+    ///
+    /// ```
+    /// use bovnar::ReadOptions;
+    /// use bovnar::live::DocumentFeed;
+    ///
+    /// let mut feed = DocumentFeed::new(&ReadOptions::default())?;
+    /// feed.set_mirror(Vec::<u8>::new())?;
+    /// for piece in [&b".a = "[..], b"1; .b", b" = 2;"] {
+    ///     feed.feed(piece, &mut |_| true)?;
+    /// }
+    /// feed.finish(&mut |_| true)?;
+    /// assert_eq!(feed.take_mirror::<Vec<u8>>().unwrap(), b".a = 1; .b = 2;");
+    /// # Ok::<(), bovnar::Error>(())
+    /// ```
+    pub fn set_mirror<W: std::io::Write + Send + 'static>(&mut self, mirror: W) -> Result<()> {
+        self.mirror = Some(Box::new(mirror));
+        self.reset()
+    }
+
+    /// Takes the mirror back, when it is a `W`; `None` (and the mirror kept)
+    /// otherwise. The rest of a document in progress is not mirrored.
+    pub fn take_mirror<W: 'static>(&mut self) -> Option<W> {
+        let is_w = self
+            .mirror
+            .as_deref()
+            .is_some_and(|m| m.type_of() == std::any::TypeId::of::<W>());
+        if !is_w {
+            return None;
+        }
+        self.mirror
+            .take()?
+            .into_any()
+            .downcast::<W>()
+            .ok()
+            .map(|b| *b)
     }
 
     /// Installs a unit policy, as [`crate::Reader::set_unit_policy`] does:
@@ -148,13 +244,105 @@ impl DocumentFeed {
     /// return it until [`reset`](Self::reset). Feeding a finished document
     /// is an [`Error::Argument`].
     pub fn feed(&mut self, bytes: &[u8], on_event: EventHandler<'_>) -> Result<()> {
+        self.feed_with(
+            bytes,
+            ReadHandlers {
+                on_verified: Some(on_event),
+                ..ReadHandlers::default()
+            },
+        )
+    }
+
+    /// [`feed`](Self::feed) with any set of [`ReadHandlers`]: the events of
+    /// `on_verified`, the raw lexer events of `on_unverified`, the unit of
+    /// each numeric value from `want_unit`, and each error, recovered or not,
+    /// to `on_error`, as [`crate::Reader::read_mem_with`] calls them.
+    ///
+    /// The C reader takes its callbacks when a document starts: the first
+    /// call of a document decides whether it calls `on_unverified` and
+    /// `want_unit`, and a later call needing one it was not started with is
+    /// an [`Error::Argument`] (reset() starts the next document). Passing
+    /// fewer later is fine; `on_verified` and `on_error` may come and go.
+    pub fn feed_with(&mut self, bytes: &[u8], handlers: ReadHandlers<'_>) -> Result<()> {
+        self.call(Some(bytes), handlers)
+    }
+
+    /// [`finish`](Self::finish) with any set of [`ReadHandlers`], as
+    /// [`feed_with`](Self::feed_with) takes them.
+    pub fn finish_with(&mut self, handlers: ReadHandlers<'_>) -> Result<()> {
+        self.call(None, handlers)
+    }
+
+    /// A feed of `bytes`, or the finish, with `handlers`.
+    fn call(&mut self, bytes: Option<&[u8]>, handlers: ReadHandlers<'_>) -> Result<()> {
         self.check_open()?;
-        let mut verified = wrap(on_event);
-        let mut h = ffi::Handlers {
-            verified: Some(&mut verified),
-            ..ffi::Handlers::default()
+        // The events of on_verified are what a feed is for: always installed.
+        self.ensure_hooks(ffi::Hooks {
+            verified: true,
+            ..hooks_of(&handlers)
+        })?;
+        self.started = true;
+        let handle = &mut self.handle;
+        let mirror = self.mirror.as_deref_mut();
+        let lent = self.lent.as_mut();
+        let ok = with_handlers(handlers, None, |h| {
+            let mut run = |h: &mut ffi::Handlers<'_>| match bytes {
+                Some(bytes) => handle.feed(bytes, h),
+                None => handle.finish(h),
+            };
+            match (mirror, lent) {
+                (Some(m), Some(lent)) => lent.lend(m.as_write(), |_| run(h)),
+                _ => run(h),
+            }
+        });
+        if !ok {
+            self.fail();
+        }
+        // A failing mirror is what ended the document (a panic in it is
+        // resumed here, the document failed).
+        if let Some(e) = self.lent.as_mut().and_then(ffi::LentSink::take_failure) {
+            let e = Error::io(ErrorCode::WritingToSink, &e);
+            self.state = State::Failed(e.clone());
+            return Err(e);
+        }
+        match &self.state {
+            State::Failed(e) => Err(e.clone()),
+            _ if bytes.is_none() => {
+                self.state = State::Finished;
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+
+    /// Re-opens a document no call has fed yet for the callbacks `needed`;
+    /// refuses a callback a started one was not opened with.
+    fn ensure_hooks(&mut self, needed: ffi::Hooks) -> Result<()> {
+        if self.hooks == needed || (self.started && self.hooks.covers(needed)) {
+            Ok(())
+        } else if self.started {
+            Err(hooks_fixed())
+        } else {
+            self.open(needed)
+        }
+    }
+
+    fn open(&mut self, hooks: ffi::Hooks) -> Result<()> {
+        if self.mirror.is_some() && self.lent.is_none() {
+            self.lent = Some(ffi::LentSink::new());
+        }
+        // An error a mirror failed with belongs to the document it ended.
+        if let Some(lent) = self.lent.as_mut() {
+            lent.take_failure();
+        }
+        let mirror = match (&self.mirror, &self.lent) {
+            (Some(_), Some(lent)) => Some(lent.sink()),
+            _ => None,
         };
-        if self.handle.feed(bytes, &mut h) {
+        if self.handle.open(self.options.flags(), hooks, mirror) {
+            self.state = State::Open;
+            self.hooks = hooks;
+            self.started = false;
             Ok(())
         } else {
             Err(self.fail())
@@ -167,29 +355,17 @@ impl DocumentFeed {
     /// `read_complete_chunk_failed` inside an octet stream, as
     /// [`crate::Reader::read_mem`] reports them.
     pub fn finish(&mut self, on_event: EventHandler<'_>) -> Result<()> {
-        self.check_open()?;
-        let mut verified = wrap(on_event);
-        let mut h = ffi::Handlers {
-            verified: Some(&mut verified),
-            ..ffi::Handlers::default()
-        };
-        if self.handle.finish(&mut h) {
-            self.state = State::Finished;
-            Ok(())
-        } else {
-            Err(self.fail())
-        }
+        self.finish_with(ReadHandlers {
+            on_verified: Some(on_event),
+            ..ReadHandlers::default()
+        })
     }
 
     /// Starts the next document, after a finish, after an error, or
-    /// abandoning the current one. The reader and its unit policy are kept.
+    /// abandoning the current one. The reader, its unit policy and the
+    /// mirror are kept.
     pub fn reset(&mut self) -> Result<()> {
-        if self.handle.open(self.options.flags()) {
-            self.state = State::Open;
-            Ok(())
-        } else {
-            Err(self.fail())
-        }
+        self.open(VERIFIED)
     }
 
     /// Whether the current document has been finished.
@@ -310,24 +486,82 @@ impl ValueFeed {
     /// Feeds `bytes` and appends the assignments they complete to `out`,
     /// those before an error included.
     pub fn feed(&mut self, bytes: &[u8], out: &mut Vec<(String, Value)>) -> Result<()> {
-        let builder = &mut self.builder;
-        let r = self.feed.feed(bytes, &mut |d| {
-            builder.push(d);
-            true
-        });
-        out.extend(builder.drain());
-        r
+        self.feed_with(bytes, out, ReadHandlers::default())
     }
 
     /// Ends the document and appends its last assignments to `out`.
     pub fn finish(&mut self, out: &mut Vec<(String, Value)>) -> Result<()> {
+        self.finish_with(out, ReadHandlers::default())
+    }
+
+    /// [`feed`](Self::feed) with the handlers of
+    /// [`DocumentFeed::feed_with`]; `on_verified`, when there is one, sees
+    /// each event after the builder has.
+    pub fn feed_with(
+        &mut self,
+        bytes: &[u8],
+        out: &mut Vec<(String, Value)>,
+        handlers: ReadHandlers<'_>,
+    ) -> Result<()> {
+        self.call(Some(bytes), out, handlers)
+    }
+
+    /// [`finish`](Self::finish) with the handlers of
+    /// [`feed_with`](Self::feed_with).
+    pub fn finish_with(
+        &mut self,
+        out: &mut Vec<(String, Value)>,
+        handlers: ReadHandlers<'_>,
+    ) -> Result<()> {
+        self.call(None, out, handlers)
+    }
+
+    fn call(
+        &mut self,
+        bytes: Option<&[u8]>,
+        out: &mut Vec<(String, Value)>,
+        handlers: ReadHandlers<'_>,
+    ) -> Result<()> {
+        let ReadHandlers {
+            mut on_verified,
+            mut on_unverified,
+            mut want_unit,
+            mut on_error,
+        } = handlers;
         let builder = &mut self.builder;
-        let r = self.feed.finish(&mut |d| {
+        let mut on_event = |d: &EventData<'_>| {
             builder.push(d);
-            true
-        });
-        out.extend(builder.drain());
+            on_verified.as_mut().is_none_or(|f| f(d))
+        };
+        // Reborrowed for this call, the lifetime of `on_event`.
+        let handlers = ReadHandlers {
+            on_verified: Some(&mut on_event),
+            on_unverified: on_unverified.as_mut().map(|f| &mut **f as EventHandler<'_>),
+            want_unit: want_unit
+                .as_mut()
+                .map(|f| &mut **f as crate::reader::WantUnit<'_>),
+            on_error: on_error
+                .as_mut()
+                .map(|f| &mut **f as crate::reader::ErrorHandler<'_>),
+        };
+        let r = match bytes {
+            Some(bytes) => self.feed.feed_with(bytes, handlers),
+            None => self.feed.finish_with(handlers),
+        };
+        out.extend(self.builder.drain());
         r
+    }
+
+    /// Mirrors the input ([`DocumentFeed::set_mirror`]); starts the next
+    /// document, as [`reset`](Self::reset) does.
+    pub fn set_mirror<W: std::io::Write + Send + 'static>(&mut self, mirror: W) -> Result<()> {
+        self.builder.reset();
+        self.feed.set_mirror(mirror)
+    }
+
+    /// Takes the mirror back ([`DocumentFeed::take_mirror`]).
+    pub fn take_mirror<W: 'static>(&mut self) -> Option<W> {
+        self.feed.take_mirror()
     }
 
     /// Starts the next document.
@@ -473,6 +707,13 @@ fn frame_error(code: i32) -> Error {
 pub struct FrameParser {
     handle: ffi::FrameParseHandle,
     finished: bool,
+    /// What the frame reader is created with, for re-creating it with other
+    /// callbacks before the first feed.
+    options: ReadOptions,
+    continue_past_failed: bool,
+    max_document_size: u64,
+    hooks: ffi::Hooks,
+    started: bool,
 }
 
 impl FrameParser {
@@ -485,12 +726,21 @@ impl FrameParser {
         continue_past_failed: bool,
         max_document_size: u64,
     ) -> Result<Self> {
-        let handle =
-            ffi::FrameParseHandle::new(options.flags(), continue_past_failed, max_document_size)
-                .ok_or(Error::OutOfMemory("bvnr_frame_reader_create()"))?;
+        let handle = ffi::FrameParseHandle::new(
+            options.flags(),
+            continue_past_failed,
+            max_document_size,
+            VERIFIED,
+        )
+        .ok_or(Error::OutOfMemory("bvnr_frame_reader_create()"))?;
         Ok(FrameParser {
             handle,
             finished: false,
+            options: options.clone(),
+            continue_past_failed,
+            max_document_size,
+            hooks: VERIFIED,
+            started: false,
         })
     }
 
@@ -505,23 +755,62 @@ impl FrameParser {
         on_event: EventHandler<'_>,
         on_document: &mut dyn FnMut(u64, Result<()>) -> bool,
     ) -> Result<()> {
+        let handlers = ReadHandlers {
+            on_verified: Some(on_event),
+            ..ReadHandlers::default()
+        };
+        self.feed_with(bytes, handlers, on_document)
+    }
+
+    /// [`feed`](Self::feed) with any set of [`ReadHandlers`] for the
+    /// documents, as [`DocumentFeed::feed_with`] takes them. The frame
+    /// reader takes its callbacks when the stream starts: the first feed
+    /// decides whether it calls `on_unverified` and `want_unit`, and a later
+    /// one needing one it was not started with is an [`Error::Argument`].
+    pub fn feed_with(
+        &mut self,
+        bytes: &[u8],
+        handlers: ReadHandlers<'_>,
+        on_document: &mut dyn FnMut(u64, Result<()>) -> bool,
+    ) -> Result<()> {
         if self.finished {
             return Err(Error::argument("the frame stream is finished"));
         }
-        let mut verified = wrap(on_event);
+        self.ensure_hooks(ffi::Hooks {
+            verified: true,
+            ..hooks_of(&handlers)
+        })?;
+        self.started = true;
         let mut documents = |index: u64, ok: bool, err: i32| {
             on_document(index, if ok { Ok(()) } else { Err(frame_error(err)) })
         };
-        let mut h = ffi::Handlers {
-            verified: Some(&mut verified),
-            on_document: Some(&mut documents),
-            ..ffi::Handlers::default()
-        };
-        if self.handle.feed(bytes, &mut h) {
+        let handle = &mut self.handle;
+        let ok = with_handlers(handlers, Some(&mut documents), |h| handle.feed(bytes, h));
+        if ok {
             Ok(())
         } else {
             Err(frame_error(self.handle.error()))
         }
+    }
+
+    /// Re-creates a frame reader no feed has reached for the callbacks
+    /// `needed`; refuses a callback a started one was not created with.
+    fn ensure_hooks(&mut self, needed: ffi::Hooks) -> Result<()> {
+        if self.hooks == needed || (self.started && self.hooks.covers(needed)) {
+            return Ok(());
+        }
+        if self.started {
+            return Err(hooks_fixed());
+        }
+        self.handle = ffi::FrameParseHandle::new(
+            self.options.flags(),
+            self.continue_past_failed,
+            self.max_document_size,
+            needed,
+        )
+        .ok_or(Error::OutOfMemory("bvnr_frame_reader_create()"))?;
+        self.hooks = needed;
+        Ok(())
     }
 
     /// Declares the end of the stream: an error when it ended inside a
@@ -769,6 +1058,10 @@ pub struct Demux {
     handle: ffi::DemuxHandle,
     options: DemuxOptions,
     finished: bool,
+    /// The callbacks the reader of the current document calls, and whether
+    /// a call has fed it yet.
+    hooks: ffi::Hooks,
+    started: bool,
 }
 
 impl Demux {
@@ -786,6 +1079,8 @@ impl Demux {
             handle,
             options: options.clone(),
             finished: false,
+            hooks: ffi::Hooks::default(),
+            started: false,
         };
         demux.reset()?;
         Ok(demux)
@@ -798,13 +1093,32 @@ impl Demux {
     /// ends it: this and every later call return it, after the events read
     /// before it.
     pub fn next<'s, 'a: 's>(&'s mut self, input: &mut &'a [u8]) -> Result<Option<DemuxItem<'s>>> {
+        self.next_with(input, ReadHandlers::default())
+    }
+
+    /// [`next`](Self::next) with [`ReadHandlers`] for the document's reader,
+    /// as [`DocumentFeed::feed_with`] takes them: `on_verified` sees every
+    /// verified event, the mux stream's chunks included, before the demux
+    /// does; `on_unverified`, `want_unit` and `on_error` as for a
+    /// [`crate::Reader`]. They run inside the calls that parse, which for a
+    /// demux are `next` and `finish`. The first call of a document decides
+    /// which of `on_verified`, `on_unverified` and `want_unit` its reader
+    /// calls; a later one needing another is an [`Error::Argument`].
+    pub fn next_with<'s, 'a: 's>(
+        &'s mut self,
+        input: &mut &'a [u8],
+        handlers: ReadHandlers<'_>,
+    ) -> Result<Option<DemuxItem<'s>>> {
         if self.finished && !input.is_empty() {
             return Err(Error::argument(
                 "the document is finished; pass an empty slice for the closing events, or reset()",
             ));
         }
+        self.ensure_hooks(hooks_of(&handlers))?;
+        self.started = true;
         let fed = if self.finished { None } else { Some(*input) };
-        match self.handle.next(fed) {
+        let handle = &mut self.handle;
+        match with_handlers(handlers, None, |h| handle.next(fed, h)) {
             Next::Item(RawItem::Message(channel, payload)) => {
                 Ok(Some(DemuxItem::Message { channel, payload }))
             }
@@ -825,6 +1139,12 @@ impl Demux {
     /// message short (`octet_stream_truncated`). Refused, changing nothing,
     /// while fed bytes are left to drain.
     pub fn finish(&mut self) -> Result<()> {
+        self.finish_with(ReadHandlers::default())
+    }
+
+    /// [`finish`](Self::finish) with the handlers of
+    /// [`next_with`](Self::next_with), for the closing events.
+    pub fn finish_with(&mut self, handlers: ReadHandlers<'_>) -> Result<()> {
         if self.finished {
             return Err(Error::argument(
                 "the document is finished; reset() starts the next one",
@@ -833,8 +1153,11 @@ impl Demux {
         if self.handle.is_attached() {
             return Err(undrained());
         }
+        self.ensure_hooks(hooks_of(&handlers))?;
+        self.started = true;
         self.finished = true;
-        let ok = self.handle.finish();
+        let handle = &mut self.handle;
+        let ok = with_handlers(handlers, None, |h| handle.finish(h));
         let code = self.handle.error();
         if ok && code == 0 {
             Ok(())
@@ -866,14 +1189,33 @@ impl Demux {
     /// ids (and with them the 4096-channel count), the error and all progress
     /// are reset.
     pub fn reset(&mut self) -> Result<()> {
+        self.open(ffi::Hooks::default())
+    }
+
+    fn open(&mut self, hooks: ffi::Hooks) -> Result<()> {
         self.finished = false;
-        if self
-            .handle
-            .open(self.options.read.flags(), self.options.deliver_events)
-        {
+        self.started = false;
+        if self.handle.open(
+            self.options.read.flags(),
+            self.options.deliver_events,
+            hooks,
+        ) {
+            self.hooks = hooks;
             Ok(())
         } else {
             Err(Error::OutOfMemory("bvnr_demux_open_feed()"))
+        }
+    }
+
+    /// Re-opens a document no call has fed yet for the callbacks `needed`;
+    /// refuses a callback a started one was not opened with.
+    fn ensure_hooks(&mut self, needed: ffi::Hooks) -> Result<()> {
+        if self.hooks == needed || (self.started && self.hooks.covers(needed)) {
+            Ok(())
+        } else if self.started {
+            Err(hooks_fixed())
+        } else {
+            self.open(needed)
         }
     }
 }

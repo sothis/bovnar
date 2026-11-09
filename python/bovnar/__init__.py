@@ -40,7 +40,8 @@ from .exceptions import (
     BovnarParseError, BovnarWriteError, BovnarArgumentError,
 )
 from .reader   import (Reader, EventPayload, UnitPolicy, UnitRule,
-                       MAX_FILESIZE_BYTES, READ_OPTIONS)
+                       MAX_FILESIZE_BYTES, READ_OPTIONS,
+                       canonicalize, canonicalize_to)
 from .writer   import Writer
 from .dom      import DomDoc, DomNode, DomType
 from .quantity import Quantity
@@ -116,7 +117,7 @@ __all__ = [
     'BovnarError', 'BovnarLibraryNotFound',
     'BovnarParseError', 'BovnarWriteError', 'BovnarArgumentError',
 
-    'MAX_FILESIZE_BYTES', 'READ_OPTIONS',
+    'MAX_FILESIZE_BYTES', 'READ_OPTIONS', 'canonicalize', 'canonicalize_to',
 ]
 
 __version__ = '2.0.2'

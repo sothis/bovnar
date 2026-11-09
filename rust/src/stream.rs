@@ -126,6 +126,47 @@ pub fn load_documents_with_options(
     })
 }
 
+/// [`load_documents_with_options`] keeping each failed document's error:
+/// every frame is read, as with `continue_past_failed`, and a document that
+/// failed is the `Err` it failed with, at its index in the stream. The
+/// error is an [`Error::Parse`] with the document's error code and no
+/// position, which the frame reader does not report. The outer `Err` is
+/// the stream's own failure (the framing, a frame over the cap).
+///
+/// ```
+/// use bovnar::{ErrorCode, Value, ReadOptions, stream};
+///
+/// let frames = stream::frame_documents(&[&b".a = 1;"[..], b".a = @;", b".b = 2;"])?;
+/// let docs = stream::load_documents_results(&frames, false, 0, &ReadOptions::default())?;
+/// assert_eq!(docs.len(), 3);
+/// assert_eq!(docs[1].as_ref().unwrap_err().kind(), Some(ErrorCode::UnexpectedInputByte));
+/// assert_eq!(docs[2], Ok(Value::Struct(vec![("b".into(), Value::Int(2))])));
+/// # Ok::<(), bovnar::Error>(())
+/// ```
+pub fn load_documents_results(
+    data: &[u8],
+    typed: bool,
+    max_document_size: u64,
+    options: &ReadOptions,
+) -> Result<Vec<Result<Value>>> {
+    ffi::with_mem_source(data, |src| {
+        load_each(src, typed, true, max_document_size, options)
+    })
+}
+
+/// [`load_documents_results`] over any [`std::io::Read`], read as
+/// [`load_documents_reader`] reads it.
+pub fn load_documents_reader_results(
+    mut input: impl std::io::Read,
+    typed: bool,
+    max_document_size: u64,
+    options: &ReadOptions,
+) -> Result<Vec<Result<Value>>> {
+    io::from_reader(&mut input, |src| {
+        load_each(src, typed, true, max_document_size, options)
+    })
+}
+
 fn load_from(
     src: &mut BvnrSource,
     typed: bool,
@@ -133,6 +174,19 @@ fn load_from(
     max_document_size: u64,
     options: &ReadOptions,
 ) -> Result<Vec<Option<Value>>> {
+    let docs = load_each(src, typed, continue_past_failed, max_document_size, options)?;
+    Ok(docs.into_iter().map(Result::ok).collect())
+}
+
+/// Every document of the stream in `src`: its value, or the code it failed
+/// with.
+fn load_each(
+    src: &mut BvnrSource,
+    typed: bool,
+    continue_past_failed: bool,
+    max_document_size: u64,
+    options: &ReadOptions,
+) -> Result<Vec<Result<Value>>> {
     let parser = RefCell::new(DictParser::new(typed));
     let mut results = Vec::new();
     let mut on_event = |d: &EventData<'_>| {
@@ -140,9 +194,13 @@ fn load_from(
         true
     };
     let mut verified = wrap(&mut on_event);
-    let mut on_document = |_index: u64, ok: bool, _err: i32| {
+    let mut on_document = |_index: u64, ok: bool, err: i32| {
         let done = parser.replace(DictParser::new(typed));
-        results.push(ok.then(|| done.result()));
+        results.push(if ok {
+            Ok(done.result())
+        } else {
+            Err(Error::parse_code(err))
+        });
         true
     };
     let mut h = ffi::Handlers {

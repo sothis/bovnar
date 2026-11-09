@@ -27,6 +27,7 @@ the C library; `import bovnar` itself never loads it.
     - 4.6 [Streaming / framing (`bovnar.stream`)](#46-streaming--framing-bovnarstream)
     - 4.7 [Live streams: feeding in pieces](#47-live-streams-feeding-in-pieces)
     - 4.8 [Live streams: writing a message at a time](#48-live-streams-writing-a-message-at-a-time)
+    - 4.9 [Canonical form](#49-canonical-form)
 5. [Unit helpers](#5-unit-helpers)
     - 5.1 [The unit-profile notations (spec 1.2)](#51-the-unit-profile-notations-spec-12)
     - 5.2 [Extended unit functions](#52-extended-unit-functions)
@@ -72,6 +73,8 @@ the C library; `import bovnar` itself never loads it.
     - 12.7 [Array helpers](#127-array-helpers)
     - 12.8 [Low-level `emit`](#128-low-level-emit)
     - 12.9 [Octets, embedded documents and mux streams](#129-octets-embedded-documents-and-mux-streams)
+    - 12.10 [Observing the output: `on_event`](#1210-observing-the-output-on_event)
+    - 12.11 [Plain values, datetimes and type annotations](#1211-plain-values-datetimes-and-type-annotations)
 13. [DOM API](#13-dom-api)
     - 13.1 [`dom_parse(data) -> DomDoc`](#131-dom_parsedata---domdoc)
     - 13.2 [`DomDoc`](#132-domdoc)
@@ -397,6 +400,8 @@ from bovnar import stream
 blob = stream.dump_documents([{"id": 1}, {"id": 2}])   # list[dict] -> bytes
 docs = stream.load_documents(blob)                      # bytes -> list[dict]
 docs = stream.load_documents(blob, continue_past_failed=True)  # bad docs -> None
+docs = stream.load_documents(blob, continue_past_failed=True,
+                             return_errors=True)   # bad docs -> their error
 
 # Octet multiplexing: (channel, payload) of any size, interleaved & reassembled
 multiplexed = stream.mux_dump([(1, b"hello"), (42, b"world")])
@@ -405,6 +410,22 @@ messages    = stream.mux_load(multiplexed)             # [(1, b"hello"), (42, b"
 # Document-in-document
 outer = stream.embed_document(bovnar.dumps({"v": 1}), key="payload")
 inner = stream.parse_embedded(bovnar.loads(outer)["payload"])   # {"v": 1}
+```
+
+With `return_errors=True` a document that failed is the `BovnarParseError`
+it failed with instead of `None`: its `code` is the document's error code and
+its `index` the document's position in the stream (and in the list). The frame
+reader reports the code alone, so the error carries no position.
+`FrameFeed(parse=True, continue_past_failed=True, return_errors=True)` (§4.7)
+hands out the same.
+
+```python
+bad = stream.frame_documents([b".a = 1;", b".a = @;", b".b = 2;"])
+docs = stream.load_documents(bad, continue_past_failed=True,
+                             return_errors=True)
+docs[0]                              # → {'a': 1}
+docs[1].code.name                    # → 'UNEXPECTED_INPUT_BYTE'
+docs[1].index                        # → 1
 ```
 
 `parse_embedded` raises `BovnarParseError` carrying the inner document's own
@@ -450,12 +471,14 @@ stream and are handed bytes in pieces of any size, cut anywhere:
 All three take the read options of `Reader.read_mem` (`bovnar.READ_OPTIONS`,
 §11.2): `max_file_size`, the text, array, length and nesting caps,
 `continue_on_error`, `strict_version`, `text_only` and the rest. Besides those:
-`DocumentFeed` takes `typed`, `want_unit` and `on_error`; `DemuxFeed(key=None,
+`DocumentFeed` takes `typed`, `want_unit`, `on_error`, `on_unverified` and
+`mirror`; `DemuxFeed(key=None,
 max_message=0, typed=False, view=False)`, whose `recovery_count`,
 `skipped_bytes` and `declared_version` are those of its reader, as on
 `DocumentFeed`; `FrameFeed(parse=False, typed=False, continue_past_failed=False,
-max_document_size=0, view=False)`, where `typed`, `continue_past_failed` and
-the read options need `parse=True` (each parsed document is read under them,
+max_document_size=0, view=False, return_errors=False)`, where `typed`,
+`continue_past_failed`, `return_errors` (§4.6) and the read options need
+`parse=True` (each parsed document is read under them,
 `max_file_size` capping one document) and `view` needs `parse=False`
 (otherwise `BovnarArgumentError`). `DemuxFeed`'s `key=None` demultiplexes every
 octet stream of the document, as `mux_load` does, while `mux_dump` and
@@ -523,13 +546,30 @@ text of a fed document is capped as `Reader`'s is, at 2 147 483 647 bytes
 (`TEXT_DATA_TOO_LONG`, doc/10 §1), and an array at as many items: pass
 `max_text_bytes=stream.BVNR_NO_LIMIT` (and `max_array_items`) for a document
 that does not end. `DemuxFeed` and a parsing `FrameFeed` take both as well.
-`DocumentFeed` takes the read options of `Reader.read_mem` and its `want_unit`
-and `on_error`, not its event callbacks, which the feed's items stand in for;
-with `values=True`, `typed=True` gives `Quantity` values as
-`loads(typed=True)` does (`typed` without `values`, or neither `events` nor
-`values`, is refused). A `want_unit` or `on_error` callback runs inside the C
-call, so it may not close the feed or feed it again (`BovnarArgumentError`). One feed reads one
-document: make a new one for the next.
+`DocumentFeed` takes the read options of `Reader.read_mem` and its
+`want_unit`, `on_error`, `on_unverified` and `mirror`, but not `on_verified`,
+which the feed's items stand in for; with `values=True`, `typed=True` gives
+`Quantity` values as `loads(typed=True)` does (`typed` without `values`, or
+neither `events` nor `values`, is refused). `on_unverified(event, data)` sees
+the raw lexer events of the bytes each `feed()` hands over, inside that call:
+the events `Reader.read_mem(on_unverified=...)` delivers for the whole
+document, wherever it was cut. `mirror` receives the bytes the reader
+consumes, each piece once the reader has parsed it (§11.2). A `want_unit`,
+`on_error` or `on_unverified` callback runs inside the C call, so it may not
+close the feed or feed it again (`BovnarArgumentError`); an exception it
+raises, or one the mirror raises, comes out of the `feed()` or `finish()` it
+was raised in. One feed reads one document: make a new one for the next.
+
+```python
+raw = []
+mirrored = bytearray()
+feed = stream.DocumentFeed(events=False, values=True, mirror=mirrored,
+                           on_unverified=lambda ev, d: raw.append(ev.name))
+got = list(feed.feed(b'.a = ')) + list(feed.feed(b'1;')) + list(feed.finish())
+got                                  # → [('a', 1)]
+bytes(mirrored)                      # → b'.a = 1;'
+raw[:2]                              # → ['STREAM_START', 'ASSIGNMENT_START']
+```
 
 ```python
 frames = stream.FrameFeed(parse=True)
@@ -701,6 +741,53 @@ A flush per message costs a ctypes call and a Python call of the object's
 one per 64 KiB batched: about 3 µs on a small message, which is the price of
 the reader having it at once. Large messages are dominated by the copy either
 way.
+
+### 4.9 Canonical form
+
+`bovnar.canonicalize(data, *, pretty=False, **options)` re-serialises a
+document from its verified events through the C library's canonicalising
+observer (`bvnr_canon_observer_*`, doc/08 §3.6) and returns the bytes;
+`bovnar.canonicalize_to(data, out, *, pretty=False, **options)` writes them to
+`out` — a writable binary file object, a socket or a `bytearray` — as they are
+made, in 64 KiB pieces. `data` is bytes, or a socket or binary file object read
+to its end as the parse pulls it, so neither the input nor the output need be
+held whole.
+
+```python
+import bovnar
+
+doc = b'.a = 1 ;  # one\n.b = { .c = "x"; };'
+canon = bovnar.canonicalize(doc)
+canon                                # → b'.a=<uint:64,_10,no_unit>1;.b={.c=<utf8>"x";};'
+bovnar.canonicalize(canon) == canon  # → True
+bovnar.canonicalize(b'.b={.c="x";};.a=1; ') == bovnar.canonicalize(b'.a=1;.b={.c="x";};')  # → False
+```
+
+It is the form `bovnar events -d` prints (`-p` for `pretty=True`): the
+compact one is a single line with no whitespace outside literals, each value
+written with the annotation the reader gives it (`1` as
+`<uint:64,_10,no_unit>1`). Two documents that differ only in layout, comments
+and the spelling of separators canonicalise to the same bytes, and
+canonicalising the output again gives it back unchanged; the order of the keys
+is kept, so documents that differ in it stay apart. Units are written as the
+document spelled them: this is not `bovnar pretty-print --canonical`, which
+writes through a writer under `UnitFlags.REDUCE | UnitFlags.NUM_CANONICAL`
+and folds them to one form. A leading `#!bovnar M.N` directive is kept — for a
+stream it is found in the first bytes pulled, before the reader sees them.
+
+The keywords are the read options of `Reader.read_mem` (`bovnar.READ_OPTIONS`,
+§11.2), all `0` / `False` by default. A document the reader refuses raises
+`BovnarParseError` with the reader's code and position. Under
+`continue_on_error` a document the reader had to recover from raises it too,
+with the first error recovered from: the observer writes what it is fed, and
+the statement a recovery leaves without its value would make the output
+unreadable. An exception the input or `out` raises comes out unchanged; after
+an error `out` may hold the start of the output.
+
+The observer's C function is installed as the reader's `on_verified` itself,
+with the observer as its userdata, so no Python runs per event: Python is
+called for the output a 64 KiB piece at a time, and for the input of a
+stream a pull at a time.
 
 ---
 
@@ -1681,7 +1768,7 @@ nested parse, and close the first one after its read returns.
 
 ### 11.2 `read_mem`
 
-`read_mem(data, *, on_verified, on_unverified, want_unit, on_error, **options)`
+`read_mem(data, *, on_verified, on_unverified, want_unit, on_error, mirror, **options)`
 
 Parse BVNR from a `bytes`, `bytearray`, or `memoryview` object. The callbacks
 are named parameters; every other keyword is a **read option**, one of the
@@ -1698,6 +1785,7 @@ outside its C field (a negative one, `max_string_length=70000`) a
 | `on_verified` | `Callable[[Event, BvnrData \| None], bool] \| None` | `None` | Callback for validated events |
 | `on_unverified` | `Callable[[Event, BvnrData \| None], bool] \| None` | `None` | Callback for raw pre-validation events |
 | `on_error` | `Callable[[BovnarParseError], None] \| None` | `None` | Called for every error the reader reports, as a `BovnarParseError` with its code and position: under `continue_on_error`, each error it recovers from — reported nowhere else — and the error that ends a read, before the read raises it. Its return value is ignored; an exception it raises stops the read at the next event and is re-raised |
+| `mirror` | binary file object, socket or `bytearray` \| `None` | `None` | Receives every byte the reader consumes: the input mirror of `bvnr_open_read_source`, a debugging aid (below) |
 | `max_file_size` | `int` | `0` (unlimited) | Hard limit on bytes consumed |
 | `continue_on_error` | `bool` | `False` | Enable resync mode |
 | `strict_version` | `bool` | `False` | Reject a declared spec version newer than this build (`error_unsupported_spec_version`) |
@@ -1714,6 +1802,27 @@ outside its C field (a negative one, `max_string_length=70000`) a
 | `max_reference_length` | `int` | `0` (default 65535) | Longest reference (`REFERENCE_TOO_LONG`) |
 | `max_struct_nesting` | `int` | `0` (255) | Deepest struct nesting, at most 255 (`STRUCT_NESTING_TOO_HIGH`). `0` is the format's limit of 255, what the DOM and the CLI read at — not the C reader's own default of 64 |
 | `max_array_nesting` | `int` | `0` (255) | Deepest array nesting, as `max_struct_nesting` (`ARRAY_NESTING_TOO_HIGH`) |
+
+**The mirror.** `mirror=` — a writable binary file object (`write`), a socket
+(`sendall`) or a `bytearray`, which is appended to — is handed every byte the
+reader consumes, the comments and the octet-stream payloads included, so what
+it holds after a read that succeeded is the input. The bytes reach it a piece
+at a time, each once the reader has parsed it: a buffer pulled (up to 64 KiB),
+a piece fed to a `DocumentFeed`, an octet-stream chunk. A read that fails, or a
+callback stops, has mirrored the input up to the start of the piece it
+stopped in. An exception the object raises ends the read and is re-raised from
+it, unchanged. `read_fd`, `read_file`, `read_stream`, `iter_mem` and
+`DocumentFeed` (§4.7) take it too; the frame readers and the demux do not,
+as the C objects behind them take no mirror (their caller holds the bytes it
+feeds them).
+
+```python
+from bovnar import Reader
+
+seen = bytearray()
+Reader().read_mem(b'.a = 1;  # note\n', mirror=seen)
+bytes(seen)                          # → b'.a = 1;  # note\n'
+```
 
 The five length caps and the two nesting caps are for untrusted input: lower
 them to what the consumer can take. The length caps are the width of their C
@@ -1808,20 +1917,40 @@ to a `DocumentFeed` instead (§4.7).
 
 | Method | Description |
 |---|---|
-| `Writer.to_mem(buf=None, cap=4194304, *, pretty=True, unit_flags=0, emit_version=False)` | Write to an in-process buffer. `buf` may be a pre-allocated `bytearray`; when `None` an internal buffer of size `cap` is allocated. |
-| `Writer.to_fd(fd, *, pretty=True, unit_flags=0, emit_version=False)` | Write to an open POSIX file descriptor. |
-| `Writer.to_file(path, *, pretty=True, unit_flags=0, emit_version=False)` | Open `path` for writing (`O_WRONLY\|O_CREAT\|O_TRUNC`, mode `0o644`) and write to it; the fd is closed when the writer is finished or destroyed. |
-| `Writer.to_stream(stream, *, pretty=True, unit_flags=0, emit_version=False)` | Write to a socket (`sendall`) or a binary file object (`write`, repeated until it has taken every byte). Output is pushed a full 64 KiB buffer at a time and the rest at `flush()` or `finish()`, which then call the object's `flush` if it has one. An exception the object raises is re-raised from the write call that pushed. |
+| `Writer.to_mem(buf=None, cap=4194304, *, …)` | Write to an in-process buffer. `buf` may be a pre-allocated `bytearray`; when `None` an internal buffer of size `cap` is allocated. |
+| `Writer.to_fd(fd, *, …)` | Write to an open POSIX file descriptor. |
+| `Writer.to_file(path, *, …)` | Open `path` for writing (`O_WRONLY\|O_CREAT\|O_TRUNC`, mode `0o644`) and write to it; the fd is closed when the writer is finished or destroyed. |
+| `Writer.to_stream(stream, *, …)` | Write to a socket (`sendall`) or a binary file object (`write`, repeated until it has taken every byte). Output is pushed a full 64 KiB buffer at a time and the rest at `flush()` or `finish()`, which then call the object's `flush` if it has one. An exception the object raises is re-raised from the write call that pushed. |
 
-All four are used as context managers.  On clean exit (`exc_type is None`)
-the context manager calls `finish()` automatically.
+Each takes the keywords `pretty=True, unit_flags=0, emit_version=False,
+on_event=None, max_struct_nesting=0, max_array_nesting=0`. All four are used
+as context managers.  On clean exit (`exc_type is None`) the context manager
+calls `finish()` automatically.
 
 `unit_flags` takes [`UnitFlags`](#53-unitflags) — `REDUCE` rewrites each unit
 and rescales its value, `ASCII_EXP` writes `^N` exponents, `NUM_CANONICAL`
 keeps a rescaled float in float shape and writes annotations in one form. `emit_version=True` writes a leading
 `#!bovnar M.N` naming the spec version this build implements, as
-`write_version()` would. Every writer accepts structs and arrays nested up to
-**255** deep, the same limit `Reader` and `loads()` read at.
+`write_version()` would. By default every writer accepts structs and arrays
+nested up to **255** deep, the same limit `Reader` and `loads()` read at.
+`max_struct_nesting` and `max_array_nesting` (`bvnr_write_flags_t`, 1 to
+255; `0` is 255, as for the reader's options) lower it: a struct or an array
+one level deeper fails the write with `STRUCT_NESTING_TOO_HIGH` or
+`ARRAY_NESTING_TOO_HIGH`, and a value outside 0–255 is a
+`BovnarArgumentError`. `on_event` is the observer of §12.10.
+
+```python
+from bovnar import Writer, BovnarWriteError
+
+w = Writer.to_mem(max_struct_nesting=2)
+w.begin_struct("a")
+w.begin_struct("b")
+try:
+    w.begin_struct("c")
+except BovnarWriteError as e:
+    code = e.code.name
+code                                 # → 'STRUCT_NESTING_TOO_HIGH'
+```
 
 ### 12.2 Output retrieval
 
@@ -1838,6 +1967,21 @@ keeps a rescaled float in float shape and writes annotations in one form. `emit_
 All scalar writers accept keyword-only unit parameters.  Unit resolution
 priority: `unit_str` (parsed via `bvn_parse_unit_n`) → `unit_iec_base` →
 `unit_si_base` → `BVN_UNIT_NONE` (no annotation emitted).
+
+The unit is written in its canonical spelling: `unit_str="ucum:mL{total}"`
+comes out as `m~L`. Each numeric writer here and in §12.4 also takes
+`unit_source=`, the spelling to write instead, as `bvnr_writer_set_unit_source`
+gives one to the C helpers. The C writer checks that it spells the unit it is
+written for (and leaves it out under a `unit_flags` rewrite); a `unit_source`
+for a value without a unit is a `BovnarArgumentError`.
+
+```python
+w = Writer.to_mem(pretty=False, emit_version=True)   # a profile unit is spec 1.2
+w.write_float("vol", 5.0, unit_str="ucum:mL{total}",
+              unit_source="ucum:mL{total}")
+w.finish()
+w.get_output().split(b"\n")[1]       # → b'.vol=<float:64,ucum:mL{total}>5e+0;'
+```
 
 #### `write_uint(key, value, *, width=64, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR, unit_iec_base=None, unit_iec_prefix=IECPrefix.NONE)`
 
@@ -1972,6 +2116,89 @@ document being written rather than making a document of one key, as
 (`BovnarArgumentError`), a channel to the unsigned 64-bit range. On a
 `to_stream` writer, call `flush()` after `mux_send` for a consumer reading
 live (§4.8).
+
+### 12.10 Observing the output: `on_event`
+
+`on_event(event, data)`, given to any constructor (§12.1), is called with each
+event once it has been serialised (`bvnr_write_flags_t.on_event`), with what
+reached the output: under `UnitFlags.REDUCE` a rescaled value's new digits and
+unit, not the ones it was written with. Every event the writer serialises
+reaches it — those of the `write_*` methods, `emit`, the struct and array
+helpers, the mux and embedding calls. `data` is a `BvnrData` snapshot, as a
+reader callback gets (`None` for an event without one), which may be kept.
+
+```python
+from bovnar import Writer, UnitFlags
+
+seen = []
+w = Writer.to_mem(pretty=False, unit_flags=UnitFlags.REDUCE,
+                  on_event=lambda ev, d: seen.append((ev.name, d.raw_bytes())))
+w.write_uint("d", 5, unit_str="k~m")
+w.finish()
+w.get_output()                       # → b'.d=<uint:64,m>5000;'
+seen[0]                              # → ('ASSIGNMENT_START', b'd')
+seen[-1]                             # → ('DATA', b'5000')
+```
+
+Returning `False` (any false value but `None`) fails the write, and the
+writer, with `SCANNER_CALLBACK_FAILED`: a veto, say of a key that must not
+leave the process. An exception the observer raises fails it the same way and
+is re-raised from the write call that ran it, unchanged; a later call raises
+the latched `BovnarWriteError`, chained to that exception. The observer runs
+inside the C call, so it may not write to, flush, finish or destroy its own
+writer (`BovnarArgumentError`). It costs a Python call per event.
+
+### 12.11 Plain values, datetimes and type annotations
+
+```python
+from bovnar import Event, ValueTypeFamily, Writer, make_type_spec
+
+w = Writer.to_mem(pretty=False, emit_version=True)
+w.write_plain("mode", "auto")                     # a bare symbol
+w.write_datetime("t", 1750000000, epoch="tai")
+u8 = make_type_spec(ValueTypeFamily.UINT, 8)
+w.emit(Event.ASSIGNMENT_START, key="v")
+w.write_type_annotation(u8, "m")                  # types the whole array
+w.begin_array_row()
+w.emit(Event.DATA, value="1", vt=u8)
+w.emit(Event.DATA, value="2", vt=u8)
+w.end_array_row()
+w.finish()
+w.get_output().split(b"\n")[1]      # → b'.mode=auto;.t=<datetime:64,tai>1750000000;.v=<uint:8,m>[1,2];'
+```
+
+`write_plain(key, value)` writes `value` bare, as a plain symbol
+(`bvnr_write_plain`): `.mode = auto;`. The C writer refuses a value that is
+not a symbol (`ILLEGAL_SYMBOL`); a NUL in it is a `BovnarArgumentError`.
+
+`write_datetime(key, value, *, width=64, epoch=None)` writes `value`, signed
+seconds since `epoch` (`"unix"`, the default, `"tai"`, `"gps"`, `"mjd"`,
+`"ntp"`, `"galileo"`, `"glonass"`, `"y2000"`, `"beidou"`), as
+`<datetime:width[,epoch]>` (`bvnr_write_datetime`). Datetime is spec 1.1, so the
+document must declare it first — `emit_version=True`, or `write_version()`
+before any value; without that the write fails with `UNSUPPORTED_SPEC_VERSION`,
+the key already in the output and the writer in its error state. An epoch the
+library does not know is a `BovnarArgumentError`, raised before anything is
+written. A datetime with a sub-second fraction is written by `dumps()` from a
+`Quantity` (§6.4).
+
+`write_type_annotation(vt, unit=None, *, unit_source=None)` writes the type
+annotation `<family:width[,_base|,qQ|,epoch][,unit]>` for the value written
+next (`bvnr_write_type_annotation`): after an assignment's key, with `emit`
+sending the value, or before an array's first row, where it types the whole
+array. `unit` is a `Unit`, a `ValueUnit` or a unit string, `unit_source` its
+spelling as in §12.3. As for the typed writers, only the parameters that say
+something are written: no width of 0, no base 10, no unit on a string or a
+datetime.
+
+The other per-type C helpers have their counterpart above: `bvnr_write_string`,
+`_null` and `_bool` in `write_string`, `write_null` and `write_bool`;
+`bvnr_write_uint`, `_sint`, `_float`, `_float_fix`, `_float_dec` and their
+`_unit` forms in the methods of §12.3; `bvnr_write_bvnf`, `_bvnf_unit`,
+`_bvnf_base`, `_bvnf_base_unit`, `bvnr_write_bvni` and `_bvni_unit` in
+`write_bvnf_base` and `write_bvni` (§12.4); `bvnr_write_struct_start` and
+`_end` in `begin_struct` and `end_struct` (§12.5); `bvnr_writer_set_unit_source`
+in `unit_source=`.
 
 ---
 

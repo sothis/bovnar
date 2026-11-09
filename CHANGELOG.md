@@ -215,11 +215,70 @@ API and implements spec 1.2.
     a mux stream can sit inside a document of any shape — values after it,
     more than one stream — as Rust's `Writer` could already write;
     `Writer.embed_document` (`bvnr_embed_document`) and `Writer.write_octets`.
-  - Left unwrapped on purpose: the C DOM's tree builder, which is for the
-    library's test fixtures and makes a tree that cannot be written out (now
-    said so in doc/09 and doc/14); the per-type `bvnr_write_*` helpers and the
-    low-level bignum, float and digit helpers, which both bindings implement
-    on their own terms.
+- **Civil time and calendars in both bindings.** `bovnar.timekeeping`
+  (Python) and `bovnar::timekeeping` (Rust) bind `bvn_datetime.h` and
+  `bvn_gregorian_date.h`: `GregorianDate`, `CivilDateTime` and `Epoch`. They
+  convert epoch seconds to and from civil time and between epochs, read GPS and
+  Galileo week + time of week, and convert UTC to and from TAI with the
+  leap-second table (`23:59:60` round-trips). They also give local time at a
+  given offset and the European summer-time test. On the calendar side they
+  cover MJD, weekday, day of year, Easter and the movable feasts, the German
+  federal holidays, banking and business days, the first/mid/penultimate/last
+  banking day of a month or quarter, and the German summer-time switch days.
+  `Quantity.to_civil()` / `Quantity::to_civil()` give a datetime value's UTC
+  time, as the reader and writer convert ISO literals. Out-of-range input and
+  overflow raise `BovnarArgumentError` / return `Error::Argument` instead of
+  C's sentinels. Not bound: `bvn_gregorian_date_to_mjd_fast` (undefined
+  outside its range; `to_mjd()` is the checked form), `bvn_dt_dump` and
+  `bvn_dt_print` (they print to stdout).
+- **Literal helpers, the type-annotation parser and the DOM builder in both
+  bindings.**
+  - The C validators and literal helpers as `bovnar.literals` /
+    `bovnar::literals` (`validate_identifier` … `validate_string`,
+    `char_to_digit`, `min_digits_for_type`, `format_*`, `parse_*`,
+    `escape_repl_table`), and `parse_type_annotation`
+    (`bvn_parse_type_annotation`), whose refusal carries the reader's code for
+    the same annotation (`illegal_value_type`, `unit_too_long`, or the unit's
+    code). Not bound: `bvn_looks_like_double`, which calls `deadbeef` a float.
+  - The DOM builder (`bvn_dom_doc_create`, `bvn_dom_node_alloc`,
+    `bvn_dom_node_from_*`, `bvn_dom_struct_add`, `bvn_dom_array_append`,
+    `bvn_dom_doc_add`). Python has `DomDoc.create()`, `doc.add()` and `NewNode`
+    (spent once attached); Rust has `DomDoc::create()`, `add()`, `NewNode`,
+    `NewStruct` and `NewArray` (moved on attach, so attaching twice does not
+    compile). Built trees read through the existing getters.
+  - `UnitConversion` reports `bvn_unit_convert_factor`'s `ok`: a field `ok`
+    (default `True`) in Python, a method `ok()` in Rust.
+  - Nothing new from `bvn_int.h` / `bvn_float.h`: every capability is in the
+    bindings' own exact numbers (Python `int` / `Fraction` / `BvnFloat`, Rust
+    num-bigint / `BigRational` / `BvnFloat`).
+- **Reader, writer and stream plumbing in both bindings.**
+  - *Both:* the writer's `on_event` observer, called after each event is
+    serialised with what reached the output (a `REDUCE` rescale's digits and
+    unit); false, an exception or a panic fails the write with
+    `scanner_callback_failed`. The writer's `max_struct_nesting` /
+    `max_array_nesting`, fixed at 255 until now, are settable (0 is 255). The
+    reader's input mirror (`src_mirror`). `canonicalize`, the canonical form of
+    the canonicalising observer (`bvnr_canon_observer_*`, installed as
+    `on_verified` itself, so nothing runs per event), byte for byte what
+    `bovnar events -d` prints; the version directive is kept, and a document
+    read with recovered errors is refused. A failed framed document keeps its
+    error code.
+  - *Rust:* `WriteOptions` with `Writer::to_mem_with_options` /
+    `to_writer_with_options`; `Reader::read_mem_mirror` / `read_reader_mirror`;
+    `live::DocumentFeed` / `ValueFeed` `set_mirror` / `take_mirror`;
+    `canonicalize` / `canonicalize_reader`; `feed_with` / `finish_with` on
+    `DocumentFeed` and `ValueFeed`, `FrameParser::feed_with`,
+    `Demux::next_with` / `finish_with`, taking a `ReadHandlers`
+    (`on_unverified`, `want_unit` and `on_error` were unreachable on the live
+    feeds); `stream::load_documents_results` / `load_documents_reader_results`.
+  - *Python:* `on_event=`, `max_struct_nesting=`, `max_array_nesting=` on every
+    `Writer` constructor; `mirror=` on the `Reader` methods and `DocumentFeed`,
+    and `on_unverified=` on `DocumentFeed`; `bovnar.canonicalize` /
+    `canonicalize_to`; `return_errors=` on `load_documents` and
+    `FrameFeed(parse=True)`; `Writer.write_plain`, `write_datetime`,
+    `write_type_annotation`, and `unit_source=` on the numeric writers.
+  - The per-type `bvnr_write_*` helpers not named above are covered by the
+    bindings' own writer methods (doc/09 §12.11, doc/14 §11.10).
 
 ### Changed
 

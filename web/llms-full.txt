@@ -1497,7 +1497,8 @@ The epoch parameter is one of `unix` (default), `tai`, `gps`, `mjd`, `ntp`,
 (negative = before the epoch); a numeric base/unit/`q` is `error_illegal_value_type`
 and a fractional value is `error_type_value_mismatch`. Being a 1.1 feature it
 requires a `#!bovnar 1.1` declaration. Convert to civil time with the
-`bvn_datetime.h` helpers.
+`bvn_datetime.h` helpers, which the Python and Rust bindings carry as
+`bovnar.timekeeping` / `bovnar::timekeeping`.
 
 You can also write the value as an **ISO-8601 literal** instead of a raw
 integer — `2026-06-15`, `2026-06-15T12:00:00`, a trailing `Z`, or a numeric
@@ -14272,6 +14273,7 @@ the C library; `import bovnar` itself never loads it.
     - 4.6 [Streaming / framing (`bovnar.stream`)](#46-streaming--framing-bovnarstream)
     - 4.7 [Live streams: feeding in pieces](#47-live-streams-feeding-in-pieces)
     - 4.8 [Live streams: writing a message at a time](#48-live-streams-writing-a-message-at-a-time)
+    - 4.9 [Canonical form](#49-canonical-form)
 5. [Unit helpers](#5-unit-helpers)
     - 5.1 [The unit-profile notations (spec 1.2)](#51-the-unit-profile-notations-spec-12)
     - 5.2 [Extended unit functions](#52-extended-unit-functions)
@@ -14280,11 +14282,13 @@ the C library; `import bovnar` itself never loads it.
     - 5.5 [Inline unit suffix](#55-inline-unit-suffix)
     - 5.6 [`UnitPolicy` — validation and conversion without a callback](#56-unitpolicy--validation-and-conversion-without-a-callback)
     - 5.7 [Building a `ValueUnit`](#57-building-a-valueunit)
+    - 5.8 [Validators and literal helpers](#58-validators-and-literal-helpers)
 6. [`Quantity`](#6-quantity)
     - 6.1 [Construction](#61-construction)
     - 6.2 [Properties and methods](#62-properties-and-methods)
     - 6.3 [Lossless numeric access (`float_dec`, `float_fix`, `float:128`/`256`)](#63-lossless-numeric-access-float_dec-float_fix-float128256)
     - 6.4 [`dumps()` integration](#64-dumps-integration)
+    - 6.5 [Civil time and calendars](#65-civil-time-and-calendars)
 7. [`write_array` helper](#7-write_array-helper)
 8. [pint bridge](#8-pint-bridge)
     - 8.1 [Prefixes ride in the unit, never the magnitude](#81-prefixes-ride-in-the-unit-never-the-magnitude)
@@ -14317,11 +14321,14 @@ the C library; `import bovnar` itself never loads it.
     - 12.7 [Array helpers](#127-array-helpers)
     - 12.8 [Low-level `emit`](#128-low-level-emit)
     - 12.9 [Octets, embedded documents and mux streams](#129-octets-embedded-documents-and-mux-streams)
+    - 12.10 [Observing the output: `on_event`](#1210-observing-the-output-on_event)
+    - 12.11 [Plain values, datetimes and type annotations](#1211-plain-values-datetimes-and-type-annotations)
 13. [DOM API](#13-dom-api)
     - 13.1 [`dom_parse(data) -> DomDoc`](#131-dom_parsedata---domdoc)
     - 13.2 [`DomDoc`](#132-domdoc)
     - 13.3 [`DomNode`](#133-domnode)
     - 13.4 [`DomType`](#134-domtype)
+    - 13.5 [Building a tree (`NewNode`)](#135-building-a-tree-newnode)
 14. [Running the test suite](#14-running-the-test-suite)
 15. [Package layout](#15-package-layout)
 16. [Error handling](#16-error-handling)
@@ -14642,6 +14649,8 @@ from bovnar import stream
 blob = stream.dump_documents([{"id": 1}, {"id": 2}])   # list[dict] -> bytes
 docs = stream.load_documents(blob)                      # bytes -> list[dict]
 docs = stream.load_documents(blob, continue_past_failed=True)  # bad docs -> None
+docs = stream.load_documents(blob, continue_past_failed=True,
+                             return_errors=True)   # bad docs -> their error
 
 # Octet multiplexing: (channel, payload) of any size, interleaved & reassembled
 multiplexed = stream.mux_dump([(1, b"hello"), (42, b"world")])
@@ -14650,6 +14659,22 @@ messages    = stream.mux_load(multiplexed)             # [(1, b"hello"), (42, b"
 # Document-in-document
 outer = stream.embed_document(bovnar.dumps({"v": 1}), key="payload")
 inner = stream.parse_embedded(bovnar.loads(outer)["payload"])   # {"v": 1}
+```
+
+With `return_errors=True` a document that failed is the `BovnarParseError`
+it failed with instead of `None`: its `code` is the document's error code and
+its `index` the document's position in the stream (and in the list). The frame
+reader reports the code alone, so the error carries no position.
+`FrameFeed(parse=True, continue_past_failed=True, return_errors=True)` (§4.7)
+hands out the same.
+
+```python
+bad = stream.frame_documents([b".a = 1;", b".a = @;", b".b = 2;"])
+docs = stream.load_documents(bad, continue_past_failed=True,
+                             return_errors=True)
+docs[0]                              # → {'a': 1}
+docs[1].code.name                    # → 'UNEXPECTED_INPUT_BYTE'
+docs[1].index                        # → 1
 ```
 
 `parse_embedded` raises `BovnarParseError` carrying the inner document's own
@@ -14695,12 +14720,14 @@ stream and are handed bytes in pieces of any size, cut anywhere:
 All three take the read options of `Reader.read_mem` (`bovnar.READ_OPTIONS`,
 §11.2): `max_file_size`, the text, array, length and nesting caps,
 `continue_on_error`, `strict_version`, `text_only` and the rest. Besides those:
-`DocumentFeed` takes `typed`, `want_unit` and `on_error`; `DemuxFeed(key=None,
+`DocumentFeed` takes `typed`, `want_unit`, `on_error`, `on_unverified` and
+`mirror`; `DemuxFeed(key=None,
 max_message=0, typed=False, view=False)`, whose `recovery_count`,
 `skipped_bytes` and `declared_version` are those of its reader, as on
 `DocumentFeed`; `FrameFeed(parse=False, typed=False, continue_past_failed=False,
-max_document_size=0, view=False)`, where `typed`, `continue_past_failed` and
-the read options need `parse=True` (each parsed document is read under them,
+max_document_size=0, view=False, return_errors=False)`, where `typed`,
+`continue_past_failed`, `return_errors` (§4.6) and the read options need
+`parse=True` (each parsed document is read under them,
 `max_file_size` capping one document) and `view` needs `parse=False`
 (otherwise `BovnarArgumentError`). `DemuxFeed`'s `key=None` demultiplexes every
 octet stream of the document, as `mux_load` does, while `mux_dump` and
@@ -14768,13 +14795,30 @@ text of a fed document is capped as `Reader`'s is, at 2 147 483 647 bytes
 (`TEXT_DATA_TOO_LONG`, doc/10 §1), and an array at as many items: pass
 `max_text_bytes=stream.BVNR_NO_LIMIT` (and `max_array_items`) for a document
 that does not end. `DemuxFeed` and a parsing `FrameFeed` take both as well.
-`DocumentFeed` takes the read options of `Reader.read_mem` and its `want_unit`
-and `on_error`, not its event callbacks, which the feed's items stand in for;
-with `values=True`, `typed=True` gives `Quantity` values as
-`loads(typed=True)` does (`typed` without `values`, or neither `events` nor
-`values`, is refused). A `want_unit` or `on_error` callback runs inside the C
-call, so it may not close the feed or feed it again (`BovnarArgumentError`). One feed reads one
-document: make a new one for the next.
+`DocumentFeed` takes the read options of `Reader.read_mem` and its
+`want_unit`, `on_error`, `on_unverified` and `mirror`, but not `on_verified`,
+which the feed's items stand in for; with `values=True`, `typed=True` gives
+`Quantity` values as `loads(typed=True)` does (`typed` without `values`, or
+neither `events` nor `values`, is refused). `on_unverified(event, data)` sees
+the raw lexer events of the bytes each `feed()` hands over, inside that call:
+the events `Reader.read_mem(on_unverified=...)` delivers for the whole
+document, wherever it was cut. `mirror` receives the bytes the reader
+consumes, each piece once the reader has parsed it (§11.2). A `want_unit`,
+`on_error` or `on_unverified` callback runs inside the C call, so it may not
+close the feed or feed it again (`BovnarArgumentError`); an exception it
+raises, or one the mirror raises, comes out of the `feed()` or `finish()` it
+was raised in. One feed reads one document: make a new one for the next.
+
+```python
+raw = []
+mirrored = bytearray()
+feed = stream.DocumentFeed(events=False, values=True, mirror=mirrored,
+                           on_unverified=lambda ev, d: raw.append(ev.name))
+got = list(feed.feed(b'.a = ')) + list(feed.feed(b'1;')) + list(feed.finish())
+got                                  # → [('a', 1)]
+bytes(mirrored)                      # → b'.a = 1;'
+raw[:2]                              # → ['STREAM_START', 'ASSIGNMENT_START']
+```
 
 ```python
 frames = stream.FrameFeed(parse=True)
@@ -14947,6 +14991,53 @@ one per 64 KiB batched: about 3 µs on a small message, which is the price of
 the reader having it at once. Large messages are dominated by the copy either
 way.
 
+### 4.9 Canonical form
+
+`bovnar.canonicalize(data, *, pretty=False, **options)` re-serialises a
+document from its verified events through the C library's canonicalising
+observer (`bvnr_canon_observer_*`, doc/08 §3.6) and returns the bytes;
+`bovnar.canonicalize_to(data, out, *, pretty=False, **options)` writes them to
+`out` — a writable binary file object, a socket or a `bytearray` — as they are
+made, in 64 KiB pieces. `data` is bytes, or a socket or binary file object read
+to its end as the parse pulls it, so neither the input nor the output need be
+held whole.
+
+```python
+import bovnar
+
+doc = b'.a = 1 ;  # one\n.b = { .c = "x"; };'
+canon = bovnar.canonicalize(doc)
+canon                                # → b'.a=<uint:64,_10,no_unit>1;.b={.c=<utf8>"x";};'
+bovnar.canonicalize(canon) == canon  # → True
+bovnar.canonicalize(b'.b={.c="x";};.a=1; ') == bovnar.canonicalize(b'.a=1;.b={.c="x";};')  # → False
+```
+
+It is the form `bovnar events -d` prints (`-p` for `pretty=True`): the
+compact one is a single line with no whitespace outside literals, each value
+written with the annotation the reader gives it (`1` as
+`<uint:64,_10,no_unit>1`). Two documents that differ only in layout, comments
+and the spelling of separators canonicalise to the same bytes, and
+canonicalising the output again gives it back unchanged; the order of the keys
+is kept, so documents that differ in it stay apart. Units are written as the
+document spelled them: this is not `bovnar pretty-print --canonical`, which
+writes through a writer under `UnitFlags.REDUCE | UnitFlags.NUM_CANONICAL`
+and folds them to one form. A leading `#!bovnar M.N` directive is kept — for a
+stream it is found in the first bytes pulled, before the reader sees them.
+
+The keywords are the read options of `Reader.read_mem` (`bovnar.READ_OPTIONS`,
+§11.2), all `0` / `False` by default. A document the reader refuses raises
+`BovnarParseError` with the reader's code and position. Under
+`continue_on_error` a document the reader had to recover from raises it too,
+with the first error recovered from: the observer writes what it is fed, and
+the statement a recovery leaves without its value would make the output
+unreadable. An exception the input or `out` raises comes out unchanged; after
+an error `out` may hold the start of the output.
+
+The observer's C function is installed as the reader's `on_verified` itself,
+with the observer as its userdata, so no Python runs per event: Python is
+called for the output a 64 KiB piece at a time, and for the input of a
+stream a pull at a time.
+
 ---
 
 ## 5. Unit helpers
@@ -15079,7 +15170,8 @@ ok = units_compatible(vu_a, vu_b)     # b vs B is False — the dimensions agree
 
 # Conversion factor between two compatible units
 c = unit_convert_factor(vu_from, vu_to)
-# c.factor, c.requires_affine
+# c.factor, c.requires_affine, c.ok — ok is False (and factor 0.0) for an
+# affine conversion whose offsets do not cancel, °C → K: use convert_value
 
 # 7-element SI dimension exponent vector [m, kg, s, A, K, mol, cd]
 dims = unit_dimension_vector(vu)       # e.g. [1, 0, -1, 0, 0, 0, 0] for m/s
@@ -15406,6 +15498,130 @@ unit_to_str(make_unit_dimensionless())   # 'no_unit'
 bytes(make_unit_none()) != bytes(make_unit_dimensionless())   # True
 ```
 
+### 5.8 Validators and literal helpers
+
+`bovnar.literals` binds the C library's checks and literal helpers
+(`bovnar.h`): the tests the writer applies to keys, symbols, references and
+numbers, the integer and float parsers and formatters behind it, and the parser
+of a type annotation. Each function is the C function of the same name without
+its `bvn_` prefix, and answers as it does. Text holding NUL is none of the
+things they check: a validator answers `False` for it, a parser raises.
+
+**Type annotations.** `parse_type_annotation(text)` parses the text between the
+angle brackets, as the reader does, into a frozen `TypeAnnotation` of
+`value_type` (a `ValueTypeSpec`), `unit` (a `ValueUnit`, with no components when
+there is no unit or it is spelled `no_unit`) and `unit_source` (the unit
+parameter as written, `''` when there is none):
+
+```python
+from bovnar import literals, BovnarParseError
+
+a = literals.parse_type_annotation("uint:32,_16,k~g")
+a.value_type.width, a.value_type.base     # → (32, 16)
+a.unit                                    # → "k~g"
+a.unit_source                             # → "k~g"
+literals.parse_type_annotation("float:64,ucum:mL{total}").unit_source   # → "ucum:mL{total}"
+
+try:
+    literals.parse_type_annotation("uint:8,_16,_16")    # a base given twice
+except BovnarParseError as e:
+    refused = e.code
+refused.name                              # → "ILLEGAL_VALUE_TYPE"
+```
+
+A refusal is a `BovnarParseError` whose `code` is the one the reader gives the
+same annotation in a document, so it tells the C function's three flags apart:
+
+| `code` | C flags | Cause |
+|---|---|---|
+| `ILLEGAL_VALUE_TYPE` | `type_ok` false | An unknown family, an empty or repeated parameter, a parameter the family does not take (a base on `float_fix`, a width on `bool`), a width or base out of range |
+| `UNIT_TOO_LONG` | `unit_ok` false, `unit_too_long` true | A unit parameter over 255 bytes |
+| `UNIT_ILLEGAL`, `UNIT_PROFILE_UNKNOWN`, `UNIT_PROFILE_UNSUPPORTED` | `unit_ok` false | A unit parameter that is not a unit this build knows; the code is the one `unit_error_code()` gives it (§5.1) |
+
+The reader's version gates are not applied: `datetime` (spec 1.1) and a profile
+unit (spec 1.2) parse here whatever version a document declares. A `datetime`'s
+epoch is no unit: its index is in `value_type.base` (`datetime_epoch_index`,
+§19), as a `float_fix`'s q is.
+
+**Validators.** Each returns a `bool`:
+
+| Function | `True` for |
+|---|---|
+| `validate_identifier(s)` | A key: an ASCII letter, `_` or a character from U+00C0 on, then no space, control character, U+0080 to U+00BF, or punctuation spec §4.2 forbids (`-` and `+` are allowed). No length limit: the reader's `max_identifier_length` (255) is separate |
+| `validate_symbol(s)` | A symbol, which is spelled as a key is |
+| `validate_reference(s)` | A path such as `.a.b[0]`, without the `&`: identifier segments, each with optional `[digits]` indexes |
+| `validate_number(s)` | A decimal number: an optional `-`, digits with at most one `.`, an optional `e`/`E` exponent. No `+`, and not `inf` |
+| `is_special_number_string(s)` | Exactly `inf`, `ninf` or `nan` |
+| `validate_digits_for_base(s, base)` | An integer literal: an optional `-` and digits of `base` (no sign at all in bases 64 and 85, where `+` and `-` are digits) |
+| `validate_number_in_base(s, base)` | A quoted float literal: either sign, digits of `base` with at most one `.`, and an exponent marked `e` (bases up to 14) or `p` (the power-of-two bases up to 16) |
+| `validate_uint_range(s, width, base=10)` / `validate_sint_range(s, width, base=10)` | A literal that fits `width` bits (0: any width); `inf`, `ninf` and `nan` pass |
+| `validate_string(data)` | Bytes that are well-formed UTF-8 |
+
+```python
+literals.validate_identifier("max-speed")      # → True
+literals.validate_identifier("max.speed")      # → False
+literals.validate_reference(".axis[2].unit")   # → True
+literals.validate_number("+1")                 # → False
+literals.validate_digits_for_base("-ff", 16)   # → True
+literals.validate_uint_range("256", 8)         # → False
+literals.validate_sint_range("-80", 8, 16)     # → True
+```
+
+Three of them are narrower than their names. The range checks test the range
+only, on text the digit check has already passed: `validate_uint_range("", 8)`
+and `validate_uint_range(" 5", 8)` are `True`. `validate_digits_for_base` does
+not check the base against the ones a type may declare: in base 1 the one digit
+is `0`. And `validate_string` is the same test as `data.decode('utf-8')`; NUL and
+the other control bytes the writer refuses in a string pass it.
+
+**Digits.** `char_to_digit(ch, base)` is the value of one digit, `None` when it
+is no digit of `base`: up to base 36 a letter's case does not matter, above it
+`A` to `Z` are 36 to 61, and bases 64 and 85 use the Base64 and Ascii85
+alphabets. `min_digits_for_type(vt)` is how many digits of the type's base the
+largest value of an integer type of up to 64 bits takes; 0 for a width of 0 or
+above 64, and a float type is answered as if it were an unsigned integer of its
+width.
+
+```python
+from bovnar import make_type_spec, ValueTypeFamily
+
+literals.char_to_digit("Z", 62)     # → 61
+literals.char_to_digit("g", 16)     # → None
+literals.min_digits_for_type(make_type_spec(ValueTypeFamily.UINT, 8, 16))   # → 2
+```
+
+**Parsing and formatting.** These are the functions the writer and the DOM use.
+Each raises `BovnarArgumentError` where the C one returns `false` or -1:
+
+| Function | Result |
+|---|---|
+| `parse_int64(s, vt)` / `parse_uint64(s, vt)` | The integer literal in the type's base; refused when it does not fit the type's width (64 when it declares none), and for a `+` or a space before it |
+| `parse_double(s, vt)` / `parse_double_in_base(s, base)` | The float literal (base 10 or 16; `inf`, `ninf` and `nan`, not `-inf`) as the nearest double, rounded once from its exact value |
+| `format_uint64(value, base=10, min_digits=0)` / `format_int64(...)` | The digits in base 2 to 62, 64 or 85, padded with zero digits to `min_digits` (which the C function caps at 64). A negative value has no form in bases 64 and 85 |
+| `format_double(value, vt)` | The literal the writer emits under `vt`: the shortest digits that read back to the same double, in base 10 or 16 (any other base raises). A `float` width below 53 rounds first to a significand of that many bits: 16 for `float:16` and 32 for `float:32`, not IEEE binary16's 11 and binary32's 24 |
+| `escape_repl_table()` | A `dict` of each escape letter to the character it stands for: `t`, `n`, `v`, `f`, `r`, `"` and `\`. The `\x` and `\u` escapes of spec 1.1 take digits and are not in it |
+
+```python
+u8 = make_type_spec(ValueTypeFamily.UINT, 8, 0)
+f64 = make_type_spec(ValueTypeFamily.FLOAT, 64, 0)
+literals.parse_uint64("255", u8)        # → 255
+literals.format_double(0.1, f64)        # → "1e-1"
+literals.parse_double("1e-1", f64)      # → 0.1
+literals.format_uint64(5, 2, 8)         # → "00000101"
+literals.escape_repl_table()["t"]       # → "\t"
+```
+
+> **`0x` in base 16.** In bases up to 36 the integer parsers are `strtoll` and
+> `strtoull`, which take a `0x` prefix in base 16:
+> `parse_uint64("0x10", make_type_spec(ValueTypeFamily.UINT, 64, 16))` is 16,
+> though no document can carry that literal (the reader refuses `0x10`). Check
+> with `validate_digits_for_base` first where that matters.
+
+`bvn_looks_like_double` is not bound. It answers whether the text contains one
+of `.`, `e`, `E`, `p` and `P`, so `deadbeef` looks like a float to it and `inf`
+does not: a shortcut for the writer's own output, not a test of text from
+anywhere else.
+
 ---
 
 ## 6. `Quantity`
@@ -15474,6 +15690,7 @@ is stored under the format's own spelling (`inf`, `ninf`, `nan`).
 | `q.ieee_bits` | `bytes` | IEEE-754 interchange bytes (binary16…256 for `float`, decimal16…256 for `float_dec`), little-endian word order |
 | `q.epoch_name` | `str \| None` | For a `datetime`, the epoch name (`"unix"`, `"tai"`, …); `None` otherwise |
 | `q.epoch_mjd` | `int \| None` | For a `datetime`, the epoch's Modified Julian Day; `None` otherwise |
+| `q.to_civil()` | `CivilDateTime` | For a `datetime`, its UTC date and time ([§6.5](#65-civil-time-and-calendars)); raises otherwise |
 | `q.datetime_fraction` | `str \| None` | For a `datetime` written as a literal with a fractional second, the verbatim sub-second digits (spec 1.1); `None` otherwise |
 | `q.unit_source` | `str \| None` | The unit exactly as the document spelled it (library 2.0) — `ucum:mL{total}` where `q.unit` is `m~L`. Set by `loads(typed=True)`, or by the `unit_source=` constructor argument; `dumps()` writes it back, and refuses one that does not parse to `q.unit` — including a spelling on a `Quantity` that has no unit at all. `None` writes the canonical form |
 
@@ -15541,6 +15758,111 @@ result passes the *document* tier: `dumps()` writes what `loads()` reads, and
 `loads()` reads heterogeneous and ragged arrays that `dom_parse` and
 `bovnar validate` refuse. See the note in
 [§4.1](#41-high-level-api-loads--dumps).
+
+
+### 6.5 Civil time and calendars
+
+A `datetime` value is a count of seconds since its epoch
+([§19](#19-spec-11-additions)). `bovnar.timekeeping` turns such counts into
+civil dates and times and back, and carries the rest of the C library's
+calendar: `bvn_datetime.h` and `bvn_gregorian_date.h`. Every result is computed
+by the C functions, so the binding gives the answers the reader and writer use
+when they read and print an ISO literal. Nothing is read from the host's time
+zone or clock.
+
+```python
+import bovnar
+from bovnar.timekeeping import (
+    CivilDateTime, Epoch, GregorianDate, easter_sunday, epoch_seconds_to_utc,
+    tai_second_is_dls_in_europe, tai_seconds_to_local_time, tai_seconds_to_utc,
+    utc_to_tai_seconds,
+)
+
+q = bovnar.loads(b'#!bovnar 1.1\n.t = <datetime:64,tai> 1861920036;',
+                 typed=True)['t']
+str(q.to_civil())                                   # → '2016-12-31T23:59:60'
+
+leap = CivilDateTime(2016, 12, 31, 23, 59, 60)
+utc_to_tai_seconds(leap)                            # → 1861920036
+str(tai_seconds_to_utc(1861920037))                 # → '2017-01-01T00:00:00'
+str(epoch_seconds_to_utc(1750000000, Epoch.UNIX))   # → '2025-06-15T15:06:40'
+
+t = utc_to_tai_seconds(CivilDateTime(2024, 7, 1, 12))
+str(tai_seconds_to_local_time(t, 3600, tai_second_is_dls_in_europe(t)))  # → '2024-07-01T14:00:00'
+
+GregorianDate(2000, 1, 1).to_mjd()                  # → 51544
+str(GregorianDate.normalize(2024, 2, 30))           # → '2024-03-01'
+str(easter_sunday(2025))                            # → '2025-04-20'
+GregorianDate(2024, 3, 29).is_federal_holiday_in_germany()      # → True  (Good Friday)
+str(GregorianDate(2024, 3, 5).last_banking_day_in_month())      # → '2024-03-28'
+```
+
+**The types.** `GregorianDate(year, month, day)` is a date of the proleptic
+Gregorian calendar (`bvn_gregorian_date_t`), with astronomical years (1 BC is
+year 0) from `YEAR_MIN` to `YEAR_MAX`, about ±2.5·10¹⁶. The constructor takes
+only a real date; `GregorianDate.normalize(year, month, day)` carries an
+out-of-range month or day into the next field instead, as `mktime` does. Its
+`leap`, `wday` (0 = Sunday) and `yday` (0 = 1 January) come from the library.
+`CivilDateTime(year, month, day, hour=0, minute=0, second=0)` adds a time of
+day (`bvn_datetime_t`) and checks hour 0–23, minute 0–59 and second 0–60;
+`.date` is its `GregorianDate` and `.mjd` the date's Modified Julian Day. Both
+are frozen and hashable, compare with the C equality functions, order
+chronologically, print as ISO 8601 (`2016-12-31T23:59:60`) and convert to
+`datetime.date` / `datetime.datetime` with `to_date()` / `to_datetime()` where
+those can hold the value (years 1–9999, no leap second). `Epoch` is
+`bvn_epoch_t`: each member's value is its epoch's MJD, so `Epoch(q.epoch_mjd)`
+is the epoch of a datetime `Quantity`, and an epoch argument may also be given
+as that int or as the library's name (`"unix"`, `"y2000"`, …).
+
+**Seconds and epochs.**
+
+| Function | C function | Result |
+|---|---|---|
+| `epoch_seconds_to_datetime(seconds, epoch)` | `bvn_dt_epoch_seconds_to_datetime` | The civil time `seconds` after `epoch` on a uniform scale (86400 s a day, no leap seconds); every int64 |
+| `datetime_to_epoch_seconds(dt, epoch)` | `bvn_dt_datetime_to_epoch_seconds` | Its inverse; `second == 60` counts as the next minute's first second |
+| `convert_epoch_seconds(seconds, epoch_from, epoch_to)` | `bvn_dt_convert_epoch_seconds` | The same count relabelled to another origin; the time scale does not change |
+| `utc_to_tai_seconds(dt)` | `bvn_dt_utc_to_tai_seconds` | UTC to TAI seconds with the leap-second table (10 s before 1972, 37 s since 2017) |
+| `tai_seconds_to_utc(tai_seconds)` | `bvn_dt_tai_seconds_to_utc` | Its inverse; an inserted leap second is `23:59:60` |
+| `tai_seconds_to_local_time(tai_seconds, utc_offset_seconds, dls_active)` | `bvn_dt_tai_seconds_to_local_time` | Wall-clock time at a fixed offset, one hour later when `dls_active`; the offset must be whole minutes |
+| `tai_second_is_dls_in_europe(tai_second)` | `bvn_dt_tai_second_is_dls_in_europe` | Whether German/European summer time is in force (none before 1980) |
+| `epoch_seconds_from_gps_time(time_of_week_ms, week, epoch)`, `tai_seconds_from_gps_time(time_of_week_ms, week)` | `bvn_dt_epoch_seconds_from_gps_time`, `bvn_dt_tai_seconds_from_gps_time` | GPS week + time of week (ms, rounded to the second) as seconds; GPS time except on `Epoch.TAI`, where the 19 s are added |
+| `epoch_seconds_from_galileo_time(…)`, `tai_seconds_from_galileo_time(…)` | `bvn_dt_epoch_seconds_from_galileo_time`, `bvn_dt_tai_seconds_from_galileo_time` | The same for Galileo System Time |
+| `epoch_seconds_to_utc(seconds, epoch)`, `utc_to_epoch_seconds(dt, epoch)` | — | A datetime value's UTC time and back, as the reader and writer convert an ISO literal: the leap-second table on tai, the uniform scale on unix, mjd, ntp and y2000; the GNSS epochs raise |
+| `Quantity.to_civil()` | — | `epoch_seconds_to_utc` of a `datetime` quantity; the sub-second digits stay in `datetime_fraction` |
+| `a == b`, `a.is_date_equal(b)`, `a.is_time_equal(b)` | `bvn_dt_is_equal`, `bvn_dt_is_date_equal`, `bvn_dt_is_time_equal` | Field-wise comparison of two `CivilDateTime` |
+
+GPS and Galileo seconds stay in their own scale: for UTC, take
+`tai_seconds_from_gps_time` to `tai_seconds_to_utc`. A datetime on a GNSS epoch
+has no civil form in the library, which is why `epoch_seconds_to_utc` and
+`to_civil()` refuse it.
+
+**The calendar.**
+
+| Function or method | C function |
+|---|---|
+| `GregorianDate.from_mjd(mjd)`, `d.to_mjd()`, `GregorianDate.normalize(y, m, d)`, `a == b` | `bvn_gregorian_date_from_mjd`, `_to_mjd`, `_normalize`, `_is_equal` |
+| `mjd_to_wday(mjd)`, `mjd_to_yday(mjd)`, `mjd_in_leap_year(mjd)` | `bvn_gregorian_date_mjd_to_wday`, `_mjd_to_yday`, `_mjd_in_leap_year` |
+| `easter_sunday_mjd(year)`; `easter_sunday(year)`, `good_friday`, `easter_monday`, `ascension_day`, `whit_monday` | `bvn_gregorian_date_easter_sunday_mjd`; `bvn_gregorian_date_calc_*` |
+| `d.is_federal_holiday_in_germany()`, `d.is_banking_day_in_germany()`, `d.is_business_day_in_germany()` | `bvn_gregorian_date_is_*_in_germany` |
+| `d.last_banking_day_in_month()`, `penultimate_…`, `mid_…`, `first_…`, `d.last_sunday_in_month()`, `d.last_saturday_in_month()` | `bvn_gregorian_date_get_*_in_month` |
+| `d.last_banking_day_in_quarter(q)`, `d.first_banking_day_in_quarter(q)` | `bvn_gregorian_date_get_*_banking_day_in_quarter` |
+| `d.is_last_banking_day_in_month()` and the other three; `d.is_last_banking_day_in_quarter(q)`, `d.is_first_banking_day_in_quarter(q)` | `bvn_gregorian_date_is_*_banking_day_in_*` |
+| `d.is_daylight_saving_switch_in_germany()`, `d.is_day_before_daylight_saving_switch_in_germany()` | `bvn_gregorian_date_is_*daylight_saving_switch_in_germany` |
+
+The federal holidays are the nine that hold in all of Germany, by the rules in
+force that year: 3 October from 1990, 17 June from 1954 to 1989, 1 May from 1933.
+A banking day is Monday to Friday, not a holiday and not 24 or 31 December; a
+business day is Monday to Saturday and not a holiday. The mid banking day is the
+first one on or after the 15th. The summer-time switch days follow the German
+rule of each year: none before 1980, the end in September until 1995.
+
+**Errors.** Where a C function signals failure with a sentinel, a `false` or an
+untouched output — an overflow, an MJD or year outside the supported range, a
+quarter outside 1–4 — the binding raises `BovnarArgumentError`, as it does for an
+argument that is not an int or does not fit in int64. Not bound:
+`bvn_gregorian_date_to_mjd_fast` (undefined behaviour out of range; `to_mjd()`
+is the checked form) and `bvn_dt_dump` / `bvn_dt_print`, which print to stdout
+(`str()` and `repr()` take their place).
 
 ---
 
@@ -15926,7 +16248,7 @@ nested parse, and close the first one after its read returns.
 
 ### 11.2 `read_mem`
 
-`read_mem(data, *, on_verified, on_unverified, want_unit, on_error, **options)`
+`read_mem(data, *, on_verified, on_unverified, want_unit, on_error, mirror, **options)`
 
 Parse BVNR from a `bytes`, `bytearray`, or `memoryview` object. The callbacks
 are named parameters; every other keyword is a **read option**, one of the
@@ -15943,6 +16265,7 @@ outside its C field (a negative one, `max_string_length=70000`) a
 | `on_verified` | `Callable[[Event, BvnrData \| None], bool] \| None` | `None` | Callback for validated events |
 | `on_unverified` | `Callable[[Event, BvnrData \| None], bool] \| None` | `None` | Callback for raw pre-validation events |
 | `on_error` | `Callable[[BovnarParseError], None] \| None` | `None` | Called for every error the reader reports, as a `BovnarParseError` with its code and position: under `continue_on_error`, each error it recovers from — reported nowhere else — and the error that ends a read, before the read raises it. Its return value is ignored; an exception it raises stops the read at the next event and is re-raised |
+| `mirror` | binary file object, socket or `bytearray` \| `None` | `None` | Receives every byte the reader consumes: the input mirror of `bvnr_open_read_source`, a debugging aid (below) |
 | `max_file_size` | `int` | `0` (unlimited) | Hard limit on bytes consumed |
 | `continue_on_error` | `bool` | `False` | Enable resync mode |
 | `strict_version` | `bool` | `False` | Reject a declared spec version newer than this build (`error_unsupported_spec_version`) |
@@ -15959,6 +16282,27 @@ outside its C field (a negative one, `max_string_length=70000`) a
 | `max_reference_length` | `int` | `0` (default 65535) | Longest reference (`REFERENCE_TOO_LONG`) |
 | `max_struct_nesting` | `int` | `0` (255) | Deepest struct nesting, at most 255 (`STRUCT_NESTING_TOO_HIGH`). `0` is the format's limit of 255, what the DOM and the CLI read at — not the C reader's own default of 64 |
 | `max_array_nesting` | `int` | `0` (255) | Deepest array nesting, as `max_struct_nesting` (`ARRAY_NESTING_TOO_HIGH`) |
+
+**The mirror.** `mirror=` — a writable binary file object (`write`), a socket
+(`sendall`) or a `bytearray`, which is appended to — is handed every byte the
+reader consumes, the comments and the octet-stream payloads included, so what
+it holds after a read that succeeded is the input. The bytes reach it a piece
+at a time, each once the reader has parsed it: a buffer pulled (up to 64 KiB),
+a piece fed to a `DocumentFeed`, an octet-stream chunk. A read that fails, or a
+callback stops, has mirrored the input up to the start of the piece it
+stopped in. An exception the object raises ends the read and is re-raised from
+it, unchanged. `read_fd`, `read_file`, `read_stream`, `iter_mem` and
+`DocumentFeed` (§4.7) take it too; the frame readers and the demux do not,
+as the C objects behind them take no mirror (their caller holds the bytes it
+feeds them).
+
+```python
+from bovnar import Reader
+
+seen = bytearray()
+Reader().read_mem(b'.a = 1;  # note\n', mirror=seen)
+bytes(seen)                          # → b'.a = 1;  # note\n'
+```
 
 The five length caps and the two nesting caps are for untrusted input: lower
 them to what the consumer can take. The length caps are the width of their C
@@ -16053,20 +16397,40 @@ to a `DocumentFeed` instead (§4.7).
 
 | Method | Description |
 |---|---|
-| `Writer.to_mem(buf=None, cap=4194304, *, pretty=True, unit_flags=0, emit_version=False)` | Write to an in-process buffer. `buf` may be a pre-allocated `bytearray`; when `None` an internal buffer of size `cap` is allocated. |
-| `Writer.to_fd(fd, *, pretty=True, unit_flags=0, emit_version=False)` | Write to an open POSIX file descriptor. |
-| `Writer.to_file(path, *, pretty=True, unit_flags=0, emit_version=False)` | Open `path` for writing (`O_WRONLY\|O_CREAT\|O_TRUNC`, mode `0o644`) and write to it; the fd is closed when the writer is finished or destroyed. |
-| `Writer.to_stream(stream, *, pretty=True, unit_flags=0, emit_version=False)` | Write to a socket (`sendall`) or a binary file object (`write`, repeated until it has taken every byte). Output is pushed a full 64 KiB buffer at a time and the rest at `flush()` or `finish()`, which then call the object's `flush` if it has one. An exception the object raises is re-raised from the write call that pushed. |
+| `Writer.to_mem(buf=None, cap=4194304, *, …)` | Write to an in-process buffer. `buf` may be a pre-allocated `bytearray`; when `None` an internal buffer of size `cap` is allocated. |
+| `Writer.to_fd(fd, *, …)` | Write to an open POSIX file descriptor. |
+| `Writer.to_file(path, *, …)` | Open `path` for writing (`O_WRONLY\|O_CREAT\|O_TRUNC`, mode `0o644`) and write to it; the fd is closed when the writer is finished or destroyed. |
+| `Writer.to_stream(stream, *, …)` | Write to a socket (`sendall`) or a binary file object (`write`, repeated until it has taken every byte). Output is pushed a full 64 KiB buffer at a time and the rest at `flush()` or `finish()`, which then call the object's `flush` if it has one. An exception the object raises is re-raised from the write call that pushed. |
 
-All four are used as context managers.  On clean exit (`exc_type is None`)
-the context manager calls `finish()` automatically.
+Each takes the keywords `pretty=True, unit_flags=0, emit_version=False,
+on_event=None, max_struct_nesting=0, max_array_nesting=0`. All four are used
+as context managers.  On clean exit (`exc_type is None`) the context manager
+calls `finish()` automatically.
 
 `unit_flags` takes [`UnitFlags`](#53-unitflags) — `REDUCE` rewrites each unit
 and rescales its value, `ASCII_EXP` writes `^N` exponents, `NUM_CANONICAL`
 keeps a rescaled float in float shape and writes annotations in one form. `emit_version=True` writes a leading
 `#!bovnar M.N` naming the spec version this build implements, as
-`write_version()` would. Every writer accepts structs and arrays nested up to
-**255** deep, the same limit `Reader` and `loads()` read at.
+`write_version()` would. By default every writer accepts structs and arrays
+nested up to **255** deep, the same limit `Reader` and `loads()` read at.
+`max_struct_nesting` and `max_array_nesting` (`bvnr_write_flags_t`, 1 to
+255; `0` is 255, as for the reader's options) lower it: a struct or an array
+one level deeper fails the write with `STRUCT_NESTING_TOO_HIGH` or
+`ARRAY_NESTING_TOO_HIGH`, and a value outside 0–255 is a
+`BovnarArgumentError`. `on_event` is the observer of §12.10.
+
+```python
+from bovnar import Writer, BovnarWriteError
+
+w = Writer.to_mem(max_struct_nesting=2)
+w.begin_struct("a")
+w.begin_struct("b")
+try:
+    w.begin_struct("c")
+except BovnarWriteError as e:
+    code = e.code.name
+code                                 # → 'STRUCT_NESTING_TOO_HIGH'
+```
 
 ### 12.2 Output retrieval
 
@@ -16083,6 +16447,21 @@ keeps a rescaled float in float shape and writes annotations in one form. `emit_
 All scalar writers accept keyword-only unit parameters.  Unit resolution
 priority: `unit_str` (parsed via `bvn_parse_unit_n`) → `unit_iec_base` →
 `unit_si_base` → `BVN_UNIT_NONE` (no annotation emitted).
+
+The unit is written in its canonical spelling: `unit_str="ucum:mL{total}"`
+comes out as `m~L`. Each numeric writer here and in §12.4 also takes
+`unit_source=`, the spelling to write instead, as `bvnr_writer_set_unit_source`
+gives one to the C helpers. The C writer checks that it spells the unit it is
+written for (and leaves it out under a `unit_flags` rewrite); a `unit_source`
+for a value without a unit is a `BovnarArgumentError`.
+
+```python
+w = Writer.to_mem(pretty=False, emit_version=True)   # a profile unit is spec 1.2
+w.write_float("vol", 5.0, unit_str="ucum:mL{total}",
+              unit_source="ucum:mL{total}")
+w.finish()
+w.get_output().split(b"\n")[1]       # → b'.vol=<float:64,ucum:mL{total}>5e+0;'
+```
 
 #### `write_uint(key, value, *, width=64, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR, unit_iec_base=None, unit_iec_prefix=IECPrefix.NONE)`
 
@@ -16218,6 +16597,89 @@ document being written rather than making a document of one key, as
 `to_stream` writer, call `flush()` after `mux_send` for a consumer reading
 live (§4.8).
 
+### 12.10 Observing the output: `on_event`
+
+`on_event(event, data)`, given to any constructor (§12.1), is called with each
+event once it has been serialised (`bvnr_write_flags_t.on_event`), with what
+reached the output: under `UnitFlags.REDUCE` a rescaled value's new digits and
+unit, not the ones it was written with. Every event the writer serialises
+reaches it — those of the `write_*` methods, `emit`, the struct and array
+helpers, the mux and embedding calls. `data` is a `BvnrData` snapshot, as a
+reader callback gets (`None` for an event without one), which may be kept.
+
+```python
+from bovnar import Writer, UnitFlags
+
+seen = []
+w = Writer.to_mem(pretty=False, unit_flags=UnitFlags.REDUCE,
+                  on_event=lambda ev, d: seen.append((ev.name, d.raw_bytes())))
+w.write_uint("d", 5, unit_str="k~m")
+w.finish()
+w.get_output()                       # → b'.d=<uint:64,m>5000;'
+seen[0]                              # → ('ASSIGNMENT_START', b'd')
+seen[-1]                             # → ('DATA', b'5000')
+```
+
+Returning `False` (any false value but `None`) fails the write, and the
+writer, with `SCANNER_CALLBACK_FAILED`: a veto, say of a key that must not
+leave the process. An exception the observer raises fails it the same way and
+is re-raised from the write call that ran it, unchanged; a later call raises
+the latched `BovnarWriteError`, chained to that exception. The observer runs
+inside the C call, so it may not write to, flush, finish or destroy its own
+writer (`BovnarArgumentError`). It costs a Python call per event.
+
+### 12.11 Plain values, datetimes and type annotations
+
+```python
+from bovnar import Event, ValueTypeFamily, Writer, make_type_spec
+
+w = Writer.to_mem(pretty=False, emit_version=True)
+w.write_plain("mode", "auto")                     # a bare symbol
+w.write_datetime("t", 1750000000, epoch="tai")
+u8 = make_type_spec(ValueTypeFamily.UINT, 8)
+w.emit(Event.ASSIGNMENT_START, key="v")
+w.write_type_annotation(u8, "m")                  # types the whole array
+w.begin_array_row()
+w.emit(Event.DATA, value="1", vt=u8)
+w.emit(Event.DATA, value="2", vt=u8)
+w.end_array_row()
+w.finish()
+w.get_output().split(b"\n")[1]      # → b'.mode=auto;.t=<datetime:64,tai>1750000000;.v=<uint:8,m>[1,2];'
+```
+
+`write_plain(key, value)` writes `value` bare, as a plain symbol
+(`bvnr_write_plain`): `.mode = auto;`. The C writer refuses a value that is
+not a symbol (`ILLEGAL_SYMBOL`); a NUL in it is a `BovnarArgumentError`.
+
+`write_datetime(key, value, *, width=64, epoch=None)` writes `value`, signed
+seconds since `epoch` (`"unix"`, the default, `"tai"`, `"gps"`, `"mjd"`,
+`"ntp"`, `"galileo"`, `"glonass"`, `"y2000"`, `"beidou"`), as
+`<datetime:width[,epoch]>` (`bvnr_write_datetime`). Datetime is spec 1.1, so the
+document must declare it first — `emit_version=True`, or `write_version()`
+before any value; without that the write fails with `UNSUPPORTED_SPEC_VERSION`,
+the key already in the output and the writer in its error state. An epoch the
+library does not know is a `BovnarArgumentError`, raised before anything is
+written. A datetime with a sub-second fraction is written by `dumps()` from a
+`Quantity` (§6.4).
+
+`write_type_annotation(vt, unit=None, *, unit_source=None)` writes the type
+annotation `<family:width[,_base|,qQ|,epoch][,unit]>` for the value written
+next (`bvnr_write_type_annotation`): after an assignment's key, with `emit`
+sending the value, or before an array's first row, where it types the whole
+array. `unit` is a `Unit`, a `ValueUnit` or a unit string, `unit_source` its
+spelling as in §12.3. As for the typed writers, only the parameters that say
+something are written: no width of 0, no base 10, no unit on a string or a
+datetime.
+
+The other per-type C helpers have their counterpart above: `bvnr_write_string`,
+`_null` and `_bool` in `write_string`, `write_null` and `write_bool`;
+`bvnr_write_uint`, `_sint`, `_float`, `_float_fix`, `_float_dec` and their
+`_unit` forms in the methods of §12.3; `bvnr_write_bvnf`, `_bvnf_unit`,
+`_bvnf_base`, `_bvnf_base_unit`, `bvnr_write_bvni` and `_bvni_unit` in
+`write_bvnf_base` and `write_bvni` (§12.4); `bvnr_write_struct_start` and
+`_end` in `begin_struct` and `end_struct` (§12.5); `bvnr_writer_set_unit_source`
+in `unit_source=`.
+
 ---
 
 ## 13. DOM API
@@ -16252,6 +16714,8 @@ tree; any `DomNode` derived from it becomes invalid after that point.
 | `doc.entries()` | Return all top-level `(key, DomNode)` pairs as a list. |
 | `doc.lookup(path)` | Dot-separated path lookup, e.g. `'server.tls.cert'`. Returns `None` when absent. |
 | `doc.to_dict()` | Convert entire document to a plain Python dict, dropping type and unit info. |
+| `DomDoc.create()` | Class method. An empty document to build in (§13.5). |
+| `doc.add(key, node)` | Add a `NewNode` as a top-level entry; returns it as a `DomNode` (§13.5). |
 
 > **File-size limits:** `DomDoc.parse_fd` and `DomDoc.parse_file` apply an internal
 > ceiling of `BVN_DOM_FD_MAX_BYTES` (256 MiB, `bovnar.dom.DOM_FD_MAX_BYTES`).
@@ -16264,10 +16728,9 @@ tree; any `DomNode` derived from it becomes invalid after that point.
 > reader's defaults for everything else), and neither binding can pass more:
 > read with a `Reader` (§11) or `loads` for the limits of §11.2.
 >
-> **No builder.** The C DOM's tree-building calls (`bvn_dom_doc_create`,
-> `bvn_dom_node_from_*`, `bvn_dom_struct_add`, …) make a tree that cannot be
-> written out and are meant for the library's test fixtures; they are not
-> wrapped. Build a document with `dumps()` or the `Writer`.
+> **Building a tree.** `DomDoc.create()` and `doc.add(key, node)` are the C
+> DOM's builder, for a tree made by hand from `NewNode`s (§13.5). Such a tree
+> cannot be written out; build a document with `dumps()` or the `Writer`.
 >
 > **Errors:** the C fd functions return `NULL` for an allocation failure, a read
 > error and input over the cap alike; the binding tells them apart by `errno`.
@@ -16315,6 +16778,72 @@ NULL=0  INT=1  FLOAT=2  STRING=3  SYMBOL=4
 REFERENCE=5  STRUCT=6  ARRAY=7  OCTET_STREAM=8  BOOL=9
 ```
 
+### 13.5 Building a tree (`NewNode`)
+
+`DomDoc.create()` makes an empty document and `NewNode` the nodes to put in it:
+the C DOM's builder (`bvn_dom_doc_create`, `bvn_dom_node_alloc`,
+`bvn_dom_node_from_*`, `bvn_dom_struct_add`, `bvn_dom_array_append`,
+`bvn_dom_doc_add`, doc/08 §4.5). It is there for code that consumes a DOM, a
+test fixture say, and it has the C builder's limits: it makes structs, arrays,
+nulls and integers only, and a built tree **cannot be written out**, since the C
+library has no DOM serialiser. To produce a document, use `dumps()` or the
+`Writer`.
+
+```python
+from bovnar import DomDoc, NewNode
+
+server = NewNode.struct()
+server.add("port", NewNode.integer(8080, width=16))
+server.add("tls", NewNode.null())
+ports = NewNode.array()
+ports.append(NewNode.integer(80, width=16))
+ports.append(NewNode.integer(443, width=16))
+server.add("ports", ports)
+
+doc = DomDoc.create()
+doc.add("server", server)
+big = doc.add("big", NewNode.integer(2**100, width=128, unit="m"))
+doc["server.port"].as_u16()     # → 8080
+big.unit_str                    # → "m"
+doc.to_dict()                   # → {"server": {"port": 8080, "tls": None, "ports": [80, 443]}, "big": 1267650600228229401496703205376}
+```
+
+| Constructor / method | Description |
+|---|---|
+| `DomDoc.create()` | An empty document; its `parse_error` is `NONE` |
+| `doc.add(key, node)` | Add `node` as a top-level entry and return it as a `DomNode` of `doc`. A parsed document takes one too |
+| `NewNode.null()` / `NewNode.struct()` / `NewNode.array()` | An empty node of that kind (`bvn_dom_node_alloc`) |
+| `NewNode.integer(value, *, width=64, signed=None, unit=None)` | An integer node of type `sint:<width>` or `uint:<width>`; `signed=None` is `sint` for a negative value and `uint` otherwise, as for `write_bvni`. A width of 8, 16, 32 or 64 is `bvn_dom_node_from_i8` … `_u64`, which take no unit; a width of 65 to 32768 is `bvn_dom_node_from_bigint`, which takes `unit` (a unit string, `Unit` or `ValueUnit`). A value that does not fit the type, another width, or a unit on a narrow width raises `BovnarArgumentError` |
+| `node.add(key, child)` | Add `child` as a member of a struct node (`bvn_dom_struct_add`) |
+| `node.append(child)` | Append `child` to an array node (`bvn_dom_array_append`) |
+| `node.dom_type` / `len(node)` | The node's `DomType`; the number of members or elements |
+
+**Ownership.** The C attach functions take the node they are given on every
+path: on success the container owns it, and on failure they destroy it. A
+`NewNode` hands its node over once. After it is attached it is spent, and any
+further use of it (adding it again, adding to it, reading it) raises
+`BovnarArgumentError`: a node is in one tree at most, and a struct cannot be
+filled after it was attached, so a tree is built from its leaves up. A refused
+attach raises before anything is handed over and leaves the node with the
+caller; it is refused for a key that is not an identifier (§5.8; the C functions
+refuse only an empty one, but the path lookups could not reach another), for a
+key the struct or document already has (which the C function would refuse by
+destroying the node), for a spent node, for a node added to itself, and on the
+wrong kind of container. Only an allocation failure inside the C call is a
+`MemoryError` with the node gone. A `NewNode` collected before it is attached
+frees its subtree.
+
+**Reading it back.** A built tree reads through `DomDoc` and `DomNode` like a
+parsed one, with two differences that come from the C builder: an integer node
+of up to 64 bits carries no unit, and a built array records no row shape, so its
+`array_dims()` is `0` and `to_python()` gives one flat list.
+
+Not bound: `bvn_dom_node_alloc` of the other kinds (a float, string, symbol,
+reference, bool or octet-stream node it makes holds no value and cannot be given
+one), `bvn_dom_strdup` (a C allocation helper; the attach functions copy the key
+themselves), and `bvn_dom_get_bigint` (a borrowed `bvn_int_t`; `as_int_str()`
+and `to_python()` already read an integer of any width).
+
 ---
 
 ## 14. Running the test suite
@@ -16357,13 +16886,15 @@ bovnar/
 ├── _pint_bridge.py  # pint bridge: to_pint/from_pint/to_pint_unit/from_pint_unit (pint optional)
 ├── _pint_units.py   # verified bovnar↔pint unit table + build_registry()
 ├── currency.py      # ISO 4217 / crypto currency metadata (pure Python)
-├── dom.py           # DomDoc, DomNode, DomType — random-access DOM
+├── dom.py           # DomDoc, DomNode, DomType, NewNode — random-access DOM and its builder
 ├── enums.py         # Python IntEnum mirrors of C enums
 ├── exceptions.py    # BovnarError hierarchy
+├── literals.py      # the C validators, literal parsers/formatters, parse_type_annotation
 ├── quantity.py      # Quantity — typed, unit-annotated scalar for lossless round-trips
 ├── reader.py        # Reader, EventPayload, UnitPolicy, UnitRule
 ├── stream.py        # framing, octet multiplexing, document-in-document, the feeds, the live writers
 ├── structs.py       # ctypes Structure/Union definitions + ValueUnitPrefix + make_* helpers
+├── timekeeping.py   # civil time and calendars: GregorianDate, CivilDateTime, Epoch (bvn_datetime.h)
 ├── unit.py          # Unit — a ValueUnit with equality, hashing and its operations
 ├── units.py         # unit_to_si_factor, unit_convert_factor, etc.
 └── writer.py        # Writer class
@@ -16380,10 +16911,12 @@ tests/
 ├── test_stream_vectors.py               # the shared wire vectors of doc/10 §9
 ├── test_stream_live.py                  # Writer.flush, MuxWriter, FrameWriter
 ├── test_dom.py, test_dom_vs_loads_parity.py   # the DOM, and its agreement with loads()
+├── test_literals.py                     # bovnar.literals, the DOM builder, UnitConversion.ok
 ├── test_write_array.py, test_array_parser.py, test_array_roundtrip_fidelity.py
 ├── test_roundtrip_property.py, test_writers_agree.py, test_dumps_directive.py
 ├── test_escapes.py, test_unicode_normalisation.py
 ├── test_datetime.py, test_datetime_oracle.py
+├── test_timekeeping.py                  # bovnar.timekeeping: calendar, leap seconds, GNSS time
 ├── test_lossless_floats.py, test_hex_float_decode.py, test_decimal_tie_rounding.py
 ├── test_bigint_digits.py                # integers past the 4300-digit str limit
 ├── test_units.py, test_unit_object.py, test_unit_physics.py, test_unit_source.py
@@ -16427,8 +16960,10 @@ is the library's text for an `ErrorCode` (`bvn_error_to_string`):
 | `False` | `False` | Units are dimensionally incompatible → `BovnarArgumentError` |
 
 `unit_convert_factor` raises `BovnarArgumentError` **only** when both
-`ok=False` and `requires_affine=False`; the result does not carry `ok`, so
-check `requires_affine` before multiplying by `factor`. When it is set, call
+`ok=False` and `requires_affine=False`; the result carries the other three as
+`c.ok` and `c.requires_affine`, so check `c.ok` before multiplying by `factor`
+(`ok` is a field with a default of `True`, so `UnitConversion(f, affine)` built
+by hand still works). When it is `False`, call
 `convert_value`, which handles the two-step affine path, or call
 `unit_to_si_factor` on both units and convert by hand. The `Unit` method
 `convert_factor()` returns the bare number and therefore raises for the
@@ -16665,7 +17200,8 @@ exposed as:
   out-of-range `\u` is `ErrorCode.INVALID_CODEPOINT`.
 - **Datetime family:** `loads` decodes a `<datetime:width,epoch>` value to a
   plain `int` (signed epoch seconds). With `typed=True` it is a `Quantity` whose
-  `.epoch_name` (`"unix"`, `"tai"`, …) and `.epoch_mjd` recover the epoch;
+  `.epoch_name` (`"unix"`, `"tai"`, …) and `.epoch_mjd` recover the epoch, and
+  `.to_civil()` its UTC date and time ([§6.5](#65-civil-time-and-calendars));
   `bovnar.datetime_epoch_index(name)` goes the other way, to the index a
   datetime `ValueTypeSpec` holds in `base`
   (`make_type_spec(ValueTypeFamily.DATETIME, 64,
@@ -22928,6 +23464,7 @@ enums are Rust enums, and an error carries the library's error kind.
     - 4.7 [Files and I/O streams (`std::io::Read` / `Write`)](#47-files-and-io-streams-stdioread--write)
     - 4.8 [Live streams: the framing codec (`bovnar::codec`)](#48-live-streams-the-framing-codec-bovnarcodec)
     - 4.9 [Live documents through C (`bovnar::live`)](#49-live-documents-through-c-bovnarlive)
+    - 4.10 [Canonical form](#410-canonical-form)
 5. [Unit helpers](#5-unit-helpers)
     - 5.1 [The unit-profile notations (spec 1.2)](#51-the-unit-profile-notations-spec-12)
     - 5.2 [Extended unit functions](#52-extended-unit-functions)
@@ -22936,11 +23473,13 @@ enums are Rust enums, and an error carries the library's error kind.
     - 5.5 [Inline unit suffix](#55-inline-unit-suffix)
     - 5.6 [`UnitPolicy` — validation and conversion without a callback](#56-unitpolicy--validation-and-conversion-without-a-callback)
     - 5.7 [Building a `Unit`](#57-building-a-unit)
+    - 5.8 [Validators and literal helpers](#58-validators-and-literal-helpers)
 6. [`Quantity`](#6-quantity)
     - 6.1 [Construction](#61-construction)
     - 6.2 [Fields and methods](#62-fields-and-methods)
     - 6.3 [Exact numbers (`Decimal`, `BigRational`, `BvnFloat`)](#63-exact-numbers-decimal-bigrational-bvnfloat)
     - 6.4 [`to_string()` integration](#64-to_string-integration)
+    - 6.5 [Civil time and calendars](#65-civil-time-and-calendars)
 7. [`write_array` helper](#7-write_array-helper)
 8. [JSON conversion](#8-json-conversion)
 9. [Currency helpers](#9-currency-helpers)
@@ -22960,11 +23499,14 @@ enums are Rust enums, and an error carries the library's error kind.
     - 11.6 [Version directive](#116-version-directive)
     - 11.7 [Array helpers](#117-array-helpers)
     - 11.8 [Low-level `emit`](#118-low-level-emit)
+    - 11.9 [Observing the output: `on_event`](#119-observing-the-output-on_event)
+    - 11.10 [The C per-type helpers](#1110-the-c-per-type-helpers)
 12. [DOM API](#12-dom-api)
     - 12.1 [`DomDoc::parse`](#121-domdocparse)
     - 12.2 [`DomDoc`](#122-domdoc)
     - 12.3 [`DomNode`](#123-domnode)
     - 12.4 [`DomType`](#124-domtype)
+    - 12.5 [Building a tree (`NewNode`)](#125-building-a-tree-newnode)
 13. [Error handling](#13-error-handling)
 14. [Threads](#14-threads)
 15. [Running the test suite](#15-running-the-test-suite)
@@ -23428,10 +23970,34 @@ All arguments are positional:
 | `frame_documents(docs)` | already-serialised documents, `&[impl AsRef<[u8]>]` |
 | `dump_documents(values, pretty)` | `&[Value]` |
 | `load_documents(data, typed, continue_past_failed, max_document_size)` | `max_document_size` 0 is the default cap (`BVNR_DOC_DEFAULT_MAX`, 256 MiB) |
+| `load_documents_results(data, typed, max_document_size, options)` | every frame read, a failed document `Err` with its error code |
 | `mux_dump(messages, key)` | `(u64, payload)` pairs; the conventional key is `"mux"` |
 | `mux_load(data, max_message, key)` | `max_message` 0 is the default cap (`BVNR_MUX_DEFAULT_MAX`, 64 MiB); `key` `None` accepts any |
 | `embed_document(inner, key, pretty)` | the conventional key is `"payload"` |
 | `parse_embedded(inner, typed)` | |
+
+`load_documents` with `continue_past_failed` gives `None` for a document that
+failed, and the error is gone. `load_documents_results` (and
+`load_documents_reader_results`) keep it: every frame is read, as with
+`continue_past_failed`, and the document at index *i* is `Ok(value)` or the
+`Err` it failed with — an `Error::Parse` with the document's error code and no
+position, which the frame reader does not report. The outer `Err` is the
+stream's own failure: the framing, a frame over the cap. `live::FrameParser`
+hands each document's index and result to `on_document` already
+([§4.9](#49-live-documents-through-c-bovnarlive)).
+
+```rust
+use bovnar::{ErrorCode, ReadOptions, Value, stream};
+
+fn main() -> Result<(), bovnar::Error> {
+    let frames = stream::frame_documents(&[&b".a = 1;"[..], b".a = @;", b".b = 2;"])?;
+    let docs = stream::load_documents_results(&frames, false, 0, &ReadOptions::default())?;
+    assert_eq!(docs[0], Ok(Value::Struct(vec![("a".into(), Value::Int(1))])));
+    assert_eq!(docs[1].as_ref().unwrap_err().code(), Some(ErrorCode::UnexpectedInputByte));
+    assert!(docs[2].is_ok());
+    Ok(())
+}
+```
 
 `parse_embedded` returns an `Error::Parse` carrying the inner document's own
 error code and, where the library reported one, its position. `mux_dump`
@@ -23855,14 +24421,93 @@ fn main() -> Result<(), bovnar::Error> {
 }
 ```
 
+**Every handler.** `feed` and `finish` take the event handler alone.
+`feed_with(bytes, handlers)` and `finish_with(handlers)` take a
+`ReadHandlers` ([§10.2](#102-read_mem)), as `Reader::read_mem_with` does:
+`on_verified`, the raw lexer events of `on_unverified`, the `want_unit` hook
+and `on_error` — which sees each error a `continue_on_error` document recovers
+from — called inside the call that parses the bytes they concern. `ValueFeed`
+takes them through its own `feed_with(bytes, out, handlers)` and
+`finish_with(out, handlers)`, its `on_verified` seeing each event after the
+value builder has. The C reader is given its callbacks when a document starts,
+so the first call of a document decides whether `on_unverified` and
+`want_unit` are called for the whole of it: a later call that needs one the
+document was not started with is an `Error::Argument` (`reset()` starts the
+next document, decided afresh), and a later call may pass fewer. A panic in a
+handler reaches the caller of the call, and the document has failed.
+
+```rust
+use bovnar::live::DocumentFeed;
+use bovnar::{EventData, ReadHandlers, ReadOptions, Unit};
+
+fn main() -> Result<(), bovnar::Error> {
+    let mut feed = DocumentFeed::new(&ReadOptions::default())?;
+    let (mut tokens, mut metres) = (0, Vec::new());
+    for piece in [&b".d = <uint:64,k~m"[..], b"> 3; .e = 4;"] {
+        let mut on_raw = |_: &EventData<'_>| { tokens += 1; true };
+        let mut want = |d: &EventData<'_>| {
+            (!d.value_unit.is_dimensionless()).then(|| (Unit::parse("m").unwrap(), 0))
+        };
+        let mut on_value = |d: &EventData<'_>| {
+            if d.converted { metres.push(String::from_utf8_lossy(d.converted_text).into_owned()); }
+            true
+        };
+        feed.feed_with(piece, ReadHandlers {
+            on_verified: Some(&mut on_value),
+            on_unverified: Some(&mut on_raw),
+            want_unit: Some(&mut want),
+            on_error: None,
+        })?;
+    }
+    feed.finish(&mut |_| true)?;
+    assert!(tokens > 0);
+    assert_eq!(metres, ["3000"]);
+    Ok(())
+}
+```
+
+**The mirror.** `set_mirror(w)` gives the feed any `std::io::Write + Send`
+that receives every byte the reader consumes (`src_mirror`, a debugging aid):
+each piece fed, once the reader has parsed it, so a document that fails has
+mirrored the input up to the start of the piece the error is in. It starts the
+next document, as `reset()` does, and stays for every document after;
+`take_mirror::<W>()` hands it back as the type it was given (`None`, and the
+mirror kept, for another type), and the rest of a document in progress is not
+mirrored. A failing mirror fails the document with an `Error::Io` with
+`writing_to_sink`; a panic in it reaches the caller. `ValueFeed` has the same
+two methods. For a `Reader`, `read_mem_mirror` and `read_reader_mirror` take a
+`&mut dyn std::io::Write` for the one read ([§10.2](#102-read_mem)). The frame
+readers and the demux take no mirror, as the C objects behind them do not:
+their caller holds the bytes it feeds.
+
+```rust
+use bovnar::ReadOptions;
+use bovnar::live::DocumentFeed;
+
+fn main() -> Result<(), bovnar::Error> {
+    let mut feed = DocumentFeed::new(&ReadOptions::default())?;
+    feed.set_mirror(Vec::<u8>::new())?;
+    for piece in [&b".a = 1;"[..], b"  # note\n.b = 2;"] {
+        feed.feed(piece, &mut |_| true)?;
+    }
+    feed.finish(&mut |_| true)?;
+    assert_eq!(feed.take_mirror::<Vec<u8>>().unwrap(), b".a = 1;  # note\n.b = 2;");
+    Ok(())
+}
+```
+
 **Frames.** `FramePull` hands out each framed document's bytes, to be parsed
 by a reused `DocumentFeed` or `ValueFeed` (or `parse`); `codec::FrameReader`
 does the same in pure Rust. `FrameParser::new(&options, continue_past_failed,
 max_document_size)` parses every document as `stream::load_documents` does,
 streaming each frame's payload into one reused reader so that a frame is never
 held whole: `feed(bytes, on_event, on_document)` calls `on_document(index,
-result)` for each document it completes, and its returning false ends the
-stream with `scanner_callback_failed`. A bad magic is
+result)` for each document it completes — `Ok(())` or the `Err` with the
+document's error code — and its returning false ends the stream with
+`scanner_callback_failed`. `feed_with(bytes, handlers, on_document)` takes a
+`ReadHandlers` for the documents, as `DocumentFeed::feed_with` does; the frame
+reader is given its callbacks when the stream starts, so the first feed
+decides whether `on_unverified` and `want_unit` are called. A bad magic is
 `unexpected_input_byte`, a frame over the cap `value_out_of_range`, a stream
 that does not end on a frame boundary `got_incomplete_bvnr_stream` at `finish`.
 
@@ -23901,7 +24546,13 @@ refused with an `Error::Argument`); `reset()`
 starts the next document: the channel buffers are kept, the channel ids (and
 with them the 4096-channel count) start afresh, as `codec::MuxReader::reset`
 does. `recovery_count()`, `skipped_bytes()` and `declared_version()` are those
-of the demux's reader, as on `DocumentFeed`.
+of the demux's reader, as on `DocumentFeed`. `next_with(input, handlers)` and
+`finish_with(handlers)` take a `ReadHandlers` for that reader, which parses
+inside `next` and `finish`: its `on_verified` sees every verified event, the
+stream's chunks included, before the demux does, and `on_unverified`,
+`want_unit` and `on_error` are a `Reader`'s. The first call of a document
+decides which of `on_verified`, `on_unverified` and `want_unit` its reader
+calls, as for `DocumentFeed`.
 
 ```rust
 use bovnar::live::{Demux, DemuxItem, DemuxOptions, ValueBuilder};
@@ -24055,6 +24706,54 @@ Feeding costs what reading the whole buffer costs, wherever the pieces are cut:
 the time is the parser's. `ValueFeed` hands each assignment out as it
 completes, where `parse` looks up every key in the document built so far,
 which is what costs it the most on a document of many keys.
+
+### 4.10 Canonical form
+
+`bovnar::canonicalize(data, pretty, &options)` re-serialises a document from its
+verified events through the C library's canonicalising observer
+(`bvnr_canon_observer_*`, doc/08 §3.6) and returns the bytes;
+`canonicalize_reader(input, out, pretty, &options)` reads any `std::io::Read`
+as it parses and writes to any `std::io::Write` as the output is made, in
+64 KiB pieces, so neither is held whole.
+
+```rust
+use bovnar::{ReadOptions, canonicalize};
+
+fn main() -> Result<(), bovnar::Error> {
+    let options = ReadOptions::default();
+    let canon = canonicalize(b".a = 1 ;  # one\n.b = { .c = \"x\"; };", false, &options)?;
+    assert_eq!(canon, b".a=<uint:64,_10,no_unit>1;.b={.c=<utf8>\"x\";};");
+    assert_eq!(canonicalize(&canon, false, &options)?, canon); // idempotent
+    assert_eq!(canonicalize(b".a=1;.b={.c=\"x\";};", false, &options)?, canon);
+    let mut out = Vec::new();
+    bovnar::canonicalize_reader(&b"#!bovnar 1.1\n.a = 1;"[..], &mut out, true, &options)?;
+    assert!(out.starts_with(b"#!bovnar 1.1\n"));
+    Ok(())
+}
+```
+
+It is the form `bovnar events -d` prints (`-p` for `pretty`): the compact one
+is a single line with no whitespace outside literals, each value written with
+the annotation the reader gives it (`1` as `<uint:64,_10,no_unit>1`). Two
+documents that differ only in layout, comments and the spelling of separators
+canonicalise to the same bytes, and canonicalising the output again gives it
+back unchanged; the order of the keys is kept. Units are written as the
+document spelled them: this is not `bovnar pretty-print --canonical`, which
+writes through a writer under `UnitFlags::REDUCE | UnitFlags::NUM_CANONICAL`
+and folds them to one form. A leading `#!bovnar M.N` directive is kept — from
+an `std::io::Read` it is found in the first bytes read, before the reader sees
+them.
+
+The document is read under `options`, and one the reader refuses is its
+`Error::Parse`. Under `continue_on_error` a document the reader had to recover
+from is refused too, with the first error it recovered from (code and
+position): the observer writes what it is fed, and the statement a recovery
+leaves without its value would make the output unreadable. A failing `input`
+is an `Error::Io` with `reading_from_source_fd`, a failing `out` one with
+`writing_to_sink`, and a panic in either reaches the caller; after an error
+`out` may hold the start of the output. The observer's C function is the
+reader's `on_verified` itself, with the observer as its userdata, so no Rust
+runs per event.
 
 ---
 
@@ -24217,7 +24916,7 @@ fn main() -> Result<(), bovnar::Error> {
 
     // Conversion factor between two compatible units
     let conv = unit_convert_factor(&km, &Unit::parse("m")?)?;
-    assert_eq!((conv.factor, conv.requires_affine), (1000.0, false));
+    assert_eq!((conv.factor, conv.requires_affine, conv.ok()), (1000.0, false, true));
 
     // 7-element SI dimension exponent vector [m, kg, s, A, K, mol, cd]
     assert_eq!(unit_dimension_vector(&Unit::parse("m/s")?)?, [1, 0, -1, 0, 0, 0, 0]);
@@ -24258,7 +24957,7 @@ fn main() -> Result<(), bovnar::Error> {
 `SI_DIM_NAMES` is the array `["m", "kg", "s", "A", "K", "mol", "cd"]` — the index
 positions used by `unit_dimension_vector`. Both `SIConversion` (`factor`,
 `is_affine`, `affine_offset`) and `UnitConversion` (`factor`,
-`requires_affine`) are small `Copy` structs, and `ReducedUnit` is
+`requires_affine`, and the method `ok()`, §13) are small `Copy` structs, and `ReducedUnit` is
 `{ unit, scale }`.
 
 ### 5.3 `UnitFlags`
@@ -24637,6 +25336,133 @@ fn main() -> Result<(), bovnar::Error> {
 `Unit::is_dimensionless()` is true for both of them and for any unit made only of
 `none` components; `%` and `ppm` are real units and answer false.
 
+### 5.8 Validators and literal helpers
+
+`bovnar::literals` binds the C library's checks and literal helpers
+(`bovnar.h`): the tests the writer applies to keys, symbols, references and
+numbers, the integer and float parsers and formatters behind it, and the parser
+of a type annotation. Each function is the C function of the same name without
+its `bvn_` prefix, and answers as it does. A string holding NUL is none of the
+things they check: a validator answers `false` for it, a parser fails.
+
+**Type annotations.** `parse_type_annotation(text)` parses the text between the
+angle brackets, as the reader does, into a `TypeAnnotation` of `value_type` (a
+`ValueTypeSpec`), `unit` (a `Unit`, `Unit::default()` when there is no unit or it
+is spelled `no_unit`) and `unit_source` (the unit parameter as written, `""` when
+there is none). The struct is `#[non_exhaustive]`, so that a field can be added
+to it without breaking anyone.
+
+```rust
+use bovnar::literals::parse_type_annotation;
+use bovnar::{ErrorCode, ValueTypeFamily, ValueTypeSpec};
+
+fn main() -> Result<(), bovnar::Error> {
+    let a = parse_type_annotation("uint:32,_16,k~g")?;
+    let spec = ValueTypeSpec { family: ValueTypeFamily::Uint as i32, width: 32, base: 16 };
+    assert_eq!(a.value_type, spec);
+    assert_eq!(a.unit.to_string(), "k~g");
+    assert_eq!(a.unit_source, "k~g");
+    let ml = parse_type_annotation("float:64,ucum:mL{total}")?;
+    assert_eq!((ml.unit.to_string(), ml.unit_source.as_str()), ("m~L".into(), "ucum:mL{total}"));
+
+    // A base given twice; a unit parameter over 255 bytes.
+    let e = parse_type_annotation("uint:8,_16,_16").unwrap_err();
+    assert_eq!(e.code(), Some(ErrorCode::IllegalValueType));
+    let e = parse_type_annotation(&format!("uint:8,{}", "m".repeat(256))).unwrap_err();
+    assert_eq!(e.code(), Some(ErrorCode::UnitTooLong));
+    Ok(())
+}
+```
+
+A refusal is an `Error::Parse` (with no position) whose code is the one the
+reader gives the same annotation in a document, so it tells the C function's
+three flags apart:
+
+| Code | C flags | Cause |
+|---|---|---|
+| `IllegalValueType` | `type_ok` false | An unknown family, an empty or repeated parameter, a parameter the family does not take (a base on `float_fix`, a width on `bool`), a width or base out of range |
+| `UnitTooLong` | `unit_ok` false, `unit_too_long` true | A unit parameter over 255 bytes |
+| `UnitIllegal`, `UnitProfileUnknown`, `UnitProfileUnsupported` | `unit_ok` false | A unit parameter that is not a unit this build knows; the code is the one `units::unit_error_code` gives it |
+
+The reader's version gates are not applied: `datetime` (spec 1.1) and a profile
+unit (spec 1.2) parse here whatever version a document declares. A `datetime`'s
+epoch is no unit: its index is in `value_type.base` (`datetime_epoch_index`,
+§18), as a `float_fix`'s q is.
+
+**Validators.** Each returns a `bool`:
+
+| Function | `true` for |
+|---|---|
+| `validate_identifier(s)` | A key: an ASCII letter, `_` or a character from U+00C0 on, then no space, control character, U+0080 to U+00BF, or punctuation spec §4.2 forbids (`-` and `+` are allowed). No length limit: the reader's `max_identifier_length` (255) is separate |
+| `validate_symbol(s)` | A symbol, which is spelled as a key is |
+| `validate_reference(s)` | A path such as `.a.b[0]`, without the `&`: identifier segments, each with optional `[digits]` indexes |
+| `validate_number(s)` | A decimal number: an optional `-`, digits with at most one `.`, an optional `e`/`E` exponent. No `+`, and not `inf` |
+| `is_special_number_string(s)` | Exactly `inf`, `ninf` or `nan` |
+| `validate_digits_for_base(s, base)` | An integer literal: an optional `-` and digits of `base` (no sign at all in bases 64 and 85, where `+` and `-` are digits) |
+| `validate_number_in_base(s, base)` | A quoted float literal: either sign, digits of `base` with at most one `.`, and an exponent marked `e` (bases up to 14) or `p` (the power-of-two bases up to 16) |
+| `validate_uint_range(s, width, base)` / `validate_sint_range(s, width, base)` | A literal that fits `width` bits (0: any width); `inf`, `ninf` and `nan` pass |
+| `validate_string(bytes)` | Bytes that are well-formed UTF-8 |
+
+Three of them are narrower than their names. The range checks test the range
+only, on text the digit check has already passed: `validate_uint_range("", 8,
+10)` and `validate_uint_range(" 5", 8, 10)` are `true`. `validate_digits_for_base`
+does not check the base against the ones a type may declare: in base 1 the one
+digit is `0`. And `validate_string` is the same test as `std::str::from_utf8`;
+NUL and the other control bytes the writer refuses in a string pass it.
+
+**Digits.** `char_to_digit(ch, base)` is the value of one digit, `None` when it
+is no digit of `base`: up to base 36 a letter's case does not matter, above it
+`A` to `Z` are 36 to 61, and bases 64 and 85 use the Base64 and Ascii85
+alphabets. `min_digits_for_type(vt)` is how many digits of the type's base the
+largest value of an integer type of up to 64 bits takes; 0 for a width of 0 or
+above 64, and a float type is answered as if it were an unsigned integer of its
+width.
+
+**Parsing and formatting.** These are the functions the writer and the DOM use.
+Each returns `Err(Error::Argument)` where the C one returns `false` or -1:
+
+| Function | Result |
+|---|---|
+| `parse_int64(s, vt)` / `parse_uint64(s, vt)` | The integer literal in the type's base; refused when it does not fit the type's width (64 when it declares none), and for a `+` or a space before it |
+| `parse_double(s, vt)` / `parse_double_in_base(s, base)` | The float literal (base 10 or 16; `inf`, `ninf` and `nan`, not `-inf`) as the nearest `f64`, rounded once from its exact value |
+| `format_uint64(value, base, min_digits)` / `format_int64(...)` | The digits in base 2 to 62, 64 or 85, padded with zero digits to `min_digits` (which the C function caps at 64). A negative value has no form in bases 64 and 85 |
+| `format_double(value, vt)` | The literal the writer emits under `vt`: the shortest digits that read back to the same `f64`, in base 10 or 16 (any other base fails). A `float` width below 53 rounds first to a significand of that many bits: 16 for `float:16` and 32 for `float:32`, not IEEE binary16's 11 and binary32's 24 |
+| `escape_repl_table()` | A `&'static [u8; 256]`: for each byte, the byte the escape `\` + that byte stands for, 0 for none. The escapes are `t`, `n`, `v`, `f`, `r`, `"` and `\`; the `\x` and `\u` escapes of spec 1.1 take digits and are not in it |
+
+```rust
+use bovnar::literals;
+use bovnar::{ValueTypeFamily, ValueTypeSpec};
+
+fn main() -> Result<(), bovnar::Error> {
+    assert!(literals::validate_identifier("max-speed"));
+    assert!(!literals::validate_identifier("max.speed"));
+    assert!(literals::validate_reference(".axis[2].unit"));
+    assert!(!literals::validate_number("+1"));
+    assert!(!literals::validate_uint_range("256", 8, 10));
+    assert_eq!(literals::char_to_digit('Z', 62), Some(61));
+
+    let u8t = ValueTypeSpec { family: ValueTypeFamily::Uint as i32, width: 8, base: 0 };
+    let f64t = ValueTypeSpec { family: ValueTypeFamily::Float as i32, width: 64, base: 0 };
+    assert_eq!(literals::parse_uint64("255", u8t)?, 255);
+    assert!(literals::parse_uint64("256", u8t).is_err());
+    assert_eq!(literals::format_double(0.1, f64t)?, "1e-1");
+    assert_eq!(literals::parse_double("1e-1", f64t)?, 0.1);
+    assert_eq!(literals::format_uint64(5, 2, 8)?, "00000101");
+    assert_eq!(literals::escape_repl_table()[usize::from(b't')], b'\t');
+    Ok(())
+}
+```
+
+> **`0x` in base 16.** In bases up to 36 the integer parsers are `strtoll` and
+> `strtoull`, which take a `0x` prefix in base 16: `parse_uint64("0x10", …)` under
+> `uint:64,_16` is 16, though no document can carry that literal (the reader
+> refuses `0x10`). Check with `validate_digits_for_base` first where that matters.
+
+`bvn_looks_like_double` is not bound. It answers whether the text contains one
+of `.`, `e`, `E`, `p` and `P`, so `deadbeef` looks like a float to it and `inf`
+does not: a shortcut for the writer's own output, not a test of text from
+anywhere else.
+
 ---
 
 ## 6. `Quantity`
@@ -24718,6 +25544,7 @@ fields and the others are methods:
 | `ieee_bits()` | `Result<Vec<u8>>` | IEEE-754 interchange bytes (binary16…256 for `float`, decimal16…256 for `float_dec`), little-endian word order |
 | `epoch_name()` | `Option<String>` | For a `datetime`, the epoch name (`"unix"`, `"tai"`, …); `None` otherwise |
 | `epoch_mjd()` | `Option<i32>` | For a `datetime`, the epoch's Modified Julian Day; `None` otherwise |
+| `to_civil()` | `Result<CivilDateTime>` | For a `datetime`, its UTC date and time ([§6.5](#65-civil-time-and-calendars)); an error otherwise |
 | `type_key()` | `(i32, u32, u32)` | `(family, width, base)` with the defaults filled in: width 0 is 64, base 0 is 10; a `float_fix` Q and a `datetime` epoch as stored |
 
 Two `Quantity`s are equal when they carry the same literal, sub-second digits,
@@ -24861,6 +25688,119 @@ round-trips.
 result passes the *document* tier: `to_string()` writes what `parse()` reads,
 and `parse()` reads heterogeneous and ragged arrays that `DomDoc::parse` and
 `bovnar validate` refuse. See the note in [§4.1](#41-high-level-api-parse--to_string).
+
+
+### 6.5 Civil time and calendars
+
+A `datetime` value is a count of seconds since its epoch
+([§18](#18-spec-11-additions)). `bovnar::timekeeping` turns such counts into
+civil dates and times and back, and carries the rest of the C library's
+calendar: `bvn_datetime.h` and `bvn_gregorian_date.h`. Every result is computed
+by the C functions, so the crate gives the answers the reader and writer use
+when they read and print an ISO literal. Nothing is read from the host's time
+zone or clock, so the module behaves the same on every target, `wasm32-wasip2`
+included.
+
+```rust
+use bovnar::timekeeping::{self, CivilDateTime, Epoch, GregorianDate};
+use bovnar::{Value, parse_typed};
+
+fn main() -> Result<(), bovnar::Error> {
+    let doc = parse_typed(b"#!bovnar 1.1\n.t = <datetime:64,tai> 1861920036;")?;
+    let Value::Struct(fields) = doc else { unreachable!() };
+    let Value::Quantity(t) = &fields[0].1 else { unreachable!() };
+    assert_eq!(t.to_civil()?.to_string(), "2016-12-31T23:59:60");
+
+    let leap = CivilDateTime::new(2016, 12, 31, 23, 59, 60)?;
+    assert_eq!(timekeeping::utc_to_tai_seconds(&leap)?, 1_861_920_036);
+    let next = timekeeping::tai_seconds_to_utc(1_861_920_037)?;
+    assert_eq!(next.to_string(), "2017-01-01T00:00:00");
+    let unix = timekeeping::epoch_seconds_to_utc(1_750_000_000, Epoch::Unix)?;
+    assert_eq!(unix.to_string(), "2025-06-15T15:06:40");
+
+    // Germany: UTC+1, one hour more in summer
+    let t = timekeeping::utc_to_tai_seconds(&CivilDateTime::new(2024, 7, 1, 12, 0, 0)?)?;
+    let dst = timekeeping::tai_second_is_dls_in_europe(t);
+    let local = timekeeping::tai_seconds_to_local_time(t, 3600, dst)?;
+    assert_eq!(local.to_string(), "2024-07-01T14:00:00");
+
+    assert_eq!(GregorianDate::new(2000, 1, 1)?.to_mjd(), 51544);
+    assert!(GregorianDate::new(2024, 2, 30).is_err());
+    assert_eq!(GregorianDate::normalize(2024, 2, 30)?.to_string(), "2024-03-01");
+    assert_eq!(timekeeping::easter_sunday(2025)?.to_string(), "2025-04-20");
+    let good_friday = GregorianDate::new(2024, 3, 29)?;
+    assert!(good_friday.is_federal_holiday_in_germany());
+    let march = GregorianDate::new(2024, 3, 5)?;
+    assert_eq!(march.last_banking_day_in_month()?.to_string(), "2024-03-28");
+    Ok(())
+}
+```
+
+**The types.** `GregorianDate` is a date of the proleptic Gregorian calendar
+(`bvn_gregorian_date_t`), with astronomical years (1 BC is year 0) from
+`YEAR_MIN` to `YEAR_MAX`, about ±2.5·10¹⁶. `GregorianDate::new(year, month,
+day)` takes only a real date; `GregorianDate::normalize(year, month, day)`
+takes any `i64` fields and carries an out-of-range month or day into the next
+field, as `mktime` does. Its accessors are `year()`, `month()`, `day()`,
+`leap()`, `wday()` (0 = Sunday) and `yday()` (0 = 1 January), the last three
+from the library. `CivilDateTime::new(year, month, day, hour, minute, second)`
+adds a time of day (`bvn_datetime_t`) and checks hour 0–23, minute 0–59 and
+second 0–60; `date()` is its `GregorianDate` and `mjd()` the date's Modified
+Julian Day. Both are `Copy`, `Eq` (through the C equality functions), `Hash`
+and `Ord` (chronological), and `Display` as ISO 8601 (`2016-12-31T23:59:60`).
+`Epoch` is `bvn_epoch_t`: each discriminant is its epoch's MJD
+(`Epoch::mjd()`), `Epoch::from_mjd` of a datetime `Quantity`'s `epoch_mjd()`
+is its epoch, and `Epoch::from_name` resolves the library's names (`"unix"`,
+`"y2000"`, …).
+
+**Seconds and epochs.** The functions are those of the Python binding
+([doc/09 §6.5](09_bovnar_python_bindings.md#65-civil-time-and-calendars)),
+under the same names and with the same arguments:
+
+| Function | C function | Result |
+|---|---|---|
+| `epoch_seconds_to_datetime(seconds, epoch)` | `bvn_dt_epoch_seconds_to_datetime` | The civil time `seconds` after `epoch` on a uniform scale (86400 s a day, no leap seconds); every `i64`, so no `Result` |
+| `datetime_to_epoch_seconds(&dt, epoch)` | `bvn_dt_datetime_to_epoch_seconds` | Its inverse; `second == 60` counts as the next minute's first second |
+| `convert_epoch_seconds(seconds, from, to)` | `bvn_dt_convert_epoch_seconds` | The same count relabelled to another origin; the time scale does not change |
+| `utc_to_tai_seconds(&dt)` | `bvn_dt_utc_to_tai_seconds` | UTC to TAI seconds with the leap-second table (10 s before 1972, 37 s since 2017) |
+| `tai_seconds_to_utc(tai_seconds)` | `bvn_dt_tai_seconds_to_utc` | Its inverse; an inserted leap second is `23:59:60` |
+| `tai_seconds_to_local_time(tai_seconds, utc_offset_seconds, dls_active)` | `bvn_dt_tai_seconds_to_local_time` | Wall-clock time at a fixed offset, one hour later when `dls_active`; the offset must be whole minutes |
+| `tai_second_is_dls_in_europe(tai_second)` | `bvn_dt_tai_second_is_dls_in_europe` | Whether German/European summer time is in force (none before 1980) |
+| `epoch_seconds_from_gps_time(time_of_week_ms, week, epoch)`, `tai_seconds_from_gps_time(time_of_week_ms, week)` | `bvn_dt_epoch_seconds_from_gps_time`, `bvn_dt_tai_seconds_from_gps_time` | GPS week + time of week (ms, rounded to the second) as seconds; GPS time except on `Epoch::Tai`, where the 19 s are added |
+| `epoch_seconds_from_galileo_time(…)`, `tai_seconds_from_galileo_time(…)` | `bvn_dt_epoch_seconds_from_galileo_time`, `bvn_dt_tai_seconds_from_galileo_time` | The same for Galileo System Time |
+| `epoch_seconds_to_utc(seconds, epoch)`, `utc_to_epoch_seconds(&dt, epoch)` | — | A datetime value's UTC time and back, as the reader and writer convert an ISO literal: the leap-second table on tai, the uniform scale on unix, mjd, ntp and y2000; the GNSS epochs are an error |
+| `Quantity::to_civil()` | — | `epoch_seconds_to_utc` of a `datetime` quantity; the sub-second digits stay in `frac` |
+| `a == b`, `a.is_date_equal(&b)`, `a.is_time_equal(&b)` | `bvn_dt_is_equal`, `bvn_dt_is_date_equal`, `bvn_dt_is_time_equal` | Field-wise comparison of two `CivilDateTime` |
+
+GPS and Galileo seconds stay in their own scale: for UTC, take
+`tai_seconds_from_gps_time` to `tai_seconds_to_utc`. A datetime on a GNSS epoch
+has no civil form in the library, which is why `epoch_seconds_to_utc` and
+`to_civil()` refuse it.
+
+**The calendar.** `GregorianDate::from_mjd` / `to_mjd` / `normalize` and `==`
+are `bvn_gregorian_date_from_mjd` / `_to_mjd` / `_normalize` / `_is_equal`;
+`mjd_to_wday`, `mjd_to_yday` and `mjd_in_leap_year` take a bare MJD;
+`easter_sunday_mjd(year)` and `easter_sunday`, `good_friday`, `easter_monday`,
+`ascension_day`, `whit_monday` give Easter and the feasts that hang off it. The
+German calendar is methods of `GregorianDate`: `is_federal_holiday_in_germany`,
+`is_banking_day_in_germany`, `is_business_day_in_germany`;
+`last_banking_day_in_month`, `penultimate_…`, `mid_…`, `first_…`,
+`last_sunday_in_month`, `last_saturday_in_month`;
+`last_banking_day_in_quarter(q)`, `first_banking_day_in_quarter(q)`; the `is_…`
+form of each banking-day getter; and `is_daylight_saving_switch_in_germany`,
+`is_day_before_daylight_saving_switch_in_germany`. The federal holidays are the
+nine that hold in all of Germany, by the rules in force that year (3 October
+from 1990, 17 June from 1954 to 1989, 1 May from 1933). A banking day is Monday
+to Friday, not a holiday and not 24 or 31 December; a business day is Monday to
+Saturday and not a holiday; the mid banking day is the first one on or after
+the 15th.
+
+**Errors.** Where a C function signals failure with a sentinel, a `false` or an
+untouched output — an overflow, an MJD or year outside the supported range, a
+quarter outside 1–4 — the crate returns `Error::Argument`. Not bound:
+`bvn_gregorian_date_to_mjd_fast` (undefined behaviour out of range; `to_mjd()`
+is the checked form) and `bvn_dt_dump` / `bvn_dt_print`, which print to stdout
+(`Display` and `Debug` take their place).
 
 ---
 
@@ -25043,6 +25983,9 @@ read_mem_want_unit(data, options, want_unit: &mut dyn FnMut(&EventData) -> Optio
                    on_verified) -> Result<()>
 
 read_mem_with(data, options, handlers: ReadHandlers) -> Result<()>
+
+read_mem_mirror(data, options, handlers: ReadHandlers,
+                mirror: &mut dyn std::io::Write) -> Result<()>
 ```
 
 Parse BVNR from a byte slice. The options are the `ReadOptions` struct, and the
@@ -25074,6 +26017,29 @@ fn main() -> Result<(), Error> {
         ReadHandlers { on_error: Some(&mut on_error), ..ReadHandlers::default() },
     );
     assert_eq!(recovered.first(), Some(&13)); // the '@'
+    Ok(())
+}
+```
+
+`read_mem_mirror` (and `read_reader_mirror` over a `std::io::Read`) is
+`read_mem_with` with `mirror` receiving every byte the reader consumes — the
+input mirror of `bvnr_open_read_source`, a debugging aid — comments and
+octet-stream payloads included, so after a read that succeeded it holds the
+input. The bytes reach it a piece at a time, each once the reader has parsed
+it: a buffer pulled (up to 64 KiB), a piece fed, an octet-stream chunk. A read
+that fails, or that a handler stops, has mirrored the input up to the start of
+the piece it stopped in. A failing `mirror` ends the read with an `Error::Io`
+with `writing_to_sink`; a panic in it reaches the caller. A `live::DocumentFeed`
+takes one with `set_mirror` ([§4.9](#49-live-documents-through-c-bovnarlive)).
+
+```rust
+use bovnar::{ReadHandlers, ReadOptions, Reader};
+
+fn main() -> Result<(), bovnar::Error> {
+    let mut seen = Vec::new();
+    Reader::new()?.read_mem_mirror(b".a = 1;  # note\n", &ReadOptions::default(),
+                                   ReadHandlers::default(), &mut seen)?;
+    assert_eq!(seen, b".a = 1;  # note\n");
     Ok(())
 }
 ```
@@ -25188,13 +26154,37 @@ The same position is on the `Error` itself — see
 | `Writer::to_mem_with(cap, pretty, unit_flags, emit_version)` | `to_mem` with two more settings: `unit_flags` ([`UnitFlags`](#53-unitflags)) rewrite units on output, `emit_version` leads the document with `#!bovnar <major>.<minor>` |
 | `Writer::to_writer(out, pretty)` | Write to any `std::io::Write`: the document streams into `out` in 64 KiB blocks as it is written, the rest on `flush()` or `finish()`, which flush `out`; no cap on its size |
 | `Writer::to_writer_with(out, cap, pretty, unit_flags, emit_version)` | `to_writer` for a document of at most `cap` bytes (`sink_buffer_exhausted` past it, from the call that pushes the output over it), plus `unit_flags` and `emit_version` as in `to_mem_with` |
+| `Writer::to_mem_with_options(cap, options: WriteOptions)` | `to_mem` with every write option, below |
+| `Writer::to_writer_with_options(out, cap, options: WriteOptions)` | `to_writer_with` with every write option; `cap` `usize::MAX` is no cap |
 
-See [§4.7](#47-files-and-io-streams-stdioread--write) for the I/O writer. Every writer accepts structs and arrays nested up to **255** deep,
+See [§4.7](#47-files-and-io-streams-stdioread--write) for the I/O writer. By default every writer accepts structs and arrays nested up to **255** deep,
 the same limit `Reader` and `parse()` read at. `unit_flags` takes
 [`UnitFlags`](#53-unitflags) — `REDUCE` rewrites each unit and rescales its
 value, `ASCII_EXP` writes `^N` exponents, `NUM_CANONICAL` keeps a rescaled float
 in float shape. `emit_version: true` writes a leading `#!bovnar M.N` naming the
 spec version this build implements, as `write_version()` would.
+
+`WriteOptions` is the whole of `bvnr_write_flags_t` that the C writer
+consults, with a `Default`: `pretty`, `unit_flags`, `emit_version`, the
+nesting caps `max_struct_nesting` and `max_array_nesting` (`0` is 255, as for
+`ReadOptions`; a struct or an array one level deeper fails the write with
+`struct_nesting_too_high` or `array_nesting_too_high`), and `on_event`, the
+observer of [§11.9](#119-observing-the-output-on_event). It holds a boxed
+closure, so it is passed by value and is not `Clone`.
+
+```rust
+use bovnar::{ErrorCode, WriteOptions, Writer};
+
+fn main() -> Result<(), bovnar::Error> {
+    let options = WriteOptions { max_struct_nesting: 2, ..WriteOptions::default() };
+    let mut w = Writer::to_mem_with_options(4096, options)?;
+    w.begin_struct("a")?;
+    w.begin_struct("b")?;
+    let err = w.begin_struct("c").unwrap_err();
+    assert_eq!(err.code(), Some(ErrorCode::StructNestingTooHigh));
+    Ok(())
+}
+```
 
 The high-level `to_string` needs no buffer size: it retries on a writer twice
 the size until the output fits (up to 256 MiB).
@@ -25486,6 +26476,94 @@ fn main() -> Result<(), bovnar::Error> {
 }
 ```
 
+### 11.9 Observing the output: `on_event`
+
+`WriteOptions::on_event` is a `Box<dyn FnMut(&EventData<'_>) -> bool + Send>`
+(`WriteObserver`), called with each event once it has been serialised
+(`bvnr_write_flags_t.on_event`), with what reached the output: under
+`UnitFlags::REDUCE` a rescaled value's new digits and unit, not the ones it was
+written with. Every event the writer serialises reaches it — those of the
+`write_*` methods, `emit`, the struct and array helpers, the mux and
+embedding calls. It is owned by the writer, so it shares state with the code
+around it through an `Arc` (or a channel); it cannot reach the writer itself.
+
+```rust
+use bovnar::units::UnitFlags;
+use bovnar::{Event, Quantity, Unit, ValueTypeFamily, ValueTypeSpec, WriteOptions, Writer};
+use std::sync::{Arc, Mutex};
+
+fn main() -> Result<(), bovnar::Error> {
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let log = Arc::clone(&seen);
+    let options = WriteOptions {
+        unit_flags: UnitFlags::REDUCE,
+        on_event: Some(Box::new(move |d| {
+            if d.event == Event::Data {
+                log.lock().unwrap().push((d.text(), d.value_unit.to_string()));
+            }
+            true
+        })),
+        ..WriteOptions::default()
+    };
+    let mut w = Writer::to_mem_with_options(4096, options)?;
+    let uint = ValueTypeSpec { family: ValueTypeFamily::Uint as i32, width: 64, base: 0 };
+    w.write_quantity("d", &Quantity::new("5", uint, Unit::parse("k~m")?))?;
+    w.finish()?;
+    assert_eq!(w.get_output(), b".d=<uint:64,m>5000;");
+    assert_eq!(*seen.lock().unwrap(), [("5000".to_string(), "m".to_string())]);
+    Ok(())
+}
+```
+
+Returning false fails the write, and the writer, with
+`scanner_callback_failed`: a veto, say of a key that must not leave the
+process. A panic in the observer fails it the same way and reaches the caller
+of the write call that ran it; a later call returns the `Error::Write`.
+
+### 11.10 The C per-type helpers
+
+The bindings write every value through `bvnr_write_event`; each of the C
+per-type helpers has its counterpart, so none is bound itself:
+
+| C helper | Rust |
+|---|---|
+| `bvnr_write_string`, `_null`, `_bool` | `write_string`, `write_null`, `write_bool` |
+| `bvnr_write_uint`, `_sint`, `_float`, `_float_fix`, `_float_dec` | the methods of [§11.3](#113-scalar-write-methods) |
+| their `_unit` forms, `bvnr_writer_set_unit_source` | `write_quantity`, whose `Quantity` carries the unit and its spelling (`unit_source`) |
+| `bvnr_write_datetime` | `write_quantity` with a `datetime` type (the epoch in its `base`, `datetime_epoch_index`) |
+| `bvnr_write_plain` | `event(Event::Data, TokenType::Symbol, …)` after the key, or `write_quantity` of a symbol |
+| `bvnr_write_type_annotation` | `annotation(vt, &unit, unit_source)`, before a value or an array's first row |
+| `bvnr_write_bvnf*`, `bvnr_write_bvni*` | `write_bvnf_base`, `write_bvni`, `write_big_int` ([§11.4](#114-extended-integer-writers)) |
+| `bvnr_write_struct_start`, `_end` | `begin_struct`, `end_struct` ([§11.5](#115-struct-helpers)) |
+
+```rust
+use bovnar::{
+    EmitSpec, Event, Quantity, TokenType, Unit, ValueTypeFamily, ValueTypeSpec, Writer,
+    datetime_epoch_index,
+};
+
+fn main() -> Result<(), bovnar::Error> {
+    let mut w = Writer::to_mem_with(4096, false, 0, true)?; // datetime is spec 1.1
+    w.emit(Event::AssignmentStart, EmitSpec::key("mode"))?;
+    w.event(Event::Data, TokenType::Symbol, ValueTypeSpec::default(), b"auto")?;
+    let tai = datetime_epoch_index("tai").unwrap();
+    let datetime = ValueTypeSpec { family: ValueTypeFamily::Datetime as i32, width: 64, base: tai };
+    w.write_quantity("t", &Quantity::new("1750000000", datetime, Unit::default()))?;
+    let u8_ = ValueTypeSpec { family: ValueTypeFamily::Uint as i32, width: 8, base: 0 };
+    w.emit(Event::AssignmentStart, EmitSpec::key("v"))?;
+    w.annotation(u8_, &Unit::parse("m")?, None)?;
+    w.begin_array_row()?;
+    w.event(Event::Data, TokenType::ArrayNumber, u8_, b"1")?;
+    w.event(Event::Data, TokenType::ArrayNumber, u8_, b"2")?;
+    w.end_array_row()?;
+    w.finish()?;
+    let out = w.get_output();
+    let body = &out[out.iter().position(|&b| b == b'\n').unwrap() + 1..];
+    assert_eq!(body, b".mode=auto;.t=<datetime:64,tai>1750000000;.v=<uint:8,m>[1,2];");
+    Ok(())
+}
+```
+
 ---
 
 ## 12. DOM API
@@ -25527,6 +26605,8 @@ Owning wrapper around `bvn_dom_doc_t`. Dropping it frees the entire tree; the
 | `doc.len()` / `doc.is_empty()` | Number of top-level entries |
 | `doc.entries()` | All top-level `(String, DomNode)` pairs, in document order |
 | `doc.to_value()` | The whole document as a `Value::Struct`, dropping type and unit info. Fails where a node cannot be read as its kind — see `node.to_value()` |
+| `DomDoc::create()` | An empty document to build in (§12.5) |
+| `doc.add(key, node)` | Add a `NewNode` as a top-level entry (§12.5) |
 
 > **File-size limits:** `DomDoc::parse_reader` and `parse_reader_with_policy` take
 > any `std::io::Read` and apply the same ceiling, `DOM_READ_MAX_BYTES`
@@ -25538,10 +26618,11 @@ Owning wrapper around `bvn_dom_doc_t`. Dropping it frees the entire tree; the
 > **The DOM takes no read options.** The C DOM parse functions read with a
 > fixed set (the 255-level nesting, the reader's defaults for everything else),
 > so `ReadOptions` cannot reach them; read with a `Reader` or
-> `parse_with_options` for those limits. The C DOM's tree-building calls
-> (`bvn_dom_node_from_*`, `bvn_dom_struct_add`, …) make a tree that cannot be
-> written out, for the library's own test fixtures, and are not wrapped: build
-> a document as a `Value` or with the `Writer`.
+> `parse_with_options` for those limits.
+>
+> **Building a tree.** `DomDoc::create()` and `doc.add(key, node)` are the C
+> DOM's builder, for a tree made by hand from `NewNode`s (§12.5). Such a tree
+> cannot be written out; build a document as a `Value` or with the `Writer`.
 
 Membership is `get(key).is_some()`, and iteration is `entries()`.
 
@@ -25592,6 +26673,98 @@ Reference=5  Struct=6  Array=7  OctetStream=8  Bool=9
 ```
 
 `DomType::from_raw(i32)` converts a raw C value.
+
+### 12.5 Building a tree (`NewNode`)
+
+`DomDoc::create()` makes an empty document and `NewNode`, `NewStruct` and
+`NewArray` the nodes to put in it: the C DOM's builder (`bvn_dom_doc_create`,
+`bvn_dom_node_alloc`, `bvn_dom_node_from_*`, `bvn_dom_struct_add`,
+`bvn_dom_array_append`, `bvn_dom_doc_add`, doc/08 §4.5). It is there for code
+that consumes a DOM, a test fixture say, and it has the C builder's limits: it
+makes structs, arrays, nulls and integers only, and a built tree **cannot be
+written out**, since the C library has no DOM serialiser. To produce a document,
+use a `Value` or the `Writer`.
+
+```rust
+use bovnar::{DomDoc, NewArray, NewNode, NewStruct, Signedness, Unit, Value};
+use num_bigint::BigInt;
+
+fn main() -> Result<(), bovnar::Error> {
+    let mut server = NewStruct::new()?;
+    server.add("port", NewNode::from_u16(8080)?)?;
+    server.add("tls", NewNode::null()?)?;
+    let mut ports = NewArray::new()?;
+    ports.push(NewNode::from_u16(80)?)?;
+    ports.push(NewNode::from_u16(443)?)?;
+    server.add("ports", ports)?;
+
+    let mut doc = DomDoc::create()?;
+    doc.add("server", server)?;
+    let m = Unit::parse("m")?;
+    let big = BigInt::from(1) << 100;
+    doc.add("big", NewNode::from_bigint(&big, 128, Signedness::Auto, Some(&m))?)?;
+
+    assert_eq!(doc.lookup("server.port").and_then(|n| n.as_u16()), Some(8080));
+    assert_eq!(doc.get("big").map(|n| n.unit_str()), Some("m".to_string()));
+    assert_eq!(
+        doc.lookup("server.ports").map(|n| n.to_value()).transpose()?,
+        Some(Value::Array(vec![Value::Int(80), Value::Int(443)]))
+    );
+    Ok(())
+}
+```
+
+| Constructor / method | Description |
+|---|---|
+| `DomDoc::create()` | An empty document |
+| `doc.add(key, node)` | Add `node` (anything `Into<NewNode>`) as a top-level entry. A parsed document takes one too |
+| `NewNode::null()` | A null node (`bvn_dom_node_alloc`) |
+| `NewNode::from_i8(v)` … `from_u64(v)` | An integer node of type `sint:8` … `uint:64`, with no unit (`bvn_dom_node_from_i8` … `_u64`) |
+| `NewNode::from_bigint(&value, width, signed, unit)` | An integer node of 65 to 32768 bits, with an `Option<&Unit>` (`bvn_dom_node_from_bigint`); `Signedness::Auto` is `sint` for a negative value and `uint` otherwise, as for `write_bvni`. A value that does not fit the type, another width, or a unit that is not structurally valid is `Error::Argument` |
+| `NewStruct::new()` / `s.add(key, node)` | A struct node, and a member added to it (`bvn_dom_struct_add`) |
+| `NewArray::new()` / `a.push(node)` | An array node, and an element appended to it (`bvn_dom_array_append`) |
+| `len()` / `is_empty()` / `dom_type()` | Members or elements of a `NewStruct` / `NewArray`; a `NewNode`'s kind |
+
+Every constructor returns a `Result`, `Error::OutOfMemory` when the C library
+cannot allocate, as `Reader::new` and `Writer::new` do.
+
+**Ownership is a move.** The C attach functions take the node they are given on
+every path: on success the container owns it, and on failure they destroy it.
+`add` and `push` take their node by value, so the type system makes that
+hand-over the last use: a node cannot be added twice, nor a struct filled after
+it was attached (a tree is built from its leaves up), and neither compiles. A
+node dropped before it is attached frees its subtree. All node types are `Send`.
+
+```rust,compile_fail
+use bovnar::{DomDoc, NewNode};
+
+fn main() -> Result<(), bovnar::Error> {
+    let mut doc = DomDoc::create()?;
+    let n = NewNode::from_i32(1)?;
+    doc.add("a", n)?;
+    doc.add("b", n)?; // error[E0382]: use of moved value: `n`
+    Ok(())
+}
+```
+
+`add` fails with `Error::Argument` for a key that is not an identifier (§5.8;
+the C functions refuse only an empty one, but the path lookups could not reach
+another), and with the code `DuplicateStructKey` for a key the struct or
+document already has; the node is dropped then. The kinds are types, so there is
+no appending to a struct or adding to an array. Only an allocation failure
+inside the C call is `Error::OutOfMemory`.
+
+**Reading it back.** A built tree reads through `DomDoc` and `DomNode` like a
+parsed one, with two differences that come from the C builder: an integer node
+of up to 64 bits carries no unit, and a built array records no row shape, so its
+`array_dims()` is 0 and `to_value()` gives one flat array. `doc.add` takes
+`&mut self`, so no `DomNode` is borrowed from the document while it grows.
+
+Not bound: `bvn_dom_node_alloc` of the other kinds (a float, string, symbol,
+reference, bool or octet-stream node it makes holds no value and cannot be given
+one), `bvn_dom_strdup` (a C allocation helper; the attach functions copy the key
+themselves), and `bvn_dom_get_bigint` (a borrowed `bvn_int_t`; `as_int_str()`
+and `to_value()` already read an integer of any width).
 
 ---
 
@@ -25656,8 +26829,11 @@ argument error caught before the library and for an allocation failure.
 | `false` | `false` | Units are dimensionally incompatible → `Error::Argument` |
 
 `unit_convert_factor` fails with `Error::Argument` **only** when both `ok=false`
-and `requires_affine=false`; the result does not carry `ok`, so check
-`requires_affine` before multiplying by `factor`. When it is set, call
+and `requires_affine=false`; for the other three the result's `ok()` method
+gives `ok`, so check it before multiplying by `factor`. It is a method rather
+than a field because a new public field would break code that builds or
+destructures `UnitConversion`; it is exact all the same, since the C function
+never succeeds with a factor of 0.0. When it is `false`, call
 `convert_value`, which handles the two-step affine path, or call
 `unit_to_si_factor` on both units and convert by hand. The `Unit` method
 `convert_factor()` returns the bare number and therefore fails for the `0.0`
@@ -25787,15 +26963,17 @@ rust/
 │   ├── codec.rs      # MuxWriter, MuxReader, FrameReader — the pure-Rust framing codec
 │   ├── currency.rs   # ISO 4217 / crypto currency metadata (read from the C catalogue)
 │   ├── decimal.rs    # Decimal: an exact decimal number (sign, coefficient, exponent)
-│   ├── dom.rs        # DomDoc, DomNode, DomType — random-access DOM
+│   ├── dom.rs        # DomDoc, DomNode, DomType, NewNode — random-access DOM and its builder
 │   ├── enums.rs      # Rust enums mirroring the C enums
 │   ├── error.rs      # Error, ErrorKind, Position
 │   ├── io.rs         # a caller's std::io::Read as a callback source for read_reader / parse_reader
 │   ├── json.rs       # from_json / to_json / detect (the CLI's `bovnar convert`)
+│   ├── literals.rs   # the C validators, literal parsers/formatters, parse_type_annotation
 │   ├── live.rs       # DocumentFeed, ValueFeed, EmbeddedFeed, FrameParser, FramePull, Demux — fed reading through C
 │   ├── quantity.rs   # Quantity — typed, unit-annotated scalar for lossless round-trips
 │   ├── reader.rs     # Reader, ReadOptions, EventData, EventPayload, UnitPolicy, UnitRule
 │   ├── stream.rs     # framing, octet multiplexing, document-in-document
+│   ├── timekeeping.rs # civil time and calendars: GregorianDate, CivilDateTime, Epoch
 │   ├── unit.rs       # Unit, UnitComponent — a unit with equality, hashing and its operations
 │   ├── units.rs      # unit_to_si_factor, unit_convert_factor, etc.
 │   └── writer.rs     # Writer, Base, Signedness, EmitSpec
@@ -25809,7 +26987,8 @@ rust/
 | `src/ffi.rs` | the C declarations and the mirrored C structs |
 | `src/reader.rs` | `Reader`, `ReadOptions`, `EventData`, `EventPayload`, `UnitPolicy`, `UnitRule` |
 | `src/writer.rs` | `Writer`, `Base`, `Signedness`, `EmitSpec` |
-| `src/dom.rs` | `DomDoc`, `DomNode`, `DomType` |
+| `src/dom.rs` | `DomDoc`, `DomNode`, `DomType`, and the builder's `NewNode`, `NewStruct`, `NewArray` |
+| `src/literals.rs` | the C validators and literal helpers, `parse_type_annotation`, `TypeAnnotation` |
 | `src/enums.rs` | the Rust enums behind the C enums, `Exponent` and `Base` |
 | `src/error.rs` | `Error`, `ErrorKind`, `Position` |
 | `src/unit.rs` | `Unit`, `UnitComponent` |
@@ -25819,6 +26998,7 @@ rust/
 | `src/decimal.rs` | `Decimal`, the exact decimal value |
 | `src/currency.rs` | currency metadata |
 | `src/stream.rs` | framing, multiplexing and document-in-document, with their `Read` / `Write` twins |
+| `src/timekeeping.rs` | civil time and calendars: `GregorianDate`, `CivilDateTime`, `Epoch` and the functions of `bvn_datetime.h` / `bvn_gregorian_date.h` |
 | `src/codec.rs` | the incremental framing codec in pure Rust: `MuxWriter`, `MuxReader`, `FrameReader`, the frame writers |
 | `src/live.rs` | fed reading through the C library: `DocumentFeed`, `ValueFeed`, `ValueBuilder`, `EmbeddedFeed`, `FrameParser`, `FramePull`, `Demux` |
 | `src/io.rs` | the `std::io::Read` helpers behind the `_reader` entry points (the sinks of the `_to` ones are in `ffi.rs` and `writer.rs`) |
@@ -25983,7 +27163,8 @@ exposed as:
 - **Datetime family:** `parse` decodes a `<datetime:width,epoch>` value to a
   plain `Value::Int` (signed epoch seconds). With `parse_typed` it is a
   `Quantity` whose `epoch_name()` (`"unix"`, `"tai"`, …) and `epoch_mjd()`
-  recover the epoch; `bovnar::datetime_epoch_index(name)` goes the other way,
+  recover the epoch, and `to_civil()` its UTC date and time
+  ([§6.5](#65-civil-time-and-calendars)); `bovnar::datetime_epoch_index(name)` goes the other way,
   to the index a datetime `ValueTypeSpec` holds in `base`, `None` for an
   unknown name. `to_string()` emits the `<datetime:…>` annotation and
   prepends `#!bovnar 1.1` automatically when the value contains a datetime. With

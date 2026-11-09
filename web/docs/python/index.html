@@ -65,6 +65,7 @@ the C library; <code>import bovnar</code> itself never loads it.</p>
 <li>4.6 <a href="#46-streaming--framing-bovnarstream">Streaming / framing (<code>bovnar.stream</code>)</a></li>
 <li>4.7 <a href="#47-live-streams-feeding-in-pieces">Live streams: feeding in pieces</a></li>
 <li>4.8 <a href="#48-live-streams-writing-a-message-at-a-time">Live streams: writing a message at a time</a></li>
+<li>4.9 <a href="#49-canonical-form">Canonical form</a></li>
 </ul>
 </li>
 <li><a href="#5-unit-helpers">Unit helpers</a><ul>
@@ -75,6 +76,7 @@ the C library; <code>import bovnar</code> itself never loads it.</p>
 <li>5.5 <a href="#55-inline-unit-suffix">Inline unit suffix</a></li>
 <li>5.6 <a href="#56-unitpolicy--validation-and-conversion-without-a-callback"><code>UnitPolicy</code> — validation and conversion without a callback</a></li>
 <li>5.7 <a href="#57-building-a-valueunit">Building a <code>ValueUnit</code></a></li>
+<li>5.8 <a href="#58-validators-and-literal-helpers">Validators and literal helpers</a></li>
 </ul>
 </li>
 <li><a href="#6-quantity"><code>Quantity</code></a><ul>
@@ -82,6 +84,7 @@ the C library; <code>import bovnar</code> itself never loads it.</p>
 <li>6.2 <a href="#62-properties-and-methods">Properties and methods</a></li>
 <li>6.3 <a href="#63-lossless-numeric-access-float_dec-float_fix-float128256">Lossless numeric access (<code>float_dec</code>, <code>float_fix</code>, <code>float:128</code>/<code>256</code>)</a></li>
 <li>6.4 <a href="#64-dumps-integration"><code>dumps()</code> integration</a></li>
+<li>6.5 <a href="#65-civil-time-and-calendars">Civil time and calendars</a></li>
 </ul>
 </li>
 <li><a href="#7-write_array-helper"><code>write_array</code> helper</a></li>
@@ -122,6 +125,8 @@ the C library; <code>import bovnar</code> itself never loads it.</p>
 <li>12.7 <a href="#127-array-helpers">Array helpers</a></li>
 <li>12.8 <a href="#128-low-level-emit">Low-level <code>emit</code></a></li>
 <li>12.9 <a href="#129-octets-embedded-documents-and-mux-streams">Octets, embedded documents and mux streams</a></li>
+<li>12.10 <a href="#1210-observing-the-output-on_event">Observing the output: <code>on_event</code></a></li>
+<li>12.11 <a href="#1211-plain-values-datetimes-and-type-annotations">Plain values, datetimes and type annotations</a></li>
 </ul>
 </li>
 <li><a href="#13-dom-api">DOM API</a><ul>
@@ -129,6 +134,7 @@ the C library; <code>import bovnar</code> itself never loads it.</p>
 <li>13.2 <a href="#132-domdoc"><code>DomDoc</code></a></li>
 <li>13.3 <a href="#133-domnode"><code>DomNode</code></a></li>
 <li>13.4 <a href="#134-domtype"><code>DomType</code></a></li>
+<li>13.5 <a href="#135-building-a-tree-newnode">Building a tree (<code>NewNode</code>)</a></li>
 </ul>
 </li>
 <li><a href="#14-running-the-test-suite">Running the test suite</a></li>
@@ -488,6 +494,8 @@ treatment):</p>
 <span class="n">blob</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">dump_documents</span><span class="p">([{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span> <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">}])</span>   <span class="c1"># list[dict] -&gt; bytes</span>
 <span class="n">docs</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">load_documents</span><span class="p">(</span><span class="n">blob</span><span class="p">)</span>                      <span class="c1"># bytes -&gt; list[dict]</span>
 <span class="n">docs</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">load_documents</span><span class="p">(</span><span class="n">blob</span><span class="p">,</span> <span class="n">continue_past_failed</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># bad docs -&gt; None</span>
+<span class="n">docs</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">load_documents</span><span class="p">(</span><span class="n">blob</span><span class="p">,</span> <span class="n">continue_past_failed</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                             <span class="n">return_errors</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>   <span class="c1"># bad docs -&gt; their error</span>
 
 <span class="c1"># Octet multiplexing: (channel, payload) of any size, interleaved &amp; reassembled</span>
 <span class="n">multiplexed</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">mux_dump</span><span class="p">([(</span><span class="mi">1</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;hello&quot;</span><span class="p">),</span> <span class="p">(</span><span class="mi">42</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;world&quot;</span><span class="p">)])</span>
@@ -496,6 +504,20 @@ treatment):</p>
 <span class="c1"># Document-in-document</span>
 <span class="n">outer</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">embed_document</span><span class="p">(</span><span class="n">bovnar</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">&quot;v&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">}),</span> <span class="n">key</span><span class="o">=</span><span class="s2">&quot;payload&quot;</span><span class="p">)</span>
 <span class="n">inner</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">parse_embedded</span><span class="p">(</span><span class="n">bovnar</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">outer</span><span class="p">)[</span><span class="s2">&quot;payload&quot;</span><span class="p">])</span>   <span class="c1"># {&quot;v&quot;: 1}</span>
+</code></pre></div>
+
+<p>With <code>return_errors=True</code> a document that failed is the <code>BovnarParseError</code>
+it failed with instead of <code>None</code>: its <code>code</code> is the document's error code and
+its <code>index</code> the document's position in the stream (and in the list). The frame
+reader reports the code alone, so the error carries no position.
+<code>FrameFeed(parse=True, continue_past_failed=True, return_errors=True)</code> (§4.7)
+hands out the same.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">bad</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">frame_documents</span><span class="p">([</span><span class="sa">b</span><span class="s2">&quot;.a = 1;&quot;</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;.a = @;&quot;</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;.b = 2;&quot;</span><span class="p">])</span>
+<span class="n">docs</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">load_documents</span><span class="p">(</span><span class="n">bad</span><span class="p">,</span> <span class="n">continue_past_failed</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                             <span class="n">return_errors</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">docs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>                              <span class="c1"># → {&#39;a&#39;: 1}</span>
+<span class="n">docs</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">code</span><span class="o">.</span><span class="n">name</span>                    <span class="c1"># → &#39;UNEXPECTED_INPUT_BYTE&#39;</span>
+<span class="n">docs</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">index</span>                        <span class="c1"># → 1</span>
 </code></pre></div>
 
 <p><code>parse_embedded</code> raises <code>BovnarParseError</code> carrying the inner document's own
@@ -555,12 +577,14 @@ stream and are handed bytes in pieces of any size, cut anywhere:</p>
 <p>All three take the read options of <code>Reader.read_mem</code> (<code>bovnar.READ_OPTIONS</code>,
 §11.2): <code>max_file_size</code>, the text, array, length and nesting caps,
 <code>continue_on_error</code>, <code>strict_version</code>, <code>text_only</code> and the rest. Besides those:
-<code>DocumentFeed</code> takes <code>typed</code>, <code>want_unit</code> and <code>on_error</code>; <code>DemuxFeed(key=None,
+<code>DocumentFeed</code> takes <code>typed</code>, <code>want_unit</code>, <code>on_error</code>, <code>on_unverified</code> and
+<code>mirror</code>; <code>DemuxFeed(key=None,
 max_message=0, typed=False, view=False)</code>, whose <code>recovery_count</code>,
 <code>skipped_bytes</code> and <code>declared_version</code> are those of its reader, as on
 <code>DocumentFeed</code>; <code>FrameFeed(parse=False, typed=False, continue_past_failed=False,
-max_document_size=0, view=False)</code>, where <code>typed</code>, <code>continue_past_failed</code> and
-the read options need <code>parse=True</code> (each parsed document is read under them,
+max_document_size=0, view=False, return_errors=False)</code>, where <code>typed</code>,
+<code>continue_past_failed</code>, <code>return_errors</code> (§4.6) and the read options need
+<code>parse=True</code> (each parsed document is read under them,
 <code>max_file_size</code> capping one document) and <code>view</code> needs <code>parse=False</code>
 (otherwise <code>BovnarArgumentError</code>). <code>DemuxFeed</code>'s <code>key=None</code> demultiplexes every
 octet stream of the document, as <code>mux_load</code> does, while <code>mux_dump</code> and
@@ -621,13 +645,29 @@ text of a fed document is capped as <code>Reader</code>'s is, at 2 147 483 647 b
 (<code>TEXT_DATA_TOO_LONG</code>, doc/10 §1), and an array at as many items: pass
 <code>max_text_bytes=stream.BVNR_NO_LIMIT</code> (and <code>max_array_items</code>) for a document
 that does not end. <code>DemuxFeed</code> and a parsing <code>FrameFeed</code> take both as well.
-<code>DocumentFeed</code> takes the read options of <code>Reader.read_mem</code> and its <code>want_unit</code>
-and <code>on_error</code>, not its event callbacks, which the feed's items stand in for;
-with <code>values=True</code>, <code>typed=True</code> gives <code>Quantity</code> values as
-<code>loads(typed=True)</code> does (<code>typed</code> without <code>values</code>, or neither <code>events</code> nor
-<code>values</code>, is refused). A <code>want_unit</code> or <code>on_error</code> callback runs inside the C
-call, so it may not close the feed or feed it again (<code>BovnarArgumentError</code>). One feed reads one
-document: make a new one for the next.</p>
+<code>DocumentFeed</code> takes the read options of <code>Reader.read_mem</code> and its
+<code>want_unit</code>, <code>on_error</code>, <code>on_unverified</code> and <code>mirror</code>, but not <code>on_verified</code>,
+which the feed's items stand in for; with <code>values=True</code>, <code>typed=True</code> gives
+<code>Quantity</code> values as <code>loads(typed=True)</code> does (<code>typed</code> without <code>values</code>, or
+neither <code>events</code> nor <code>values</code>, is refused). <code>on_unverified(event, data)</code> sees
+the raw lexer events of the bytes each <code>feed()</code> hands over, inside that call:
+the events <code>Reader.read_mem(on_unverified=...)</code> delivers for the whole
+document, wherever it was cut. <code>mirror</code> receives the bytes the reader
+consumes, each piece once the reader has parsed it (§11.2). A <code>want_unit</code>,
+<code>on_error</code> or <code>on_unverified</code> callback runs inside the C call, so it may not
+close the feed or feed it again (<code>BovnarArgumentError</code>); an exception it
+raises, or one the mirror raises, comes out of the <code>feed()</code> or <code>finish()</code> it
+was raised in. One feed reads one document: make a new one for the next.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">raw</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">mirrored</span> <span class="o">=</span> <span class="nb">bytearray</span><span class="p">()</span>
+<span class="n">feed</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">DocumentFeed</span><span class="p">(</span><span class="n">events</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">mirror</span><span class="o">=</span><span class="n">mirrored</span><span class="p">,</span>
+                           <span class="n">on_unverified</span><span class="o">=</span><span class="k">lambda</span> <span class="n">ev</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="n">raw</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ev</span><span class="o">.</span><span class="n">name</span><span class="p">))</span>
+<span class="n">got</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">feed</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;.a = &#39;</span><span class="p">))</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">feed</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;1;&#39;</span><span class="p">))</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">feed</span><span class="o">.</span><span class="n">finish</span><span class="p">())</span>
+<span class="n">got</span>                                  <span class="c1"># → [(&#39;a&#39;, 1)]</span>
+<span class="nb">bytes</span><span class="p">(</span><span class="n">mirrored</span><span class="p">)</span>                      <span class="c1"># → b&#39;.a = 1;&#39;</span>
+<span class="n">raw</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span>                              <span class="c1"># → [&#39;STREAM_START&#39;, &#39;ASSIGNMENT_START&#39;]</span>
+</code></pre></div>
+
 <div class="codehilite"><pre><span></span><code><span class="n">frames</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">FrameFeed</span><span class="p">(</span><span class="n">parse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">blob</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">dump_documents</span><span class="p">([{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span> <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">}])</span>
 <span class="n">docs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">frames</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="n">blob</span><span class="p">[:</span><span class="mi">30</span><span class="p">]))</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">frames</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="n">blob</span><span class="p">[</span><span class="mi">30</span><span class="p">:]))</span>
@@ -856,6 +896,47 @@ message, the median over its runs:</p>
 one per 64 KiB batched: about 3 µs on a small message, which is the price of
 the reader having it at once. Large messages are dominated by the copy either
 way.</p>
+<h3 id="49-canonical-form">4.9 Canonical form</h3>
+<p><code>bovnar.canonicalize(data, *, pretty=False, **options)</code> re-serialises a
+document from its verified events through the C library's canonicalising
+observer (<code>bvnr_canon_observer_*</code>, doc/08 §3.6) and returns the bytes;
+<code>bovnar.canonicalize_to(data, out, *, pretty=False, **options)</code> writes them to
+<code>out</code> — a writable binary file object, a socket or a <code>bytearray</code> — as they are
+made, in 64 KiB pieces. <code>data</code> is bytes, or a socket or binary file object read
+to its end as the parse pulls it, so neither the input nor the output need be
+held whole.</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">bovnar</span>
+
+<span class="n">doc</span> <span class="o">=</span> <span class="sa">b</span><span class="s1">&#39;.a = 1 ;  # one</span><span class="se">\n</span><span class="s1">.b = { .c = &quot;x&quot;; };&#39;</span>
+<span class="n">canon</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">canonicalize</span><span class="p">(</span><span class="n">doc</span><span class="p">)</span>
+<span class="n">canon</span>                                <span class="c1"># → b&#39;.a=&lt;uint:64,_10,no_unit&gt;1;.b={.c=&lt;utf8&gt;&quot;x&quot;;};&#39;</span>
+<span class="n">bovnar</span><span class="o">.</span><span class="n">canonicalize</span><span class="p">(</span><span class="n">canon</span><span class="p">)</span> <span class="o">==</span> <span class="n">canon</span>  <span class="c1"># → True</span>
+<span class="n">bovnar</span><span class="o">.</span><span class="n">canonicalize</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;.b={.c=&quot;x&quot;;};.a=1; &#39;</span><span class="p">)</span> <span class="o">==</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">canonicalize</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;.a=1;.b={.c=&quot;x&quot;;};&#39;</span><span class="p">)</span>  <span class="c1"># → False</span>
+</code></pre></div>
+
+<p>It is the form <code>bovnar events -d</code> prints (<code>-p</code> for <code>pretty=True</code>): the
+compact one is a single line with no whitespace outside literals, each value
+written with the annotation the reader gives it (<code>1</code> as
+<code>&lt;uint:64,_10,no_unit&gt;1</code>). Two documents that differ only in layout, comments
+and the spelling of separators canonicalise to the same bytes, and
+canonicalising the output again gives it back unchanged; the order of the keys
+is kept, so documents that differ in it stay apart. Units are written as the
+document spelled them: this is not <code>bovnar pretty-print --canonical</code>, which
+writes through a writer under <code>UnitFlags.REDUCE | UnitFlags.NUM_CANONICAL</code>
+and folds them to one form. A leading <code>#!bovnar M.N</code> directive is kept — for a
+stream it is found in the first bytes pulled, before the reader sees them.</p>
+<p>The keywords are the read options of <code>Reader.read_mem</code> (<code>bovnar.READ_OPTIONS</code>,
+§11.2), all <code>0</code> / <code>False</code> by default. A document the reader refuses raises
+<code>BovnarParseError</code> with the reader's code and position. Under
+<code>continue_on_error</code> a document the reader had to recover from raises it too,
+with the first error recovered from: the observer writes what it is fed, and
+the statement a recovery leaves without its value would make the output
+unreadable. An exception the input or <code>out</code> raises comes out unchanged; after
+an error <code>out</code> may hold the start of the output.</p>
+<p>The observer's C function is installed as the reader's <code>on_verified</code> itself,
+with the observer as its userdata, so no Python runs per event: Python is
+called for the output a 64 KiB piece at a time, and for the input of a
+stream a pull at a time.</p>
 <hr />
 <h2 id="5-unit-helpers">5. Unit helpers</h2>
 <div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">bovnar</span>
@@ -976,7 +1057,8 @@ out) wherever it takes a <code>ValueUnit</code>, so <code>unit_to_str(q.unit)</c
 
 <span class="c1"># Conversion factor between two compatible units</span>
 <span class="n">c</span> <span class="o">=</span> <span class="n">unit_convert_factor</span><span class="p">(</span><span class="n">vu_from</span><span class="p">,</span> <span class="n">vu_to</span><span class="p">)</span>
-<span class="c1"># c.factor, c.requires_affine</span>
+<span class="c1"># c.factor, c.requires_affine, c.ok — ok is False (and factor 0.0) for an</span>
+<span class="c1"># affine conversion whose offsets do not cancel, °C → K: use convert_value</span>
 
 <span class="c1"># 7-element SI dimension exponent vector [m, kg, s, A, K, mol, cd]</span>
 <span class="n">dims</span> <span class="o">=</span> <span class="n">unit_dimension_vector</span><span class="p">(</span><span class="n">vu</span><span class="p">)</span>       <span class="c1"># e.g. [1, 0, -1, 0, 0, 0, 0] for m/s</span>
@@ -1250,6 +1332,193 @@ refuses together (§5.6), and the distinction survives a round trip:</p>
 <span class="nb">bytes</span><span class="p">(</span><span class="n">make_unit_none</span><span class="p">())</span> <span class="o">!=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">make_unit_dimensionless</span><span class="p">())</span>   <span class="c1"># True</span>
 </code></pre></div>
 
+<h3 id="58-validators-and-literal-helpers">5.8 Validators and literal helpers</h3>
+<p><code>bovnar.literals</code> binds the C library's checks and literal helpers
+(<code>bovnar.h</code>): the tests the writer applies to keys, symbols, references and
+numbers, the integer and float parsers and formatters behind it, and the parser
+of a type annotation. Each function is the C function of the same name without
+its <code>bvn_</code> prefix, and answers as it does. Text holding NUL is none of the
+things they check: a validator answers <code>False</code> for it, a parser raises.</p>
+<p><strong>Type annotations.</strong> <code>parse_type_annotation(text)</code> parses the text between the
+angle brackets, as the reader does, into a frozen <code>TypeAnnotation</code> of
+<code>value_type</code> (a <code>ValueTypeSpec</code>), <code>unit</code> (a <code>ValueUnit</code>, with no components when
+there is no unit or it is spelled <code>no_unit</code>) and <code>unit_source</code> (the unit
+parameter as written, <code>''</code> when there is none):</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">literals</span><span class="p">,</span> <span class="n">BovnarParseError</span>
+
+<span class="n">a</span> <span class="o">=</span> <span class="n">literals</span><span class="o">.</span><span class="n">parse_type_annotation</span><span class="p">(</span><span class="s2">&quot;uint:32,_16,k~g&quot;</span><span class="p">)</span>
+<span class="n">a</span><span class="o">.</span><span class="n">value_type</span><span class="o">.</span><span class="n">width</span><span class="p">,</span> <span class="n">a</span><span class="o">.</span><span class="n">value_type</span><span class="o">.</span><span class="n">base</span>     <span class="c1"># → (32, 16)</span>
+<span class="n">a</span><span class="o">.</span><span class="n">unit</span>                                    <span class="c1"># → &quot;k~g&quot;</span>
+<span class="n">a</span><span class="o">.</span><span class="n">unit_source</span>                             <span class="c1"># → &quot;k~g&quot;</span>
+<span class="n">literals</span><span class="o">.</span><span class="n">parse_type_annotation</span><span class="p">(</span><span class="s2">&quot;float:64,ucum:mL</span><span class="si">{total}</span><span class="s2">&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">unit_source</span>   <span class="c1"># → &quot;ucum:mL{total}&quot;</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="n">literals</span><span class="o">.</span><span class="n">parse_type_annotation</span><span class="p">(</span><span class="s2">&quot;uint:8,_16,_16&quot;</span><span class="p">)</span>    <span class="c1"># a base given twice</span>
+<span class="k">except</span> <span class="n">BovnarParseError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="n">refused</span> <span class="o">=</span> <span class="n">e</span><span class="o">.</span><span class="n">code</span>
+<span class="n">refused</span><span class="o">.</span><span class="n">name</span>                              <span class="c1"># → &quot;ILLEGAL_VALUE_TYPE&quot;</span>
+</code></pre></div>
+
+<p>A refusal is a <code>BovnarParseError</code> whose <code>code</code> is the one the reader gives the
+same annotation in a document, so it tells the C function's three flags apart:</p>
+<table>
+<thead>
+<tr>
+<th><code>code</code></th>
+<th>C flags</th>
+<th>Cause</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ILLEGAL_VALUE_TYPE</code></td>
+<td><code>type_ok</code> false</td>
+<td>An unknown family, an empty or repeated parameter, a parameter the family does not take (a base on <code>float_fix</code>, a width on <code>bool</code>), a width or base out of range</td>
+</tr>
+<tr>
+<td><code>UNIT_TOO_LONG</code></td>
+<td><code>unit_ok</code> false, <code>unit_too_long</code> true</td>
+<td>A unit parameter over 255 bytes</td>
+</tr>
+<tr>
+<td><code>UNIT_ILLEGAL</code>, <code>UNIT_PROFILE_UNKNOWN</code>, <code>UNIT_PROFILE_UNSUPPORTED</code></td>
+<td><code>unit_ok</code> false</td>
+<td>A unit parameter that is not a unit this build knows; the code is the one <code>unit_error_code()</code> gives it (§5.1)</td>
+</tr>
+</tbody>
+</table>
+<p>The reader's version gates are not applied: <code>datetime</code> (spec 1.1) and a profile
+unit (spec 1.2) parse here whatever version a document declares. A <code>datetime</code>'s
+epoch is no unit: its index is in <code>value_type.base</code> (<code>datetime_epoch_index</code>,
+§19), as a <code>float_fix</code>'s q is.</p>
+<p><strong>Validators.</strong> Each returns a <code>bool</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th><code>True</code> for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>validate_identifier(s)</code></td>
+<td>A key: an ASCII letter, <code>_</code> or a character from U+00C0 on, then no space, control character, U+0080 to U+00BF, or punctuation spec §4.2 forbids (<code>-</code> and <code>+</code> are allowed). No length limit: the reader's <code>max_identifier_length</code> (255) is separate</td>
+</tr>
+<tr>
+<td><code>validate_symbol(s)</code></td>
+<td>A symbol, which is spelled as a key is</td>
+</tr>
+<tr>
+<td><code>validate_reference(s)</code></td>
+<td>A path such as <code>.a.b[0]</code>, without the <code>&amp;</code>: identifier segments, each with optional <code>[digits]</code> indexes</td>
+</tr>
+<tr>
+<td><code>validate_number(s)</code></td>
+<td>A decimal number: an optional <code>-</code>, digits with at most one <code>.</code>, an optional <code>e</code>/<code>E</code> exponent. No <code>+</code>, and not <code>inf</code></td>
+</tr>
+<tr>
+<td><code>is_special_number_string(s)</code></td>
+<td>Exactly <code>inf</code>, <code>ninf</code> or <code>nan</code></td>
+</tr>
+<tr>
+<td><code>validate_digits_for_base(s, base)</code></td>
+<td>An integer literal: an optional <code>-</code> and digits of <code>base</code> (no sign at all in bases 64 and 85, where <code>+</code> and <code>-</code> are digits)</td>
+</tr>
+<tr>
+<td><code>validate_number_in_base(s, base)</code></td>
+<td>A quoted float literal: either sign, digits of <code>base</code> with at most one <code>.</code>, and an exponent marked <code>e</code> (bases up to 14) or <code>p</code> (the power-of-two bases up to 16)</td>
+</tr>
+<tr>
+<td><code>validate_uint_range(s, width, base=10)</code> / <code>validate_sint_range(s, width, base=10)</code></td>
+<td>A literal that fits <code>width</code> bits (0: any width); <code>inf</code>, <code>ninf</code> and <code>nan</code> pass</td>
+</tr>
+<tr>
+<td><code>validate_string(data)</code></td>
+<td>Bytes that are well-formed UTF-8</td>
+</tr>
+</tbody>
+</table>
+<div class="codehilite"><pre><span></span><code><span class="n">literals</span><span class="o">.</span><span class="n">validate_identifier</span><span class="p">(</span><span class="s2">&quot;max-speed&quot;</span><span class="p">)</span>      <span class="c1"># → True</span>
+<span class="n">literals</span><span class="o">.</span><span class="n">validate_identifier</span><span class="p">(</span><span class="s2">&quot;max.speed&quot;</span><span class="p">)</span>      <span class="c1"># → False</span>
+<span class="n">literals</span><span class="o">.</span><span class="n">validate_reference</span><span class="p">(</span><span class="s2">&quot;.axis[2].unit&quot;</span><span class="p">)</span>   <span class="c1"># → True</span>
+<span class="n">literals</span><span class="o">.</span><span class="n">validate_number</span><span class="p">(</span><span class="s2">&quot;+1&quot;</span><span class="p">)</span>                 <span class="c1"># → False</span>
+<span class="n">literals</span><span class="o">.</span><span class="n">validate_digits_for_base</span><span class="p">(</span><span class="s2">&quot;-ff&quot;</span><span class="p">,</span> <span class="mi">16</span><span class="p">)</span>   <span class="c1"># → True</span>
+<span class="n">literals</span><span class="o">.</span><span class="n">validate_uint_range</span><span class="p">(</span><span class="s2">&quot;256&quot;</span><span class="p">,</span> <span class="mi">8</span><span class="p">)</span>         <span class="c1"># → False</span>
+<span class="n">literals</span><span class="o">.</span><span class="n">validate_sint_range</span><span class="p">(</span><span class="s2">&quot;-80&quot;</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">16</span><span class="p">)</span>     <span class="c1"># → True</span>
+</code></pre></div>
+
+<p>Three of them are narrower than their names. The range checks test the range
+only, on text the digit check has already passed: <code>validate_uint_range("", 8)</code>
+and <code>validate_uint_range(" 5", 8)</code> are <code>True</code>. <code>validate_digits_for_base</code> does
+not check the base against the ones a type may declare: in base 1 the one digit
+is <code>0</code>. And <code>validate_string</code> is the same test as <code>data.decode('utf-8')</code>; NUL and
+the other control bytes the writer refuses in a string pass it.</p>
+<p><strong>Digits.</strong> <code>char_to_digit(ch, base)</code> is the value of one digit, <code>None</code> when it
+is no digit of <code>base</code>: up to base 36 a letter's case does not matter, above it
+<code>A</code> to <code>Z</code> are 36 to 61, and bases 64 and 85 use the Base64 and Ascii85
+alphabets. <code>min_digits_for_type(vt)</code> is how many digits of the type's base the
+largest value of an integer type of up to 64 bits takes; 0 for a width of 0 or
+above 64, and a float type is answered as if it were an unsigned integer of its
+width.</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_type_spec</span><span class="p">,</span> <span class="n">ValueTypeFamily</span>
+
+<span class="n">literals</span><span class="o">.</span><span class="n">char_to_digit</span><span class="p">(</span><span class="s2">&quot;Z&quot;</span><span class="p">,</span> <span class="mi">62</span><span class="p">)</span>     <span class="c1"># → 61</span>
+<span class="n">literals</span><span class="o">.</span><span class="n">char_to_digit</span><span class="p">(</span><span class="s2">&quot;g&quot;</span><span class="p">,</span> <span class="mi">16</span><span class="p">)</span>     <span class="c1"># → None</span>
+<span class="n">literals</span><span class="o">.</span><span class="n">min_digits_for_type</span><span class="p">(</span><span class="n">make_type_spec</span><span class="p">(</span><span class="n">ValueTypeFamily</span><span class="o">.</span><span class="n">UINT</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">16</span><span class="p">))</span>   <span class="c1"># → 2</span>
+</code></pre></div>
+
+<p><strong>Parsing and formatting.</strong> These are the functions the writer and the DOM use.
+Each raises <code>BovnarArgumentError</code> where the C one returns <code>false</code> or -1:</p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>parse_int64(s, vt)</code> / <code>parse_uint64(s, vt)</code></td>
+<td>The integer literal in the type's base; refused when it does not fit the type's width (64 when it declares none), and for a <code>+</code> or a space before it</td>
+</tr>
+<tr>
+<td><code>parse_double(s, vt)</code> / <code>parse_double_in_base(s, base)</code></td>
+<td>The float literal (base 10 or 16; <code>inf</code>, <code>ninf</code> and <code>nan</code>, not <code>-inf</code>) as the nearest double, rounded once from its exact value</td>
+</tr>
+<tr>
+<td><code>format_uint64(value, base=10, min_digits=0)</code> / <code>format_int64(...)</code></td>
+<td>The digits in base 2 to 62, 64 or 85, padded with zero digits to <code>min_digits</code> (which the C function caps at 64). A negative value has no form in bases 64 and 85</td>
+</tr>
+<tr>
+<td><code>format_double(value, vt)</code></td>
+<td>The literal the writer emits under <code>vt</code>: the shortest digits that read back to the same double, in base 10 or 16 (any other base raises). A <code>float</code> width below 53 rounds first to a significand of that many bits: 16 for <code>float:16</code> and 32 for <code>float:32</code>, not IEEE binary16's 11 and binary32's 24</td>
+</tr>
+<tr>
+<td><code>escape_repl_table()</code></td>
+<td>A <code>dict</code> of each escape letter to the character it stands for: <code>t</code>, <code>n</code>, <code>v</code>, <code>f</code>, <code>r</code>, <code>"</code> and <code>\</code>. The <code>\x</code> and <code>\u</code> escapes of spec 1.1 take digits and are not in it</td>
+</tr>
+</tbody>
+</table>
+<div class="codehilite"><pre><span></span><code><span class="n">u8</span> <span class="o">=</span> <span class="n">make_type_spec</span><span class="p">(</span><span class="n">ValueTypeFamily</span><span class="o">.</span><span class="n">UINT</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+<span class="n">f64</span> <span class="o">=</span> <span class="n">make_type_spec</span><span class="p">(</span><span class="n">ValueTypeFamily</span><span class="o">.</span><span class="n">FLOAT</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+<span class="n">literals</span><span class="o">.</span><span class="n">parse_uint64</span><span class="p">(</span><span class="s2">&quot;255&quot;</span><span class="p">,</span> <span class="n">u8</span><span class="p">)</span>        <span class="c1"># → 255</span>
+<span class="n">literals</span><span class="o">.</span><span class="n">format_double</span><span class="p">(</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">f64</span><span class="p">)</span>        <span class="c1"># → &quot;1e-1&quot;</span>
+<span class="n">literals</span><span class="o">.</span><span class="n">parse_double</span><span class="p">(</span><span class="s2">&quot;1e-1&quot;</span><span class="p">,</span> <span class="n">f64</span><span class="p">)</span>      <span class="c1"># → 0.1</span>
+<span class="n">literals</span><span class="o">.</span><span class="n">format_uint64</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">8</span><span class="p">)</span>         <span class="c1"># → &quot;00000101&quot;</span>
+<span class="n">literals</span><span class="o">.</span><span class="n">escape_repl_table</span><span class="p">()[</span><span class="s2">&quot;t&quot;</span><span class="p">]</span>       <span class="c1"># → &quot;\t&quot;</span>
+</code></pre></div>
+
+<blockquote>
+<p><strong><code>0x</code> in base 16.</strong> In bases up to 36 the integer parsers are <code>strtoll</code> and
+<code>strtoull</code>, which take a <code>0x</code> prefix in base 16:
+<code>parse_uint64("0x10", make_type_spec(ValueTypeFamily.UINT, 64, 16))</code> is 16,
+though no document can carry that literal (the reader refuses <code>0x10</code>). Check
+with <code>validate_digits_for_base</code> first where that matters.</p>
+</blockquote>
+<p><code>bvn_looks_like_double</code> is not bound. It answers whether the text contains one
+of <code>.</code>, <code>e</code>, <code>E</code>, <code>p</code> and <code>P</code>, so <code>deadbeef</code> looks like a float to it and <code>inf</code>
+does not: a shortcut for the writer's own output, not a test of text from
+anywhere else.</p>
 <hr />
 <h2 id="6-quantity">6. <code>Quantity</code></h2>
 <p><code>Quantity</code> is a typed, unit-annotated scalar value that preserves the original
@@ -1363,6 +1632,11 @@ is stored under the format's own spelling (<code>inf</code>, <code>ninf</code>, 
 <td>For a <code>datetime</code>, the epoch's Modified Julian Day; <code>None</code> otherwise</td>
 </tr>
 <tr>
+<td><code>q.to_civil()</code></td>
+<td><code>CivilDateTime</code></td>
+<td>For a <code>datetime</code>, its UTC date and time (<a href="#65-civil-time-and-calendars">§6.5</a>); raises otherwise</td>
+</tr>
+<tr>
 <td><code>q.datetime_fraction</code></td>
 <td><code>str \| None</code></td>
 <td>For a <code>datetime</code> written as a literal with a fractional second, the verbatim sub-second digits (spec 1.1); <code>None</code> otherwise</td>
@@ -1427,6 +1701,188 @@ result passes the <em>document</em> tier: <code>dumps()</code> writes what <code
 <code>loads()</code> reads heterogeneous and ragged arrays that <code>dom_parse</code> and
 <code>bovnar validate</code> refuse. See the note in
 <a href="#41-high-level-api-loads--dumps">§4.1</a>.</p>
+<h3 id="65-civil-time-and-calendars">6.5 Civil time and calendars</h3>
+<p>A <code>datetime</code> value is a count of seconds since its epoch
+(<a href="#19-spec-11-additions">§19</a>). <code>bovnar.timekeeping</code> turns such counts into
+civil dates and times and back, and carries the rest of the C library's
+calendar: <code>bvn_datetime.h</code> and <code>bvn_gregorian_date.h</code>. Every result is computed
+by the C functions, so the binding gives the answers the reader and writer use
+when they read and print an ISO literal. Nothing is read from the host's time
+zone or clock.</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">bovnar</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bovnar.timekeeping</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">CivilDateTime</span><span class="p">,</span> <span class="n">Epoch</span><span class="p">,</span> <span class="n">GregorianDate</span><span class="p">,</span> <span class="n">easter_sunday</span><span class="p">,</span> <span class="n">epoch_seconds_to_utc</span><span class="p">,</span>
+    <span class="n">tai_second_is_dls_in_europe</span><span class="p">,</span> <span class="n">tai_seconds_to_local_time</span><span class="p">,</span> <span class="n">tai_seconds_to_utc</span><span class="p">,</span>
+    <span class="n">utc_to_tai_seconds</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">q</span> <span class="o">=</span> <span class="n">bovnar</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;#!bovnar 1.1</span><span class="se">\n</span><span class="s1">.t = &lt;datetime:64,tai&gt; 1861920036;&#39;</span><span class="p">,</span>
+                 <span class="n">typed</span><span class="o">=</span><span class="kc">True</span><span class="p">)[</span><span class="s1">&#39;t&#39;</span><span class="p">]</span>
+<span class="nb">str</span><span class="p">(</span><span class="n">q</span><span class="o">.</span><span class="n">to_civil</span><span class="p">())</span>                                   <span class="c1"># → &#39;2016-12-31T23:59:60&#39;</span>
+
+<span class="n">leap</span> <span class="o">=</span> <span class="n">CivilDateTime</span><span class="p">(</span><span class="mi">2016</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">31</span><span class="p">,</span> <span class="mi">23</span><span class="p">,</span> <span class="mi">59</span><span class="p">,</span> <span class="mi">60</span><span class="p">)</span>
+<span class="n">utc_to_tai_seconds</span><span class="p">(</span><span class="n">leap</span><span class="p">)</span>                            <span class="c1"># → 1861920036</span>
+<span class="nb">str</span><span class="p">(</span><span class="n">tai_seconds_to_utc</span><span class="p">(</span><span class="mi">1861920037</span><span class="p">))</span>                 <span class="c1"># → &#39;2017-01-01T00:00:00&#39;</span>
+<span class="nb">str</span><span class="p">(</span><span class="n">epoch_seconds_to_utc</span><span class="p">(</span><span class="mi">1750000000</span><span class="p">,</span> <span class="n">Epoch</span><span class="o">.</span><span class="n">UNIX</span><span class="p">))</span>   <span class="c1"># → &#39;2025-06-15T15:06:40&#39;</span>
+
+<span class="n">t</span> <span class="o">=</span> <span class="n">utc_to_tai_seconds</span><span class="p">(</span><span class="n">CivilDateTime</span><span class="p">(</span><span class="mi">2024</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">12</span><span class="p">))</span>
+<span class="nb">str</span><span class="p">(</span><span class="n">tai_seconds_to_local_time</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="mi">3600</span><span class="p">,</span> <span class="n">tai_second_is_dls_in_europe</span><span class="p">(</span><span class="n">t</span><span class="p">)))</span>  <span class="c1"># → &#39;2024-07-01T14:00:00&#39;</span>
+
+<span class="n">GregorianDate</span><span class="p">(</span><span class="mi">2000</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">to_mjd</span><span class="p">()</span>                  <span class="c1"># → 51544</span>
+<span class="nb">str</span><span class="p">(</span><span class="n">GregorianDate</span><span class="o">.</span><span class="n">normalize</span><span class="p">(</span><span class="mi">2024</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">30</span><span class="p">))</span>           <span class="c1"># → &#39;2024-03-01&#39;</span>
+<span class="nb">str</span><span class="p">(</span><span class="n">easter_sunday</span><span class="p">(</span><span class="mi">2025</span><span class="p">))</span>                            <span class="c1"># → &#39;2025-04-20&#39;</span>
+<span class="n">GregorianDate</span><span class="p">(</span><span class="mi">2024</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">29</span><span class="p">)</span><span class="o">.</span><span class="n">is_federal_holiday_in_germany</span><span class="p">()</span>      <span class="c1"># → True  (Good Friday)</span>
+<span class="nb">str</span><span class="p">(</span><span class="n">GregorianDate</span><span class="p">(</span><span class="mi">2024</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span><span class="o">.</span><span class="n">last_banking_day_in_month</span><span class="p">())</span>      <span class="c1"># → &#39;2024-03-28&#39;</span>
+</code></pre></div>
+
+<p><strong>The types.</strong> <code>GregorianDate(year, month, day)</code> is a date of the proleptic
+Gregorian calendar (<code>bvn_gregorian_date_t</code>), with astronomical years (1 BC is
+year 0) from <code>YEAR_MIN</code> to <code>YEAR_MAX</code>, about ±2.5·10¹⁶. The constructor takes
+only a real date; <code>GregorianDate.normalize(year, month, day)</code> carries an
+out-of-range month or day into the next field instead, as <code>mktime</code> does. Its
+<code>leap</code>, <code>wday</code> (0 = Sunday) and <code>yday</code> (0 = 1 January) come from the library.
+<code>CivilDateTime(year, month, day, hour=0, minute=0, second=0)</code> adds a time of
+day (<code>bvn_datetime_t</code>) and checks hour 0–23, minute 0–59 and second 0–60;
+<code>.date</code> is its <code>GregorianDate</code> and <code>.mjd</code> the date's Modified Julian Day. Both
+are frozen and hashable, compare with the C equality functions, order
+chronologically, print as ISO 8601 (<code>2016-12-31T23:59:60</code>) and convert to
+<code>datetime.date</code> / <code>datetime.datetime</code> with <code>to_date()</code> / <code>to_datetime()</code> where
+those can hold the value (years 1–9999, no leap second). <code>Epoch</code> is
+<code>bvn_epoch_t</code>: each member's value is its epoch's MJD, so <code>Epoch(q.epoch_mjd)</code>
+is the epoch of a datetime <code>Quantity</code>, and an epoch argument may also be given
+as that int or as the library's name (<code>"unix"</code>, <code>"y2000"</code>, …).</p>
+<p><strong>Seconds and epochs.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>C function</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>epoch_seconds_to_datetime(seconds, epoch)</code></td>
+<td><code>bvn_dt_epoch_seconds_to_datetime</code></td>
+<td>The civil time <code>seconds</code> after <code>epoch</code> on a uniform scale (86400 s a day, no leap seconds); every int64</td>
+</tr>
+<tr>
+<td><code>datetime_to_epoch_seconds(dt, epoch)</code></td>
+<td><code>bvn_dt_datetime_to_epoch_seconds</code></td>
+<td>Its inverse; <code>second == 60</code> counts as the next minute's first second</td>
+</tr>
+<tr>
+<td><code>convert_epoch_seconds(seconds, epoch_from, epoch_to)</code></td>
+<td><code>bvn_dt_convert_epoch_seconds</code></td>
+<td>The same count relabelled to another origin; the time scale does not change</td>
+</tr>
+<tr>
+<td><code>utc_to_tai_seconds(dt)</code></td>
+<td><code>bvn_dt_utc_to_tai_seconds</code></td>
+<td>UTC to TAI seconds with the leap-second table (10 s before 1972, 37 s since 2017)</td>
+</tr>
+<tr>
+<td><code>tai_seconds_to_utc(tai_seconds)</code></td>
+<td><code>bvn_dt_tai_seconds_to_utc</code></td>
+<td>Its inverse; an inserted leap second is <code>23:59:60</code></td>
+</tr>
+<tr>
+<td><code>tai_seconds_to_local_time(tai_seconds, utc_offset_seconds, dls_active)</code></td>
+<td><code>bvn_dt_tai_seconds_to_local_time</code></td>
+<td>Wall-clock time at a fixed offset, one hour later when <code>dls_active</code>; the offset must be whole minutes</td>
+</tr>
+<tr>
+<td><code>tai_second_is_dls_in_europe(tai_second)</code></td>
+<td><code>bvn_dt_tai_second_is_dls_in_europe</code></td>
+<td>Whether German/European summer time is in force (none before 1980)</td>
+</tr>
+<tr>
+<td><code>epoch_seconds_from_gps_time(time_of_week_ms, week, epoch)</code>, <code>tai_seconds_from_gps_time(time_of_week_ms, week)</code></td>
+<td><code>bvn_dt_epoch_seconds_from_gps_time</code>, <code>bvn_dt_tai_seconds_from_gps_time</code></td>
+<td>GPS week + time of week (ms, rounded to the second) as seconds; GPS time except on <code>Epoch.TAI</code>, where the 19 s are added</td>
+</tr>
+<tr>
+<td><code>epoch_seconds_from_galileo_time(…)</code>, <code>tai_seconds_from_galileo_time(…)</code></td>
+<td><code>bvn_dt_epoch_seconds_from_galileo_time</code>, <code>bvn_dt_tai_seconds_from_galileo_time</code></td>
+<td>The same for Galileo System Time</td>
+</tr>
+<tr>
+<td><code>epoch_seconds_to_utc(seconds, epoch)</code>, <code>utc_to_epoch_seconds(dt, epoch)</code></td>
+<td>—</td>
+<td>A datetime value's UTC time and back, as the reader and writer convert an ISO literal: the leap-second table on tai, the uniform scale on unix, mjd, ntp and y2000; the GNSS epochs raise</td>
+</tr>
+<tr>
+<td><code>Quantity.to_civil()</code></td>
+<td>—</td>
+<td><code>epoch_seconds_to_utc</code> of a <code>datetime</code> quantity; the sub-second digits stay in <code>datetime_fraction</code></td>
+</tr>
+<tr>
+<td><code>a == b</code>, <code>a.is_date_equal(b)</code>, <code>a.is_time_equal(b)</code></td>
+<td><code>bvn_dt_is_equal</code>, <code>bvn_dt_is_date_equal</code>, <code>bvn_dt_is_time_equal</code></td>
+<td>Field-wise comparison of two <code>CivilDateTime</code></td>
+</tr>
+</tbody>
+</table>
+<p>GPS and Galileo seconds stay in their own scale: for UTC, take
+<code>tai_seconds_from_gps_time</code> to <code>tai_seconds_to_utc</code>. A datetime on a GNSS epoch
+has no civil form in the library, which is why <code>epoch_seconds_to_utc</code> and
+<code>to_civil()</code> refuse it.</p>
+<p><strong>The calendar.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Function or method</th>
+<th>C function</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GregorianDate.from_mjd(mjd)</code>, <code>d.to_mjd()</code>, <code>GregorianDate.normalize(y, m, d)</code>, <code>a == b</code></td>
+<td><code>bvn_gregorian_date_from_mjd</code>, <code>_to_mjd</code>, <code>_normalize</code>, <code>_is_equal</code></td>
+</tr>
+<tr>
+<td><code>mjd_to_wday(mjd)</code>, <code>mjd_to_yday(mjd)</code>, <code>mjd_in_leap_year(mjd)</code></td>
+<td><code>bvn_gregorian_date_mjd_to_wday</code>, <code>_mjd_to_yday</code>, <code>_mjd_in_leap_year</code></td>
+</tr>
+<tr>
+<td><code>easter_sunday_mjd(year)</code>; <code>easter_sunday(year)</code>, <code>good_friday</code>, <code>easter_monday</code>, <code>ascension_day</code>, <code>whit_monday</code></td>
+<td><code>bvn_gregorian_date_easter_sunday_mjd</code>; <code>bvn_gregorian_date_calc_*</code></td>
+</tr>
+<tr>
+<td><code>d.is_federal_holiday_in_germany()</code>, <code>d.is_banking_day_in_germany()</code>, <code>d.is_business_day_in_germany()</code></td>
+<td><code>bvn_gregorian_date_is_*_in_germany</code></td>
+</tr>
+<tr>
+<td><code>d.last_banking_day_in_month()</code>, <code>penultimate_…</code>, <code>mid_…</code>, <code>first_…</code>, <code>d.last_sunday_in_month()</code>, <code>d.last_saturday_in_month()</code></td>
+<td><code>bvn_gregorian_date_get_*_in_month</code></td>
+</tr>
+<tr>
+<td><code>d.last_banking_day_in_quarter(q)</code>, <code>d.first_banking_day_in_quarter(q)</code></td>
+<td><code>bvn_gregorian_date_get_*_banking_day_in_quarter</code></td>
+</tr>
+<tr>
+<td><code>d.is_last_banking_day_in_month()</code> and the other three; <code>d.is_last_banking_day_in_quarter(q)</code>, <code>d.is_first_banking_day_in_quarter(q)</code></td>
+<td><code>bvn_gregorian_date_is_*_banking_day_in_*</code></td>
+</tr>
+<tr>
+<td><code>d.is_daylight_saving_switch_in_germany()</code>, <code>d.is_day_before_daylight_saving_switch_in_germany()</code></td>
+<td><code>bvn_gregorian_date_is_*daylight_saving_switch_in_germany</code></td>
+</tr>
+</tbody>
+</table>
+<p>The federal holidays are the nine that hold in all of Germany, by the rules in
+force that year: 3 October from 1990, 17 June from 1954 to 1989, 1 May from 1933.
+A banking day is Monday to Friday, not a holiday and not 24 or 31 December; a
+business day is Monday to Saturday and not a holiday. The mid banking day is the
+first one on or after the 15th. The summer-time switch days follow the German
+rule of each year: none before 1980, the end in September until 1995.</p>
+<p><strong>Errors.</strong> Where a C function signals failure with a sentinel, a <code>false</code> or an
+untouched output — an overflow, an MJD or year outside the supported range, a
+quarter outside 1–4 — the binding raises <code>BovnarArgumentError</code>, as it does for an
+argument that is not an int or does not fit in int64. Not bound:
+<code>bvn_gregorian_date_to_mjd_fast</code> (undefined behaviour out of range; <code>to_mjd()</code>
+is the checked form) and <code>bvn_dt_dump</code> / <code>bvn_dt_print</code>, which print to stdout
+(<code>str()</code> and <code>repr()</code> take their place).</p>
 <hr />
 <h2 id="7-write_array-helper">7. <code>write_array</code> helper</h2>
 <p><code>write_array</code> is a high-level helper exported from the top-level <code>bovnar</code>
@@ -1803,7 +2259,7 @@ start another read on it, or <code>set_unit_policy()</code>: each raises
 running parse and is re-raised from the read. Use a second <code>Reader</code> for a
 nested parse, and close the first one after its read returns.</p>
 <h3 id="112-read_mem">11.2 <code>read_mem</code></h3>
-<p><code>read_mem(data, *, on_verified, on_unverified, want_unit, on_error, **options)</code></p>
+<p><code>read_mem(data, *, on_verified, on_unverified, want_unit, on_error, mirror, **options)</code></p>
 <p>Parse BVNR from a <code>bytes</code>, <code>bytearray</code>, or <code>memoryview</code> object. The callbacks
 are named parameters; every other keyword is a <strong>read option</strong>, one of the
 names in <code>bovnar.READ_OPTIONS</code>. That table is the one list every reading entry
@@ -1845,6 +2301,12 @@ outside its C field (a negative one, <code>max_string_length=70000</code>) a
 <td><code>Callable[[BovnarParseError], None] \| None</code></td>
 <td><code>None</code></td>
 <td>Called for every error the reader reports, as a <code>BovnarParseError</code> with its code and position: under <code>continue_on_error</code>, each error it recovers from — reported nowhere else — and the error that ends a read, before the read raises it. Its return value is ignored; an exception it raises stops the read at the next event and is re-raised</td>
+</tr>
+<tr>
+<td><code>mirror</code></td>
+<td>binary file object, socket or <code>bytearray</code> | <code>None</code></td>
+<td><code>None</code></td>
+<td>Receives every byte the reader consumes: the input mirror of <code>bvnr_open_read_source</code>, a debugging aid (below)</td>
 </tr>
 <tr>
 <td><code>max_file_size</code></td>
@@ -1944,6 +2406,25 @@ outside its C field (a negative one, <code>max_string_length=70000</code>) a
 </tr>
 </tbody>
 </table>
+<p><strong>The mirror.</strong> <code>mirror=</code> — a writable binary file object (<code>write</code>), a socket
+(<code>sendall</code>) or a <code>bytearray</code>, which is appended to — is handed every byte the
+reader consumes, the comments and the octet-stream payloads included, so what
+it holds after a read that succeeded is the input. The bytes reach it a piece
+at a time, each once the reader has parsed it: a buffer pulled (up to 64 KiB),
+a piece fed to a <code>DocumentFeed</code>, an octet-stream chunk. A read that fails, or a
+callback stops, has mirrored the input up to the start of the piece it
+stopped in. An exception the object raises ends the read and is re-raised from
+it, unchanged. <code>read_fd</code>, <code>read_file</code>, <code>read_stream</code>, <code>iter_mem</code> and
+<code>DocumentFeed</code> (§4.7) take it too; the frame readers and the demux do not,
+as the C objects behind them take no mirror (their caller holds the bytes it
+feeds them).</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">Reader</span>
+
+<span class="n">seen</span> <span class="o">=</span> <span class="nb">bytearray</span><span class="p">()</span>
+<span class="n">Reader</span><span class="p">()</span><span class="o">.</span><span class="n">read_mem</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;.a = 1;  # note</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">mirror</span><span class="o">=</span><span class="n">seen</span><span class="p">)</span>
+<span class="nb">bytes</span><span class="p">(</span><span class="n">seen</span><span class="p">)</span>                          <span class="c1"># → b&#39;.a = 1;  # note\n&#39;</span>
+</code></pre></div>
+
 <p>The five length caps and the two nesting caps are for untrusted input: lower
 them to what the consumer can take. The length caps are the width of their C
 field (<code>uint16_t</code>); a key or symbol longer than 255 bytes is accepted at a
@@ -2110,31 +2591,50 @@ to a <code>DocumentFeed</code> instead (§4.7).</p>
 </thead>
 <tbody>
 <tr>
-<td><code>Writer.to_mem(buf=None, cap=4194304, *, pretty=True, unit_flags=0, emit_version=False)</code></td>
+<td><code>Writer.to_mem(buf=None, cap=4194304, *, …)</code></td>
 <td>Write to an in-process buffer. <code>buf</code> may be a pre-allocated <code>bytearray</code>; when <code>None</code> an internal buffer of size <code>cap</code> is allocated.</td>
 </tr>
 <tr>
-<td><code>Writer.to_fd(fd, *, pretty=True, unit_flags=0, emit_version=False)</code></td>
+<td><code>Writer.to_fd(fd, *, …)</code></td>
 <td>Write to an open POSIX file descriptor.</td>
 </tr>
 <tr>
-<td><code>Writer.to_file(path, *, pretty=True, unit_flags=0, emit_version=False)</code></td>
+<td><code>Writer.to_file(path, *, …)</code></td>
 <td>Open <code>path</code> for writing (<code>O_WRONLY\|O_CREAT\|O_TRUNC</code>, mode <code>0o644</code>) and write to it; the fd is closed when the writer is finished or destroyed.</td>
 </tr>
 <tr>
-<td><code>Writer.to_stream(stream, *, pretty=True, unit_flags=0, emit_version=False)</code></td>
+<td><code>Writer.to_stream(stream, *, …)</code></td>
 <td>Write to a socket (<code>sendall</code>) or a binary file object (<code>write</code>, repeated until it has taken every byte). Output is pushed a full 64 KiB buffer at a time and the rest at <code>flush()</code> or <code>finish()</code>, which then call the object's <code>flush</code> if it has one. An exception the object raises is re-raised from the write call that pushed.</td>
 </tr>
 </tbody>
 </table>
-<p>All four are used as context managers.  On clean exit (<code>exc_type is None</code>)
-the context manager calls <code>finish()</code> automatically.</p>
+<p>Each takes the keywords <code>pretty=True, unit_flags=0, emit_version=False,
+on_event=None, max_struct_nesting=0, max_array_nesting=0</code>. All four are used
+as context managers.  On clean exit (<code>exc_type is None</code>) the context manager
+calls <code>finish()</code> automatically.</p>
 <p><code>unit_flags</code> takes <a href="#53-unitflags"><code>UnitFlags</code></a> — <code>REDUCE</code> rewrites each unit
 and rescales its value, <code>ASCII_EXP</code> writes <code>^N</code> exponents, <code>NUM_CANONICAL</code>
 keeps a rescaled float in float shape and writes annotations in one form. <code>emit_version=True</code> writes a leading
 <code>#!bovnar M.N</code> naming the spec version this build implements, as
-<code>write_version()</code> would. Every writer accepts structs and arrays nested up to
-<strong>255</strong> deep, the same limit <code>Reader</code> and <code>loads()</code> read at.</p>
+<code>write_version()</code> would. By default every writer accepts structs and arrays
+nested up to <strong>255</strong> deep, the same limit <code>Reader</code> and <code>loads()</code> read at.
+<code>max_struct_nesting</code> and <code>max_array_nesting</code> (<code>bvnr_write_flags_t</code>, 1 to
+255; <code>0</code> is 255, as for the reader's options) lower it: a struct or an array
+one level deeper fails the write with <code>STRUCT_NESTING_TOO_HIGH</code> or
+<code>ARRAY_NESTING_TOO_HIGH</code>, and a value outside 0–255 is a
+<code>BovnarArgumentError</code>. <code>on_event</code> is the observer of §12.10.</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">Writer</span><span class="p">,</span> <span class="n">BovnarWriteError</span>
+
+<span class="n">w</span> <span class="o">=</span> <span class="n">Writer</span><span class="o">.</span><span class="n">to_mem</span><span class="p">(</span><span class="n">max_struct_nesting</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">w</span><span class="o">.</span><span class="n">begin_struct</span><span class="p">(</span><span class="s2">&quot;a&quot;</span><span class="p">)</span>
+<span class="n">w</span><span class="o">.</span><span class="n">begin_struct</span><span class="p">(</span><span class="s2">&quot;b&quot;</span><span class="p">)</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="n">w</span><span class="o">.</span><span class="n">begin_struct</span><span class="p">(</span><span class="s2">&quot;c&quot;</span><span class="p">)</span>
+<span class="k">except</span> <span class="n">BovnarWriteError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="n">code</span> <span class="o">=</span> <span class="n">e</span><span class="o">.</span><span class="n">code</span><span class="o">.</span><span class="n">name</span>
+<span class="n">code</span>                                 <span class="c1"># → &#39;STRUCT_NESTING_TOO_HIGH&#39;</span>
+</code></pre></div>
+
 <h3 id="122-output-retrieval">12.2 Output retrieval</h3>
 <table>
 <thead>
@@ -2170,6 +2670,19 @@ keeps a rescaled float in float shape and writes annotations in one form. <code>
 <p>All scalar writers accept keyword-only unit parameters.  Unit resolution
 priority: <code>unit_str</code> (parsed via <code>bvn_parse_unit_n</code>) → <code>unit_iec_base</code> →
 <code>unit_si_base</code> → <code>BVN_UNIT_NONE</code> (no annotation emitted).</p>
+<p>The unit is written in its canonical spelling: <code>unit_str="ucum:mL{total}"</code>
+comes out as <code>m~L</code>. Each numeric writer here and in §12.4 also takes
+<code>unit_source=</code>, the spelling to write instead, as <code>bvnr_writer_set_unit_source</code>
+gives one to the C helpers. The C writer checks that it spells the unit it is
+written for (and leaves it out under a <code>unit_flags</code> rewrite); a <code>unit_source</code>
+for a value without a unit is a <code>BovnarArgumentError</code>.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">w</span> <span class="o">=</span> <span class="n">Writer</span><span class="o">.</span><span class="n">to_mem</span><span class="p">(</span><span class="n">pretty</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">emit_version</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>   <span class="c1"># a profile unit is spec 1.2</span>
+<span class="n">w</span><span class="o">.</span><span class="n">write_float</span><span class="p">(</span><span class="s2">&quot;vol&quot;</span><span class="p">,</span> <span class="mf">5.0</span><span class="p">,</span> <span class="n">unit_str</span><span class="o">=</span><span class="s2">&quot;ucum:mL</span><span class="si">{total}</span><span class="s2">&quot;</span><span class="p">,</span>
+              <span class="n">unit_source</span><span class="o">=</span><span class="s2">&quot;ucum:mL</span><span class="si">{total}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">w</span><span class="o">.</span><span class="n">finish</span><span class="p">()</span>
+<span class="n">w</span><span class="o">.</span><span class="n">get_output</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>       <span class="c1"># → b&#39;.vol=&lt;float:64,ucum:mL{total}&gt;5e+0;&#39;</span>
+</code></pre></div>
+
 <h4 id="write_uintkey-value--width64-base10-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear-unit_iec_basenone-unit_iec_prefixiecprefixnone"><code>write_uint(key, value, *, width=64, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR, unit_iec_base=None, unit_iec_prefix=IECPrefix.NONE)</code></h4>
 <p>Write an unsigned integer. <code>base</code> selects the numeral system (10 or 16 for
 inline values; any Bovnar-supported base for <code>write_bvni</code>).</p>
@@ -2267,6 +2780,79 @@ document being written rather than making a document of one key, as
 (<code>BovnarArgumentError</code>), a channel to the unsigned 64-bit range. On a
 <code>to_stream</code> writer, call <code>flush()</code> after <code>mux_send</code> for a consumer reading
 live (§4.8).</p>
+<h3 id="1210-observing-the-output-on_event">12.10 Observing the output: <code>on_event</code></h3>
+<p><code>on_event(event, data)</code>, given to any constructor (§12.1), is called with each
+event once it has been serialised (<code>bvnr_write_flags_t.on_event</code>), with what
+reached the output: under <code>UnitFlags.REDUCE</code> a rescaled value's new digits and
+unit, not the ones it was written with. Every event the writer serialises
+reaches it — those of the <code>write_*</code> methods, <code>emit</code>, the struct and array
+helpers, the mux and embedding calls. <code>data</code> is a <code>BvnrData</code> snapshot, as a
+reader callback gets (<code>None</code> for an event without one), which may be kept.</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">Writer</span><span class="p">,</span> <span class="n">UnitFlags</span>
+
+<span class="n">seen</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">w</span> <span class="o">=</span> <span class="n">Writer</span><span class="o">.</span><span class="n">to_mem</span><span class="p">(</span><span class="n">pretty</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">unit_flags</span><span class="o">=</span><span class="n">UnitFlags</span><span class="o">.</span><span class="n">REDUCE</span><span class="p">,</span>
+                  <span class="n">on_event</span><span class="o">=</span><span class="k">lambda</span> <span class="n">ev</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="n">seen</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">ev</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">d</span><span class="o">.</span><span class="n">raw_bytes</span><span class="p">())))</span>
+<span class="n">w</span><span class="o">.</span><span class="n">write_uint</span><span class="p">(</span><span class="s2">&quot;d&quot;</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="n">unit_str</span><span class="o">=</span><span class="s2">&quot;k~m&quot;</span><span class="p">)</span>
+<span class="n">w</span><span class="o">.</span><span class="n">finish</span><span class="p">()</span>
+<span class="n">w</span><span class="o">.</span><span class="n">get_output</span><span class="p">()</span>                       <span class="c1"># → b&#39;.d=&lt;uint:64,m&gt;5000;&#39;</span>
+<span class="n">seen</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>                              <span class="c1"># → (&#39;ASSIGNMENT_START&#39;, b&#39;d&#39;)</span>
+<span class="n">seen</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>                             <span class="c1"># → (&#39;DATA&#39;, b&#39;5000&#39;)</span>
+</code></pre></div>
+
+<p>Returning <code>False</code> (any false value but <code>None</code>) fails the write, and the
+writer, with <code>SCANNER_CALLBACK_FAILED</code>: a veto, say of a key that must not
+leave the process. An exception the observer raises fails it the same way and
+is re-raised from the write call that ran it, unchanged; a later call raises
+the latched <code>BovnarWriteError</code>, chained to that exception. The observer runs
+inside the C call, so it may not write to, flush, finish or destroy its own
+writer (<code>BovnarArgumentError</code>). It costs a Python call per event.</p>
+<h3 id="1211-plain-values-datetimes-and-type-annotations">12.11 Plain values, datetimes and type annotations</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">Event</span><span class="p">,</span> <span class="n">ValueTypeFamily</span><span class="p">,</span> <span class="n">Writer</span><span class="p">,</span> <span class="n">make_type_spec</span>
+
+<span class="n">w</span> <span class="o">=</span> <span class="n">Writer</span><span class="o">.</span><span class="n">to_mem</span><span class="p">(</span><span class="n">pretty</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">emit_version</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">w</span><span class="o">.</span><span class="n">write_plain</span><span class="p">(</span><span class="s2">&quot;mode&quot;</span><span class="p">,</span> <span class="s2">&quot;auto&quot;</span><span class="p">)</span>                     <span class="c1"># a bare symbol</span>
+<span class="n">w</span><span class="o">.</span><span class="n">write_datetime</span><span class="p">(</span><span class="s2">&quot;t&quot;</span><span class="p">,</span> <span class="mi">1750000000</span><span class="p">,</span> <span class="n">epoch</span><span class="o">=</span><span class="s2">&quot;tai&quot;</span><span class="p">)</span>
+<span class="n">u8</span> <span class="o">=</span> <span class="n">make_type_spec</span><span class="p">(</span><span class="n">ValueTypeFamily</span><span class="o">.</span><span class="n">UINT</span><span class="p">,</span> <span class="mi">8</span><span class="p">)</span>
+<span class="n">w</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">Event</span><span class="o">.</span><span class="n">ASSIGNMENT_START</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s2">&quot;v&quot;</span><span class="p">)</span>
+<span class="n">w</span><span class="o">.</span><span class="n">write_type_annotation</span><span class="p">(</span><span class="n">u8</span><span class="p">,</span> <span class="s2">&quot;m&quot;</span><span class="p">)</span>                  <span class="c1"># types the whole array</span>
+<span class="n">w</span><span class="o">.</span><span class="n">begin_array_row</span><span class="p">()</span>
+<span class="n">w</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">Event</span><span class="o">.</span><span class="n">DATA</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="s2">&quot;1&quot;</span><span class="p">,</span> <span class="n">vt</span><span class="o">=</span><span class="n">u8</span><span class="p">)</span>
+<span class="n">w</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">Event</span><span class="o">.</span><span class="n">DATA</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="s2">&quot;2&quot;</span><span class="p">,</span> <span class="n">vt</span><span class="o">=</span><span class="n">u8</span><span class="p">)</span>
+<span class="n">w</span><span class="o">.</span><span class="n">end_array_row</span><span class="p">()</span>
+<span class="n">w</span><span class="o">.</span><span class="n">finish</span><span class="p">()</span>
+<span class="n">w</span><span class="o">.</span><span class="n">get_output</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>      <span class="c1"># → b&#39;.mode=auto;.t=&lt;datetime:64,tai&gt;1750000000;.v=&lt;uint:8,m&gt;[1,2];&#39;</span>
+</code></pre></div>
+
+<p><code>write_plain(key, value)</code> writes <code>value</code> bare, as a plain symbol
+(<code>bvnr_write_plain</code>): <code>.mode = auto;</code>. The C writer refuses a value that is
+not a symbol (<code>ILLEGAL_SYMBOL</code>); a NUL in it is a <code>BovnarArgumentError</code>.</p>
+<p><code>write_datetime(key, value, *, width=64, epoch=None)</code> writes <code>value</code>, signed
+seconds since <code>epoch</code> (<code>"unix"</code>, the default, <code>"tai"</code>, <code>"gps"</code>, <code>"mjd"</code>,
+<code>"ntp"</code>, <code>"galileo"</code>, <code>"glonass"</code>, <code>"y2000"</code>, <code>"beidou"</code>), as
+<code>&lt;datetime:width[,epoch]&gt;</code> (<code>bvnr_write_datetime</code>). Datetime is spec 1.1, so the
+document must declare it first — <code>emit_version=True</code>, or <code>write_version()</code>
+before any value; without that the write fails with <code>UNSUPPORTED_SPEC_VERSION</code>,
+the key already in the output and the writer in its error state. An epoch the
+library does not know is a <code>BovnarArgumentError</code>, raised before anything is
+written. A datetime with a sub-second fraction is written by <code>dumps()</code> from a
+<code>Quantity</code> (§6.4).</p>
+<p><code>write_type_annotation(vt, unit=None, *, unit_source=None)</code> writes the type
+annotation <code>&lt;family:width[,_base|,qQ|,epoch][,unit]&gt;</code> for the value written
+next (<code>bvnr_write_type_annotation</code>): after an assignment's key, with <code>emit</code>
+sending the value, or before an array's first row, where it types the whole
+array. <code>unit</code> is a <code>Unit</code>, a <code>ValueUnit</code> or a unit string, <code>unit_source</code> its
+spelling as in §12.3. As for the typed writers, only the parameters that say
+something are written: no width of 0, no base 10, no unit on a string or a
+datetime.</p>
+<p>The other per-type C helpers have their counterpart above: <code>bvnr_write_string</code>,
+<code>_null</code> and <code>_bool</code> in <code>write_string</code>, <code>write_null</code> and <code>write_bool</code>;
+<code>bvnr_write_uint</code>, <code>_sint</code>, <code>_float</code>, <code>_float_fix</code>, <code>_float_dec</code> and their
+<code>_unit</code> forms in the methods of §12.3; <code>bvnr_write_bvnf</code>, <code>_bvnf_unit</code>,
+<code>_bvnf_base</code>, <code>_bvnf_base_unit</code>, <code>bvnr_write_bvni</code> and <code>_bvni_unit</code> in
+<code>write_bvnf_base</code> and <code>write_bvni</code> (§12.4); <code>bvnr_write_struct_start</code> and
+<code>_end</code> in <code>begin_struct</code> and <code>end_struct</code> (§12.5); <code>bvnr_writer_set_unit_source</code>
+in <code>unit_source=</code>.</p>
 <hr />
 <h2 id="13-dom-api">13. DOM API</h2>
 <p>The DOM API parses a complete BVNR document into an in-memory tree for
@@ -2332,6 +2918,14 @@ tree; any <code>DomNode</code> derived from it becomes invalid after that point.
 <td><code>doc.to_dict()</code></td>
 <td>Convert entire document to a plain Python dict, dropping type and unit info.</td>
 </tr>
+<tr>
+<td><code>DomDoc.create()</code></td>
+<td>Class method. An empty document to build in (§13.5).</td>
+</tr>
+<tr>
+<td><code>doc.add(key, node)</code></td>
+<td>Add a <code>NewNode</code> as a top-level entry; returns it as a <code>DomNode</code> (§13.5).</td>
+</tr>
 </tbody>
 </table>
 <blockquote>
@@ -2344,10 +2938,9 @@ is no way to raise it, and no unlimited mode.</p>
 fixed set (no total cap besides the one above, the 255-level nesting, and the
 reader's defaults for everything else), and neither binding can pass more:
 read with a <code>Reader</code> (§11) or <code>loads</code> for the limits of §11.2.</p>
-<p><strong>No builder.</strong> The C DOM's tree-building calls (<code>bvn_dom_doc_create</code>,
-<code>bvn_dom_node_from_*</code>, <code>bvn_dom_struct_add</code>, …) make a tree that cannot be
-written out and are meant for the library's test fixtures; they are not
-wrapped. Build a document with <code>dumps()</code> or the <code>Writer</code>.</p>
+<p><strong>Building a tree.</strong> <code>DomDoc.create()</code> and <code>doc.add(key, node)</code> are the C
+DOM's builder, for a tree made by hand from <code>NewNode</code>s (§13.5). Such a tree
+cannot be written out; build a document with <code>dumps()</code> or the <code>Writer</code>.</p>
 <p><strong>Errors:</strong> the C fd functions return <code>NULL</code> for an allocation failure, a read
 error and input over the cap alike; the binding tells them apart by <code>errno</code>.
 A read error is the matching <code>OSError</code>, input over the cap is
@@ -2469,6 +3062,94 @@ for as long as any derived <code>DomNode</code> is in use.</p>
 REFERENCE=5  STRUCT=6  ARRAY=7  OCTET_STREAM=8  BOOL=9
 </code></pre></div>
 
+<h3 id="135-building-a-tree-newnode">13.5 Building a tree (<code>NewNode</code>)</h3>
+<p><code>DomDoc.create()</code> makes an empty document and <code>NewNode</code> the nodes to put in it:
+the C DOM's builder (<code>bvn_dom_doc_create</code>, <code>bvn_dom_node_alloc</code>,
+<code>bvn_dom_node_from_*</code>, <code>bvn_dom_struct_add</code>, <code>bvn_dom_array_append</code>,
+<code>bvn_dom_doc_add</code>, doc/08 §4.5). It is there for code that consumes a DOM, a
+test fixture say, and it has the C builder's limits: it makes structs, arrays,
+nulls and integers only, and a built tree <strong>cannot be written out</strong>, since the C
+library has no DOM serialiser. To produce a document, use <code>dumps()</code> or the
+<code>Writer</code>.</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">DomDoc</span><span class="p">,</span> <span class="n">NewNode</span>
+
+<span class="n">server</span> <span class="o">=</span> <span class="n">NewNode</span><span class="o">.</span><span class="n">struct</span><span class="p">()</span>
+<span class="n">server</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s2">&quot;port&quot;</span><span class="p">,</span> <span class="n">NewNode</span><span class="o">.</span><span class="n">integer</span><span class="p">(</span><span class="mi">8080</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">16</span><span class="p">))</span>
+<span class="n">server</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s2">&quot;tls&quot;</span><span class="p">,</span> <span class="n">NewNode</span><span class="o">.</span><span class="n">null</span><span class="p">())</span>
+<span class="n">ports</span> <span class="o">=</span> <span class="n">NewNode</span><span class="o">.</span><span class="n">array</span><span class="p">()</span>
+<span class="n">ports</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">NewNode</span><span class="o">.</span><span class="n">integer</span><span class="p">(</span><span class="mi">80</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">16</span><span class="p">))</span>
+<span class="n">ports</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">NewNode</span><span class="o">.</span><span class="n">integer</span><span class="p">(</span><span class="mi">443</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">16</span><span class="p">))</span>
+<span class="n">server</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s2">&quot;ports&quot;</span><span class="p">,</span> <span class="n">ports</span><span class="p">)</span>
+
+<span class="n">doc</span> <span class="o">=</span> <span class="n">DomDoc</span><span class="o">.</span><span class="n">create</span><span class="p">()</span>
+<span class="n">doc</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s2">&quot;server&quot;</span><span class="p">,</span> <span class="n">server</span><span class="p">)</span>
+<span class="n">big</span> <span class="o">=</span> <span class="n">doc</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s2">&quot;big&quot;</span><span class="p">,</span> <span class="n">NewNode</span><span class="o">.</span><span class="n">integer</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="mi">100</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;m&quot;</span><span class="p">))</span>
+<span class="n">doc</span><span class="p">[</span><span class="s2">&quot;server.port&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">as_u16</span><span class="p">()</span>     <span class="c1"># → 8080</span>
+<span class="n">big</span><span class="o">.</span><span class="n">unit_str</span>                    <span class="c1"># → &quot;m&quot;</span>
+<span class="n">doc</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>                   <span class="c1"># → {&quot;server&quot;: {&quot;port&quot;: 8080, &quot;tls&quot;: None, &quot;ports&quot;: [80, 443]}, &quot;big&quot;: 1267650600228229401496703205376}</span>
+</code></pre></div>
+
+<table>
+<thead>
+<tr>
+<th>Constructor / method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DomDoc.create()</code></td>
+<td>An empty document; its <code>parse_error</code> is <code>NONE</code></td>
+</tr>
+<tr>
+<td><code>doc.add(key, node)</code></td>
+<td>Add <code>node</code> as a top-level entry and return it as a <code>DomNode</code> of <code>doc</code>. A parsed document takes one too</td>
+</tr>
+<tr>
+<td><code>NewNode.null()</code> / <code>NewNode.struct()</code> / <code>NewNode.array()</code></td>
+<td>An empty node of that kind (<code>bvn_dom_node_alloc</code>)</td>
+</tr>
+<tr>
+<td><code>NewNode.integer(value, *, width=64, signed=None, unit=None)</code></td>
+<td>An integer node of type <code>sint:&lt;width&gt;</code> or <code>uint:&lt;width&gt;</code>; <code>signed=None</code> is <code>sint</code> for a negative value and <code>uint</code> otherwise, as for <code>write_bvni</code>. A width of 8, 16, 32 or 64 is <code>bvn_dom_node_from_i8</code> … <code>_u64</code>, which take no unit; a width of 65 to 32768 is <code>bvn_dom_node_from_bigint</code>, which takes <code>unit</code> (a unit string, <code>Unit</code> or <code>ValueUnit</code>). A value that does not fit the type, another width, or a unit on a narrow width raises <code>BovnarArgumentError</code></td>
+</tr>
+<tr>
+<td><code>node.add(key, child)</code></td>
+<td>Add <code>child</code> as a member of a struct node (<code>bvn_dom_struct_add</code>)</td>
+</tr>
+<tr>
+<td><code>node.append(child)</code></td>
+<td>Append <code>child</code> to an array node (<code>bvn_dom_array_append</code>)</td>
+</tr>
+<tr>
+<td><code>node.dom_type</code> / <code>len(node)</code></td>
+<td>The node's <code>DomType</code>; the number of members or elements</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Ownership.</strong> The C attach functions take the node they are given on every
+path: on success the container owns it, and on failure they destroy it. A
+<code>NewNode</code> hands its node over once. After it is attached it is spent, and any
+further use of it (adding it again, adding to it, reading it) raises
+<code>BovnarArgumentError</code>: a node is in one tree at most, and a struct cannot be
+filled after it was attached, so a tree is built from its leaves up. A refused
+attach raises before anything is handed over and leaves the node with the
+caller; it is refused for a key that is not an identifier (§5.8; the C functions
+refuse only an empty one, but the path lookups could not reach another), for a
+key the struct or document already has (which the C function would refuse by
+destroying the node), for a spent node, for a node added to itself, and on the
+wrong kind of container. Only an allocation failure inside the C call is a
+<code>MemoryError</code> with the node gone. A <code>NewNode</code> collected before it is attached
+frees its subtree.</p>
+<p><strong>Reading it back.</strong> A built tree reads through <code>DomDoc</code> and <code>DomNode</code> like a
+parsed one, with two differences that come from the C builder: an integer node
+of up to 64 bits carries no unit, and a built array records no row shape, so its
+<code>array_dims()</code> is <code>0</code> and <code>to_python()</code> gives one flat list.</p>
+<p>Not bound: <code>bvn_dom_node_alloc</code> of the other kinds (a float, string, symbol,
+reference, bool or octet-stream node it makes holds no value and cannot be given
+one), <code>bvn_dom_strdup</code> (a C allocation helper; the attach functions copy the key
+themselves), and <code>bvn_dom_get_bigint</code> (a borrowed <code>bvn_int_t</code>; <code>as_int_str()</code>
+and <code>to_python()</code> already read an integer of any width).</p>
 <hr />
 <h2 id="14-running-the-test-suite">14. Running the test suite</h2>
 <div class="codehilite"><pre><span></span><code><span class="c1"># Run everything (tests marked needs_lib are skipped when libbvnr.so cannot be loaded)</span>
@@ -2503,13 +3184,15 @@ are skipped automatically when <code>numpy</code> / <code>pint</code> is not ins
 ├── _pint_bridge.py  # pint bridge: to_pint/from_pint/to_pint_unit/from_pint_unit (pint optional)
 ├── _pint_units.py   # verified bovnar↔pint unit table + build_registry()
 ├── currency.py      # ISO 4217 / crypto currency metadata (pure Python)
-├── dom.py           # DomDoc, DomNode, DomType — random-access DOM
+├── dom.py           # DomDoc, DomNode, DomType, NewNode — random-access DOM and its builder
 ├── enums.py         # Python IntEnum mirrors of C enums
 ├── exceptions.py    # BovnarError hierarchy
+├── literals.py      # the C validators, literal parsers/formatters, parse_type_annotation
 ├── quantity.py      # Quantity — typed, unit-annotated scalar for lossless round-trips
 ├── reader.py        # Reader, EventPayload, UnitPolicy, UnitRule
 ├── stream.py        # framing, octet multiplexing, document-in-document, the feeds, the live writers
 ├── structs.py       # ctypes Structure/Union definitions + ValueUnitPrefix + make_* helpers
+├── timekeeping.py   # civil time and calendars: GregorianDate, CivilDateTime, Epoch (bvn_datetime.h)
 ├── unit.py          # Unit — a ValueUnit with equality, hashing and its operations
 ├── units.py         # unit_to_si_factor, unit_convert_factor, etc.
 └── writer.py        # Writer class
@@ -2526,10 +3209,12 @@ tests/
 ├── test_stream_vectors.py               # the shared wire vectors of doc/10 §9
 ├── test_stream_live.py                  # Writer.flush, MuxWriter, FrameWriter
 ├── test_dom.py, test_dom_vs_loads_parity.py   # the DOM, and its agreement with loads()
+├── test_literals.py                     # bovnar.literals, the DOM builder, UnitConversion.ok
 ├── test_write_array.py, test_array_parser.py, test_array_roundtrip_fidelity.py
 ├── test_roundtrip_property.py, test_writers_agree.py, test_dumps_directive.py
 ├── test_escapes.py, test_unicode_normalisation.py
 ├── test_datetime.py, test_datetime_oracle.py
+├── test_timekeeping.py                  # bovnar.timekeeping: calendar, leap seconds, GNSS time
 ├── test_lossless_floats.py, test_hex_float_decode.py, test_decimal_tie_rounding.py
 ├── test_bigint_digits.py                # integers past the 4300-digit str limit
 ├── test_units.py, test_unit_object.py, test_unit_physics.py, test_unit_source.py
@@ -2621,8 +3306,10 @@ is the library's text for an <code>ErrorCode</code> (<code>bvn_error_to_string</
 </tbody>
 </table>
 <p><code>unit_convert_factor</code> raises <code>BovnarArgumentError</code> <strong>only</strong> when both
-<code>ok=False</code> and <code>requires_affine=False</code>; the result does not carry <code>ok</code>, so
-check <code>requires_affine</code> before multiplying by <code>factor</code>. When it is set, call
+<code>ok=False</code> and <code>requires_affine=False</code>; the result carries the other three as
+<code>c.ok</code> and <code>c.requires_affine</code>, so check <code>c.ok</code> before multiplying by <code>factor</code>
+(<code>ok</code> is a field with a default of <code>True</code>, so <code>UnitConversion(f, affine)</code> built
+by hand still works). When it is <code>False</code>, call
 <code>convert_value</code>, which handles the two-step affine path, or call
 <code>unit_to_si_factor</code> on both units and convert by hand. The <code>Unit</code> method
 <code>convert_factor()</code> returns the bare number and therefore raises for the
@@ -3048,7 +3735,8 @@ exposed as:</p>
   out-of-range <code>\u</code> is <code>ErrorCode.INVALID_CODEPOINT</code>.</li>
 <li><strong>Datetime family:</strong> <code>loads</code> decodes a <code>&lt;datetime:width,epoch&gt;</code> value to a
   plain <code>int</code> (signed epoch seconds). With <code>typed=True</code> it is a <code>Quantity</code> whose
-  <code>.epoch_name</code> (<code>"unix"</code>, <code>"tai"</code>, …) and <code>.epoch_mjd</code> recover the epoch;
+  <code>.epoch_name</code> (<code>"unix"</code>, <code>"tai"</code>, …) and <code>.epoch_mjd</code> recover the epoch, and
+  <code>.to_civil()</code> its UTC date and time (<a href="#65-civil-time-and-calendars">§6.5</a>);
   <code>bovnar.datetime_epoch_index(name)</code> goes the other way, to the index a
   datetime <code>ValueTypeSpec</code> holds in <code>base</code>
   (<code>make_type_spec(ValueTypeFamily.DATETIME, 64,

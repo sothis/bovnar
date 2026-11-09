@@ -9,15 +9,20 @@
 //! positions for the large vectors) and in seeded random pieces; each must
 //! hand out the messages the manifest lists and end with its error. Every
 //! canonical vector must come out of `codec::MuxWriter` byte for byte, its
-//! preamble included, and `stream::mux_load` (the C demultiplexer) must read
-//! what the codec wrote. The frame vectors are read by `codec::FrameReader`
-//! and must come out of `codec::write_frame` byte for byte.
+//! preamble included, and so must every one without a preamble out of the
+//! C-backed `Writer::mux_send`; `stream::mux_load` (the C demultiplexer) must
+//! read what the codec wrote. The frame vectors are read by
+//! `codec::FrameReader` and `live::FramePull`, cut the same ways, and by
+//! `live::FrameParser` and `stream::load_documents` with and without
+//! `continue_past_failed`, which must report each document's own outcome; a
+//! frame vector that ends cleanly must come out of `codec::write_frame` byte
+//! for byte.
 
 use std::path::{Path, PathBuf};
 
 use bovnar::codec::{self, FrameReader, MuxReader, MuxWriter};
-use bovnar::live::{Demux, DemuxItem, DemuxOptions};
-use bovnar::{Value, stream};
+use bovnar::live::{Demux, DemuxItem, DemuxOptions, FrameParser, FramePull};
+use bovnar::{ReadOptions, Value, Writer, stream};
 
 /// Vectors up to this size are cut in two at every position.
 const EVERY_CUT_MAX: usize = 4096;
@@ -47,8 +52,14 @@ struct Vector {
     is_mux: bool,
     max: u64,
     items: Vec<Item>,
+    /// Each document's outcome when parsed on its own (frame vectors).
+    doc_errors: Vec<String>,
     digest: u64,
     error: String,
+    /// What the codec makes of a document shape it does not read, and how
+    /// many of the messages it hands out first.
+    codec_error: String,
+    codec_messages: usize,
     canonical: bool,
     preamble: Vec<u8>,
 }
@@ -83,7 +94,7 @@ fn vectors() -> Vec<Vector> {
     let Value::Struct(entries) = bovnar::parse(&manifest).unwrap() else {
         panic!("the manifest is not a document")
     };
-    assert!(entries.len() >= 6, "the manifest lists the vectors");
+    assert!(entries.len() >= 25, "the manifest lists the vectors");
     entries
         .into_iter()
         .map(|(name, v)| {
@@ -95,6 +106,7 @@ fn vectors() -> Vec<Vector> {
             let Value::Array(rows) = field(&s, list) else {
                 panic!("{name}: .{list} is not an array")
             };
+            let mut doc_errors = Vec::new();
             let items = rows
                 .iter()
                 .map(|r| {
@@ -102,6 +114,9 @@ fn vectors() -> Vec<Vector> {
                         panic!("{name}: a row is not a struct")
                     };
                     let ch = if is_mux { int(r, "channel") } else { 0 };
+                    if !is_mux {
+                        doc_errors.push(text(r, "error"));
+                    }
                     (ch, int(r, "length"), hex(r, "fnv"))
                 })
                 .collect();
@@ -109,10 +124,28 @@ fn vectors() -> Vec<Vector> {
             assert_eq!(data.len() as u64, int(&s, "size"), "{name}: size");
             Vector {
                 is_mux,
-                max: if is_mux { int(&s, "max_message") } else { 0 },
+                max: int(
+                    &s,
+                    if is_mux {
+                        "max_message"
+                    } else {
+                        "max_document_size"
+                    },
+                ),
                 items,
+                doc_errors,
                 digest: if is_mux { hex(&s, "digest") } else { 0 },
                 error: text(&s, "error"),
+                codec_error: if is_mux {
+                    text(&s, "codec_error")
+                } else {
+                    text(&s, "error")
+                },
+                codec_messages: if is_mux {
+                    int(&s, "codec_messages") as usize
+                } else {
+                    0
+                },
                 canonical: is_mux && matches!(field(&s, "canonical"), Value::Bool(true)),
                 preamble: if is_mux {
                     text(&s, "preamble").into_bytes()
@@ -165,11 +198,19 @@ fn expected(v: &Vector) -> Got {
     }
 }
 
+/// What the codec hands out: the first `codec_messages`, then its error.
+fn codec_expected(v: &Vector) -> (Vec<Item>, String) {
+    (v.items[..v.codec_messages].to_vec(), v.codec_error.clone())
+}
+
 /// The ways a vector is cut: the end of every piece.
 fn cuts(n: usize) -> Vec<(String, Vec<usize>)> {
     let mut out = vec![
         ("whole".to_string(), vec![n]),
-        ("a byte at a time".to_string(), (1..=n.max(1)).collect()),
+        (
+            "a byte at a time".to_string(),
+            (1..=n).chain((n == 0).then_some(0)).collect(),
+        ),
     ];
     for k in 0..=n {
         let near_chunk = k % 65539 <= 8 || k % 65539 >= 65531;
@@ -275,6 +316,7 @@ fn read_frames(v: &Vector, parts: &[&[u8]]) -> Got {
                 Ok(None) => break,
                 Err(e) => {
                     got.fail(&e);
+                    got.digest = FNV_INIT;
                     return got;
                 }
             }
@@ -285,6 +327,63 @@ fn read_frames(v: &Vector, parts: &[&[u8]]) -> Got {
     }
     got.digest = FNV_INIT;
     got
+}
+
+fn read_frame_pull(v: &Vector, parts: &[&[u8]]) -> Got {
+    let mut got = Got::new();
+    let mut reader = FramePull::new(v.max).unwrap();
+    for part in parts {
+        let mut input = *part;
+        loop {
+            match reader.next(&mut input) {
+                Ok(Some(doc)) => got.add(0, doc),
+                Ok(None) => break,
+                Err(e) => {
+                    got.fail(&e);
+                    got.digest = FNV_INIT;
+                    return got;
+                }
+            }
+        }
+    }
+    if let Err(e) = reader.finish() {
+        got.fail(&e);
+    }
+    got.digest = FNV_INIT;
+    got
+}
+
+/// How a parsing reader ends: the stream's error going on past a failed
+/// document; stopping at one, that document's error, after the documents up
+/// to and including it. (Per document: its outcome.)
+fn parse_expected(v: &Vector, go_on: bool) -> (Vec<String>, String) {
+    match v.doc_errors.iter().position(|e| e != "none") {
+        Some(i) if !go_on => (v.doc_errors[..=i].to_vec(), v.doc_errors[i].clone()),
+        _ => (v.doc_errors.clone(), v.error.clone()),
+    }
+}
+
+fn outcome(r: &bovnar::Result<()>) -> String {
+    match r {
+        Ok(()) => "none".into(),
+        Err(e) => e.name().unwrap_or("no code").into(),
+    }
+}
+
+fn read_frame_parser(v: &Vector, go_on: bool, parts: &[&[u8]]) -> (Vec<String>, String) {
+    let mut docs = Vec::new();
+    let mut parser = FrameParser::new(&ReadOptions::default(), go_on, v.max).unwrap();
+    for part in parts {
+        let r = parser.feed(part, &mut |_| true, &mut |_, r| {
+            docs.push(outcome(&r));
+            true
+        });
+        if r.is_err() {
+            return (docs, outcome(&r));
+        }
+    }
+    let end = outcome(&parser.finish());
+    (docs, end)
 }
 
 /// The messages of a well-read vector, for the writers.
@@ -307,8 +406,19 @@ fn every_vector_reads_as_the_manifest_says() {
             let parts = pieces(&v.data, &ends);
             if v.is_mux {
                 let (got, preamble) = read_codec(&v, &parts);
-                assert_eq!(got, want, "{}: codec::MuxReader ({how})", v.name);
-                if want.error == "none" {
+                // The digest is over all the messages: compared where the
+                // codec reads them all.
+                if v.codec_messages == v.items.len() && v.codec_error == v.error {
+                    assert_eq!(got, want, "{}: codec::MuxReader ({how})", v.name);
+                } else {
+                    assert_eq!(
+                        (got.items, got.error),
+                        codec_expected(&v),
+                        "{}: codec::MuxReader ({how})",
+                        v.name
+                    );
+                }
+                if v.codec_error == "none" {
                     assert_eq!(preamble.as_deref(), Some(&v.preamble[..]), "{}", v.name);
                 }
                 let got = read_demux(&v, &parts);
@@ -316,8 +426,55 @@ fn every_vector_reads_as_the_manifest_says() {
             } else {
                 let got = read_frames(&v, &parts);
                 assert_eq!(got, want, "{}: codec::FrameReader ({how})", v.name);
+                let got = read_frame_pull(&v, &parts);
+                assert_eq!(got, want, "{}: live::FramePull ({how})", v.name);
+                for go_on in [false, true] {
+                    assert_eq!(
+                        read_frame_parser(&v, go_on, &parts),
+                        parse_expected(&v, go_on),
+                        "{}: live::FrameParser, continue_past_failed {go_on} ({how})",
+                        v.name
+                    );
+                }
             }
         }
+        if !v.is_mux {
+            for go_on in [false, true] {
+                let (docs, end) = parse_expected(&v, go_on);
+                let got = stream::load_documents(&v.data, false, go_on, v.max);
+                let want: Vec<bool> = docs.iter().map(|e| e == "none").collect();
+                match got {
+                    Ok(values) => {
+                        assert_eq!(end, "none", "{}: load_documents {go_on}", v.name);
+                        let ok: Vec<bool> = values.iter().map(Option::is_some).collect();
+                        assert_eq!(ok, want, "{}: load_documents {go_on}", v.name);
+                    }
+                    Err(e) => assert_eq!(
+                        e.name(),
+                        Some(&end[..]),
+                        "{}: load_documents {go_on}",
+                        v.name
+                    ),
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn the_c_backed_writer_writes_the_canonical_vectors_byte_for_byte() {
+    for v in vectors()
+        .into_iter()
+        .filter(|v| v.canonical && v.preamble.is_empty())
+    {
+        let mut w = Writer::to_mem(v.data.len() + 64, false).unwrap();
+        w.mux_begin("mux").unwrap();
+        for (c, p) in messages(&v) {
+            w.mux_send(c, &p).unwrap();
+        }
+        w.mux_end().unwrap();
+        w.finish().unwrap();
+        assert!(w.get_output() == v.data, "{}: Writer::mux_send", v.name);
     }
 }
 

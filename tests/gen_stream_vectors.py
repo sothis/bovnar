@@ -6,10 +6,12 @@
 One set of wire vectors on disk for the readers and writers of the streaming
 layer (doc/10 §2 and §3), so that the C library and the Rust crate's
 pure-Rust codec are held to the same bytes instead of each to its own
-hand-written vectors in its own test code. This is the minimal set: the
-multiplexed streams and frames a live consumer relies on, and three malformed
-streams. The full set (every reader of every layer, the remaining wire
-shapes and limits) is still to come (TODO.md, streaming item 5).
+hand-written vectors in its own test code: every wire shape a producer may
+write (packed and interleaved chunks, a length varint split across chunks,
+the widest channel ids, a message filling a chunk exactly and one spilling a
+byte), the limits (4096 channels and the 4097th, max_message,
+max_document_size), and the ways a stream fails (a cut inside the octet
+stream or a frame, a desync, a failed document among good ones).
 
 The bytes are built here from the wire conventions alone -- the octet chunk of
 spec §9, the two LEB128 varints of doc/10 §3.1, the BVF1 frame of doc/10 §2.1
@@ -124,6 +126,76 @@ MESSAGES = [(1, payload(150, 1)), (2, payload(30000, 2)),
 DOCUMENTS = [b'.id = 1; .name = "doc1";', b"",
              b".s = { .x = [1, 2]/[3, 4]; .u = 9.81 m/s; };"]
 
+# A frame stream's documents as (bytes, the error each gives on its own). The
+# failing ones fail in a way the grammar fixes: '@' starts no value, and a
+# struct left open is an incomplete document.
+GOOD = b'.ok = 1;'
+FAILED = [(GOOD, "none"), (b".a = @;", "unexpected_input_byte"), (b"", "none"),
+          (b".b = { .c = 1;", "incomplete_bvnr_stream"), (GOOD, "none")]
+
+MAX_U64 = (1 << 64) - 1
+
+
+def wide_channels():
+    """Channel ids of every varint width, and the one-chunk boundary for the
+    widest: 10 + 3 varint bytes leave 65523 for the payload, so 65523 fills
+    the chunk exactly and 65524 spills one byte into a second chunk."""
+    return [(MAX_U64, payload(65523, 5)), (MAX_U64, payload(65524, 6)),
+            (1 << 63, b""), (127, b"a"), (128, b"bc"), (16383, b"d"),
+            (16384, payload(300, 7)), (0, b"zero")]
+
+
+def packed():
+    """Chunks a producer may pack: several messages in one chunk, and a
+    chunk that ends one message, holds another whole and starts a third."""
+    a, b, c = payload(40, 8), payload(500, 9), payload(70, 10)
+    octets = (chunk(leb(3) + leb(2) + b"p1" + leb(0) + leb(3) + b"p22")
+              + chunk(leb(4) + leb(len(a)) + a[:10])
+              + chunk(leb(4) + a[10:] + leb(len(b)) + b + leb(len(c)) + c[:5])
+              + chunk(leb(4) + c[5:]))
+    msgs = [(3, b"p1"), (3, b""), (3, b"p22"), (4, a), (4, b), (4, c)]
+    return octets, msgs
+
+
+def interleaved():
+    """Two messages of 100 KB whose chunks alternate, and a small one on a
+    third channel between them: messages complete in the order their last
+    chunk arrives, not the order they were begun."""
+    x, y = payload(100000, 11), payload(100000, 12)
+    hx, hy = leb(len(x)), leb(len(y))
+    out = bytearray()
+    step = 30000
+    for k in range(0, 100000, step):
+        out += chunk(leb(1) + (hx if k == 0 else b"") + x[k:k + step])
+        if k == step:
+            out += chunk(leb(9) + leb(5) + b"small")
+        out += chunk(leb(2) + (hy if k == 0 else b"") + y[k:k + step])
+    return bytes(out), [(9, b"small"), (1, x), (2, y)]
+
+
+def split_lengths():
+    """A length varint split across chunks: two bytes split 1 | 1 with
+    another channel's chunk between them, and three bytes split 1 | 1 | 1."""
+    p, q = payload(300, 13), payload(20000, 14)
+    lp, lq = leb(len(p)), leb(len(q))
+    assert len(lp) == 2 and len(lq) == 3
+    octets = (chunk(leb(5) + lp[:1]) + chunk(leb(6) + leb(4) + b"mid!")
+              + chunk(leb(5) + lp[1:] + p)
+              + chunk(leb(7) + lq[:1]) + chunk(leb(7) + lq[1:2])
+              + chunk(leb(7) + lq[2:]))
+    pos = 0
+    while pos < len(q):
+        take = min(CHUNK - 1, len(q) - pos)
+        octets += chunk(leb(7) + q[pos:pos + take])
+        pos += take
+    return octets, [(6, b"mid!"), (5, p), (7, q)]
+
+
+def channels(n):
+    """n distinct channels, each with an empty message in a chunk of its own."""
+    msgs = [(c, b"") for c in range(n)]
+    return b"".join(mux_send(c, p) for c, p in msgs), msgs
+
 
 def vectors():
     """(name, kind, data, fields): fields are the manifest entries."""
@@ -154,6 +226,97 @@ def vectors():
               error="value_out_of_range",
               note="a declared length over max_message (100), after a "
                    "message at the cap")),
+        ("mux_empty", "mux", mux_doc(b""),
+         dict(messages=[], canonical=True,
+              note="a stream that carries no message")),
+        ("mux_wide_channels", "mux",
+         mux_doc(b"".join(mux_send(c, p) for c, p in wide_channels())),
+         dict(messages=wide_channels(), canonical=True,
+              note="channel ids of every varint width up to 2^64-1, and for "
+                   "the widest a message filling a chunk exactly (65523 "
+                   "bytes) and one spilling a byte into a second chunk")),
+        ("mux_packed", "mux", mux_doc(packed()[0]),
+         dict(messages=packed()[1],
+              note="several messages packed into one chunk, and a chunk that "
+                   "ends a message, holds one whole and starts a third")),
+        ("mux_interleaved", "mux", mux_doc(interleaved()[0]),
+         dict(messages=interleaved()[1],
+              note="the chunks of two 100 KB messages alternating, and a "
+                   "small message between them, which completes first")),
+        ("mux_split_length", "mux", mux_doc(split_lengths()[0]),
+         dict(messages=split_lengths()[1],
+              note="a length varint split across chunks: two bytes with "
+                   "another channel's chunk between them, three bytes over "
+                   "three chunks")),
+        ("mux_4096_channels", "mux", mux_doc(channels(4096)[0]),
+         dict(messages=channels(4096)[1], canonical=True,
+              note="4096 distinct channels, the most one stream may use")),
+        ("mux_4097th_channel", "mux",
+         mux_doc(channels(4096)[0] + mux_send(4096, b"")),
+         dict(messages=channels(4096)[1], error="octet_stream_out_of_sync",
+              note="a 4097th distinct channel, which cannot be attributed")),
+        ("mux_channel_cut", "mux", mux_doc(ok + chunk(b"\x80") + ok),
+         dict(messages=[(1, b"ok")], error="octet_stream_out_of_sync",
+              note="a chunk that ends inside its channel varint")),
+        ("mux_overlong_length", "mux",
+         mux_doc(ok + chunk(leb(1) + b"\xff" * 10 + b"\x01")),
+         dict(messages=[(1, b"ok")], error="octet_stream_out_of_sync",
+              note="a length varint of eleven bytes")),
+        ("mux_channel_over_64_bits", "mux",
+         mux_doc(ok + chunk(b"\xff" * 9 + b"\x02" + leb(0))),
+         dict(messages=[(1, b"ok")], error="octet_stream_out_of_sync",
+              note="a channel varint whose tenth byte carries bits past 64")),
+        ("mux_ends_in_chunk", "mux",
+         b".mux=\x00" + ok + chunk(leb(1) + leb(10) + b"0123456789")[:8],
+         dict(messages=[(1, b"ok")], error="read_complete_chunk_failed",
+              note="the input ends inside a chunk, a message in progress")),
+        ("mux_ends_before_terminator", "mux", b".mux=\x00" + ok,
+         dict(messages=[(1, b"ok")], error="read_complete_chunk_failed",
+              note="the input ends after a chunk, before the stream's "
+                   "closing 0x00")),
+        ("mux_terminator", "mux",
+         b".mux = \x00" + ok + b"\x00 # closed\n ; # done\n\t\n",
+         dict(messages=[(1, b"ok")],
+              note="the closing 0x00, then whitespace and comments before "
+                   "and after the ;")),
+        ("mux_after_stream", "mux", mux_doc(ok) + b".after = 1;",
+         dict(messages=[(1, b"ok")], codec_error="unexpected_input_byte",
+              note="a statement after the stream: the C demux reads the "
+                   "document on, the codec reads only a document that ends "
+                   "with the stream")),
+        ("mux_other_key", "mux", b".media=\x00" + ok + b"\x00;",
+         dict(messages=[], codec_error="unexpected_input_byte",
+              note="a stream under another key: the C demux scoped to mux "
+                   "passes it over, the codec refuses it")),
+        ("mux_binary_preamble", "mux",
+         b".bin=\x00" + chunk(b"\x00\x01\x02") + b"\x00;" + mux_doc(ok),
+         dict(messages=[(1, b"ok")], codec_error="unexpected_input_byte",
+              codec_messages=0,
+              note="an octet stream before the mux stream: the C demux "
+                   "scoped to mux passes it over, the codec takes the first "
+                   "0x00 for the stream's opener")),
+        ("frames_failed", "frames", b"".join(frame(d) for d, _ in FAILED),
+         dict(documents=FAILED,
+              note="a document that does not parse and one left incomplete, "
+                   "among good ones (and an empty one)")),
+        ("frames_bad_magic", "frames", frame(GOOD) + b"BVF2" + bytes(8),
+         dict(documents=[(GOOD, "none")], error="unexpected_input_byte",
+              note="a header without the BVF1 magic, after a good frame")),
+        ("frames_oversize", "frames",
+         frame(b"#" + b"x" * 62 + b"\n") + frame(b"#" + b"y" * 63 + b"\n"),
+         dict(documents=[(b"#" + b"x" * 62 + b"\n", "none")],
+              max_document_size=64, error="value_out_of_range",
+              note="a frame over max_document_size (64), after one at it")),
+        ("frames_cut_payload", "frames", (frame(GOOD) * 2)[:-3],
+         dict(documents=[(GOOD, "none")],
+              error="incomplete_bvnr_stream",
+              note="the input ends inside a frame's document")),
+        ("frames_cut_header", "frames", frame(GOOD) + frame(GOOD)[:7],
+         dict(documents=[(GOOD, "none")],
+              error="incomplete_bvnr_stream",
+              note="the input ends inside a frame header")),
+        ("frames_none", "frames", b"",
+         dict(documents=[], note="a frame stream of no frames")),
     ]
 
 
@@ -176,10 +339,17 @@ def manifest(vs) -> bytes:
 # 64 MiB default), hands out the .messages listed (all of them, or those before
 # the error), whose FNV-1a over channel, length and payload is .digest, and
 # ends with .error: the outcome of the reference reader, the C demultiplexer.
+# .codec_error is the outcome of the pure-Rust codec (bovnar::codec), which
+# reads one shape of document only and refuses the others where the C demux
+# reads on, after the first .codec_messages of the messages.
 # .preamble is the text before the stream's assignment. A .canonical vector is
 # what bvnr_mux_send writes after that preamble, so every writer must
 # reproduce it byte for byte. A frame vector (.kind = frames) holds the
-# .documents listed, each with the error it gives on its own.
+# .documents listed, each with the error it gives when parsed on its own, read
+# under .max_document_size (0: the 256 MiB default); .error is how the stream
+# ends for a reader that does not parse the documents, or that goes on past a
+# failed one. One that stops at a failed document ends with that document's
+# error instead. Errors are named as bvn_error_to_string names them.
 """]
     for name, kind, data, f in vs:
         i = "    "
@@ -194,18 +364,26 @@ def manifest(vs) -> bytes:
             out.append(i + ".digest = \"%s\";\n" % digest(msgs))
             rows = [i + "    { .channel = %s; .length = %s; .fnv = \"%s\"; }"
                     % (u64(c), u64(len(p)), fnv(p)) for c, p in msgs]
-            out.append(i + ".messages = [\n" + ",\n".join(rows) + "\n" + i
-                       + "];\n")
+            out.append(i + ".messages = [" + ("\n" + ",\n".join(rows) + "\n"
+                                             + i if rows else "") + "];\n")
             out.append(i + ".error = %s;\n" % f.get("error", "none"))
+            out.append(i + ".codec_error = %s;\n"
+                       % f.get("codec_error", f.get("error", "none")))
+            out.append(i + ".codec_messages = %s;\n"
+                       % u64(f.get("codec_messages", len(msgs))))
             out.append(i + ".canonical = %s;\n"
                        % ("true" if f.get("canonical") else "false"))
             out.append(i + ".preamble = %s;\n" % bstr(f.get("preamble", b"")))
         else:
-            rows = [i + "    { .length = %s; .fnv = \"%s\"; .error = none; }"
-                    % (u64(len(d)), fnv(d)) for d in f["documents"]]
-            out.append(i + ".documents = [\n" + ",\n".join(rows) + "\n" + i
-                       + "];\n")
-            out.append(i + ".error = none;\n")
+            docs = [d if isinstance(d, tuple) else (d, "none")
+                    for d in f["documents"]]
+            out.append(i + ".max_document_size = %s;\n"
+                       % u64(f.get("max_document_size", 0)))
+            rows = [i + "    { .length = %s; .fnv = \"%s\"; .error = %s; }"
+                    % (u64(len(d)), fnv(d), e) for d, e in docs]
+            out.append(i + ".documents = [" + ("\n" + ",\n".join(rows) + "\n"
+                                              + i if rows else "") + "];\n")
+            out.append(i + ".error = %s;\n" % f.get("error", "none"))
         out.append("};\n")
     return "".join(out).encode("utf-8")
 

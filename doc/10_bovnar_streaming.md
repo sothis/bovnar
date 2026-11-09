@@ -777,40 +777,71 @@ message, the push of the sink included — and allocates nothing.
 
 ## 9. Shared conformance vectors
 
-`tests/stream_vectors/` holds one set of wire vectors that the C library and
-the Rust crate are both held to, so that the C reference and the pure-Rust
-codec (`bovnar::codec`) cannot each agree with their own test code and
-disagree with each other. `tests/gen_stream_vectors.py` writes them from the
+`tests/stream_vectors/` holds one set of wire vectors that the C library, the
+Rust crate and the Python bindings are all held to, so that the C reference and
+the pure-Rust codec (`bovnar::codec`) cannot each agree with their own test code
+and disagree with each other. `tests/gen_stream_vectors.py` writes them from the
 wire conventions of §2.1 and §3.1 alone, never through the library, and lists
 each with its expected outcome in `manifest.bvnr`, a Bovnar document: the
 messages (channel, length and 64-bit FNV-1a of each), the preamble text, the
-framed documents, and the error the C demultiplexer gives a malformed stream.
-The set covers a stream after a preamble of text values (a struct with a
-unit, a string) and the same stream without it — messages of 150 B, 30 KB and
-400 KB, an empty one, one that fills a 65536-byte chunk, two channels
-interleaved message by message —, a frame stream of three documents, and
-three malformed streams: one truncated inside a message
-(`error_octet_stream_truncated`), one with a bad chunk tag
-(`error_octet_stream_out_of_sync`) and one over a stated `max_message`
-(`error_value_out_of_range`).
+framed documents with the outcome each gives when parsed on its own, and the
+error that ends the stream, named as `bvn_error_to_string` names it.
 
-The C demultiplexer, batch and fed (`tests/bovnar_stream_vectors_test.c`),
-`codec::MuxReader`, `codec::FrameReader` and `live::Demux`
-(`rust/tests/test_stream_vectors.rs`) read every vector fed whole, a byte at
-a time, cut in two at every position (sampled positions for the large ones)
-and in random pieces; `python/tests/test_stream_vectors.py` reads them through
-`mux_load`, `DemuxFeed` and `FrameFeed`, whole and in small pieces.
-`bvnr_mux_send` and
-`codec::MuxWriter`, its preamble included, write the well-formed multiplexed
-vectors byte for byte, and `bvnr_frame_write` and `codec::write_frame` the
-frame stream, so each side reads what the other writes. `bovnar mux list` and
-`bovnar frames list` read the valid vectors and refuse the malformed ones,
-except the one over `max_message`, which the CLI cannot set. CTest checks that
-the committed files are what the generator writes.
+**What the set covers.** Multiplexed streams:
 
-This is a minimal set. The full one — every reader and writer of every layer,
-the remaining wire shapes and limits, and where readers deliberately differ —
-is still to come.
+- a stream after a preamble of text values (a struct with a unit, a string) and
+  the same stream without it — messages of 150 B, 30 KB and 400 KB, an empty
+  one, one that fills a 65536-byte chunk (length field `0x0000`), two channels
+  interleaved message by message;
+- a stream with no message; channel ids of every varint width up to 2^64−1,
+  with, for the widest, a message that fills a chunk exactly (65523 bytes after
+  10 + 3 varint bytes) and one that spills a byte into a second chunk;
+- several messages packed into one chunk, and a chunk that ends one message,
+  holds another whole and starts a third;
+- the chunks of two 100 KB messages alternating, with a small message between
+  them that completes first;
+- a length varint split across chunks, with another channel's chunk between
+  its bytes;
+- 4096 distinct channels, the most a stream may use, and a 4097th
+  (`error_octet_stream_out_of_sync`);
+- the closing `0x00` followed by whitespace and comments before and after the
+  `;`;
+- the ways a stream fails: closed inside a message
+  (`error_octet_stream_truncated`), a bad chunk tag, a chunk ending inside its
+  channel varint, an eleven-byte length varint and a channel varint past 64
+  bits (`error_octet_stream_out_of_sync`), a length over a stated
+  `max_message` (`error_value_out_of_range`), and input that ends inside a
+  chunk or before the closing `0x00` (`error_read_complete_chunk_failed`);
+- three documents the C demultiplexer reads and the codec, which reads one shape
+  of document only ([Rust Bindings §4.8](14_bovnar_rust_bindings.md#48-live-streams-the-framing-codec-bovnarcodec)),
+  refuses: a statement after the stream, a stream under
+  another key, an octet stream before the mux stream. The manifest gives the
+  codec's outcome beside the C one.
+
+Frame streams: three documents, one empty; a document that does not parse and
+one left incomplete among good ones; a bad magic; a frame over a stated
+`max_document_size`; input that ends inside a document or inside a header; no
+frames at all.
+
+**Who reads and writes them.** The C demultiplexer, batch and fed, the pull and
+the parsing frame reader, and `bvnr_doc_stream_read_ex`
+(`tests/bovnar_stream_vectors_test.c`); `codec::MuxReader`,
+`codec::FrameReader`, `live::Demux`, `live::FramePull`, `live::FrameParser`
+and `stream::load_documents` (`rust/tests/test_stream_vectors.rs`); `mux_load`,
+`DemuxFeed`, `FrameFeed` pulled and parsing, and `load_documents`
+(`python/tests/test_stream_vectors.py`). The C and Rust readers take every
+vector fed whole, a byte at a time, cut in two at every position (sampled
+positions for the large ones) and in random pieces, the Python ones whole and in
+small pieces; the parsing frame readers, with and without
+`continue_past_failed`, report each document's own outcome. Every canonical
+vector — what `bvnr_mux_send` writes — comes out byte for byte of
+`bvnr_mux_send`, `codec::MuxWriter` (its preamble included), the C-backed
+`Writer::mux_send`, `mux_dump` and `MuxWriter`; the frame streams that end
+cleanly out of `bvnr_frame_write`, `codec::write_frame`, `frame_documents` and
+`FrameWriter`. So each side reads what every other writes. `bovnar mux list` and
+`bovnar frames list` read every vector as the manifest says
+(`tests/check_stream_vectors_cli.py`), short of the two limits the CLI cannot
+set. CTest checks that the committed files are what the generator writes.
 
 ---
 

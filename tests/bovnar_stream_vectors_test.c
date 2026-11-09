@@ -34,8 +34,10 @@
  * its error. Every canonical vector must come out of bvnr_mux_send byte for
  * byte, its preamble replayed into the writer first, with and without a
  * bvnr_write_flush after each message. The frame vectors are read by the
- * pull-mode frame reader, cut the same ways, and must come out of
- * bvnr_frame_write byte for byte.
+ * pull-mode frame reader and by the parsing one, with and without
+ * continue_past_failed, cut the same ways, and by bvnr_doc_stream_read_ex;
+ * the parsing readers must report each document's own outcome. A frame
+ * vector that ends cleanly must come out of bvnr_frame_write byte for byte.
  *
  * Usage: bvnr_stream_vectors_test <tests/stream_vectors>
  */
@@ -123,7 +125,8 @@ static bool read_file(const char* path, buf_t* out)
  * The manifest.
  * ------------------------------------------------------------------------- */
 typedef struct {
-	uint64_t channel, length, fnv;
+	uint64_t    channel, length, fnv;
+	const char* error;        /* a document's outcome when parsed alone */
 } msg_t;
 
 typedef struct {
@@ -189,6 +192,8 @@ static void load_vector(const bvn_dom_entry_t* e, vector_t* v)
 		v->items[i].channel = v->is_mux ? get_u64(m, "channel") : 0;
 		v->items[i].length  = get_u64(m, "length");
 		v->items[i].fnv     = get_hex(m, "fnv");
+		v->items[i].error   = v->is_mux ? "none"
+					: get_str(m, "error", NULL);
 	}
 	if (v->is_mux) {
 		v->max_value = get_u64(s, "max_message");
@@ -197,6 +202,8 @@ static void load_vector(const bvn_dom_entry_t* e, vector_t* v)
 		bool c = false;
 		bvn_dom_get_bool(bvn_dom_struct_get(s, "canonical"), &c);
 		v->canonical = c;
+	} else {
+		v->max_value = get_u64(s, "max_document_size");
 	}
 }
 
@@ -460,10 +467,131 @@ static bool frames_pull(const vector_t* v, const uint8_t* data, size_t n,
 	return ok;
 }
 
+/* What a parsing reader reported of each document. */
+typedef struct {
+	uint32_t     n;
+	bool         mismatch;
+	const vector_t* v;
+} docs_t;
+
+static bool on_document(void* ud, uint64_t index, bool ok, error_code_t err)
+{
+	docs_t* d = ud;
+	const char* want = index < d->v->nitems ? d->v->items[index].error : "?";
+	if (index != d->n || ok != (strcmp(want, "none") == 0) ||
+	    (!ok && strcmp(bvn_error_to_string(err), want) != 0))
+		d->mismatch = true;
+	d->n++;
+	return true;
+}
+
+/* How a parsing reader ends: the stream's error going on past a failed
+ * document; stopping at one, that document's error. Its count is of the
+ * documents up to and including the one it stopped at. */
+static const char* parse_outcome(const vector_t* v, bool go_on,
+	uint32_t* count)
+{
+	for (uint32_t i = 0; !go_on && i < v->nitems; i++)
+		if (strcmp(v->items[i].error, "none") != 0) {
+			*count = i + 1;
+			return v->items[i].error;
+		}
+	*count = v->nitems;
+	return v->error;
+}
+
+static void parse_opts(const vector_t* v, bool go_on, docs_t* d,
+	bvnr_read_flags_t* fl, bvnr_doc_stream_opts_t* o)
+{
+	memset(d, 0, sizeof(*d));
+	d->v = v;
+	memset(fl, 0, sizeof(*fl));
+	memset(o, 0, sizeof(*o));
+	o->flags = fl;
+	o->userdata = d;
+	o->on_document = on_document;
+	o->continue_past_failed = go_on;
+	o->max_document_size = v->max_value;
+}
+
+static bool parse_same(const vector_t* v, bool go_on, const docs_t* d,
+	error_code_t err, const char* reader, const char* how)
+{
+	uint32_t count;
+	const char* want = parse_outcome(v, go_on, &count);
+	bool ok = !d->mismatch && d->n == count &&
+		  strcmp(bvn_error_to_string(err), want) == 0;
+	if (!ok)
+		fprintf(stderr, "  %s %s%s (%s): %u documents%s, %s; expected "
+			"%u, %s\n", v->name, reader,
+			go_on ? " going on" : "", how, d->n,
+			d->mismatch ? " (one reported wrong)" : "",
+			bvn_error_to_string(err), count, want);
+	return ok;
+}
+
+static bool frames_parse(const vector_t* v, bool go_on, const uint8_t* data,
+	const size_t* cuts, size_t ncuts, const char* how)
+{
+	docs_t d;
+	bvnr_read_flags_t fl;
+	bvnr_doc_stream_opts_t o;
+	parse_opts(v, go_on, &d, &fl, &o);
+	bvnr_frame_reader_t* fr = bvnr_frame_reader_create(&o);
+	bool alive = true;
+	size_t at = 0;
+	for (size_t i = 0; alive && i < ncuts; i++) {
+		alive = bvnr_frame_reader_feed(fr, data + at, cuts[i] - at);
+		at = cuts[i];
+	}
+	if (alive) bvnr_frame_reader_finish(fr);
+	bool ok = parse_same(v, go_on, &d, bvnr_frame_reader_error(fr),
+			     "parsing frame reader", how);
+	bvnr_frame_reader_destroy(fr);
+	return ok;
+}
+
+static bool frames_parse_strict(const vector_t* v, const uint8_t* data,
+	size_t n, const size_t* cuts, size_t ncuts, const char* how)
+{
+	(void)n;
+	return frames_parse(v, false, data, cuts, ncuts, how);
+}
+
+static bool frames_parse_go_on(const vector_t* v, const uint8_t* data,
+	size_t n, const size_t* cuts, size_t ncuts, const char* how)
+{
+	(void)n;
+	return frames_parse(v, true, data, cuts, ncuts, how);
+}
+
 static void test_frames(const vector_t* v, const buf_t* data)
 {
 	CHECK(for_cuts(v, data->p, data->n, frames_pull),
 	      "%s: the pull frame reader, wherever cut", v->name);
+	CHECK(for_cuts(v, data->p, data->n, frames_parse_strict),
+	      "%s: the parsing frame reader, wherever cut", v->name);
+	CHECK(for_cuts(v, data->p, data->n, frames_parse_go_on),
+	      "%s: the parsing frame reader past failed documents, wherever "
+	      "cut", v->name);
+	for (int go_on = 0; go_on < 2; go_on++) {
+		docs_t d;
+		bvnr_read_flags_t fl;
+		bvnr_doc_stream_opts_t o;
+		parse_opts(v, go_on != 0, &d, &fl, &o);
+		bvnr_source_t src;
+		bvnr_source_from_mem(&src, data->p, data->n);
+		uint64_t count = 0;
+		error_code_t err = error_none;
+		bvnr_doc_stream_read_ex(&src, &o, &count, &err);
+		CHECK(parse_same(v, go_on != 0, &d, err,
+				 "bvnr_doc_stream_read_ex", "whole") &&
+		      count == d.n,
+		      "%s: bvnr_doc_stream_read_ex%s", v->name,
+		      go_on ? " going on" : "");
+	}
+	if (strcmp(v->error, "none") != 0)
+		return;
 	/* bvnr_frame_write of the documents the frames hold. */
 	buf_t out = {0};
 	bvnr_sink_t sink;
@@ -498,7 +626,7 @@ int main(int argc, char** argv)
 	}
 	const bvn_dom_entry_t* e = bvn_dom_doc_entries(doc);
 	uint32_t count = bvn_dom_doc_count(doc);
-	CHECK(count >= 6, "the manifest lists the vectors (%u)", count);
+	CHECK(count >= 25, "the manifest lists the vectors (%u)", count);
 	for (uint32_t i = 0; i < count; i++) {
 		vector_t v;
 		load_vector(&e[i], &v);

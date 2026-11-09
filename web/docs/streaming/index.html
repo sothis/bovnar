@@ -861,38 +861,69 @@ after the send costs what the table in §8.4 shows — about 8 ns on a 150-byte
 message, the push of the sink included — and allocates nothing.</p>
 <hr />
 <h2 id="9-shared-conformance-vectors">9. Shared conformance vectors</h2>
-<p><code>tests/stream_vectors/</code> holds one set of wire vectors that the C library and
-the Rust crate are both held to, so that the C reference and the pure-Rust
-codec (<code>bovnar::codec</code>) cannot each agree with their own test code and
-disagree with each other. <code>tests/gen_stream_vectors.py</code> writes them from the
+<p><code>tests/stream_vectors/</code> holds one set of wire vectors that the C library, the
+Rust crate and the Python bindings are all held to, so that the C reference and
+the pure-Rust codec (<code>bovnar::codec</code>) cannot each agree with their own test code
+and disagree with each other. <code>tests/gen_stream_vectors.py</code> writes them from the
 wire conventions of §2.1 and §3.1 alone, never through the library, and lists
 each with its expected outcome in <code>manifest.bvnr</code>, a Bovnar document: the
 messages (channel, length and 64-bit FNV-1a of each), the preamble text, the
-framed documents, and the error the C demultiplexer gives a malformed stream.
-The set covers a stream after a preamble of text values (a struct with a
-unit, a string) and the same stream without it — messages of 150 B, 30 KB and
-400 KB, an empty one, one that fills a 65536-byte chunk, two channels
-interleaved message by message —, a frame stream of three documents, and
-three malformed streams: one truncated inside a message
-(<code>error_octet_stream_truncated</code>), one with a bad chunk tag
-(<code>error_octet_stream_out_of_sync</code>) and one over a stated <code>max_message</code>
-(<code>error_value_out_of_range</code>).</p>
-<p>The C demultiplexer, batch and fed (<code>tests/bovnar_stream_vectors_test.c</code>),
-<code>codec::MuxReader</code>, <code>codec::FrameReader</code> and <code>live::Demux</code>
-(<code>rust/tests/test_stream_vectors.rs</code>) read every vector fed whole, a byte at
-a time, cut in two at every position (sampled positions for the large ones)
-and in random pieces; <code>python/tests/test_stream_vectors.py</code> reads them through
-<code>mux_load</code>, <code>DemuxFeed</code> and <code>FrameFeed</code>, whole and in small pieces.
-<code>bvnr_mux_send</code> and
-<code>codec::MuxWriter</code>, its preamble included, write the well-formed multiplexed
-vectors byte for byte, and <code>bvnr_frame_write</code> and <code>codec::write_frame</code> the
-frame stream, so each side reads what the other writes. <code>bovnar mux list</code> and
-<code>bovnar frames list</code> read the valid vectors and refuse the malformed ones,
-except the one over <code>max_message</code>, which the CLI cannot set. CTest checks that
-the committed files are what the generator writes.</p>
-<p>This is a minimal set. The full one — every reader and writer of every layer,
-the remaining wire shapes and limits, and where readers deliberately differ —
-is still to come.</p>
+framed documents with the outcome each gives when parsed on its own, and the
+error that ends the stream, named as <code>bvn_error_to_string</code> names it.</p>
+<p><strong>What the set covers.</strong> Multiplexed streams:</p>
+<ul>
+<li>a stream after a preamble of text values (a struct with a unit, a string) and
+  the same stream without it — messages of 150 B, 30 KB and 400 KB, an empty
+  one, one that fills a 65536-byte chunk (length field <code>0x0000</code>), two channels
+  interleaved message by message;</li>
+<li>a stream with no message; channel ids of every varint width up to 2^64−1,
+  with, for the widest, a message that fills a chunk exactly (65523 bytes after
+  10 + 3 varint bytes) and one that spills a byte into a second chunk;</li>
+<li>several messages packed into one chunk, and a chunk that ends one message,
+  holds another whole and starts a third;</li>
+<li>the chunks of two 100 KB messages alternating, with a small message between
+  them that completes first;</li>
+<li>a length varint split across chunks, with another channel's chunk between
+  its bytes;</li>
+<li>4096 distinct channels, the most a stream may use, and a 4097th
+  (<code>error_octet_stream_out_of_sync</code>);</li>
+<li>the closing <code>0x00</code> followed by whitespace and comments before and after the
+  <code>;</code>;</li>
+<li>the ways a stream fails: closed inside a message
+  (<code>error_octet_stream_truncated</code>), a bad chunk tag, a chunk ending inside its
+  channel varint, an eleven-byte length varint and a channel varint past 64
+  bits (<code>error_octet_stream_out_of_sync</code>), a length over a stated
+  <code>max_message</code> (<code>error_value_out_of_range</code>), and input that ends inside a
+  chunk or before the closing <code>0x00</code> (<code>error_read_complete_chunk_failed</code>);</li>
+<li>three documents the C demultiplexer reads and the codec, which reads one shape
+  of document only (<a href="https://www.bovnar.io/docs/rust/#48-live-streams-the-framing-codec-bovnarcodec">Rust Bindings §4.8</a>),
+  refuses: a statement after the stream, a stream under
+  another key, an octet stream before the mux stream. The manifest gives the
+  codec's outcome beside the C one.</li>
+</ul>
+<p>Frame streams: three documents, one empty; a document that does not parse and
+one left incomplete among good ones; a bad magic; a frame over a stated
+<code>max_document_size</code>; input that ends inside a document or inside a header; no
+frames at all.</p>
+<p><strong>Who reads and writes them.</strong> The C demultiplexer, batch and fed, the pull and
+the parsing frame reader, and <code>bvnr_doc_stream_read_ex</code>
+(<code>tests/bovnar_stream_vectors_test.c</code>); <code>codec::MuxReader</code>,
+<code>codec::FrameReader</code>, <code>live::Demux</code>, <code>live::FramePull</code>, <code>live::FrameParser</code>
+and <code>stream::load_documents</code> (<code>rust/tests/test_stream_vectors.rs</code>); <code>mux_load</code>,
+<code>DemuxFeed</code>, <code>FrameFeed</code> pulled and parsing, and <code>load_documents</code>
+(<code>python/tests/test_stream_vectors.py</code>). The C and Rust readers take every
+vector fed whole, a byte at a time, cut in two at every position (sampled
+positions for the large ones) and in random pieces, the Python ones whole and in
+small pieces; the parsing frame readers, with and without
+<code>continue_past_failed</code>, report each document's own outcome. Every canonical
+vector — what <code>bvnr_mux_send</code> writes — comes out byte for byte of
+<code>bvnr_mux_send</code>, <code>codec::MuxWriter</code> (its preamble included), the C-backed
+<code>Writer::mux_send</code>, <code>mux_dump</code> and <code>MuxWriter</code>; the frame streams that end
+cleanly out of <code>bvnr_frame_write</code>, <code>codec::write_frame</code>, <code>frame_documents</code> and
+<code>FrameWriter</code>. So each side reads what every other writes. <code>bovnar mux list</code> and
+<code>bovnar frames list</code> read every vector as the manifest says
+(<code>tests/check_stream_vectors_cli.py</code>), short of the two limits the CLI cannot
+set. CTest checks that the committed files are what the generator writes.</p>
 <hr />
 <h2 id="see-also">See also</h2>
 <ul>

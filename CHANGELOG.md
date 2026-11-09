@@ -155,21 +155,31 @@ API and implements spec 1.2.
   `live::Demux` and `codec::MuxReader`, and the figures of
   `rust/benches/live.rs`.
 - **Shared streaming vectors.** `tests/stream_vectors/` holds one set of wire
-  vectors for the C library and the Rust crate, written by
+  vectors for the C library, the Rust crate and the Python bindings, written by
   `tests/gen_stream_vectors.py` from the wire conventions alone and listed with
-  their expected outcome in `manifest.bvnr`: multiplexed streams with and
-  without a preamble of text values (messages of 150 B, 30 KB and 400 KB, an
-  empty one, one filling a 65536-byte chunk, two channels interleaved), a frame
-  stream, and three malformed streams. The C demultiplexer (batch and fed),
-  `bovnar::codec::MuxReader`, `FrameReader` and `bovnar::live::Demux` read
-  every vector wherever it is cut, `bvnr_mux_send` and `codec::MuxWriter`
-  (preamble included) write the well-formed ones byte for byte, as do
-  `bvnr_frame_write` and `codec::write_frame`, and `bovnar mux list` /
-  `frames list` accept or refuse each. New CTest tests:
-  `bvnr_stream_vectors_test`, `bvnr_stream_vectors_fresh` (the committed files
-  are a fresh generation) and the `bvnr_cli_vectors_*` group; the Python
-  bindings read them in `python/tests/test_stream_vectors.py`. doc/10 §9. This
-  is the minimal set; the full one is still to come.
+  their expected outcome in `manifest.bvnr`. Twenty multiplexed streams: with
+  and without a preamble of text values (150 B, 30 KB and 400 KB messages, an
+  empty one, one filling a 65536-byte chunk), none at all, channel ids of every
+  varint width up to 2^64−1 at the one-chunk boundary, packed chunks, the
+  interleaved chunks of two large messages, a length varint split across
+  chunks, 4096 channels and the 4097th, whitespace and comments around the
+  closing `;`, every way a stream fails (truncated, desynchronised, oversize,
+  cut inside the octet stream), and three documents the C demultiplexer reads
+  and the pure-Rust codec deliberately refuses. Eight frame streams: three
+  documents, a failed and an incomplete document among good ones, a bad magic,
+  an oversize frame, input cut inside a document or a header, and none at
+  all. The C demultiplexer (batch and fed), the pull and the parsing frame
+  readers and `bvnr_doc_stream_read_ex`; `codec::MuxReader`, `FrameReader`,
+  `live::Demux`, `FramePull`, `FrameParser` and `stream::load_documents`; and
+  `mux_load`, `DemuxFeed`, `FrameFeed` and `load_documents` read every vector
+  wherever it is cut, the parsing frame readers with each document's own
+  outcome. `bvnr_mux_send`, `codec::MuxWriter`, `Writer::mux_send`, `mux_dump`
+  and `MuxWriter` write the canonical vectors byte for byte, as do
+  `bvnr_frame_write`, `codec::write_frame`, `frame_documents` and `FrameWriter`
+  the frame streams, so each side reads what the others write. `bovnar mux
+  list` and `frames list` read every vector as the manifest says. New CTest
+  tests: `bvnr_stream_vectors_test`, `bvnr_stream_vectors_fresh` (the committed
+  files are a fresh generation) and `bvnr_cli_stream_vectors`. doc/10 §9.
 - **Rust: `Writer::flush`** wraps `bvnr_write_flush`: a `to_writer` writer
   writes what its 64 KiB buffer holds into its `std::io::Write` and calls that
   writer's `flush` once, so a `flush()` after each `mux_send` hands a live

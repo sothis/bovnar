@@ -25,14 +25,14 @@ has not moved on (tags always). `.github/scripts/runner-shortage.sh REPO RUN
 [ATTEMPT]` prints its verdict for any run. It takes effect from its first push
 to main; its first real use is the evidence it works.
 
-## Open — incremental streaming for Rust and Python (asked 2026-11-08)
+## Done — incremental streaming for Rust and Python (asked 2026-11-08)
 
-**Status 2026-11-08:** items 1–4, 6 and 7 have shipped on main (unreleased:
+**Status 2026-11-09:** every item has shipped on main (unreleased:
 `bovnar::codec`, `bovnar::live`, the C callback sources and sinks, the push-fed
 reader, frame reader and demux, `bvnr_write_flush`, the Python feeds and live
-writers, the benchmarks and the docs). What is still open is the full vector set
-of item 5. The paragraphs below describe the state before the work, as the plan
-was written.
+writers, the benchmarks, the docs, and on 2026-11-09 the full vector set of
+item 5). Nothing is open. The paragraphs below describe the state before the
+work, as the plan was written.
 
 The streaming layer of doc/10 (frames, octet multiplexing,
 document-in-document, endless streams) is batch-only in both bindings.
@@ -152,7 +152,14 @@ three invalid vectors), checked by the C demux, the Rust codec and
 `live::Demux`, the Python feeds, the C and Rust writers byte for byte, and the
 CLI. The fuzz targets have shipped too: `codec` and `live` under `rust/fuzz/`,
 and `bvnr_fuzz_feed` for the C feed readers. It covers
-what the first consumer (Mumcord) relies on. **Still open:** the full set below.
+what the first consumer (Mumcord) relies on.
+
+**Status 2026-11-09:** the full set below has shipped: 28 vectors (doc/10 §9),
+read by every reader of the three implementations wherever cut and by `bovnar
+mux list` / `frames list` (`tests/check_stream_vectors_cli.py`), written byte
+for byte by every writer. "Input split at every byte" is the readers' cutting,
+not a vector. Three vectors pin where the pure-Rust codec deliberately differs
+from the C demultiplexer (`.codec_error` in the manifest).
 
 Shared vectors across C, Rust and Python, each side reading the others'
 output and `bovnar frames list` / `bovnar mux list` reading all of it:

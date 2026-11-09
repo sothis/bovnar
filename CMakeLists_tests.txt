@@ -1350,27 +1350,21 @@ add_test(
 set_tests_properties(bvnr_cli_stream_roundtrip PROPERTIES
     LABELS "cli;stream" TIMEOUT 30)
 
-# The shared streaming vectors through `mux list` / `frames list`: the valid
-# ones list every message (or document), in order and at its length; the
-# malformed ones fail with the reason. The CLI cannot set max_message, so
-# mux_oversize lists both of its messages under the 64 MiB default.
-set(_bvnr_sv ${CMAKE_CURRENT_SOURCE_DIR}/tests/stream_vectors)
-set(_bvnr_sv_msgs
-    "channel 1: 150 bytes.*channel 2: 30000 bytes.*channel 1: 400000 bytes.*channel 2: 0 bytes.*channel 1: 65532 bytes.*channel 2: 4 bytes")
-_bvnr_cli_expect(bvnr_cli_vectors_mux_preamble "cli;stream;vectors" 0
-    "${_bvnr_sv_msgs}" "error" mux list ${_bvnr_sv}/mux_preamble.bvnr)
-_bvnr_cli_expect(bvnr_cli_vectors_mux_plain "cli;stream;vectors" 0
-    "${_bvnr_sv_msgs}" "error" mux list ${_bvnr_sv}/mux_plain.bvnr)
-_bvnr_cli_expect(bvnr_cli_vectors_frames_three "cli;stream;vectors" 0
-    "frame 0: OK.*frame 1: OK.*frame 2: OK.*3 document\\(s\\)" "ERROR"
-    frames list ${_bvnr_sv}/frames_three.bvf)
-_bvnr_cli_expect(bvnr_cli_vectors_mux_truncated "cli;stream;vectors" 1
-    "demux error octet_stream_truncated" "" mux list ${_bvnr_sv}/mux_truncated_message.bvnr)
-_bvnr_cli_expect(bvnr_cli_vectors_mux_bad_tag "cli;stream;vectors" 1
-    "parse error octet_stream_out_of_sync" "" mux list ${_bvnr_sv}/mux_bad_tag.bvnr)
-_bvnr_cli_expect(bvnr_cli_vectors_mux_oversize "cli;stream;vectors" 0
-    "channel 1: 100 bytes.*channel 1: 101 bytes" "error"
-    mux list ${_bvnr_sv}/mux_oversize.bvnr)
+# The shared streaming vectors through `mux list` / `frames list`: every
+# vector of the manifest lists its messages (or documents, each with its own
+# outcome) in order and at their lengths, and fails exactly when the vector
+# does, naming the error. The manifest is read through `bovnar convert`, so
+# the check needs only the binary (and the emulator of a cross build).
+if(Python3_Interpreter_FOUND)
+    add_test(NAME bvnr_cli_stream_vectors
+        COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_stream_vectors_cli.py
+                $<TARGET_FILE:bovnar>
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/stream_vectors
+                ${CMAKE_CROSSCOMPILING_EMULATOR})
+    set_tests_properties(bvnr_cli_stream_vectors PROPERTIES
+        LABELS "cli;stream;vectors" TIMEOUT 120)
+endif()
 
 # ── the command line's own contract ───────────────────────────────────────────
 # Exit statuses (0 / 1 the document or the I/O failed / 2 the command line was
@@ -1520,7 +1514,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 204)   # 134 base + rust_build_sync + canonical_keeps_meaning + interval_array + bench_iterations_zero + sitemap + convert_wide_int + unit_source + 3 for examples/unit_profiles.bvnr + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier) + cli_regressions + wasm_native_shape + abi_baseline + crate_provenance
+set(BVNR_EXPECTED_TEST_COUNT 199)   # 129 base (the six per-vector CLI tests are one bvnr_cli_stream_vectors) + rust_build_sync + canonical_keeps_meaning + interval_array + bench_iterations_zero + sitemap + convert_wide_int + unit_source + 3 for examples/unit_profiles.bvnr + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier) + cli_regressions + wasm_native_shape + abi_baseline + crate_provenance
                                     #             + citation
                                     #         + profiles_off_build
                                     # + om_test + cf_test

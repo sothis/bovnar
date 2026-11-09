@@ -9,7 +9,8 @@ name: Runner shortage retry
 # Build & Package dispatches this workflow from its `shortage_retry` job when a push
 # run ends without succeeding. This asks .github/scripts/runner-shortage.sh whether a
 # missing runner is the only reason, and if so waits five minutes and re-runs the
-# failed jobs (their dependents with them), up to attempt 6. A run with a real
+# failed jobs (their dependents with them), up to attempt 50 (GitHub re-runs a run
+# at most 50 times, so one is left for a person). A run with a real
 # failure, one cancelled by a newer push or by hand, and a branch run its branch has
 # moved on from are left as they are. Pull request runs never get here: only push
 # runs dispatch it.

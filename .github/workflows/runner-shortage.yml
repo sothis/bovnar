@@ -6,16 +6,27 @@ name: Runner shortage retry
 # is skipped. On a tag that skips the release and the publish jobs; v2.0.1 needed five
 # attempts for that alone, each re-run by hand.
 #
-# After each Build & Package run of a push that did not succeed, this asks
-# .github/scripts/runner-shortage.sh whether a missing runner is the only reason. If so,
-# it waits five minutes and re-runs the failed jobs (their dependents with them), up to
-# attempt 6. A run with a real failure, one cancelled by a newer push or by hand, and a
-# branch run its branch has moved on from are left as they are. Pull request runs are
-# left to whoever opened them.
+# Build & Package dispatches this workflow from its `shortage_retry` job when a push
+# run ends without succeeding. This asks .github/scripts/runner-shortage.sh whether a
+# missing runner is the only reason, and if so waits five minutes and re-runs the
+# failed jobs (their dependents with them), up to attempt 6. A run with a real
+# failure, one cancelled by a newer push or by hand, and a branch run its branch has
+# moved on from are left as they are. Pull request runs never get here: only push
+# runs dispatch it.
+#
+# It is dispatched instead of triggered on `workflow_run` on purpose. That trigger
+# fires for every completed Build & Package run, and when the `retry` job's `if` then
+# skips it GitHub still creates the run and lists it as skipped -- so a shortage the
+# first re-run cured left a second, skipped "Runner shortage retry" entry behind.
 on:
-  workflow_run:
-    workflows: ["Build & Package"]
-    types: [completed]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Build & Package run id to judge
+        required: true
+      attempt:
+        description: Run attempt to judge
+        required: true
 
 permissions:
   actions: write   # re-run the failed jobs
@@ -24,10 +35,6 @@ permissions:
 
 jobs:
   retry:
-    if: >-
-      github.event.workflow_run.conclusion != 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.run_attempt < 6
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -36,11 +43,25 @@ jobs:
       - name: Re-run the jobs GitHub found no runner for
         env:
           GH_TOKEN: ${{ github.token }}
-          RERUN_TOKEN: ${{ secrets.RERUN_TOKEN || github.token }}
-          RUN: ${{ github.event.workflow_run.id }}
-          ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          RUN: ${{ inputs.run_id }}
+          ATTEMPT: ${{ inputs.attempt }}
         run: |
           set -euo pipefail
+          # The dispatch comes from inside the run it names, so that run ends
+          # moments later. Wait for it: the verdict below reads the jobs'
+          # conclusions, and a job still in flight has none.
+          status=unknown
+          for _ in $(seq 1 24); do
+            if ! status=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN" --jq .status 2>/dev/null); then
+              status=unknown
+            fi
+            if [ "$status" = completed ]; then break; fi
+            sleep 5
+          done
+          if [ "$status" != completed ]; then
+            echo "::warning::run $RUN did not finish within two minutes of the dispatch; leaving it"
+            exit 0
+          fi
           verdict=$(.github/scripts/runner-shortage.sh "$GITHUB_REPOSITORY" "$RUN" "$ATTEMPT")
           echo "run $RUN attempt $ATTEMPT: $verdict"
           [ "$verdict" = retry ] || exit 0
@@ -54,13 +75,8 @@ jobs:
           # wait, the latest attempt is one nobody judged; leave it to them.
           latest=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN" --jq .run_attempt)
           [ "$latest" = "$ATTEMPT" ] || { echo "run $RUN: attempt $latest started meanwhile; keep"; exit 0; }
-          # The re-run uses RERUN_TOKEN (a fine-grained token: this repository,
-          # Actions read/write) when the secret exists. A re-run started with
-          # GITHUB_TOKEN may not fire workflow_run when it completes -- GitHub
-          # suppresses events caused by that token -- so a second shortage in a
-          # row would get no retry. Started with the owner's token it is the
-          # owner's re-run, its completion triggers this workflow again, and the
-          # chain continues up to attempt 6. Without the secret it falls back to
-          # GITHUB_TOKEN: one retry at least.
-          GH_TOKEN="$RERUN_TOKEN" gh run rerun "$RUN" --failed -R "$GITHUB_REPOSITORY"
+          # GITHUB_TOKEN is enough now: the re-run needs no event of its own --
+          # when it ends, its own `shortage_retry` job (re-run as a dependent of
+          # the jobs that failed) asks for the next judgement.
+          gh run rerun "$RUN" --failed -R "$GITHUB_REPOSITORY"
           echo "::notice::re-ran the failed jobs of run $RUN (attempt $ATTEMPT): GitHub had found no runner for them"

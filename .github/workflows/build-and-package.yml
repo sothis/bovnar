@@ -956,3 +956,56 @@ jobs:
             gh release upload "$tag" assets/* --clobber
             gh release edit "$tag" --draft=false
           fi
+
+  # ── Runner-shortage retry ─────────────────────────────────────────────────
+  shortage_retry:
+    name: Runner shortage retry dispatch
+    # A job GitHub never starts ("The job was not acquired by Runner of type
+    # hosted even after multiple attempts", as when macOS arm64 runners run
+    # short) ends `cancelled`, and every job that needs it is skipped: the run
+    # fails with no real failure behind it. This job hands the run to
+    # .github/workflows/runner-shortage.yml, which checks that a missing runner
+    # is the only reason and re-runs the failed jobs.
+    #
+    # It depends on every other job on purpose: a shortage can cancel any of
+    # them, and a job left out of `needs` is invisible to `failure()` and
+    # `needs.*.result`. A job added above has to be added here too.
+    #
+    # This dispatches instead of the retry workflow listening on `workflow_run`
+    # because that trigger fires for every completed run, and when the retry
+    # job's `if` then skips it GitHub still creates the run and lists it as
+    # skipped: a shortage the first re-run cured left a second, skipped
+    # "Runner shortage retry" entry behind.
+    needs: [msvc, mingw, tests, linux, macos, rust_version, rust, rust_wasm,
+            rust_package, source, build_wheels, build_sdist, publish,
+            publish_crate, release]
+    # A real failure is handed over too; the retry workflow tells it apart and
+    # leaves the run alone. A cancelled job is the shortage's own signature;
+    # `!cancelled()` keeps out a run superseded by a newer push (re-running it
+    # would only cancel the newer run). A re-run brings this job back too -- it
+    # depends on the failed job -- so every attempt asks for its own judgement.
+    if: >-
+      always() &&
+      !cancelled() &&
+      github.event_name == 'push' &&
+      github.run_attempt < 6 &&
+      (failure() || contains(needs.*.result, 'cancelled'))
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write   # dispatch the retry workflow
+    steps:
+      - name: Dispatch the runner-shortage retry workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # The dispatch is an API call; a transient error here would leave the
+          # shortage unretried. Ask up to three times.
+          for i in 1 2 3; do
+            if gh workflow run runner-shortage.yml -R "$GITHUB_REPOSITORY" \
+                 -f run_id="$GITHUB_RUN_ID" -f attempt="$GITHUB_RUN_ATTEMPT"; then
+              exit 0
+            fi
+            if [ "$i" -lt 3 ]; then sleep 10; fi
+          done
+          exit 1

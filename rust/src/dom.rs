@@ -189,6 +189,265 @@ impl DomDoc {
     pub fn to_value(&self) -> Result<Value> {
         strict_entries(self.handle.entries()).map(Value::Struct)
     }
+
+    /// An empty document, to build a tree in by hand (`bvn_dom_doc_create`):
+    /// see [`NewNode`]. It reads like a parsed one, and has no parse error.
+    pub fn create() -> Result<Self> {
+        let handle = ffi::DocHandle::create().ok_or(Error::OutOfMemory("bvn_dom_doc_create()"))?;
+        Ok(DomDoc { handle })
+    }
+
+    /// Adds `node` as the top-level entry `key` (`bvn_dom_doc_add`); the
+    /// document owns it from then on. A parsed document takes one too.
+    ///
+    /// Fails with [`Error::Argument`] when `key` is not an identifier
+    /// ([`crate::literals::validate_identifier`]) and, with the code
+    /// `duplicate_struct_key`, when the document already has it; the node is
+    /// dropped then.
+    pub fn add(&mut self, key: &str, node: impl Into<NewNode>) -> Result<()> {
+        let node = node.into();
+        check_new_key(key)?;
+        if self.get(key).is_some() {
+            return Err(duplicate_key(key));
+        }
+        attached(self.handle.add(key, node.0), "bvn_dom_doc_add()")
+    }
+}
+
+/// A node built by hand and not yet in a tree: a null, an integer, or a
+/// finished [`NewStruct`] or [`NewArray`]. This is the C DOM's builder
+/// (doc/08 §4.5): it makes structs, arrays, nulls and integers only, and a
+/// built tree cannot be written out (the C library has no DOM serialiser);
+/// it is read through [`DomDoc`] and [`DomNode`] like a parsed one, for code
+/// that consumes a DOM, such as a test fixture.
+///
+/// Attaching a node moves it into its container, so a node is in one tree at
+/// most and is never used after it was handed over; one dropped before it is
+/// attached is freed. Adding one twice does not compile:
+///
+/// ```compile_fail,E0382
+/// use bovnar::{DomDoc, NewNode};
+///
+/// let mut doc = DomDoc::create().unwrap();
+/// let n = NewNode::from_i32(1).unwrap();
+/// doc.add("a", n).unwrap();
+/// doc.add("b", n).unwrap(); // use of moved value
+/// ```
+///
+/// Neither does filling a struct after it was attached:
+///
+/// ```compile_fail,E0382
+/// use bovnar::{DomDoc, NewNode, NewStruct};
+///
+/// let mut doc = DomDoc::create().unwrap();
+/// let mut s = NewStruct::new().unwrap();
+/// doc.add("s", s).unwrap();
+/// s.add("x", NewNode::null().unwrap()).unwrap(); // borrow of moved value
+/// ```
+pub struct NewNode(ffi::dom_build::BuildNode);
+
+/// A struct node being built: add members with [`NewStruct::add`], then
+/// attach it as any [`NewNode`].
+pub struct NewStruct(ffi::dom_build::BuildNode);
+
+/// An array node being built: append elements with [`NewArray::push`], then
+/// attach it as any [`NewNode`]. Its elements are one flat row.
+pub struct NewArray(ffi::dom_build::BuildNode);
+
+fn alloc_failed(call: &'static str) -> Error {
+    Error::OutOfMemory(call)
+}
+
+macro_rules! new_narrow {
+    ($($name:ident($t:ty) => $width:literal $family:literal;)*) => {$(
+        #[doc = concat!("An integer node of type `", $family, ":", $width,
+                        "` holding `v`, with no unit (`bvn_dom_node_", stringify!($name), "`).")]
+        pub fn $name(v: $t) -> Result<Self> {
+            ffi::dom_build::BuildNode::$name(v)
+                .map(NewNode)
+                .ok_or(alloc_failed(concat!("bvn_dom_node_", stringify!($name), "()")))
+        }
+    )*};
+}
+
+impl NewNode {
+    /// A null node (`bvn_dom_node_alloc(BVN_DOM_NULL)`).
+    pub fn null() -> Result<Self> {
+        ffi::dom_build::BuildNode::alloc(ffi::dom_build::DOM_NULL)
+            .map(NewNode)
+            .ok_or(alloc_failed("bvn_dom_node_alloc()"))
+    }
+
+    new_narrow! {
+        from_i8(i8) => "8" "sint";
+        from_u8(u8) => "8" "uint";
+        from_i16(i16) => "16" "sint";
+        from_u16(u16) => "16" "uint";
+        from_i32(i32) => "32" "sint";
+        from_u32(u32) => "32" "uint";
+        from_i64(i64) => "64" "sint";
+        from_u64(u64) => "64" "uint";
+    }
+
+    /// An integer node wider than 64 bits (`bvn_dom_node_from_bigint`):
+    /// `value` as a `sint` or `uint` of `width` bits (65 to 32768), with
+    /// `unit` (none when `None`). [`crate::Signedness::Auto`] is `sint` for a
+    /// negative value and `uint` otherwise, as for
+    /// [`crate::Writer::write_bvni`].
+    ///
+    /// Fails with [`Error::Argument`] for a width outside 65 to 32768, a
+    /// value that does not fit the type, or a unit that is not structurally
+    /// valid. The narrow constructors ([`NewNode::from_i64`], …) take no
+    /// unit: the C library gives them none.
+    pub fn from_bigint(
+        value: &num_bigint::BigInt,
+        width: u32,
+        signed: crate::Signedness,
+        unit: Option<&crate::Unit>,
+    ) -> Result<Self> {
+        if !(65..=crate::writer::MAX_INT_WIDTH).contains(&width) {
+            return Err(Error::argument(format!(
+                "from_bigint: the width must be 65 to {}, got {width}; a narrower \
+                 integer is NewNode::from_i64 and its kin",
+                crate::writer::MAX_INT_WIDTH
+            )));
+        }
+        let signed = match signed {
+            crate::Signedness::Signed => true,
+            crate::Signedness::Unsigned => false,
+            crate::Signedness::Auto => value.sign() == num_bigint::Sign::Minus,
+        };
+        let family = if signed {
+            ValueTypeFamily::Sint
+        } else {
+            ValueTypeFamily::Uint
+        };
+        let unit = unit.copied().unwrap_or_default();
+        if !crate::units::unit_valid(&unit) {
+            return Err(Error::argument(
+                "from_bigint: the unit is not structurally valid",
+            ));
+        }
+        // The C function makes the same check, but says only NULL; made here
+        // first, the refusal can say why.
+        let fits = if signed {
+            let half = num_bigint::BigInt::from(1) << (width - 1);
+            *value >= -half.clone() && *value < half
+        } else {
+            value.sign() != num_bigint::Sign::Minus && value.bits() <= u64::from(width)
+        };
+        if !fits {
+            return Err(Error::argument(format!(
+                "from_bigint: {value} does not fit {}:{width}",
+                if signed { "sint" } else { "uint" }
+            )));
+        }
+        let vt = ValueTypeSpec {
+            family: family as i32,
+            width,
+            base: 0,
+        };
+        ffi::dom_build::BuildNode::from_bigint(&value.to_str_radix(16), vt, unit.0)
+            .map(NewNode)
+            .ok_or(alloc_failed("bvn_dom_node_from_bigint()"))
+    }
+
+    /// The node's kind.
+    pub fn dom_type(&self) -> Option<DomType> {
+        DomType::from_raw(self.0.node_type())
+    }
+}
+
+impl NewStruct {
+    /// An empty struct node (`bvn_dom_node_alloc(BVN_DOM_STRUCT)`).
+    pub fn new() -> Result<Self> {
+        ffi::dom_build::BuildNode::alloc(ffi::dom_build::DOM_STRUCT)
+            .map(NewStruct)
+            .ok_or(alloc_failed("bvn_dom_node_alloc()"))
+    }
+
+    /// Adds `node` as member `key` (`bvn_dom_struct_add`). Fails as
+    /// [`DomDoc::add`] does, for a key that is not an identifier or that the
+    /// struct already has; the node is dropped then.
+    pub fn add(&mut self, key: &str, node: impl Into<NewNode>) -> Result<()> {
+        let node = node.into();
+        check_new_key(key)?;
+        if self.0.has_key(key) {
+            return Err(duplicate_key(key));
+        }
+        attached(self.0.struct_add(key, node.0), "bvn_dom_struct_add()")
+    }
+
+    /// The number of members.
+    pub fn len(&self) -> usize {
+        self.0.count()
+    }
+
+    /// Whether the struct has no members.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl NewArray {
+    /// An empty array node (`bvn_dom_node_alloc(BVN_DOM_ARRAY)`).
+    pub fn new() -> Result<Self> {
+        ffi::dom_build::BuildNode::alloc(ffi::dom_build::DOM_ARRAY)
+            .map(NewArray)
+            .ok_or(alloc_failed("bvn_dom_node_alloc()"))
+    }
+
+    /// Appends `node` (`bvn_dom_array_append`).
+    pub fn push(&mut self, node: impl Into<NewNode>) -> Result<()> {
+        attached(self.0.array_append(node.into().0), "bvn_dom_array_append()")
+    }
+
+    /// The number of elements.
+    pub fn len(&self) -> usize {
+        self.0.count()
+    }
+
+    /// Whether the array has no elements.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl From<NewStruct> for NewNode {
+    fn from(s: NewStruct) -> Self {
+        NewNode(s.0)
+    }
+}
+
+impl From<NewArray> for NewNode {
+    fn from(a: NewArray) -> Self {
+        NewNode(a.0)
+    }
+}
+
+/// A key the builder takes: what a parsed document can hold, so that the
+/// path lookups find it.
+fn check_new_key(key: &str) -> Result<()> {
+    if crate::literals::validate_identifier(key) {
+        Ok(())
+    } else {
+        Err(Error::argument(format!(
+            "{key:?} is not an identifier (spec §4.2), so it cannot be a key"
+        )))
+    }
+}
+
+fn duplicate_key(key: &str) -> Error {
+    Error::argument_with(
+        ErrorCode::DuplicateStructKey,
+        format!("the key {key:?} is there already"),
+    )
+}
+
+/// The result of an attach the checks above have cleared: only an
+/// allocation can fail it, and the C function has freed the node then.
+fn attached(ok: bool, call: &'static str) -> Result<()> {
+    if ok { Ok(()) } else { Err(alloc_failed(call)) }
 }
 
 /// `(key, value)` pairs for a [`Value::Struct`]: a key that is not UTF-8 is an

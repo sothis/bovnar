@@ -35,6 +35,7 @@ the C library; `import bovnar` itself never loads it.
     - 5.5 [Inline unit suffix](#55-inline-unit-suffix)
     - 5.6 [`UnitPolicy` — validation and conversion without a callback](#56-unitpolicy--validation-and-conversion-without-a-callback)
     - 5.7 [Building a `ValueUnit`](#57-building-a-valueunit)
+    - 5.8 [Validators and literal helpers](#58-validators-and-literal-helpers)
 6. [`Quantity`](#6-quantity)
     - 6.1 [Construction](#61-construction)
     - 6.2 [Properties and methods](#62-properties-and-methods)
@@ -78,6 +79,7 @@ the C library; `import bovnar` itself never loads it.
     - 13.2 [`DomDoc`](#132-domdoc)
     - 13.3 [`DomNode`](#133-domnode)
     - 13.4 [`DomType`](#134-domtype)
+    - 13.5 [Building a tree (`NewNode`)](#135-building-a-tree-newnode)
 14. [Running the test suite](#14-running-the-test-suite)
 15. [Package layout](#15-package-layout)
 16. [Error handling](#16-error-handling)
@@ -835,7 +837,8 @@ ok = units_compatible(vu_a, vu_b)     # b vs B is False — the dimensions agree
 
 # Conversion factor between two compatible units
 c = unit_convert_factor(vu_from, vu_to)
-# c.factor, c.requires_affine
+# c.factor, c.requires_affine, c.ok — ok is False (and factor 0.0) for an
+# affine conversion whose offsets do not cancel, °C → K: use convert_value
 
 # 7-element SI dimension exponent vector [m, kg, s, A, K, mol, cd]
 dims = unit_dimension_vector(vu)       # e.g. [1, 0, -1, 0, 0, 0, 0] for m/s
@@ -1161,6 +1164,130 @@ unit_to_str(make_unit_none())            # 'no_unit'
 unit_to_str(make_unit_dimensionless())   # 'no_unit'
 bytes(make_unit_none()) != bytes(make_unit_dimensionless())   # True
 ```
+
+### 5.8 Validators and literal helpers
+
+`bovnar.literals` binds the C library's checks and literal helpers
+(`bovnar.h`): the tests the writer applies to keys, symbols, references and
+numbers, the integer and float parsers and formatters behind it, and the parser
+of a type annotation. Each function is the C function of the same name without
+its `bvn_` prefix, and answers as it does. Text holding NUL is none of the
+things they check: a validator answers `False` for it, a parser raises.
+
+**Type annotations.** `parse_type_annotation(text)` parses the text between the
+angle brackets, as the reader does, into a frozen `TypeAnnotation` of
+`value_type` (a `ValueTypeSpec`), `unit` (a `ValueUnit`, with no components when
+there is no unit or it is spelled `no_unit`) and `unit_source` (the unit
+parameter as written, `''` when there is none):
+
+```python
+from bovnar import literals, BovnarParseError
+
+a = literals.parse_type_annotation("uint:32,_16,k~g")
+a.value_type.width, a.value_type.base     # → (32, 16)
+a.unit                                    # → "k~g"
+a.unit_source                             # → "k~g"
+literals.parse_type_annotation("float:64,ucum:mL{total}").unit_source   # → "ucum:mL{total}"
+
+try:
+    literals.parse_type_annotation("uint:8,_16,_16")    # a base given twice
+except BovnarParseError as e:
+    refused = e.code
+refused.name                              # → "ILLEGAL_VALUE_TYPE"
+```
+
+A refusal is a `BovnarParseError` whose `code` is the one the reader gives the
+same annotation in a document, so it tells the C function's three flags apart:
+
+| `code` | C flags | Cause |
+|---|---|---|
+| `ILLEGAL_VALUE_TYPE` | `type_ok` false | An unknown family, an empty or repeated parameter, a parameter the family does not take (a base on `float_fix`, a width on `bool`), a width or base out of range |
+| `UNIT_TOO_LONG` | `unit_ok` false, `unit_too_long` true | A unit parameter over 255 bytes |
+| `UNIT_ILLEGAL`, `UNIT_PROFILE_UNKNOWN`, `UNIT_PROFILE_UNSUPPORTED` | `unit_ok` false | A unit parameter that is not a unit this build knows; the code is the one `unit_error_code()` gives it (§5.1) |
+
+The reader's version gates are not applied: `datetime` (spec 1.1) and a profile
+unit (spec 1.2) parse here whatever version a document declares. A `datetime`'s
+epoch is no unit: its index is in `value_type.base` (`datetime_epoch_index`,
+§19), as a `float_fix`'s q is.
+
+**Validators.** Each returns a `bool`:
+
+| Function | `True` for |
+|---|---|
+| `validate_identifier(s)` | A key: an ASCII letter, `_` or a character from U+00C0 on, then no space, control character, U+0080 to U+00BF, or punctuation spec §4.2 forbids (`-` and `+` are allowed). No length limit: the reader's `max_identifier_length` (255) is separate |
+| `validate_symbol(s)` | A symbol, which is spelled as a key is |
+| `validate_reference(s)` | A path such as `.a.b[0]`, without the `&`: identifier segments, each with optional `[digits]` indexes |
+| `validate_number(s)` | A decimal number: an optional `-`, digits with at most one `.`, an optional `e`/`E` exponent. No `+`, and not `inf` |
+| `is_special_number_string(s)` | Exactly `inf`, `ninf` or `nan` |
+| `validate_digits_for_base(s, base)` | An integer literal: an optional `-` and digits of `base` (no sign at all in bases 64 and 85, where `+` and `-` are digits) |
+| `validate_number_in_base(s, base)` | A quoted float literal: either sign, digits of `base` with at most one `.`, and an exponent marked `e` (bases up to 14) or `p` (the power-of-two bases up to 16) |
+| `validate_uint_range(s, width, base=10)` / `validate_sint_range(s, width, base=10)` | A literal that fits `width` bits (0: any width); `inf`, `ninf` and `nan` pass |
+| `validate_string(data)` | Bytes that are well-formed UTF-8 |
+
+```python
+literals.validate_identifier("max-speed")      # → True
+literals.validate_identifier("max.speed")      # → False
+literals.validate_reference(".axis[2].unit")   # → True
+literals.validate_number("+1")                 # → False
+literals.validate_digits_for_base("-ff", 16)   # → True
+literals.validate_uint_range("256", 8)         # → False
+literals.validate_sint_range("-80", 8, 16)     # → True
+```
+
+Three of them are narrower than their names. The range checks test the range
+only, on text the digit check has already passed: `validate_uint_range("", 8)`
+and `validate_uint_range(" 5", 8)` are `True`. `validate_digits_for_base` does
+not check the base against the ones a type may declare: in base 1 the one digit
+is `0`. And `validate_string` is the same test as `data.decode('utf-8')`; NUL and
+the other control bytes the writer refuses in a string pass it.
+
+**Digits.** `char_to_digit(ch, base)` is the value of one digit, `None` when it
+is no digit of `base`: up to base 36 a letter's case does not matter, above it
+`A` to `Z` are 36 to 61, and bases 64 and 85 use the Base64 and Ascii85
+alphabets. `min_digits_for_type(vt)` is how many digits of the type's base the
+largest value of an integer type of up to 64 bits takes; 0 for a width of 0 or
+above 64, and a float type is answered as if it were an unsigned integer of its
+width.
+
+```python
+from bovnar import make_type_spec, ValueTypeFamily
+
+literals.char_to_digit("Z", 62)     # → 61
+literals.char_to_digit("g", 16)     # → None
+literals.min_digits_for_type(make_type_spec(ValueTypeFamily.UINT, 8, 16))   # → 2
+```
+
+**Parsing and formatting.** These are the functions the writer and the DOM use.
+Each raises `BovnarArgumentError` where the C one returns `false` or -1:
+
+| Function | Result |
+|---|---|
+| `parse_int64(s, vt)` / `parse_uint64(s, vt)` | The integer literal in the type's base; refused when it does not fit the type's width (64 when it declares none), and for a `+` or a space before it |
+| `parse_double(s, vt)` / `parse_double_in_base(s, base)` | The float literal (base 10 or 16; `inf`, `ninf` and `nan`, not `-inf`) as the nearest double, rounded once from its exact value |
+| `format_uint64(value, base=10, min_digits=0)` / `format_int64(...)` | The digits in base 2 to 62, 64 or 85, padded with zero digits to `min_digits` (which the C function caps at 64). A negative value has no form in bases 64 and 85 |
+| `format_double(value, vt)` | The literal the writer emits under `vt`: the shortest digits that read back to the same double, in base 10 or 16 (any other base raises). A `float` width below 53 rounds first to a significand of that many bits: 16 for `float:16` and 32 for `float:32`, not IEEE binary16's 11 and binary32's 24 |
+| `escape_repl_table()` | A `dict` of each escape letter to the character it stands for: `t`, `n`, `v`, `f`, `r`, `"` and `\`. The `\x` and `\u` escapes of spec 1.1 take digits and are not in it |
+
+```python
+u8 = make_type_spec(ValueTypeFamily.UINT, 8, 0)
+f64 = make_type_spec(ValueTypeFamily.FLOAT, 64, 0)
+literals.parse_uint64("255", u8)        # → 255
+literals.format_double(0.1, f64)        # → "1e-1"
+literals.parse_double("1e-1", f64)      # → 0.1
+literals.format_uint64(5, 2, 8)         # → "00000101"
+literals.escape_repl_table()["t"]       # → "\t"
+```
+
+> **`0x` in base 16.** In bases up to 36 the integer parsers are `strtoll` and
+> `strtoull`, which take a `0x` prefix in base 16:
+> `parse_uint64("0x10", make_type_spec(ValueTypeFamily.UINT, 64, 16))` is 16,
+> though no document can carry that literal (the reader refuses `0x10`). Check
+> with `validate_digits_for_base` first where that matters.
+
+`bvn_looks_like_double` is not bound. It answers whether the text contains one
+of `.`, `e`, `E`, `p` and `P`, so `deadbeef` looks like a float to it and `inf`
+does not: a shortcut for the writer's own output, not a test of text from
+anywhere else.
 
 ---
 
@@ -2114,6 +2241,8 @@ tree; any `DomNode` derived from it becomes invalid after that point.
 | `doc.entries()` | Return all top-level `(key, DomNode)` pairs as a list. |
 | `doc.lookup(path)` | Dot-separated path lookup, e.g. `'server.tls.cert'`. Returns `None` when absent. |
 | `doc.to_dict()` | Convert entire document to a plain Python dict, dropping type and unit info. |
+| `DomDoc.create()` | Class method. An empty document to build in (§13.5). |
+| `doc.add(key, node)` | Add a `NewNode` as a top-level entry; returns it as a `DomNode` (§13.5). |
 
 > **File-size limits:** `DomDoc.parse_fd` and `DomDoc.parse_file` apply an internal
 > ceiling of `BVN_DOM_FD_MAX_BYTES` (256 MiB, `bovnar.dom.DOM_FD_MAX_BYTES`).
@@ -2126,10 +2255,9 @@ tree; any `DomNode` derived from it becomes invalid after that point.
 > reader's defaults for everything else), and neither binding can pass more:
 > read with a `Reader` (§11) or `loads` for the limits of §11.2.
 >
-> **No builder.** The C DOM's tree-building calls (`bvn_dom_doc_create`,
-> `bvn_dom_node_from_*`, `bvn_dom_struct_add`, …) make a tree that cannot be
-> written out and are meant for the library's test fixtures; they are not
-> wrapped. Build a document with `dumps()` or the `Writer`.
+> **Building a tree.** `DomDoc.create()` and `doc.add(key, node)` are the C
+> DOM's builder, for a tree made by hand from `NewNode`s (§13.5). Such a tree
+> cannot be written out; build a document with `dumps()` or the `Writer`.
 >
 > **Errors:** the C fd functions return `NULL` for an allocation failure, a read
 > error and input over the cap alike; the binding tells them apart by `errno`.
@@ -2177,6 +2305,72 @@ NULL=0  INT=1  FLOAT=2  STRING=3  SYMBOL=4
 REFERENCE=5  STRUCT=6  ARRAY=7  OCTET_STREAM=8  BOOL=9
 ```
 
+### 13.5 Building a tree (`NewNode`)
+
+`DomDoc.create()` makes an empty document and `NewNode` the nodes to put in it:
+the C DOM's builder (`bvn_dom_doc_create`, `bvn_dom_node_alloc`,
+`bvn_dom_node_from_*`, `bvn_dom_struct_add`, `bvn_dom_array_append`,
+`bvn_dom_doc_add`, doc/08 §4.5). It is there for code that consumes a DOM, a
+test fixture say, and it has the C builder's limits: it makes structs, arrays,
+nulls and integers only, and a built tree **cannot be written out**, since the C
+library has no DOM serialiser. To produce a document, use `dumps()` or the
+`Writer`.
+
+```python
+from bovnar import DomDoc, NewNode
+
+server = NewNode.struct()
+server.add("port", NewNode.integer(8080, width=16))
+server.add("tls", NewNode.null())
+ports = NewNode.array()
+ports.append(NewNode.integer(80, width=16))
+ports.append(NewNode.integer(443, width=16))
+server.add("ports", ports)
+
+doc = DomDoc.create()
+doc.add("server", server)
+big = doc.add("big", NewNode.integer(2**100, width=128, unit="m"))
+doc["server.port"].as_u16()     # → 8080
+big.unit_str                    # → "m"
+doc.to_dict()                   # → {"server": {"port": 8080, "tls": None, "ports": [80, 443]}, "big": 1267650600228229401496703205376}
+```
+
+| Constructor / method | Description |
+|---|---|
+| `DomDoc.create()` | An empty document; its `parse_error` is `NONE` |
+| `doc.add(key, node)` | Add `node` as a top-level entry and return it as a `DomNode` of `doc`. A parsed document takes one too |
+| `NewNode.null()` / `NewNode.struct()` / `NewNode.array()` | An empty node of that kind (`bvn_dom_node_alloc`) |
+| `NewNode.integer(value, *, width=64, signed=None, unit=None)` | An integer node of type `sint:<width>` or `uint:<width>`; `signed=None` is `sint` for a negative value and `uint` otherwise, as for `write_bvni`. A width of 8, 16, 32 or 64 is `bvn_dom_node_from_i8` … `_u64`, which take no unit; a width of 65 to 32768 is `bvn_dom_node_from_bigint`, which takes `unit` (a unit string, `Unit` or `ValueUnit`). A value that does not fit the type, another width, or a unit on a narrow width raises `BovnarArgumentError` |
+| `node.add(key, child)` | Add `child` as a member of a struct node (`bvn_dom_struct_add`) |
+| `node.append(child)` | Append `child` to an array node (`bvn_dom_array_append`) |
+| `node.dom_type` / `len(node)` | The node's `DomType`; the number of members or elements |
+
+**Ownership.** The C attach functions take the node they are given on every
+path: on success the container owns it, and on failure they destroy it. A
+`NewNode` hands its node over once. After it is attached it is spent, and any
+further use of it (adding it again, adding to it, reading it) raises
+`BovnarArgumentError`: a node is in one tree at most, and a struct cannot be
+filled after it was attached, so a tree is built from its leaves up. A refused
+attach raises before anything is handed over and leaves the node with the
+caller; it is refused for a key that is not an identifier (§5.8; the C functions
+refuse only an empty one, but the path lookups could not reach another), for a
+key the struct or document already has (which the C function would refuse by
+destroying the node), for a spent node, for a node added to itself, and on the
+wrong kind of container. Only an allocation failure inside the C call is a
+`MemoryError` with the node gone. A `NewNode` collected before it is attached
+frees its subtree.
+
+**Reading it back.** A built tree reads through `DomDoc` and `DomNode` like a
+parsed one, with two differences that come from the C builder: an integer node
+of up to 64 bits carries no unit, and a built array records no row shape, so its
+`array_dims()` is `0` and `to_python()` gives one flat list.
+
+Not bound: `bvn_dom_node_alloc` of the other kinds (a float, string, symbol,
+reference, bool or octet-stream node it makes holds no value and cannot be given
+one), `bvn_dom_strdup` (a C allocation helper; the attach functions copy the key
+themselves), and `bvn_dom_get_bigint` (a borrowed `bvn_int_t`; `as_int_str()`
+and `to_python()` already read an integer of any width).
+
 ---
 
 ## 14. Running the test suite
@@ -2219,9 +2413,10 @@ bovnar/
 ├── _pint_bridge.py  # pint bridge: to_pint/from_pint/to_pint_unit/from_pint_unit (pint optional)
 ├── _pint_units.py   # verified bovnar↔pint unit table + build_registry()
 ├── currency.py      # ISO 4217 / crypto currency metadata (pure Python)
-├── dom.py           # DomDoc, DomNode, DomType — random-access DOM
+├── dom.py           # DomDoc, DomNode, DomType, NewNode — random-access DOM and its builder
 ├── enums.py         # Python IntEnum mirrors of C enums
 ├── exceptions.py    # BovnarError hierarchy
+├── literals.py      # the C validators, literal parsers/formatters, parse_type_annotation
 ├── quantity.py      # Quantity — typed, unit-annotated scalar for lossless round-trips
 ├── reader.py        # Reader, EventPayload, UnitPolicy, UnitRule
 ├── stream.py        # framing, octet multiplexing, document-in-document, the feeds, the live writers
@@ -2243,6 +2438,7 @@ tests/
 ├── test_stream_vectors.py               # the shared wire vectors of doc/10 §9
 ├── test_stream_live.py                  # Writer.flush, MuxWriter, FrameWriter
 ├── test_dom.py, test_dom_vs_loads_parity.py   # the DOM, and its agreement with loads()
+├── test_literals.py                     # bovnar.literals, the DOM builder, UnitConversion.ok
 ├── test_write_array.py, test_array_parser.py, test_array_roundtrip_fidelity.py
 ├── test_roundtrip_property.py, test_writers_agree.py, test_dumps_directive.py
 ├── test_escapes.py, test_unicode_normalisation.py
@@ -2291,8 +2487,10 @@ is the library's text for an `ErrorCode` (`bvn_error_to_string`):
 | `False` | `False` | Units are dimensionally incompatible → `BovnarArgumentError` |
 
 `unit_convert_factor` raises `BovnarArgumentError` **only** when both
-`ok=False` and `requires_affine=False`; the result does not carry `ok`, so
-check `requires_affine` before multiplying by `factor`. When it is set, call
+`ok=False` and `requires_affine=False`; the result carries the other three as
+`c.ok` and `c.requires_affine`, so check `c.ok` before multiplying by `factor`
+(`ok` is a field with a default of `True`, so `UnitConversion(f, affine)` built
+by hand still works). When it is `False`, call
 `convert_value`, which handles the two-step affine path, or call
 `unit_to_si_factor` on both units and convert by hand. The `Unit` method
 `convert_factor()` returns the bare number and therefore raises for the

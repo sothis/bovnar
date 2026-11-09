@@ -606,5 +606,235 @@ class DomDoc:
         """Convert the entire document to a plain Python dict, dropping type/unit info."""
         return {k: v.to_python() for k, v in self.entries()}
 
+    @classmethod
+    def create(cls) -> 'DomDoc':
+        """An empty document, to build a tree in by hand
+        (``bvn_dom_doc_create``): see :class:`NewNode`. It reads like a parsed
+        one, and has no parse error."""
+        return cls(get_library().bvn_dom_doc_create())
+
+    def add(self, key: str, node: 'NewNode') -> DomNode:
+        """Add *node* as the top-level entry *key* (``bvn_dom_doc_add``) and
+        return it as a :class:`DomNode` of this document, which owns it from
+        then on. A parsed document takes one too.
+
+        Raises BovnarArgumentError, and leaves *node* with the caller, when
+        *key* is not an identifier (:func:`bovnar.literals.validate_identifier`),
+        when the document already has it, and when *node* is already in a
+        tree.
+        """
+        _new_key(key)
+        if key in self:
+            raise BovnarArgumentError(f"the key {key!r} is there already")
+        ptr = NewNode._handed(node)
+        raw = key.encode('utf-8')
+        if not get_library().bvn_dom_doc_add(self._ptr, raw, len(raw), ptr):
+            raise MemoryError("bvn_dom_doc_add() could not allocate")
+        return DomNode(ptr, self)
+
     def __repr__(self) -> str:
         return f"DomDoc(entries={len(self)}, ptr=0x{self._ptr:x})"
+
+
+def _new_key(key) -> None:
+    """A key the builder takes: what a parsed document can hold, so that the
+    path lookups find it."""
+    from .literals import validate_identifier
+    if not isinstance(key, str):
+        raise TypeError(f"a key is a str, not {type(key).__name__}")
+    if not validate_identifier(key):
+        raise BovnarArgumentError(
+            f"{key!r} is not an identifier (spec §4.2), so it cannot be a key")
+
+
+# BVN_MAX_INT_WIDTH: the widest integer the library holds.
+_MAX_INT_WIDTH = 32768
+
+
+class NewNode:
+    """A node built by hand and not yet in a tree: a null, a struct, an array
+    or an integer (``bvn_dom_node_alloc``, ``bvn_dom_node_from_*``).
+
+    This is the C DOM's builder (doc/08 §4.5): it makes structs, arrays,
+    nulls and integers only, and a built tree cannot be written out (the C
+    library has no DOM serialiser); it is read through :class:`DomDoc` and
+    :class:`DomNode` like a parsed one, for code that consumes a DOM, such as
+    a test fixture.
+
+    Attaching a node -- ``struct.add(key, node)``, ``array.append(node)``,
+    ``doc.add(key, node)`` -- hands it to its container, and the NewNode is
+    spent: any further use of it raises BovnarArgumentError, so a node is in
+    one tree at most. A refused attach (a bad or duplicate key, a spent node)
+    raises before anything is handed over. A NewNode collected before it is
+    attached frees its subtree.
+    """
+    __slots__ = ('_ptr',)
+
+    def __init__(self, ptr: int) -> None:
+        # Assigned before the check, as in DomDoc: __del__ runs regardless.
+        self._ptr = 0
+        if not ptr:
+            raise MemoryError("the C DOM builder could not allocate a node")
+        self._ptr = ptr
+
+    def __del__(self) -> None:
+        if getattr(self, '_ptr', 0):
+            get_library().bvn_dom_node_destroy(self._ptr)
+            self._ptr = 0
+
+    @classmethod
+    def null(cls) -> 'NewNode':
+        """A null node."""
+        return cls(get_library().bvn_dom_node_alloc(int(DomType.NULL)))
+
+    @classmethod
+    def struct(cls) -> 'NewNode':
+        """An empty struct node; add members with :meth:`add`."""
+        return cls(get_library().bvn_dom_node_alloc(int(DomType.STRUCT)))
+
+    @classmethod
+    def array(cls) -> 'NewNode':
+        """An empty array node; append elements with :meth:`append`. Its
+        elements are one flat row."""
+        return cls(get_library().bvn_dom_node_alloc(int(DomType.ARRAY)))
+
+    @classmethod
+    def integer(cls, value: int, *, width: int = 64,
+                signed: bool | None = None, unit=None) -> 'NewNode':
+        """An integer node of type ``sint:<width>`` or ``uint:<width>``.
+
+        *signed* None is ``sint`` for a negative value and ``uint`` otherwise,
+        as for ``Writer.write_bvni``. A width of 8, 16, 32 or 64 is
+        ``bvn_dom_node_from_i8`` .. ``_u64``, which take no unit; a width of
+        65 to 32768 is ``bvn_dom_node_from_bigint``, which takes *unit* (a
+        unit string, ``Unit`` or ``ValueUnit``; none when None).
+
+        Raises BovnarArgumentError for another width, a value that does not
+        fit the type, a unit with a narrow width, and a unit that does not
+        parse or is not structurally valid.
+        """
+        if type(value) is not int:
+            raise TypeError(f"NewNode.integer takes an int, not {type(value).__name__}")
+        if type(width) is not int or not (
+                width in (8, 16, 32, 64) or 64 < width <= _MAX_INT_WIDTH):
+            raise BovnarArgumentError(
+                f"NewNode.integer: the width must be 8, 16, 32, 64 or 65 to "
+                f"{_MAX_INT_WIDTH}, not {width!r}")
+        use_signed = value < 0 if signed is None else bool(signed)
+        lo, hi = ((-(1 << (width - 1)), (1 << (width - 1)) - 1) if use_signed
+                  else (0, (1 << width) - 1))
+        if not lo <= value <= hi:
+            raise BovnarArgumentError(
+                f"NewNode.integer: {value} does not fit "
+                f"{'sint' if use_signed else 'uint'}:{width}")
+        lib = get_library()
+        if width <= 64:
+            if unit is not None:
+                raise BovnarArgumentError(
+                    "NewNode.integer: a unit needs a width above 64; the C "
+                    "library's narrow integer constructors take none")
+            name = f"bvn_dom_node_from_{'i' if use_signed else 'u'}{width}"
+            return cls(getattr(lib, name)(value))
+        from .structs import make_type_spec
+        from .enums import ValueTypeFamily
+        vu = _new_unit(unit)
+        vt = make_type_spec(ValueTypeFamily.SINT if use_signed
+                            else ValueTypeFamily.UINT, width, 0)
+        n = lib.bvn_int_alloc()
+        if not n:
+            raise MemoryError("bvn_int_alloc() returned NULL")
+        # Base 16: CPython caps a decimal str() of a big int at 4300 digits.
+        ptr = None
+        try:
+            if lib.bvn_int_from_str(n, format(value, 'x').encode(), 16):
+                ptr = lib.bvn_dom_node_from_bigint(n, vt, vu)
+        finally:
+            # On NULL the node did not take the bignum: it is still ours.
+            if not ptr:
+                lib.bvn_int_free(n)
+        if not ptr:
+            raise MemoryError("bvn_dom_node_from_bigint() returned NULL")
+        return cls(ptr)
+
+    @property
+    def dom_type(self) -> DomType:
+        """The node's kind."""
+        return DomType(get_library().bvn_dom_node_type(self._live()))
+
+    def __len__(self) -> int:
+        """Members of a struct, elements of an array, 0 otherwise."""
+        lib = get_library()
+        p = self._live()
+        return int(lib.bvn_dom_struct_count(p) + lib.bvn_dom_array_count(p))
+
+    def add(self, key: str, node: 'NewNode') -> None:
+        """Add *node* as member *key* of this struct (``bvn_dom_struct_add``).
+        Raises as :meth:`DomDoc.add` does, and for a node that is not a
+        struct."""
+        if self.dom_type != DomType.STRUCT:
+            raise BovnarArgumentError(
+                f"add() is for a struct node, this is {self.dom_type.name}")
+        _new_key(key)
+        raw = key.encode('utf-8')
+        lib = get_library()
+        if lib.bvn_dom_struct_get(self._ptr, raw):
+            raise BovnarArgumentError(f"the key {key!r} is there already")
+        ptr = self._take(node)
+        if not lib.bvn_dom_struct_add(self._ptr, raw, len(raw), ptr):
+            raise MemoryError("bvn_dom_struct_add() could not allocate")
+
+    def append(self, node: 'NewNode') -> None:
+        """Append *node* to this array (``bvn_dom_array_append``). Raises
+        BovnarArgumentError for a spent node and for a node that is not an
+        array."""
+        if self.dom_type != DomType.ARRAY:
+            raise BovnarArgumentError(
+                f"append() is for an array node, this is {self.dom_type.name}")
+        ptr = self._take(node)
+        if not get_library().bvn_dom_array_append(self._ptr, ptr):
+            raise MemoryError("bvn_dom_array_append() could not allocate")
+
+    def _live(self) -> int:
+        if not self._ptr:
+            raise BovnarArgumentError(
+                "this NewNode was attached to a tree and belongs to it now")
+        return self._ptr
+
+    def _take(self, node: 'NewNode') -> int:
+        """Hand *node* over to this container: the C attach takes it on every
+        path, so from here the NewNode no longer owns it."""
+        if node is self:
+            raise BovnarArgumentError("a node cannot be added to itself")
+        return NewNode._handed(node)
+
+    @staticmethod
+    def _handed(node) -> int:
+        if not isinstance(node, NewNode):
+            raise TypeError(f"expected a NewNode, not {type(node).__name__}")
+        ptr = node._live()
+        node._ptr = 0
+        return ptr
+
+    def __repr__(self) -> str:
+        if not self._ptr:
+            return "NewNode(attached)"
+        return f"NewNode(type={self.dom_type.name})"
+
+
+def _new_unit(unit) -> ValueUnit:
+    """The ValueUnit for NewNode.integer's *unit*: none, a unit string, a Unit or
+    a ValueUnit, refused unless structurally valid."""
+    from .structs import make_unit_none
+    from .unit import _as_vu
+    if unit is None:
+        return make_unit_none()
+    if isinstance(unit, str):
+        from . import parse_unit
+        unit = parse_unit(unit)
+    vu = _as_vu(unit)
+    if not isinstance(vu, ValueUnit):
+        raise TypeError(f"a unit is a str, Unit or ValueUnit, not "
+                        f"{type(unit).__name__}")
+    if not get_library().bvn_unit_valid(vu):
+        raise BovnarArgumentError("NewNode.integer: the unit is not structurally valid")
+    return vu

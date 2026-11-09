@@ -64,10 +64,18 @@ class UnitConversion:
     Result of unit_convert_factor.
 
     factor         : multiply the source value by this to get the target value
-    requires_affine: True when a simple multiply is not sufficient (e.g. °C → °F)
+    requires_affine: True when an affine unit is involved (e.g. °C → °F)
+    ok             : the C function's ``ok``: True when multiplying by
+                     ``factor`` performs the conversion. False for an affine
+                     conversion whose offsets do not cancel (°C → K), where
+                     ``factor`` is 0.0 -- use convert_value. An affine pair
+                     that shares its offset (°C → m~°C) is True with
+                     ``requires_affine`` too. It defaults to True, so code
+                     that builds the result with two arguments still runs.
     """
     factor:          float
     requires_affine: bool
+    ok:              bool = True
 
 @dataclass(frozen=True)
 class ReducedUnit:
@@ -258,11 +266,11 @@ def unit_convert_factor(from_unit: ValueUnit,
                                         which does the two-step conversion
       ok=False, requires_affine=False → units are incompatible; raises
 
-    Because the affine cases are distinguished only by requires_affine, a caller
-    that multiplies by .factor without checking it silently scales by zero.
+    The result's ``ok`` is that flag. A caller that multiplies by .factor
+    without checking it silently scales by zero.
 
-    When requires_affine is True, use convert_value which handles the two-step
-    affine conversion automatically, or call unit_to_si_factor on both units and
+    When ok is False, use convert_value which handles the two-step affine
+    conversion automatically, or call unit_to_si_factor on both units and
     perform the conversion manually.
     """
     lib             = get_library()
@@ -275,7 +283,8 @@ def unit_convert_factor(from_unit: ValueUnit,
     if not ok.value and not requires_affine.value:
         raise BovnarArgumentError(
             "unit_convert_factor: incompatible or invalid units")
-    return UnitConversion(float(factor), bool(requires_affine.value))
+    return UnitConversion(float(factor), bool(requires_affine.value),
+                          bool(ok.value))
 
 
 def unit_dimension_vector(unit: ValueUnit) -> list[int]:

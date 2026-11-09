@@ -42,7 +42,8 @@ from .exceptions import (
 from .reader   import (Reader, EventPayload, UnitPolicy, UnitRule,
                        MAX_FILESIZE_BYTES, READ_OPTIONS)
 from .writer   import Writer
-from .dom      import DomDoc, DomNode, DomType
+from .dom      import DomDoc, DomNode, DomType, NewNode
+from .         import literals
 from .quantity import Quantity
 from .unit     import Unit, _as_vu
 from .units   import (
@@ -87,7 +88,7 @@ __all__ = [
     'Quantity',
 
     'Reader', 'Writer', 'EventPayload', 'UnitPolicy', 'UnitRule',
-    'DomDoc', 'DomNode', 'DomType',
+    'DomDoc', 'DomNode', 'DomType', 'NewNode', 'literals',
 
     'ValueTypeSpec', 'ValueUnit', 'ValueUnitComponent', 'ValueUnitPrefix', 'BvnrData',
     'BvnrReadFlags', 'BvnrWriteFlags',

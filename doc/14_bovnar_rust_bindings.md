@@ -45,6 +45,7 @@ enums are Rust enums, and an error carries the library's error kind.
     - 5.5 [Inline unit suffix](#55-inline-unit-suffix)
     - 5.6 [`UnitPolicy` — validation and conversion without a callback](#56-unitpolicy--validation-and-conversion-without-a-callback)
     - 5.7 [Building a `Unit`](#57-building-a-unit)
+    - 5.8 [Validators and literal helpers](#58-validators-and-literal-helpers)
 6. [`Quantity`](#6-quantity)
     - 6.1 [Construction](#61-construction)
     - 6.2 [Fields and methods](#62-fields-and-methods)
@@ -75,6 +76,7 @@ enums are Rust enums, and an error carries the library's error kind.
     - 12.2 [`DomDoc`](#122-domdoc)
     - 12.3 [`DomNode`](#123-domnode)
     - 12.4 [`DomType`](#124-domtype)
+    - 12.5 [Building a tree (`NewNode`)](#125-building-a-tree-newnode)
 13. [Error handling](#13-error-handling)
 14. [Threads](#14-threads)
 15. [Running the test suite](#15-running-the-test-suite)
@@ -1327,7 +1329,7 @@ fn main() -> Result<(), bovnar::Error> {
 
     // Conversion factor between two compatible units
     let conv = unit_convert_factor(&km, &Unit::parse("m")?)?;
-    assert_eq!((conv.factor, conv.requires_affine), (1000.0, false));
+    assert_eq!((conv.factor, conv.requires_affine, conv.ok()), (1000.0, false, true));
 
     // 7-element SI dimension exponent vector [m, kg, s, A, K, mol, cd]
     assert_eq!(unit_dimension_vector(&Unit::parse("m/s")?)?, [1, 0, -1, 0, 0, 0, 0]);
@@ -1368,7 +1370,7 @@ fn main() -> Result<(), bovnar::Error> {
 `SI_DIM_NAMES` is the array `["m", "kg", "s", "A", "K", "mol", "cd"]` — the index
 positions used by `unit_dimension_vector`. Both `SIConversion` (`factor`,
 `is_affine`, `affine_offset`) and `UnitConversion` (`factor`,
-`requires_affine`) are small `Copy` structs, and `ReducedUnit` is
+`requires_affine`, and the method `ok()`, §13) are small `Copy` structs, and `ReducedUnit` is
 `{ unit, scale }`.
 
 ### 5.3 `UnitFlags`
@@ -1746,6 +1748,133 @@ fn main() -> Result<(), bovnar::Error> {
 
 `Unit::is_dimensionless()` is true for both of them and for any unit made only of
 `none` components; `%` and `ppm` are real units and answer false.
+
+### 5.8 Validators and literal helpers
+
+`bovnar::literals` binds the C library's checks and literal helpers
+(`bovnar.h`): the tests the writer applies to keys, symbols, references and
+numbers, the integer and float parsers and formatters behind it, and the parser
+of a type annotation. Each function is the C function of the same name without
+its `bvn_` prefix, and answers as it does. A string holding NUL is none of the
+things they check: a validator answers `false` for it, a parser fails.
+
+**Type annotations.** `parse_type_annotation(text)` parses the text between the
+angle brackets, as the reader does, into a `TypeAnnotation` of `value_type` (a
+`ValueTypeSpec`), `unit` (a `Unit`, `Unit::default()` when there is no unit or it
+is spelled `no_unit`) and `unit_source` (the unit parameter as written, `""` when
+there is none). The struct is `#[non_exhaustive]`, so that a field can be added
+to it without breaking anyone.
+
+```rust
+use bovnar::literals::parse_type_annotation;
+use bovnar::{ErrorCode, ValueTypeFamily, ValueTypeSpec};
+
+fn main() -> Result<(), bovnar::Error> {
+    let a = parse_type_annotation("uint:32,_16,k~g")?;
+    let spec = ValueTypeSpec { family: ValueTypeFamily::Uint as i32, width: 32, base: 16 };
+    assert_eq!(a.value_type, spec);
+    assert_eq!(a.unit.to_string(), "k~g");
+    assert_eq!(a.unit_source, "k~g");
+    let ml = parse_type_annotation("float:64,ucum:mL{total}")?;
+    assert_eq!((ml.unit.to_string(), ml.unit_source.as_str()), ("m~L".into(), "ucum:mL{total}"));
+
+    // A base given twice; a unit parameter over 255 bytes.
+    let e = parse_type_annotation("uint:8,_16,_16").unwrap_err();
+    assert_eq!(e.code(), Some(ErrorCode::IllegalValueType));
+    let e = parse_type_annotation(&format!("uint:8,{}", "m".repeat(256))).unwrap_err();
+    assert_eq!(e.code(), Some(ErrorCode::UnitTooLong));
+    Ok(())
+}
+```
+
+A refusal is an `Error::Parse` (with no position) whose code is the one the
+reader gives the same annotation in a document, so it tells the C function's
+three flags apart:
+
+| Code | C flags | Cause |
+|---|---|---|
+| `IllegalValueType` | `type_ok` false | An unknown family, an empty or repeated parameter, a parameter the family does not take (a base on `float_fix`, a width on `bool`), a width or base out of range |
+| `UnitTooLong` | `unit_ok` false, `unit_too_long` true | A unit parameter over 255 bytes |
+| `UnitIllegal`, `UnitProfileUnknown`, `UnitProfileUnsupported` | `unit_ok` false | A unit parameter that is not a unit this build knows; the code is the one `units::unit_error_code` gives it |
+
+The reader's version gates are not applied: `datetime` (spec 1.1) and a profile
+unit (spec 1.2) parse here whatever version a document declares. A `datetime`'s
+epoch is no unit: its index is in `value_type.base` (`datetime_epoch_index`,
+§18), as a `float_fix`'s q is.
+
+**Validators.** Each returns a `bool`:
+
+| Function | `true` for |
+|---|---|
+| `validate_identifier(s)` | A key: an ASCII letter, `_` or a character from U+00C0 on, then no space, control character, U+0080 to U+00BF, or punctuation spec §4.2 forbids (`-` and `+` are allowed). No length limit: the reader's `max_identifier_length` (255) is separate |
+| `validate_symbol(s)` | A symbol, which is spelled as a key is |
+| `validate_reference(s)` | A path such as `.a.b[0]`, without the `&`: identifier segments, each with optional `[digits]` indexes |
+| `validate_number(s)` | A decimal number: an optional `-`, digits with at most one `.`, an optional `e`/`E` exponent. No `+`, and not `inf` |
+| `is_special_number_string(s)` | Exactly `inf`, `ninf` or `nan` |
+| `validate_digits_for_base(s, base)` | An integer literal: an optional `-` and digits of `base` (no sign at all in bases 64 and 85, where `+` and `-` are digits) |
+| `validate_number_in_base(s, base)` | A quoted float literal: either sign, digits of `base` with at most one `.`, and an exponent marked `e` (bases up to 14) or `p` (the power-of-two bases up to 16) |
+| `validate_uint_range(s, width, base)` / `validate_sint_range(s, width, base)` | A literal that fits `width` bits (0: any width); `inf`, `ninf` and `nan` pass |
+| `validate_string(bytes)` | Bytes that are well-formed UTF-8 |
+
+Three of them are narrower than their names. The range checks test the range
+only, on text the digit check has already passed: `validate_uint_range("", 8,
+10)` and `validate_uint_range(" 5", 8, 10)` are `true`. `validate_digits_for_base`
+does not check the base against the ones a type may declare: in base 1 the one
+digit is `0`. And `validate_string` is the same test as `std::str::from_utf8`;
+NUL and the other control bytes the writer refuses in a string pass it.
+
+**Digits.** `char_to_digit(ch, base)` is the value of one digit, `None` when it
+is no digit of `base`: up to base 36 a letter's case does not matter, above it
+`A` to `Z` are 36 to 61, and bases 64 and 85 use the Base64 and Ascii85
+alphabets. `min_digits_for_type(vt)` is how many digits of the type's base the
+largest value of an integer type of up to 64 bits takes; 0 for a width of 0 or
+above 64, and a float type is answered as if it were an unsigned integer of its
+width.
+
+**Parsing and formatting.** These are the functions the writer and the DOM use.
+Each returns `Err(Error::Argument)` where the C one returns `false` or -1:
+
+| Function | Result |
+|---|---|
+| `parse_int64(s, vt)` / `parse_uint64(s, vt)` | The integer literal in the type's base; refused when it does not fit the type's width (64 when it declares none), and for a `+` or a space before it |
+| `parse_double(s, vt)` / `parse_double_in_base(s, base)` | The float literal (base 10 or 16; `inf`, `ninf` and `nan`, not `-inf`) as the nearest `f64`, rounded once from its exact value |
+| `format_uint64(value, base, min_digits)` / `format_int64(...)` | The digits in base 2 to 62, 64 or 85, padded with zero digits to `min_digits` (which the C function caps at 64). A negative value has no form in bases 64 and 85 |
+| `format_double(value, vt)` | The literal the writer emits under `vt`: the shortest digits that read back to the same `f64`, in base 10 or 16 (any other base fails). A `float` width below 53 rounds first to a significand of that many bits: 16 for `float:16` and 32 for `float:32`, not IEEE binary16's 11 and binary32's 24 |
+| `escape_repl_table()` | A `&'static [u8; 256]`: for each byte, the byte the escape `\` + that byte stands for, 0 for none. The escapes are `t`, `n`, `v`, `f`, `r`, `"` and `\`; the `\x` and `\u` escapes of spec 1.1 take digits and are not in it |
+
+```rust
+use bovnar::literals;
+use bovnar::{ValueTypeFamily, ValueTypeSpec};
+
+fn main() -> Result<(), bovnar::Error> {
+    assert!(literals::validate_identifier("max-speed"));
+    assert!(!literals::validate_identifier("max.speed"));
+    assert!(literals::validate_reference(".axis[2].unit"));
+    assert!(!literals::validate_number("+1"));
+    assert!(!literals::validate_uint_range("256", 8, 10));
+    assert_eq!(literals::char_to_digit('Z', 62), Some(61));
+
+    let u8t = ValueTypeSpec { family: ValueTypeFamily::Uint as i32, width: 8, base: 0 };
+    let f64t = ValueTypeSpec { family: ValueTypeFamily::Float as i32, width: 64, base: 0 };
+    assert_eq!(literals::parse_uint64("255", u8t)?, 255);
+    assert!(literals::parse_uint64("256", u8t).is_err());
+    assert_eq!(literals::format_double(0.1, f64t)?, "1e-1");
+    assert_eq!(literals::parse_double("1e-1", f64t)?, 0.1);
+    assert_eq!(literals::format_uint64(5, 2, 8)?, "00000101");
+    assert_eq!(literals::escape_repl_table()[usize::from(b't')], b'\t');
+    Ok(())
+}
+```
+
+> **`0x` in base 16.** In bases up to 36 the integer parsers are `strtoll` and
+> `strtoull`, which take a `0x` prefix in base 16: `parse_uint64("0x10", …)` under
+> `uint:64,_16` is 16, though no document can carry that literal (the reader
+> refuses `0x10`). Check with `validate_digits_for_base` first where that matters.
+
+`bvn_looks_like_double` is not bound. It answers whether the text contains one
+of `.`, `e`, `E`, `p` and `P`, so `deadbeef` looks like a float to it and `inf`
+does not: a shortcut for the writer's own output, not a test of text from
+anywhere else.
 
 ---
 
@@ -2751,6 +2880,8 @@ Owning wrapper around `bvn_dom_doc_t`. Dropping it frees the entire tree; the
 | `doc.len()` / `doc.is_empty()` | Number of top-level entries |
 | `doc.entries()` | All top-level `(String, DomNode)` pairs, in document order |
 | `doc.to_value()` | The whole document as a `Value::Struct`, dropping type and unit info. Fails where a node cannot be read as its kind — see `node.to_value()` |
+| `DomDoc::create()` | An empty document to build in (§12.5) |
+| `doc.add(key, node)` | Add a `NewNode` as a top-level entry (§12.5) |
 
 > **File-size limits:** `DomDoc::parse_reader` and `parse_reader_with_policy` take
 > any `std::io::Read` and apply the same ceiling, `DOM_READ_MAX_BYTES`
@@ -2762,10 +2893,11 @@ Owning wrapper around `bvn_dom_doc_t`. Dropping it frees the entire tree; the
 > **The DOM takes no read options.** The C DOM parse functions read with a
 > fixed set (the 255-level nesting, the reader's defaults for everything else),
 > so `ReadOptions` cannot reach them; read with a `Reader` or
-> `parse_with_options` for those limits. The C DOM's tree-building calls
-> (`bvn_dom_node_from_*`, `bvn_dom_struct_add`, …) make a tree that cannot be
-> written out, for the library's own test fixtures, and are not wrapped: build
-> a document as a `Value` or with the `Writer`.
+> `parse_with_options` for those limits.
+>
+> **Building a tree.** `DomDoc::create()` and `doc.add(key, node)` are the C
+> DOM's builder, for a tree made by hand from `NewNode`s (§12.5). Such a tree
+> cannot be written out; build a document as a `Value` or with the `Writer`.
 
 Membership is `get(key).is_some()`, and iteration is `entries()`.
 
@@ -2816,6 +2948,98 @@ Reference=5  Struct=6  Array=7  OctetStream=8  Bool=9
 ```
 
 `DomType::from_raw(i32)` converts a raw C value.
+
+### 12.5 Building a tree (`NewNode`)
+
+`DomDoc::create()` makes an empty document and `NewNode`, `NewStruct` and
+`NewArray` the nodes to put in it: the C DOM's builder (`bvn_dom_doc_create`,
+`bvn_dom_node_alloc`, `bvn_dom_node_from_*`, `bvn_dom_struct_add`,
+`bvn_dom_array_append`, `bvn_dom_doc_add`, doc/08 §4.5). It is there for code
+that consumes a DOM, a test fixture say, and it has the C builder's limits: it
+makes structs, arrays, nulls and integers only, and a built tree **cannot be
+written out**, since the C library has no DOM serialiser. To produce a document,
+use a `Value` or the `Writer`.
+
+```rust
+use bovnar::{DomDoc, NewArray, NewNode, NewStruct, Signedness, Unit, Value};
+use num_bigint::BigInt;
+
+fn main() -> Result<(), bovnar::Error> {
+    let mut server = NewStruct::new()?;
+    server.add("port", NewNode::from_u16(8080)?)?;
+    server.add("tls", NewNode::null()?)?;
+    let mut ports = NewArray::new()?;
+    ports.push(NewNode::from_u16(80)?)?;
+    ports.push(NewNode::from_u16(443)?)?;
+    server.add("ports", ports)?;
+
+    let mut doc = DomDoc::create()?;
+    doc.add("server", server)?;
+    let m = Unit::parse("m")?;
+    let big = BigInt::from(1) << 100;
+    doc.add("big", NewNode::from_bigint(&big, 128, Signedness::Auto, Some(&m))?)?;
+
+    assert_eq!(doc.lookup("server.port").and_then(|n| n.as_u16()), Some(8080));
+    assert_eq!(doc.get("big").map(|n| n.unit_str()), Some("m".to_string()));
+    assert_eq!(
+        doc.lookup("server.ports").map(|n| n.to_value()).transpose()?,
+        Some(Value::Array(vec![Value::Int(80), Value::Int(443)]))
+    );
+    Ok(())
+}
+```
+
+| Constructor / method | Description |
+|---|---|
+| `DomDoc::create()` | An empty document |
+| `doc.add(key, node)` | Add `node` (anything `Into<NewNode>`) as a top-level entry. A parsed document takes one too |
+| `NewNode::null()` | A null node (`bvn_dom_node_alloc`) |
+| `NewNode::from_i8(v)` … `from_u64(v)` | An integer node of type `sint:8` … `uint:64`, with no unit (`bvn_dom_node_from_i8` … `_u64`) |
+| `NewNode::from_bigint(&value, width, signed, unit)` | An integer node of 65 to 32768 bits, with an `Option<&Unit>` (`bvn_dom_node_from_bigint`); `Signedness::Auto` is `sint` for a negative value and `uint` otherwise, as for `write_bvni`. A value that does not fit the type, another width, or a unit that is not structurally valid is `Error::Argument` |
+| `NewStruct::new()` / `s.add(key, node)` | A struct node, and a member added to it (`bvn_dom_struct_add`) |
+| `NewArray::new()` / `a.push(node)` | An array node, and an element appended to it (`bvn_dom_array_append`) |
+| `len()` / `is_empty()` / `dom_type()` | Members or elements of a `NewStruct` / `NewArray`; a `NewNode`'s kind |
+
+Every constructor returns a `Result`, `Error::OutOfMemory` when the C library
+cannot allocate, as `Reader::new` and `Writer::new` do.
+
+**Ownership is a move.** The C attach functions take the node they are given on
+every path: on success the container owns it, and on failure they destroy it.
+`add` and `push` take their node by value, so the type system makes that
+hand-over the last use: a node cannot be added twice, nor a struct filled after
+it was attached (a tree is built from its leaves up), and neither compiles. A
+node dropped before it is attached frees its subtree. All node types are `Send`.
+
+```rust,compile_fail
+use bovnar::{DomDoc, NewNode};
+
+fn main() -> Result<(), bovnar::Error> {
+    let mut doc = DomDoc::create()?;
+    let n = NewNode::from_i32(1)?;
+    doc.add("a", n)?;
+    doc.add("b", n)?; // error[E0382]: use of moved value: `n`
+    Ok(())
+}
+```
+
+`add` fails with `Error::Argument` for a key that is not an identifier (§5.8;
+the C functions refuse only an empty one, but the path lookups could not reach
+another), and with the code `DuplicateStructKey` for a key the struct or
+document already has; the node is dropped then. The kinds are types, so there is
+no appending to a struct or adding to an array. Only an allocation failure
+inside the C call is `Error::OutOfMemory`.
+
+**Reading it back.** A built tree reads through `DomDoc` and `DomNode` like a
+parsed one, with two differences that come from the C builder: an integer node
+of up to 64 bits carries no unit, and a built array records no row shape, so its
+`array_dims()` is 0 and `to_value()` gives one flat array. `doc.add` takes
+`&mut self`, so no `DomNode` is borrowed from the document while it grows.
+
+Not bound: `bvn_dom_node_alloc` of the other kinds (a float, string, symbol,
+reference, bool or octet-stream node it makes holds no value and cannot be given
+one), `bvn_dom_strdup` (a C allocation helper; the attach functions copy the key
+themselves), and `bvn_dom_get_bigint` (a borrowed `bvn_int_t`; `as_int_str()`
+and `to_value()` already read an integer of any width).
 
 ---
 
@@ -2880,8 +3104,11 @@ argument error caught before the library and for an allocation failure.
 | `false` | `false` | Units are dimensionally incompatible → `Error::Argument` |
 
 `unit_convert_factor` fails with `Error::Argument` **only** when both `ok=false`
-and `requires_affine=false`; the result does not carry `ok`, so check
-`requires_affine` before multiplying by `factor`. When it is set, call
+and `requires_affine=false`; for the other three the result's `ok()` method
+gives `ok`, so check it before multiplying by `factor`. It is a method rather
+than a field because a new public field would break code that builds or
+destructures `UnitConversion`; it is exact all the same, since the C function
+never succeeds with a factor of 0.0. When it is `false`, call
 `convert_value`, which handles the two-step affine path, or call
 `unit_to_si_factor` on both units and convert by hand. The `Unit` method
 `convert_factor()` returns the bare number and therefore fails for the `0.0`
@@ -3011,11 +3238,12 @@ rust/
 │   ├── codec.rs      # MuxWriter, MuxReader, FrameReader — the pure-Rust framing codec
 │   ├── currency.rs   # ISO 4217 / crypto currency metadata (read from the C catalogue)
 │   ├── decimal.rs    # Decimal: an exact decimal number (sign, coefficient, exponent)
-│   ├── dom.rs        # DomDoc, DomNode, DomType — random-access DOM
+│   ├── dom.rs        # DomDoc, DomNode, DomType, NewNode — random-access DOM and its builder
 │   ├── enums.rs      # Rust enums mirroring the C enums
 │   ├── error.rs      # Error, ErrorKind, Position
 │   ├── io.rs         # a caller's std::io::Read as a callback source for read_reader / parse_reader
 │   ├── json.rs       # from_json / to_json / detect (the CLI's `bovnar convert`)
+│   ├── literals.rs   # the C validators, literal parsers/formatters, parse_type_annotation
 │   ├── live.rs       # DocumentFeed, ValueFeed, EmbeddedFeed, FrameParser, FramePull, Demux — fed reading through C
 │   ├── quantity.rs   # Quantity — typed, unit-annotated scalar for lossless round-trips
 │   ├── reader.rs     # Reader, ReadOptions, EventData, EventPayload, UnitPolicy, UnitRule
@@ -3034,7 +3262,8 @@ rust/
 | `src/ffi.rs` | the C declarations and the mirrored C structs |
 | `src/reader.rs` | `Reader`, `ReadOptions`, `EventData`, `EventPayload`, `UnitPolicy`, `UnitRule` |
 | `src/writer.rs` | `Writer`, `Base`, `Signedness`, `EmitSpec` |
-| `src/dom.rs` | `DomDoc`, `DomNode`, `DomType` |
+| `src/dom.rs` | `DomDoc`, `DomNode`, `DomType`, and the builder's `NewNode`, `NewStruct`, `NewArray` |
+| `src/literals.rs` | the C validators and literal helpers, `parse_type_annotation`, `TypeAnnotation` |
 | `src/enums.rs` | the Rust enums behind the C enums, `Exponent` and `Base` |
 | `src/error.rs` | `Error`, `ErrorKind`, `Position` |
 | `src/unit.rs` | `Unit`, `UnitComponent` |

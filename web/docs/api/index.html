@@ -1587,8 +1587,9 @@ all <code>len</code> bytes or return <code>false</code>. Usable wherever an fd o
 <p>It behaves as an fd sink does, not as a memory sink: the writer batches output
 into its 64 KiB buffer and pushes whole blocks, and a refused push is
 <code>error_writing_to_sink</code> (never <code>error_sink_buffer_exhausted</code>).
-<code>bvnr_writer_bytes_written</code> and <code>bvnr_sink_bytes_written</code> count what <code>push</code>
-accepted. <code>bvnr_write_flush</code> (§2.18) pushes the buffer early. <code>flush</code> may be
+<code>bvnr_sink_bytes_written</code> counts what <code>push</code> accepted;
+<code>bvnr_writer_bytes_written</code> counts that plus what the writer still buffers
+(§2.9). <code>bvnr_write_flush</code> (§2.18) pushes the buffer early. <code>flush</code> may be
 <code>NULL</code>; when set, <code>bvnr_write_flush</code> and <code>bvnr_write_finish</code> call it after
 their last push, and a <code>false</code> from it fails them with <code>error_writing_to_sink</code>.</p>
 <p>As with the source, <code>userdata</code> lives inside the 64-byte handle, the writer

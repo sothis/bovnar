@@ -831,7 +831,7 @@ impl Writer {
 }
 
 /// A key the C mux and embedding calls can take: no NUL byte.
-fn check_key(key: &str) -> Result<()> {
+pub(crate) fn check_key(key: &str) -> Result<()> {
     if key.contains('\0') {
         Err(Error::argument(format!("key {key:?} contains a NUL byte")))
     } else {

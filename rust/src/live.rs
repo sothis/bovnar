@@ -74,7 +74,10 @@ enum State {
 /// events [`crate::Reader::read_mem`] delivers for the concatenation of
 /// everything fed, in order and wherever the pieces were cut. Nothing is
 /// buffered beyond one token or one octet chunk, so memory stays flat over an
-/// endless document.
+/// endless document. Its text is capped at the library's default of
+/// 2 147 483 647 bytes per document (`error_text_data_too_long`) unless
+/// [`ReadOptions::max_text_bytes`] lifts it: set it (and `max_array_items`)
+/// to `u64::MAX` for a document that does not end.
 ///
 /// ```
 /// use bovnar::live::DocumentFeed;
@@ -840,8 +843,9 @@ impl Demux {
         }
     }
 
-    /// Starts the next document: the channels and their buffers are kept,
-    /// the error and all progress are reset.
+    /// Starts the next document: the channel buffers are kept; the channel
+    /// ids (and with them the 4096-channel count), the error and all progress
+    /// are reset.
     pub fn reset(&mut self) -> Result<()> {
         self.finished = false;
         if self

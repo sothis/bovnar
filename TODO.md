@@ -34,6 +34,12 @@ writers, the benchmarks, the docs, and on 2026-11-09 the full vector set of
 item 5). Nothing is open. The paragraphs below describe the state before the
 work, as the plan was written.
 
+**Next release: 2.1.0** (decided 2026-11-09). It includes one
+source-incompatible Rust change, taken in a minor version on the maintainer's
+word: `ReadOptions` gained `max_text_bytes` and `max_array_items`, so a struct
+literal naming every field no longer compiles (CHANGELOG, Changed). Mumcord
+does not use `ReadOptions`.
+
 The streaming layer of doc/10 (frames, octet multiplexing,
 document-in-document, endless streams) is batch-only in both bindings.
 `bovnar::stream` (`mux_dump`, `mux_load`, `load_documents`,

@@ -13290,8 +13290,9 @@ all `len` bytes or return `false`. Usable wherever an fd or memory sink is —
 It behaves as an fd sink does, not as a memory sink: the writer batches output
 into its 64 KiB buffer and pushes whole blocks, and a refused push is
 `error_writing_to_sink` (never `error_sink_buffer_exhausted`).
-`bvnr_writer_bytes_written` and `bvnr_sink_bytes_written` count what `push`
-accepted. `bvnr_write_flush` (§2.18) pushes the buffer early. `flush` may be
+`bvnr_sink_bytes_written` counts what `push` accepted;
+`bvnr_writer_bytes_written` counts that plus what the writer still buffers
+(§2.9). `bvnr_write_flush` (§2.18) pushes the buffer early. `flush` may be
 `NULL`; when set, `bvnr_write_flush` and `bvnr_write_finish` call it after
 their last push, and a `false` from it fails them with `error_writing_to_sink`.
 
@@ -14328,6 +14329,7 @@ the C library; `import bovnar` itself never loads it.
     - 17.2 [`BvnrWriteFlags` layout](#172-bvnrwriteflags-layout)
     - 17.3 [`write_string` behaviour](#173-write_string-behaviour)
     - 17.4 [`_resolve_unit` default](#174-_resolve_unit-default)
+    - 17.5 [Signals inside a callback](#175-signals-inside-a-callback)
 18. [`BaseUnit` enum](#18-baseunit-enum)
 19. [Spec 1.1 additions](#19-spec-11-additions)
 
@@ -14738,10 +14740,21 @@ last                                 # → [('x', [1, 2])]
 A scalar, a struct or an octet stream is complete at its end; an array at the
 next key or the end of the document, because a further `/[…]` row would extend
 it. An octet stream in a `DocumentFeed` is gathered whole before it is handed
-over, so an endless one belongs in a `DemuxFeed` or is read by its events.
-`DocumentFeed` takes the options of `Reader.read_mem` (`continue_on_error`,
-`want_unit`, `max_file_size`, …), and its `typed=True` gives `Quantity`
-values as `loads(typed=True)` does.
+over, so an endless one belongs in a `DemuxFeed` or is read by its events. The
+text of a fed document is capped as `Reader`'s is, at 2 147 483 647 bytes
+(`TEXT_DATA_TOO_LONG`, doc/10 §1), and an array at as many items: pass
+`max_text_bytes=stream.BVNR_NO_LIMIT` (and `max_array_items`) for a document
+that does not end. `DemuxFeed` and a parsing `FrameFeed` take both as well.
+`DocumentFeed` takes the reading options of `Reader.read_mem`
+(`continue_on_error`, `strict_version`, `text_only`, `want_unit`,
+`want_unit_allow_nonterminating`, `max_file_size`, `max_conversion_length`,
+`max_text_bytes`, `max_array_items`),
+not its callbacks, which the feed's
+items stand in for; with `values=True`, `typed=True` gives `Quantity` values as
+`loads(typed=True)` does (`typed` without `values`, or neither `events` nor
+`values`, is refused). A `want_unit` callback runs inside the C call, so it may
+not close the feed or feed it again (`BovnarArgumentError`). One feed reads one
+document: make a new one for the next.
 
 ```python
 frames = stream.FrameFeed(parse=True)
@@ -14768,9 +14781,12 @@ raises `ValueError` rather than reading memory that has been reused. Copy what
 must be kept with `bytes(view)`. A buffer made from the view —
 `memoryview(view)`, a slice of it, `numpy.frombuffer(view)`, a held export — is
 not released with it, so while one is alive the next call raises
-`BovnarArgumentError` and leaves the stream as it was; drop it and the call can
-be repeated. Such a buffer also keeps the feed's C memory alive: `close()` then
-closes the feed but frees that memory only when the buffer goes.
+`BovnarArgumentError` and leaves the stream as it was, as often as it is
+repeated; drop the buffer and the call goes ahead. Such a buffer also keeps the
+feed's C memory alive: `close()` then closes the feed at once (it hands out
+nothing more) but frees that memory only when the buffer goes. A message that
+lay whole in the fed bytes is a view of those `bytes`, which a buffer made from
+it keeps alive by itself, so that one never makes a call refuse.
 
 ```python
 dm = stream.DemuxFeed(view=True)
@@ -14882,6 +14898,10 @@ stream.load_documents(out.getvalue())   # → [{'id': 1}, {'id': 2}]
 frames.count                            # → 2
 ```
 
+The object has to be blocking: a non-blocking socket is refused when the
+writer is made, since one that took part of a buffer and then raised
+`BlockingIOError` would leave the stream cut mid-chunk. (A socket with a
+timeout is accepted; a timeout fails the writer as any other exception does.)
 An exception the object raises (a closed socket, a full disk) comes out of the
 call that pushed — the constructor, `send`, `write`, `flush` or `close` —
 unchanged. The writer has failed then: `MuxWriter.close()` only releases it,
@@ -14893,7 +14913,7 @@ value by value.
 
 **What it costs.** Measured with `python/bench/bench_stream.py` on the machine
 of §4.7, into a socket-like object whose `sendall` takes the bytes, per
-message, median of five runs:
+message, the median over its runs:
 
 | Path | 150 B | 30 KB | 400 KB |
 |------|------:|------:|-------:|
@@ -15881,7 +15901,7 @@ nested parse, and close the first one after its read returns.
 
 `read_mem(data, *, on_verified, on_unverified, max_file_size, continue_on_error,
 strict_version, text_only, want_unit, want_unit_allow_nonterminating,
-max_conversion_length)`
+max_conversion_length, max_text_bytes, max_array_items)`
 
 Parse BVNR from a `bytes`, `bytearray`, or `memoryview` object.
 
@@ -15897,6 +15917,8 @@ Parse BVNR from a `bytes`, `bytearray`, or `memoryview` object.
 | `want_unit` | `Callable[[BvnrData], tuple \| None] \| None` | `None` | Optional read-time lossless unit/base conversion hook. Called per numeric value; return `(unit, base)` to request a conversion (the exact result arrives on the payload as `converted` and `converted_str()`, with `converted_rational()` / `converted_in_base()` beside it — see §4.2), or `None` to leave the value untouched. An inexact conversion aborts the parse (`error_unit_inexact`). |
 | `want_unit_allow_nonterminating` | `bool` | `False` | Deliver an exact-rational-but-non-terminating conversion (e.g. km/h→m/s) as a rational — `converted_str()` returns `None`, `converted_rational()` the exact pair — instead of aborting with `error_unit_inexact` |
 | `max_conversion_length` | `int` | `0` (default 1024) | Longest converted text a conversion may produce, in characters; a longer exact result aborts with `error_value_out_of_range` |
+| `max_text_bytes` | `int` | `0` (default 2147483647) | Most bytes of text in the document (octet-stream payloads not counted); past it the read fails with `TEXT_DATA_TOO_LONG`. `stream.BVNR_NO_LIMIT` (2**64 − 1) lifts it |
+| `max_array_items` | `int` | `0` (default 2147483647) | Most items in one array; past it the read fails with `TOO_MANY_ARRAY_ITEMS`. `stream.BVNR_NO_LIMIT` lifts it |
 
 ### 11.3 `read_fd`
 
@@ -16407,6 +16429,21 @@ case. Passing `unit_si_base` or `unit_iec_base` produces a unit with one
 component; the `no_unit` keyword is only produced when the
 caller explicitly constructs a dimensionless `ValueUnit` with `BaseUnit.NONE`.
 
+### 17.5 Signals inside a callback
+
+Where C calls back into Python — the event callbacks of `Reader`, `mux_load`'s
+per-message callback, `load_documents`, a parsing `FrameFeed`, the sources and
+sinks of sockets and file objects — every exception the callback raises is kept,
+the callback answers false so that C stops, and the exception is re-raised once
+the C call has returned. One window is beyond the binding's reach: an exception
+raised by a signal handler (`KeyboardInterrupt` from Ctrl-C) at the very entry
+of a callback, before its body runs. ctypes reports it as "Exception ignored"
+and the call goes on as if the callback had succeeded, so the interrupt is lost
+and the callback's work for that event (a message, a pushed buffer) is missing.
+Where an interrupt must stop the work reliably, use the pull-style feeds
+(`DemuxFeed`, an unparsed `FrameFeed`), which make no Python callback per item,
+or have the signal handler set a flag the loop checks.
+
 ---
 
 ## 18. `BaseUnit` enum
@@ -16632,7 +16669,9 @@ stream as a whole, and — for its *text* — `max_text_bytes`, whose default is
 finite. With both left at `0` an octet stream may run without bound, but the
 text of a document stops at 2 147 483 647 bytes (`error_text_data_too_long`);
 raise `max_text_bytes` as well (to `UINT64_MAX` if need be) for a text stream
-longer than 2 GiB. (`max_file_size`
+longer than 2 GiB — in Rust `ReadOptions::max_text_bytes`, in Python the
+`max_text_bytes=` keyword (`stream.BVNR_NO_LIMIT`), and `max_array_items`
+beside it for an array as long. (`max_file_size`
 exists on `bvnr_write_flags_t` too, for symmetry, and the writer ignores
 it: a writer never limits how much it writes.)
 
@@ -16769,7 +16808,11 @@ Two kinds, chosen when it is created:
   `max_document_size`. Each payload is streamed into a reused push-fed reader as
   its bytes arrive, so a frame is never buffered whole, however large; the
   reader keeps its buffers from one document to the next, so once warm the
-  frame reader allocates nothing per document.
+  frame reader allocates nothing per document. The one difference that
+  streaming makes: a document whose frame the stream cuts off has had its
+  events delivered up to the cut (with no `ev_stream_end` and no `on_document`
+  call; `finish` reports `error_got_incomplete_bvnr_stream`), where
+  `bvnr_doc_stream_read`, which reads each frame whole first, delivers none.
 - **Pull** (`bvnr_frame_reader_create_pull`): the documents are handed out as
   bytes by `bvnr_frame_reader_next`, for the caller to parse as it likes. A
   document whose frame lies whole in the fed buffer is handed out from that
@@ -16867,17 +16910,21 @@ opened under that key — a document can then mix one mux stream with ordinary
 binary octet payloads (those under other keys are ignored, not misread as
 framing). Pass `NULL` to clear the filter.
 
-**Memory.** The demux keeps one reassembly buffer per channel it has seen; each
-grows to that channel's largest message and is retained for reuse until
-`bvnr_demux_destroy`, so steady-state memory is the sum of per-channel high-water
-marks (bounded by 4096 channels). Channels are not reclaimed individually.
+**Memory.** The demux keeps one reassembly buffer per channel it has seen; a
+message that lies whole in one chunk is handed out from the chunk, so a buffer
+grows only to that channel's largest message that spans chunks. It is retained
+for reuse until `bvnr_demux_destroy`, so steady-state memory is the sum of
+per-channel high-water marks (bounded by 4096 channels). Channels are not
+reclaimed individually.
 
 That 4096 is a **hard limit**, not only a memory estimate. A chunk naming a
 4097th distinct channel cannot be attributed, so the read aborts and
 `bvnr_demux_error` latches `error_octet_stream_out_of_sync` — the demux has lost
 track of the stream, even though the wire framing was well formed. Because
 channels are never reclaimed, the count is of *distinct channel ids seen over the
-whole stream*, not of channels live at any one moment.
+whole stream*, not of channels live at any one moment. A push-fed demux opened
+again for the next document (`bvnr_demux_open_feed`) starts a new stream: its
+ids count afresh, and the buffers are kept as spares.
 
 ```c
 bvnr_demux_t* dm = bvnr_demux_create(on_message, ctx, 0 /* default cap */);
@@ -16985,7 +17032,9 @@ while (bvnr_demux_next(dm, &it) > 0) { /* the closing events */ }
 ```
 
 A message that lies whole in the fed buffer is handed out from it without a
-copy; one split across chunks or feeds is reassembled in the channel's buffer.
+copy, one whole in a chunk that arrived split across feeds from the reader's
+chunk buffer, and one split across chunks is reassembled in the channel's
+buffer.
 Everything an item points to is valid until the next call on the demux, and the
 fed buffer must stay valid until `bvnr_demux_next` has returned
 `BVNR_NEXT_NONE` (feeding before that is refused). Truncation is a finish
@@ -17137,8 +17186,9 @@ For a stream that never ends, `bovnar::codec` writes and reads the framing of
 byte that of `bvnr_mux_send` and `bvnr_frame_write`; the reader is fed bytes in
 pieces of any size, keeps the demultiplexer's limits and error codes, hands a
 message out without a copy when it lies whole in the input, and can peek at a
-message's channel, length and first bytes to skip it or forward its chunks
-unchanged. A multiplexed stream may open with a **preamble**, ordinary text
+message's channel, length and first bytes to skip it or forward it (its
+chunks unchanged where they lie consecutive in the input, re-encoded as
+`MuxWriter` writes them otherwise). A multiplexed stream may open with a **preamble**, ordinary text
 values in the same document before the stream's assignment
 (`.meta = { … }; .media = <octet stream>;`). Nothing is allocated per message
 once the reader's buffers have grown. See
@@ -17148,9 +17198,10 @@ To parse documents as they arrive, `bovnar::live` wraps the push-fed readers of
 §8: `DocumentFeed` over `bvnr_open_read_feed` (and `ValueFeed`, which hands out
 each top-level assignment as a value once it is complete), `FrameParser` and
 `FramePull` over the two kinds of fed frame reader (§2.4), and `Demux` over the
-fed demultiplexer (§3.4). `FramePull` and `Demux` are drained like the codec's
-readers, one item per call, borrowed from the input without a copy where it lies
-whole there, and the borrow checker keeps an item from outliving the next call.
+fed demultiplexer (§3.4). `FramePull` and `Demux` are drained one item per
+call, like the codec's readers but without advancing the slice (the C reader
+keeps its place; [Rust Bindings §4.9](14_bovnar_rust_bindings.md#49-live-documents-through-c-bovnarlive)), borrowed from the input without a copy
+where it lies whole there, and the borrow checker keeps an item from outliving the next call.
 With `deliver_events` the demux hands out the document's own events in order
 with the messages, so the metadata before a stream is there before its first
 message. `EmbeddedFeed` reads the documents embedded in a live document (§4)
@@ -17218,7 +17269,7 @@ the caller hands over bytes in pieces of any size and says when the document is
 over. The events are exactly those `bvnr_read` delivers for the whole buffer,
 wherever the pieces were cut, and so are the errors and their positions. Running
 out of input is never an error until the finish. One reader serves an endless
-document with flat memory, and the frame reader (§2.4) and the demux (§3.4) are
+document with flat memory (its text up to `max_text_bytes`, §1), and the frame reader (§2.4) and the demux (§3.4) are
 built on it.
 
 It is the same state machine `bvnr_read` runs, not a second one: the text lexer
@@ -23454,7 +23505,7 @@ is one of:
 |---|---|
 | `encode(&mut head, channel, payload)` | only the chunk headers, into `head` (cleared, then reused); returns `Parts`, an iterator over the message's wire bytes in order — header, payload slice, header, … — for a vectored write |
 | `write_message(&mut vec, channel, payload)` | the whole message, appended to a `Vec` |
-| `write_message_to(&mut out, channel, payload)` | the whole message to any `std::io::Write`, one vectored write per chunk, nothing allocated; `out` is not flushed |
+| `write_message_to(&mut out, channel, payload)` | the whole message to any `std::io::Write`, one vectored write per chunk, nothing allocated; `out` is not flushed, and must block (a failure part-way, `WouldBlock` included, leaves the stream broken; for a non-blocking socket write `encode`'s parts yourself) |
 
 A message is cut into chunks exactly as `bvnr_mux_send` cuts it (a message of
 at most `stream::BVNR_MUX_MAX_MESSAGE` bytes is one chunk), so the bytes are
@@ -23599,21 +23650,22 @@ message spans seven chunks.
 
 | Message | write | write + copy | peek + skip | forward | read | `mux_dump` | `mux_load` |
 |---|---|---|---|---|---|---|---|
-| 150 B | 8.6 ns (8.4) | 28 ns (27) | 14 ns (12) | 15 ns (14) | 8.9 ns (8.1) | 274 ns (268) | 150 ns (146) |
-| 30 KB | 8.9 ns (8.6) | 1.6 µs (1.5) | 13 ns (13) | 15 ns (14) | 8.9 ns (8.8) | 8.8 µs (8.3) | 7.2 µs (5.2) |
-| 400 KB | 39 ns (38) | 24 µs (22) | 55 ns (55) | 57 ns (56) | 27 µs (23) | 118 µs (110) | 110 µs (86) |
+| 150 B | 8.4 ns (8.3) | 26 ns (25) | 12 ns (12) | 13 ns (13) | 8.2 ns (8.1) | 244 ns (242) | 123 ns (122) |
+| 30 KB | 8.6 ns (8.6) | 1.5 µs (1.5) | 12 ns (12) | 14 ns (14) | 8.8 ns (8.8) | 8.4 µs (8.2) | 2.7 µs (2.5) |
+| 400 KB | 37 ns (37) | 22 µs (21) | 55 ns (55) | 56 ns (56) | 25 µs (23) | 110 µs (110) | 76 µs (70) |
 
 *write* is `encode` (the headers only, for a vectored write); *write + copy* is
 `write_message` into a reused `Vec`; *peek + skip* and *forward* are
 `next_item`, a look at the channel and the first payload byte, and the
 decision, the forwarded chunks borrowed from the input; *read* is `read`, which gathers (copies) a message that spans
 chunks, so the 400 KB one; *mux_dump* and *mux_load* are the batch functions
-through the C library, for comparison. Counted in instructions, which the
+through the C library, for comparison (`mux_load` copies every message into
+the `Vec` it returns, which the C demux alone does not: doc/10 §8.4). Counted in instructions, which the
 clock does not move, a 150-byte message is about 145 to write, 120 to read and
 140 to peek at and skip, the benchmark's loop included. From a stream much
 larger than the cache, every chunk header a 400 KB message has is a cache
-miss, which puts peek and forward at about 145 ns for it, and small messages
-are read as fast as memory delivers them: about 25 ns to read a 150-byte one
+miss, which puts peek and forward at about 130 ns for it, and small messages
+are read as fast as memory delivers them: about 24 ns to read a 150-byte one
 and 29 ns to peek at and skip it. The other figures move little.
 
 ### 4.9 Live documents through C (`bovnar::live`)
@@ -23649,7 +23701,11 @@ error ends the document, and every later `feed` or `finish` returns it until
 bytes complete, those before an error included: a scalar, a struct or an octet
 stream with its last event, an array (which a `/` may still continue) with the
 event after it. A key assigned twice comes twice, and nothing is kept once it is
-handed out, so an endless document is read in constant memory.
+handed out, so an endless document is read in constant memory. Its *text* is
+capped by the library's default of 2 147 483 647 bytes per document
+(`error_text_data_too_long`, doc/10 §1), and each array at as many items: set
+`ReadOptions::max_text_bytes` (and `max_array_items`) to `u64::MAX` for a
+document that does not end, and `max_file_size` where a cap still matters.
 
 ```rust
 use bovnar::live::ValueFeed;
@@ -23714,7 +23770,9 @@ the stream's chunks, in document order: the metadata before the stream comes
 out before its first message, and a `ValueBuilder` makes values of it. After
 `finish()`, `next` on an empty slice hands out the closing events (more input is
 refused with an `Error::Argument`); `reset()`
-starts the next document, keeping the channels and their buffers.
+starts the next document: the channel buffers are kept, the channel ids (and
+with them the 4096-channel count) start afresh, as `codec::MuxReader::reset`
+does.
 
 ```rust
 use bovnar::live::{Demux, DemuxItem, DemuxOptions, ValueBuilder};
@@ -24874,6 +24932,8 @@ rest with `..ReadOptions::default()`.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `max_file_size` | `u64` | `0` (unlimited) | Hard limit on bytes consumed; past it the read fails with `file_too_long` |
+| `max_text_bytes` | `u64` | `0` (default 2 147 483 647) | Most bytes of text in a document (octet-stream payloads not counted); past it the read fails with `text_data_too_long`. `u64::MAX` lifts it, for an endless text document |
+| `max_array_items` | `u64` | `0` (default 2 147 483 647) | Most items in one array; past it the read fails with `too_many_array_items`. `u64::MAX` lifts it |
 | `continue_on_error` | `bool` | `false` | Enable resync mode |
 | `strict_version` | `bool` | `false` | Reject a declared spec version newer than this build (`error_unsupported_spec_version`) |
 | `text_only` | `bool` | `false` | Refuse a document that contains an octet stream (`error_octet_stream_forbidden`), for a channel that is not byte-transparent |
@@ -24881,6 +24941,9 @@ rest with `..ReadOptions::default()`.
 | `max_conversion_length` | `u32` | `0` (default 1024) | Longest converted text a conversion may produce, in characters; a longer exact result aborts with `error_value_out_of_range` |
 
 `max_file_size` is 0 by default, which means no cap; set it where a cap matters.
+`max_text_bytes` and `max_array_items` are 0 by default too, but 0 selects the
+library's finite default there, as in C (`bvnr_read_flags_t`), so an untrusted
+document stays bounded unless a caller lifts the cap.
 
 ### 10.4 `EventData` and `EventPayload`
 

@@ -62,7 +62,9 @@ stream as a whole, and — for its *text* — `max_text_bytes`, whose default is
 finite. With both left at `0` an octet stream may run without bound, but the
 text of a document stops at 2 147 483 647 bytes (`error_text_data_too_long`);
 raise `max_text_bytes` as well (to `UINT64_MAX` if need be) for a text stream
-longer than 2 GiB. (`max_file_size`
+longer than 2 GiB — in Rust `ReadOptions::max_text_bytes`, in Python the
+`max_text_bytes=` keyword (`stream.BVNR_NO_LIMIT`), and `max_array_items`
+beside it for an array as long. (`max_file_size`
 exists on `bvnr_write_flags_t` too, for symmetry, and the writer ignores
 it: a writer never limits how much it writes.)
 
@@ -199,7 +201,11 @@ Two kinds, chosen when it is created:
   `max_document_size`. Each payload is streamed into a reused push-fed reader as
   its bytes arrive, so a frame is never buffered whole, however large; the
   reader keeps its buffers from one document to the next, so once warm the
-  frame reader allocates nothing per document.
+  frame reader allocates nothing per document. The one difference that
+  streaming makes: a document whose frame the stream cuts off has had its
+  events delivered up to the cut (with no `ev_stream_end` and no `on_document`
+  call; `finish` reports `error_got_incomplete_bvnr_stream`), where
+  `bvnr_doc_stream_read`, which reads each frame whole first, delivers none.
 - **Pull** (`bvnr_frame_reader_create_pull`): the documents are handed out as
   bytes by `bvnr_frame_reader_next`, for the caller to parse as it likes. A
   document whose frame lies whole in the fed buffer is handed out from that
@@ -297,17 +303,21 @@ opened under that key — a document can then mix one mux stream with ordinary
 binary octet payloads (those under other keys are ignored, not misread as
 framing). Pass `NULL` to clear the filter.
 
-**Memory.** The demux keeps one reassembly buffer per channel it has seen; each
-grows to that channel's largest message and is retained for reuse until
-`bvnr_demux_destroy`, so steady-state memory is the sum of per-channel high-water
-marks (bounded by 4096 channels). Channels are not reclaimed individually.
+**Memory.** The demux keeps one reassembly buffer per channel it has seen; a
+message that lies whole in one chunk is handed out from the chunk, so a buffer
+grows only to that channel's largest message that spans chunks. It is retained
+for reuse until `bvnr_demux_destroy`, so steady-state memory is the sum of
+per-channel high-water marks (bounded by 4096 channels). Channels are not
+reclaimed individually.
 
 That 4096 is a **hard limit**, not only a memory estimate. A chunk naming a
 4097th distinct channel cannot be attributed, so the read aborts and
 `bvnr_demux_error` latches `error_octet_stream_out_of_sync` — the demux has lost
 track of the stream, even though the wire framing was well formed. Because
 channels are never reclaimed, the count is of *distinct channel ids seen over the
-whole stream*, not of channels live at any one moment.
+whole stream*, not of channels live at any one moment. A push-fed demux opened
+again for the next document (`bvnr_demux_open_feed`) starts a new stream: its
+ids count afresh, and the buffers are kept as spares.
 
 ```c
 bvnr_demux_t* dm = bvnr_demux_create(on_message, ctx, 0 /* default cap */);
@@ -415,7 +425,9 @@ while (bvnr_demux_next(dm, &it) > 0) { /* the closing events */ }
 ```
 
 A message that lies whole in the fed buffer is handed out from it without a
-copy; one split across chunks or feeds is reassembled in the channel's buffer.
+copy, one whole in a chunk that arrived split across feeds from the reader's
+chunk buffer, and one split across chunks is reassembled in the channel's
+buffer.
 Everything an item points to is valid until the next call on the demux, and the
 fed buffer must stay valid until `bvnr_demux_next` has returned
 `BVNR_NEXT_NONE` (feeding before that is refused). Truncation is a finish
@@ -567,8 +579,9 @@ For a stream that never ends, `bovnar::codec` writes and reads the framing of
 byte that of `bvnr_mux_send` and `bvnr_frame_write`; the reader is fed bytes in
 pieces of any size, keeps the demultiplexer's limits and error codes, hands a
 message out without a copy when it lies whole in the input, and can peek at a
-message's channel, length and first bytes to skip it or forward its chunks
-unchanged. A multiplexed stream may open with a **preamble**, ordinary text
+message's channel, length and first bytes to skip it or forward it (its
+chunks unchanged where they lie consecutive in the input, re-encoded as
+`MuxWriter` writes them otherwise). A multiplexed stream may open with a **preamble**, ordinary text
 values in the same document before the stream's assignment
 (`.meta = { … }; .media = <octet stream>;`). Nothing is allocated per message
 once the reader's buffers have grown. See
@@ -578,9 +591,10 @@ To parse documents as they arrive, `bovnar::live` wraps the push-fed readers of
 §8: `DocumentFeed` over `bvnr_open_read_feed` (and `ValueFeed`, which hands out
 each top-level assignment as a value once it is complete), `FrameParser` and
 `FramePull` over the two kinds of fed frame reader (§2.4), and `Demux` over the
-fed demultiplexer (§3.4). `FramePull` and `Demux` are drained like the codec's
-readers, one item per call, borrowed from the input without a copy where it lies
-whole there, and the borrow checker keeps an item from outliving the next call.
+fed demultiplexer (§3.4). `FramePull` and `Demux` are drained one item per
+call, like the codec's readers but without advancing the slice (the C reader
+keeps its place; [Rust Bindings §4.9](14_bovnar_rust_bindings.md#49-live-documents-through-c-bovnarlive)), borrowed from the input without a copy
+where it lies whole there, and the borrow checker keeps an item from outliving the next call.
 With `deliver_events` the demux hands out the document's own events in order
 with the messages, so the metadata before a stream is there before its first
 message. `EmbeddedFeed` reads the documents embedded in a live document (§4)
@@ -648,7 +662,7 @@ the caller hands over bytes in pieces of any size and says when the document is
 over. The events are exactly those `bvnr_read` delivers for the whole buffer,
 wherever the pieces were cut, and so are the errors and their positions. Running
 out of input is never an error until the finish. One reader serves an endless
-document with flat memory, and the frame reader (§2.4) and the demux (§3.4) are
+document with flat memory (its text up to `max_text_bytes`, §1), and the frame reader (§2.4) and the demux (§3.4) are
 built on it.
 
 It is the same state machine `bvnr_read` runs, not a second one: the text lexer

@@ -585,7 +585,8 @@ fn int_annotation(rows: &[Value]) -> Option<ValueTypeSpec> {
 ///
 /// The document streams into `out` as it is serialised, in 64 KiB blocks,
 /// and `out` is flushed at the end, so memory stays flat however large
-/// `value` is; `out` receives exactly the bytes [`to_string`] returns. A value
+/// `value` is; `out` receives exactly the bytes [`to_string`] returns (and,
+/// unlike [`to_string`], has no 256 MiB ceiling on the document). A value
 /// that cannot be serialised is refused with the error [`to_string`] gives,
 /// but `out` may by then hold the blocks before it (nothing, when the value
 /// is not a struct at all). A failing `out` is an [`Error::Io`] with

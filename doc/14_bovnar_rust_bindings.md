@@ -712,7 +712,7 @@ is one of:
 |---|---|
 | `encode(&mut head, channel, payload)` | only the chunk headers, into `head` (cleared, then reused); returns `Parts`, an iterator over the message's wire bytes in order — header, payload slice, header, … — for a vectored write |
 | `write_message(&mut vec, channel, payload)` | the whole message, appended to a `Vec` |
-| `write_message_to(&mut out, channel, payload)` | the whole message to any `std::io::Write`, one vectored write per chunk, nothing allocated; `out` is not flushed |
+| `write_message_to(&mut out, channel, payload)` | the whole message to any `std::io::Write`, one vectored write per chunk, nothing allocated; `out` is not flushed, and must block (a failure part-way, `WouldBlock` included, leaves the stream broken; for a non-blocking socket write `encode`'s parts yourself) |
 
 A message is cut into chunks exactly as `bvnr_mux_send` cuts it (a message of
 at most `stream::BVNR_MUX_MAX_MESSAGE` bytes is one chunk), so the bytes are
@@ -857,21 +857,22 @@ message spans seven chunks.
 
 | Message | write | write + copy | peek + skip | forward | read | `mux_dump` | `mux_load` |
 |---|---|---|---|---|---|---|---|
-| 150 B | 8.6 ns (8.4) | 28 ns (27) | 14 ns (12) | 15 ns (14) | 8.9 ns (8.1) | 274 ns (268) | 150 ns (146) |
-| 30 KB | 8.9 ns (8.6) | 1.6 µs (1.5) | 13 ns (13) | 15 ns (14) | 8.9 ns (8.8) | 8.8 µs (8.3) | 7.2 µs (5.2) |
-| 400 KB | 39 ns (38) | 24 µs (22) | 55 ns (55) | 57 ns (56) | 27 µs (23) | 118 µs (110) | 110 µs (86) |
+| 150 B | 8.4 ns (8.3) | 26 ns (25) | 12 ns (12) | 13 ns (13) | 8.2 ns (8.1) | 244 ns (242) | 123 ns (122) |
+| 30 KB | 8.6 ns (8.6) | 1.5 µs (1.5) | 12 ns (12) | 14 ns (14) | 8.8 ns (8.8) | 8.4 µs (8.2) | 2.7 µs (2.5) |
+| 400 KB | 37 ns (37) | 22 µs (21) | 55 ns (55) | 56 ns (56) | 25 µs (23) | 110 µs (110) | 76 µs (70) |
 
 *write* is `encode` (the headers only, for a vectored write); *write + copy* is
 `write_message` into a reused `Vec`; *peek + skip* and *forward* are
 `next_item`, a look at the channel and the first payload byte, and the
 decision, the forwarded chunks borrowed from the input; *read* is `read`, which gathers (copies) a message that spans
 chunks, so the 400 KB one; *mux_dump* and *mux_load* are the batch functions
-through the C library, for comparison. Counted in instructions, which the
+through the C library, for comparison (`mux_load` copies every message into
+the `Vec` it returns, which the C demux alone does not: doc/10 §8.4). Counted in instructions, which the
 clock does not move, a 150-byte message is about 145 to write, 120 to read and
 140 to peek at and skip, the benchmark's loop included. From a stream much
 larger than the cache, every chunk header a 400 KB message has is a cache
-miss, which puts peek and forward at about 145 ns for it, and small messages
-are read as fast as memory delivers them: about 25 ns to read a 150-byte one
+miss, which puts peek and forward at about 130 ns for it, and small messages
+are read as fast as memory delivers them: about 24 ns to read a 150-byte one
 and 29 ns to peek at and skip it. The other figures move little.
 
 ### 4.9 Live documents through C (`bovnar::live`)
@@ -907,7 +908,11 @@ error ends the document, and every later `feed` or `finish` returns it until
 bytes complete, those before an error included: a scalar, a struct or an octet
 stream with its last event, an array (which a `/` may still continue) with the
 event after it. A key assigned twice comes twice, and nothing is kept once it is
-handed out, so an endless document is read in constant memory.
+handed out, so an endless document is read in constant memory. Its *text* is
+capped by the library's default of 2 147 483 647 bytes per document
+(`error_text_data_too_long`, doc/10 §1), and each array at as many items: set
+`ReadOptions::max_text_bytes` (and `max_array_items`) to `u64::MAX` for a
+document that does not end, and `max_file_size` where a cap still matters.
 
 ```rust
 use bovnar::live::ValueFeed;
@@ -972,7 +977,9 @@ the stream's chunks, in document order: the metadata before the stream comes
 out before its first message, and a `ValueBuilder` makes values of it. After
 `finish()`, `next` on an empty slice hands out the closing events (more input is
 refused with an `Error::Argument`); `reset()`
-starts the next document, keeping the channels and their buffers.
+starts the next document: the channel buffers are kept, the channel ids (and
+with them the 4096-channel count) start afresh, as `codec::MuxReader::reset`
+does.
 
 ```rust
 use bovnar::live::{Demux, DemuxItem, DemuxOptions, ValueBuilder};
@@ -2132,6 +2139,8 @@ rest with `..ReadOptions::default()`.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `max_file_size` | `u64` | `0` (unlimited) | Hard limit on bytes consumed; past it the read fails with `file_too_long` |
+| `max_text_bytes` | `u64` | `0` (default 2 147 483 647) | Most bytes of text in a document (octet-stream payloads not counted); past it the read fails with `text_data_too_long`. `u64::MAX` lifts it, for an endless text document |
+| `max_array_items` | `u64` | `0` (default 2 147 483 647) | Most items in one array; past it the read fails with `too_many_array_items`. `u64::MAX` lifts it |
 | `continue_on_error` | `bool` | `false` | Enable resync mode |
 | `strict_version` | `bool` | `false` | Reject a declared spec version newer than this build (`error_unsupported_spec_version`) |
 | `text_only` | `bool` | `false` | Refuse a document that contains an octet stream (`error_octet_stream_forbidden`), for a channel that is not byte-transparent |
@@ -2139,6 +2148,9 @@ rest with `..ReadOptions::default()`.
 | `max_conversion_length` | `u32` | `0` (default 1024) | Longest converted text a conversion may produce, in characters; a longer exact result aborts with `error_value_out_of_range` |
 
 `max_file_size` is 0 by default, which means no cap; set it where a cap matters.
+`max_text_bytes` and `max_array_items` are 0 by default too, but 0 selects the
+library's finite default there, as in C (`bvnr_read_flags_t`), so an untrusted
+document stays bounded unless a caller lifts the cap.
 
 ### 10.4 `EventData` and `EventPayload`
 

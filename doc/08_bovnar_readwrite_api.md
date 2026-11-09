@@ -1622,8 +1622,9 @@ all `len` bytes or return `false`. Usable wherever an fd or memory sink is —
 It behaves as an fd sink does, not as a memory sink: the writer batches output
 into its 64 KiB buffer and pushes whole blocks, and a refused push is
 `error_writing_to_sink` (never `error_sink_buffer_exhausted`).
-`bvnr_writer_bytes_written` and `bvnr_sink_bytes_written` count what `push`
-accepted. `bvnr_write_flush` (§2.18) pushes the buffer early. `flush` may be
+`bvnr_sink_bytes_written` counts what `push` accepted;
+`bvnr_writer_bytes_written` counts that plus what the writer still buffers
+(§2.9). `bvnr_write_flush` (§2.18) pushes the buffer early. `flush` may be
 `NULL`; when set, `bvnr_write_flush` and `bvnr_write_finish` call it after
 their last push, and a `false` from it fails them with `error_writing_to_sink`.
 

@@ -755,6 +755,14 @@ static void test_feed_api_edges(void)
 	ASSERT_TRUE(!bvnr_read(r), "bvnr_read on a fed reader");
 	ASSERT_EQ_UINT(bvnr_reader_get_error(r), error_invalid_argument,
 		"bvnr_read on a fed reader is error_invalid_argument");
+	/* Mid-read, too: the misuse ends the read, so the error it shows is
+	 * never one the read went on past. */
+	ASSERT_TRUE(bvnr_open_read_feed(r, NULL, NULL), "open feed again");
+	ASSERT_TRUE(bvnr_read_feed(r, ".a = 1; .b = ", 13), "feed a part");
+	ASSERT_TRUE(!bvnr_read(r), "bvnr_read mid-feed");
+	ASSERT_TRUE(!bvnr_read_feed(r, "2;", 2), "the read is over");
+	ASSERT_EQ_UINT(bvnr_reader_get_error(r), error_invalid_argument,
+		"and its error stays error_invalid_argument");
 
 	ASSERT_TRUE(bvnr_open_read_feed(r, NULL, NULL), "re-open feed");
 	ASSERT_TRUE(bvnr_read_feed(r, NULL, 0), "empty feed");
@@ -2073,6 +2081,45 @@ static void test_demux_feed(void)
 	while (bvnr_demux_next(dm, &it) == BVNR_NEXT_MESSAGE)
 		msgs++;
 	ASSERT_TRUE(msgs == 5 && bvnr_demux_finish(dm), "second document");
+	bvnr_demux_destroy(dm);
+
+	/* Each document re-opened on one demux is its own stream: two documents
+	 * of 4096 distinct ids each (8192 over the demux's life) both pass, and
+	 * a message spanning chunks reassembles in a previous document's buffer. */
+	dm = bvnr_demux_create(NULL, NULL, 0);
+	for (uint32_t d2 = 0; d2 < 3; d2++) {
+		doc.n = 0;
+		raw_doc_begin(&doc);
+		for (uint32_t ch = 0; ch < 4096u; ch++) {
+			k = put_varint(c, (uint64_t)d2 * 4096u + ch);
+			k += put_varint(c + k, ch == 7 ? 10 : 1);
+			if (ch == 7) {
+				memcpy(c + k, "01234", 5); k += 5;
+				raw_chunk(&doc, c, k);
+				k = put_varint(c, (uint64_t)d2 * 4096u + ch);
+				memcpy(c + k, "56789", 5); k += 5;
+			} else {
+				c[k++] = (uint8_t)ch;
+			}
+			raw_chunk(&doc, c, k);
+		}
+		raw_doc_end(&doc);
+		ASSERT_TRUE(bvnr_demux_open_feed(dm, NULL, false), "re-open");
+		ASSERT_TRUE(bvnr_demux_feed(dm, doc.p, doc.n), "feed 4096 ids");
+		uint32_t got = 0;
+		bool spanned = false;
+		while ((rc = bvnr_demux_next(dm, &it)) == BVNR_NEXT_MESSAGE) {
+			got++;
+			if (it.channel == (uint64_t)d2 * 4096u + 7u)
+				spanned = it.length == 10 &&
+					  !memcmp(it.data, "0123456789", 10);
+		}
+		ASSERT_EQ_UINT(rc, BVNR_NEXT_NONE, "4096 new ids per document");
+		ASSERT_EQ_UINT(got, 4096, "every message of the document");
+		ASSERT_TRUE(spanned, "the spanning message, in a reused buffer");
+		ASSERT_TRUE(bvnr_demux_finish(dm) &&
+			bvnr_demux_error(dm) == error_none, "document clean");
+	}
 	bvnr_demux_destroy(dm);
 	buf_free(&doc);
 }

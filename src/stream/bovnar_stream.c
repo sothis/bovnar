@@ -417,6 +417,9 @@ struct bvnr_demux_s {
 	demux_channel_t*	chans;
 	uint32_t		nchans;
 	uint32_t		chans_cap;
+	/* Slots whose buf/cap are set: the channels in use and, past nchans,
+	 * the buffers of a previous document's channels, kept as spares. */
+	uint32_t		chans_init;
 	/* Optional key scope (bvnr_demux_set_key). When key is non-NULL the demux
 	 * only treats octet streams opened under a matching assignment key as
 	 * multiplexed; any other octet stream in the same document is ignored, so a
@@ -477,7 +480,7 @@ bvnr_demux_t* bvnr_demux_create(bvnr_mux_on_msg_fn on_message,
 void bvnr_demux_destroy(bvnr_demux_t* dm)
 {
 	if (!dm) return;
-	for (uint32_t i = 0; i < dm->nchans; i++)
+	for (uint32_t i = 0; i < dm->chans_init; i++)
 		free(dm->chans[i].buf);
 	free(dm->chans);
 	free(dm->key);
@@ -543,8 +546,19 @@ static demux_channel_t* demux_get_channel(bvnr_demux_t* dm, uint64_t channel)
 		dm->chans_cap = ncap;
 	}
 	demux_channel_t* c = &dm->chans[dm->nchans++];
+	/* A slot a previous document used keeps its buffer for the new id. */
+	uint8_t* buf = NULL;
+	uint64_t cap = 0;
+	if (dm->nchans <= dm->chans_init) {
+		buf = c->buf;
+		cap = c->cap;
+	} else {
+		dm->chans_init = dm->nchans;
+	}
 	memset(c, 0, sizeof(*c));
 	c->channel = channel;
+	c->buf     = buf;
+	c->cap     = cap;
 	return c;
 }
 
@@ -667,8 +681,8 @@ static bool demux_feed(bvnr_demux_t* dm, demux_channel_t* c,
 {
 	uint32_t pos = 0;
 	for (;;) {
-		const uint8_t* msg;
-		uint64_t msg_len;
+		const uint8_t* msg = NULL;
+		uint64_t msg_len = 0;
 		int rc = demux_take(dm, c, frag, fraglen, &pos, &msg, &msg_len);
 		if (rc < 0) return false;
 		if (rc == 0) return true;
@@ -887,6 +901,10 @@ bool bvnr_demux_open_feed(bvnr_demux_t* dm, const bvnr_read_flags_t* flags,
 	bool deliver_events)
 {
 	if (!dm) return false;
+	/* Not open until the reader is: a failed re-open must not leave the
+	 * demux feeding a reader that open has torn down. */
+	dm->feeding   = false;
+	dm->has_chunk = false;
 	if (!dm->reader && !(dm->reader = bvnr_reader_create()))
 		return false;
 	bvnr_read_flags_t f;
@@ -904,14 +922,10 @@ bool bvnr_demux_open_feed(bvnr_demux_t* dm, const bvnr_read_flags_t* flags,
 	f.want_unit     = f.want_unit ? demux_feed_want_unit : NULL;
 	if (!bvnr_open_read_feed(dm->reader, NULL, &f))
 		return false;
-	/* A new document: whatever the last one left is gone, the channels and
-	 * their buffers stay. */
-	for (uint32_t i = 0; i < dm->nchans; i++) {
-		dm->chans[i].active = false;
-		dm->chans[i].have   = 0;
-		dm->chans[i].need   = 0;
-		dm->chans[i].lvhave = 0;
-	}
+	/* A new document is a new mux stream: its channel ids are its own, so
+	 * the 4096-channel limit counts afresh, as it does for the Rust codec's
+	 * MuxReader::reset. The buffers stay, as spares for the new ids. */
+	dm->nchans = 0;
 	dm->error          = error_none;
 	dm->in_octet       = false;
 	dm->key_match      = false;
@@ -977,8 +991,8 @@ int bvnr_demux_next(bvnr_demux_t* dm, bvnr_demux_item_t* item)
 			return BVNR_NEXT_EVENT;
 		}
 		if (dm->has_chunk) {
-			const uint8_t* msg;
-			uint64_t msg_len;
+			const uint8_t* msg = NULL;
+			uint64_t msg_len = 0;
 			demux_channel_t* c = &dm->chans[dm->chunk_chan];
 			int rc = demux_take(dm, c, dm->chunk, dm->chunk_len,
 					    &dm->chunk_pos, &msg, &msg_len);
@@ -1152,8 +1166,11 @@ static bool frame_document_done(bvnr_frame_reader_t* fr)
 	if (fr->opts.on_document &&
 	    !fr->opts.on_document(fr->opts.userdata, index, ok, err))
 		return frame_fail(fr, error_scanner_callback_failed);
+	/* As in bvnr_doc_stream_read_ex: a failed document never ends the
+	 * stream looking clean. */
 	if (!ok && !fr->opts.continue_past_failed)
-		return frame_fail(fr, err);
+		return frame_fail(fr, err != error_none
+			? err : error_got_incomplete_bvnr_stream);
 	return true;
 }
 

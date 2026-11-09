@@ -218,10 +218,18 @@ class Writer:
                 pass
             self._owned_fd = None
 
+    def _check_not_in_sink(self) -> None:
+        stream = getattr(self, '_stream', None)
+        if stream is not None and stream.busy:
+            raise BovnarArgumentError(
+                "the writer is in use by its own sink: it cannot be finished, "
+                "flushed or destroyed from the object's write() or flush()")
+
     def finish(self) -> None:
 
         if self._ptr is None or self._finished:
             return
+        self._check_not_in_sink()
         if self._struct_depth != 0:
             raise BovnarWriteError(
                 ErrorCode.GOT_INCOMPLETE_BVNR_STREAM, 0,
@@ -245,11 +253,13 @@ class Writer:
         :meth:`finish`."""
         if self._ptr is None:
             raise BovnarArgumentError("Writer has been destroyed")
+        self._check_not_in_sink()
         if not self._lib.bvnr_write_flush(self._ptr):
             self._raise_error()
 
     def destroy(self) -> None:
 
+        self._check_not_in_sink()
         if self._ptr is not None:
             self._lib.bvnr_writer_destroy(self._ptr)
             self._ptr = None

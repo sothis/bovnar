@@ -504,6 +504,32 @@ fn what_follows_the_document() {
     let bad = [body, b";# \x01\n"].concat();
     assert_eq!(kind(&read_all(&bad)), Some(ErrorCode::UnexpectedInputByte));
     assert_eq!(kind(&read_all(&bad)), kind(&c_load(&bad)));
+    // A comment is UTF-8 text: well-formed characters pass, a malformed
+    // byte, a sequence a newline cuts short and one the input ends inside
+    // are refused, each as C refuses it, wherever the input is cut.
+    for (tail, ok) in [
+        (&b"# caf\xc3\xa9 \xe2\x82\xac \xf0\x9f\x98\x80\n"[..], true),
+        (b"# caf\xe9\n", false),
+        (b"# \xc3\n", false),
+        (b"# \xed\xa0\x80\n", false),
+        (b"# \xc0\xaf\n", false),
+        (b"#\xc3", false),
+        (b"#\xf0\x9f\x98", false),
+    ] {
+        for at_semicolon in [false, true] {
+            let doc = if at_semicolon {
+                [body, tail, b"\n;"].concat()
+            } else {
+                [body, b";", tail].concat()
+            };
+            let want = c_load(&doc);
+            assert_eq!(want.is_ok(), ok, "C on {doc:?}");
+            for cut in 0..=doc.len() {
+                let got = read_parts(&mut MuxReader::new(), &[&doc[..cut], &doc[cut..]]);
+                assert_eq!(kind(&got), kind(&want), "{doc:?} cut at {cut}");
+            }
+        }
+    }
     // The C writer's pretty form.
     let pretty = [&b".mux = \0"[..], &c[6..], b"\n"].concat();
     assert_eq!(read_all(&pretty).unwrap(), c_load(&pretty).unwrap());

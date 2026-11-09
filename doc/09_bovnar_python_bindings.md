@@ -84,6 +84,7 @@ the C library; `import bovnar` itself never loads it.
     - 17.2 [`BvnrWriteFlags` layout](#172-bvnrwriteflags-layout)
     - 17.3 [`write_string` behaviour](#173-write_string-behaviour)
     - 17.4 [`_resolve_unit` default](#174-_resolve_unit-default)
+    - 17.5 [Signals inside a callback](#175-signals-inside-a-callback)
 18. [`BaseUnit` enum](#18-baseunit-enum)
 19. [Spec 1.1 additions](#19-spec-11-additions)
 
@@ -494,10 +495,21 @@ last                                 # → [('x', [1, 2])]
 A scalar, a struct or an octet stream is complete at its end; an array at the
 next key or the end of the document, because a further `/[…]` row would extend
 it. An octet stream in a `DocumentFeed` is gathered whole before it is handed
-over, so an endless one belongs in a `DemuxFeed` or is read by its events.
-`DocumentFeed` takes the options of `Reader.read_mem` (`continue_on_error`,
-`want_unit`, `max_file_size`, …), and its `typed=True` gives `Quantity`
-values as `loads(typed=True)` does.
+over, so an endless one belongs in a `DemuxFeed` or is read by its events. The
+text of a fed document is capped as `Reader`'s is, at 2 147 483 647 bytes
+(`TEXT_DATA_TOO_LONG`, doc/10 §1), and an array at as many items: pass
+`max_text_bytes=stream.BVNR_NO_LIMIT` (and `max_array_items`) for a document
+that does not end. `DemuxFeed` and a parsing `FrameFeed` take both as well.
+`DocumentFeed` takes the reading options of `Reader.read_mem`
+(`continue_on_error`, `strict_version`, `text_only`, `want_unit`,
+`want_unit_allow_nonterminating`, `max_file_size`, `max_conversion_length`,
+`max_text_bytes`, `max_array_items`),
+not its callbacks, which the feed's
+items stand in for; with `values=True`, `typed=True` gives `Quantity` values as
+`loads(typed=True)` does (`typed` without `values`, or neither `events` nor
+`values`, is refused). A `want_unit` callback runs inside the C call, so it may
+not close the feed or feed it again (`BovnarArgumentError`). One feed reads one
+document: make a new one for the next.
 
 ```python
 frames = stream.FrameFeed(parse=True)
@@ -524,9 +536,12 @@ raises `ValueError` rather than reading memory that has been reused. Copy what
 must be kept with `bytes(view)`. A buffer made from the view —
 `memoryview(view)`, a slice of it, `numpy.frombuffer(view)`, a held export — is
 not released with it, so while one is alive the next call raises
-`BovnarArgumentError` and leaves the stream as it was; drop it and the call can
-be repeated. Such a buffer also keeps the feed's C memory alive: `close()` then
-closes the feed but frees that memory only when the buffer goes.
+`BovnarArgumentError` and leaves the stream as it was, as often as it is
+repeated; drop the buffer and the call goes ahead. Such a buffer also keeps the
+feed's C memory alive: `close()` then closes the feed at once (it hands out
+nothing more) but frees that memory only when the buffer goes. A message that
+lay whole in the fed bytes is a view of those `bytes`, which a buffer made from
+it keeps alive by itself, so that one never makes a call refuse.
 
 ```python
 dm = stream.DemuxFeed(view=True)
@@ -638,6 +653,10 @@ stream.load_documents(out.getvalue())   # → [{'id': 1}, {'id': 2}]
 frames.count                            # → 2
 ```
 
+The object has to be blocking: a non-blocking socket is refused when the
+writer is made, since one that took part of a buffer and then raised
+`BlockingIOError` would leave the stream cut mid-chunk. (A socket with a
+timeout is accepted; a timeout fails the writer as any other exception does.)
 An exception the object raises (a closed socket, a full disk) comes out of the
 call that pushed — the constructor, `send`, `write`, `flush` or `close` —
 unchanged. The writer has failed then: `MuxWriter.close()` only releases it,
@@ -649,7 +668,7 @@ value by value.
 
 **What it costs.** Measured with `python/bench/bench_stream.py` on the machine
 of §4.7, into a socket-like object whose `sendall` takes the bytes, per
-message, median of five runs:
+message, the median over its runs:
 
 | Path | 150 B | 30 KB | 400 KB |
 |------|------:|------:|-------:|
@@ -1637,7 +1656,7 @@ nested parse, and close the first one after its read returns.
 
 `read_mem(data, *, on_verified, on_unverified, max_file_size, continue_on_error,
 strict_version, text_only, want_unit, want_unit_allow_nonterminating,
-max_conversion_length)`
+max_conversion_length, max_text_bytes, max_array_items)`
 
 Parse BVNR from a `bytes`, `bytearray`, or `memoryview` object.
 
@@ -1653,6 +1672,8 @@ Parse BVNR from a `bytes`, `bytearray`, or `memoryview` object.
 | `want_unit` | `Callable[[BvnrData], tuple \| None] \| None` | `None` | Optional read-time lossless unit/base conversion hook. Called per numeric value; return `(unit, base)` to request a conversion (the exact result arrives on the payload as `converted` and `converted_str()`, with `converted_rational()` / `converted_in_base()` beside it — see §4.2), or `None` to leave the value untouched. An inexact conversion aborts the parse (`error_unit_inexact`). |
 | `want_unit_allow_nonterminating` | `bool` | `False` | Deliver an exact-rational-but-non-terminating conversion (e.g. km/h→m/s) as a rational — `converted_str()` returns `None`, `converted_rational()` the exact pair — instead of aborting with `error_unit_inexact` |
 | `max_conversion_length` | `int` | `0` (default 1024) | Longest converted text a conversion may produce, in characters; a longer exact result aborts with `error_value_out_of_range` |
+| `max_text_bytes` | `int` | `0` (default 2147483647) | Most bytes of text in the document (octet-stream payloads not counted); past it the read fails with `TEXT_DATA_TOO_LONG`. `stream.BVNR_NO_LIMIT` (2**64 − 1) lifts it |
+| `max_array_items` | `int` | `0` (default 2147483647) | Most items in one array; past it the read fails with `TOO_MANY_ARRAY_ITEMS`. `stream.BVNR_NO_LIMIT` lifts it |
 
 ### 11.3 `read_fd`
 
@@ -2162,6 +2183,21 @@ matching the C convenience helpers. No unit annotation is emitted in this
 case. Passing `unit_si_base` or `unit_iec_base` produces a unit with one
 component; the `no_unit` keyword is only produced when the
 caller explicitly constructs a dimensionless `ValueUnit` with `BaseUnit.NONE`.
+
+### 17.5 Signals inside a callback
+
+Where C calls back into Python — the event callbacks of `Reader`, `mux_load`'s
+per-message callback, `load_documents`, a parsing `FrameFeed`, the sources and
+sinks of sockets and file objects — every exception the callback raises is kept,
+the callback answers false so that C stops, and the exception is re-raised once
+the C call has returned. One window is beyond the binding's reach: an exception
+raised by a signal handler (`KeyboardInterrupt` from Ctrl-C) at the very entry
+of a callback, before its body runs. ctypes reports it as "Exception ignored"
+and the call goes on as if the callback had succeeded, so the interrupt is lost
+and the callback's work for that event (a message, a pushed buffer) is missing.
+Where an interrupt must stop the work reliably, use the pull-style feeds
+(`DemuxFeed`, an unparsed `FrameFeed`), which make no Python callback per item,
+or have the signal handler set a flag the loop checks.
 
 ---
 

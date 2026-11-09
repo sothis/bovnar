@@ -206,6 +206,14 @@ fn a_fed_document_takes_the_reader_options_and_policy() {
             text_only: true,
             ..ReadOptions::default()
         },
+        ReadOptions {
+            max_text_bytes: 10,
+            ..ReadOptions::default()
+        },
+        ReadOptions {
+            max_array_items: 2,
+            ..ReadOptions::default()
+        },
     ];
     let policy = UnitPolicy {
         targets: vec![("m".into(), 16)],
@@ -961,4 +969,67 @@ fn values_built_from_demux_events_include_the_streams_key() {
             ("media".to_string(), Value::Bytes(Vec::new())),
         ]
     );
+}
+
+/// Each document a reset demux reads is its own stream, as for the codec's
+/// `MuxReader::reset`: the 4096-channel limit counts afresh, so three
+/// documents of 4096 new ids each (12288 over the demux's life) all read.
+#[test]
+fn demux_reset_counts_channels_per_document() {
+    let mut demux = Demux::new(&DemuxOptions::default()).unwrap();
+    for d in 0..3u64 {
+        let msgs: Vec<(u64, Vec<u8>)> = (0..4096u64)
+            .map(|ch| {
+                (
+                    d * 4096 + ch,
+                    vec![ch as u8; if ch == 7 { 70_000 } else { 1 }],
+                )
+            })
+            .collect();
+        let doc = stream::mux_dump(&msgs, "mux").unwrap();
+        let (got, _, r) = demuxed(&mut demux, &doc, &[doc.len() / 2]);
+        r.unwrap();
+        assert_eq!(got, msgs, "document {d}");
+    }
+}
+
+/// `max_text_bytes` and `max_array_items` reach the C reader, in a whole read
+/// and a fed one alike: at a small cap they fail where C says, and
+/// `u64::MAX` lifts the library's 2 147 483 647 default (which an endless
+/// text document would otherwise reach).
+#[test]
+fn the_text_and_array_caps_are_read_options() {
+    let doc = b".a = 1; .b = [1, 2, 3];";
+    let read = |o: &ReadOptions| {
+        let mut sink = |_: &EventData<'_>| true;
+        let whole = Reader::new()
+            .unwrap()
+            .read_mem(doc, o, Some(&mut sink), None)
+            .err()
+            .and_then(|e| e.kind());
+        let mut feed = DocumentFeed::new(o).unwrap();
+        let mut events = |_: &EventData<'_>| true;
+        let fed = feed
+            .feed(&doc[..9], &mut events)
+            .and_then(|()| feed.feed(&doc[9..], &mut events))
+            .and_then(|()| feed.finish(&mut events))
+            .err()
+            .and_then(|e| e.kind());
+        assert_eq!(whole, fed, "{o:?}");
+        whole
+    };
+    let text = |n| ReadOptions {
+        max_text_bytes: n,
+        ..ReadOptions::default()
+    };
+    let items = |n| ReadOptions {
+        max_array_items: n,
+        ..ReadOptions::default()
+    };
+    assert_eq!(read(&text(10)), Some(ErrorCode::TextDataTooLong));
+    assert_eq!(read(&text(doc.len() as u64)), None);
+    assert_eq!(read(&text(u64::MAX)), None);
+    assert_eq!(read(&items(2)), Some(ErrorCode::TooManyArrayItems));
+    assert_eq!(read(&items(3)), None);
+    assert_eq!(read(&items(u64::MAX)), None);
 }

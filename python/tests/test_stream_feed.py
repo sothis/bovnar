@@ -671,3 +671,178 @@ class TestReviewFixes:
     def test_an_int_is_not_a_payload(self):
         with pytest.raises(BovnarArgumentError):
             stream.frame_documents([5])
+
+
+class TestSecondReviewFixes:
+    """What a second review of the feeds found (2026-11-09)."""
+
+    def test_a_refused_call_is_refused_again(self):
+        # The refusal used to forget the view, so a repeated call went ahead
+        # and freed or reused the memory the held buffer still read.
+        dm = DemuxFeed(view=True)
+        it = dm.feed(stream.mux_dump([(1, b'x' * 70000), (1, b'y' * 70000)]))
+        first = next(it)
+        held = memoryview(first.payload)
+        for _ in range(3):
+            with pytest.raises(BovnarArgumentError):
+                next(it)
+        dm.close()                                # deferred: held is alive
+        assert dm._dm is not None
+        assert bytes(held[:3]) == b'xxx' and bytes(held[-3:]) == b'xxx'
+        del held, first
+        import gc
+        gc.collect()
+        assert dm._dm is None                     # freed when the buffer went
+
+    def test_a_closed_feed_hands_out_nothing(self):
+        dm = DemuxFeed(view=True)
+        it = dm.feed(stream.mux_dump([(1, b'abc'), (2, b'def')]))
+        first = next(it)
+        exp = pickle.PickleBuffer(first.payload)  # an export of the view
+        dm.close()
+        del exp
+        assert list(it) == []
+        fr = FrameFeed(view=True)
+        it = fr.feed(stream.frame_documents([b'.a=1;', b'.b=2;']))
+        d0 = next(it)
+        exp = pickle.PickleBuffer(d0)
+        fr.close()
+        assert list(it) == []
+        with pytest.raises(BovnarArgumentError):
+            fr.feed(b'BVF1')
+        del exp, d0
+
+    def test_a_view_into_the_fed_bytes_outlives_close(self):
+        fr = FrameFeed(view=True)
+        doc = next(iter(fr.feed(bytearray(stream.frame_documents([b'.a = 1;'])))))
+        held = memoryview(doc)
+        fr.close()
+        import gc
+        gc.collect()
+        assert bytes(held) == b'.a = 1;'
+
+    def test_close_or_feed_from_want_unit_is_refused(self):
+        for action in ('close', 'feed'):
+            f = None
+
+            def want(_d):
+                f.close() if action == 'close' else f.feed(b'.b = 2;')
+            f = DocumentFeed(want_unit=want)
+            with pytest.raises(BovnarArgumentError, match='own callback'):
+                f.feed(b'.a = <float:64,km> 1.0; .c = 3;')
+            f.close()                             # after the call: fine
+
+    def test_a_parse_error_from_a_callback_propagates_from_feed(self):
+        # A parser exception, even a BovnarParseError, is the caller's, not
+        # the stream's: it is raised by the feed() that ran the callback.
+        fr = FrameFeed(parse=True)
+        boom = BovnarParseError(ErrorCode.NONE, message='from the parser')
+
+        def raising(*_a):
+            raise boom
+        fr._state['parser'].on_event = raising
+        with pytest.raises(BovnarParseError, match='from the parser'):
+            fr.feed(stream.frame_documents([b'.a = 1;']))
+
+    def test_a_channel_is_an_int(self):
+        with pytest.raises(BovnarArgumentError):
+            stream.mux_dump([(1.9, b'x')])
+        import operator
+
+        class Index:
+            def __index__(self):
+                return 3
+        assert stream.mux_load(stream.mux_dump([(Index(), b'x')])) == [(3, b'x')]
+        assert operator.index(Index()) == 3
+
+    def test_any_bytes_like_object_is_fed(self):
+        import array
+        wire = stream.mux_dump([(1, b'abcd')])
+        got = list(DemuxFeed().feed(array.array('B', wire)))
+        assert got == [Message(1, b'abcd')]
+
+    def test_options_that_would_be_ignored_are_refused(self):
+        with pytest.raises(BovnarArgumentError):
+            DemuxFeed(typed=True)
+        with pytest.raises(BovnarArgumentError):
+            DocumentFeed(typed=True)
+        with pytest.raises(BovnarArgumentError):
+            DocumentFeed(events=False, values=False)
+
+    def test_mux_load_refuses_a_bad_key_before_it_allocates(self):
+        with pytest.raises(BovnarArgumentError):
+            stream.mux_load(stream.mux_dump([(1, b'x')]), key='a\x00b')
+
+    def test_the_closing_items_survive_a_truncated_message(self):
+        # A message cut short is the demux's error, not the document's: the
+        # document's closing events are still handed out after finish raises.
+        doc = _mux_doc(_chunk(_leb(4) + _leb(1000) + b'0123456789')) + b'.n = [1, 2];'
+        dm = DemuxFeed(events=True, values=True)
+        before = list(dm.feed(doc))
+        assert not any(isinstance(i, Message) for i in before)
+        with pytest.raises(BovnarParseError) as ei:
+            dm.finish()
+        assert ei.value.code == ErrorCode.OCTET_STREAM_TRUNCATED
+        after = list(dm)
+        assert Value('n', [1, 2]) in after
+        assert after[-1].event == Event.STREAM_END
+
+
+class TestReadLimits:
+    """max_text_bytes and max_array_items (2.1.0): 0 keeps the library's
+    default of 2147483647, BVNR_NO_LIMIT lifts it, and a small cap fails
+    where Reader.read_mem fails, fed or whole."""
+
+    DOC = b'.a = 1; .b = [1, 2, 3];'
+
+    def _whole(self, **kw):
+        try:
+            Reader().read_mem(self.DOC, **kw)
+            return None
+        except BovnarParseError as e:
+            return e.code
+
+    def _fed(self, **kw):
+        try:
+            f = DocumentFeed(**kw)
+            list(f.feed(self.DOC[:9]))
+            list(f.feed(self.DOC[9:]))
+            list(f.finish())
+            return None
+        except BovnarParseError as e:
+            return e.code
+
+    @pytest.mark.parametrize('kw, want', [
+        ({'max_text_bytes': 10}, ErrorCode.TEXT_DATA_TOO_LONG),
+        ({'max_text_bytes': len(DOC)}, None),
+        ({'max_text_bytes': stream.BVNR_NO_LIMIT}, None),
+        ({'max_array_items': 2}, ErrorCode.TOO_MANY_ARRAY_ITEMS),
+        ({'max_array_items': 3}, None),
+        ({'max_array_items': stream.BVNR_NO_LIMIT}, None),
+    ])
+    def test_reader_and_feed_agree(self, kw, want):
+        assert self._whole(**kw) == want
+        assert self._fed(**kw) == want
+
+    def test_demux_and_frame_feeds_take_them(self):
+        doc = stream.mux_dump([(1, b'x')], preamble={'n': [1, 2, 3]})
+        with pytest.raises(BovnarParseError) as ei:
+            list(DemuxFeed(values=True, max_array_items=2).feed(doc))
+        assert ei.value.code == ErrorCode.TOO_MANY_ARRAY_ITEMS
+        assert Message(1, b'x') in list(DemuxFeed(max_array_items=3).feed(doc))
+        wire = stream.frame_documents([self.DOC])
+        fr = FrameFeed(parse=True, max_text_bytes=10)
+        with pytest.raises(BovnarParseError) as ei:
+            list(fr.feed(wire))
+        assert ei.value.code == ErrorCode.TEXT_DATA_TOO_LONG
+        assert list(FrameFeed(parse=True, max_text_bytes=len(self.DOC))
+                    .feed(wire)) == [{'a': 1, 'b': [1, 2, 3]}]
+        with pytest.raises(BovnarArgumentError):
+            FrameFeed(max_text_bytes=10)      # applies to parse=True
+
+    @pytest.mark.parametrize('bad', [-1, 1 << 64, 1.5, '10', None])
+    def test_a_value_ctypes_would_wrap_is_refused(self, bad):
+        with pytest.raises(BovnarArgumentError):
+            Reader().read_mem(self.DOC, max_text_bytes=bad)
+        with pytest.raises(BovnarArgumentError):
+            DocumentFeed(max_array_items=bad)

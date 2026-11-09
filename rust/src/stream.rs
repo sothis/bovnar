@@ -169,6 +169,7 @@ pub fn load_documents_reader(
 /// Multiplexes `(channel, payload)` messages into one document under `key`
 /// (conventionally `"mux"`).
 pub fn mux_dump<P: AsRef<[u8]>>(messages: &[(u64, P)], key: &str) -> Result<Vec<u8>> {
+    writer::check_key(key)?;
     let msgs = borrowed(messages);
     let total: usize = msgs.iter().map(|(_, p)| p.len()).sum();
     writer::grow_write(total + msgs.len() * 64 + key.len(), false, |w| {
@@ -182,6 +183,7 @@ pub fn mux_dump_to<P: AsRef<[u8]>>(
     key: &str,
     out: impl std::io::Write,
 ) -> Result<()> {
+    writer::check_key(key)?;
     let msgs = borrowed(messages);
     writer::stream_to(out, false, |w| w.check(|h| h.mux(key, &msgs)))
 }
@@ -236,6 +238,7 @@ pub fn mux_load_reader(
 /// Embeds the document `inner` under `key` (conventionally `"payload"`)
 /// in a new document.
 pub fn embed_document(inner: &[u8], key: &str, pretty: bool) -> Result<Vec<u8>> {
+    writer::check_key(key)?;
     writer::grow_write(inner.len() + key.len(), pretty, |w| {
         w.check(|h| h.embed_document(key, inner))
     })
@@ -248,6 +251,7 @@ pub fn embed_document_to(
     pretty: bool,
     out: impl std::io::Write,
 ) -> Result<()> {
+    writer::check_key(key)?;
     writer::stream_to(out, pretty, |w| w.check(|h| h.embed_document(key, inner)))
 }
 

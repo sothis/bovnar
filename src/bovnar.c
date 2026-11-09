@@ -3866,7 +3866,11 @@ static int cmd_mux_list(const char *path)
 	bool is_stdin = (strcmp(path, "-") == 0);
 	int fd = is_stdin ? STDIN_FILENO : open(path, BVN_O_RDONLY);
 	if (fd < 0) { perror(path); return 1; }
-	bvnr_demux_t *dm = bvnr_demux_create(mux_print_msg, NULL, 0);
+	/* List every message regardless of size, as `frames list` does every
+	 * frame: an explicit huge cap (0 would select the 64 MiB default, which
+	 * `mux pack` of a larger file exceeds). Memory still grows only with the
+	 * bytes that arrive. */
+	bvnr_demux_t *dm = bvnr_demux_create(mux_print_msg, NULL, UINT64_MAX);
 	/* `mux pack` writes under the key "mux" and doc/10_bovnar_streaming.md tells
 	 * callers to set the same filter. Without it every octet stream in the
 	 * document is demuxed, so an ordinary binary payload is misread as framing

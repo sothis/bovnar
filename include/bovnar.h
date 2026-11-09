@@ -1042,8 +1042,9 @@ BVN_API bool bvnr_read(bvnr_reader_t* r);
  * bvnr_open_read_feed arms `r` the way bvnr_open_read_source does (it may be a
  * reader used before; the unit policy survives), with no source; `src_mirror`
  * is optional and receives the bytes as they are consumed. bvnr_read on a fed
- * reader returns false with error_invalid_argument (once the fed read is over,
- * it returns false and leaves the error as it was).
+ * reader returns false with error_invalid_argument and ends the read, as a
+ * misused bvnr_read_feed does (once the fed read is over, it returns false and
+ * leaves the error as it was).
  *
  * bvnr_read_feed lexes `len` bytes of `buf` (NULL is allowed for len 0) and
  * returns once they are consumed; the caller may reuse the buffer then. The

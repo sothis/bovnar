@@ -11,9 +11,9 @@ list` must report every document with its own outcome, `frame N: OK` or
 framing did, naming the framing error. The manifest is read through the CLI
 itself (`bovnar convert`), so the check needs nothing but the binary.
 
-The CLI cannot set max_message or max_document_size: under its defaults (64
-MiB, and no frame cap) a vector that sets one is read further than the
-manifest says, so only the messages or documents before its error are held
+The CLI cannot set max_message or max_document_size: it lists messages and
+frames of any size, so a vector that sets one is read further than the
+manifest says, and only the messages or documents before its error are held
 to it.
 
 Usage: check_stream_vectors_cli.py <bovnar> <tests/stream_vectors> [emulator...]

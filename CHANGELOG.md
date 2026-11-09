@@ -157,7 +157,7 @@ API and implements spec 1.2.
 - **Shared streaming vectors.** `tests/stream_vectors/` holds one set of wire
   vectors for the C library, the Rust crate and the Python bindings, written by
   `tests/gen_stream_vectors.py` from the wire conventions alone and listed with
-  their expected outcome in `manifest.bvnr`. Twenty multiplexed streams: with
+  their expected outcome in `manifest.bvnr`. Twenty-one multiplexed streams: with
   and without a preamble of text values (150 B, 30 KB and 400 KB messages, an
   empty one, one filling a 65536-byte chunk), none at all, channel ids of every
   varint width up to 2^64−1 at the one-chunk boundary, packed chunks, the
@@ -165,7 +165,7 @@ API and implements spec 1.2.
   chunks, 4096 channels and the 4097th, whitespace and comments around the
   closing `;`, every way a stream fails (truncated, desynchronised, oversize,
   cut inside the octet stream), and three documents the C demultiplexer reads
-  and the pure-Rust codec deliberately refuses. Eight frame streams: three
+  and the pure-Rust codec deliberately refuses. Seven frame streams: three
   documents, a failed and an incomplete document among good ones, a bad magic,
   an oversize frame, input cut inside a document or a header, and none at
   all. The C demultiplexer (batch and fed), the pull and the parsing frame
@@ -198,6 +198,25 @@ API and implements spec 1.2.
   addition; `bovnar frames list` names the error with it.
 
 ### Changed
+
+- **The text and array caps can be lifted from Rust and Python.** An endless
+  text document read with a live feed stopped at the library's default of
+  2 147 483 647 bytes of text (`text_data_too_long`), and an array at as many
+  items, with no way to raise either from a binding. Both now pass to
+  `bvnr_read_flags_t` as given, 0 keeping the library default:
+  - *Rust:* `ReadOptions` gains `max_text_bytes` and `max_array_items`
+    (`u64::MAX` lifts the cap), honoured by every reader that takes
+    `ReadOptions` (`Reader`, the live feeds, `FrameParser`, `Demux`).
+    **Source-incompatible** for code that builds `ReadOptions` with a struct
+    literal naming every field: add `..ReadOptions::default()` (or the two
+    fields). Code using `ReadOptions::default()` or `..Default::default()` is
+    unaffected, as is every default behaviour. Released in a minor version
+    (2.1.0) on the maintainer's word; no known user names every field.
+  - *Python:* the `max_text_bytes=` and `max_array_items=` keywords of
+    `Reader.read_mem`, `read_fd`, `read_file` and `read_stream`, of
+    `DocumentFeed` and `DemuxFeed`, and of a parsing `FrameFeed`;
+    `stream.BVNR_NO_LIMIT` (2**64 − 1) lifts the cap, and a value that does
+    not fit a `uint64_t` is refused rather than wrapped.
 
 - **The canonical text of a double is its nearest shortest decimal.**
   `bvn_format_double`, which writes every float the writer formats, chose
@@ -254,6 +273,54 @@ API and implements spec 1.2.
 
 ### Fixed
 
+- **Fixes from a second review of the streaming work (2026-11-09).**
+  - *The 4096-channel limit is per document on a re-opened demux.*
+    `bvnr_demux_open_feed` kept the channel ids of every earlier document, so
+    a long-lived demux (and `live::Demux::reset`) refused a new id once 4096
+    had been seen over its whole life; each document is now its own stream,
+    as for `codec::MuxReader::reset`, and the old buffers serve the new ids. A
+    re-open that fails no longer leaves the demux feeding a reader that open
+    has torn down.
+  - *Python: no use-after-free through a memoryview payload.* When a call was
+    refused because a buffer made from the last view was alive, the repeated
+    call went ahead and reused or freed the memory that buffer read; it is
+    refused until the buffer is gone. A feed closed while one is alive hands
+    out nothing more and frees its C object when the buffer goes.
+  - *Python: no crash closing a reader or writer from its own callback.*
+    `DocumentFeed.close()` or `feed()` from `want_unit`, and
+    `MuxWriter.close()` or `Writer.destroy()` from the object's own `write` or
+    `flush`, freed the C object under the running call; they raise
+    `BovnarArgumentError` now.
+  - *Python, smaller:* `mux_load` no longer leaks its demux when it refuses
+    the key; a float channel (`1.9`) is refused instead of sent on channel 1;
+    an exception from a parsing `FrameFeed`'s callback propagates from the
+    `feed()` that ran it even when it is a `BovnarParseError`; `feed()` takes
+    any bytes-like object; `typed` without `values` is refused, as `FrameFeed`
+    refuses it; `DemuxFeed.finish()` queues the document's closing items before
+    it raises for a message cut short, as `live::Demux` hands them out; a
+    writer refuses a non-blocking socket, which would cut the stream
+    mid-chunk; the in-memory `frame_documents` names
+    `SINK_BUFFER_EXHAUSTED`, not `NONE`.
+  - *Rust:* the codec checks the UTF-8 of comments after the stream's closing
+    `;` as the C reader does (`invalid_utf8_byte`, where it read on); the
+    `stream::` writers refuse a key holding NUL as an `Error::Argument`
+    instead of `Error::Write` with code 0.
+  - *C:* `bvnr_read` on a fed reader mid-read ends that read, as a misused
+    feed does, so the error getters never show an error the read went on
+    past; a failed document whose reader gave no code ends a parsing frame
+    reader with `error_got_incomplete_bvnr_stream`, as
+    `bvnr_doc_stream_read_ex` does; `bovnar mux list` lists messages of any
+    size, as `frames list` lists frames; `bvnr_stream_vectors_test` no longer
+    hands `memcmp` a NULL buffer for the empty frame vector, which failed it
+    under UBSan.
+  - *Docs:* the events of a frame the stream cuts off reach the parsing frame
+    reader's callbacks up to the cut; `bvnr_writer_bytes_written` counts the
+    buffered bytes too; the 2 GiB text cap of an endless document (which
+    Rust can now lift, see Changed); the
+    codec's io writers need a blocking `out`; the codec benchmark's batch
+    columns are measured anew (they were of the 2.0.2 C library); the
+    vector counts (21 multiplexed, 7 frame streams); the README's test table;
+    a signal at the entry of a Python callback (doc/09 §17.5).
 - **A failing `bvnr_write_finish` hands the sink everything written, also
   when it is the finish that finds the document incomplete.** After an earlier
   error it already pushed what its 64 KiB buffer held, but when the finish

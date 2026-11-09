@@ -54,6 +54,7 @@ callback source and sink instead of holding the whole input or output.
 """
 
 import ctypes
+import operator
 import weakref
 from collections import deque
 from functools import lru_cache
@@ -68,7 +69,7 @@ from .structs import (
     BvnrDemuxItem,
     EVENT_CALLBACK_FUNC, ON_DOCUMENT_FUNC, MUX_ON_MSG_FUNC, ON_ERROR_FUNC,
 )
-from .reader import Reader
+from .reader import Reader, _read_limit
 from .writer import Writer
 
 # Mirrors of the C constants (bovnar.h / bovnar_stream.h).
@@ -78,10 +79,14 @@ BVNR_FILESIZE_UNLIMITED = 0
 BVNR_DOC_DEFAULT_MAX    = 256 * 1024 * 1024
 BVNR_MUX_DEFAULT_MAX    = 64 * 1024 * 1024
 BVNR_MUX_MAX_MESSAGE    = 65536 - 20
+# The largest uint64_t: for max_text_bytes and max_array_items, no cap (0
+# selects their finite default of 2147483647). An endless text document read
+# with a DocumentFeed needs max_text_bytes=BVNR_NO_LIMIT.
+BVNR_NO_LIMIT           = (1 << 64) - 1
 
 __all__ = [
     'BVNR_FILESIZE_UNLIMITED', 'BVNR_DOC_DEFAULT_MAX', 'BVNR_MUX_DEFAULT_MAX',
-    'BVNR_MUX_MAX_MESSAGE',
+    'BVNR_MUX_MAX_MESSAGE', 'BVNR_NO_LIMIT',
     'frame_documents', 'dump_documents', 'load_documents',
     'mux_dump', 'mux_load',
     'embed_document', 'parse_embedded',
@@ -155,7 +160,10 @@ def frame_documents(docs: Iterable[bytes], *, file=None) -> bytes | None:
     for b in blobs:
         dptr, _keep = _void_copy(b)
         if not lib.bvnr_frame_write(ctypes.byref(sink), dptr, len(b)):
-            raise BovnarWriteError(ErrorCode.NONE, message="bvnr_frame_write failed")
+            # The buffer is sized to fit every frame, so this is a memory
+            # sink that ran out: the code says so, never NONE.
+            raise BovnarWriteError(ErrorCode.SINK_BUFFER_EXHAUSTED,
+                                   message="bvnr_frame_write failed")
     return bytes(out[:total])
 
 
@@ -181,8 +189,10 @@ def load_documents(data,
     returned list. ``typed=True`` wraps scalars in :class:`bovnar.Quantity`.
 
     ``data`` may also be a socket or a binary file object, read until it
-    reports end of input; the frames are then parsed as they are pulled, never
-    gathered first. For a stream that does not end, use :class:`FrameFeed`.
+    reports end of input; the frames are then parsed one at a time as they are
+    pulled, each gathered whole first (up to ``max_document_size``), never the
+    stream. For a stream that does not end, or to stream each frame's payload
+    into the parser as it arrives, use :class:`FrameFeed`.
     """
     from . import _DictParser, _TypedDictParser  # deferred (import cycle)
     lib  = get_library()
@@ -360,7 +370,16 @@ def _filter_key(key: str | None) -> bytes | None:
 
 
 def _mux_channel(channel) -> int:
-    ch = channel if type(channel) is int else int(channel)
+    if type(channel) is int:
+        ch = channel
+    else:
+        # An integer, or what stands for one (operator.index): int(1.9) would
+        # send on channel 1, one the caller never named.
+        try:
+            ch = operator.index(channel)
+        except TypeError:
+            raise BovnarArgumentError(
+                f"a mux channel is an int, not {type(channel).__name__}") from None
     # The channel crosses the FFI as a uint64_t, and ctypes wraps an
     # out-of-range int without a word: channel -1 was written as 2**64-1, and
     # the reader then reported a channel the producer never used.
@@ -416,10 +435,10 @@ def mux_load(data, *, max_message: int = 0, key: str | None = None) -> list:
             return False
     cb_msg = MUX_ON_MSG_FUNC(_on_msg)
 
+    kfilter = _filter_key(key)      # before the demux: it may refuse the key
     dm = lib.bvnr_demux_create(cb_msg, None, max_message)
     if not dm:
         raise MemoryError("bvnr_demux_create() returned NULL")
-    kfilter = _filter_key(key)
     if kfilter is not None and not lib.bvnr_demux_set_key(dm, kfilter):
         lib.bvnr_demux_destroy(dm)
         raise MemoryError("bvnr_demux_set_key() failed")
@@ -681,17 +700,23 @@ def _held_bytes(data) -> bytes:
     they are."""
     if isinstance(data, bytes):
         return data
-    if isinstance(data, (bytearray, memoryview)):
-        return bytes(data)
     if isinstance(data, str):
         return data.encode('utf-8')
-    raise BovnarArgumentError(
-        f"feed() takes bytes, bytearray or memoryview, not {type(data).__name__}")
+    try:
+        # Any bytes-like object: bytearray, memoryview, array.array, mmap, a
+        # NumPy array -- its bytes in memory order.
+        return memoryview(data).tobytes()
+    except TypeError:
+        raise BovnarArgumentError(
+            f"feed() takes a bytes-like object, not {type(data).__name__}") from None
 
 
-def _flags_255(max_file_size: int) -> BvnrReadFlags:
+def _flags_255(max_file_size: int, max_text_bytes: int = 0,
+               max_array_items: int = 0) -> BvnrReadFlags:
     flags = BvnrReadFlags()
     flags.max_file_size      = max_file_size
+    flags.max_text_bytes     = _read_limit('max_text_bytes', max_text_bytes)
+    flags.max_array_items    = _read_limit('max_array_items', max_array_items)
     flags.max_array_nesting  = 255
     flags.max_struct_nesting = 255
     return flags
@@ -715,8 +740,9 @@ class _Feed:
         return self
 
     def __next__(self):
-        if self._view is not None:
-            self._release()
+        if self._closed:
+            raise StopIteration
+        self._release()
         if self._queue:
             return self._queue.popleft()
         if self._failure is not None:
@@ -732,7 +758,7 @@ class _Feed:
         return None
 
     # -- memoryview lifetime -----------------------------------------------
-    def _hand_out(self, ptr: int, n: int) -> memoryview:
+    def _hand_out(self, ptr: int, n: int, keep=None) -> memoryview:
         # Read-only, as a view of the fed bytes is: the memory is the demux's.
         if not n:
             view = memoryview(b'')
@@ -740,24 +766,47 @@ class _Feed:
             mem = (ctypes.c_ubyte * n).from_address(ptr)
             # Whatever is made from the view (memoryview(view),
             # numpy.frombuffer(view)) keeps `mem` alive, and `mem` keeps the
-            # feed, so the C memory is not freed under it; the weak reference
-            # tells whether anything still points there.
+            # feed (and `keep`, the Python bytes the memory may lie in), so
+            # the memory is not freed under it; the weak reference tells
+            # whether anything still points there, and frees the C object of
+            # a feed closed meanwhile once nothing does.
             mem._bvnr_owner = self
-            self._view_mem = weakref.ref(mem)
+            mem._bvnr_keep = keep
+            self._view_mem = weakref.ref(mem, self._view_gone)
             view = memoryview(mem).toreadonly()
         self._view = view
         return view
 
-    def _view_in_use(self) -> bool:
-        """Release the last view; true when something made from it is alive."""
-        try:
-            self._view.release()
-        except BufferError:
-            return True
-        self._view = None
-        if self._view_mem is not None and self._view_mem() is not None:
-            return True
+    def _view_gone(self, ref) -> None:
+        # The memory of the last view is unreferenced now (weakref callback).
+        if ref is not self._view_mem:
+            return
         self._view_mem = None
+        if self._closed and self._view is None:
+            try:
+                self._destroy()
+            except Exception:                       # noqa: BLE001 (callback)
+                pass
+
+    def _view_in_use(self) -> bool:
+        """Release the last view; true while something made from it is
+        alive. The answer rests on the view's memory alone, so a refused call
+        is refused again until that buffer is gone."""
+        view = self._view
+        if view is not None:
+            # Whether or not it can be released, the feed holds it no longer:
+            # a view still exported is kept alive by its exports, and its
+            # memory then by it.
+            self._view = None
+            try:
+                view.release()
+            except BufferError:
+                return True
+        mem = self._view_mem
+        if mem is not None:
+            if mem() is not None:
+                return True
+            self._view_mem = None
         return False
 
     def _release(self) -> None:
@@ -787,12 +836,19 @@ class _Feed:
 
         While a buffer made from the last memoryview is still alive, the C
         object is released when that buffer goes, not now: the feed is closed
-        either way."""
+        either way, and iterates over nothing more."""
         if self._closed:
             return
+        if getattr(self, '_busy', False):
+            raise BovnarArgumentError(
+                f"{type(self).__name__}.close() from inside one of its own "
+                "callbacks")
         self._closed = True
         self._queue.clear()
-        if self._view is not None and self._view_in_use():
+        self._failure = None
+        # Nothing more is handed out; a view still alive keeps what it needs.
+        self._fed = None
+        if self._view_in_use():
             return
         self._destroy()
 
@@ -846,8 +902,18 @@ class DocumentFeed(_Feed):
     ``BovnarParseError`` for a document cut off part-way, as ``Reader`` does.
     Any other error raises from the ``feed()`` whose bytes hit it, with the
     position the reader reports, and the items that call had completed are
-    dropped. An exception from ``want_unit`` is re-raised unchanged. The keyword
-    options are those of :meth:`Reader.read_mem`.
+    dropped. An exception from ``want_unit`` is re-raised unchanged; it runs
+    inside the C call, so it may not close or feed this feed. The keyword
+    options are the reading options of :meth:`Reader.read_mem` (not its
+    callbacks: the items stand in for them). ``typed`` applies to
+    ``values=True``. One feed reads one document.
+
+    The text of a document is capped at 2147483647 bytes
+    (``TEXT_DATA_TOO_LONG``) and an array at as many items
+    (``TOO_MANY_ARRAY_ITEMS``) unless ``max_text_bytes`` / ``max_array_items``
+    say otherwise (``0`` is that default); for a document that does not end,
+    pass :data:`BVNR_NO_LIMIT`, and ``max_file_size`` where a cap still
+    matters.
     """
 
     def __init__(self, *,
@@ -860,15 +926,24 @@ class DocumentFeed(_Feed):
                  text_only: bool = False,
                  want_unit=None,
                  want_unit_allow_nonterminating: bool = False,
-                 max_conversion_length: int = 0) -> None:
+                 max_conversion_length: int = 0,
+                 max_text_bytes: int = 0,
+                 max_array_items: int = 0) -> None:
         super().__init__()
+        self._busy   = False
+        if typed and not values:
+            raise BovnarArgumentError("typed applies to values=True")
+        if not events and not values:
+            raise BovnarArgumentError(
+                "DocumentFeed needs events=True or values=True")
         self._reader = Reader()
         self._events = events
         self._parser = _top_level_parser(typed) if values else None
         self._flags, self._cb_refs = self._reader._build_flags(
             self._on_event, None, max_file_size, continue_on_error,
             strict_version, text_only, want_unit,
-            want_unit_allow_nonterminating, max_conversion_length)
+            want_unit_allow_nonterminating, max_conversion_length,
+            max_text_bytes=max_text_bytes, max_array_items=max_array_items)
         if not self._lib.bvnr_open_read_feed(self._reader._ptr, None,
                                              ctypes.byref(self._flags)):
             self._reader._raise_error()
@@ -906,15 +981,27 @@ class DocumentFeed(_Feed):
         self._check_open()
         buf = data if isinstance(data, bytes) else _held_bytes(data)
         queued = len(self._queue)
-        ok = self._lib.bvnr_read_feed(self._reader._ptr, buf, len(buf))
+        ok = self._run(self._lib.bvnr_read_feed, buf, len(buf))
         self._check(ok, queued)
         return self
+
+    def _run(self, fn, *args) -> bool:
+        # want_unit is the caller's code, run inside the C call: it must not
+        # close the feed (or its reader) or feed it again from there.
+        if self._busy:
+            raise BovnarArgumentError(
+                "DocumentFeed is in use by its own callback")
+        self._busy = self._reader._busy = True
+        try:
+            return fn(self._reader._ptr, *args)
+        finally:
+            self._busy = self._reader._busy = False
 
     def finish(self) -> 'DocumentFeed':
         """Declare the end of the document; raises if it is incomplete."""
         self._check_open()
         queued = len(self._queue)
-        ok = self._lib.bvnr_read_finish(self._reader._ptr)
+        ok = self._run(self._lib.bvnr_read_finish)
         self._finished = True
         self._check(ok, queued)
         return self
@@ -958,7 +1045,9 @@ class FrameFeed(_Feed):
       ``None`` for a failed document), each payload streamed into one reused
       reader as it arrives, so a frame is never held whole.
 
-    ``max_document_size`` is that of :func:`load_documents` (``0`` selects
+    ``max_text_bytes`` and ``max_array_items`` apply to each parsed document,
+    as for :class:`DocumentFeed`. ``max_document_size`` is that of
+    :func:`load_documents` (``0`` selects
     ``BVNR_DOC_DEFAULT_MAX``). A failed document (without
     ``continue_past_failed``) raises ``BovnarParseError`` with its own code, as
     there; a bad magic and a declared length over the cap raise it with
@@ -975,7 +1064,9 @@ class FrameFeed(_Feed):
                  typed: bool = False,
                  continue_past_failed: bool = False,
                  max_document_size: int = 0,
-                 view: bool = False) -> None:
+                 view: bool = False,
+                 max_text_bytes: int = 0,
+                 max_array_items: int = 0) -> None:
         super().__init__()
         self._fr     = None
         self._fed    = None
@@ -984,9 +1075,10 @@ class FrameFeed(_Feed):
         self._continue = continue_past_failed
         lib = self._lib
         if not parse:
-            if typed or continue_past_failed:
+            if typed or continue_past_failed or max_text_bytes or max_array_items:
                 raise BovnarArgumentError(
-                    "typed and continue_past_failed apply to parse=True")
+                    "typed, continue_past_failed, max_text_bytes and "
+                    "max_array_items apply to parse=True")
             self._fr = lib.bvnr_frame_reader_create_pull(max_document_size)
             if not self._fr:
                 raise MemoryError("bvnr_frame_reader_create_pull() returned NULL")
@@ -1024,7 +1116,8 @@ class FrameFeed(_Feed):
 
         self._cb_event = Reader._wrap_callback(on_event)
         self._cb_doc   = ON_DOCUMENT_FUNC(on_document)
-        flags = _flags_255(BVNR_FILESIZE_UNLIMITED)
+        flags = _flags_255(BVNR_FILESIZE_UNLIMITED, max_text_bytes,
+                           max_array_items)
         flags.on_verified       = self._cb_event
         flags.continue_on_error = False            # strict per-document parsing
         opts = BvnrDocStreamOpts()
@@ -1040,8 +1133,7 @@ class FrameFeed(_Feed):
         """Hand over the next piece of the frame stream and return the feed,
         iterating over the documents it completed."""
         self._check_open()
-        if self._view is not None:
-            self._release()
+        self._release()
         if not self._parse:
             if self._fed is not None:
                 raise BovnarArgumentError(
@@ -1057,20 +1149,26 @@ class FrameFeed(_Feed):
         ok = self._lib.bvnr_frame_reader_feed(self._fr, buf, len(buf))
         # The documents this feed completed before the stream's error come
         # out first; the iteration that reaches the error raises it. (An
-        # exception from a callback is not the stream's: it propagates now.)
-        try:
-            self._check_parse(ok)
-        except BovnarParseError as exc:
-            if self._failure is None:
-                self._failure = exc
+        # exception from a callback is not the stream's: it propagates now,
+        # whatever its class.)
+        self._raise_callback_exc()
+        if not ok:
+            try:
+                self._raise_error()
+            except BovnarParseError as exc:
+                if self._failure is None:
+                    self._failure = exc
         return self
 
-    def _check_parse(self, ok: bool) -> None:
+    def _raise_callback_exc(self) -> None:
         cb_state = getattr(self._cb_event, '_bvnr_state', None)
         for st in (cb_state, self._state):
             if st is not None and st.get('exc') is not None:
                 exc, st['exc'] = st['exc'], None
                 raise exc
+
+    def _check_parse(self, ok: bool) -> None:
+        self._raise_callback_exc()
         if not ok:
             self._raise_error()
 
@@ -1099,7 +1197,8 @@ class FrameFeed(_Feed):
         if rc == _NEXT_ITEM:
             n = self._len.value
             if self._as_view:
-                return self._hand_out(self._doc.value, n)
+                # A document whole in the fed bytes lies in them.
+                return self._hand_out(self._doc.value, n, keep=self._fed)
             return ctypes.string_at(self._doc.value, n) if n else b''
         self._fed = None
         if rc == _NEXT_NONE:
@@ -1109,8 +1208,7 @@ class FrameFeed(_Feed):
     def finish(self) -> 'FrameFeed':
         """Declare the end of the stream; raises if it stopped inside a frame."""
         self._check_open()
-        if self._view is not None:
-            self._release()
+        self._release()
         if self._fed is not None:
             raise BovnarArgumentError(
                 "the last feed has not been drained; iterate the FrameFeed to "
@@ -1161,7 +1259,9 @@ class DemuxFeed(_Feed):
     4096-channel limit and every error are those of :func:`mux_load`, raised
     as the same ``BovnarParseError`` codes, from the iteration that reaches
     them (the items before them come out first), or from ``finish()``.
-    ``max_file_size`` caps the document (``0``: no cap).
+    ``max_file_size`` caps the document (``0``: no cap); ``max_text_bytes``
+    and ``max_array_items`` are those of :class:`DocumentFeed`, for the values
+    around the stream.
 
     The fed bytes are referenced until the feed is drained (iterated until it
     stops), and feeding again before that raises ``BovnarArgumentError``. A
@@ -1171,12 +1271,14 @@ class DemuxFeed(_Feed):
     the copy and is valid ONLY until the next call on the feed (the next item,
     ``feed``, ``finish`` or ``close``). The feed releases it then, so a late use
     raises ``ValueError``; ``bytes(view)`` keeps a copy. A slice or a buffer
-    taken from it is not released with it and must not outlive it either; one
-    that holds an export makes the next call raise ``BovnarArgumentError``.
+    taken from a view of the demux's memory is not released with it: while
+    one is alive, the next call raises ``BovnarArgumentError`` (a view of the
+    fed bytes is kept alive by such a buffer itself, so it is never refused).
 
     ``finish()`` declares the end of the document and raises for one cut off
     part-way or for a message the stream's end cut short; the feed then
-    iterates over the closing items.
+    iterates over the closing items (after a message cut short as well: they
+    are queued before the error is raised).
     """
 
     def __init__(self, *,
@@ -1186,9 +1288,13 @@ class DemuxFeed(_Feed):
                  events: bool = False,
                  typed: bool = False,
                  view: bool = False,
-                 max_file_size: int = 0) -> None:
+                 max_file_size: int = 0,
+                 max_text_bytes: int = 0,
+                 max_array_items: int = 0) -> None:
         super().__init__()
         self._dm = None
+        if typed and not values:
+            raise BovnarArgumentError("typed applies to values=True")
         lib = self._lib
         dm = lib.bvnr_demux_create(MUX_ON_MSG_FUNC(), None, max_message)
         if not dm:
@@ -1197,7 +1303,8 @@ class DemuxFeed(_Feed):
         self._key = _filter_key(key)
         if self._key is not None and not lib.bvnr_demux_set_key(dm, self._key):
             raise MemoryError("bvnr_demux_set_key() failed")
-        if not lib.bvnr_demux_open_feed(dm, ctypes.byref(_flags_255(max_file_size)),
+        flags = _flags_255(max_file_size, max_text_bytes, max_array_items)
+        if not lib.bvnr_demux_open_feed(dm, ctypes.byref(flags),
                                         values or events):
             raise MemoryError("bvnr_demux_open_feed() failed")
         self._fed     = None
@@ -1216,8 +1323,7 @@ class DemuxFeed(_Feed):
         iterating over what it completed. Drain it before feeding again."""
         if self._closed or self._finished:
             self._check_open()
-        if self._view is not None:
-            self._release()
+        self._release()
         if self._fed is not None or self._queue:
             raise BovnarArgumentError(
                 "the previous feed has not been drained; iterate the DemuxFeed "
@@ -1234,7 +1340,7 @@ class DemuxFeed(_Feed):
 
     def __next__(self):
         # The per-message path, kept flat: everything else is _resume's.
-        if self._view is not None:
+        if self._view is not None or self._view_mem is not None:
             self._release()
         if self._queue:
             return self._queue.popleft()
@@ -1328,8 +1434,7 @@ class DemuxFeed(_Feed):
         """Declare the end of the document and return the feed, iterating over
         the closing items; raises if the document or a message is incomplete."""
         self._check_open()
-        if self._view is not None:
-            self._release()
+        self._release()
         if self._fed is not None or self._queue:
             raise BovnarArgumentError(
                 "the last feed has not been drained; iterate the DemuxFeed to "
@@ -1338,16 +1443,20 @@ class DemuxFeed(_Feed):
         ok = lib.bvnr_demux_finish(self._dm)
         self._finished = True
         err = lib.bvnr_demux_error(self._dm)
+        if ok:
+            # The document read to its end: its closing events are drained
+            # now, even when a message was cut short (that is the demux's
+            # error, not the document's), so they are queued before the
+            # error is raised, as the Rust Demux still hands them out. A
+            # message cannot complete at the finish, so none is a view.
+            self._fed, self._fed_at = b'', 0
+            while (it := self._resume(self._next(self._dm, self._item_ref),
+                                      False)) is not None:
+                self._queue.append(it)
         if not ok or err != int(ErrorCode.NONE):
             if err == int(ErrorCode.NONE):
                 err = int(ErrorCode.GOT_INCOMPLETE_BVNR_STREAM)
             raise _demux_error(lib, err, lib.bvnr_demux_get_reader(self._dm))
-        # The closing events are drained now, while the demux is known good;
-        # a message cannot complete at the finish, so none is held as a view.
-        self._fed, self._fed_at = b'', 0
-        while (it := self._resume(self._next(self._dm, self._item_ref),
-                                  False)) is not None:
-            self._queue.append(it)
         return self
 
     def _destroy(self) -> None:
@@ -1416,6 +1525,8 @@ class MuxWriter:
         payload of any size is split over octet chunks as needed."""
         if self._closed:
             raise BovnarArgumentError("MuxWriter has been closed")
+        if self._w._stream.busy:
+            self._w._check_not_in_sink()
         ch = _mux_channel(channel)
         data = payload if type(payload) is bytes else _as_bytes(payload)
         if not self._send(self._ptr, ch, data, len(data)):
@@ -1440,9 +1551,11 @@ class MuxWriter:
 
     def close(self) -> None:
         """End the stream and the document, flush, and release the writer.
-        After a failure it only releases it. Safe to call twice."""
+        After a failure it only releases it. Safe to call twice; refused from
+        inside the object's own ``write`` or ``flush``."""
         if self._closed:
             return
+        self._w._check_not_in_sink()
         self._closed = True
         w = self._w
         try:
@@ -1454,6 +1567,8 @@ class MuxWriter:
             self._release()
 
     def _release(self) -> None:
+        if self._w is not None:
+            self._w._check_not_in_sink()
         self._closed = True
         if self._w is not None:
             self._w.destroy()

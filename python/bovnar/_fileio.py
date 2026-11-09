@@ -81,7 +81,8 @@ class PullSource:
     else ``readinto``, else ``read``. A short read is fine; an empty one is
     end of input, as the C pull contract has it. A non-blocking object with
     nothing to read has no way to say "later" through a pull source, so that is
-    an error here: feed such a transport to a DocumentFeed or DemuxFeed.
+    an error here: feed such a transport to a DocumentFeed, FrameFeed or
+    DemuxFeed.
     """
 
     __slots__ = ('handle', 'exc', '_cb')
@@ -110,7 +111,7 @@ class PullSource:
                     raise BlockingIOError(
                         "the source is non-blocking and has no data yet; a "
                         "pull source cannot wait for it -- feed the bytes to "
-                        "a DocumentFeed or DemuxFeed instead")
+                        "a DocumentFeed, FrameFeed or DemuxFeed instead")
                 if type(n) is not int or not 0 <= n <= want:
                     raise BovnarArgumentError(
                         f"{type(obj).__name__} reported reading {n!r} bytes "
@@ -138,11 +139,14 @@ class PushSink:
     the object has one, runs at ``Writer.flush()`` and ``Writer.finish()``.
     """
 
-    __slots__ = ('handle', 'exc', '_push', '_flush')
+    __slots__ = ('handle', 'exc', 'busy', '_push', '_flush')
 
     def __init__(self, obj) -> None:
         _refuse_text(obj)
         self.exc = None
+        # True while the writer is inside the object's write/flush: the
+        # writer must not be destroyed from there (Writer.destroy refuses).
+        self.busy = False
         sendall = getattr(obj, 'sendall', None)
         write = getattr(obj, 'write', None)
         flush = getattr(obj, 'flush', None)
@@ -153,8 +157,22 @@ class PushSink:
             raise BovnarArgumentError(
                 f"cannot write to {type(obj).__name__}: it has no sendall or "
                 f"write")
+        # A non-blocking socket takes part of a buffer and then raises
+        # BlockingIOError: the bytes already sent cannot be taken back, so the
+        # stream would be cut mid-chunk. A writer needs a blocking transport.
+        gettimeout = getattr(obj, 'gettimeout', None)
+        if sendall is not None and gettimeout is not None:
+            try:
+                nonblocking = gettimeout() == 0.0
+            except Exception:                       # noqa: BLE001 (duck-typed)
+                nonblocking = False
+            if nonblocking:
+                raise BovnarArgumentError(
+                    "the socket is non-blocking; a writer needs a blocking "
+                    "socket (sock.setblocking(True), or a timeout)")
 
         def push(_sink, buf, n):
+            self.busy = True
             try:
                 data = ctypes.string_at(buf, n)
                 if sendall is not None:
@@ -180,8 +198,11 @@ class PushSink:
                 if self.exc is None:
                     self.exc = exc
                 return False
+            finally:
+                self.busy = False
 
         def do_flush(_sink):
+            self.busy = True
             try:
                 flush()
                 return True
@@ -189,6 +210,8 @@ class PushSink:
                 if self.exc is None:
                     self.exc = exc
                 return False
+            finally:
+                self.busy = False
 
         self._push = PUSH_FUNC(push)
         self._flush = FLUSH_FUNC(do_flush) if flush is not None else FLUSH_FUNC()

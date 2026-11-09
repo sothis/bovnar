@@ -185,8 +185,11 @@ BVN_API bool bvnr_doc_stream_read_ex(
  * opts->flags, the same on_document calls, the same continue_past_failed and
  * max_document_size policy (opts may be NULL: validate only). The payload is
  * streamed into one reused push-fed reader (bvnr_open_read_feed) as it arrives,
- * so a frame is never buffered whole, however large. opts and *opts->flags are
- * copied.
+ * so a frame is never buffered whole, however large. One consequence: the
+ * events of a document whose frame the stream cuts off have been delivered up
+ * to the cut (without its ev_stream_end or an on_document call), where
+ * bvnr_doc_stream_read, which reads a frame whole first, delivers none. opts
+ * and *opts->flags are copied.
  *
  * bvnr_frame_reader_create_pull(max_document_size) hands documents out instead,
  * as bytes, through bvnr_frame_reader_next; the caller parses them as it likes.
@@ -215,7 +218,8 @@ BVN_API bool bvnr_doc_stream_read_ex(
  * bvnr_frame_reader_finish declares end of input: true on a frame boundary,
  * false with error_got_incomplete_bvnr_stream inside a header or a payload (a
  * cut-off document is not reported to on_document, as with
- * bvnr_doc_stream_read), false if the stream had already failed. In pull mode
+ * bvnr_doc_stream_read, though in parse mode its events up to the cut have
+ * been delivered), false if the stream had already failed. In pull mode
  * it refuses, changing nothing, while fed bytes are left undrained.
  *
  * bvnr_frame_reader_count is the number of documents seen (parsed or handed
@@ -306,8 +310,9 @@ typedef struct bvnr_demux_s bvnr_demux_t;
  * BVNR_MUX_DEFAULT_MAX); a larger declared length is refused with
  * error_value_out_of_range.
  *
- * The demultiplexer owns one reassembly buffer per channel it has seen; each
- * buffer grows to that channel's largest message and is retained for reuse until
+ * The demultiplexer owns one reassembly buffer per channel it has seen; a
+ * message that lies whole in one chunk never touches it, so each buffer grows
+ * to that channel's largest message spanning chunks and is retained for reuse until
  * bvnr_demux_destroy, so steady-state memory is the sum of per-channel high-water
  * marks (bounded by 4096 channels). Channels are not reclaimed individually.
  *
@@ -316,7 +321,9 @@ typedef struct bvnr_demux_s bvnr_demux_t;
  * bvnr_demux_error latches error_octet_stream_out_of_sync -- the demux has lost
  * track of the stream, even though the wire framing was well formed. Since
  * channels are never reclaimed, the count is of DISTINCT channel ids seen over
- * the whole stream, not of channels live at any one moment. */
+ * the whole stream, not of channels live at any one moment. A push-fed demux
+ * opened again for the next document (bvnr_demux_open_feed) starts a new
+ * stream, whose ids count afresh. */
 BVN_API bvnr_demux_t* bvnr_demux_create(bvnr_mux_on_msg_fn on_message,
 	void* userdata, uint64_t max_message);
 BVN_API void bvnr_demux_destroy(bvnr_demux_t* dm);
@@ -361,8 +368,9 @@ BVN_API error_code_t bvnr_demux_error(const bvnr_demux_t* dm);
  * every error code are those of bvnr_demux_on_event; the result is the same as
  * installing it on a reader of the whole buffer.
  *
- * bvnr_demux_open_feed starts a document (call it again for the next one; the
- * channels and their buffers are kept, the error and all progress reset).
+ * bvnr_demux_open_feed starts a document (call it again for the next one: the
+ * channel buffers are kept; the channel ids, and with them the 4096-channel
+ * count, the error and all progress are reset).
  * `flags` is copied: its limits and callbacks apply to the document, and its
  * on_verified, if any, sees EVERY event -- the values before and after the mux
  * stream as well as the stream's chunks -- before the demux does, so a stream
@@ -382,8 +390,10 @@ BVN_API error_code_t bvnr_demux_error(const bvnr_demux_t* dm);
  *
  *   BVNR_NEXT_MESSAGE  item->channel, item->data, item->length: a message. One
  *                      that lies whole in the fed buffer is handed out from it
- *                      without a copy; one split across chunks or feeds is
- *                      reassembled in the channel's buffer.
+ *                      without a copy, one whole in a chunk that arrived
+ *                      split across feeds from the reader's chunk buffer, and
+ *                      one split across chunks is reassembled in the
+ *                      channel's buffer.
  *   BVNR_NEXT_EVENT    item->event, item->value: a document event (only when
  *                      opened with deliver_events). Every verified event except
  *                      the mux stream's chunks, in document order and in order

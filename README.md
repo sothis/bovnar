@@ -580,6 +580,9 @@ every registered test, and then sweeps the fuzz harnesses:
 | `bvnr_write_read_roundtrip_test` | Writer output re-read by the reader, value for value |
 | `bvnr_socketpair_roundtrip_test` | Full round-trip over a POSIX socketpair |
 | `bvnr_stream_test` | Framing, multiplexing, and document-in-document streaming |
+| `bvnr_feed_test` | The push-fed reader, frame reader and demux against the batch functions, input cut at every byte; callback sources and sinks; `bvnr_write_flush` |
+| `bvnr_stream_vectors_test` | The shared streaming vectors (`tests/stream_vectors/`) through every C reader and writer; `bvnr_stream_vectors_fresh` checks them against their generator |
+| `bvnr_alloc_test` | No allocation per message on the streaming hot paths |
 | `bvnr_concurrency_test` | Independent readers and writers driven from several threads |
 | `bvnr_dom_test` | DOM builder and traversal |
 | `bvnr_si_test` | SI/IEC unit parsing and formatting |
@@ -601,11 +604,11 @@ every registered test, and then sweeps the fuzz harnesses:
 | `bvnr_float_fix_dec_test` | Fixed and decimal float modes |
 | `bvnr_datetime_test` | Datetime parsing, epochs, ISO-8601 literals, and Gregorian conversions |
 | `bvnr_high_severity_test` | Robustness under malformed input |
-| `bvnr_conformance` | 470-case conformance suite — self-test plus `--iut` adapter mode |
-| `bvnr_fuzz_test --harness reader\|dom\|utils` | Randomised fuzzing of reader, DOM, and utils |
+| `bvnr_conformance` | 470-case conformance suite — self-test, `--feed` (every case fed in pieces) and `--iut` adapter mode |
+| `bvnr_fuzz_test --harness reader\|dom\|utils\|feed` | Randomised fuzzing of reader, DOM, utils and the push-fed readers |
 | `bvnr_fuzz_writer_test` | Randomised fuzzing of the serialiser |
 
-CTest additionally runs every file in `examples/` through `bovnar events` and `bovnar validate` as smoke tests. Label filters narrow the run, e.g. `ctest -L unit`, `ctest -L conformance`, `ctest -L fuzz_deep`, or `ctest -L cli`.
+CTest additionally runs every file in `examples/` through `bovnar events` and `bovnar validate` as smoke tests, and the streaming vectors through `bovnar mux list` and `frames list` (`bvnr_cli_stream_vectors`). Label filters narrow the run, e.g. `ctest -L unit`, `ctest -L conformance`, `ctest -L fuzz_deep`, or `ctest -L cli`.
 
 ### Python tests
 

@@ -516,3 +516,20 @@ fn test_reader_twins_refuse_input_over_the_cap_like_the_in_memory_functions() {
     );
     assert_eq!(stream::mux_load_reader(&muxed[..], 3, None), mem);
 }
+
+#[test]
+fn test_a_key_with_nul_is_an_argument_error_in_every_writer() {
+    // It used to reach the C call as a failed CString and come back as
+    // Error::Write with code 0 ("error_none").
+    let msgs: &[(u64, &[u8])] = &[(1, b"x")];
+    let mut sink = Vec::new();
+    for r in [
+        stream::mux_dump(msgs, "a\0b").map(drop),
+        stream::mux_dump_to(msgs, "a\0b", &mut sink),
+        stream::embed_document(b".a = 1;", "a\0b", false).map(drop),
+        stream::embed_document_to(b".a = 1;", "a\0b", false, &mut sink),
+    ] {
+        assert!(matches!(r, Err(Error::Argument { .. })), "{r:?}");
+    }
+    assert!(sink.is_empty());
+}

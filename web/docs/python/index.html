@@ -138,6 +138,7 @@ the C library; <code>import bovnar</code> itself never loads it.</p>
 <li>17.2 <a href="#172-bvnrwriteflags-layout"><code>BvnrWriteFlags</code> layout</a></li>
 <li>17.3 <a href="#173-write_string-behaviour"><code>write_string</code> behaviour</a></li>
 <li>17.4 <a href="#174-_resolve_unit-default"><code>_resolve_unit</code> default</a></li>
+<li>17.5 <a href="#175-signals-inside-a-callback">Signals inside a callback</a></li>
 </ul>
 </li>
 <li><a href="#18-baseunit-enum"><code>BaseUnit</code> enum</a></li>
@@ -595,10 +596,21 @@ not kept, so memory stays flat:</p>
 <p>A scalar, a struct or an octet stream is complete at its end; an array at the
 next key or the end of the document, because a further <code>/[…]</code> row would extend
 it. An octet stream in a <code>DocumentFeed</code> is gathered whole before it is handed
-over, so an endless one belongs in a <code>DemuxFeed</code> or is read by its events.
-<code>DocumentFeed</code> takes the options of <code>Reader.read_mem</code> (<code>continue_on_error</code>,
-<code>want_unit</code>, <code>max_file_size</code>, …), and its <code>typed=True</code> gives <code>Quantity</code>
-values as <code>loads(typed=True)</code> does.</p>
+over, so an endless one belongs in a <code>DemuxFeed</code> or is read by its events. The
+text of a fed document is capped as <code>Reader</code>'s is, at 2 147 483 647 bytes
+(<code>TEXT_DATA_TOO_LONG</code>, doc/10 §1), and an array at as many items: pass
+<code>max_text_bytes=stream.BVNR_NO_LIMIT</code> (and <code>max_array_items</code>) for a document
+that does not end. <code>DemuxFeed</code> and a parsing <code>FrameFeed</code> take both as well.
+<code>DocumentFeed</code> takes the reading options of <code>Reader.read_mem</code>
+(<code>continue_on_error</code>, <code>strict_version</code>, <code>text_only</code>, <code>want_unit</code>,
+<code>want_unit_allow_nonterminating</code>, <code>max_file_size</code>, <code>max_conversion_length</code>,
+<code>max_text_bytes</code>, <code>max_array_items</code>),
+not its callbacks, which the feed's
+items stand in for; with <code>values=True</code>, <code>typed=True</code> gives <code>Quantity</code> values as
+<code>loads(typed=True)</code> does (<code>typed</code> without <code>values</code>, or neither <code>events</code> nor
+<code>values</code>, is refused). A <code>want_unit</code> callback runs inside the C call, so it may
+not close the feed or feed it again (<code>BovnarArgumentError</code>). One feed reads one
+document: make a new one for the next.</p>
 <div class="codehilite"><pre><span></span><code><span class="n">frames</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">FrameFeed</span><span class="p">(</span><span class="n">parse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">blob</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">dump_documents</span><span class="p">([{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span> <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">}])</span>
 <span class="n">docs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">frames</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="n">blob</span><span class="p">[:</span><span class="mi">30</span><span class="p">]))</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">frames</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="n">blob</span><span class="p">[</span><span class="mi">30</span><span class="p">:]))</span>
@@ -622,9 +634,12 @@ raises <code>ValueError</code> rather than reading memory that has been reused. 
 must be kept with <code>bytes(view)</code>. A buffer made from the view —
 <code>memoryview(view)</code>, a slice of it, <code>numpy.frombuffer(view)</code>, a held export — is
 not released with it, so while one is alive the next call raises
-<code>BovnarArgumentError</code> and leaves the stream as it was; drop it and the call can
-be repeated. Such a buffer also keeps the feed's C memory alive: <code>close()</code> then
-closes the feed but frees that memory only when the buffer goes.</p>
+<code>BovnarArgumentError</code> and leaves the stream as it was, as often as it is
+repeated; drop the buffer and the call goes ahead. Such a buffer also keeps the
+feed's C memory alive: <code>close()</code> then closes the feed at once (it hands out
+nothing more) but frees that memory only when the buffer goes. A message that
+lay whole in the fed bytes is a view of those <code>bytes</code>, which a buffer made from
+it keeps alive by itself, so that one never makes a call refuse.</p>
 <div class="codehilite"><pre><span></span><code><span class="n">dm</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">DemuxFeed</span><span class="p">(</span><span class="n">view</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">it</span> <span class="o">=</span> <span class="n">dm</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="n">stream</span><span class="o">.</span><span class="n">mux_dump</span><span class="p">([(</span><span class="mi">1</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;abc&quot;</span><span class="p">),</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;def&quot;</span><span class="p">)]))</span>
 <span class="n">first</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">it</span><span class="p">)</span>
@@ -774,7 +789,11 @@ object's <code>flush()</code> follows each document. A frame stream has no termi
 <span class="n">frames</span><span class="o">.</span><span class="n">count</span>                            <span class="c1"># → 2</span>
 </code></pre></div>
 
-<p>An exception the object raises (a closed socket, a full disk) comes out of the
+<p>The object has to be blocking: a non-blocking socket is refused when the
+writer is made, since one that took part of a buffer and then raised
+<code>BlockingIOError</code> would leave the stream cut mid-chunk. (A socket with a
+timeout is accepted; a timeout fails the writer as any other exception does.)
+An exception the object raises (a closed socket, a full disk) comes out of the
 call that pushed — the constructor, <code>send</code>, <code>write</code>, <code>flush</code> or <code>close</code> —
 unchanged. The writer has failed then: <code>MuxWriter.close()</code> only releases it,
 and a <code>FrameWriter</code>, which may have written half a frame, refuses further
@@ -784,7 +803,7 @@ stream either, so a reader sees it cut off rather than complete.
 value by value.</p>
 <p><strong>What it costs.</strong> Measured with <code>python/bench/bench_stream.py</code> on the machine
 of §4.7, into a socket-like object whose <code>sendall</code> takes the bytes, per
-message, median of five runs:</p>
+message, the median over its runs:</p>
 <table>
 <thead>
 <tr>
@@ -1762,7 +1781,7 @@ nested parse, and close the first one after its read returns.</p>
 <h3 id="112-read_mem">11.2 <code>read_mem</code></h3>
 <p><code>read_mem(data, *, on_verified, on_unverified, max_file_size, continue_on_error,
 strict_version, text_only, want_unit, want_unit_allow_nonterminating,
-max_conversion_length)</code></p>
+max_conversion_length, max_text_bytes, max_array_items)</code></p>
 <p>Parse BVNR from a <code>bytes</code>, <code>bytearray</code>, or <code>memoryview</code> object.</p>
 <table>
 <thead>
@@ -1833,6 +1852,18 @@ max_conversion_length)</code></p>
 <td><code>int</code></td>
 <td><code>0</code> (default 1024)</td>
 <td>Longest converted text a conversion may produce, in characters; a longer exact result aborts with <code>error_value_out_of_range</code></td>
+</tr>
+<tr>
+<td><code>max_text_bytes</code></td>
+<td><code>int</code></td>
+<td><code>0</code> (default 2147483647)</td>
+<td>Most bytes of text in the document (octet-stream payloads not counted); past it the read fails with <code>TEXT_DATA_TOO_LONG</code>. <code>stream.BVNR_NO_LIMIT</code> (2**64 − 1) lifts it</td>
+</tr>
+<tr>
+<td><code>max_array_items</code></td>
+<td><code>int</code></td>
+<td><code>0</code> (default 2147483647)</td>
+<td>Most items in one array; past it the read fails with <code>TOO_MANY_ARRAY_ITEMS</code>. <code>stream.BVNR_NO_LIMIT</code> lifts it</td>
 </tr>
 </tbody>
 </table>
@@ -2557,6 +2588,19 @@ matching the C convenience helpers. No unit annotation is emitted in this
 case. Passing <code>unit_si_base</code> or <code>unit_iec_base</code> produces a unit with one
 component; the <code>no_unit</code> keyword is only produced when the
 caller explicitly constructs a dimensionless <code>ValueUnit</code> with <code>BaseUnit.NONE</code>.</p>
+<h3 id="175-signals-inside-a-callback">17.5 Signals inside a callback</h3>
+<p>Where C calls back into Python — the event callbacks of <code>Reader</code>, <code>mux_load</code>'s
+per-message callback, <code>load_documents</code>, a parsing <code>FrameFeed</code>, the sources and
+sinks of sockets and file objects — every exception the callback raises is kept,
+the callback answers false so that C stops, and the exception is re-raised once
+the C call has returned. One window is beyond the binding's reach: an exception
+raised by a signal handler (<code>KeyboardInterrupt</code> from Ctrl-C) at the very entry
+of a callback, before its body runs. ctypes reports it as "Exception ignored"
+and the call goes on as if the callback had succeeded, so the interrupt is lost
+and the callback's work for that event (a message, a pushed buffer) is missing.
+Where an interrupt must stop the work reliably, use the pull-style feeds
+(<code>DemuxFeed</code>, an unparsed <code>FrameFeed</code>), which make no Python callback per item,
+or have the signal handler set a flag the loop checks.</p>
 <hr />
 <h2 id="18-baseunit-enum">18. <code>BaseUnit</code> enum</h2>
 <p>The <code>BaseUnit</code> enum mirrors the C <code>value_base_unit_e</code> for the two blocks of

@@ -972,7 +972,7 @@ is one of:</p>
 </tr>
 <tr>
 <td><code>write_message_to(&amp;mut out, channel, payload)</code></td>
-<td>the whole message to any <code>std::io::Write</code>, one vectored write per chunk, nothing allocated; <code>out</code> is not flushed</td>
+<td>the whole message to any <code>std::io::Write</code>, one vectored write per chunk, nothing allocated; <code>out</code> is not flushed, and must block (a failure part-way, <code>WouldBlock</code> included, leaves the stream broken; for a non-blocking socket write <code>encode</code>'s parts yourself)</td>
 </tr>
 </tbody>
 </table>
@@ -1158,33 +1158,33 @@ message spans seven chunks.</p>
 <tbody>
 <tr>
 <td>150 B</td>
-<td>8.6 ns (8.4)</td>
-<td>28 ns (27)</td>
-<td>14 ns (12)</td>
-<td>15 ns (14)</td>
-<td>8.9 ns (8.1)</td>
-<td>274 ns (268)</td>
-<td>150 ns (146)</td>
+<td>8.4 ns (8.3)</td>
+<td>26 ns (25)</td>
+<td>12 ns (12)</td>
+<td>13 ns (13)</td>
+<td>8.2 ns (8.1)</td>
+<td>244 ns (242)</td>
+<td>123 ns (122)</td>
 </tr>
 <tr>
 <td>30 KB</td>
-<td>8.9 ns (8.6)</td>
-<td>1.6 µs (1.5)</td>
-<td>13 ns (13)</td>
-<td>15 ns (14)</td>
-<td>8.9 ns (8.8)</td>
-<td>8.8 µs (8.3)</td>
-<td>7.2 µs (5.2)</td>
+<td>8.6 ns (8.6)</td>
+<td>1.5 µs (1.5)</td>
+<td>12 ns (12)</td>
+<td>14 ns (14)</td>
+<td>8.8 ns (8.8)</td>
+<td>8.4 µs (8.2)</td>
+<td>2.7 µs (2.5)</td>
 </tr>
 <tr>
 <td>400 KB</td>
-<td>39 ns (38)</td>
-<td>24 µs (22)</td>
+<td>37 ns (37)</td>
+<td>22 µs (21)</td>
 <td>55 ns (55)</td>
-<td>57 ns (56)</td>
-<td>27 µs (23)</td>
-<td>118 µs (110)</td>
-<td>110 µs (86)</td>
+<td>56 ns (56)</td>
+<td>25 µs (23)</td>
+<td>110 µs (110)</td>
+<td>76 µs (70)</td>
 </tr>
 </tbody>
 </table>
@@ -1193,12 +1193,13 @@ message spans seven chunks.</p>
 <code>next_item</code>, a look at the channel and the first payload byte, and the
 decision, the forwarded chunks borrowed from the input; <em>read</em> is <code>read</code>, which gathers (copies) a message that spans
 chunks, so the 400 KB one; <em>mux_dump</em> and <em>mux_load</em> are the batch functions
-through the C library, for comparison. Counted in instructions, which the
+through the C library, for comparison (<code>mux_load</code> copies every message into
+the <code>Vec</code> it returns, which the C demux alone does not: doc/10 §8.4). Counted in instructions, which the
 clock does not move, a 150-byte message is about 145 to write, 120 to read and
 140 to peek at and skip, the benchmark's loop included. From a stream much
 larger than the cache, every chunk header a 400 KB message has is a cache
-miss, which puts peek and forward at about 145 ns for it, and small messages
-are read as fast as memory delivers them: about 25 ns to read a 150-byte one
+miss, which puts peek and forward at about 130 ns for it, and small messages
+are read as fast as memory delivers them: about 24 ns to read a 150-byte one
 and 29 ns to peek at and skip it. The other figures move little.</p>
 <h3 id="49-live-documents-through-c-bovnarlive">4.9 Live documents through C (<code>bovnar::live</code>)</h3>
 <p>The codec of <a href="#48-live-streams-the-framing-codec-bovnarcodec">§4.8</a> reads the
@@ -1267,7 +1268,11 @@ error ends the document, and every later <code>feed</code> or <code>finish</code
 bytes complete, those before an error included: a scalar, a struct or an octet
 stream with its last event, an array (which a <code>/</code> may still continue) with the
 event after it. A key assigned twice comes twice, and nothing is kept once it is
-handed out, so an endless document is read in constant memory.</p>
+handed out, so an endless document is read in constant memory. Its <em>text</em> is
+capped by the library's default of 2 147 483 647 bytes per document
+(<code>error_text_data_too_long</code>, doc/10 §1), and each array at as many items: set
+<code>ReadOptions::max_text_bytes</code> (and <code>max_array_items</code>) to <code>u64::MAX</code> for a
+document that does not end, and <code>max_file_size</code> where a cap still matters.</p>
 <div class="codehilite"><pre><span></span><code><span class="k">use</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">live</span><span class="p">::</span><span class="n">ValueFeed</span><span class="p">;</span>
 <span class="k">use</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::{</span><span class="n">ReadOptions</span><span class="p">,</span><span class="w"> </span><span class="n">Value</span><span class="p">};</span>
 
@@ -1328,7 +1333,9 @@ the stream's chunks, in document order: the metadata before the stream comes
 out before its first message, and a <code>ValueBuilder</code> makes values of it. After
 <code>finish()</code>, <code>next</code> on an empty slice hands out the closing events (more input is
 refused with an <code>Error::Argument</code>); <code>reset()</code>
-starts the next document, keeping the channels and their buffers.</p>
+starts the next document: the channel buffers are kept, the channel ids (and
+with them the 4096-channel count) start afresh, as <code>codec::MuxReader::reset</code>
+does.</p>
 <div class="codehilite"><pre><span></span><code><span class="k">use</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">live</span><span class="p">::{</span><span class="n">Demux</span><span class="p">,</span><span class="w"> </span><span class="n">DemuxItem</span><span class="p">,</span><span class="w"> </span><span class="n">DemuxOptions</span><span class="p">,</span><span class="w"> </span><span class="n">ValueBuilder</span><span class="p">};</span>
 <span class="k">use</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::</span><span class="n">Writer</span><span class="p">;</span>
 
@@ -2587,6 +2594,18 @@ rest with <code>..ReadOptions::default()</code>.</p>
 <td>Hard limit on bytes consumed; past it the read fails with <code>file_too_long</code></td>
 </tr>
 <tr>
+<td><code>max_text_bytes</code></td>
+<td><code>u64</code></td>
+<td><code>0</code> (default 2 147 483 647)</td>
+<td>Most bytes of text in a document (octet-stream payloads not counted); past it the read fails with <code>text_data_too_long</code>. <code>u64::MAX</code> lifts it, for an endless text document</td>
+</tr>
+<tr>
+<td><code>max_array_items</code></td>
+<td><code>u64</code></td>
+<td><code>0</code> (default 2 147 483 647)</td>
+<td>Most items in one array; past it the read fails with <code>too_many_array_items</code>. <code>u64::MAX</code> lifts it</td>
+</tr>
+<tr>
 <td><code>continue_on_error</code></td>
 <td><code>bool</code></td>
 <td><code>false</code></td>
@@ -2618,7 +2637,10 @@ rest with <code>..ReadOptions::default()</code>.</p>
 </tr>
 </tbody>
 </table>
-<p><code>max_file_size</code> is 0 by default, which means no cap; set it where a cap matters.</p>
+<p><code>max_file_size</code> is 0 by default, which means no cap; set it where a cap matters.
+<code>max_text_bytes</code> and <code>max_array_items</code> are 0 by default too, but 0 selects the
+library's finite default there, as in C (<code>bvnr_read_flags_t</code>), so an untrusted
+document stays bounded unless a caller lifts the cap.</p>
 <h3 id="104-eventdata-and-eventpayload">10.4 <code>EventData</code> and <code>EventPayload</code></h3>
 <p><code>EventData&lt;'a&gt;</code> — the table in <a href="#42-sax-style-streaming-reader">§4.2</a> — is the
 borrowed view a callback receives. <code>EventPayload</code> is the owned copy: the same

@@ -168,6 +168,15 @@ class EventPayload:
     def __repr__(self) -> str:
         return f"EventPayload(event={self.event.name}, text={self.text!r})"
 
+def _read_limit(name: str, value) -> int:
+    """A max_text_bytes / max_array_items value: an int that fits the C
+    uint64_t (ctypes would wrap a negative one or cut a large one silently)."""
+    if type(value) is not int or not 0 <= value < (1 << 64):
+        raise BovnarArgumentError(
+            f"{name} must be an int from 0 to 2**64 - 1, not {value!r}")
+    return value
+
+
 class Reader:
 
 
@@ -241,12 +250,19 @@ class Reader:
                      text_only: bool = False,
                      want_unit=None,
                      want_unit_allow_nonterminating: bool = False,
-                     max_conversion_length: int = 0) -> tuple:
+                     max_conversion_length: int = 0,
+                     *,
+                     max_text_bytes: int = 0,
+                     max_array_items: int = 0) -> tuple:
 
         flags    = BvnrReadFlags()
         cb_refs  = []
 
         flags.max_file_size = max_file_size
+        # 0 selects the library's default of 2147483647 for both, as in C; an
+        # endless text document needs max_text_bytes lifted (BVNR_NO_LIMIT).
+        flags.max_text_bytes  = _read_limit('max_text_bytes', max_text_bytes)
+        flags.max_array_items = _read_limit('max_array_items', max_array_items)
         # Match the nesting limit used by the CLI, the DOM builder and stream.py
         # (the uint8_t hard cap, 255) rather than the reader's bare 64 default,
         # so loads()/read_mem accept the same documents those paths do. Leaving
@@ -428,7 +444,9 @@ class Reader:
                  text_only: bool = False,
                  want_unit: Callable | None = None,
                  want_unit_allow_nonterminating: bool = False,
-                 max_conversion_length: int = 0) -> None:
+                 max_conversion_length: int = 0,
+                 max_text_bytes: int = 0,
+                 max_array_items: int = 0) -> None:
 
         self._check_open()
         self._check_not_busy()
@@ -440,7 +458,8 @@ class Reader:
         flags, cb_refs = self._build_flags(
             on_verified, on_unverified, max_file_size, continue_on_error,
             strict_version, text_only, want_unit,
-            want_unit_allow_nonterminating, max_conversion_length
+            want_unit_allow_nonterminating, max_conversion_length,
+            max_text_bytes=max_text_bytes, max_array_items=max_array_items
         )
 
         buf = (ctypes.c_char * len(data)).from_buffer_copy(data)
@@ -475,7 +494,9 @@ class Reader:
                 text_only: bool = False,
                 want_unit: Callable | None = None,
                 want_unit_allow_nonterminating: bool = False,
-                max_conversion_length: int = 0) -> None:
+                max_conversion_length: int = 0,
+                max_text_bytes: int = 0,
+                max_array_items: int = 0) -> None:
 
         self._check_open()
         self._check_not_busy()
@@ -485,7 +506,8 @@ class Reader:
         flags, cb_refs = self._build_flags(
             on_verified, on_unverified, max_file_size, continue_on_error,
             strict_version, text_only, want_unit,
-            want_unit_allow_nonterminating, max_conversion_length
+            want_unit_allow_nonterminating, max_conversion_length,
+            max_text_bytes=max_text_bytes, max_array_items=max_array_items
         )
 
         src = BvnrSource()
@@ -503,7 +525,9 @@ class Reader:
                     text_only: bool = False,
                     want_unit: Callable | None = None,
                     want_unit_allow_nonterminating: bool = False,
-                    max_conversion_length: int = 0) -> None:
+                    max_conversion_length: int = 0,
+                    max_text_bytes: int = 0,
+                    max_array_items: int = 0) -> None:
         """Parse a document pulled from a socket or a binary file object.
 
         The keyword parameters are those of :meth:`read_mem`. The bytes are
@@ -518,7 +542,8 @@ class Reader:
         flags, cb_refs = self._build_flags(
             on_verified, on_unverified, max_file_size, continue_on_error,
             strict_version, text_only, want_unit,
-            want_unit_allow_nonterminating, max_conversion_length
+            want_unit_allow_nonterminating, max_conversion_length,
+            max_text_bytes=max_text_bytes, max_array_items=max_array_items
         )
         self._read_source(source.handle, flags, cb_refs, source)
 
@@ -556,7 +581,9 @@ class Reader:
                   text_only: bool = False,
                   want_unit: Callable | None = None,
                   want_unit_allow_nonterminating: bool = False,
-                  max_conversion_length: int = 0) -> None:
+                  max_conversion_length: int = 0,
+                  max_text_bytes: int = 0,
+                  max_array_items: int = 0) -> None:
         # Forwards every read_fd option; dropping any of them here would make a
         # conversion or strict-version read impossible from a path.
         import os
@@ -573,6 +600,8 @@ class Reader:
                 want_unit=want_unit,
                 want_unit_allow_nonterminating=want_unit_allow_nonterminating,
                 max_conversion_length=max_conversion_length,
+                max_text_bytes=max_text_bytes,
+                max_array_items=max_array_items,
             )
         finally:
             os.close(fd)

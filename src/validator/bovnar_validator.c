@@ -2411,9 +2411,14 @@ bool bvnr_read(bvnr_reader_t* r)
 		return false;
 	if (bvn_source_impl(&r->lex.src)->pull == NULL) {
 		/* A fed reader has no source either. Once its read is over the
-		 * getters describe how it ended, as for a feed or finish call. */
-		if (!(r->lex.feed_mode && r->lex.feed_ended))
+		 * getters describe how it ended, as for a feed or finish call;
+		 * while it runs, the misuse ends it, as a misused feed does, so
+		 * the getters never show an error the read went on past. */
+		if (!(r->lex.feed_mode && r->lex.feed_ended)) {
 			r->val.last_error = error_invalid_argument;
+			if (r->lex.feed_mode)
+				r->lex.feed_ended = true;
+		}
 		return false;
 	}
 	return bvn_lex_run(r);

@@ -405,7 +405,8 @@ static bool mux_write(const vector_t* v, const got_t* g, bool flush, buf_t* out)
 	ok = ok && bvnr_mux_end(w) && bvnr_write_finish(w);
 	bvnr_writer_destroy(w);
 	CHECK(ok && out->n >= v->preamble_len &&
-	      memcmp(out->p, v->preamble, v->preamble_len) == 0 &&
+	      (v->preamble_len == 0 ||
+	       memcmp(out->p, v->preamble, v->preamble_len) == 0) &&
 	      memcmp(out->p + v->preamble_len, ".mux=", 5) == 0,
 	      "%s: the C writer writes the manifest's preamble", v->name);
 	return ok;
@@ -604,7 +605,10 @@ static void test_frames(const vector_t* v, const buf_t* data)
 		     bvnr_frame_write(&sink, data->p + at, v->items[i].length);
 		at += (size_t)v->items[i].length;
 	}
-	CHECK(ok && out.n == data->n && memcmp(out.p, data->p, out.n) == 0,
+	/* An empty vector (frames_none) leaves out.p NULL: memcmp may not
+	 * be handed one, even for no bytes. */
+	CHECK(ok && out.n == data->n &&
+	      (out.n == 0 || memcmp(out.p, data->p, out.n) == 0),
 	      "%s: bvnr_frame_write writes the vector byte for byte", v->name);
 	buf_free(&out);
 }

@@ -390,3 +390,39 @@ class TestFrameWriter:
             pass
         with pytest.raises(BovnarArgumentError):
             fw.write(b".a = 1;")
+
+
+class TestSinkReentry:
+    """A writer is not torn down from inside its own sink (2026-11-09 review):
+    destroying it there freed the C writer under bvnr_mux_send."""
+
+    def test_close_from_write_is_refused(self):
+        mw = None
+        seen = []
+
+        class Sink:
+            def write(self, b):
+                if mw is not None:
+                    try:
+                        mw.close()
+                    except BovnarArgumentError as exc:
+                        seen.append(exc)
+                return len(b)
+        out = Sink()
+        mw = stream.MuxWriter(out)
+        mw.send(1, b'x' * 100)
+        assert seen and 'own sink' in str(seen[0])
+        mw.close()                                # from outside: fine
+
+    def test_a_non_blocking_socket_is_refused(self):
+        a, b = socket.socketpair()
+        try:
+            a.setblocking(False)
+            with pytest.raises(BovnarArgumentError, match='non-blocking'):
+                stream.MuxWriter(a)
+            a.setblocking(True)
+            with stream.MuxWriter(a) as mw:
+                mw.send(1, b'ok')
+        finally:
+            a.close()
+            b.close()

@@ -63,9 +63,11 @@
 //! | The stream is under another key than [`MuxReader::with_options`] asked for | `UnexpectedInputByte`, as an [`Error::Argument`] naming both keys |
 //!
 //! The first five rows are the codes [`crate::stream::mux_load`] gives for
-//! the same input. The rest are the codec's own: it reads this one shape,
-//! where `mux_load` parses any document, and accepts one without an octet
-//! stream, one with statements after it, or one under any key. An error is
+//! the same input, but for a complete document without an octet stream,
+//! which `mux_load` reads as no messages and the codec's `finish` refuses
+//! (it is not a stream). The rest are the codec's own: it reads this one
+//! shape, where `mux_load` parses any document, and accepts one without an
+//! octet stream, one with statements after it, or one under any key. An error is
 //! latched: every later call returns it again.
 //!
 //! # Frames
@@ -593,7 +595,11 @@ impl MuxWriter {
     /// Writes the whole message to `out`, one vectored write per chunk with
     /// the header on the stack, so neither the payload is copied nor anything
     /// allocated. `out` is not flushed. A failing `out` is an [`Error::Io`]
-    /// with `writing_to_sink`.
+    /// with `writing_to_sink`, after an unknown part of the message may have
+    /// gone out: the stream is then broken. `out` must therefore block (an
+    /// [`std::io::ErrorKind::WouldBlock`] is such a failure); for a
+    /// non-blocking socket, [`encode`](Self::encode) the message and write the
+    /// parts with your own loop.
     pub fn write_message_to<W: Write + ?Sized>(
         &self,
         out: &mut W,
@@ -984,6 +990,48 @@ pub struct MuxReader {
     head: Vec<u8>,
     wire: Vec<u8>,
     error: Option<Error>,
+    /// The UTF-8 sequence a comment after the stream is inside: continuation
+    /// bytes still needed, and the range of the next one (`bvn_utf8_feed_st`).
+    utf8: Utf8,
+}
+
+/// An incremental UTF-8 check, as the C lexer makes on every text byte: the
+/// well-formedness ranges of Unicode Table 3-7 (no overlong forms, no
+/// surrogates, nothing past U+10FFFF).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct Utf8 {
+    need: u8,
+    lo: u8,
+    hi: u8,
+}
+
+impl Utf8 {
+    /// Takes one byte; false when it makes the text malformed.
+    fn feed(&mut self, b: u8) -> bool {
+        if self.need > 0 {
+            if b < self.lo || b > self.hi {
+                *self = Utf8::default();
+                return false;
+            }
+            self.need -= 1;
+            self.lo = 0x80;
+            self.hi = 0xBF;
+            return true;
+        }
+        let (need, lo, hi) = match b {
+            0x00..=0x7F => (0, 0, 0),
+            0xC2..=0xDF => (1, 0x80, 0xBF),
+            0xE0 => (2, 0xA0, 0xBF),
+            0xED => (2, 0x80, 0x9F),
+            0xE1..=0xEF => (2, 0x80, 0xBF),
+            0xF0 => (3, 0x90, 0xBF),
+            0xF1..=0xF3 => (3, 0x80, 0xBF),
+            0xF4 => (3, 0x80, 0x8F),
+            _ => return false,
+        };
+        *self = Utf8 { need, lo, hi };
+        true
+    }
 }
 
 impl Default for MuxReader {
@@ -1017,6 +1065,7 @@ impl MuxReader {
             head: Vec::new(),
             wire: Vec::new(),
             error: None,
+            utf8: Utf8::default(),
         }
     }
 
@@ -1121,7 +1170,9 @@ impl MuxReader {
         }
         let code = match self.state {
             State::Text if self.text.is_empty() => return Ok(()),
-            // A comment ends at the end of input.
+            // A comment ends at the end of input, but not inside a
+            // character.
+            State::DoneComment if self.utf8.need > 0 => ErrorCode::InvalidUtf8Byte,
             State::Done | State::DoneComment => return Ok(()),
             State::Text | State::Semicolon | State::SemicolonComment => {
                 ErrorCode::GotIncompleteBvnrStream
@@ -1523,6 +1574,17 @@ impl MuxReader {
     /// comments before and after it, as the C lexer reads them.
     fn end_byte(&mut self, b: u8) -> Result<()> {
         use State as S;
+        // A comment is text: its bytes are UTF-8, as everywhere in the
+        // document. A byte that breaks a pending sequence is refused here,
+        // a newline among them.
+        if matches!(self.state, S::SemicolonComment | S::DoneComment)
+            && (self.utf8.need > 0 || b >= 0x80)
+        {
+            if !self.utf8.feed(b) {
+                return Err(self.fail(ErrorCode::InvalidUtf8Byte));
+            }
+            return Ok(());
+        }
         match (self.state, b) {
             (S::SemicolonComment, b'\n' | b'\r') => self.state = S::Semicolon,
             (S::DoneComment, b'\n' | b'\r') => self.state = S::Done,
@@ -1532,8 +1594,14 @@ impl MuxReader {
             }
             (S::SemicolonComment | S::DoneComment, _) => {}
             (S::Semicolon, b';') => self.state = S::Done,
-            (S::Semicolon, b'#') => self.state = S::SemicolonComment,
-            (S::Done, b'#') => self.state = S::DoneComment,
+            (S::Semicolon, b'#') => {
+                self.utf8 = Utf8::default();
+                self.state = S::SemicolonComment;
+            }
+            (S::Done, b'#') => {
+                self.utf8 = Utf8::default();
+                self.state = S::DoneComment;
+            }
             (S::Semicolon | S::Done, b) if is_space(b) => {}
             _ => return Err(self.fail(ErrorCode::UnexpectedInputByte)),
         }
@@ -2074,7 +2142,9 @@ pub fn write_frame(out: &mut Vec<u8>, doc: &[u8]) {
 
 /// Writes one framed document to `out` in one vectored write, without
 /// copying it. `out` is not flushed. A failing `out` is an [`Error::Io`]
-/// with `writing_to_sink`.
+/// with `writing_to_sink`, after an unknown part of the frame may have gone
+/// out, so `out` must block; for a non-blocking socket, [`frame_header`]
+/// and the document are written with your own loop.
 pub fn write_frame_to<W: Write + ?Sized>(out: &mut W, doc: &[u8]) -> Result<()> {
     let header = frame_header(doc.len() as u64);
     let mut bufs = [IoSlice::new(&header), IoSlice::new(doc)];

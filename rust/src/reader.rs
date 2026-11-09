@@ -10,8 +10,18 @@ use crate::unit::Unit;
 #[derive(Clone, Debug, Default)]
 pub struct ReadOptions {
     /// Largest accepted input in bytes; 0 means no total-byte cap (the
-    /// text stays bounded by the library's `max_text_bytes`).
+    /// text stays bounded by [`max_text_bytes`](Self::max_text_bytes)).
     pub max_file_size: u64,
+    /// Most bytes of text a document may have (octet-stream payloads do not
+    /// count); 0 is the library default of 2 147 483 647, past which a read
+    /// fails with `text_data_too_long`. `u64::MAX` lifts it, for an endless
+    /// text document read with [`crate::live::DocumentFeed`] or
+    /// [`crate::live::ValueFeed`]; [`max_file_size`](Self::max_file_size)
+    /// is the cap that counts every byte.
+    pub max_text_bytes: u64,
+    /// Most items one array may have; 0 is the library default of
+    /// 2 147 483 647. `u64::MAX` lifts it.
+    pub max_array_items: u64,
     /// Recover from errors and keep reading instead of stopping.
     pub continue_on_error: bool,
     /// Refuse a document whose `#!bovnar` directive names a newer version.
@@ -369,6 +379,8 @@ impl ReadOptions {
     pub(crate) fn flags(&self) -> BvnrReadFlags {
         let mut flags = BvnrReadFlags::zeroed();
         flags.max_file_size = self.max_file_size;
+        flags.max_text_bytes = self.max_text_bytes;
+        flags.max_array_items = self.max_array_items;
         // A Reader opens at the 255-level cap in both directions, like the
         // CLI and the DOM; zero would select the C default of 64.
         flags.max_struct_nesting = 255;

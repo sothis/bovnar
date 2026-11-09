@@ -594,6 +594,15 @@ console.log('# converted_num / converted_den');
     ok(!z.ok && z.error_name === 'invalid_argument' && z.events.length === 0,
        `rational: base ${bad} refused up front`);
   }
+  // Bases 64 and 85 have no sign character: a negative result there is
+  // refused before the document is read, not written as a digit that means
+  // something else.
+  for (const base of [64, 85]) {
+    const neg = b.eventsConvert('.v = -5;', '', base, true);
+    ok(!neg.ok && neg.error_name === 'invalid_argument' &&
+       !neg.events.some(e => e.ev === 'data'),
+       `rational: a negative in base ${base} is refused and dropped (${neg.error_name})`);
+  }
 }
 
 // --- the unit policy --------------------------------------------------------
@@ -958,6 +967,14 @@ console.log('# parseTypeAnnotation (vs the reader it mirrors)');
   const u = b.parseTypeAnnotation('uint');
   ok(u.ok && u.width === 0 && u.base === 0 && u.unit === 'no_unit' &&
      u.unit_source === null, `annotation: unwritten fields ${JSON.stringify(u)}`);
+  // An explicit no_unit and an omitted unit resolve the same, and this is the
+  // surface that can tell them apart (the event stream omits unit_source for
+  // both).
+  const explicitNoUnit = b.parseTypeAnnotation('uint:8,no_unit');
+  ok(explicitNoUnit.ok && explicitNoUnit.unit === 'no_unit' &&
+     explicitNoUnit.unit_source === 'no_unit' &&
+     b.parseTypeAnnotation('uint:8').unit_source === null,
+     `annotation: explicit no_unit ${JSON.stringify(explicitNoUnit)}`);
 
   // The three failure flags mirror the reader's own refusal, and the flags are
   // data: these never throw.
@@ -975,6 +992,68 @@ console.log('# parseTypeAnnotation (vs the reader it mirrors)');
     ok(b.validate(text).error_name === code,
        `annotation ${ann}: the reader says ${code}`);
   }
+  // The standalone parser is the reader's own annotation parser, so its fields
+  // must equal the reader's type_start fields over generated annotations. The
+  // one intended difference is `unit_source: "no_unit"` (the surface that can
+  // tell an explicit no_unit from an omitted unit); the event stream omits it.
+  {
+    let seed = 4242;
+    const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    const ri = (n) => Math.floor(rnd() * n);
+    const pick = (a) => a[ri(a.length)];
+    const units = ['', 'no_unit', 'm', 'k~m', 'm/s', '°C', 'kg', '%', 'ucum:mm[Hg]'];
+    const epochs = ['', 'unix', 'tai'];
+    function gen() {
+      const k = ri(5);
+      let s, value;
+      if (k === 0) {
+        s = pick(['uint', 'sint']) + (ri(2) ? ':' + pick([8, 16, 32, 64]) : '');
+        const base = pick([0, 2, 8, 10, 16]);
+        if (base) s += ',_' + base;
+        const u = pick(units); if (u) s += ',' + u;
+        value = '1';
+      } else if (k === 1) {
+        s = 'float:' + pick([32, 64]);
+        const u = pick(units); if (u) s += ',' + u;
+        value = '1.0';
+      } else if (k === 2) {
+        s = 'float_fix:' + pick([16, 32, 64]);
+        const q = pick([0, 4, 8, 16]); if (q) s += ',q' + q;
+        const u = pick(units); if (u) s += ',' + u;
+        value = '1.5';
+      } else if (k === 3) {
+        s = 'float_dec:' + pick([32, 64]);
+        const u = pick(units); if (u) s += ',' + u;
+        value = '1.25';
+      } else {
+        s = 'datetime:' + pick([32, 64]);
+        const e = pick(epochs); if (e) s += ',' + e;
+        value = '2026-01-01T00:00:00Z';
+      }
+      return { s, value };
+    }
+    let accepted = 0;
+    for (let n = 0; n < 150; n++) {
+      const { s, value } = gen();
+      const text = '#!bovnar 1.2\n.v = <' + s + '> ' + value + ';\n';
+      const a = b.parseTypeAnnotation(s);
+      const v = b.validate(text);
+      ok(a.ok === v.ok,
+         `annotation parity ${JSON.stringify(s)}: standalone ${a.ok}/${a.type_ok}/${a.unit_ok} vs reader ${v.ok}/${v.error_name}`);
+      if (!v.ok || !a.ok) continue;
+      accepted++;
+      const ts = b.events(text).events.find(e => e.ev === 'type_start');
+      const paSrc = (a.unit === 'no_unit' && a.unit_source === 'no_unit')
+        ? null : a.unit_source;
+      ok(a.family === ts.family && a.width === ts.width && a.base === ts.base &&
+         (a.unit || 'no_unit') === (ts.unit || 'no_unit') &&
+         paSrc === (ts.unit_source || null) &&
+         (a.epoch || null) === (ts.epoch || null),
+         `annotation fields ${JSON.stringify(s)}: ${JSON.stringify(a)} vs ${JSON.stringify(ts)}`);
+    }
+    ok(accepted >= 50, `annotation parity: ${accepted} accepted, expected 50+`);
+  }
+
   const tooLong = b.parseTypeAnnotation('uint:8,' + 'm'.repeat(260));
   ok(!tooLong.ok && tooLong.type_ok && !tooLong.unit_ok &&
      tooLong.unit_too_long && tooLong.unit_source === null,

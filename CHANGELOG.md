@@ -327,7 +327,10 @@ API and implements spec 1.2.
   epoch, canonical unit and the unit's written spelling. The angle brackets are
   optional in the JS surface. This is the reader's acceptance test for the
   annotation itself (`<float:64,_8>` and `<uint:64,_0>` are refused as in a
-  document); it is data, never a throw.
+  document); it is data, never a throw. An explicit `no_unit` parameter is
+  visible as `unit_source: "no_unit"` where an omitted one is null — the one
+  surface that distinguishes them (the event stream omits `unit_source` for a
+  value with no unit).
 
 ### Changed
 

@@ -829,8 +829,9 @@ export async function loadBovnar(opts) {
      *  its epoch index there, with the epoch's name beside it in `epoch`.
      *  `family`/`width`/`base` are null when type_ok is false; `unit` is the
      *  canonical spelling (null for a unit with no text), and `unit_source`
-     *  the parameter as written. A bad annotation is data, as with parseUnit:
-     *  it never throws.
+     *  the parameter as written — including "no_unit", so an explicit no_unit
+     *  is distinguishable from an omitted one (null). A bad annotation is
+     *  data, as with parseUnit: it never throws.
      *
      *  There is no document here, so there is no declared spec version: a
      *  profile spelling ("ucum:mm[Hg]") parses as a unit, while a DOCUMENT

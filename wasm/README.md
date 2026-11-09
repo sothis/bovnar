@@ -343,6 +343,11 @@ spelling (and `"no_unit"` for an annotation with no unit), `unit_source` the
 parameter exactly as written (`null` when none was written or it was over the
 length bound), and `profile_only` says the unit has no native spelling.
 
+An explicit `no_unit` parameter is therefore visible as `unit_source:
+"no_unit"`, distinct from an omitted one (`null`) — the two are the same
+resolved unit, and this is the surface that can tell them apart. The event
+stream does not: it omits `unit_source` for any value with no unit.
+
 There is no document here, so there is no declared spec version and no value:
 a profile spelling such as `ucum:mm[Hg]` parses as a unit (`ok: true`), yet a
 **document** carrying it still needs `#!bovnar 1.2` and would report

@@ -16,7 +16,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 // Honour BOVNAR_CLI so the test runner can point at a non-default --build-dir;
@@ -479,6 +479,34 @@ console.log('# a float_fix q parameter');
      `q data: ${JSON.stringify(data)}`);
 }
 
+// --- octet payloads are opt-in hex ------------------------------------------
+// A chunk event carries its length; JSON text cannot carry the bytes, so the
+// payload is available only when asked for, as lowercase hex.
+console.log('# octet payloads (octets: hex)');
+{
+  const text = '.bin = \x00\x01\x02\x00hi\x00;\n.after = 1;\n';
+  const plain = b.events(text).events.find(e => e.tok === 'octet_stream');
+  ok(plain && plain.bytes === 2 && !('hex' in plain),
+     `octets: lengths only by default (${JSON.stringify(plain)})`);
+  const hexed = b.events(text, { octets: 'hex' }).events.find(e => e.tok === 'octet_stream');
+  ok(hexed && hexed.bytes === 2 && hexed.hex === '6869',
+     `octets: hex carries the payload (${JSON.stringify(hexed)})`);
+  const parsed = b.parse(text, { octets: 'hex' }).events.find(e => e.tok === 'octet_stream');
+  ok(parsed && parsed.hex === '6869', 'octets: parse takes it too');
+  const conv = b.eventsConvert(text, '', 0, false, { octets: 'hex' })
+    .events.find(e => e.tok === 'octet_stream');
+  ok(conv && conv.hex === '6869', 'octets: eventsConvert takes it too');
+  // Per CHUNK, so the original boundaries survive.
+  const two = b.events('.bin = \x00\x01\x02\x00hi\x01\x02\x00ho\x00;', { octets: 'hex' })
+    .events.filter(e => e.tok === 'octet_stream');
+  ok(two.length === 2 && two[0].hex === '6869' && two[1].hex === '686f',
+     `octets: one hex per chunk (${JSON.stringify(two)})`);
+  ok(throws(() => b.validate(text, { octets: 'hex' })),
+     'octets: validate has no event stream and refuses it');
+  ok(throws(() => b.events(text, { octets: 'base64' })),
+     "octets: only 'hex' is offered");
+}
+
 // --- an empty string's text is "", not absent -------------------------------
 // The event for `.s = ""` had no `text` at all, so it read like a token that
 // carries none (a null literal) and `e.text.length` threw.
@@ -543,6 +571,23 @@ console.log('# unit policy (vs the CLI)');
   ok(ed && ed.converted === '1500' && ed.converted_unit === 'm',
      `policy target: the event carries the conversion (${JSON.stringify(ed)})`);
   tgt.dispose();
+
+  // Options and a policy together reach the same reader on every surface,
+  // including eventsConvert, whose hook takes precedence over the policy's
+  // conversion choice but leaves its assertions in force.
+  {
+    const both = b.createPolicy().requireUnit();
+    const opts = { policy: both, maxFileSize: 1000 };
+    const e = b.eventsConvert('.v = <float:64,km> 1.5;', 'm', 10, false, opts);
+    const d = (e.events || []).find(x => x.ev === 'data');
+    ok(e.ok && d && d.converted === '1500',
+       `policy+options: eventsConvert (${JSON.stringify(e).slice(0, 120)})`);
+    ok(b.parse('.v = <float:64,km> 1.5;', opts).ok,
+       'policy+options: parse');
+    ok(!b.eventsConvert('.v = 1;', 'm', 10, false, opts).ok,
+       'policy+options: the requireUnit assertion still applies');
+    both.dispose();
+  }
 
   // A rule names one field, asserts it, and converts it. A rule that matches
   // NOTHING is satisfied — the C contract, and the opposite of a value it
@@ -763,6 +808,59 @@ console.log('# doc(): unitSource and a datetime fraction');
      `doc policy: ${JSON.stringify(conv.tree[0].value)}`);
 }
 
+
+// --- the single-file build answers the same ----------------------------------
+// index.single.mjs (inlined wasm, no second fetch) is what the web playground
+// ships as web/bovnar_wasm_core.js, and what works in an environment with
+// neither Node globals nor `window`. Nothing above exercises it: the
+// differential runs against the multi-file module. Hold every surface to the
+// same JSON here, so a stale or half-assembled inlined artifact fails here
+// rather than in a browser.
+console.log('# the single-file build (the playground ships this one)');
+{
+  const singlePath = join(ROOT, 'dist', 'wasm', 'index.single.mjs');
+  let single = null, why = '';
+  try {
+    const m = await import(pathToFileURL(singlePath).href);
+    single = await m.loadBovnar();
+  } catch (e) { why = String(e && e.message || e); }
+  ok(single !== null, `single: loadBovnar works (${why})`);
+  if (single) {
+    ok(single.version() === b.version(),
+       `single version: ${single.version()} vs ${b.version()}`);
+    const sample = [
+      '.v = <float:64,m/s> 9.81 kg;',
+      '.speed = 9.81 m/s;\n.name = "probe";',
+      '.a = 1;\n.a = 2;\n',
+      '.a = @;\n.b = 1;\n',
+      '#!bovnar 1.1\n.t = <datetime:64> 2026-06-15T12:00:00.5Z;',
+      '.s = "";\n.n = null;\n.w = <uint:128> 340282366920938463463374607431768211455;',
+    ];
+    for (const text of sample) {
+      for (const fn of ['validate', 'toJSON', 'doc', 'events', 'errors', 'parse']) {
+        const a = b[fn](text), c = single[fn](text);
+        ok(JSON.stringify(a) === JSON.stringify(c),
+           `single ${fn}: ${JSON.stringify(text.slice(0, 40))}`);
+      }
+    }
+    // The newer exports must be compiled into the inlined build too: options,
+    // the policy handle, the rational, the unit helpers.
+    ok(single.validate('.a = 1;', { maxFileSize: 100 }).ok,
+       'single: reader options work');
+    const sp = single.createPolicy().requireUnit();
+    ok(!single.validate('.a = 1;', { policy: sp }).ok,
+       'single: a unit policy works');
+    sp.dispose();
+    const conv = single.eventsConvert('.v = <float:64,k~m/h> 100.0;', 'm/s', 10, true)
+      .events.find(e => e.ev === 'data');
+    ok(conv && conv.converted_num === '250' && conv.converted_den === '9',
+       `single: the exact rational (${JSON.stringify(conv)})`);
+    ok(single.parseUnit('k~m/s').unit === 'k~m/s' &&
+       single.unitToProfile('k~m/s').unit === 'km.s-1' &&
+       single.unitProfiles().profiles.includes('ucum'),
+       'single: the unit helpers work');
+  }
+}
 
 // --- report ----------------------------------------------------------------
 console.log(`\nhard: ${pass} passed, ${fail} failed   |   soft toJSON diffs: ${soft}`);

@@ -11,8 +11,9 @@ unit mismatch such as
 ```
 
 is reported as `error_unit_mismatch`, byte-for-byte as the native `bovnar` CLI
-reports it — in the browser, in Node, in Deno, or on an edge runtime, with no
-native build step.
+reports it — in the browser, in a web worker, in Node, and (with the single-file
+build) in Deno or an edge runtime that exposes neither, with no native build
+step.
 
 ## Install / build
 
@@ -61,6 +62,10 @@ page with no bundler:
 import { loadBovnar } from 'bovnar-wasm/single';
 ```
 
+It is also the variant for a runtime that exposes neither Node's globals nor
+`window`: the multi-file glue resolves `bovnar.wasm` through Node's `fs` or,
+in a browser or worker, through `fetch`; the inlined build needs neither.
+
 ## API surfaces
 
 `loadBovnar()` resolves to an object with these members:
@@ -108,6 +113,7 @@ bvnr.events(doc, { policy: bvnr.createPolicy().requireUnit() });
 | `maxConversionLength` | longest exact `converted` expansion a conversion may produce; `0` = 1024 |
 | `maxIdentifierLength`, `maxStringLength`, `maxNumberLength`, `maxSymbolLength`, `maxReferenceLength` | per-token byte caps; `0` = the library default |
 | `maxStructNesting`, `maxArrayNesting` | nesting limits; `0` = **255** (the format's hard limit, and what every WASM surface has always used) |
+| `octets` | `'hex'` on `events`/`parse`/`eventsConvert`: each octet chunk's data event also carries `hex`, its payload as lowercase hex. Off by default (hex doubles the payload); JSON cannot carry the bytes directly, so this is the only way to read a document's binary part through the module. Refused on surfaces with no event stream |
 | `policy` | a unit policy from `createPolicy()` (see below) |
 
 `toJSON` and `doc` accept `policy` only. The C DOM entry points take a unit
@@ -256,7 +262,7 @@ Each `events` entry is `{ seq, ev, tok, ... }`, where `ev` is one of the C
 | `struct_open`, `struct_close` | `ev_struct_start`, `ev_struct_end` | none |
 | `array_row_start`, `array_row_end`, `array_dim_start` | `ev_array_row_start`, `ev_array_row_end`, `ev_array_dim_start` | none |
 | `octet_start`, `octet_end` | `ev_octet_stream_start`, `ev_octet_stream_end` | none (each octet chunk is a `data` event with `bytes`) |
-| `data` | `ev_data` | `text` (the value as text: a number keeps its source spelling — `007`, `1.50`, `ninf`; a string is decoded from its escapes; a bool is normalised to `true`/`false`, so `on` reads as `true`; an empty string is `""`; a null literal and an octet chunk carry none, the latter with `bytes` instead), `family`, `width`, `base`, `unit`, `unit_source`, `epoch`, `frac`, and `converted*` where a conversion applied |
+| `data` | `ev_data` | `text` (the value as text: a number keeps its source spelling — `007`, `1.50`, `ninf`; a string is decoded from its escapes; a bool is normalised to `true`/`false`, so `on` reads as `true`; an empty string is `""`; a null literal and an octet chunk carry none, the latter with `bytes` instead), `family`, `width`, `base`, `unit`, `unit_source`, `epoch`, `frac`, and `converted*` where a conversion applied. An octet chunk is `{ bytes }`, plus `{ hex }` with `octets: 'hex'` |
 | `type_start`, `type_end` | `ev_type_annotation_start`, `ev_type_annotation_end` | `text`: the annotation as written; resolved `family`/`width`/`base`/`unit` |
 | `type_family` | `ev_type_annotation_type_family` | the same resolved fields |
 | `type_param` | `ev_type_annotation_type_family_parameter` | `tok` says which: `type_width` → `width`, `type_base` → `base`, `type_q` → `q`, `unit` → `text` (the unit or a datetime epoch name) |
@@ -310,7 +316,10 @@ drops unit/type metadata (use `events()` to recover that). Specifically:
 `familyName`, `width`, `base`, `unit`, `unitSource` and `epoch` (null where the
 field does not apply), a scalar's number `text` beside its JSON `value`, a
 datetime's sub-second digits as `frac`, a struct's `children`, an array's
-`dims` and `rows`; an octet stream is `{ type: "octet", total, chunks }`. An
+`dims` and `rows`; an octet stream is `{ type: "octet", total, chunks }` —
+the DOM joins the chunks into one payload, so `chunks` carries a single entry
+of `total` bytes, and the original boundaries are in the event stream
+(`events()`, with `octets: 'hex'` for the bytes themselves). An
 integer wider than 64 bits is a string in `value`, as in `toJSON`; unit/type
 metadata is kept. This is what the web playground's parser shim uses to
 cross-check its event-stream reconstruction.

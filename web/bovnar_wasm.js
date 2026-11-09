@@ -29,7 +29,7 @@
 // reader-side C API: the bvnr_read_flags_t assertions and limits, and a unit
 // policy. See "Reader options" below.
 
-import createBovnar from './bovnar_wasm_core.js?v=4bcc99c21ff9';
+import createBovnar from './bovnar_wasm_core.js?v=60d5891c8f14';
 
 const enc = new TextEncoder();
 
@@ -54,6 +54,7 @@ const OPTS_SIZE = 72;
 const OPTS_VERSION = 1;
 const OPT_STRICT_VERSION = 0x1;
 const OPT_TEXT_ONLY = 0x2;
+const OPT_OCTETS_HEX = 0x4;
 
 const READ_OPTIONS = [
   'strictVersion', 'textOnly',
@@ -63,6 +64,11 @@ const READ_OPTIONS = [
   'maxStructNesting', 'maxArrayNesting',
   'policy',
 ];
+// `octets` only means something where a data event is delivered, so it is
+// offered only on the event surfaces -- validate() and errors() have no events
+// array, and accepting it there would be the silently-ignored option this
+// module refuses everywhere else.
+const EVENT_OPTIONS = [...READ_OPTIONS, 'octets'];
 // The DOM entry points (bvn_dom_parse_policy) take a unit policy but no read
 // flags. Accepting a flag here would be the "assertion the caller believes is
 // in force but which is quietly ignored" that --text-only on `bovnar query`
@@ -254,6 +260,10 @@ export async function loadBovnar(opts) {
     // Validate every value BEFORE allocating: a RangeError thrown after the
     // malloc would leak the block, and a caller retrying a bad option would
     // leak one per attempt.
+    const octets = options.octets;
+    if (octets !== undefined && octets !== 'hex')
+      throw new TypeError(
+        `bovnar: ${label}: octets must be 'hex' (the only encoding offered)`);
     const fields = {
       maxFileSize: u64(options.maxFileSize ?? 0, 'maxFileSize'),
       maxTextBytes: u64(options.maxTextBytes ?? 0, 'maxTextBytes'),
@@ -283,6 +293,7 @@ export async function loadBovnar(opts) {
     let flags = 0;
     if (options.strictVersion) flags |= OPT_STRICT_VERSION;
     if (options.textOnly) flags |= OPT_TEXT_ONLY;
+    if (octets === 'hex') flags |= OPT_OCTETS_HEX;
     dv.setUint32(4, flags, true);
     dv.setBigUint64(8, fields.maxFileSize, true);
     dv.setBigUint64(16, fields.maxTextBytes, true);
@@ -347,7 +358,7 @@ export async function loadBovnar(opts) {
   // (buf, len, unit, base, allow) where `unit` is a NUL-terminated C string we
   // allocate alongside the document; the _ex form appends options + policy.
   function callJsonConvert(input, unit, base, allowNonterminating, options) {
-    const withOptions = optionWork(options, READ_OPTIONS, 'eventsConvert');
+    const withOptions = optionWork(options, EVENT_OPTIONS, 'eventsConvert');
     const fnName = withOptions
       ? 'bvnr_wasm_events_convert_ex' : 'bvnr_wasm_events_convert';
     if (withOptions)
@@ -361,7 +372,7 @@ export async function loadBovnar(opts) {
     // every other bad unit). Swapping the NUL for another control byte keeps
     // the string whole and just as unparseable.
     const unitBytes = enc.encode(String(unit || '').replace(/\0/g, '\x01'));
-    const o = withOptions ? buildOptions(options, READ_OPTIONS, 'eventsConvert')
+    const o = withOptions ? buildOptions(options, EVENT_OPTIONS, 'eventsConvert')
                           : { ptr: 0, policy: 0 };
     // Both allocations happen before the try, so a failure in the second used to
     // leak the first. Allocate, check for the null emscripten returns on OOM,
@@ -616,10 +627,15 @@ export async function loadBovnar(opts) {
      *  A unit crosses twice: `unit` is the canonical form ("m~L") and
      *  `unit_source` the spelling the document used ("ucum:mL{total}"), when
      *  they differ. `base` 0 on a value means "no explicit base", i.e. decimal
-     *  10; on a datetime it is the EPOCH INDEX, whose name is in `epoch`. */
+     *  10; on a datetime it is the EPOCH INDEX, whose name is in `epoch`.
+     *
+     *  An octet chunk's data event reports `bytes`; pass `{ octets: 'hex' }`
+     *  to also carry the payload as `hex`, the only way to read the binary
+     *  part of a document through this module (JSON text cannot hold it
+     *  directly). Off by default: hex doubles the payload. */
     events: (input, options) =>
       callJsonOpts('bvnr_wasm_events', 'bvnr_wasm_events_ex',
-                   input, options, READ_OPTIONS, 'events'),
+                   input, options, EVENT_OPTIONS, 'events'),
 
     /** Events AND errors from a SINGLE reader pass:
      *  { ok, error, error_name, line, column, byte, offset, recovery_count,
@@ -640,6 +656,8 @@ export async function loadBovnar(opts) {
      *  clean EOF; deriving the status from that code alone reported
      *  {"ok":false,"error_name":"none"} here, and plain {"ok":true} in events().
      *
+     *  Takes the same options as events(), including `octets: 'hex'`.
+     *
      *  Defined only when the compiled module actually exports it: this wrapper
      *  and the core are separate URLs with separate cache entries, so a current
      *  wrapper can be paired with a stale core. Callers feature-test `parse`,
@@ -648,7 +666,7 @@ export async function loadBovnar(opts) {
     ...(typeof Module._bvnr_wasm_parse === 'function'
         ? { parse: (input, options) =>
               callJsonOpts('bvnr_wasm_parse', 'bvnr_wasm_parse_ex',
-                           input, options, READ_OPTIONS, 'parse') }
+                           input, options, EVENT_OPTIONS, 'parse') }
         : {}),
 
     /** The event stream with the reader's LOSSLESS unit/base conversion armed,
@@ -670,7 +688,9 @@ export async function loadBovnar(opts) {
      *  Note: this surface runs in resync mode, so a value the conversion
      *  rejects is skipped along with its assignment rather than aborting the
      *  call — it will not appear in `events` — but `ok` is then false and
-     *  `error_name` names the rejection (unit_mismatch, unit_inexact). */
+     *  `error_name` names the rejection (unit_mismatch, unit_inexact).
+     *
+     *  Takes the same options as events(), including `octets: 'hex'`. */
     eventsConvert: (input, unit = '', base = 0, allowNonterminating = false,
                     options) =>
       callJsonConvert(input, unit, base, allowNonterminating, options),

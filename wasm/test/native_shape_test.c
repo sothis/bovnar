@@ -368,6 +368,9 @@ static void test_read_options_and_policy(void)
 static void test_new_event_and_doc_fields(void)
 {
 	char *j;
+	bvnr_wasm_opts_t o;
+	memset(&o, 0, sizeof o);
+	o.version = BVNR_WASM_OPTS_VERSION;
 #define LEN(s) ((int)(sizeof(s) - 1))
 	static const char ff[] = ".v = <float_fix:16,q8> 1.5;";
 	j = bvnr_wasm_events(ff, LEN(ff));
@@ -385,6 +388,20 @@ static void test_new_event_and_doc_fields(void)
 	      "an empty string carries text: %s", j);
 	CHECK(!has(j, "\"tok\":\"null\",\"text\""),
 	      "a null literal carries no text: %s", j);
+	free(j);
+
+	/* An octet chunk's payload is opt-in hex: JSON text cannot carry the bytes,
+	 * and hex doubles them, so the default is the length alone. */
+	static const char octdoc[] = ".a = \x00\x01\x02\x00hi\x00;";
+	o.flags = BVNR_WASM_OPT_OCTETS_HEX;
+	j = bvnr_wasm_events_ex(octdoc, LEN(octdoc), (uintptr_t)&o, 0);
+	CHECK(has(j, "\"bytes\":2") && has(j, "\"hex\":\"6869\""),
+	      "octets: hex carries the payload: %s", j);
+	free(j);
+	o.flags = 0;
+	j = bvnr_wasm_events(octdoc, LEN(octdoc));
+	CHECK(has(j, "\"bytes\":2") && !has(j, "\"hex\""),
+	      "octet chunks carry no payload by default: %s", j);
 	free(j);
 
 	static const char bad[] = ".a = @;\n.b = 1;\n";

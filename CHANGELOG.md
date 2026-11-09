@@ -294,19 +294,28 @@ API and implements spec 1.2.
   `target`, `requireConvertibleTo`, `rule`, `normaliseSI`, `base`,
   `onInexact` — and any surface takes it as `options.policy`; `toJSON` and
   `doc` reach the DOM's policy path, and refuse read flags they cannot honour
-  instead of ignoring them. Small stateless helpers mirror the rest of the
-  reader API: `versionNumber` (`bvnr_version`), `specVersion`
-  (`bvnr_spec_version`), `peekVersion` (`bvnr_peek_version`), `errorName`
-  (`bvn_error_to_string`), `parseUnit`/`unitsEqual`/`unitsConvertible`/
-  `convertUnit`/`unitToProfile`/`unitProfiles` (`bvn_parse_unit`,
-  `bvn_unit_to_string`, `bvn_unit_error_code`, `bvn_unit_is_profile_only`,
-  `bvn_unit_equal`, `bvn_units_convertible`, `bvn_unit_convert_value`,
-  `bvn_unit_to_ucum` / `bvn_unit_to_profile`, the profile table). The
+  instead of ignoring them. `events`/`parse`/`eventsConvert` also take
+  `octets: 'hex'`, which carries each octet chunk's payload as a hex string —
+  the only way to read a document's binary part through the module (JSON text
+  cannot hold it, and `toJSON`'s whole-document hex string loses the chunk
+  boundaries); it is off by default because hex doubles the payload. Small
+  stateless helpers mirror the rest of the reader API: `versionNumber`
+  (`bvnr_version`), `specVersion` (`bvnr_spec_version`), `peekVersion`
+  (`bvnr_peek_version`), `errorName` (`bvn_error_to_string`),
+  `parseUnit`/`unitsEqual`/`unitsConvertible`/`convertUnit`/`unitToProfile`/
+  `unitProfiles` (`bvn_parse_unit`, `bvn_unit_to_string`,
+  `bvn_unit_error_code`, `bvn_unit_is_profile_only`, `bvn_unit_equal`,
+  `bvn_units_convertible`, `bvn_unit_convert_value`, `bvn_unit_to_ucum` /
+  `bvn_unit_to_profile`, the profile table). The
   old exports stay, and the wrapper feature-tests the new ones so a current
   wrapper paired with a stale core refuses an option rather than dropping it.
   Input may now also be an `ArrayBuffer`, and the README states that a JS
   string is UTF-8-encoded (a lone surrogate becomes U+FFFD; pass bytes for
-  exact input).
+  exact input). The package's single-file module — the inlined build the web
+  playground ships — is now held to the same answers as the multi-file one on
+  every surface, options and policies included, so that artifact cannot go
+  stale in a way no test notices; the README also states which build needs
+  Node's globals or `window` and which needs neither.
 
 ### Changed
 

@@ -266,8 +266,17 @@ static void sb_splice(sb_t *into, sb_t *part)
 #define BVNR_WASM_OPTS_VERSION	1u
 #define BVNR_WASM_OPT_STRICT_VERSION	0x1u
 #define BVNR_WASM_OPT_TEXT_ONLY		0x2u
+/* Deliver an octet chunk's payload as a hex string in its data event. The
+ * reader's chunk events carry the bytes; JSON cannot, so without this a JS
+ * consumer of a binary document saw only lengths (and toJSON's whole-stream
+ * hex string, which loses the chunk boundaries). Off by default: hex doubles
+ * the payload, and the playground parses documents it never needs bytes for.
+ * A core from before this bit refuses it as an unknown flag rather than
+ * ignoring the request. */
+#define BVNR_WASM_OPT_OCTETS_HEX	0x4u
 #define BVNR_WASM_OPTS_KNOWN		(BVNR_WASM_OPT_STRICT_VERSION | \
-					 BVNR_WASM_OPT_TEXT_ONLY)
+					 BVNR_WASM_OPT_TEXT_ONLY | \
+					 BVNR_WASM_OPT_OCTETS_HEX)
 typedef struct {
 	uint32_t	version;
 	uint32_t	flags;
@@ -1113,6 +1122,8 @@ typedef struct {
 	sb_t    *b;
 	uint64_t seq;
 	int      count;
+	/* BVNR_WASM_OPT_OCTETS_HEX: carry each octet chunk's payload as `hex`. */
+	bool     octet_hex;
 } evt_ctx_t;
 
 /*
@@ -1203,6 +1214,15 @@ static bool evt_cb(void *ud, bvnr_event_t e, bvnr_data_t *d)
 	 * no text field. */
 	if (d->type == token_is_octet_stream) {
 		sb_printf(b, ",\"bytes\":%u", d->length);
+		if (ctx->octet_hex && d->data && d->length) {
+			const uint8_t *p = (const uint8_t *)d->data;
+			sb_puts(b, ",\"hex\":\"");
+			for (uint32_t k = 0; k < d->length; k++) {
+				sb_putc(b, hexd[p[k] >> 4]);
+				sb_putc(b, hexd[p[k] & 0xf]);
+			}
+			sb_putc(b, '"');
+		}
 	} else if (d->length ||
 		   d->type == token_is_string ||
 		   d->type == token_is_array_string) {
@@ -1314,6 +1334,7 @@ static char *events_impl(const char *buf, int len,
 	ud.ev.b    = &evbuf;
 	ud.ev.seq  = 0;
 	ud.ev.count = 0;
+	ud.ev.octet_hex = opts && (opts->flags & BVNR_WASM_OPT_OCTETS_HEX);
 	ud.unit    = target;
 	ud.base    = base;
 	ud.first_err = error_none;
@@ -1662,6 +1683,7 @@ static char *parse_impl(const char *buf, int len,
 	both_ud_t ud;
 	memset(&ud, 0, sizeof(ud));
 	ud.ev.ev.b = &evbuf;
+	ud.ev.ev.octet_hex = opts && (opts->flags & BVNR_WASM_OPT_OCTETS_HEX);
 	ud.ev.unit = NULL;
 	ud.ev.base = 0u;
 	ud.er.b     = &ebuf;

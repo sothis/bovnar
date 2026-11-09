@@ -576,6 +576,36 @@ impl Reader {
         self.read_handlers(Input::Read(&mut input), options, handlers)
     }
 
+    /// [`Reader::read_mem_with`] with `mirror` receiving every byte the
+    /// reader consumes (`src_mirror`, a debugging aid). The bytes reach it a
+    /// piece at a time, each once the reader has parsed it: a buffer pulled
+    /// (up to 64 KiB), a piece fed, an octet-stream chunk. So a read that
+    /// fails or is stopped has mirrored the input up to the start of the
+    /// piece it stopped in. A failing `mirror` ends the read with an
+    /// [`Error::Io`] with `writing_to_sink`; a panic in it reaches the
+    /// caller.
+    pub fn read_mem_mirror(
+        &mut self,
+        data: &[u8],
+        options: &ReadOptions,
+        handlers: ReadHandlers<'_>,
+        mirror: &mut dyn std::io::Write,
+    ) -> Result<()> {
+        self.read_mirrored(Input::Mem(data), options, handlers, Some(mirror))
+    }
+
+    /// [`Reader::read_mem_mirror`] over any [`std::io::Read`]. Reads `input`
+    /// as [`Reader::read_reader`] does.
+    pub fn read_reader_mirror(
+        &mut self,
+        mut input: impl std::io::Read,
+        options: &ReadOptions,
+        handlers: ReadHandlers<'_>,
+        mirror: &mut dyn std::io::Write,
+    ) -> Result<()> {
+        self.read_mirrored(Input::Read(&mut input), options, handlers, Some(mirror))
+    }
+
     /// Installs a unit policy for every following read; `None` clears it.
     pub fn set_unit_policy(&mut self, policy: Option<&UnitPolicy>) -> Result<()> {
         if let Some(p) = policy {
@@ -638,37 +668,51 @@ impl Reader {
         options: &ReadOptions,
         handlers: ReadHandlers<'_>,
     ) -> Result<()> {
-        let ReadHandlers {
-            on_verified,
-            on_unverified,
-            want_unit,
-            on_error,
-        } = handlers;
+        self.read_mirrored(input, options, handlers, None)
+    }
+
+    fn read_mirrored(
+        &mut self,
+        input: Input<'_>,
+        options: &ReadOptions,
+        handlers: ReadHandlers<'_>,
+        mirror: Option<&mut dyn std::io::Write>,
+    ) -> Result<()> {
         let flags = options.flags();
-        let mut verified = on_verified.map(wrap);
-        let mut unverified = on_unverified.map(wrap);
-        let mut want = want_unit.map(|f| {
-            move |view: &ffi::EventView<'_>| {
-                let d = EventData::from_view(view)?;
-                f(&d).map(|(u, base)| (u.0, base))
-            }
-        });
-        let mut errors = on_error.map(wrap_error);
-        let mut handlers = ffi::Handlers {
-            verified: verified.as_mut().map(|f| f as ffi::Handler<'_>),
-            unverified: unverified.as_mut().map(|f| f as ffi::Handler<'_>),
-            want_unit: want.as_mut().map(|f| f as ffi::WantUnit<'_>),
-            on_error: errors
-                .as_mut()
-                .map(|f| f as &mut dyn FnMut(i32, u64, u64, u32, u64)),
-            ..ffi::Handlers::default()
-        };
+        with_handlers(handlers, None, |handlers| {
+            self.read_ffi(input, flags, handlers, mirror)
+        })
+    }
+
+    fn read_ffi(
+        &mut self,
+        input: Input<'_>,
+        flags: BvnrReadFlags,
+        handlers: &mut ffi::Handlers<'_>,
+        mirror: Option<&mut dyn std::io::Write>,
+    ) -> Result<()> {
         let handle = &mut self.handle;
-        let ok = match input {
-            Input::Mem(data) => handle.read_mem(data, flags, &mut handlers),
-            Input::Read(input) => crate::io::from_reader(input, |src| {
-                Ok(handle.read_source(src, flags, &mut handlers))
-            })?,
+        let ok = match (input, mirror) {
+            (Input::Mem(data), None) => handle.read_mem(data, flags, handlers),
+            (Input::Read(input), None) => {
+                crate::io::from_reader(input, |src| Ok(handle.read_source(src, flags, handlers)))?
+            }
+            (input, Some(mirror)) => {
+                let mut lent = ffi::LentSink::new();
+                let ok = lent.lend(mirror, |sink| match input {
+                    Input::Mem(data) => {
+                        Ok(ffi::read_mem_mirror(handle, data, flags, handlers, sink))
+                    }
+                    Input::Read(input) => crate::io::from_reader(input, |src| {
+                        Ok(handle.read_source_mirror(src, flags, handlers, Some(sink)))
+                    }),
+                });
+                // The mirror's failure first: it is what stopped the read.
+                if let Some(e) = lent.take_failure() {
+                    return Err(Error::io(ErrorCode::WritingToSink, &e));
+                }
+                ok?
+            }
         };
         if ok { Ok(()) } else { Err(self.error()) }
     }
@@ -730,6 +774,92 @@ impl Reader {
     }
 }
 
+/// `data` in canonical form: the document re-serialised from its verified
+/// events by the canonicalising observer (`bvnr_canon_observer_*`), the form
+/// `bovnar events -d` prints (`-p` with `pretty`). The compact form is one
+/// line with no spaces outside literals; two documents that differ only in
+/// layout, comments and the spelling of separators canonicalise to the same
+/// bytes, and canonicalising the output again gives it back unchanged. A
+/// leading `#!bovnar M.N` directive is kept.
+///
+/// The document is read under `options`; one the reader refuses is its
+/// [`Error::Parse`]. Under [`ReadOptions::continue_on_error`] a document the
+/// reader had to recover from is refused too, with the first error it
+/// recovered from: the observer writes what it is fed, and the gap a
+/// recovery leaves would make the output unreadable (doc/08 §3.6).
+///
+/// ```
+/// let canonical = bovnar::canonicalize(
+///     b".a = 1 ;  # one\n.b = { .c = \"x\"; };",
+///     false,
+///     &bovnar::ReadOptions::default(),
+/// )?;
+/// assert_eq!(canonical, b".a=<uint:64,_10,no_unit>1;.b={.c=<utf8>\"x\";};");
+/// # Ok::<(), bovnar::Error>(())
+/// ```
+pub fn canonicalize(data: &[u8], pretty: bool, options: &ReadOptions) -> Result<Vec<u8>> {
+    let mut out = Vec::new();
+    canonical(ffi::CanonInput::Mem(data), &mut out, pretty, options)?;
+    Ok(out)
+}
+
+/// [`canonicalize`] from any [`std::io::Read`] into any
+/// [`std::io::Write`]: `input` is read as it is parsed, and the output
+/// reaches `out` in 64 KiB pieces as it is made, so neither is held whole.
+/// After an error `out` may hold the start of the output. A failing `input`
+/// is an [`Error::Io`] with `reading_from_source_fd`, a failing `out` one
+/// with `writing_to_sink`; a panic in either reaches the caller.
+pub fn canonicalize_reader(
+    mut input: impl std::io::Read,
+    mut out: impl std::io::Write,
+    pretty: bool,
+    options: &ReadOptions,
+) -> Result<()> {
+    canonical(ffi::CanonInput::Read(&mut input), &mut out, pretty, options)
+}
+
+fn canonical(
+    input: ffi::CanonInput<'_>,
+    out: &mut dyn std::io::Write,
+    pretty: bool,
+    options: &ReadOptions,
+) -> Result<()> {
+    let outcome = match ffi::canonicalize(input, out, pretty, options.flags()) {
+        None => return Err(Error::OutOfMemory("bvnr_canon_observer_create()")),
+        Some(Err((ffi::ErrorKindIo::Output, e))) => {
+            return Err(Error::io(ErrorCode::WritingToSink, &e));
+        }
+        Some(Err((ffi::ErrorKindIo::Input, e))) => {
+            return Err(Error::io(ErrorCode::ReadingFromSourceFd, &e));
+        }
+        Some(Ok(outcome)) => outcome,
+    };
+    outcome.read.map_err(reader_error)?;
+    if outcome.recovered > 0 {
+        let (code, line, column, byte, offset) =
+            outcome
+                .first_error
+                .unwrap_or((ErrorCode::InvalidArgument as i32, 0, 0, 0, 0));
+        return Err(Error::Parse {
+            code,
+            position: Some(Position {
+                line,
+                column,
+                offset,
+                byte,
+            }),
+        });
+    }
+    if outcome.finished {
+        Ok(())
+    } else {
+        Err(Error::Write {
+            code: ErrorCode::WritingToSink as i32,
+            offset: 0,
+        })
+    }
+}
+
 /// A reader's error as a parse error with its position.
 pub(crate) fn reader_error(e: ffi::ReaderError) -> Error {
     Error::Parse {
@@ -740,6 +870,53 @@ pub(crate) fn reader_error(e: ffi::ReaderError) -> Error {
             offset: e.offset,
             byte: e.byte,
         }),
+    }
+}
+
+/// Runs `f` on the FFI handlers adapting `handlers`.
+/// `on_document` is a frame reader's per-document callback, when there is
+/// one.
+pub(crate) fn with_handlers<R>(
+    handlers: ReadHandlers<'_>,
+    mut on_document: Option<&mut dyn FnMut(u64, bool, i32) -> bool>,
+    f: impl FnOnce(&mut ffi::Handlers<'_>) -> R,
+) -> R {
+    let ReadHandlers {
+        on_verified,
+        on_unverified,
+        want_unit,
+        on_error,
+    } = handlers;
+    let mut verified = on_verified.map(wrap);
+    let mut unverified = on_unverified.map(wrap);
+    let mut want = want_unit.map(|f| {
+        move |view: &ffi::EventView<'_>| {
+            let d = EventData::from_view(view)?;
+            f(&d).map(|(u, base)| (u.0, base))
+        }
+    });
+    let mut errors = on_error.map(wrap_error);
+    let mut handlers = ffi::Handlers {
+        verified: verified.as_mut().map(|f| f as ffi::Handler<'_>),
+        unverified: unverified.as_mut().map(|f| f as ffi::Handler<'_>),
+        want_unit: want.as_mut().map(|f| f as ffi::WantUnit<'_>),
+        on_error: errors
+            .as_mut()
+            .map(|f| f as &mut dyn FnMut(i32, u64, u64, u32, u64)),
+        on_document: on_document
+            .as_mut()
+            .map(|f| &mut **f as &mut dyn FnMut(u64, bool, i32) -> bool),
+        ..ffi::Handlers::default()
+    };
+    f(&mut handlers)
+}
+
+/// The callbacks a fed reader must call for `handlers`.
+pub(crate) fn hooks_of(handlers: &ReadHandlers<'_>) -> ffi::Hooks {
+    ffi::Hooks {
+        verified: handlers.on_verified.is_some(),
+        unverified: handlers.on_unverified.is_some(),
+        want_unit: handlers.want_unit.is_some(),
     }
 }
 

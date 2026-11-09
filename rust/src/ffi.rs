@@ -765,7 +765,7 @@ pub struct Handlers<'h> {
     /// Per-document callback of `bvnr_doc_stream_read`: (index, ok, error).
     pub on_document: Option<&'h mut dyn FnMut(u64, bool, c_int) -> bool>,
     /// The first error `on_error` reported: (code, line, column, byte, offset).
-    pub first_error: Option<(c_int, u64, u64, u32, u64)>,
+    pub first_error: Option<ErrorReport>,
     /// Called for every error `on_error` reports, recovered or not, with the
     /// same (code, line, column, byte, offset).
     pub on_error: Option<&'h mut dyn FnMut(c_int, u64, u64, u32, u64)>,
@@ -1028,15 +1028,28 @@ impl ReaderHandle {
     pub fn read_source(
         &mut self,
         src: &mut BvnrSource,
-        mut flags: BvnrReadFlags,
+        flags: BvnrReadFlags,
         h: &mut Handlers<'_>,
     ) -> bool {
+        self.read_source_mirror(src, flags, h, None)
+    }
+
+    /// [`read_source`](Self::read_source) with `mirror` receiving every byte
+    /// the reader consumes (`src_mirror`).
+    pub fn read_source_mirror(
+        &mut self,
+        src: &mut BvnrSource,
+        mut flags: BvnrReadFlags,
+        h: &mut Handlers<'_>,
+        mirror: Option<&BvnrSink>,
+    ) -> bool {
         h.install(&mut flags);
-        // SAFETY: the reader is live; `src`, `flags` and `h` outlive both
-        // calls (the reader copies the source), and nothing else touches `h`
-        // meanwhile.
+        let mirror = mirror.map_or(std::ptr::null_mut(), |m| std::ptr::from_ref(m).cast_mut());
+        // SAFETY: the reader is live; `src`, `mirror`, `flags` and `h`
+        // outlive both calls (the reader copies the source and the mirror,
+        // and only reads the mirror), and nothing else touches `h` meanwhile.
         let ok = unsafe {
-            bvnr_open_read_source(self.0.as_ptr(), src, std::ptr::null_mut(), &mut flags)
+            bvnr_open_read_source(self.0.as_ptr(), src, mirror, &mut flags)
                 && bvnr_read(self.0.as_ptr())
         };
         h.resume();
@@ -1448,6 +1461,9 @@ pub struct WriterHandle {
     /// library holds the same pointer as the sink's user pointer, so it is
     /// freed only after the writer is destroyed.
     sink: *mut PushState,
+    /// The `on_event` observer's state, from `Box::into_raw` (NULL for
+    /// none), the writer's userdata; freed after the writer, like `sink`.
+    observer: *mut ObserverState,
 }
 
 impl WriterHandle {
@@ -1459,7 +1475,22 @@ impl WriterHandle {
             ptr,
             buf: Vec::new(),
             sink: std::ptr::null_mut(),
+            observer: std::ptr::null_mut(),
         })
+    }
+
+    /// Points `flags` at `f` as the writer's `on_event` observer, for the
+    /// open that follows. Call it on a writer that has not been opened.
+    pub fn set_observer(&mut self, f: Observer, flags: &mut BvnrWriteFlags) {
+        let st = Box::into_raw(Box::new(ObserverState { f, panic: None }));
+        let old = std::mem::replace(&mut self.observer, st);
+        if !old.is_null() {
+            // SAFETY: from Box::into_raw, released once; the writer has not
+            // been opened with it.
+            drop(unsafe { Box::from_raw(old) });
+        }
+        flags.on_event = Some(observer_trampoline as EventCallbackFn);
+        flags.userdata = st.cast();
     }
 
     /// `bvnr_sink_to_callback` + `bvnr_open_write_sink`: the writer pushes
@@ -1497,10 +1528,16 @@ impl WriterHandle {
         unsafe { self.sink.as_ref() }
     }
 
-    /// Rethrows a panic the sink's writer raised during the last call.
+    /// Rethrows a panic the sink's writer or the observer raised during the
+    /// last call.
     pub fn resume_sink_panic(&mut self) {
         // SAFETY: as for `sink`.
         if let Some(payload) = unsafe { self.sink.as_mut() }.and_then(|s| s.panic.take()) {
+            std::panic::resume_unwind(payload);
+        }
+        // SAFETY: NULL or the live state this handle owns; the library uses
+        // it only inside a call, which needs `&mut self`.
+        if let Some(payload) = unsafe { self.observer.as_mut() }.and_then(|s| s.panic.take()) {
             std::panic::resume_unwind(payload);
         }
     }
@@ -1689,7 +1726,8 @@ impl WriterHandle {
 // the library writes no shared state after startup. The memory sink `buf` is
 // owned by this handle and moves with it (its heap address does not change);
 // so is the callback sink's state, which is Send (an owned destination is
-// `Write + Send`, a scoped one is looked up on the calling thread).
+// `Write + Send`, a scoped one is looked up on the calling thread), and the
+// observer's, whose closure is Send.
 // Not Sync: two threads must not share one writer.
 unsafe impl Send for WriterHandle {}
 
@@ -1701,6 +1739,10 @@ impl Drop for WriterHandle {
         if !self.sink.is_null() {
             // SAFETY: from Box::into_raw, released once, after the writer.
             drop(unsafe { Box::from_raw(self.sink) });
+        }
+        if !self.observer.is_null() {
+            // SAFETY: from Box::into_raw, released once, after the writer.
+            drop(unsafe { Box::from_raw(self.observer) });
         }
     }
 }
@@ -2662,6 +2704,9 @@ enum Out {
     /// The writer of the innermost [`with_scoped_out`] running on this
     /// thread, for a write that begins and ends inside one call.
     Scoped,
+    /// The writer [`LentSink::lend`] lends for the call in progress; none
+    /// between calls, when what is pushed is dropped.
+    Lent(Option<*mut (dyn std::io::Write + 'static)>),
 }
 
 thread_local! {
@@ -2771,6 +2816,18 @@ impl PushState {
                     std::io::ErrorKind::BrokenPipe,
                     "the writer's destination was only lent for a call that has returned",
                 ))),
+            },
+            Out::Lent(lent) => match *lent {
+                Some(w) => unwind(&mut || {
+                    // SAFETY: a lent pointer is the writer `LentSink::lend`
+                    // borrows for the call that is running; nothing else uses
+                    // it during the push.
+                    let w = unsafe { &mut *w };
+                    f.take().map_or(Ok(()), |f| f(w))
+                }),
+                // Nothing lent: a mirror taken back from a fed reader whose
+                // document goes on (DocumentFeed::take_mirror).
+                None => Ok(Ok(())),
             },
         };
         match result {
@@ -2882,6 +2939,79 @@ extern "C" fn slot_on_document(ud: *mut c_void, index: u64, ok: bool, err: c_int
     !h.is_null() && on_document_trampoline(h, index, ok, err)
 }
 
+extern "C" fn slot_on_unverified(ud: *mut c_void, ev: c_int, d: *const BvnrData) -> bool {
+    // SAFETY: as for slot_on_verified.
+    let h = unsafe { slot_handlers(ud) };
+    !h.is_null() && dispatch(h, ev, d, false)
+}
+
+extern "C" fn slot_want_unit(
+    ud: *mut c_void,
+    d: *const BvnrData,
+    want: *mut ValueUnit,
+    want_base: *mut u32,
+) -> bool {
+    // SAFETY: as for slot_on_verified.
+    let h = unsafe { slot_handlers(ud) };
+    !h.is_null() && want_unit_trampoline(h, d, want, want_base)
+}
+
+extern "C" fn slot_on_error(
+    ud: *mut c_void,
+    err: c_int,
+    line: u64,
+    column: u64,
+    byte: u32,
+    offset: u64,
+) {
+    // SAFETY: as for slot_on_verified.
+    let h = unsafe { slot_handlers(ud) };
+    if !h.is_null() {
+        on_error_trampoline(h, err, line, column, byte, offset);
+    }
+}
+
+/// Which of a read's event callbacks a fed object's C reader calls. They are
+/// copied into it when a document (or, for a frame reader, the stream)
+/// starts, so a call can use only the ones installed then. `on_error` is
+/// installed always: it runs only for an error.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Hooks {
+    pub verified: bool,
+    pub unverified: bool,
+    pub want_unit: bool,
+}
+
+impl Hooks {
+    /// The callbacks `h` has handlers for.
+    pub fn of(h: &Handlers<'_>) -> Self {
+        Hooks {
+            verified: h.verified.is_some(),
+            unverified: h.unverified.is_some(),
+            want_unit: h.want_unit.is_some(),
+        }
+    }
+
+    /// Whether every callback `other` needs is among these.
+    pub fn covers(self, other: Hooks) -> bool {
+        (self.verified || !other.verified)
+            && (self.unverified || !other.unverified)
+            && (self.want_unit || !other.want_unit)
+    }
+
+    /// Points `flags` at the slot trampolines of these callbacks, with
+    /// `slot` as userdata.
+    fn install(self, flags: &mut BvnrReadFlags, slot: *mut Slot) {
+        flags.userdata = slot.cast();
+        flags.on_verified = self.verified.then_some(slot_on_verified as EventCallbackFn);
+        flags.on_unverified = self
+            .unverified
+            .then_some(slot_on_unverified as EventCallbackFn);
+        flags.want_unit = self.want_unit.then_some(slot_want_unit as WantUnitFn);
+        flags.on_error = Some(slot_on_error as OnErrorFn);
+    }
+}
+
 /// A reader opened with `bvnr_open_read_feed` for one document after
 /// another; events go to the handlers of the feed or finish that produces
 /// them.
@@ -2910,13 +3040,23 @@ impl FeedHandle {
     }
 
     /// `bvnr_open_read_feed` with the limits in `flags` (its userdata and
-    /// callbacks are set here): starts a document.
-    pub fn open(&mut self, mut flags: BvnrReadFlags) -> bool {
-        flags.userdata = self.slot.cast();
-        flags.on_verified = Some(slot_on_verified as EventCallbackFn);
-        // SAFETY: the reader is live; `flags` is copied during the call, and
-        // its user pointer, the slot, lives as long as the reader.
-        unsafe { bvnr_open_read_feed(self.reader.0.as_ptr(), std::ptr::null(), &mut flags) }
+    /// callbacks are set here, those of `hooks`): starts a document, its
+    /// input mirrored into `mirror` when there is one.
+    ///
+    /// The reader keeps a copy of `mirror`; the sink's state must outlive
+    /// every feed and finish of this document.
+    pub fn open(
+        &mut self,
+        mut flags: BvnrReadFlags,
+        hooks: Hooks,
+        mirror: Option<&BvnrSink>,
+    ) -> bool {
+        hooks.install(&mut flags, self.slot);
+        let mirror = mirror.map_or(std::ptr::null(), std::ptr::from_ref);
+        // SAFETY: the reader is live; `flags` and `mirror` are copied during
+        // the call, and its user pointer, the slot, lives as long as the
+        // reader.
+        unsafe { bvnr_open_read_feed(self.reader.0.as_ptr(), mirror, &mut flags) }
     }
 
     /// `bvnr_read_feed`: `h.verified` sees the events `data` completes.
@@ -2968,10 +3108,10 @@ impl FrameParseHandle {
         mut flags: BvnrReadFlags,
         continue_past_failed: bool,
         max_document_size: u64,
+        hooks: Hooks,
     ) -> Option<Self> {
         let slot = new_slot();
-        flags.userdata = slot.cast();
-        flags.on_verified = Some(slot_on_verified as EventCallbackFn);
+        hooks.install(&mut flags, slot);
         let opts = BvnrDocStreamOpts {
             flags: &mut flags,
             userdata: slot.cast(),
@@ -3167,6 +3307,9 @@ pub enum DemuxItem<'a> {
 pub struct DemuxHandle {
     dm: std::ptr::NonNull<c_void>,
     attached: Attached,
+    /// The handlers of the call in progress, for the callbacks of the
+    /// document's reader.
+    slot: *mut Slot,
 }
 
 /// What a reader counts beside its error: recoveries, the bytes they
@@ -3188,6 +3331,7 @@ impl DemuxHandle {
         let handle = DemuxHandle {
             dm,
             attached: Attached::default(),
+            slot: new_slot(),
         };
         // SAFETY: the demux is live; `key` is NUL-terminated and copied.
         if key.is_some_and(|k| !unsafe { bvnr_demux_set_key(dm.as_ptr(), k.as_ptr()) }) {
@@ -3198,15 +3342,11 @@ impl DemuxHandle {
         Ok(handle)
     }
 
-    /// `bvnr_demux_open_feed` with the limits in `flags` (no callbacks):
-    /// starts a document.
-    pub fn open(&mut self, mut flags: BvnrReadFlags, deliver_events: bool) -> bool {
+    /// `bvnr_demux_open_feed` with the limits in `flags` and the callbacks
+    /// of `hooks`: starts a document.
+    pub fn open(&mut self, mut flags: BvnrReadFlags, deliver_events: bool, hooks: Hooks) -> bool {
         self.attached = Attached::default();
-        flags.userdata = std::ptr::null_mut();
-        flags.on_verified = None;
-        flags.on_unverified = None;
-        flags.on_error = None;
-        flags.want_unit = None;
+        hooks.install(&mut flags, self.slot);
         // SAFETY: the demux is live; `flags` is copied during the call. The
         // reader is re-armed, so it holds no pointer into an earlier input.
         unsafe { bvnr_demux_open_feed(self.dm.as_ptr(), &flags, deliver_events) }
@@ -3219,28 +3359,20 @@ impl DemuxHandle {
 
     /// Feeds `input` unless it is being drained already (or with `None`,
     /// after the finish, feeds nothing), then `bvnr_demux_next`, passing
-    /// over an event this binding does not know. A failure carries
-    /// `bvnr_demux_error` and the reader's error.
+    /// over an event this binding does not know; the reader's callbacks run
+    /// on `h`. A failure carries `bvnr_demux_error` and the reader's error.
     pub fn next<'s, 'a: 's>(
         &'s mut self,
         input: Option<&'a [u8]>,
+        h: &mut Handlers<'_>,
     ) -> Next<DemuxItem<'s>, (c_int, Option<ReaderError>)> {
         let dm = self.dm.as_ptr();
-        match (self.attached.0, input) {
+        let feed = match (self.attached.0, input) {
             (Some(a), Some(input)) if Attached::of(input) != Some(a) => return Next::OtherInput,
             (Some(_), None) => return Next::OtherInput,
-            (Some(_), Some(_)) | (None, None) => {}
-            (None, Some(input)) => {
-                // SAFETY: the demux is live. It keeps a pointer into `input`
-                // until `next` reports NONE; it reads through it only in
-                // `next`, which is called only with these same bytes borrowed
-                // again (checked above).
-                if !unsafe { bvnr_demux_feed(dm, input.as_ptr().cast(), input.len() as u64) } {
-                    return Next::Error((self.error(), self.reader_error()));
-                }
-                self.attached = Attached(Attached::of(input));
-            }
-        }
+            (Some(_), Some(_)) | (None, None) => None,
+            (None, Some(input)) => Some(input),
+        };
         let mut item = BvnrDemuxItem {
             channel: 0,
             data: std::ptr::null(),
@@ -3248,14 +3380,31 @@ impl DemuxHandle {
             event: 0,
             value: std::ptr::null(),
         };
-        let (rc, event) = loop {
-            // SAFETY: the demux is live, any attached input is borrowed for
-            // 'a, and `item` is writable.
-            let rc = unsafe { bvnr_demux_next(dm, &mut item) };
-            let event = crate::enums::Event::from_raw(item.event);
-            if rc != NEXT_EVENT || event.is_some() {
-                break (rc, event);
-            }
+        let attached = &mut self.attached;
+        // SAFETY: the slot is live. The demux is live; it keeps a pointer
+        // into a fed `input` until `next` reports NONE and reads through it
+        // only in `next`, which is called only with these same bytes
+        // borrowed again (checked above); any attached input is borrowed for
+        // 'a, and `item` is writable.
+        let step = unsafe {
+            with_slot(self.slot, h, || {
+                if let Some(input) = feed {
+                    if !bvnr_demux_feed(dm, input.as_ptr().cast(), input.len() as u64) {
+                        return None;
+                    }
+                    *attached = Attached(Attached::of(input));
+                }
+                Some(loop {
+                    let rc = bvnr_demux_next(dm, &mut item);
+                    let event = crate::enums::Event::from_raw(item.event);
+                    if rc != NEXT_EVENT || event.is_some() {
+                        break (rc, event);
+                    }
+                })
+            })
+        };
+        let Some((rc, event)) = step else {
+            return Next::Error((self.error(), self.reader_error()));
         };
         match (rc, event) {
             // SAFETY: the message lies in the input or in the channel's
@@ -3280,10 +3429,12 @@ impl DemuxHandle {
         }
     }
 
-    /// `bvnr_demux_finish`; call it only while nothing is attached.
-    pub fn finish(&mut self) -> bool {
-        // SAFETY: the demux is live; finishing reads no input.
-        unsafe { bvnr_demux_finish(self.dm.as_ptr()) }
+    /// `bvnr_demux_finish`; call it only while nothing is attached. The
+    /// reader's callbacks for the document's end run on `h`.
+    pub fn finish(&mut self, h: &mut Handlers<'_>) -> bool {
+        let dm = self.dm.as_ptr();
+        // SAFETY: the slot and the demux are live; finishing reads no input.
+        unsafe { with_slot(self.slot, h, || bvnr_demux_finish(dm)) }
     }
 
     /// `bvnr_demux_error`.
@@ -3333,14 +3484,364 @@ impl DemuxHandle {
 
 // SAFETY: a demux and its reader hold their whole state (bovnar.h,
 // THREADING); the attached input is only an address, read through only while
-// the caller lends the bytes to a call.
+// the caller lends the bytes to a call; the slot is owned by the handle alone
+// and empty between calls.
 unsafe impl Send for DemuxHandle {}
 
 impl Drop for DemuxHandle {
     fn drop(&mut self) {
-        // SAFETY: live and destroyed once; destroying reads no input.
-        unsafe { bvnr_demux_destroy(self.dm.as_ptr()) }
+        // SAFETY: both are live and released once, the demux first;
+        // destroying it reads no input and calls nothing back.
+        unsafe {
+            bvnr_demux_destroy(self.dm.as_ptr());
+            free_slot(self.slot);
+        }
     }
+}
+
+// ---------------------------------------------------------------------------
+// writer observer, mirror, canonicaliser: the writer's `on_event`, a sink
+// lent a `Write` for one call (the reader's mirror, the canonicaliser's
+// output), and the canonicalising observer driven by a reader.
+
+/// A writer's `on_event` observer: each event once it has been serialised,
+/// with what reached the output; false fails the write.
+pub type Observer = Box<dyn FnMut(&EventView<'_>) -> bool + Send>;
+
+/// What [`observer_trampoline`] reaches through the writer's userdata.
+pub struct ObserverState {
+    f: Observer,
+    panic: Option<Box<dyn std::any::Any + Send>>,
+}
+
+extern "C" fn observer_trampoline(ud: *mut c_void, ev: c_int, d: *const BvnrData) -> bool {
+    // SAFETY: `ud` is the `ObserverState` the writer handle owns, untouched
+    // by anything else while the writer runs; `d` is NULL or a bvnr_data_t
+    // whose pointers are valid for the call.
+    let (st, view) = unsafe {
+        (
+            &mut *ud.cast::<ObserverState>(),
+            EventView::new(ev, d.as_ref()),
+        )
+    };
+    if st.panic.is_some() {
+        return false;
+    }
+    let f = &mut st.f;
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&view))) {
+        Ok(go_on) => go_on,
+        Err(payload) => {
+            st.panic = Some(payload);
+            false
+        }
+    }
+}
+
+/// A callback sink whose destination is lent to it for one call at a time
+/// ([`lend`](Self::lend)): a reader's mirror, the canonicaliser's output.
+/// Between calls nothing is lent, and a push is dropped.
+pub struct LentSink {
+    /// From `Box::into_raw`; the sink's user pointer, freed in `Drop`.
+    state: *mut PushState,
+    sink: BvnrSink,
+}
+
+impl LentSink {
+    pub fn new() -> Self {
+        let state = Box::into_raw(Box::new(PushState::new(Out::Lent(None), u64::MAX)));
+        let mut sink = blank_sink();
+        // SAFETY: `state` is owned by this value and lives until it is
+        // dropped; a reader holding a copy of the sink pushes only inside a
+        // call its owner makes while this value is alive.
+        unsafe {
+            bvnr_sink_to_callback(
+                &mut sink,
+                push_trampoline,
+                Some(flush_trampoline),
+                state.cast(),
+            );
+        }
+        LentSink { state, sink }
+    }
+
+    /// The sink, for the library to copy.
+    pub fn sink(&self) -> &BvnrSink {
+        &self.sink
+    }
+
+    /// Runs `f` with `out` as the sink's destination, and takes it back when
+    /// `f` returns or unwinds.
+    pub fn lend<R>(&mut self, out: &mut dyn std::io::Write, f: impl FnOnce(&BvnrSink) -> R) -> R {
+        struct TakeBack(*mut PushState);
+        impl Drop for TakeBack {
+            fn drop(&mut self) {
+                // SAFETY: the state is live (owned by the LentSink borrowed
+                // for this call), and no push is running.
+                unsafe { (*self.0).out = Out::Lent(None) };
+            }
+        }
+        let raw: *mut (dyn std::io::Write + '_) = out;
+        // SAFETY: only the lifetime changes. The pointer is reachable
+        // through the state only until `TakeBack` clears it, which happens
+        // before `out`'s borrow ends, on return and on unwinding alike;
+        // nothing else uses `out` meanwhile.
+        let raw = unsafe {
+            std::mem::transmute::<*mut (dyn std::io::Write + '_), *mut (dyn std::io::Write + 'static)>(
+                raw,
+            )
+        };
+        // SAFETY: the state is live, and no push is running.
+        unsafe { (*self.state).out = Out::Lent(Some(raw)) };
+        let _take_back = TakeBack(self.state);
+        f(&self.sink)
+    }
+
+    /// What the last pushes failed with: a panic in the destination is
+    /// resumed, an I/O error returned. Either is cleared, so the sink can be
+    /// used again.
+    pub fn take_failure(&mut self) -> Option<std::io::Error> {
+        // SAFETY: the state is live, and no push is running.
+        let st = unsafe { &mut *self.state };
+        if let Some(payload) = st.panic.take() {
+            std::panic::resume_unwind(payload);
+        }
+        st.error.take()
+    }
+}
+
+impl Default for LentSink {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Drop for LentSink {
+    fn drop(&mut self) {
+        // SAFETY: from Box::into_raw, released once.
+        drop(unsafe { Box::from_raw(self.state) });
+    }
+}
+
+// SAFETY: the state is owned by this value alone; the destination it points
+// at is set only for the duration of a call on the calling thread.
+unsafe impl Send for LentSink {}
+
+/// [`ReaderHandle::read_mem`] with `mirror` receiving every byte the reader
+/// consumes: the same read, through a memory source and `src_mirror`.
+pub fn read_mem_mirror(
+    r: &mut ReaderHandle,
+    data: &[u8],
+    flags: BvnrReadFlags,
+    h: &mut Handlers<'_>,
+    mirror: &BvnrSink,
+) -> bool {
+    with_mem_source(data, |src| {
+        r.read_source_mirror(src, flags, h, Some(mirror))
+    })
+}
+
+/// An error as `on_error` reports it: (code, line, column, byte, offset).
+pub type ErrorReport = (c_int, u64, u64, u32, u64);
+
+thread_local! {
+    /// The first error a canonicalising read reported, (code, line, column,
+    /// byte, offset): `canon_on_error` has no userdata of its own, as the
+    /// observer is the read's userdata.
+    static CANON_FIRST_ERROR: std::cell::Cell<Option<ErrorReport>> =
+        const { std::cell::Cell::new(None) };
+}
+
+extern "C" fn canon_on_error(
+    _ud: *mut c_void,
+    err: c_int,
+    line: u64,
+    column: u64,
+    byte: u32,
+    offset: u64,
+) {
+    CANON_FIRST_ERROR.with(|c| {
+        if c.get().is_none() {
+            c.set(Some((err, line, column, byte, offset)));
+        }
+    });
+}
+
+/// Hands `set_version` the `#!bovnar M.N` leading the bytes a pull hands
+/// over before the reader sees them: the directive's whole line arrives
+/// before any value can, so the version is set before output begins.
+struct VersionSniff<'a> {
+    input: &'a mut dyn std::io::Read,
+    obs: *mut c_void,
+    head: Vec<u8>,
+    done: bool,
+}
+
+/// The most bytes [`VersionSniff`] gathers looking for the end of the first
+/// line.
+const SNIFF_CAP: usize = 1 << 16;
+
+impl VersionSniff<'_> {
+    fn look(&mut self, got: &[u8]) {
+        if got.is_empty() {
+            self.decide();
+            return;
+        }
+        self.head.extend_from_slice(got);
+        let head = &self.head;
+        if head.len() < 3 && b"\xef\xbb\xbf".starts_with(head) {
+            return; // a BOM, perhaps
+        }
+        let mut i = if head.starts_with(b"\xef\xbb\xbf") {
+            3
+        } else {
+            0
+        };
+        while i < head.len() && matches!(head[i], b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c) {
+            i += 1;
+        }
+        if i == head.len() {
+            if head.len() > SNIFF_CAP {
+                self.decide();
+            }
+        } else if head[i] != b'#' {
+            self.done = true;
+            self.head = Vec::new();
+        } else if head[i..].iter().any(|&b| b == b'\n' || b == b'\r') || head.len() > SNIFF_CAP {
+            self.decide();
+        }
+    }
+
+    fn decide(&mut self) {
+        self.done = true;
+        if let Some((major, minor)) = peek_version(&self.head) {
+            // SAFETY: the observer is live for the whole read, and nothing
+            // else uses it during a pull.
+            unsafe { bvnr_canon_observer_set_version(self.obs, major, minor) };
+        }
+        self.head = Vec::new();
+    }
+}
+
+impl std::io::Read for VersionSniff<'_> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let n = self.input.read(buf)?;
+        if !self.done {
+            self.look(&buf[..n.min(buf.len())]);
+        }
+        Ok(n)
+    }
+}
+
+/// Where a canonicalising read takes its input from.
+pub enum CanonInput<'a> {
+    Mem(&'a [u8]),
+    Read(&'a mut dyn std::io::Read),
+}
+
+/// How a canonicalising read ended.
+pub struct CanonOutcome {
+    /// What `bvnr_read` returned, and the reader's error.
+    pub read: Result<(), ReaderError>,
+    /// The errors a `continue_on_error` read recovered from, and the first.
+    pub recovered: u64,
+    pub first_error: Option<ErrorReport>,
+    /// What `bvnr_canon_observer_finish` returned (false when not called).
+    pub finished: bool,
+}
+
+/// Re-serialises `input` into `out` through `bvnr_canon_observer_*`: the
+/// observer is the read's `on_verified` itself, with itself as userdata, so
+/// no binding code runs per event. A leading version directive is handed to
+/// the observer first. `Err` is the input's or the output's I/O error (a
+/// panic in either is resumed); `None` an allocation failure.
+pub fn canonicalize(
+    input: CanonInput<'_>,
+    out: &mut dyn std::io::Write,
+    pretty: bool,
+    mut flags: BvnrReadFlags,
+) -> Option<Result<CanonOutcome, (ErrorKindIo, std::io::Error)>> {
+    let reader = ReaderHandle::new()?;
+    let mut lent = LentSink::new();
+    let r = reader.0.as_ptr();
+    let result = lent.lend(out, |sink| {
+        // SAFETY: `sink` is a callback sink, which the observer copies.
+        let obs =
+            unsafe { bvnr_canon_observer_create(std::ptr::from_ref(sink).cast_mut(), pretty) };
+        if obs.is_null() {
+            return None;
+        }
+        // SAFETY: the C function has the reader callback's signature
+        // (`bool (void*, bvnr_event_t, bvnr_data_t*)`; the binding's
+        // EventCallbackFn takes the data as *const, the same ABI), and the
+        // library calls it only with this read's userdata, the observer.
+        let on_event = unsafe {
+            std::mem::transmute::<
+                unsafe extern "C" fn(*mut c_void, c_int, *mut BvnrData) -> bool,
+                EventCallbackFn,
+            >(bvnr_canon_observer_on_event)
+        };
+        flags.on_verified = Some(on_event);
+        flags.on_unverified = None;
+        flags.want_unit = None;
+        flags.on_error = Some(canon_on_error as OnErrorFn);
+        flags.userdata = obs;
+        CANON_FIRST_ERROR.with(|c| c.set(None));
+        let read = |src: &mut BvnrSource| {
+            // SAFETY: the reader is live; `src` and `flags` outlive both
+            // calls, and the observer outlives the read.
+            unsafe {
+                bvnr_open_read_source(r, src, std::ptr::null_mut(), &mut flags) && bvnr_read(r)
+            }
+        };
+        let ok = match input {
+            CanonInput::Mem(data) => {
+                if let Some((major, minor)) = peek_version(data) {
+                    // SAFETY: the observer is live and has written nothing.
+                    unsafe { bvnr_canon_observer_set_version(obs, major, minor) };
+                }
+                Ok(with_mem_source(data, read))
+            }
+            CanonInput::Read(input) => {
+                let mut sniff = VersionSniff {
+                    input,
+                    obs,
+                    head: Vec::new(),
+                    done: false,
+                };
+                with_source(&mut sniff, read)
+            }
+        };
+        let first_error = CANON_FIRST_ERROR.with(std::cell::Cell::take);
+        // SAFETY: the reader is live; the getters only read it.
+        let recovered = unsafe { bvnr_reader_get_recovery_count(r) };
+        let outcome = ok.map(|ok| {
+            let read = if ok { Ok(()) } else { Err(reader.error()) };
+            // SAFETY: the observer is live; finishing flushes into the sink,
+            // whose destination is still lent.
+            let finished = read.is_ok() && unsafe { bvnr_canon_observer_finish(obs) };
+            CanonOutcome {
+                read,
+                recovered,
+                first_error,
+                finished,
+            }
+        });
+        // SAFETY: created above, destroyed once, after its last use.
+        unsafe { bvnr_canon_observer_destroy(obs) };
+        Some(outcome)
+    })?;
+    // The output's failure first: it is what stopped the read.
+    if let Some(e) = lent.take_failure() {
+        return Some(Err((ErrorKindIo::Output, e)));
+    }
+    Some(result.map_err(|e| (ErrorKindIo::Input, e)))
+}
+
+/// Which side of a [`canonicalize`] an I/O error came from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ErrorKindIo {
+    Input,
+    Output,
 }
 
 /// Checks every mirrored struct against the C compiler's own layout, as printed by the upstream ABI manifest generator

@@ -61,7 +61,7 @@ from functools import lru_cache
 from typing import Iterable, NamedTuple
 
 from ._ffi import get_library
-from ._fileio import PullSource, PushSink, is_stream
+from ._fileio import PullSource, PushSink, is_stream, push_sink
 from .enums import ErrorCode, Event
 from .exceptions import BovnarParseError, BovnarWriteError, BovnarArgumentError
 from .structs import (
@@ -181,13 +181,17 @@ def load_documents(data,
                    typed: bool = False,
                    continue_past_failed: bool = False,
                    max_document_size: int = 0,
+                   return_errors: bool = False,
                    **options) -> list:
     """Parse a frame stream into a list of documents (one dict per frame).
 
     With ``continue_past_failed=False`` (default) the first malformed document
     raises :class:`BovnarParseError`. With ``continue_past_failed=True`` every
     frame is processed and a failed document is represented by ``None`` in the
-    returned list. ``typed=True`` wraps scalars in :class:`bovnar.Quantity`.
+    returned list -- or, with ``return_errors=True``, by the
+    :class:`BovnarParseError` it failed with: its ``code`` the reader's error
+    code, its ``index`` the document's position in the stream (and in the
+    list). ``typed=True`` wraps scalars in :class:`bovnar.Quantity`.
 
     ``data`` may also be a socket or a binary file object, read until it
     reports end of input; the frames are then parsed one at a time as they are
@@ -219,7 +223,11 @@ def load_documents(data,
         return holder['parser'].on_event(ev, d)
 
     def on_document(index, ok, err):
-        results.append(holder['parser'].result() if ok else None)
+        if ok:
+            results.append(holder['parser'].result())
+        else:
+            results.append(_failed_document(lib, index, err)
+                           if return_errors else None)
         if not ok and fail['index'] is None:
             fail['index'], fail['err'] = index, err
         holder['parser'] = _new_parser()
@@ -278,6 +286,19 @@ def load_documents(data,
             code, message="frame stream: " + (msg_b.decode('utf-8') if msg_b
                                                else code.name.lower()))
     return results
+
+
+def _failed_document(lib, index: int, err: int) -> BovnarParseError:
+    """What ``return_errors=True`` puts in place of a failed document: its
+    error code, and its index in the stream as ``.index``. The code is all
+    the frame reader reports (no position)."""
+    code = ErrorCode(err)
+    msg_b = lib.bvn_error_to_string(int(code))
+    exc = BovnarParseError(
+        code, message=f"document {index} failed to parse: "
+                      + (msg_b.decode('utf-8') if msg_b else code.name.lower()))
+    exc.index = index
+    return exc
 
 
 # ===========================================================================
@@ -893,13 +914,17 @@ class DocumentFeed(_Feed):
     ``BovnarParseError`` for a document cut off part-way, as ``Reader`` does.
     Any other error raises from the ``feed()`` whose bytes hit it, with the
     position the reader reports, and the items that call had completed are
-    dropped. An exception from ``want_unit`` or ``on_error`` is re-raised
-    unchanged; they run inside the C call, so they may not close or feed this
-    feed. The keyword options are the reading options of
-    :meth:`Reader.read_mem` (:data:`bovnar.reader.READ_OPTIONS`), with its
-    ``want_unit`` and ``on_error`` but not its event callbacks: the items
-    stand in for them. ``typed`` applies to ``values=True``. One feed reads
-    one document.
+    dropped. An exception from ``want_unit``, ``on_error`` or
+    ``on_unverified`` is re-raised unchanged; they run inside the C call, so
+    they may not close or feed this feed. The keyword options are the
+    reading options of :meth:`Reader.read_mem`
+    (:data:`bovnar.reader.READ_OPTIONS`), with its ``want_unit``,
+    ``on_error``, ``on_unverified`` and ``mirror``; ``on_verified`` it has
+    not: the items stand in for it. ``on_unverified(event, data)`` sees each
+    raw lexer event of the bytes a call hands over, inside that call, and
+    ``mirror`` receives every byte the reader consumes, as for
+    :meth:`Reader.read_mem`. ``typed`` applies to ``values=True``. One feed
+    reads one document.
 
     The text of a document is capped at 2147483647 bytes
     (``TEXT_DATA_TOO_LONG``) and an array at as many items
@@ -915,6 +940,8 @@ class DocumentFeed(_Feed):
                  typed: bool = False,
                  want_unit=None,
                  on_error=None,
+                 on_unverified=None,
+                 mirror=None,
                  **options) -> None:
         super().__init__()
         self._busy   = False
@@ -927,10 +954,13 @@ class DocumentFeed(_Feed):
         self._events = events
         self._parser = _top_level_parser(typed) if values else None
         self._flags, self._cb_refs = self._reader._build_flags(
-            'DocumentFeed', self._on_event, None, want_unit, on_error,
-            options)
-        if not self._lib.bvnr_open_read_feed(self._reader._ptr, None,
-                                             ctypes.byref(self._flags)):
+            'DocumentFeed', self._on_event, on_unverified, want_unit,
+            on_error, options)
+        self._mirror = push_sink(mirror) if mirror is not None else None
+        if not self._lib.bvnr_open_read_feed(
+                self._reader._ptr,
+                ctypes.byref(self._mirror.handle) if self._mirror else None,
+                ctypes.byref(self._flags)):
             self._reader._raise_error()
 
     def _on_event(self, ev, data) -> bool:
@@ -945,6 +975,11 @@ class DocumentFeed(_Feed):
         return True
 
     def _check(self, ok: bool, queued: int) -> None:
+        mirror = self._mirror
+        if mirror is not None and mirror.exc is not None:
+            exc, mirror.exc = mirror.exc, None
+            self._drop_after(queued)
+            raise exc
         for cb in self._cb_refs:
             st = getattr(cb, '_bvnr_state', None)
             if st is not None and st.get('exc') is not None:
@@ -1028,7 +1063,11 @@ class FrameFeed(_Feed):
     * with ``parse=True`` each document parsed to a dict, exactly as
       :func:`load_documents` parses it (``typed``, ``continue_past_failed``,
       ``None`` for a failed document), each payload streamed into one reused
-      reader as it arrives, so a frame is never held whole.
+      reader as it arrives, so a frame is never held whole. With
+      ``return_errors=True`` a failed document is the
+      :class:`BovnarParseError` it failed with instead of ``None``, its
+      ``index`` the document's position in the stream, as for
+      :func:`load_documents`.
 
     The read options of :meth:`Reader.read_mem`
     (:data:`bovnar.reader.READ_OPTIONS`: ``max_text_bytes``,
@@ -1053,6 +1092,7 @@ class FrameFeed(_Feed):
                  continue_past_failed: bool = False,
                  max_document_size: int = 0,
                  view: bool = False,
+                 return_errors: bool = False,
                  **options) -> None:
         super().__init__()
         self._fr     = None
@@ -1065,10 +1105,11 @@ class FrameFeed(_Feed):
         # is a TypeError in either mode.
         read_flags('FrameFeed', options)
         if not parse:
-            if typed or continue_past_failed or any(options.values()):
+            if (typed or continue_past_failed or return_errors
+                    or any(options.values())):
                 raise BovnarArgumentError(
-                    "typed, continue_past_failed and the read options "
-                    "apply to parse=True")
+                    "typed, continue_past_failed, return_errors and the "
+                    "read options apply to parse=True")
             self._fr = lib.bvnr_frame_reader_create_pull(max_document_size)
             if not self._fr:
                 raise MemoryError("bvnr_frame_reader_create_pull() returned NULL")
@@ -1093,8 +1134,12 @@ class FrameFeed(_Feed):
             try:
                 # Without continue_past_failed a failed document is the
                 # stream's error, not an item.
-                if ok or self._continue:
-                    self._queue.append(st['parser'].result() if ok else None)
+                if ok:
+                    self._queue.append(st['parser'].result())
+                elif self._continue:
+                    self._queue.append(
+                        _failed_document(lib, int(index), int(err))
+                        if return_errors else None)
                 if not ok and st['index'] is None:
                     st['index'], st['err'] = int(index), int(err)
                 st['parser'] = new_parser()

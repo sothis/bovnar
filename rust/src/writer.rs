@@ -5,7 +5,7 @@ use crate::enums::{ErrorCode, Event, TokenType, ValueTypeFamily};
 use crate::error::{Error, Result};
 use crate::ffi::{self, BvnrWriteFlags, ValueTypeSpec};
 use crate::quantity::Quantity;
-use crate::reader::UnitPolicy;
+use crate::reader::{EventData, UnitPolicy};
 use crate::unit::Unit;
 
 /// Default size of the memory sink.
@@ -155,6 +155,51 @@ pub(crate) fn stream_to(
     ffi::with_scoped_out(&mut out, || write(&mut w).and_then(|()| w.finish()))
 }
 
+/// A writer's observer ([`WriteOptions::on_event`]): each event once it has
+/// been serialised, with what reached the output; returning false fails the
+/// write with `scanner_callback_failed`.
+pub type WriteObserver = Box<dyn FnMut(&EventData<'_>) -> bool + Send>;
+
+/// How a writer writes, for [`Writer::to_mem_with_options`] and
+/// [`Writer::to_writer_with_options`]. The default is what
+/// [`Writer::to_mem`] gives with `pretty` false.
+#[derive(Default)]
+pub struct WriteOptions {
+    /// Indent the output.
+    pub pretty: bool,
+    /// [`crate::units::UnitFlags`] rewriting units on output.
+    pub unit_flags: u32,
+    /// Lead the document with `#!bovnar <major>.<minor>`.
+    pub emit_version: bool,
+    /// Deepest struct nesting; 0 is 255, the format's limit, as for
+    /// [`crate::ReadOptions::max_struct_nesting`]. A deeper struct fails the
+    /// write with `struct_nesting_too_high`.
+    pub max_struct_nesting: u8,
+    /// Deepest array nesting; 0 is 255. A deeper array fails the write with
+    /// `array_nesting_too_high`.
+    pub max_array_nesting: u8,
+    /// Called with each event once it has been serialised
+    /// (`bvnr_write_flags_t.on_event`), with what reached the output: under
+    /// [`crate::units::UnitFlags::REDUCE`] a rescaled value's new digits and
+    /// unit, not the ones it was given. Returning false fails that write,
+    /// and the writer, with `scanner_callback_failed`; a panic in it reaches
+    /// the caller of the write.
+    pub on_event: Option<WriteObserver>,
+}
+
+impl std::fmt::Debug for WriteOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WriteOptions")
+            .field("pretty", &self.pretty)
+            .field("unit_flags", &self.unit_flags)
+            .field("emit_version", &self.emit_version)
+            .field("max_struct_nesting", &self.max_struct_nesting)
+            .field("max_array_nesting", &self.max_array_nesting)
+            .field("on_event", &self.on_event.as_ref().map(|_| ".."))
+            .finish()
+    }
+}
+
 /// A streaming BVNR writer into memory, or into a [`std::io::Write`].
 pub struct Writer {
     handle: ffi::WriterHandle,
@@ -181,9 +226,62 @@ impl Writer {
         unit_flags: u32,
         emit_version: bool,
     ) -> Result<Self> {
-        Self::open(unit_flags, emit_version, |h, flags| {
-            h.open_mem(cap, pretty, flags)
-        })
+        Self::open(
+            WriteOptions {
+                unit_flags,
+                emit_version,
+                ..WriteOptions::default()
+            },
+            |h, flags| h.open_mem(cap, pretty, flags),
+        )
+    }
+
+    /// [`Writer::to_mem`] with every [`WriteOptions`]: the nesting caps and
+    /// the `on_event` observer beside the options of
+    /// [`Writer::to_mem_with`].
+    ///
+    /// ```
+    /// use bovnar::{Event, Value, Writer, WriteOptions};
+    /// use std::sync::{Arc, Mutex};
+    ///
+    /// let seen = Arc::new(Mutex::new(Vec::new()));
+    /// let log = Arc::clone(&seen);
+    /// let options = WriteOptions {
+    ///     unit_flags: bovnar::units::UnitFlags::REDUCE,
+    ///     on_event: Some(Box::new(move |d| {
+    ///         if d.event == Event::Data {
+    ///             log.lock().unwrap().push(d.text());
+    ///         }
+    ///         true
+    ///     })),
+    ///     ..WriteOptions::default()
+    /// };
+    /// let mut w = Writer::to_mem_with_options(4096, options)?;
+    /// let Value::Struct(doc) = bovnar::parse_typed(b".d = <uint:64,k~m> 5;")? else {
+    ///     unreachable!()
+    /// };
+    /// let Value::Quantity(q) = &doc[0].1 else { unreachable!() };
+    /// w.write_quantity("d", q)?;
+    /// w.finish()?;
+    /// assert_eq!(w.get_output(), b".d=<uint:64,m>5000;");
+    /// assert_eq!(*seen.lock().unwrap(), ["5000"]);
+    /// # Ok::<(), bovnar::Error>(())
+    /// ```
+    pub fn to_mem_with_options(cap: usize, options: WriteOptions) -> Result<Self> {
+        let pretty = options.pretty;
+        Self::open(options, |h, flags| h.open_mem(cap, pretty, flags))
+    }
+
+    /// [`Writer::to_writer_with`] with every [`WriteOptions`]; `cap` is the
+    /// most bytes `out` takes, `usize::MAX` for no cap.
+    pub fn to_writer_with_options(
+        out: impl std::io::Write + Send + 'static,
+        cap: usize,
+        options: WriteOptions,
+    ) -> Result<Self> {
+        let pretty = options.pretty;
+        let state = ffi::PushState::owned(Box::new(out), cap as u64);
+        Self::open(options, |h, flags| h.open_sink(state, pretty, flags))
     }
 
     /// A writer whose document streams into any [`std::io::Write`], such as
@@ -239,15 +337,20 @@ impl Writer {
         unit_flags: u32,
         emit_version: bool,
     ) -> Result<Self> {
-        Self::open(unit_flags, emit_version, |h, flags| {
-            h.open_sink(state, pretty, flags)
-        })
+        Self::open(
+            WriteOptions {
+                unit_flags,
+                emit_version,
+                ..WriteOptions::default()
+            },
+            |h, flags| h.open_sink(state, pretty, flags),
+        )
     }
 
-    /// A fresh writer, opened by `open` with the crate's write flags.
+    /// A fresh writer, opened by `open` with the write flags of `options`
+    /// (its `pretty` is `open`'s to pass).
     fn open(
-        unit_flags: u32,
-        emit_version: bool,
+        options: WriteOptions,
         open: impl FnOnce(&mut ffi::WriterHandle, BvnrWriteFlags) -> bool,
     ) -> Result<Self> {
         let handle = ffi::WriterHandle::new().ok_or(Error::OutOfMemory("bvnr_writer_create()"))?;
@@ -259,11 +362,21 @@ impl Writer {
         };
         let mut flags = BvnrWriteFlags::zeroed();
         // The writer matches what the reader reads: the 255-level cap in both
-        // directions, where zero would select the C default of 64.
-        flags.max_struct_nesting = 255;
-        flags.max_array_nesting = 255;
-        flags.unit_flags = unit_flags;
-        flags.emit_version = emit_version;
+        // directions unless told otherwise, where zero would select the C
+        // default of 64.
+        let nesting = |n: u8| if n == 0 { 255 } else { n };
+        flags.max_struct_nesting = nesting(options.max_struct_nesting);
+        flags.max_array_nesting = nesting(options.max_array_nesting);
+        flags.unit_flags = options.unit_flags;
+        flags.emit_version = options.emit_version;
+        if let Some(mut f) = options.on_event {
+            w.handle.set_observer(
+                Box::new(move |view: &ffi::EventView<'_>| {
+                    EventData::from_view(view).is_none_or(|d| f(&d))
+                }),
+                &mut flags,
+            );
+        }
         if !open(&mut w.handle, flags) {
             return Err(w.error());
         }

@@ -889,3 +889,17 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     # still does.
     lib.bvn_dom_node_from_bigint.restype  = c_void_p
     lib.bvn_dom_node_from_bigint.argtypes = [c_void_p, ValueTypeSpec, ValueUnit]
+
+    # --- writer observer, mirror, canonicaliser ---
+    # The writer's on_event and nesting caps are fields of BvnrWriteFlags, the
+    # reader's mirror a sink argument of bvnr_open_read_* (declared above), and
+    # the canonicalising observer's functions are declared with the reader's;
+    # what is new here are the two per-type helpers the bindings had no way
+    # to reach otherwise (Writer.write_plain, Writer.write_datetime).
+    lib.bvnr_write_plain.restype  = c_bool
+    lib.bvnr_write_plain.argtypes = [c_void_p, c_char_p, c_char_p]
+
+    lib.bvnr_write_datetime.restype  = c_bool
+    lib.bvnr_write_datetime.argtypes = [
+        c_void_p, c_char_p, c_uint32, c_char_p, c_int64,
+    ]

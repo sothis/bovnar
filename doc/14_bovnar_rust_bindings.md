@@ -37,6 +37,7 @@ enums are Rust enums, and an error carries the library's error kind.
     - 4.7 [Files and I/O streams (`std::io::Read` / `Write`)](#47-files-and-io-streams-stdioread--write)
     - 4.8 [Live streams: the framing codec (`bovnar::codec`)](#48-live-streams-the-framing-codec-bovnarcodec)
     - 4.9 [Live documents through C (`bovnar::live`)](#49-live-documents-through-c-bovnarlive)
+    - 4.10 [Canonical form](#410-canonical-form)
 5. [Unit helpers](#5-unit-helpers)
     - 5.1 [The unit-profile notations (spec 1.2)](#51-the-unit-profile-notations-spec-12)
     - 5.2 [Extended unit functions](#52-extended-unit-functions)
@@ -71,6 +72,8 @@ enums are Rust enums, and an error carries the library's error kind.
     - 11.6 [Version directive](#116-version-directive)
     - 11.7 [Array helpers](#117-array-helpers)
     - 11.8 [Low-level `emit`](#118-low-level-emit)
+    - 11.9 [Observing the output: `on_event`](#119-observing-the-output-on_event)
+    - 11.10 [The C per-type helpers](#1110-the-c-per-type-helpers)
 12. [DOM API](#12-dom-api)
     - 12.1 [`DomDoc::parse`](#121-domdocparse)
     - 12.2 [`DomDoc`](#122-domdoc)
@@ -540,10 +543,34 @@ All arguments are positional:
 | `frame_documents(docs)` | already-serialised documents, `&[impl AsRef<[u8]>]` |
 | `dump_documents(values, pretty)` | `&[Value]` |
 | `load_documents(data, typed, continue_past_failed, max_document_size)` | `max_document_size` 0 is the default cap (`BVNR_DOC_DEFAULT_MAX`, 256 MiB) |
+| `load_documents_results(data, typed, max_document_size, options)` | every frame read, a failed document `Err` with its error code |
 | `mux_dump(messages, key)` | `(u64, payload)` pairs; the conventional key is `"mux"` |
 | `mux_load(data, max_message, key)` | `max_message` 0 is the default cap (`BVNR_MUX_DEFAULT_MAX`, 64 MiB); `key` `None` accepts any |
 | `embed_document(inner, key, pretty)` | the conventional key is `"payload"` |
 | `parse_embedded(inner, typed)` | |
+
+`load_documents` with `continue_past_failed` gives `None` for a document that
+failed, and the error is gone. `load_documents_results` (and
+`load_documents_reader_results`) keep it: every frame is read, as with
+`continue_past_failed`, and the document at index *i* is `Ok(value)` or the
+`Err` it failed with — an `Error::Parse` with the document's error code and no
+position, which the frame reader does not report. The outer `Err` is the
+stream's own failure: the framing, a frame over the cap. `live::FrameParser`
+hands each document's index and result to `on_document` already
+([§4.9](#49-live-documents-through-c-bovnarlive)).
+
+```rust
+use bovnar::{ErrorCode, ReadOptions, Value, stream};
+
+fn main() -> Result<(), bovnar::Error> {
+    let frames = stream::frame_documents(&[&b".a = 1;"[..], b".a = @;", b".b = 2;"])?;
+    let docs = stream::load_documents_results(&frames, false, 0, &ReadOptions::default())?;
+    assert_eq!(docs[0], Ok(Value::Struct(vec![("a".into(), Value::Int(1))])));
+    assert_eq!(docs[1].as_ref().unwrap_err().code(), Some(ErrorCode::UnexpectedInputByte));
+    assert!(docs[2].is_ok());
+    Ok(())
+}
+```
 
 `parse_embedded` returns an `Error::Parse` carrying the inner document's own
 error code and, where the library reported one, its position. `mux_dump`
@@ -967,14 +994,93 @@ fn main() -> Result<(), bovnar::Error> {
 }
 ```
 
+**Every handler.** `feed` and `finish` take the event handler alone.
+`feed_with(bytes, handlers)` and `finish_with(handlers)` take a
+`ReadHandlers` ([§10.2](#102-read_mem)), as `Reader::read_mem_with` does:
+`on_verified`, the raw lexer events of `on_unverified`, the `want_unit` hook
+and `on_error` — which sees each error a `continue_on_error` document recovers
+from — called inside the call that parses the bytes they concern. `ValueFeed`
+takes them through its own `feed_with(bytes, out, handlers)` and
+`finish_with(out, handlers)`, its `on_verified` seeing each event after the
+value builder has. The C reader is given its callbacks when a document starts,
+so the first call of a document decides whether `on_unverified` and
+`want_unit` are called for the whole of it: a later call that needs one the
+document was not started with is an `Error::Argument` (`reset()` starts the
+next document, decided afresh), and a later call may pass fewer. A panic in a
+handler reaches the caller of the call, and the document has failed.
+
+```rust
+use bovnar::live::DocumentFeed;
+use bovnar::{EventData, ReadHandlers, ReadOptions, Unit};
+
+fn main() -> Result<(), bovnar::Error> {
+    let mut feed = DocumentFeed::new(&ReadOptions::default())?;
+    let (mut tokens, mut metres) = (0, Vec::new());
+    for piece in [&b".d = <uint:64,k~m"[..], b"> 3; .e = 4;"] {
+        let mut on_raw = |_: &EventData<'_>| { tokens += 1; true };
+        let mut want = |d: &EventData<'_>| {
+            (!d.value_unit.is_dimensionless()).then(|| (Unit::parse("m").unwrap(), 0))
+        };
+        let mut on_value = |d: &EventData<'_>| {
+            if d.converted { metres.push(String::from_utf8_lossy(d.converted_text).into_owned()); }
+            true
+        };
+        feed.feed_with(piece, ReadHandlers {
+            on_verified: Some(&mut on_value),
+            on_unverified: Some(&mut on_raw),
+            want_unit: Some(&mut want),
+            on_error: None,
+        })?;
+    }
+    feed.finish(&mut |_| true)?;
+    assert!(tokens > 0);
+    assert_eq!(metres, ["3000"]);
+    Ok(())
+}
+```
+
+**The mirror.** `set_mirror(w)` gives the feed any `std::io::Write + Send`
+that receives every byte the reader consumes (`src_mirror`, a debugging aid):
+each piece fed, once the reader has parsed it, so a document that fails has
+mirrored the input up to the start of the piece the error is in. It starts the
+next document, as `reset()` does, and stays for every document after;
+`take_mirror::<W>()` hands it back as the type it was given (`None`, and the
+mirror kept, for another type), and the rest of a document in progress is not
+mirrored. A failing mirror fails the document with an `Error::Io` with
+`writing_to_sink`; a panic in it reaches the caller. `ValueFeed` has the same
+two methods. For a `Reader`, `read_mem_mirror` and `read_reader_mirror` take a
+`&mut dyn std::io::Write` for the one read ([§10.2](#102-read_mem)). The frame
+readers and the demux take no mirror, as the C objects behind them do not:
+their caller holds the bytes it feeds.
+
+```rust
+use bovnar::ReadOptions;
+use bovnar::live::DocumentFeed;
+
+fn main() -> Result<(), bovnar::Error> {
+    let mut feed = DocumentFeed::new(&ReadOptions::default())?;
+    feed.set_mirror(Vec::<u8>::new())?;
+    for piece in [&b".a = 1;"[..], b"  # note\n.b = 2;"] {
+        feed.feed(piece, &mut |_| true)?;
+    }
+    feed.finish(&mut |_| true)?;
+    assert_eq!(feed.take_mirror::<Vec<u8>>().unwrap(), b".a = 1;  # note\n.b = 2;");
+    Ok(())
+}
+```
+
 **Frames.** `FramePull` hands out each framed document's bytes, to be parsed
 by a reused `DocumentFeed` or `ValueFeed` (or `parse`); `codec::FrameReader`
 does the same in pure Rust. `FrameParser::new(&options, continue_past_failed,
 max_document_size)` parses every document as `stream::load_documents` does,
 streaming each frame's payload into one reused reader so that a frame is never
 held whole: `feed(bytes, on_event, on_document)` calls `on_document(index,
-result)` for each document it completes, and its returning false ends the
-stream with `scanner_callback_failed`. A bad magic is
+result)` for each document it completes — `Ok(())` or the `Err` with the
+document's error code — and its returning false ends the stream with
+`scanner_callback_failed`. `feed_with(bytes, handlers, on_document)` takes a
+`ReadHandlers` for the documents, as `DocumentFeed::feed_with` does; the frame
+reader is given its callbacks when the stream starts, so the first feed
+decides whether `on_unverified` and `want_unit` are called. A bad magic is
 `unexpected_input_byte`, a frame over the cap `value_out_of_range`, a stream
 that does not end on a frame boundary `got_incomplete_bvnr_stream` at `finish`.
 
@@ -1013,7 +1119,13 @@ refused with an `Error::Argument`); `reset()`
 starts the next document: the channel buffers are kept, the channel ids (and
 with them the 4096-channel count) start afresh, as `codec::MuxReader::reset`
 does. `recovery_count()`, `skipped_bytes()` and `declared_version()` are those
-of the demux's reader, as on `DocumentFeed`.
+of the demux's reader, as on `DocumentFeed`. `next_with(input, handlers)` and
+`finish_with(handlers)` take a `ReadHandlers` for that reader, which parses
+inside `next` and `finish`: its `on_verified` sees every verified event, the
+stream's chunks included, before the demux does, and `on_unverified`,
+`want_unit` and `on_error` are a `Reader`'s. The first call of a document
+decides which of `on_verified`, `on_unverified` and `want_unit` its reader
+calls, as for `DocumentFeed`.
 
 ```rust
 use bovnar::live::{Demux, DemuxItem, DemuxOptions, ValueBuilder};
@@ -1167,6 +1279,54 @@ Feeding costs what reading the whole buffer costs, wherever the pieces are cut:
 the time is the parser's. `ValueFeed` hands each assignment out as it
 completes, where `parse` looks up every key in the document built so far,
 which is what costs it the most on a document of many keys.
+
+### 4.10 Canonical form
+
+`bovnar::canonicalize(data, pretty, &options)` re-serialises a document from its
+verified events through the C library's canonicalising observer
+(`bvnr_canon_observer_*`, doc/08 §3.6) and returns the bytes;
+`canonicalize_reader(input, out, pretty, &options)` reads any `std::io::Read`
+as it parses and writes to any `std::io::Write` as the output is made, in
+64 KiB pieces, so neither is held whole.
+
+```rust
+use bovnar::{ReadOptions, canonicalize};
+
+fn main() -> Result<(), bovnar::Error> {
+    let options = ReadOptions::default();
+    let canon = canonicalize(b".a = 1 ;  # one\n.b = { .c = \"x\"; };", false, &options)?;
+    assert_eq!(canon, b".a=<uint:64,_10,no_unit>1;.b={.c=<utf8>\"x\";};");
+    assert_eq!(canonicalize(&canon, false, &options)?, canon); // idempotent
+    assert_eq!(canonicalize(b".a=1;.b={.c=\"x\";};", false, &options)?, canon);
+    let mut out = Vec::new();
+    bovnar::canonicalize_reader(&b"#!bovnar 1.1\n.a = 1;"[..], &mut out, true, &options)?;
+    assert!(out.starts_with(b"#!bovnar 1.1\n"));
+    Ok(())
+}
+```
+
+It is the form `bovnar events -d` prints (`-p` for `pretty`): the compact one
+is a single line with no whitespace outside literals, each value written with
+the annotation the reader gives it (`1` as `<uint:64,_10,no_unit>1`). Two
+documents that differ only in layout, comments and the spelling of separators
+canonicalise to the same bytes, and canonicalising the output again gives it
+back unchanged; the order of the keys is kept. Units are written as the
+document spelled them: this is not `bovnar pretty-print --canonical`, which
+writes through a writer under `UnitFlags::REDUCE | UnitFlags::NUM_CANONICAL`
+and folds them to one form. A leading `#!bovnar M.N` directive is kept — from
+an `std::io::Read` it is found in the first bytes read, before the reader sees
+them.
+
+The document is read under `options`, and one the reader refuses is its
+`Error::Parse`. Under `continue_on_error` a document the reader had to recover
+from is refused too, with the first error it recovered from (code and
+position): the observer writes what it is fed, and the statement a recovery
+leaves without its value would make the output unreadable. A failing `input`
+is an `Error::Io` with `reading_from_source_fd`, a failing `out` one with
+`writing_to_sink`, and a panic in either reaches the caller; after an error
+`out` may hold the start of the output. The observer's C function is the
+reader's `on_verified` itself, with the observer as its userdata, so no Rust
+runs per event.
 
 ---
 
@@ -2396,6 +2556,9 @@ read_mem_want_unit(data, options, want_unit: &mut dyn FnMut(&EventData) -> Optio
                    on_verified) -> Result<()>
 
 read_mem_with(data, options, handlers: ReadHandlers) -> Result<()>
+
+read_mem_mirror(data, options, handlers: ReadHandlers,
+                mirror: &mut dyn std::io::Write) -> Result<()>
 ```
 
 Parse BVNR from a byte slice. The options are the `ReadOptions` struct, and the
@@ -2427,6 +2590,29 @@ fn main() -> Result<(), Error> {
         ReadHandlers { on_error: Some(&mut on_error), ..ReadHandlers::default() },
     );
     assert_eq!(recovered.first(), Some(&13)); // the '@'
+    Ok(())
+}
+```
+
+`read_mem_mirror` (and `read_reader_mirror` over a `std::io::Read`) is
+`read_mem_with` with `mirror` receiving every byte the reader consumes — the
+input mirror of `bvnr_open_read_source`, a debugging aid — comments and
+octet-stream payloads included, so after a read that succeeded it holds the
+input. The bytes reach it a piece at a time, each once the reader has parsed
+it: a buffer pulled (up to 64 KiB), a piece fed, an octet-stream chunk. A read
+that fails, or that a handler stops, has mirrored the input up to the start of
+the piece it stopped in. A failing `mirror` ends the read with an `Error::Io`
+with `writing_to_sink`; a panic in it reaches the caller. A `live::DocumentFeed`
+takes one with `set_mirror` ([§4.9](#49-live-documents-through-c-bovnarlive)).
+
+```rust
+use bovnar::{ReadHandlers, ReadOptions, Reader};
+
+fn main() -> Result<(), bovnar::Error> {
+    let mut seen = Vec::new();
+    Reader::new()?.read_mem_mirror(b".a = 1;  # note\n", &ReadOptions::default(),
+                                   ReadHandlers::default(), &mut seen)?;
+    assert_eq!(seen, b".a = 1;  # note\n");
     Ok(())
 }
 ```
@@ -2541,13 +2727,37 @@ The same position is on the `Error` itself — see
 | `Writer::to_mem_with(cap, pretty, unit_flags, emit_version)` | `to_mem` with two more settings: `unit_flags` ([`UnitFlags`](#53-unitflags)) rewrite units on output, `emit_version` leads the document with `#!bovnar <major>.<minor>` |
 | `Writer::to_writer(out, pretty)` | Write to any `std::io::Write`: the document streams into `out` in 64 KiB blocks as it is written, the rest on `flush()` or `finish()`, which flush `out`; no cap on its size |
 | `Writer::to_writer_with(out, cap, pretty, unit_flags, emit_version)` | `to_writer` for a document of at most `cap` bytes (`sink_buffer_exhausted` past it, from the call that pushes the output over it), plus `unit_flags` and `emit_version` as in `to_mem_with` |
+| `Writer::to_mem_with_options(cap, options: WriteOptions)` | `to_mem` with every write option, below |
+| `Writer::to_writer_with_options(out, cap, options: WriteOptions)` | `to_writer_with` with every write option; `cap` `usize::MAX` is no cap |
 
-See [§4.7](#47-files-and-io-streams-stdioread--write) for the I/O writer. Every writer accepts structs and arrays nested up to **255** deep,
+See [§4.7](#47-files-and-io-streams-stdioread--write) for the I/O writer. By default every writer accepts structs and arrays nested up to **255** deep,
 the same limit `Reader` and `parse()` read at. `unit_flags` takes
 [`UnitFlags`](#53-unitflags) — `REDUCE` rewrites each unit and rescales its
 value, `ASCII_EXP` writes `^N` exponents, `NUM_CANONICAL` keeps a rescaled float
 in float shape. `emit_version: true` writes a leading `#!bovnar M.N` naming the
 spec version this build implements, as `write_version()` would.
+
+`WriteOptions` is the whole of `bvnr_write_flags_t` that the C writer
+consults, with a `Default`: `pretty`, `unit_flags`, `emit_version`, the
+nesting caps `max_struct_nesting` and `max_array_nesting` (`0` is 255, as for
+`ReadOptions`; a struct or an array one level deeper fails the write with
+`struct_nesting_too_high` or `array_nesting_too_high`), and `on_event`, the
+observer of [§11.9](#119-observing-the-output-on_event). It holds a boxed
+closure, so it is passed by value and is not `Clone`.
+
+```rust
+use bovnar::{ErrorCode, WriteOptions, Writer};
+
+fn main() -> Result<(), bovnar::Error> {
+    let options = WriteOptions { max_struct_nesting: 2, ..WriteOptions::default() };
+    let mut w = Writer::to_mem_with_options(4096, options)?;
+    w.begin_struct("a")?;
+    w.begin_struct("b")?;
+    let err = w.begin_struct("c").unwrap_err();
+    assert_eq!(err.code(), Some(ErrorCode::StructNestingTooHigh));
+    Ok(())
+}
+```
 
 The high-level `to_string` needs no buffer size: it retries on a writer twice
 the size until the output fits (up to 256 MiB).
@@ -2835,6 +3045,94 @@ fn main() -> Result<(), bovnar::Error> {
     w.emit(Event::Data, EmitSpec::value("42", spec))?;
     w.finish()?;
     assert_eq!(bovnar::parse(w.get_output())?, bovnar::parse(b".x = <uint:16> 42;")?);
+    Ok(())
+}
+```
+
+### 11.9 Observing the output: `on_event`
+
+`WriteOptions::on_event` is a `Box<dyn FnMut(&EventData<'_>) -> bool + Send>`
+(`WriteObserver`), called with each event once it has been serialised
+(`bvnr_write_flags_t.on_event`), with what reached the output: under
+`UnitFlags::REDUCE` a rescaled value's new digits and unit, not the ones it was
+written with. Every event the writer serialises reaches it — those of the
+`write_*` methods, `emit`, the struct and array helpers, the mux and
+embedding calls. It is owned by the writer, so it shares state with the code
+around it through an `Arc` (or a channel); it cannot reach the writer itself.
+
+```rust
+use bovnar::units::UnitFlags;
+use bovnar::{Event, Quantity, Unit, ValueTypeFamily, ValueTypeSpec, WriteOptions, Writer};
+use std::sync::{Arc, Mutex};
+
+fn main() -> Result<(), bovnar::Error> {
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let log = Arc::clone(&seen);
+    let options = WriteOptions {
+        unit_flags: UnitFlags::REDUCE,
+        on_event: Some(Box::new(move |d| {
+            if d.event == Event::Data {
+                log.lock().unwrap().push((d.text(), d.value_unit.to_string()));
+            }
+            true
+        })),
+        ..WriteOptions::default()
+    };
+    let mut w = Writer::to_mem_with_options(4096, options)?;
+    let uint = ValueTypeSpec { family: ValueTypeFamily::Uint as i32, width: 64, base: 0 };
+    w.write_quantity("d", &Quantity::new("5", uint, Unit::parse("k~m")?))?;
+    w.finish()?;
+    assert_eq!(w.get_output(), b".d=<uint:64,m>5000;");
+    assert_eq!(*seen.lock().unwrap(), [("5000".to_string(), "m".to_string())]);
+    Ok(())
+}
+```
+
+Returning false fails the write, and the writer, with
+`scanner_callback_failed`: a veto, say of a key that must not leave the
+process. A panic in the observer fails it the same way and reaches the caller
+of the write call that ran it; a later call returns the `Error::Write`.
+
+### 11.10 The C per-type helpers
+
+The bindings write every value through `bvnr_write_event`; each of the C
+per-type helpers has its counterpart, so none is bound itself:
+
+| C helper | Rust |
+|---|---|
+| `bvnr_write_string`, `_null`, `_bool` | `write_string`, `write_null`, `write_bool` |
+| `bvnr_write_uint`, `_sint`, `_float`, `_float_fix`, `_float_dec` | the methods of [§11.3](#113-scalar-write-methods) |
+| their `_unit` forms, `bvnr_writer_set_unit_source` | `write_quantity`, whose `Quantity` carries the unit and its spelling (`unit_source`) |
+| `bvnr_write_datetime` | `write_quantity` with a `datetime` type (the epoch in its `base`, `datetime_epoch_index`) |
+| `bvnr_write_plain` | `event(Event::Data, TokenType::Symbol, …)` after the key, or `write_quantity` of a symbol |
+| `bvnr_write_type_annotation` | `annotation(vt, &unit, unit_source)`, before a value or an array's first row |
+| `bvnr_write_bvnf*`, `bvnr_write_bvni*` | `write_bvnf_base`, `write_bvni`, `write_big_int` ([§11.4](#114-extended-integer-writers)) |
+| `bvnr_write_struct_start`, `_end` | `begin_struct`, `end_struct` ([§11.5](#115-struct-helpers)) |
+
+```rust
+use bovnar::{
+    EmitSpec, Event, Quantity, TokenType, Unit, ValueTypeFamily, ValueTypeSpec, Writer,
+    datetime_epoch_index,
+};
+
+fn main() -> Result<(), bovnar::Error> {
+    let mut w = Writer::to_mem_with(4096, false, 0, true)?; // datetime is spec 1.1
+    w.emit(Event::AssignmentStart, EmitSpec::key("mode"))?;
+    w.event(Event::Data, TokenType::Symbol, ValueTypeSpec::default(), b"auto")?;
+    let tai = datetime_epoch_index("tai").unwrap();
+    let datetime = ValueTypeSpec { family: ValueTypeFamily::Datetime as i32, width: 64, base: tai };
+    w.write_quantity("t", &Quantity::new("1750000000", datetime, Unit::default()))?;
+    let u8_ = ValueTypeSpec { family: ValueTypeFamily::Uint as i32, width: 8, base: 0 };
+    w.emit(Event::AssignmentStart, EmitSpec::key("v"))?;
+    w.annotation(u8_, &Unit::parse("m")?, None)?;
+    w.begin_array_row()?;
+    w.event(Event::Data, TokenType::ArrayNumber, u8_, b"1")?;
+    w.event(Event::Data, TokenType::ArrayNumber, u8_, b"2")?;
+    w.end_array_row()?;
+    w.finish()?;
+    let out = w.get_output();
+    let body = &out[out.iter().position(|&b| b == b'\n').unwrap() + 1..];
+    assert_eq!(body, b".mode=auto;.t=<datetime:64,tai>1750000000;.v=<uint:8,m>[1,2];");
     Ok(())
 }
 ```

@@ -33,7 +33,7 @@ from .enums import (
 )
 from .exceptions import BovnarWriteError, BovnarArgumentError
 from .structs import (
-    BvnrSink, BvnrWriteFlags, BvnrData,
+    BvnrSink, BvnrWriteFlags, BvnrData, EVENT_CALLBACK_FUNC,
     ValueTypeSpec, ValueUnit,
     build_unit_policy, describe_unit_policy_refusal,
     make_type_spec, make_unit_dimensionless, make_unit_none,
@@ -57,6 +57,11 @@ class Writer:
         self._buf_cap  = 0
         self._finished = False
         self._struct_depth = 0
+        # The on_event observer: its ctypes callback, and a state holding the
+        # exception it raised (for the write call to re-raise) and whether it
+        # is running.
+        self._observer = None
+        self._observer_state = None
 
         ptr = self._lib.bvnr_writer_create()
         if not ptr:
@@ -64,14 +69,17 @@ class Writer:
         self._ptr = ptr
 
     @staticmethod
-    def _make_flags(unit_flags, emit_version) -> BvnrWriteFlags:
+    def _make_flags(unit_flags, emit_version, max_struct_nesting=0,
+                    max_array_nesting=0) -> BvnrWriteFlags:
         """The write options every constructor opens with.
 
         NESTING. The reader is opened at the 255-level cap in both directions
         (reader.py says why: it is what the CLI and the DOM use), and a zeroed
         bvnr_write_flags_t selects the C default of 64 -- so a document
         loads() had just taken, nested 65 to 255 deep, was refused by dumps()
-        with *_nesting_too_high. The writer now matches what the reader reads.
+        with *_nesting_too_high. The writer now matches what the reader reads:
+        ``max_struct_nesting`` / ``max_array_nesting`` 0 is 255, as in the
+        reader's READ_OPTIONS, and 1 to 255 is that cap.
 
         UNIT FLAGS AND THE DIRECTIVE. Both are fields this struct has always
         mirrored and no constructor let a caller set, while set_unit_policy's
@@ -80,12 +88,65 @@ class Writer:
         NUM_CANONICAL); `emit_version` writes a leading "#!bovnar M.N" naming
         the spec version this build implements, as write_version() would.
         """
+        def nesting(name, n):
+            if type(n) is not int or not 0 <= n <= 255:
+                raise BovnarArgumentError(
+                    f"{name} must be an int from 0 to 255, not {n!r}")
+            return n or 255
         flags = BvnrWriteFlags()
-        flags.max_struct_nesting = 255
-        flags.max_array_nesting  = 255
+        flags.max_struct_nesting = nesting('max_struct_nesting',
+                                           max_struct_nesting)
+        flags.max_array_nesting  = nesting('max_array_nesting',
+                                           max_array_nesting)
         flags.unit_flags         = int(unit_flags)
         flags.emit_version       = bool(emit_version)
         return flags
+
+    def _install_observer(self, flags: BvnrWriteFlags, on_event) -> None:
+        """Point ``flags.on_event`` at a callback running ``on_event(event,
+        data)`` after each event is serialised, with what reached the output
+        (bvnr_write_event: a BVN_UNIT_REDUCE rescale shows the rescaled
+        digits). ``data`` is a snapshot the observer may keep. Returning
+        ``False`` fails the write with SCANNER_CALLBACK_FAILED; an exception
+        it raises fails it too, and is re-raised from the write call."""
+        if on_event is None:
+            return
+        if not callable(on_event):
+            raise BovnarArgumentError(
+                f"on_event must be callable, not {type(on_event).__name__}")
+        from .reader import Reader          # deferred, as the package root does
+        snapshot = Reader._snapshot
+        # No reference to self: the callback lives on the writer, and a cycle
+        # would leave the C writer to the garbage collector.
+        state = {'exc': None, 'busy': False}
+
+        def _c_cb(_ud, ev, dptr) -> bool:
+            if state['exc'] is not None:
+                return False
+            state['busy'] = True
+            try:
+                data = snapshot(dptr.contents) if dptr else None
+                result = on_event(Event(ev), data)
+                return True if result is None else bool(result)
+            except BaseException as exc:            # noqa: BLE001 (re-raised by the write)
+                state['exc'] = exc
+                return False
+            finally:
+                state['busy'] = False
+
+        self._observer = EVENT_CALLBACK_FUNC(_c_cb)
+        self._observer_state = state
+        flags.on_event = self._observer
+
+    @classmethod
+    def _opened(cls, unit_flags, emit_version, on_event, max_struct_nesting,
+                max_array_nesting):
+        """A fresh writer and the flags to open it with."""
+        flags = cls._make_flags(unit_flags, emit_version, max_struct_nesting,
+                                max_array_nesting)
+        w = cls()
+        w._install_observer(flags, on_event)
+        return w, flags
 
     @classmethod
     def to_mem(cls,
@@ -94,9 +155,27 @@ class Writer:
                *,
                pretty: bool = True,
                unit_flags: int = 0,
-               emit_version: bool = False) -> 'Writer':
+               emit_version: bool = False,
+               on_event=None,
+               max_struct_nesting: int = 0,
+               max_array_nesting: int = 0) -> 'Writer':
+        """A writer into memory: ``buf`` (a bytearray of at least ``cap``
+        bytes) or a buffer of its own; :meth:`get_output` is the document.
 
-        w = cls()
+        The keywords are those of every constructor. ``pretty`` indents the
+        output. ``unit_flags`` (:class:`UnitFlags`) rewrites units on output,
+        and ``emit_version`` leads the document with ``#!bovnar M.N``.
+        ``max_struct_nesting`` and ``max_array_nesting`` cap the nesting
+        (``0`` is 255, the format's limit); a deeper struct or array fails
+        the write with ``STRUCT_NESTING_TOO_HIGH`` or
+        ``ARRAY_NESTING_TOO_HIGH``. ``on_event(event, data)`` observes each
+        event once it has been serialised, with what reached the output (a
+        ``UnitFlags.REDUCE`` rescale shows the rescaled digits); returning
+        ``False`` fails the write with ``SCANNER_CALLBACK_FAILED``, and an
+        exception it raises is re-raised from the write call.
+        """
+        w, flags = cls._opened(unit_flags, emit_version, on_event,
+                               max_struct_nesting, max_array_nesting)
 
         if buf is not None:
             if len(buf) < cap:
@@ -109,7 +188,6 @@ class Writer:
         w._buf     = raw_buf
         w._buf_cap = cap
 
-        flags = cls._make_flags(unit_flags, emit_version)
         ok = w._lib.bvnr_open_write_mem(
             w._ptr,
             ctypes.cast(raw_buf, ctypes.c_void_p),
@@ -123,17 +201,21 @@ class Writer:
 
     @classmethod
     def to_fd(cls, fd: int, *, pretty: bool = True,
-              unit_flags: int = 0, emit_version: bool = False) -> 'Writer':
+              unit_flags: int = 0, emit_version: bool = False,
+              on_event=None, max_struct_nesting: int = 0,
+              max_array_nesting: int = 0) -> 'Writer':
+        """A writer into file descriptor ``fd``; the keywords are those of
+        :meth:`to_mem`."""
 
         if not isinstance(fd, int) or fd < 0:
             raise BovnarArgumentError(f"Invalid file descriptor: {fd!r}")
 
-        w    = cls()
+        w, flags = cls._opened(unit_flags, emit_version, on_event,
+                               max_struct_nesting, max_array_nesting)
         sink = BvnrSink()
         w._lib.bvnr_sink_to_fd(ctypes.byref(sink), fd)
         w._sink = sink
 
-        flags = cls._make_flags(unit_flags, emit_version)
         ok = w._lib.bvnr_open_write_sink(
             w._ptr,
             ctypes.byref(sink),
@@ -146,17 +228,19 @@ class Writer:
 
     @classmethod
     def to_stream(cls, stream, *, pretty: bool = True,
-                  unit_flags: int = 0, emit_version: bool = False) -> 'Writer':
+                  unit_flags: int = 0, emit_version: bool = False,
+                  on_event=None, max_struct_nesting: int = 0,
+                  max_array_nesting: int = 0) -> 'Writer':
         """Write to a socket (``sendall``) or a binary file object
         (``write``). The writer batches its output into a 64 KiB buffer and
         pushes each full buffer, then the rest at :meth:`flush` or
         :meth:`finish`, which also call the object's ``flush`` when it has
         one. An exception the object raises is re-raised from the write call
-        that pushed, unchanged."""
+        that pushed, unchanged. The keywords are those of :meth:`to_mem`."""
         sink = PushSink(stream)
-        w = cls()
+        w, flags = cls._opened(unit_flags, emit_version, on_event,
+                               max_struct_nesting, max_array_nesting)
         w._stream = sink
-        flags = cls._make_flags(unit_flags, emit_version)
         ok = w._lib.bvnr_open_write_sink(
             w._ptr,
             ctypes.byref(sink.handle),
@@ -169,13 +253,22 @@ class Writer:
 
     @classmethod
     def to_file(cls, path: str, *, pretty: bool = True,
-                unit_flags: int = 0, emit_version: bool = False) -> 'Writer':
+                unit_flags: int = 0, emit_version: bool = False,
+                on_event=None, max_struct_nesting: int = 0,
+                max_array_nesting: int = 0) -> 'Writer':
+        """A writer into the file at ``path``, created or truncated; the
+        keywords are those of :meth:`to_mem`."""
 
         import os
+        # Check the options before the file is created or truncated.
+        cls._make_flags(unit_flags, emit_version, max_struct_nesting,
+                        max_array_nesting)
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
         try:
             w = cls.to_fd(fd, pretty=pretty, unit_flags=unit_flags,
-                          emit_version=emit_version)
+                          emit_version=emit_version, on_event=on_event,
+                          max_struct_nesting=max_struct_nesting,
+                          max_array_nesting=max_array_nesting)
         except BaseException:
             os.close(fd)
             raise
@@ -224,6 +317,16 @@ class Writer:
             raise BovnarArgumentError(
                 "the writer is in use by its own sink: it cannot be finished, "
                 "flushed or destroyed from the object's write() or flush()")
+        self._check_not_observing()
+
+    def _check_not_observing(self) -> None:
+        # The observer runs inside bvnr_write_event: writing, finishing or
+        # destroying the writer from there would run the writer inside itself.
+        state = getattr(self, '_observer_state', None)
+        if state is not None and state['busy']:
+            raise BovnarArgumentError(
+                "the writer is in use by its own on_event observer: it cannot "
+                "be written to, finished, flushed or destroyed from there")
 
     def finish(self) -> None:
 
@@ -346,6 +449,8 @@ class Writer:
 
         if self._ptr is None:
             raise BovnarArgumentError("Writer has been destroyed")
+        if self._observer_state is not None:
+            self._check_not_observing()
 
         d     = BvnrData()
         _keep = []
@@ -573,8 +678,7 @@ class Writer:
         (:func:`bovnar.spec_version`), the same directive ``emit_version=True``
         writes. Pass both to declare an older version explicitly; giving only
         one raises BovnarArgumentError."""
-        if self._ptr is None:
-            raise BovnarArgumentError("Writer has been destroyed")
+        self._check_writable()
         if major is None and minor is None:
             maj, mn = ctypes.c_uint16(0), ctypes.c_uint16(0)
             self._lib.bvnr_spec_version(ctypes.byref(maj), ctypes.byref(mn))
@@ -596,13 +700,14 @@ class Writer:
                    unit_si_prefix: SIPrefix = SIPrefix.NONE,
                    unit_si_exp: Exponent = Exponent.LINEAR,
                    unit_iec_base: BaseUnit | None = None,
-                   unit_iec_prefix: IECPrefix = IECPrefix.NONE) -> None:
+                   unit_iec_prefix: IECPrefix = IECPrefix.NONE,
+                   unit_source: str | None = None) -> None:
 
         vt  = make_type_spec(ValueTypeFamily.UINT, width, base)
         vu  = self._resolve_unit(unit_str, unit_si_base, unit_si_prefix,
                                  unit_si_exp, unit_iec_base, unit_iec_prefix)
         val = self._format_uint(value, base, width)
-        self._write_scalar(key, 'uint', vt, vu, val)
+        self._write_scalar(key, 'uint', vt, vu, val, unit_source)
 
     def write_sint(self,
                    key: str,
@@ -613,14 +718,15 @@ class Writer:
                    unit_str: str | None = None,
                    unit_si_base: BaseUnit | None = None,
                    unit_si_prefix: SIPrefix = SIPrefix.NONE,
-                   unit_si_exp: Exponent = Exponent.LINEAR) -> None:
+                   unit_si_exp: Exponent = Exponent.LINEAR,
+                   unit_source: str | None = None) -> None:
 
         self._refuse_signed_high_base(base)
         vt  = make_type_spec(ValueTypeFamily.SINT, width, base)
         vu  = self._resolve_unit(unit_str, unit_si_base, unit_si_prefix,
                                  unit_si_exp, None, IECPrefix.NONE)
         val = self._format_sint(value, base)
-        self._write_scalar(key, 'sint', vt, vu, val)
+        self._write_scalar(key, 'sint', vt, vu, val, unit_source)
 
     def write_float(self,
                     key: str,
@@ -630,13 +736,14 @@ class Writer:
                     unit_str: str | None = None,
                     unit_si_base: BaseUnit | None = None,
                     unit_si_prefix: SIPrefix = SIPrefix.NONE,
-                    unit_si_exp: Exponent = Exponent.LINEAR) -> None:
+                    unit_si_exp: Exponent = Exponent.LINEAR,
+                    unit_source: str | None = None) -> None:
 
         vt  = make_type_spec(ValueTypeFamily.FLOAT, width, 0)
         vu  = self._resolve_unit(unit_str, unit_si_base, unit_si_prefix,
                                  unit_si_exp, None, IECPrefix.NONE)
         val = self._format_float(value, vt)
-        self._write_scalar(key, 'float', vt, vu, val)
+        self._write_scalar(key, 'float', vt, vu, val, unit_source)
 
     def write_float_fix(self,
                         key: str,
@@ -647,13 +754,14 @@ class Writer:
                         unit_str: str | None = None,
                         unit_si_base: BaseUnit | None = None,
                         unit_si_prefix: SIPrefix = SIPrefix.NONE,
-                        unit_si_exp: Exponent = Exponent.LINEAR) -> None:
+                        unit_si_exp: Exponent = Exponent.LINEAR,
+                        unit_source: str | None = None) -> None:
 
         vt  = make_type_spec(ValueTypeFamily.FLOAT_FIX, width, q)
         vu  = self._resolve_unit(unit_str, unit_si_base, unit_si_prefix,
                                  unit_si_exp, None, IECPrefix.NONE)
         val = self._format_float(value, make_type_spec(ValueTypeFamily.FLOAT, width, 0))
-        self._write_scalar(key, 'float_fix', vt, vu, val)
+        self._write_scalar(key, 'float_fix', vt, vu, val, unit_source)
 
     def write_float_dec(self,
                         key: str,
@@ -663,13 +771,99 @@ class Writer:
                         unit_str: str | None = None,
                         unit_si_base: BaseUnit | None = None,
                         unit_si_prefix: SIPrefix = SIPrefix.NONE,
-                        unit_si_exp: Exponent = Exponent.LINEAR) -> None:
+                        unit_si_exp: Exponent = Exponent.LINEAR,
+                        unit_source: str | None = None) -> None:
 
         vt  = make_type_spec(ValueTypeFamily.FLOAT_DEC, width, 0)
         vu  = self._resolve_unit(unit_str, unit_si_base, unit_si_prefix,
                                  unit_si_exp, None, IECPrefix.NONE)
         val = self._format_float(value, make_type_spec(ValueTypeFamily.FLOAT, width, 0))
-        self._write_scalar(key, 'float_dec', vt, vu, val)
+        self._write_scalar(key, 'float_dec', vt, vu, val, unit_source)
+
+    def write_plain(self, key: str, value: str) -> None:
+        """``.key = value;`` with ``value`` written bare, as a plain symbol
+        (``bvnr_write_plain``): ``.mode = auto;``. The C writer refuses a
+        value that is not a symbol (``ILLEGAL_SYMBOL``) and a ``key`` that is
+        not an identifier."""
+        from .stream import _writer_key     # deferred: avoids an import cycle
+        self._check_writable()
+        if not isinstance(value, str) or '\0' in value:
+            raise BovnarArgumentError(
+                f"write_plain() takes a str without NUL bytes, not {value!r}")
+        if not self._lib.bvnr_write_plain(self._ptr, _writer_key(key),
+                                          value.encode('utf-8')):
+            self._raise_error()
+
+    def write_datetime(self, key: str, value: int, *, width: int = 64,
+                       epoch: str | None = None) -> None:
+        """``.key = <datetime:width[,epoch]> value;``: ``value`` signed
+        seconds since ``epoch`` (``"unix"``, the default, ``"tai"``,
+        ``"gps"``, ``"mjd"``, ``"ntp"``, ``"galileo"``, ``"glonass"``,
+        ``"y2000"``, ``"beidou"``), as ``bvnr_write_datetime`` writes it.
+
+        Datetime is spec 1.1, so the document must have declared it first:
+        open the writer with ``emit_version=True`` or call
+        :meth:`write_version` before any value. Without that the write fails
+        with ``UNSUPPORTED_SPEC_VERSION``; the key is in the output by then
+        and the writer is in its error state. An unknown epoch is
+        ``INVALID_ARGUMENT`` from the C writer, with the same effect; it is
+        refused here first, before anything is written."""
+        from .stream import _writer_key     # deferred: avoids an import cycle
+        self._check_writable()
+        if type(value) is not int or not -(1 << 63) <= value < (1 << 63):
+            raise BovnarArgumentError(
+                f"write_datetime() takes an int that fits 64 signed bits, "
+                f"not {value!r}")
+        if type(width) is not int or not 0 <= width < (1 << 32):
+            raise BovnarArgumentError(f"invalid datetime width {width!r}")
+        ep = None
+        if epoch is not None:
+            ep = epoch.encode('utf-8')
+            if self._lib.bvnr_datetime_epoch_index(ep) < 0:
+                raise BovnarArgumentError(f"unknown datetime epoch {epoch!r}")
+        if not self._lib.bvnr_write_datetime(self._ptr, _writer_key(key),
+                                             width, ep, value):
+            self._raise_error()
+
+    def write_type_annotation(self, vt: ValueTypeSpec, unit=None, *,
+                              unit_source: str | None = None) -> None:
+        """A type annotation, ``<family:width[,_base|,qQ|,epoch][,unit]>``,
+        for the value written next (``bvnr_write_type_annotation``): after
+        the key of an assignment, with :meth:`emit` sending the value, or
+        before the first row of an array, which it then types whole.
+        ``unit`` is a :class:`Unit`, a ``ValueUnit`` or a unit string;
+        ``unit_source`` its own spelling, written in place of the canonical
+        one (the C writer checks that it spells ``unit``).
+
+            w.emit(Event.ASSIGNMENT_START, key="v")
+            w.write_type_annotation(make_type_spec(ValueTypeFamily.UINT, 8))
+            w.begin_array_row(); ...
+
+        Only the parameters that say something are written, as for the typed
+        ``write_*`` methods: no width of 0, no base 10, no unit on a string
+        or a datetime."""
+        self._check_writable()
+        if not isinstance(vt, ValueTypeSpec):
+            raise BovnarArgumentError(
+                f"write_type_annotation() takes a ValueTypeSpec, not "
+                f"{type(vt).__name__}")
+        if unit is None:
+            vu = make_unit_none()
+        elif isinstance(unit, str):
+            vu = self._resolve_unit(unit, None, SIPrefix.NONE,
+                                    Exponent.LINEAR, None, IECPrefix.NONE)
+        else:
+            from .unit import _as_vu        # deferred, as the package root does
+            vu = _as_vu(unit)
+            if not isinstance(vu, ValueUnit):
+                raise BovnarArgumentError(
+                    f"unit must be a Unit, a ValueUnit or a str, not "
+                    f"{type(unit).__name__}")
+        if unit_source is not None and vu.num_components == 0:
+            raise BovnarArgumentError(
+                f"unit_source {unit_source!r} given without a unit")
+        name = ValueTypeFamily(int(vt.family)).name.lower()
+        self._emit_annotation(name, vt, vu, unit_source)
 
     def write_string(self, key: str, value: str) -> None:
 
@@ -791,9 +985,18 @@ class Writer:
                       family_name: str,
                       vt: ValueTypeSpec,
                       vu: ValueUnit,
-                      val: str) -> None:
+                      val: str,
+                      unit_source: str | None = None) -> None:
+        # unit_source: the unit's own spelling, written in the annotation in
+        # place of the canonical one (bvnr_data_t.unit_source; the C writer
+        # checks that it spells this unit). A value without a unit has no
+        # annotation parameter to carry it, so it is refused, as
+        # bvnr_writer_set_unit_source refuses a spelling for one.
+        if unit_source is not None and vu.num_components == 0:
+            raise BovnarArgumentError(
+                f"unit_source {unit_source!r} given for a value without a unit")
         self.emit(Event.ASSIGNMENT_START, key=key)
-        self._emit_annotation(family_name, vt, vu)
+        self._emit_annotation(family_name, vt, vu, unit_source)
 
         _SPECIAL = frozenset(('nan', 'inf', 'ninf'))
         _decimal_float_families = frozenset((
@@ -932,7 +1135,8 @@ class Writer:
                         unit_str: str | None = None,
                         unit_si_base: BaseUnit | None = None,
                         unit_si_prefix: SIPrefix = SIPrefix.NONE,
-                        unit_si_exp: Exponent = Exponent.LINEAR) -> None:
+                        unit_si_exp: Exponent = Exponent.LINEAR,
+                        unit_source: str | None = None) -> None:
 
         if base not in (10, 16):
             raise BovnarArgumentError(
@@ -941,7 +1145,7 @@ class Writer:
         vt  = make_type_spec(ValueTypeFamily.FLOAT, width, vt_base)
         vu  = self._resolve_unit(unit_str, unit_si_base, unit_si_prefix,
                                  unit_si_exp, None, IECPrefix.NONE)
-        self._write_scalar(key, 'float', vt, vu, value_str)
+        self._write_scalar(key, 'float', vt, vu, value_str, unit_source)
 
     def write_bvni(self,
                    key: str,
@@ -953,7 +1157,8 @@ class Writer:
                    unit_str: str | None = None,
                    unit_si_base: BaseUnit | None = None,
                    unit_si_prefix: SIPrefix = SIPrefix.NONE,
-                   unit_si_exp: Exponent = Exponent.LINEAR) -> None:
+                   unit_si_exp: Exponent = Exponent.LINEAR,
+                   unit_source: str | None = None) -> None:
 
         if signed is None:
             use_signed = value < 0
@@ -968,7 +1173,7 @@ class Writer:
                                  unit_si_exp, None, IECPrefix.NONE)
         val = self._format_bigint(value, base)
         family_name = 'sint' if use_signed else 'uint'
-        self._write_scalar(key, family_name, vt, vu, val)
+        self._write_scalar(key, family_name, vt, vu, val, unit_source)
 
     def _raise_error(self) -> None:
         # A stream writer's sink fails because its object raised; that
@@ -976,13 +1181,19 @@ class Writer:
         # is raised once, from the call that pushed: a later call on the failed
         # writer raises the latched BovnarWriteError, chained to it, so it does
         # not look like a second failure of the transport.
-        cause = None
+        # The on_event observer's exception is the same kind of failure: the
+        # write it stopped raises it, later ones the latched
+        # SCANNER_CALLBACK_FAILED chained to it.
+        state = self._observer_state
+        if state is not None and state['exc'] is not None:
+            exc, state['exc'] = state['exc'], None
+            self._stream_failure = exc
+            raise exc
         if self._stream is not None and self._stream.exc is not None:
             exc, self._stream.exc = self._stream.exc, None
             self._stream_failure = exc
             raise exc
-        if self._stream is not None:
-            cause = getattr(self, '_stream_failure', None)
+        cause = getattr(self, '_stream_failure', None)
         code   = ErrorCode(self._lib.bvnr_writer_get_error(self._ptr))
         offset = self._lib.bvnr_writer_get_error_offset(self._ptr)
         msg_b  = self._lib.bvn_error_to_string(int(code))

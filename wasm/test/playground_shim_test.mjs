@@ -786,6 +786,42 @@ console.log('# a skipped assignment does not leak its annotation');
      `leak: a written annotation still lands ${show(b && b.ann)}`);
 }
 
+/* The annotation's resolved view must not invent parameters the format cannot
+   write. Only uint/sint/float have a base parameter; a datetime's slot holds
+   the epoch (a `_10` there is not even writable), and float_fix/float_dec have
+   no base parameter at all. The synthesised flag for a bare datetime comes from
+   the group's text and parameter count: the reader emits no type_base for it,
+   so the old signal could not see the default it invented. */
+console.log('# annotation parameters the format can actually write');
+{
+  const annOf = (text) => P.parseFaithful(text).tree.children[0].ann;
+  const kinds = (a) => (a && a.params ? a.params.map(p => p.kind) : []);
+  const bare = annOf('#!bovnar 1.1\n.t = 2026-06-15T12:00:00Z;');
+  ok(bare && bare.synthesized === true,
+     `datetime default is tagged synthesised ${show(bare)}`);
+  ok(bare && !kinds(bare).includes('base') &&
+     bare.params.some(p => p.kind === 'epoch' && p.text === 'unix'),
+     `datetime default has no base parameter ${show(bare)}`);
+  const explicit = annOf('#!bovnar 1.1\n.t = <datetime:64,tai> 2026-06-15T12:00:00Z;');
+  ok(explicit && explicit.synthesized === false &&
+     !kinds(explicit).includes('base') &&
+     explicit.params.some(p => p.kind === 'epoch' && p.text === 'tai'),
+     `explicit datetime annotation ${show(explicit)}`);
+  const noWidth = annOf('#!bovnar 1.1\n.t = <datetime> 2026-06-15T12:00:00Z;');
+  ok(noWidth && noWidth.synthesized === false,
+     `explicit <datetime> is not called synthesised ${show(noWidth)}`);
+  const ff = annOf('.v = <float_fix:16,q8,°C> 1.5;');
+  ok(ff && !kinds(ff).includes('base') &&
+     ff.params.some(p => p.kind === 'q' && p.value === 8),
+     `float_fix keeps q, not a base ${show(ff)}`);
+  const fd = annOf('.v = <float_dec:64,$USD> 1.5;');
+  ok(fd && !kinds(fd).includes('base'),
+     `float_dec has no base parameter ${show(fd)}`);
+  const ui = annOf('.v = 1;');
+  ok(ui && ui.params.some(p => p.kind === 'base' && p.text === '_10'),
+     `uint still shows the resolved _10 ${show(ui)}`);
+}
+
 /* A float_fix annotation's q is a parameter of its own, not a radix. The C
    event carries "q": 8; the shim used to read a `text` the event never had, so
    parseBovnar rendered {kind:'q', text:undefined}. Pinned against the C so a
@@ -990,6 +1026,11 @@ console.log('# the website demos and playground run on this shim');
   /* the event tree draws the stream end only when the reader delivered one */
   ok(/res\.events\.some\(\(e\) => e\.ev === 'stream_end'\)/.test(page),
      'page: the playground appends a stream_end the reader did not deliver');
+  /* A decoded datetime is its epoch-second carrier, not an ISO string: the
+     mission MET must come from the frame's decoded .mission_time, never from
+     Date.parse() of the stamp (which is NaN and silently used the sim clock). */
+  ok(/tmm\.mission_time/.test(page) && !/metFromStamp\(/.test(page),
+     'page: mission MET does not use the decoded mission_time');
 
   /* The config editors are the one place a demo validates user-typed text, so
      they ask for the document tier (duplicate keys, array shapes); the frames

@@ -536,6 +536,24 @@ API and implements spec 1.2.
     with a duplicate key or a heterogeneous array was accepted where the
     playground and `bovnar validate` refuse it. Config parsing now asks for the
     document tier (once per Apply); the per-frame decoders stay single-pass.
+  - *The playground's annotation view invented parameters the format cannot
+    write.* It spelled a `base _10` for a datetime (whose parameter slot holds
+    the epoch — a base is `error_illegal_value_type` there) and for
+    `float_fix`/`float_dec` (which have no base parameter at all), and it
+    tagged a bare datetime literal's synthesised default as **explicit**,
+    because the reader emits no `type_base` for that family and the old signal
+    could not see it. A datetime now carries width + epoch, float_fix keeps
+    its q, and the synthesised tag for a datetime comes from the reader's own
+    group text and parameter count.
+  - *The mission demo parsed DECODED datetimes as ISO strings.* The reader's
+    datetime value is its epoch-second carrier, not the literal the frame
+    wrote, so `Date.parse` returned NaN: editing `.orbit.epoch` was silently
+    ignored and the status MET always fell back to the simulation clock,
+    although the comment said it came from the decoded stamp. MET now comes
+    from the frame's decoded `.mission_time` (a plain seconds value), and the
+    epoch accepts the carrier, falling back to a spelling. The README now
+    states the carrier explicitly, beside the `float_fix` `base`-is-`q`
+    caveat and `converted_unit`'s `"no_unit"`.
   - A page-wiring test now fails if any demo decoder (or the playground) stops
     going through `BovnarParser.parseFaithful`, or if the page, shim, wrapper
     and core cache stamps stop naming each other — the claims the landing page

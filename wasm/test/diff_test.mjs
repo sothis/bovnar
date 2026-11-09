@@ -643,16 +643,39 @@ console.log('# unit policy (vs the CLI)');
   // A rule names one field, asserts it, and converts it. A rule that matches
   // NOTHING is satisfied — the C contract, and the opposite of a value it
   // cannot check.
-  const rule = b.createPolicy().rule('.speed', 'm/s');
+  const rule = b.createPolicy().rule('.speed', 'm');   // convert mode
   const bad = '.speed = 2 kg;';
   ok(b.validate(bad, { policy: rule }).error_name ===
-     cliValidate(bad, ['--require-field', '.speed=m/s']).error_name,
+     cliValidate(bad, ['--field', '.speed=m']).error_name,
      'policy rule: a wrong unit is refused, as the CLI refuses it');
-  ok(b.validate('.speed = 2 m/s;', { policy: rule }).ok,
+  ok(b.validate('.speed = 2 m;', { policy: rule }).ok,
      'policy rule: a convertible value passes');
   ok(b.validate('.other = 1;', { policy: rule }).ok,
      'policy rule: a rule that matches nothing is satisfied');
+  // Convert mode DELIVERS the conversion; require mode asserts and delivers as
+  // written. Same document, same path, two modes — the difference the old test
+  // could not see (it compared a convert-mode rule with --require-field).
+  const convEv = b.events('.speed = 2 km;', { policy: rule })
+    .events.find(x => x.ev === 'data');
+  ok(convEv && convEv.converted === '2000' && convEv.converted_unit === 'm',
+     `policy rule convert: delivered converted ${JSON.stringify(convEv)}`);
   rule.dispose();
+  const reqRule = b.createPolicy().rule('.speed', 'm', { mode: 'require' });
+  ok(b.validate('.speed = 2 km;', { policy: reqRule }).ok &&
+     cliValidate('.speed = 2 km;', ['--require-field', '.speed=m']).ok,
+     'policy rule require: a convertible value passes');
+  const reqEv = b.events('.speed = 2 km;', { policy: reqRule })
+    .events.find(x => x.ev === 'data');
+  ok(reqEv && reqEv.converted === undefined && reqEv.unit === 'k~m',
+     `policy rule require: delivered as written ${JSON.stringify(reqEv)}`);
+  reqRule.dispose();
+  // A convert rule renders the result in its own base.
+  const baseRule = b.createPolicy().rule('.speed', 'm', { base: 16 });
+  const baseEv = b.events('.speed = 2 km;', { policy: baseRule })
+    .events.find(x => x.ev === 'data');
+  ok(baseEv && baseEv.converted === '7d0' && baseEv.converted_base === 16,
+     `policy rule base: ${JSON.stringify(baseEv)}`);
+  baseRule.dispose();
 
   const dim = b.createPolicy().requireConvertibleTo('m');
   ok(b.validate('.a = 1;', { policy: dim }).error_name ===

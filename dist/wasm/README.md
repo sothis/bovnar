@@ -262,11 +262,20 @@ canonical, so the two surfaces are not interchangeable field for field.
   decimal 10 (`bvn_effective_base`).
 - On a **datetime**, an event's `base` field is the **epoch index**, not a
   radix: 0 is unix, 1 is tai, and the epoch's name is beside it in `epoch`.
-  (`doc()` reports `base: null` for a datetime and the epoch by name.)
+  Its `text` is the epoch-second **carrier** the format stores, not the ISO
+  literal the document wrote; any sub-second digits are in `frac`.
+  (`doc()` reports `base: null` for a datetime and the epoch by name.) A unix
+  carrier converts with `new Date(seconds * 1000)`; other epochs need the
+  leap-second table, which this module does not expose.
 - Numbers in `text` are the source spelling, not a JS number. A wide integer's
   digits live only there (or in `converted_num`/`converted_den`).
-- A `float_fix` value's `q` is its fixed-point scaling; a `type_q` parameter
-  event carries it as `q`, never as `base`.
+- On a **`float_fix`**, an event's `base` field is its `q` (the fixed-point
+  scaling), not a radix: `<float_fix:16,q8>` reports `base: 8` on its
+  `type_start` and `data` events. A `type_q` parameter event carries the same
+  number as `q` instead, so the parameter's kind is never ambiguous.
+- `converted_unit` is the canonical spelling of the target, so a conversion to
+  the dimensionless unit reports `"no_unit"`; a value's own `unit` is absent
+  when the value has no unit. The two spell the same absence differently.
 
 ### The event stream
 

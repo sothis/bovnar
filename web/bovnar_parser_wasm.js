@@ -226,31 +226,29 @@
    * has to branch the same way the reader does, or `<float_fix:16,q8,°C>` reads
    * as "base 8" and `<datetime:64,tai>` as "base 1" — a radix neither value has.
    *
-   * A radix of 0 means "no explicit base", which resolves to decimal: the CLI
-   * prints that as <uint:64,_10,no_unit>, and so does this.
+   * Only uint/sint/float have a base PARAMETER at all. The other three answer
+   * error_illegal_value_type for a base (`<float_fix:…,_16>`, `<float_dec:…,_16>`,
+   * `<datetime:…,_16>`): their carriers are decimal by definition — a Q-format
+   * fraction, an IEEE 754-2008 decimal, and a signed second count — and their
+   * slot holds q, nothing, or the epoch index. This used to spell a `_10` base
+   * for all of them, so the tree showed a parameter the format cannot write
+   * (and, for a datetime, one that is not what the slot means). The resolved
+   * view keeps the CLI's `_10` only where a base parameter exists; a radix of 0
+   * means "not written", which resolves to decimal.
    */
-  /*
-   * The radix the carrier is actually written in. uint/sint/float keep it in the
-   * slot — 0 meaning "not written", which is decimal, and float admits only _10
-   * or _16. The other three cannot take a base parameter at all: the reader
-   * answers error_illegal_value_type for <float_fix:…,_16>, <float_dec:…,_16>
-   * and <datetime:…,_16>, because their carriers are decimal by definition — a
-   * Q-format fraction, an IEEE 754-2008 decimal, and a signed second count
-   * "validated exactly like sint (signed, decimal)" (spec §6.2). Their slot is
-   * busy holding something else (q, nothing, the epoch index), so the radix is
-   * stated here rather than read out of it.
-   */
-  function annBase(v) {
-    switch (v.familyName) {
-      case 'float_fix': case 'float_dec': case 'datetime': return 10;
-      default: return v.base || 10;
-    }
-  }
   function annFromValue(v, synthesized) {
     var params = [];
     if (v.width != null) params.push({ kind: 'width', text: String(v.width), value: v.width });
-    var base = annBase(v);
-    params.push({ kind: 'base', text: '_' + base, value: base });
+    if (v.familyName === 'datetime') {
+      /* No unit and no base parameter: the slot holds the epoch. */
+      if (v.epoch) params.push({ kind: 'epoch', text: v.epoch });
+      return { synthesized: synthesized, familyName: v.familyName,
+               family: 'vt_' + v.familyName, params: params };
+    }
+    if (v.familyName !== 'float_fix' && v.familyName !== 'float_dec') {
+      var base = v.base || 10;
+      params.push({ kind: 'base', text: '_' + base, value: base });
+    }
     if (v.familyName === 'float_fix' && v.base != null)
       params.push({ kind: 'q', text: 'q' + v.base, value: v.base });
     /* Dimensionless is a statement, not an absence: bvn_unit_to_string answers
@@ -259,11 +257,8 @@
        annotation that spells it out (an explicit one that merely omits the unit
        is a structurally distinct internal state, spec §11), but these rows show
        the RESOLVED annotation — the same reason base 0 reads as 10 — so every
-       unitless value says so. Except a datetime, whose parameter slot holds the
-       epoch reported below; it has no unit to have none of. */
-    if (v.familyName !== 'datetime')
-      params.push({ kind: 'unit', text: v.unit || 'no_unit' });
-    if (v.epoch)         params.push({ kind: 'epoch', text: v.epoch });
+       unitless value says so. */
+    params.push({ kind: 'unit', text: v.unit || 'no_unit' });
     return { synthesized: synthesized, familyName: v.familyName,
              family: 'vt_' + v.familyName, params: params };
   }
@@ -321,6 +316,15 @@
        attached to a value that HAS a unit: a datetime's epoch arrives in the
        same parameter slot, and `<datetime:64,tai>` does not make `tai` a unit. */
     var annUnit = null;
+    /* The current annotation group, for the one family whose synthesised flag
+       the type_base signal cannot state: a datetime emits no type_base at all
+       (its slot holds the epoch index, and a base parameter is illegal for it),
+       so a bare datetime literal's default group looks exactly like an
+       explicit `<datetime>`+width one. The reader's own sign is the group's
+       TEXT: the synthesised default is spelled "datetime" and resolves a
+       width (one parameter), while an explicit `<datetime>` spells "datetime"
+       with no parameters and `<datetime:64>` spells its width into the text. */
+    var annText = '', annParams = 0, annFamily = null;
     var oct = null;       // the octet node currently collecting chunks
     /* struct_close events already spent by a resynced array_row_end (below) */
     var swallowStructClose = 0;
@@ -373,13 +377,20 @@
           annSynth = false;
           break;
         }
-        case 'type_start': annUnit = null; annSynth = false; break;
+        case 'type_start':
+          annUnit = null; annSynth = false;
+          annText = e.text || ''; annParams = 0; annFamily = e.family || null;
+          break;
         case 'type_param':
+          annParams++;
           if (e.tok === 'unit' && e.text && e.text !== 'no_unit') annUnit = e.text;
           /* the reader's "no explicit base" — see annSynth above */
           else if (e.tok === 'type_base' && !e.base) annSynth = true;
           break;
-        case 'type_end': annPending = true; break;
+        case 'type_end':
+          if (annFamily === 'datetime' && annText === 'datetime' && annParams > 0)
+            annSynth = true;
+          annPending = true; break;
         case 'struct_open': {
           settle();
           var snode = { type: 'struct', children: [] };

@@ -489,7 +489,8 @@ fn leap_seconds() -> Result<(), Error> {
         utc_to_tai_seconds(&dt(2017, 12, 31, 23, 59, 60))?,
         utc_to_tai_seconds(&dt(2018, 1, 1, 0, 0, 0))?
     );
-    for t in (-10_000_000_000i64..10_000_000_000).step_by(10_000_000_000 / 4999) {
+    // The step is a usize, 32 bits on wasm32: 10^10 / 4999 fits, 10^10 not.
+    for t in (-10_000_000_000i64..10_000_000_000).step_by(2_000_400) {
         assert_eq!(utc_to_tai_seconds(&tai_seconds_to_utc(t)?)?, t);
     }
     Ok(())

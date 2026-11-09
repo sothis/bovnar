@@ -177,6 +177,7 @@ fn on_error_sees_the_error_that_ends_a_read() {
 }
 
 #[test]
+#[cfg_attr(panic = "abort", ignore = "a panic cannot be caught where it aborts")]
 fn a_panic_in_on_error_reaches_the_caller() {
     let caught = std::panic::catch_unwind(|| {
         let mut on_error = |_: &Error| panic!("from on_error");

@@ -836,7 +836,11 @@ fn unattached_nodes_are_dropped_cleanly() {
         drop(NewNode::null().unwrap());
         drop(NewNode::from_bigint(&BigInt::from(-7), 100, Signedness::Auto, None).unwrap());
     }
-    // Nodes and documents move between threads.
+}
+
+#[test]
+#[cfg_attr(target_os = "wasi", ignore = "WASI has no threads")]
+fn built_nodes_and_documents_move_between_threads() {
     let node = NewNode::from_i64(5).unwrap();
     let doc = std::thread::spawn(move || {
         let mut doc = DomDoc::create().unwrap();

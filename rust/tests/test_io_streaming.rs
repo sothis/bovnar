@@ -581,6 +581,7 @@ fn a_live_writer_writes_mux_streams_and_embedded_documents() {
 }
 
 #[test]
+#[cfg_attr(panic = "abort", ignore = "a panic cannot be caught where it aborts")]
 fn a_finish_that_panicked_keeps_failing() {
     let mut o = Partial::new(usize::MAX, 0);
     o.panic_at = Some(0);

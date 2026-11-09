@@ -16,6 +16,10 @@ use bovnar::{
     WriteOptions, Writer, canonicalize, canonicalize_reader, parse, parse_typed, stream,
 };
 
+/// Whether a panic unwinds here. Where it aborts (wasm32-wasip2) a caught
+/// panic would end the test binary, so the parts that catch one are skipped.
+const UNWINDS: bool = cfg!(panic = "unwind");
+
 fn examples() -> Vec<PathBuf> {
     let dir = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../examples"));
     let mut v: Vec<_> = std::fs::read_dir(dir)
@@ -29,6 +33,11 @@ fn examples() -> Vec<PathBuf> {
 
 /// The built CLI: `$BOVNAR_CLI`, or `build/bovnar` of the repository.
 fn cli() -> Option<PathBuf> {
+    // WASI runs no processes; the comparison with the CLI is for the native
+    // legs.
+    if cfg!(target_os = "wasi") {
+        return None;
+    }
     let candidates = [
         std::env::var_os("BOVNAR_CLI").map(PathBuf::from),
         Some(PathBuf::from(concat!(
@@ -137,20 +146,22 @@ fn observer_can_veto_and_its_panic_reaches_the_caller() {
     assert_eq!(err.code(), Some(ErrorCode::ScannerCallbackFailed));
     assert!(w.write_null("c").is_err(), "the writer stays failed");
 
-    let options = WriteOptions {
-        on_event: Some(Box::new(|d: &EventData<'_>| {
-            if d.event == Event::Data {
-                panic!("observer panicked");
-            }
-            true
-        })),
-        ..WriteOptions::default()
-    };
-    let mut w = Writer::to_writer_with_options(Vec::new(), usize::MAX, options).unwrap();
-    let payload = catch_unwind(AssertUnwindSafe(|| w.write_bool("b", true))).unwrap_err();
-    assert_eq!(panic_text(payload), "observer panicked");
-    let err = w.write_bool("c", true).unwrap_err();
-    assert_eq!(err.code(), Some(ErrorCode::ScannerCallbackFailed));
+    if UNWINDS {
+        let options = WriteOptions {
+            on_event: Some(Box::new(|d: &EventData<'_>| {
+                if d.event == Event::Data {
+                    panic!("observer panicked");
+                }
+                true
+            })),
+            ..WriteOptions::default()
+        };
+        let mut w = Writer::to_writer_with_options(Vec::new(), usize::MAX, options).unwrap();
+        let payload = catch_unwind(AssertUnwindSafe(|| w.write_bool("b", true))).unwrap_err();
+        assert_eq!(panic_text(payload), "observer panicked");
+        let err = w.write_bool("c", true).unwrap_err();
+        assert_eq!(err.code(), Some(ErrorCode::ScannerCallbackFailed));
+    }
 }
 
 // -- nesting caps ------------------------------------------------------------
@@ -281,16 +292,18 @@ fn a_failing_or_panicking_mirror_reaches_the_caller() {
     assert_eq!(err.code(), Some(ErrorCode::WritingToSink));
     assert!(matches!(err, Error::Io { .. }), "{err:?}");
 
-    let payload = catch_unwind(AssertUnwindSafe(|| {
-        Reader::new().unwrap().read_mem_mirror(
-            b".a = 1;",
-            &options,
-            ReadHandlers::default(),
-            &mut Panicking,
-        )
-    }))
-    .unwrap_err();
-    assert_eq!(panic_text(payload), "mirror panicked");
+    if UNWINDS {
+        let payload = catch_unwind(AssertUnwindSafe(|| {
+            Reader::new().unwrap().read_mem_mirror(
+                b".a = 1;",
+                &options,
+                ReadHandlers::default(),
+                &mut Panicking,
+            )
+        }))
+        .unwrap_err();
+        assert_eq!(panic_text(payload), "mirror panicked");
+    }
 
     let mut feed = DocumentFeed::new(&options).unwrap();
     feed.set_mirror(Failing).unwrap();
@@ -299,12 +312,14 @@ fn a_failing_or_panicking_mirror_reaches_the_caller() {
     // The document has failed; reset() starts a fresh one with the mirror.
     assert_eq!(feed.feed(b"x", &mut |_| true).unwrap_err(), err);
 
-    let mut feed = DocumentFeed::new(&options).unwrap();
-    feed.set_mirror(Panicking).unwrap();
-    let payload =
-        catch_unwind(AssertUnwindSafe(|| feed.feed(b".a = 1;", &mut |_| true))).unwrap_err();
-    assert_eq!(panic_text(payload), "mirror panicked");
-    assert!(feed.feed(b".b = 1;", &mut |_| true).is_err());
+    if UNWINDS {
+        let mut feed = DocumentFeed::new(&options).unwrap();
+        feed.set_mirror(Panicking).unwrap();
+        let payload =
+            catch_unwind(AssertUnwindSafe(|| feed.feed(b".a = 1;", &mut |_| true))).unwrap_err();
+        assert_eq!(panic_text(payload), "mirror panicked");
+        assert!(feed.feed(b".b = 1;", &mut |_| true).is_err());
+    }
 }
 
 // -- canonical form ----------------------------------------------------------
@@ -410,11 +425,13 @@ fn canonicalize_refuses_a_recovered_document_and_reports_errors() {
     let err =
         canonicalize_reader(&b".a=1;"[..], Failing, false, &ReadOptions::default()).unwrap_err();
     assert_eq!(err.code(), Some(ErrorCode::WritingToSink));
-    let payload = catch_unwind(AssertUnwindSafe(|| {
-        canonicalize_reader(&b".a=1;"[..], Panicking, false, &ReadOptions::default())
-    }))
-    .unwrap_err();
-    assert_eq!(panic_text(payload), "mirror panicked");
+    if UNWINDS {
+        let payload = catch_unwind(AssertUnwindSafe(|| {
+            canonicalize_reader(&b".a=1;"[..], Panicking, false, &ReadOptions::default())
+        }))
+        .unwrap_err();
+        assert_eq!(panic_text(payload), "mirror panicked");
+    }
     struct BadIn;
     impl std::io::Read for BadIn {
         fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
@@ -537,23 +554,25 @@ fn feed_on_error_sees_recovered_errors_and_panics_propagate() {
     .unwrap();
     assert_eq!(codes, [Some(ErrorCode::UnexpectedInputByte)]);
 
-    for which in 0..3 {
-        let mut feed = DocumentFeed::new(&ReadOptions::default()).unwrap();
-        let payload = catch_unwind(AssertUnwindSafe(|| {
-            let mut boom = |_: &EventData<'_>| -> bool { panic!("handler panicked") };
-            let mut boom_unit =
-                |_: &EventData<'_>| -> Option<(Unit, u32)> { panic!("handler panicked") };
-            let mut h = ReadHandlers::default();
-            match which {
-                0 => h.on_unverified = Some(&mut boom),
-                1 => h.want_unit = Some(&mut boom_unit),
-                _ => h.on_verified = Some(&mut boom),
-            }
-            feed.feed_with(b".a = 1;", h)
-        }))
-        .unwrap_err();
-        assert_eq!(panic_text(payload), "handler panicked", "{which}");
-        assert!(feed.feed(b".b = 1;", &mut |_| true).is_err(), "{which}");
+    if UNWINDS {
+        for which in 0..3 {
+            let mut feed = DocumentFeed::new(&ReadOptions::default()).unwrap();
+            let payload = catch_unwind(AssertUnwindSafe(|| {
+                let mut boom = |_: &EventData<'_>| -> bool { panic!("handler panicked") };
+                let mut boom_unit =
+                    |_: &EventData<'_>| -> Option<(Unit, u32)> { panic!("handler panicked") };
+                let mut h = ReadHandlers::default();
+                match which {
+                    0 => h.on_unverified = Some(&mut boom),
+                    1 => h.want_unit = Some(&mut boom_unit),
+                    _ => h.on_verified = Some(&mut boom),
+                }
+                feed.feed_with(b".a = 1;", h)
+            }))
+            .unwrap_err();
+            assert_eq!(panic_text(payload), "handler panicked", "{which}");
+            assert!(feed.feed(b".b = 1;", &mut |_| true).is_err(), "{which}");
+        }
     }
 }
 
@@ -649,23 +668,25 @@ fn frame_parser_and_demux_take_the_handlers() {
     assert!(verified.contains(&Event::OctetStreamStart));
     assert_eq!(verified.last(), Some(&Event::StreamEnd));
 
-    // A panic in a demux handler reaches the caller.
-    let mut demux = Demux::new(&DemuxOptions::default()).unwrap();
-    let payload = catch_unwind(AssertUnwindSafe(|| {
-        let mut boom = |_: &EventData<'_>| -> bool { panic!("demux handler") };
-        let mut input = &doc[..];
-        demux
-            .next_with(
-                &mut input,
-                ReadHandlers {
-                    on_unverified: Some(&mut boom),
-                    ..ReadHandlers::default()
-                },
-            )
-            .map(|_| ())
-    }))
-    .unwrap_err();
-    assert_eq!(panic_text(payload), "demux handler");
+    if UNWINDS {
+        // A panic in a demux handler reaches the caller.
+        let mut demux = Demux::new(&DemuxOptions::default()).unwrap();
+        let payload = catch_unwind(AssertUnwindSafe(|| {
+            let mut boom = |_: &EventData<'_>| -> bool { panic!("demux handler") };
+            let mut input = &doc[..];
+            demux
+                .next_with(
+                    &mut input,
+                    ReadHandlers {
+                        on_unverified: Some(&mut boom),
+                        ..ReadHandlers::default()
+                    },
+                )
+                .map(|_| ())
+        }))
+        .unwrap_err();
+        assert_eq!(panic_text(payload), "demux handler");
+    }
 }
 
 // -- failed framed documents ---------------------------------------------------

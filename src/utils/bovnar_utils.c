@@ -355,14 +355,21 @@ bool bvn_validate_uint_range(const char* s, uint32_t w, uint32_t base)
 	const char* p = s;
 	if (uses_sign && *p == '+') p++;
 	if (!*p) return false;
-	if (base == 10 && !bvn_all_dec_digits(p)) return false;
 	if (w <= 64) {
 		uint64_t maxv = (w >= 64) ? UINT64_MAX : (1ULL << w) - 1ULL;
 		if (base == 10) {
-			char* end;
-			errno = 0;
-			uint64_t v = strtoull(p, &end, 10);
-			if (*end || errno == ERANGE) return false;
+			/* Digits only (checked above for the callers that reach here
+			 * without it). A local accumulation instead of strtoull: that
+			 * is a locale-aware general parser, and this runs for every
+			 * numeric value a writer validates. Overflow means > UINT64_MAX,
+			 * which is out of range exactly as ERANGE made it. */
+			uint64_t v = 0;
+			for (; *p; p++) {
+				uint32_t d = (uint32_t)((uint8_t)*p - '0');
+				if (d > 9u) return false;
+				if (v > (UINT64_MAX - d) / 10u) return false;
+				v = v * 10u + d;
+			}
 			return v <= maxv;
 		}
 		uint64_t v = 0;
@@ -374,6 +381,9 @@ bool bvn_validate_uint_range(const char* s, uint32_t w, uint32_t base)
 		}
 		return v <= maxv;
 	}
+	/* The <=64-bit path checked the digits as it accumulated; the wide path
+	 * needs the check on its own. */
+	if (base == 10 && !bvn_all_dec_digits(p)) return false;
 	uint32_t max_digits = bvn_dec_digits_2pow(w);
 	if (base == 10) {
 		int pf = bvn_dec_digit_prefilter(p, max_digits);

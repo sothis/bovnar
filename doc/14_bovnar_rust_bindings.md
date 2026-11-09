@@ -1265,7 +1265,7 @@ cut inside a frame `got_incomplete_bvnr_stream`. A panic in
 a handler reaches the caller, as for `Reader` ([§13](#13-error-handling)).
 
 **What it costs**, from `cargo bench --bench live`: a release build pinned to
-one core (`taskset -c 4`) of the same i7-2700K as §4.8, load average about 2;
+one core (`taskset -c 4`) of the same i7-2700K as §4.8, load average under 2;
 the median of three runs, each the median of nine passes. The input is a few
 MiB held in the cache; *pieces* feeds it in 1460-byte pieces, a TCP segment's
 payload, so most messages and documents straddle a feed. The `mux_load` and
@@ -1275,9 +1275,9 @@ Per message:
 
 | Message | `Demux` whole | `Demux` pieces | with `deliver_events` | `mux_load` | `MuxReader` whole | `MuxReader` pieces |
 |---|---|---|---|---|---|---|
-| 150 B | 90 ns | 98 ns | 90 ns | 136 ns | 8 ns | 15 ns |
-| 30 KB | 138 ns | 2.1 µs | 168 ns | 3.5 µs | 10 ns | 1.8 µs |
-| 400 KB | 26 µs | 48 µs | 28 µs | 72 µs | 25 µs | 29 µs |
+| 150 B | 100 ns | 109 ns | 100 ns | 123 ns | 8 ns | 14 ns |
+| 30 KB | 150 ns | 2.4 µs | 182 ns | 2.9 µs | 11 ns | 1.8 µs |
+| 400 KB | 26 µs | 50 µs | 26 µs | 68 µs | 23 µs | 28 µs |
 
 A message whole in the fed buffer is borrowed, so its cost does not grow with
 its size; one that straddles a feed or spans chunks is gathered, and copying it
@@ -1288,14 +1288,15 @@ line, an octet stream every 512 lines), with the throughput in brackets:
 
 | Document | `DocumentFeed` whole | `DocumentFeed` pieces | `Reader::read_mem` | `ValueFeed` | `parse` |
 |---|---|---|---|---|---|
-| 196 B | 18 µs (11 MB/s) | 19 µs (10 MB/s) | 19 µs (11 MB/s) | 22 µs (9 MB/s) | 29 µs (7 MB/s) |
-| 32 KB | 2.2 ms (14 MB/s) | 2.2 ms (14 MB/s) | 2.2 ms (15 MB/s) | 2.8 ms (12 MB/s) | 3.1 ms (10 MB/s) |
-| 402 KB | 28 ms (14 MB/s) | 28 ms (14 MB/s) | 27 ms (15 MB/s) | 33 ms (12 MB/s) | 113 ms (4 MB/s) |
+| 196 B | 16 µs (12 MB/s) | 16 µs (12 MB/s) | 16 µs (12 MB/s) | 20 µs (10 MB/s) | 27 µs (7 MB/s) |
+| 32 KB | 2.0 ms (16 MB/s) | 1.9 ms (16 MB/s) | 2.0 ms (16 MB/s) | 2.4 ms (13 MB/s) | 2.5 ms (13 MB/s) |
+| 402 KB | 24 ms (17 MB/s) | 24 ms (17 MB/s) | 24 ms (17 MB/s) | 29 ms (14 MB/s) | 30 ms (13 MB/s) |
 
 Feeding costs what reading the whole buffer costs, wherever the pieces are cut:
 the time is the parser's. `ValueFeed` hands each assignment out as it
-completes, where `parse` looks up every key in the document built so far,
-which is what costs it the most on a document of many keys.
+completes. `parse` builds the whole document, and past 32 entries keeps an
+index from key to entry instead of scanning the keys already there — which took
+its 402 KB column from 113 ms to 30 ms.
 
 ### 4.10 Canonical form
 

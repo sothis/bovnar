@@ -48,6 +48,37 @@
  * arbitrary-precision float/int types for values that don't fit in double/u64.
  */
 
+/* BVN_UNIT_NONE as a constant: the no-unit helpers hand this over instead of
+ * building a 516-byte compound literal per call. */
+static const value_unit_t bvn_w_unone = { 0u, { { 0 } } };
+/*
+ * Start a helper's event data block. The writer reads type, value_type,
+ * value_unit, data, length, the datetime fraction and unit_source; it never
+ * reads conv or converted. An installed observer may see the whole struct, so
+ * for one the block is cleared as it always was (the documented "conv is
+ * zeroed when converted is false"); with no observer the conversion block is
+ * left alone, which takes 552 bytes of zeroing out of every helper event.
+ * value_unit is set to the empty encoding's count; callers that carry a unit
+ * assign it in full.
+ */
+static void bvn_w_data_begin(bvnr_writer_t *w, bvnr_data_t *d)
+{
+	d->type                 = (token_type_t)0;
+	d->value_type           = BVN_TYPE_PLAIN;
+	d->data                 = NULL;
+	d->length               = 0;
+	d->frac_data            = NULL;
+	d->frac_length          = 0;
+	d->unit_source          = NULL;
+	d->unit_source_length   = 0;
+	d->converted            = false;
+	if (w->ser.on_event) {
+		memset(&d->conv, 0, sizeof d->conv);
+		memset(&d->value_unit, 0, sizeof d->value_unit);
+	} else {
+		d->value_unit.num_components = 0;
+	}
+}
 /*
  * Emit the `.key =` assignment header common to every typed-value helper.
  */
@@ -55,11 +86,11 @@ static bool emit_key(bvnr_writer_t *w, const char *key)
 {
 	if (!key)
 		return bvn_writer_set_error(w, error_invalid_argument);
-	bvnr_data_t d = {
-		.type   = token_is_identifier,
-		.data   = (const void *)key,
-		.length = (uint32_t)strlen(key),
-	};
+	bvnr_data_t d;
+	bvn_w_data_begin(w, &d);
+	d.type   = token_is_identifier;
+	d.data   = (const void *)key;
+	d.length = (uint32_t)strlen(key);
 	return bvnr_write_event(w, ev_assignment_start, &d);
 }
 /*
@@ -93,12 +124,15 @@ bool bvnr_writer_set_unit_source(bvnr_writer_t *w,
 	w->val.unit_src_len = (uint8_t)length;
 	return true;
 }
-bool bvnr_write_type_annotation(bvnr_writer_t *w,
+static bool bvn_w_type_annotation(bvnr_writer_t *w,
 				value_type_spec_t vt,
-				value_unit_t vu)
+				const value_unit_t *vu)
 {
-	if (vu.num_components == 1u && vu.components[0].base == bu_none)
-		vu = BVN_UNIT_NONE;
+	/* One component naming bu_none is how the reader spells "no unit"; the
+	 * writer emits it as the parameterless form. */
+	const value_unit_t *pu = vu;
+	if (pu->num_components == 1u && pu->components[0].base == bu_none)
+		pu = &bvn_w_unone;
 	/* Take the one-shot spelling now and forget it, whatever happens below: a
 	 * spelling that outlived a failed write would land on an unrelated value.
 	 * The copy is what the unit-parameter event points at. */
@@ -109,11 +143,11 @@ bool bvnr_write_type_annotation(bvnr_writer_t *w,
 		w->val.unit_src_len = 0;
 		w->usrc_keys        = 0;
 	}
-	bvnr_data_t d = {
-		.type       = token_is_type,
-		.value_type = vt,
-		.value_unit = vu,
-	};
+	bvnr_data_t d;
+	bvn_w_data_begin(w, &d);
+	d.type       = token_is_type;
+	d.value_type = vt;
+	d.value_unit = *pu;
 	if (!bvnr_write_event(w, ev_type_annotation_start,       &d)) return false;
 	if (!bvnr_write_event(w, ev_type_annotation_type_family, &d)) return false;
 	/* Only numeric families and datetime carry a width; utf8/bool are
@@ -163,10 +197,10 @@ bool bvnr_write_type_annotation(bvnr_writer_t *w,
 				ev_type_annotation_type_family_parameter, &d))
 			return false;
 	}
-	if (vu.num_components > 0) {
+	if (pu->num_components > 0) {
 		char ubuf[BVNR_UNIT_STRING_MAX];
 		bvn_unit_flags_t uflags = bvnr_writer_unit_flags(w);
-		int32_t ulen = bvn_unit_to_string_ex(vu, ubuf, sizeof(ubuf), uflags);
+		int32_t ulen = bvn_unit_to_string_ex(*pu, ubuf, sizeof(ubuf), uflags);
 		if (ulen < 0) {
 			/* -1 is not only "the text did not fit". It also means the unit has
 			 * no spelling (a bu_none component) and, under BVN_UNIT_REDUCE, that
@@ -177,7 +211,7 @@ bool bvnr_write_type_annotation(bvnr_writer_t *w,
 			 * alias at 31 bytes, so this cannot fail for length — and if it still
 			 * refuses, the length was not the cause. */
 			char probe[1024];
-			int32_t again = bvn_unit_to_string_ex(vu, probe, sizeof probe, uflags);
+			int32_t again = bvn_unit_to_string_ex(*pu, probe, sizeof probe, uflags);
 			return bvn_writer_set_error(
 				w, again < 0 ? error_unit_illegal : error_unit_too_long);
 		}
@@ -204,6 +238,12 @@ bool bvnr_write_type_annotation(bvnr_writer_t *w,
 	d.length = 0;
 	return bvnr_write_event(w, ev_type_annotation_end, &d);
 }
+bool bvnr_write_type_annotation(bvnr_writer_t *w,
+				value_type_spec_t vt,
+				value_unit_t vu)
+{
+	return bvn_w_type_annotation(w, vt, &vu);
+}
 /*
  * Common tail for every numeric helper: write the annotation, then the value
  * event. The token type is a parameter because a non-decimal-base number is
@@ -211,21 +251,21 @@ bool bvnr_write_type_annotation(bvnr_writer_t *w,
  * base-10 uses the number token; callers pick accordingly.
  */
 static bool emit_numeric_tt(bvnr_writer_t *w,
-			     value_type_spec_t vt, value_unit_t vu,
+			     value_type_spec_t vt, const value_unit_t *vu,
 			     const char *valbuf, token_type_t tt)
 {
-	if (!bvnr_write_type_annotation(w, vt, vu)) return false;
-	bvnr_data_t d = {
-		.type       = tt,
-		.value_type = vt,
-		.value_unit = vu,
-		.data       = (const void *)valbuf,
-		.length     = (uint32_t)strlen(valbuf),
-	};
+	if (!bvn_w_type_annotation(w, vt, vu)) return false;
+	bvnr_data_t d;
+	bvn_w_data_begin(w, &d);
+	d.type       = tt;
+	d.value_type = vt;
+	d.value_unit = *vu;
+	d.data       = (const void *)valbuf;
+	d.length     = (uint32_t)strlen(valbuf);
 	return bvnr_write_event(w, ev_data, &d);
 }
 static bool emit_numeric(bvnr_writer_t *w,
-			 value_type_spec_t vt, value_unit_t vu,
+			 value_type_spec_t vt, const value_unit_t *vu,
 			 const char *valbuf)
 {
 	return emit_numeric_tt(w, vt, vu, valbuf, token_is_number);
@@ -234,39 +274,41 @@ bool bvnr_write_string(bvnr_writer_t *w, const char *key, const char *value)
 {
 	if (!emit_key(w, key)) return false;
 	if (!value) return bvn_writer_set_error(w, error_invalid_argument);
-	bvnr_data_t d = {
-		.type   = token_is_string,
-		.data   = (const void *)value,
-		.length = (uint32_t)strlen(value),
-	};
+	bvnr_data_t d;
+	bvn_w_data_begin(w, &d);
+	d.type   = token_is_string;
+	d.data   = (const void *)value;
+	d.length = (uint32_t)strlen(value);
 	return bvnr_write_event(w, ev_data, &d);
 }
 bool bvnr_write_plain(bvnr_writer_t *w, const char *key, const char *value)
 {
 	if (!emit_key(w, key)) return false;
 	if (!value) return bvn_writer_set_error(w, error_invalid_argument);
-	bvnr_data_t d = {
-		.type   = token_is_symbol,
-		.data   = (const void *)value,
-		.length = (uint32_t)strlen(value),
-	};
+	bvnr_data_t d;
+	bvn_w_data_begin(w, &d);
+	d.type   = token_is_symbol;
+	d.data   = (const void *)value;
+	d.length = (uint32_t)strlen(value);
 	return bvnr_write_event(w, ev_data, &d);
 }
 bool bvnr_write_null(bvnr_writer_t *w, const char *key)
 {
 	if (!emit_key(w, key)) return false;
-	bvnr_data_t d = { .type = token_is_null_value };
+	bvnr_data_t d;
+	bvn_w_data_begin(w, &d);
+	d.type = token_is_null_value;
 	return bvnr_write_event(w, ev_data, &d);
 }
 bool bvnr_write_bool(bvnr_writer_t *w, const char *key, bool value)
 {
 	if (!emit_key(w, key)) return false;
 	const char *sym = value ? "true" : "false";
-	bvnr_data_t d = {
-		.type   = token_is_bool,
-		.data   = (const void *)sym,
-		.length = (uint32_t)strlen(sym),
-	};
+	bvnr_data_t d;
+	bvn_w_data_begin(w, &d);
+	d.type   = token_is_bool;
+	d.data   = (const void *)sym;
+	d.length = (uint32_t)strlen(sym);
 	return bvnr_write_event(w, ev_data, &d);
 }
 /*
@@ -279,13 +321,9 @@ bool bvnr_write_bool(bvnr_writer_t *w, const char *key, bool value)
  * decimal helpers do not: a binary32 is not what either of those types
  * promises (see the notes in them).
  */
-bool bvnr_write_uint(bvnr_writer_t *w, const char *key,
-			 uint32_t width, uint64_t value)
-{
-	return bvnr_write_uint_unit(w, key, width, value, BVN_UNIT_NONE);
-}
-bool bvnr_write_uint_unit(bvnr_writer_t *w, const char *key,
-			   uint32_t width, uint64_t value, value_unit_t unit)
+static bool bvn_w_write_uint(bvnr_writer_t *w, const char *key,
+			     uint32_t width, uint64_t value,
+			     const value_unit_t *unit)
 {
 	if (!emit_key(w, key)) return false;
 	value_type_spec_t vt = BVN_TYPE_UINT(width);
@@ -299,13 +337,19 @@ bool bvnr_write_uint_unit(bvnr_writer_t *w, const char *key,
 	}
 	return emit_numeric(w, vt, unit, buf);
 }
-bool bvnr_write_sint(bvnr_writer_t *w, const char *key,
-			 uint32_t width, int64_t value)
+bool bvnr_write_uint(bvnr_writer_t *w, const char *key,
+			 uint32_t width, uint64_t value)
 {
-	return bvnr_write_sint_unit(w, key, width, value, BVN_UNIT_NONE);
+	return bvn_w_write_uint(w, key, width, value, &bvn_w_unone);
 }
-bool bvnr_write_sint_unit(bvnr_writer_t *w, const char *key,
-			   uint32_t width, int64_t value, value_unit_t unit)
+bool bvnr_write_uint_unit(bvnr_writer_t *w, const char *key,
+			   uint32_t width, uint64_t value, value_unit_t unit)
+{
+	return bvn_w_write_uint(w, key, width, value, &unit);
+}
+static bool bvn_w_write_sint(bvnr_writer_t *w, const char *key,
+			     uint32_t width, int64_t value,
+			     const value_unit_t *unit)
 {
 	if (!emit_key(w, key)) return false;
 	value_type_spec_t vt = BVN_TYPE_SINT(width);
@@ -318,6 +362,16 @@ bool bvnr_write_sint_unit(bvnr_writer_t *w, const char *key,
 		return false;
 	}
 	return emit_numeric(w, vt, unit, buf);
+}
+bool bvnr_write_sint(bvnr_writer_t *w, const char *key,
+			 uint32_t width, int64_t value)
+{
+	return bvn_w_write_sint(w, key, width, value, &bvn_w_unone);
+}
+bool bvnr_write_sint_unit(bvnr_writer_t *w, const char *key,
+			   uint32_t width, int64_t value, value_unit_t unit)
+{
+	return bvn_w_write_sint(w, key, width, value, &unit);
 }
 bool bvnr_write_datetime(bvnr_writer_t *w, const char *key,
 			 uint32_t width, const char *epoch, int64_t value)
@@ -335,18 +389,14 @@ bool bvnr_write_datetime(bvnr_writer_t *w, const char *key,
 		                    + (uint64_t)w->ser.wbuf_pos;
 		return false;
 	}
-	return emit_numeric(w, vt, BVN_UNIT_NONE, buf);
-}
-bool bvnr_write_float(bvnr_writer_t *w, const char *key,
-			  uint32_t width, double value)
-{
-	return bvnr_write_float_unit(w, key, width, value, BVN_UNIT_NONE);
+	return emit_numeric(w, vt, &bvn_w_unone, buf);
 }
 /* Finite without <math.h>: inf - inf and nan - nan are nan, which is != 0. */
 static bool bvn_w_is_finite(double v) { return v - v == 0.0; }
 
-bool bvnr_write_float_unit(bvnr_writer_t *w, const char *key,
-			    uint32_t width, double value, value_unit_t unit)
+static bool bvn_w_write_float(bvnr_writer_t *w, const char *key,
+			      uint32_t width, double value,
+			      const value_unit_t *unit)
 {
 	if (!emit_key(w, key)) return false;
 	if (width != 0u && width != 16u && width != 32u && width != 64u
@@ -369,14 +419,19 @@ bool bvnr_write_float_unit(bvnr_writer_t *w, const char *key,
 	}
 	return emit_numeric(w, vt, unit, buf);
 }
-bool bvnr_write_float_fix(bvnr_writer_t *w, const char *key,
-			   uint32_t width, uint32_t q, double value)
+bool bvnr_write_float(bvnr_writer_t *w, const char *key,
+			  uint32_t width, double value)
 {
-	return bvnr_write_float_fix_unit(w, key, width, q, value, BVN_UNIT_NONE);
+	return bvn_w_write_float(w, key, width, value, &bvn_w_unone);
 }
-bool bvnr_write_float_fix_unit(bvnr_writer_t *w, const char *key,
-			        uint32_t width, uint32_t q,
-			        double value, value_unit_t unit)
+bool bvnr_write_float_unit(bvnr_writer_t *w, const char *key,
+			    uint32_t width, double value, value_unit_t unit)
+{
+	return bvn_w_write_float(w, key, width, value, &unit);
+}
+static bool bvn_w_write_float_fix(bvnr_writer_t *w, const char *key,
+				  uint32_t width, uint32_t q,
+				  double value, const value_unit_t *unit)
 {
 	if (!emit_key(w, key)) return false;
 	if (width != 0u && width != 16u && width != 32u && width != 64u
@@ -398,14 +453,20 @@ bool bvnr_write_float_fix_unit(bvnr_writer_t *w, const char *key,
 	}
 	return emit_numeric(w, vt, unit, buf);
 }
-bool bvnr_write_float_dec(bvnr_writer_t *w, const char *key,
-			   uint32_t width, double value)
+bool bvnr_write_float_fix(bvnr_writer_t *w, const char *key,
+			   uint32_t width, uint32_t q, double value)
 {
-	return bvnr_write_float_dec_unit(w, key, width, value, BVN_UNIT_NONE);
+	return bvn_w_write_float_fix(w, key, width, q, value, &bvn_w_unone);
 }
-bool bvnr_write_float_dec_unit(bvnr_writer_t *w, const char *key,
-			        uint32_t width,
+bool bvnr_write_float_fix_unit(bvnr_writer_t *w, const char *key,
+			        uint32_t width, uint32_t q,
 			        double value, value_unit_t unit)
+{
+	return bvn_w_write_float_fix(w, key, width, q, value, &unit);
+}
+static bool bvn_w_write_float_dec(bvnr_writer_t *w, const char *key,
+				  uint32_t width,
+				  double value, const value_unit_t *unit)
 {
 	if (!emit_key(w, key)) return false;
 	if (width != 0u && width != 16u && width != 32u && width != 64u
@@ -427,10 +488,22 @@ bool bvnr_write_float_dec_unit(bvnr_writer_t *w, const char *key,
 	}
 	return emit_numeric(w, vt, unit, buf);
 }
+bool bvnr_write_float_dec(bvnr_writer_t *w, const char *key,
+			   uint32_t width, double value)
+{
+	return bvn_w_write_float_dec(w, key, width, value, &bvn_w_unone);
+}
+bool bvnr_write_float_dec_unit(bvnr_writer_t *w, const char *key,
+			        uint32_t width,
+			        double value, value_unit_t unit)
+{
+	return bvn_w_write_float_dec(w, key, width, value, &unit);
+}
 bool bvnr_write_struct_start(bvnr_writer_t *w, const char *key)
 {
 	if (!emit_key(w, key)) return false;
-	bvnr_data_t d = {0};
+	bvnr_data_t d;
+	bvn_w_data_begin(w, &d);
 	return bvnr_write_event(w, ev_struct_start, &d);
 }
 bool bvnr_write_struct_end(bvnr_writer_t *w)
@@ -500,7 +573,7 @@ bool bvnr_write_bvnf_base_unit(bvnr_writer_t *w, const char *key,
 		tt = token_is_number;
 	else
 		tt = token_is_string;
-	bool ok = emit_numeric_tt(w, vt, unit, buf, tt);
+	bool ok = emit_numeric_tt(w, vt, &unit, buf, tt);
 	free(buf);
 	return ok;
 }
@@ -558,7 +631,7 @@ bool bvnr_write_bvni_unit(bvnr_writer_t *w, const char *key,
 	if (nr > 0) {
 		token_type_t tt = (effective_base == 10u)
 			? token_is_number : token_is_string;
-		ok = emit_numeric_tt(w, vt, unit, buf, tt);
+		ok = emit_numeric_tt(w, vt, &unit, buf, tt);
 	} else {
 		bvn_writer_set_error(w, error_value_out_of_range);
 	}

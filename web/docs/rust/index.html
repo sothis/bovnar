@@ -1673,7 +1673,7 @@ framing errors are <code>load_documents</code>' too: a bad magic is
 cut inside a frame <code>got_incomplete_bvnr_stream</code>. A panic in
 a handler reaches the caller, as for <code>Reader</code> (<a href="#13-error-handling">§13</a>).</p>
 <p><strong>What it costs</strong>, from <code>cargo bench --bench live</code>: a release build pinned to
-one core (<code>taskset -c 4</code>) of the same i7-2700K as §4.8, load average about 2;
+one core (<code>taskset -c 4</code>) of the same i7-2700K as §4.8, load average under 2;
 the median of three runs, each the median of nine passes. The input is a few
 MiB held in the cache; <em>pieces</em> feeds it in 1460-byte pieces, a TCP segment's
 payload, so most messages and documents straddle a feed. The <code>mux_load</code> and
@@ -1695,30 +1695,30 @@ Per message:</p>
 <tbody>
 <tr>
 <td>150 B</td>
-<td>90 ns</td>
-<td>98 ns</td>
-<td>90 ns</td>
-<td>136 ns</td>
+<td>100 ns</td>
+<td>109 ns</td>
+<td>100 ns</td>
+<td>123 ns</td>
 <td>8 ns</td>
-<td>15 ns</td>
+<td>14 ns</td>
 </tr>
 <tr>
 <td>30 KB</td>
-<td>138 ns</td>
-<td>2.1 µs</td>
-<td>168 ns</td>
-<td>3.5 µs</td>
-<td>10 ns</td>
+<td>150 ns</td>
+<td>2.4 µs</td>
+<td>182 ns</td>
+<td>2.9 µs</td>
+<td>11 ns</td>
 <td>1.8 µs</td>
 </tr>
 <tr>
 <td>400 KB</td>
 <td>26 µs</td>
-<td>48 µs</td>
+<td>50 µs</td>
+<td>26 µs</td>
+<td>68 µs</td>
+<td>23 µs</td>
 <td>28 µs</td>
-<td>72 µs</td>
-<td>25 µs</td>
-<td>29 µs</td>
 </tr>
 </tbody>
 </table>
@@ -1742,34 +1742,35 @@ line, an octet stream every 512 lines), with the throughput in brackets:</p>
 <tbody>
 <tr>
 <td>196 B</td>
-<td>18 µs (11 MB/s)</td>
-<td>19 µs (10 MB/s)</td>
-<td>19 µs (11 MB/s)</td>
-<td>22 µs (9 MB/s)</td>
-<td>29 µs (7 MB/s)</td>
+<td>16 µs (12 MB/s)</td>
+<td>16 µs (12 MB/s)</td>
+<td>16 µs (12 MB/s)</td>
+<td>20 µs (10 MB/s)</td>
+<td>27 µs (7 MB/s)</td>
 </tr>
 <tr>
 <td>32 KB</td>
-<td>2.2 ms (14 MB/s)</td>
-<td>2.2 ms (14 MB/s)</td>
-<td>2.2 ms (15 MB/s)</td>
-<td>2.8 ms (12 MB/s)</td>
-<td>3.1 ms (10 MB/s)</td>
+<td>2.0 ms (16 MB/s)</td>
+<td>1.9 ms (16 MB/s)</td>
+<td>2.0 ms (16 MB/s)</td>
+<td>2.4 ms (13 MB/s)</td>
+<td>2.5 ms (13 MB/s)</td>
 </tr>
 <tr>
 <td>402 KB</td>
-<td>28 ms (14 MB/s)</td>
-<td>28 ms (14 MB/s)</td>
-<td>27 ms (15 MB/s)</td>
-<td>33 ms (12 MB/s)</td>
-<td>113 ms (4 MB/s)</td>
+<td>24 ms (17 MB/s)</td>
+<td>24 ms (17 MB/s)</td>
+<td>24 ms (17 MB/s)</td>
+<td>29 ms (14 MB/s)</td>
+<td>30 ms (13 MB/s)</td>
 </tr>
 </tbody>
 </table>
 <p>Feeding costs what reading the whole buffer costs, wherever the pieces are cut:
 the time is the parser's. <code>ValueFeed</code> hands each assignment out as it
-completes, where <code>parse</code> looks up every key in the document built so far,
-which is what costs it the most on a document of many keys.</p>
+completes. <code>parse</code> builds the whole document, and past 32 entries keeps an
+index from key to entry instead of scanning the keys already there — which took
+its 402 KB column from 113 ms to 30 ms.</p>
 <h3 id="410-canonical-form">4.10 Canonical form</h3>
 <p><code>bovnar::canonicalize(data, pretty, &amp;options)</code> re-serialises a document from its
 verified events through the C library's canonicalising observer

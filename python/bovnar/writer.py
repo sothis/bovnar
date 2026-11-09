@@ -44,6 +44,30 @@ from .structs import (
 
 DEFAULT_MEM_CAP = 4 * 1024 * 1024
 
+# The families whose base field is not a radix (bvn_effective_base reports 10
+# for them): Q for float_fix, unused for float_dec, the epoch index for
+# datetime. Their literal is never quoted for it. Module constants: these were
+# rebuilt as a frozenset on every value emitted.
+_DECIMAL_FLOAT_FAMILIES = frozenset((
+    int(ValueTypeFamily.FLOAT_FIX),
+    int(ValueTypeFamily.FLOAT_DEC),
+    int(ValueTypeFamily.DATETIME),
+))
+# Families an annotation writes a width parameter for (utf8 and bool are
+# parameterless).
+_WIDTH_FAMILIES = frozenset((
+    int(ValueTypeFamily.UINT),
+    int(ValueTypeFamily.SINT),
+    int(ValueTypeFamily.FLOAT),
+    int(ValueTypeFamily.FLOAT_FIX),
+    int(ValueTypeFamily.FLOAT_DEC),
+    int(ValueTypeFamily.DATETIME),
+))
+# Families whose annotation takes no unit parameter: a datetime's parameter is
+# its epoch, and a utf8 value carries its unit as an inline suffix instead.
+_NO_UNIT_PARAM_FAMILIES = (int(ValueTypeFamily.DATETIME),
+                           int(ValueTypeFamily.UTF8))
+
 class Writer:
 
 
@@ -471,7 +495,7 @@ class Writer:
         if key is not None:
             raw = key.encode('utf-8')
             _keep.append(raw)
-            d.data   = ctypes.cast(ctypes.c_char_p(raw), ctypes.c_void_p)
+            d.data   = ctypes.cast(raw, ctypes.c_void_p)
             d.length = len(raw)
 
         if vt is not None:
@@ -483,23 +507,15 @@ class Writer:
         if value is not None:
             raw = value.encode('utf-8')
             _keep.append(raw)
-            d.data   = ctypes.cast(ctypes.c_char_p(raw), ctypes.c_void_p)
+            d.data   = ctypes.cast(raw, ctypes.c_void_p)
             d.length = len(raw)
 
-            # The families whose base field is not a radix (bvn_effective_base
-            # reports 10 for them): Q for float_fix, unused for float_dec, the
-            # epoch index for datetime. Their literal is never quoted for it.
-            _decimal_float_families = frozenset((
-                int(ValueTypeFamily.FLOAT_FIX),
-                int(ValueTypeFamily.FLOAT_DEC),
-                int(ValueTypeFamily.DATETIME),
-            ))
             if vt is not None:
                 fam = int(vt.family)
                 if fam == int(ValueTypeFamily.UTF8):
                     d.type = self._TOKEN_IS_STRING
                 elif (vt.base not in (0, 10)
-                      and fam not in _decimal_float_families):
+                      and fam not in _DECIMAL_FLOAT_FAMILIES):
                     d.type = self._TOKEN_IS_STRING
                 else:
                     d.type = self._TOKEN_IS_NUMBER
@@ -555,17 +571,9 @@ class Writer:
 
         # Only numeric families carry a width; utf8/bool are parameterless
         # (a width on them is rejected by the C type-spec validator).
-        _width_families = {
-            int(ValueTypeFamily.UINT),
-            int(ValueTypeFamily.SINT),
-            int(ValueTypeFamily.FLOAT),
-            int(ValueTypeFamily.FLOAT_FIX),
-            int(ValueTypeFamily.FLOAT_DEC),
-            int(ValueTypeFamily.DATETIME),
-        }
         fam = int(vt.family)
 
-        if fam in _width_families and vt.width != 0:
+        if fam in _WIDTH_FAMILIES and vt.width != 0:
             d_width = BvnrData()
             d_width.type = self._TOKEN_IS_TYPE_WIDTH
             d_width.value_type = vt
@@ -607,8 +615,7 @@ class Writer:
                 d_ep = BvnrData()
                 d_ep.type = self._TOKEN_IS_UNIT
                 d_ep.value_type = vt
-                d_ep.data = ctypes.cast(
-                    ctypes.c_char_p(epoch), ctypes.c_void_p)
+                d_ep.data = ctypes.cast(epoch, ctypes.c_void_p)
                 d_ep.length = len(epoch)
                 ok = self._lib.bvnr_write_event(
                     self._ptr, int(Event.TYPE_ANNOTATION_TYPE_FAMILY_PARAM),
@@ -631,9 +638,7 @@ class Writer:
         # `loads` failed on a document it had just read. The C writer places it
         # inline (`<utf8> "x" m;`) and round-trips; leaving the parameter off
         # lets the value event's unit reach it and do the same.
-        _no_unit_param = (int(ValueTypeFamily.DATETIME),
-                          int(ValueTypeFamily.UTF8))
-        if vu.num_components > 0 and fam not in _no_unit_param:
+        if vu.num_components > 0 and fam not in _NO_UNIT_PARAM_FAMILIES:
             lib = self._lib
             ubuf = ctypes.create_string_buffer(UNIT_STRING_MAX)
             unit_flags = lib.bvnr_writer_unit_flags(self._ptr)
@@ -658,16 +663,14 @@ class Writer:
                 d_unit.type = self._TOKEN_IS_UNIT
                 d_unit.value_type = vt
                 d_unit.value_unit = vu
-                d_unit.data = ctypes.cast(
-                    ctypes.c_char_p(raw_unit), ctypes.c_void_p)
+                d_unit.data = ctypes.cast(raw_unit, ctypes.c_void_p)
                 d_unit.length = ulen
                 # library 2.0 — the producer's own spelling, when one was kept. The
                 # C writer checks it against `vu` and ignores it under a unit
                 # flag; `_keep_src` must outlive the call.
                 if unit_source:
                     _keep_src = unit_source.encode('utf-8')
-                    d_unit.unit_source = ctypes.cast(
-                        ctypes.c_char_p(_keep_src), ctypes.c_void_p)
+                    d_unit.unit_source = ctypes.cast(_keep_src, ctypes.c_void_p)
                     d_unit.unit_source_length = len(_keep_src)
                 ok = self._lib.bvnr_write_event(
                     self._ptr, int(Event.TYPE_ANNOTATION_TYPE_FAMILY_PARAM),

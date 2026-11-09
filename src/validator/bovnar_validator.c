@@ -113,6 +113,31 @@ void bvnr_reader_destroy(bvnr_reader_t* r)
 	bvn_lex_destroy(&r->lex);
 	free(r);
 }
+/*
+ * The two spellings of "no unit" as fully initialised constants. Written as a
+ * compound literal at its use site, a value_unit_t zeroes its 516 bytes on the
+ * stack and then copies them to the destination; on the per-value path that is
+ * a measurable share of a parse. These live in .rodata, and an assignment from
+ * one is the copy alone. Plain aggregate initialisers, not compound literals,
+ * because a file-scope compound literal is not a constant expression
+ * (-Wpedantic). The order is value_unit_t's: num_components, then
+ * {base, exponent, {system, {id}}}.
+ */
+static const value_unit_t bvn_unit_no_unit = {
+	1u,
+	{ { bu_none, exp_linear, { prefix_si, { si_none } } } }
+};
+/*
+ * Set a value_unit_t to that shape, skipping the write when it already is:
+ * the per-value reset runs twice for every value (at the value's start and its
+ * end) and usually finds the field already clean, and the struct is 516 bytes.
+ */
+static inline void bvn_unit_set_no_unit(value_unit_t* u)
+{
+	if (memcmp(u, &bvn_unit_no_unit, sizeof(*u)) != 0)
+		*u = bvn_unit_no_unit;
+}
+
 void bvn_val_init(bvnr_validator_t* v, bvnr_read_flags_t* opts)
 {
 	/* A reader is explicitly reusable across documents (bvnr_open_read_source),
@@ -136,7 +161,7 @@ void bvn_val_init(bvnr_validator_t* v, bvnr_read_flags_t* opts)
 	memset(v, 0, pol_at);
 	memset((uint8_t*)v + pol_end, 0, sizeof(*v) - pol_end);
 	v->value_type             = BVN_TYPE_PLAIN;
-	v->parsed_unit            = BVN_UNIT_NO_PREFIX(bu_none);
+	bvn_unit_set_no_unit(&v->parsed_unit);
 	v->inferred_default_vtype = BVN_TYPE_PLAIN;
 	if (opts) {
 		v->userdata      = opts->userdata;
@@ -663,6 +688,22 @@ static inline void bvn_normalize_data_ptr(bvnr_data_t* d)
 {
 	if (d && d->data == NULL)
 		d->data = bvn_empty_sentinel;
+}
+/*
+ * Prepare an event's data block. `type` starts as 0, `data` as NULL, and
+ * every caller writes `value_type` and `value_unit` before it emits. Those
+ * four fields are the first 544 bytes of bvnr_data_t and are overwritten
+ * anyway, so zeroing them with the rest was wasted work on every event --
+ * the struct is 1136 bytes, and value_unit alone is 516. What must start
+ * clean is the rest: length and the padding after it, the datetime
+ * fraction, the unit spelling and the conversion result, which consumers
+ * read unconditionally when they check `converted`.
+ */
+static inline void bvn_event_data_init(bvnr_data_t* d)
+{
+	d->type = (token_type_t)0;
+	d->data = NULL;
+	memset(&d->length, 0, sizeof(*d) - offsetof(bvnr_data_t, length));
 }
 /* Remember the text parsed_unit is about to be (or was just) read from. */
 static inline void bvn_val_set_unit_src(bvnr_validator_t* v,
@@ -1325,15 +1366,14 @@ static uint32_t bvn_i64_to_decimal(uint8_t* buf, int64_t value)
 	buf[bi] = 0;
 	return bi;
 }
-static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
+static bool bvn_emit_default_type_annotation(bvnr_reader_t* r, bvnr_data_t* d,
 	token_type_t tt, const uint8_t* str, uint32_t str_len,
 	bool is_currency_unit,
 	const uint8_t* inline_unit_str, uint32_t inline_unit_len,
-	value_unit_t inline_unit_val)
+	const value_unit_t* inline_unit_val)
 {
 	bvnr_validator_t* v = &r->val;
 	value_type_spec_t default_type;
-	const value_unit_t default_unit = BVN_UNIT_NO_PREFIX(bu_none);
 	const char*       family_name;
 	uint32_t          family_name_len;
 	bool              emit_width = false;
@@ -1344,7 +1384,7 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 		if (!bvn_type_is_plain(v->inferred_default_vtype) &&
 		    bvn_default_type_equiv(BVN_TYPE_UTF8, v->inferred_default_vtype)) {
 			v->value_type    = BVN_TYPE_UTF8;
-			v->parsed_unit   = BVN_UNIT_NO_PREFIX(bu_none);
+			bvn_unit_set_no_unit(&v->parsed_unit);
 			v->unit_data_len = 0;
 			return true;
 		}
@@ -1389,7 +1429,7 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 			if (!bvn_type_is_plain(v->inferred_default_vtype) &&
 			    bvn_default_type_equiv(cand, v->inferred_default_vtype)) {
 				v->value_type    = cand;
-				v->parsed_unit   = BVN_UNIT_NO_PREFIX(bu_none);
+				bvn_unit_set_no_unit(&v->parsed_unit);
 				v->unit_data_len = 7u;
 				return true;
 			}
@@ -1409,7 +1449,7 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 			if (!bvn_type_is_plain(v->inferred_default_vtype) &&
 			    bvn_default_type_equiv(cand, v->inferred_default_vtype)) {
 				v->value_type    = cand;
-				v->parsed_unit   = BVN_UNIT_NO_PREFIX(bu_none);
+				bvn_unit_set_no_unit(&v->parsed_unit);
 				v->unit_data_len = 7u;
 				return true;
 			}
@@ -1467,7 +1507,7 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 	if (!bvn_type_is_plain(v->inferred_default_vtype) &&
 	    bvn_default_type_equiv(default_type, v->inferred_default_vtype)) {
 		v->value_type    = default_type;
-		v->parsed_unit   = default_unit;
+		bvn_unit_set_no_unit(&v->parsed_unit);
 		v->unit_data_len = emit_unit ? 7u : 0u;
 		return true;
 	}
@@ -1483,61 +1523,60 @@ static bool bvn_emit_default_type_annotation(bvnr_reader_t* r,
 	 */
 	bool have_inline_unit =
 		emit_unit && inline_unit_str != NULL && inline_unit_len > 0;
-	v->parsed_unit   = have_inline_unit ? inline_unit_val : default_unit;
+	v->parsed_unit   = have_inline_unit ? *inline_unit_val : bvn_unit_no_unit;
 	if (have_inline_unit)
 		bvn_val_set_unit_src(v, inline_unit_str, inline_unit_len);
 	v->unit_data_len = have_inline_unit ? (uint8_t)inline_unit_len
 	                 : (emit_unit ? 7u : 0u);
-	bvnr_data_t d = {0};
-	d.type       = token_is_type;
-	d.value_type = BVN_TYPE_PLAIN;
-	d.value_unit = BVN_UNIT_NO_PREFIX(bu_none);
-	d.data       = family_name;
-	d.length     = family_name_len;
-	if (!bvn_emit_unverified(r, ev_type_annotation_start, &d))
+	d->type       = token_is_type;
+	d->value_type = BVN_TYPE_PLAIN;
+	d->value_unit = bvn_unit_no_unit;
+	d->data       = family_name;
+	d->length     = family_name_len;
+	if (!bvn_emit_unverified(r, ev_type_annotation_start, d))
 		return false;
-	d.value_type = v->value_type;
-	d.value_unit = v->parsed_unit;
-	if (!bvn_emit_verified(r, ev_type_annotation_start, &d))
+	d->value_type = v->value_type;
+	d->value_unit = v->parsed_unit;
+	if (!bvn_emit_verified(r, ev_type_annotation_start, d))
 		return false;
-	if (!bvn_emit_both(r, ev_type_annotation_type_family, &d))
+	if (!bvn_emit_both(r, ev_type_annotation_type_family, d))
 		return false;
 	if (emit_width) {
-		d.type   = token_is_type_width;
-		d.data   = NULL;
-		d.length = 0;
+		d->type   = token_is_type_width;
+		d->data   = NULL;
+		d->length = 0;
 		if (!bvn_emit_both(r,
 				ev_type_annotation_type_family_parameter,
-				&d))
+				d))
 			return false;
 	}
 	if (emit_base) {
-		d.type   = token_is_type_base;
-		d.data   = NULL;
-		d.length = 0;
+		d->type   = token_is_type_base;
+		d->data   = NULL;
+		d->length = 0;
 		if (!bvn_emit_both(r,
 				ev_type_annotation_type_family_parameter,
-				&d))
+				d))
 			return false;
 	}
 	if (emit_unit) {
-		d.type   = token_is_unit;
+		d->type   = token_is_unit;
 		if (have_inline_unit) {
-			d.data   = inline_unit_str;
-			d.length = inline_unit_len;
+			d->data   = inline_unit_str;
+			d->length = inline_unit_len;
 		} else {
-			d.data   = no_unit_str;
-			d.length = 7;
+			d->data   = no_unit_str;
+			d->length = 7;
 		}
 		if (!bvn_emit_both(r,
 				ev_type_annotation_type_family_parameter,
-				&d))
+				d))
 			return false;
 	}
-	d.type   = token_is_type;
-	d.data   = family_name;
-	d.length = family_name_len;
-	if (!bvn_emit_both(r, ev_type_annotation_end, &d))
+	d->type   = token_is_type;
+	d->data   = family_name;
+	d->length = family_name_len;
+	if (!bvn_emit_both(r, ev_type_annotation_end, d))
 		return false;
 	return true;
 }
@@ -1835,13 +1874,15 @@ static bool bvn_val_receive_type(bvnr_reader_t* r,
 {
 	bvnr_validator_t* v = &r->val;
 	bool type_ok = true, unit_ok = true, unit_too_long = false;
-	value_unit_t parsed_unit = BVN_UNIT_NO_PREFIX(bu_none);
+	/* Written on both paths below: the cache slot, or the parser. */
+	value_unit_t parsed_unit;
 	uint8_t unit_buf[UINT8_MAX + 1];
 	uint8_t ulen = 0;
-	bvnr_data_t d = {0};
+	bvnr_data_t d;
+	bvn_event_data_init(&d);
 	d.type       = token_is_type;
 	d.value_type = BVN_TYPE_PLAIN;
-	d.value_unit = BVN_UNIT_NO_PREFIX(bu_none);
+	d.value_unit = bvn_unit_no_unit;
 	d.data       = raw->type_data;
 	d.length     = raw->type_len;
 	if (!bvn_emit_unverified(r, ev_type_annotation_start, &d))
@@ -2069,16 +2110,17 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 			tt = token_is_number;
 		}
 		if (kw_bool) {
+			bvnr_data_t d;
+			bvn_event_data_init(&d);
 			if (bvn_type_is_plain(v->value_type)) {
-				if (!bvn_emit_default_type_annotation(r,
+				if (!bvn_emit_default_type_annotation(r, &d,
 						token_is_bool, s, n, false,
-						NULL, 0, BVN_UNIT_NO_PREFIX(bu_none)))
+						NULL, 0, NULL))
 					return false;
 			} else if (v->value_type.family != vt_bool) {
 				v->last_error = error_type_value_mismatch;
 				return false;
 			}
-			bvnr_data_t d = {0};
 			d.type       = token_is_bool;
 			d.value_type = v->value_type;
 			d.value_unit = v->parsed_unit;
@@ -2088,7 +2130,8 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 		}
 	}
 	if (tt == token_is_null_value) {
-		bvnr_data_t d = {0};
+		bvnr_data_t d;
+		bvn_event_data_init(&d);
 		d.type       = tt;
 		d.value_type = v->value_type;
 		d.value_unit = v->parsed_unit;
@@ -2098,7 +2141,12 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 	}
 	bool         iu_have = false;
 	bool         iu_ok   = true;
-	value_unit_t iu_unit = BVN_UNIT_NO_PREFIX(bu_none);
+	/* Assigned (in full) when an inline unit is present; the num_components
+	 * store keeps the variable defined for the compiler without the 516-byte
+	 * zeroing of a compound-literal initialiser, which every token used to
+	 * pay even with no unit at all. */
+	value_unit_t iu_unit;
+	iu_unit.num_components = 0;
 	if (raw->inline_unit_len > 0) {
 		uint32_t iu_hit_idx = (uint32_t)-1;
 		for (uint32_t i = 0; i < v->iucache_count; i++) {
@@ -2156,6 +2204,8 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 			return false;
 		}
 	}
+	bvnr_data_t d;
+	bvn_event_data_init(&d);
 	if (bvn_type_is_plain(v->value_type) &&
 		(tt == token_is_number || tt == token_is_array_number ||
 		 tt == token_is_string || tt == token_is_array_string)) {
@@ -2166,14 +2216,14 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 			    bvn_unit_is_currency((int)iu_unit.components[0].base))
 				is_currency_unit = true;
 		}
-		const uint8_t* fold_unit_str = NULL;
-		uint32_t       fold_unit_len = 0;
-		value_unit_t   fold_unit_val = BVN_UNIT_NO_PREFIX(bu_none);
+		const uint8_t*     fold_unit_str = NULL;
+		uint32_t           fold_unit_len = 0;
+		const value_unit_t* fold_unit_val = NULL;
 		if (iu_have && iu_ok &&
 		    (tt == token_is_number || tt == token_is_array_number)) {
 			fold_unit_str = raw->inline_unit_data;
 			fold_unit_len = raw->inline_unit_len;
-			fold_unit_val = iu_unit;
+			fold_unit_val = &iu_unit;
 		}
 		/* The synthesised annotation is a VERIFIED event, so the inline unit
 		 * it may carry has to have passed first: `.o = 100 zzz;` delivered a
@@ -2193,7 +2243,7 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 				raw->inline_unit_data, raw->inline_unit_len);
 			return false;
 		}
-		if (!bvn_emit_default_type_annotation(r, tt,
+		if (!bvn_emit_default_type_annotation(r, &d, tt,
 				raw->str_data, raw->str_len, is_currency_unit,
 				fold_unit_str, fold_unit_len, fold_unit_val))
 			return false;
@@ -2267,7 +2317,6 @@ bool bvn_val_receive(bvnr_reader_t* r, const bvnr_raw_token_t* raw)
 		if (!BVN_UNIT_IS_NO_UNIT(iu_unit))
 			v->parsed_unit_serial++;
 	}
-	bvnr_data_t d = {0};
 	d.type       = tt;
 	d.value_type = v->value_type;
 	d.value_unit = v->parsed_unit;
@@ -2315,7 +2364,8 @@ bool bvn_val_receive_event(bvnr_reader_t* r, bvnr_event_t ev)
 		else if (ev == ev_struct_end) bvn_path_pop(&v->path);
 	}
 	if (!v->on_unverified && !v->on_verified) return true;
-	bvnr_data_t d = {0};
+	bvnr_data_t d;
+	bvn_event_data_init(&d);
 	d.value_type = v->value_type;
 	d.value_unit = v->parsed_unit;
 	return bvn_emit_both(r, ev, &d);
@@ -2340,7 +2390,7 @@ bool bvn_val_on_value_intro(bvnr_reader_t* r)
 {
 	bvnr_validator_t* v = &r->val;
 	v->value_type             = BVN_TYPE_PLAIN;
-	v->parsed_unit            = BVN_UNIT_NO_PREFIX(bu_none);
+	bvn_unit_set_no_unit(&v->parsed_unit);
 	v->inferred_default_vtype = BVN_TYPE_PLAIN;
 	v->has_annotation_unit    = false;
 	bvn_acc_reset(v);
@@ -2350,7 +2400,7 @@ bool bvn_val_on_value_outro(bvnr_reader_t* r)
 {
 	bvnr_validator_t* v = &r->val;
 	v->value_type             = BVN_TYPE_PLAIN;
-	v->parsed_unit            = BVN_UNIT_NO_PREFIX(bu_none);
+	bvn_unit_set_no_unit(&v->parsed_unit);
 	v->inferred_default_vtype = BVN_TYPE_PLAIN;
 	v->has_annotation_unit    = false;
 	bvn_acc_reset(v);
@@ -2358,7 +2408,8 @@ bool bvn_val_on_value_outro(bvnr_reader_t* r)
 }
 bool bvn_val_on_array_intro(bvnr_reader_t* r)
 {
-	bvnr_data_t d = {0};
+	bvnr_data_t d;
+	bvn_event_data_init(&d);
 	d.value_type = r->val.value_type;
 	d.value_unit = r->val.parsed_unit;
 	bvn_acc_reset(&r->val);

@@ -167,8 +167,20 @@ bool bvn_ser_flush_wbuf(bvnr_serializer_t* s)
 static bool bvn_ser_push(bvnr_serializer_t* s,
 	const void* data, uint32_t len)
 {
-	if (bvn_sink_impl(&s->sink)->is_mem)
-		return bvn_sink_push(&s->sink, data, len);
+	/* The memory sink's whole push is a bounds check and a copy; doing it here
+	 * rather than through the stored function pointer takes an indirect call
+	 * out of every tiny emit (a separator, a '<', a digit run), which a
+	 * document of many short values makes the writer's hottest work. It is
+	 * push_mem's contract exactly: refuse past the cap, then copy. */
+	bvn_sink_impl_t* impl = bvn_sink_impl(&s->sink);
+	if (impl->is_mem) {
+		if (len > impl->mem_left) return false;
+		memcpy(impl->mem_ptr, data, len);
+		impl->mem_ptr    += len;
+		impl->mem_left   -= len;
+		impl->mem_written += len;
+		return true;
+	}
 	const uint8_t* src = (const uint8_t*)data;
 	uint32_t pos = 0;
 	while (pos < len) {
@@ -190,6 +202,14 @@ static uint64_t bvn_ser_position(const bvnr_serializer_t* s)
 }
 static bool bvn_ser_push_byte(bvnr_serializer_t* s, uint8_t b)
 {
+	bvn_sink_impl_t* impl = bvn_sink_impl(&s->sink);
+	if (impl->is_mem) {
+		if (!impl->mem_left) return false;
+		*impl->mem_ptr++ = b;
+		impl->mem_left--;
+		impl->mem_written++;
+		return true;
+	}
 	return bvn_ser_push(s, &b, 1);
 }
 static bool bvn_ser_push_str(bvnr_serializer_t* s, const char* str)
@@ -1052,11 +1072,18 @@ static void bvn_w_element_done(bvnr_writer_t* w, uint32_t struct_depth)
 	const bvnr_serializer_t* s = &w->ser;
 	if (s->array_depth > 0u && s->array_depth <= s->max_array_nesting &&
 	    struct_depth == s->struct_depth_at_array_start[s->array_depth - 1u]) {
-		w->gov_unit  = w->arr_gov_unit[s->array_depth - 1u];
+		/* The saved unit is either the empty encoding (0 components) or a
+		 * full copy, so the empty case is the count store alone. */
+		const value_unit_t* saved =
+			&w->arr_gov_unit[s->array_depth - 1u];
+		if (saved->num_components == 0u)
+			w->gov_unit.num_components = 0;
+		else
+			w->gov_unit  = *saved;
 		w->gov_typed = w->arr_gov_typed[s->array_depth - 1u];
 		w->gov_type  = w->arr_gov_type[s->array_depth - 1u];
 	} else if (s->array_depth == 0u) {
-		w->gov_unit  = BVN_UNIT_NONE;
+		w->gov_unit.num_components = 0;
 		w->gov_typed = false;
 	}
 }
@@ -1242,7 +1269,10 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		return true;
 	case ev_assignment_start:
 		w->ser.stream_begun = true;
-		w->gov_unit  = BVN_UNIT_NONE;
+		/* The writer's own unit state only ever reads num_components (and,
+		 * for a real unit, the components of a full copy); clearing the count
+		 * is the whole reset, without zeroing 516 bytes per event. */
+		w->gov_unit.num_components = 0;
 		w->gov_typed = false;
 		w->gov_type  = BVN_TYPE_PLAIN;
 		w->last_ann_type = BVN_TYPE_PLAIN;
@@ -1271,8 +1301,12 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		w->ser.stream_begun     = true;
 		w->ser.w_in_annotation  = true;
 		w->val.value_type  = data->value_type;
-		w->val.parsed_unit = data->value_unit;
-		w->ann_unit        = data->value_unit;
+		/* The writer never reads val.parsed_unit; it was a 516-byte copy
+		 * per annotation kept only for symmetry with the reader. */
+		if (BVN_UNIT_IS_REAL(data->value_unit))
+			w->ann_unit = data->value_unit;
+		else
+			w->ann_unit.num_components = 0;
 		w->ann_family      = data->value_type.family;
 		/* The type as WRITTEN is assembled from the events that write it:
 		 * the family now (the family event confirms it), and the width,
@@ -1280,7 +1314,7 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		w->ann_type.family = data->value_type.family;
 		w->ann_type.width  = 0;
 		w->ann_type.base   = 0;
-		w->gov_unit        = BVN_UNIT_NONE;
+		w->gov_unit.num_components = 0;
 		w->gov_typed       = false;
 		w->gov_type        = BVN_TYPE_PLAIN;
 		/*
@@ -1358,7 +1392,6 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 			w->ann_type.family = data->value_type.family;
 		}
 		w->val.value_type  = data->value_type;
-		w->val.parsed_unit = data->value_unit;
 		break;
 	case ev_type_annotation_end:
 		w->ser.w_in_annotation = false;
@@ -1367,9 +1400,12 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		 * other family has no unit parameter (`<utf8> "x" m` carries its unit
 		 * inline, and the Python binding puts `m` on that start event), so
 		 * there the annotation governs no unit at all. */
-		w->gov_unit = (w->ser.emitted_unit ||
-		               bvn_w_family_takes_unit(w->ann_family))
-		              ? w->ann_unit : BVN_UNIT_NONE;
+		if ((w->ser.emitted_unit ||
+		     bvn_w_family_takes_unit(w->ann_family)) &&
+		    BVN_UNIT_IS_REAL(w->ann_unit))
+			w->gov_unit = w->ann_unit;
+		else
+			w->gov_unit.num_components = 0;
 		w->gov_typed           = true;
 		w->gov_type            = w->ann_type;
 		w->last_ann_type       = w->ann_type;
@@ -1690,7 +1726,7 @@ static bool bvn_writer_validate_event(bvnr_writer_t* w,
 		if (w->gov_typed)
 			return bvn_writer_set_error(w, error_type_value_mismatch);
 		bvn_w_element_begins(w);
-		w->gov_unit  = BVN_UNIT_NONE;
+		w->gov_unit.num_components = 0;
 		w->gov_typed = false;
 		w->gov_type  = BVN_TYPE_PLAIN;
 		if (w->val.policy.num_rules)
@@ -2819,9 +2855,22 @@ bool bvnr_write_event(
 	 * -- after 64 KiB, or at finish -- so refuse it now. */
 	if (!bvn_sink_impl(&w->ser.sink)->push)
 		return bvn_writer_set_error(w, error_invalid_argument);
-	/* The unit in force for a value, before validation moves it on. */
-	const bool         governed = w->ser.emitted_unit;
-	const value_unit_t gov      = w->gov_unit;
+	/* The unit in force for a value, before validation moves it on. The
+	 * validation for a value event walks it past its annotation and clears
+	 * gov_unit, so both the inheritance decision and the unit copied have to be
+	 * taken here. The struct is 516 bytes and copying it for every event was
+	 * most of this function's cost, so it is copied only for the event that
+	 * may actually inherit it. */
+	const bool governed = w->ser.emitted_unit;
+	const bool inherit_unit =
+		ev == ev_data && governed && BVN_UNIT_IS_REAL(w->gov_unit) &&
+		BVN_UNIT_IS_UNITLESS(data->value_unit) &&
+		(data->type == token_is_number ||
+		 data->type == token_is_array_number ||
+		 data->type == token_is_string ||
+		 data->type == token_is_array_string);
+	value_unit_t gov_snapshot;
+	if (inherit_unit) gov_snapshot = w->gov_unit;
 	/* ...and the type in force, for the same reason. */
 	const bool              typed = w->gov_typed;
 	const value_type_spec_t gtype = w->gov_type;
@@ -2853,14 +2902,11 @@ bool bvnr_write_event(
 					? error_sink_buffer_exhausted
 					: error_writing_to_sink);
 	}
-	if (ev == ev_data && governed && BVN_UNIT_IS_REAL(gov) &&
-	    BVN_UNIT_IS_UNITLESS(data->value_unit) &&
-	    (data->type == token_is_number || data->type == token_is_array_number ||
-	     data->type == token_is_string || data->type == token_is_array_string)) {
+	if (inherit_unit) {
 		/* "That unit or none": a value that leaves it to the annotation still
 		 * HAS the annotation's unit, and BVN_UNIT_REDUCE has to rescale it. */
 		local = *data;
-		local.value_unit = gov;
+		local.value_unit = gov_snapshot;
 		data = &local;
 	}
 	if (ev == ev_data &&

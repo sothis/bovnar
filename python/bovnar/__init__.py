@@ -26,7 +26,7 @@ from fractions import Fraction
 
 from .enums import (
     Event, TokenType, ValueTypeFamily, PrefixSystem,
-    SIPrefix, IECPrefix, BaseUnit, Exponent, ErrorCode,
+    SIPrefix, IECPrefix, BaseUnit, Exponent, ErrorCode, family_from_value,
 )
 from .structs import (
     ValueTypeSpec, ValueUnit, ValueUnitComponent, ValueUnitPrefix, BvnrData,
@@ -215,8 +215,11 @@ def loads(data: bytes | bytearray | str | memoryview,
     if isinstance(data, str):
         data = data.encode('utf-8')
     parser = _TypedDictParser() if typed else _DictParser()
+    # _raw: the parser reads the event block during the call and keeps nothing,
+    # so the per-event snapshot (a 1136-byte copy and four owned buffers) is
+    # skipped -- several microseconds of every event on the load path.
     with Reader() as r:
-        r.read_mem(data, on_verified=parser.on_event, **options)
+        r.read_mem(data, on_verified=parser.on_event, _raw=True, **options)
     return parser.result()
 
 
@@ -235,7 +238,8 @@ def load(stream,
     read_flags('load', options)         # a bad keyword names load()
     parser = _TypedDictParser() if typed else _DictParser()
     with Reader() as r:
-        r.read_stream(stream, on_verified=parser.on_event, **options)
+        r.read_stream(stream, on_verified=parser.on_event, _raw=True,
+                      **options)
     return parser.result()
 
 
@@ -692,7 +696,7 @@ class _DictParser:
     def on_event(self, ev: Event, data) -> bool:
         raw = data.raw_bytes() if data else b''
         vt  = data.value_type if data else None
-        fam = ValueTypeFamily(vt.family) if vt else ValueTypeFamily.PLAIN
+        fam = family_from_value(vt.family) if vt else ValueTypeFamily.PLAIN
 
         if ev == Event.STREAM_START:
             pass

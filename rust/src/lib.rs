@@ -1058,9 +1058,51 @@ pub mod dict_parser {
         }
     }
 
+    /// The entries of one document or struct, in insertion order. A repeated
+    /// key keeps its first position and takes the last value.
+    ///
+    /// Up to `SMALL_DICT` entries a linear scan is the cheapest duplicate
+    /// check; past it the scan is quadratic (a 4000-key document spent most of
+    /// its parse in `memcmp`), so an index of key -> position takes over. The
+    /// index copies the keys, which is why it is not built for small structs.
+    #[derive(Default)]
+    struct Dict {
+        entries: Vec<(String, Value)>,
+        index: Option<std::collections::HashMap<String, usize>>,
+    }
+
+    impl Dict {
+        fn insert(&mut self, key: String, value: Value) {
+            if let Some(index) = self.index.as_mut() {
+                if let Some(&i) = index.get(&key) {
+                    self.entries[i].1 = value;
+                } else {
+                    index.insert(key.clone(), self.entries.len());
+                    self.entries.push((key, value));
+                }
+                return;
+            }
+            if let Some(slot) = self.entries.iter_mut().find(|(k, _)| *k == key) {
+                slot.1 = value;
+                return;
+            }
+            self.entries.push((key, value));
+            if self.entries.len() > SMALL_DICT {
+                let mut index = std::collections::HashMap::with_capacity(self.entries.len() * 2);
+                for (i, (k, _)) in self.entries.iter().enumerate() {
+                    index.insert(k.clone(), i);
+                }
+                self.index = Some(index);
+            }
+        }
+    }
+
+    /// The entries a linear scan is cheaper than an index for.
+    const SMALL_DICT: usize = 32;
+
     enum Scope {
-        Doc(Vec<(String, Value)>),
-        Struct(Vec<(String, Value)>, Option<String>),
+        Doc(Dict),
+        Struct(Dict, Option<String>),
         Array(ArrScope),
     }
 
@@ -1076,20 +1118,12 @@ pub mod dict_parser {
     impl DictParser {
         pub fn new(typed: bool) -> Self {
             DictParser {
-                stack: vec![Scope::Doc(Vec::new())],
+                stack: vec![Scope::Doc(Dict::default())],
                 current_key: None,
                 in_octet: false,
                 octets: Vec::new(),
                 typed,
             }
-        }
-    }
-
-    /// Dict assignment: a repeated key keeps its first position, last value.
-    fn insert(entries: &mut Vec<(String, Value)>, key: String, value: Value) {
-        match entries.iter_mut().find(|(k, _)| *k == key) {
-            Some(slot) => slot.1 = value,
-            None => entries.push((key, value)),
         }
     }
 
@@ -1102,7 +1136,7 @@ pub mod dict_parser {
                 }
                 Event::StructStart => {
                     let key = self.current_key.take();
-                    self.stack.push(Scope::Struct(Vec::new(), key));
+                    self.stack.push(Scope::Struct(Dict::default(), key));
                 }
                 Event::StructEnd => {
                     self.maybe_seal_array();
@@ -1110,7 +1144,7 @@ pub mod dict_parser {
                         && matches!(self.stack.last(), Some(Scope::Struct(..)))
                         && let Some(Scope::Struct(entries, key)) = self.stack.pop()
                     {
-                        self.commit(key, Value::Struct(entries));
+                        self.commit(key, Value::Struct(entries.entries));
                     }
                 }
                 Event::ArrayDimStart => {
@@ -1173,8 +1207,9 @@ pub mod dict_parser {
         /// only the assignment in progress. A key assigned again after its
         /// first value was taken is delivered again.
         pub fn take_completed(&mut self, out: &mut Vec<(String, Value)>) {
-            if let Some(Scope::Doc(entries)) = self.stack.first_mut() {
-                out.append(entries);
+            if let Some(Scope::Doc(dict)) = self.stack.first_mut() {
+                out.append(&mut dict.entries);
+                dict.index = None;
             }
         }
 
@@ -1183,7 +1218,7 @@ pub mod dict_parser {
             while self.stack.len() > 1 {
                 // An unterminated scope (continue_on_error) still lands.
                 match self.stack.pop() {
-                    Some(Scope::Struct(entries, key)) => self.commit(key, Value::Struct(entries)),
+                    Some(Scope::Struct(dict, key)) => self.commit(key, Value::Struct(dict.entries)),
                     Some(Scope::Array(a)) => {
                         let key = a.parent_key.clone();
                         self.commit(key, a.seal());
@@ -1192,7 +1227,7 @@ pub mod dict_parser {
                 }
             }
             match self.stack.pop() {
-                Some(Scope::Doc(entries)) => Value::Struct(entries),
+                Some(Scope::Doc(dict)) => Value::Struct(dict.entries),
                 _ => Value::Struct(Vec::new()),
             }
         }
@@ -1201,9 +1236,9 @@ pub mod dict_parser {
         /// current key.
         fn push_value(&mut self, value: Value) {
             match self.stack.last_mut() {
-                Some(Scope::Doc(entries) | Scope::Struct(entries, _)) => {
+                Some(Scope::Doc(dict) | Scope::Struct(dict, _)) => {
                     if let Some(key) = self.current_key.take() {
-                        insert(entries, key, value);
+                        dict.insert(key, value);
                     }
                 }
                 Some(Scope::Array(a)) => a.cur_row.push(value),
@@ -1215,9 +1250,9 @@ pub mod dict_parser {
         /// saved when it opened.
         fn commit(&mut self, key: Option<String>, value: Value) {
             match self.stack.last_mut() {
-                Some(Scope::Doc(entries) | Scope::Struct(entries, _)) => {
+                Some(Scope::Doc(dict) | Scope::Struct(dict, _)) => {
                     if let Some(key) = key {
-                        insert(entries, key, value);
+                        dict.insert(key, value);
                     }
                 }
                 Some(Scope::Array(a)) => a.cur_row.push(value),

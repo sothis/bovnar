@@ -81,6 +81,27 @@ class ValueTypeFamily(IntEnum):
     ILLEGAL     = 9
 
 
+# The two enums a read hands over once per event, by wire number. Calling the
+# enum does a lookup in its member map on every event (about a microsecond on
+# CPython 3.14, measured); indexing a tuple is a few nanoseconds. Both are
+# contiguous from zero and test_enums.py checks them against the C header, so
+# an out-of-range value falls back to the enum call (which raises ValueError,
+# as every caller already handles).
+_EVENT_BY_VALUE  = tuple(Event)
+_FAMILY_BY_VALUE = tuple(ValueTypeFamily)
+
+def event_from_value(v: int) -> Event:
+    """Event(v) for a wire number, without the enum-map lookup on the hot path."""
+    if 0 <= v < len(_EVENT_BY_VALUE):
+        return _EVENT_BY_VALUE[v]
+    return Event(v)
+
+def family_from_value(v: int) -> ValueTypeFamily:
+    """ValueTypeFamily(v), as event_from_value."""
+    if 0 <= v < len(_FAMILY_BY_VALUE):
+        return _FAMILY_BY_VALUE[v]
+    return ValueTypeFamily(v)
+
 class PrefixSystem(IntEnum):
 
     SI          = 0

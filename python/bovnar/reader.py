@@ -28,7 +28,7 @@ from typing import Callable, Generator, IO, Sequence
 
 from ._ffi import get_library
 from ._fileio import PullSource, push_sink, is_stream
-from .enums import Event, ErrorCode
+from .enums import Event, ErrorCode, event_from_value
 from .exceptions import (BovnarParseError, BovnarArgumentError,
                          BovnarWriteError)
 from .structs import (
@@ -317,7 +317,8 @@ class Reader:
                      on_unverified=None,
                      want_unit=None,
                      on_error=None,
-                     options: dict | None = None) -> tuple:
+                     options: dict | None = None,
+                     raw: bool = False) -> tuple:
         """The C read flags for `options` (READ_OPTIONS keywords) and the
         callbacks, with the ctypes callbacks to keep alive. The callbacks
         share one state, so the first exception any of them raises stops the
@@ -327,7 +328,7 @@ class Reader:
         state   = {'exc': None}
 
         if on_verified is not None:
-            cb = self._wrap_callback(on_verified, state)
+            cb = self._wrap_callback(on_verified, state, raw)
             cb_refs.append(cb)
             flags.on_verified = cb
 
@@ -400,21 +401,32 @@ class Reader:
         return snap
 
     @staticmethod
-    def _wrap_callback(py_fn: Callable, state: dict | None = None):
+    def _wrap_callback(py_fn: Callable, state: dict | None = None,
+                       raw: bool = False):
+        """The C callback for `py_fn`.
+
+        Each event normally gets a fresh BvnrData that owns everything it
+        points at (see _snapshot), so a callback may keep it -- or a
+        sub-struct view like d.value_type -- and use every accessor after the
+        reader is gone. ``raw`` passes the reader-owned event block itself
+        instead, valid only for the call: the package's own parsers read it
+        and keep nothing, and for them the snapshot was a 1136-byte copy plus
+        four owned buffers per event.
+        """
 
         if state is None:
             state = {'exc': None}
-        # Each event gets a fresh BvnrData that owns everything it points at
-        # (see _snapshot), so a callback may keep it -- or a sub-struct view
-        # like d.value_type -- and use every accessor after the reader is gone.
 
         def _c_cb(userdata_void, event_int: int, data_ptr) -> bool:
             if state['exc'] is not None:
                 return False
             try:
-                ev = Event(event_int)
-                data = Reader._snapshot(data_ptr.contents) if data_ptr else None
-                result = py_fn(ev, data)
+                ev = event_from_value(event_int)
+                if raw:
+                    result = py_fn(ev, data_ptr.contents if data_ptr else None)
+                else:
+                    data = Reader._snapshot(data_ptr.contents) if data_ptr else None
+                    result = py_fn(ev, data)
                 return bool(result) if result is not None else True
             except BaseException as exc:
                 if state['exc'] is None:
@@ -513,6 +525,7 @@ class Reader:
                  want_unit: Callable | None = None,
                  on_error: Callable | None = None,
                  mirror=None,
+                 _raw: bool = False,
                  **options) -> None:
         """Parse a document held in memory.
 
@@ -554,7 +567,7 @@ class Reader:
 
         flags, cb_refs = self._build_flags(
             'read_mem', on_verified, on_unverified, want_unit, on_error,
-            options)
+            options, _raw)
 
         buf = (ctypes.c_char * len(data)).from_buffer_copy(data)
         if mirror is not None:
@@ -616,6 +629,7 @@ class Reader:
                     want_unit: Callable | None = None,
                     on_error: Callable | None = None,
                     mirror=None,
+                    _raw: bool = False,
                     **options) -> None:
         """Parse a document pulled from a socket or a binary file object.
 
@@ -629,7 +643,7 @@ class Reader:
         self._check_not_busy()
         flags, cb_refs = self._build_flags(
             'read_stream', on_verified, on_unverified, want_unit, on_error,
-            options)
+            options, _raw)
         source = PullSource(stream)
         self._read_source(source.handle, flags, cb_refs, source, mirror=mirror)
 

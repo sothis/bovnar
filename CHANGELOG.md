@@ -362,7 +362,8 @@ API and implements spec 1.2.
   unchanged: `bvnr_feed_test` reads every document after every other, under
   every pair of settings, and a frame stream cut at every byte, against a reader
   fresh from `bvnr_reader_create`. `bvnr_doc_stream_read` reads a 43-byte framed
-  document in about 2.4 µs instead of 2.0.2's 5.6 µs (doc/10 §8.4).
+  document in about 1.9 µs and a 30 KB one in 584 µs, where 2.0.2 took 5.6 and
+  757 µs (doc/10 §8.4).
 - **The Rust crate's `std::io` entry points stream.** `parse_reader`,
   `Reader::read_reader`, `write_to`, `Writer::to_writer` and the `*_reader` /
   `*_to` twins of `bovnar::stream` went through memory: a reader twin read its
@@ -421,6 +422,56 @@ API and implements spec 1.2.
   copied the whole output once more out of the writer with
   `get_output().to_vec()`; the buffer is taken as the result instead.
   `stream::mux_dump` for 150-byte messages went from about 255 to 108 ns each.
+
+- **Reading: a value's unit and an event's block cost the copy, not the
+  zeroing.** Every value reset its 516-byte `value_unit_t` twice, and every
+  event built its `bvnr_data_t` (1 136 bytes) from a zeroed temporary. The unit
+  reset is now a copy from a read-only constant, made only when the field is
+  not already clean; an inline unit is filled only when the token has one; an
+  event block zeroes only its tail, from `length` on, leaving the fields every
+  site writes itself untouched. The synthesised annotation's block is the one
+  its value event then uses. `bovnar bench --size 65536 --iterations 200`:
+  scalars 24.8→31.1 MB/s, structs 17.0→21.3, arrays 12.5→17.0, mixed
+  26.7→30.8, typed 33.3→35.4, units 40.3→42.4. The stream bench's 30 KB
+  documents fall from 773 to 584 µs and its 43-byte ones from 2.3 to 1.9 µs
+  (doc/10 §8.4). Every event, error and position is unchanged; the full
+  suite, under ASan and UBSan as well, passes as before.
+- **Writing: a unit travels by pointer, and an event block no longer starts
+  zeroed.** `bvnr_write_*` passed a 516-byte `value_unit_t` by value down every
+  helper layer and built a zeroed 1 136-byte `bvnr_data_t` per call. The
+  internal helpers now take the unit by pointer and use one shared no-unit
+  constant when the value has none, an event's block initialises only the
+  fields the writer reads, the governing and annotation units are restored
+  lazily, and a write into a memory sink goes straight to its pointers instead
+  of through the generic push. `bvnr_write_uint` 897→404 ns,
+  `bvnr_write_string` 326→159, `bvnr_write_bool` 254→111,
+  `bvnr_write_float` 2 629→2 064, and a run of mixed writes 1 160→759 ns per
+  value. The output is byte for byte the same; the writer, feed-replay and
+  conformance tests pass as before.
+- **The writer's numeric range check stops calling `strtoull`.** It paid for
+  `strtoull`'s locale and overflow machinery, then scanned the digits again;
+  it now accumulates the decimal digits locally with its own overflow guard and
+  takes the wide path only for a value that does not fit 64 bits. The
+  acceptance and every error code are unchanged.
+- **Python: `loads` reads the C event stream without copying it.** Every event
+  reached the parser as a `BvnrData` snapshot (1 136 bytes) with up to four
+  buffers copied out of it (fraction, unit spelling, value, converted value),
+  about 11 µs per event. `loads` and `load` now use an internal raw callback
+  that hands the package's parser the C block by pointer; the public `Reader`
+  callback payload is unchanged. `loads` on a 4 000-value document went from
+  75.5 to 23.6 µs per value. `dumps` also stopped building a `frozenset` per
+  call and casts byte strings to pointers directly instead of through a
+  `c_char_p` temporary: 35.1 to 33.7 µs per value.
+- **Rust: a document's keys are indexed instead of scanned.** `DictParser` —
+  behind `parse`, `parse_typed`, `ValueFeed` and `EmbeddedFeed` — found a
+  repeated key by comparing the new key with every key already in the scope, so
+  a document of many keys parsed quadratically: `parse` of the 402 KB document
+  of doc/14 §4.9 cost 113 ms, four times what reading its events did. A scope
+  now keeps an index from key to position once it holds more than 32 entries
+  (small structs keep the linear scan, and the index is built lazily on the
+  33rd insertion). `parse` reads that document in 30 ms and the 32 KB one in
+  2.5 ms, against 3.1 ms; duplicate keys still keep their first position and
+  take the last value.
 
 ### Fixed
 

@@ -736,9 +736,9 @@ Per framed document, a 43-byte one and a 30 KB one of numbers and strings
 | Path | 43 B | 30 KB |
 |------|-----:|------:|
 | `bvnr_doc_stream_read` (2.0.2: the reader's buffers and the payload allocated per document) | 5.6 µs | 757 µs |
-| `bvnr_doc_stream_read` | 2.3 µs | 773 µs |
-| parsing frame reader, one feed | 2.2 µs | 767 µs |
-| parsing frame reader, 1460 B feeds | 2.2 µs | 772 µs |
+| `bvnr_doc_stream_read` | 1.9 µs | 584 µs |
+| parsing frame reader, one feed | 1.8 µs | 584 µs |
+| parsing frame reader, 1460 B feeds | 1.8 µs | 578 µs |
 
 Re-opening a reader for the next document used to free its frame stack and
 scratch buffers and allocate them again, about 120 KB zeroed, and to copy the

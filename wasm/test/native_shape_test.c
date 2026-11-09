@@ -131,6 +131,31 @@ static char *call_unit_to_profile(const char *buf, int len)
 	(void)buf; (void)len;
 	return bvnr_wasm_unit_to_profile("k~m/s", "ucum");
 }
+/* The exact-rational serialiser: allow_nonterminating makes the value arrive
+ * as converted_num/converted_den, so sb_json_bigint's scratch buffer is part
+ * of the exhaustion sweep too. */
+static char *call_convert_rational(const char *buf, int len)
+{
+	(void)buf; (void)len;
+	static const char slow[] = ".v = <float:64,k~m/h> 100.0;";
+	return bvnr_wasm_events_convert(slow, (int)(sizeof slow - 1),
+					"m/s", 10, 1);
+}
+/* The octet-hex serialiser's own buffer writes: a chunk large enough that the
+ * hex doubles the buffer it grows. */
+static char *call_events_hex(const char *buf, int len)
+{
+	(void)buf; (void)len;
+	static const char oct[] =
+		".a = \x00\x01\x40\x00"
+		"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+		"\x00;";
+	static const bvnr_wasm_opts_t o = {
+		.version = BVNR_WASM_OPTS_VERSION,
+		.flags   = BVNR_WASM_OPT_OCTETS_HEX,
+	};
+	return bvnr_wasm_events_ex(oct, (int)(sizeof oct - 1), (uintptr_t)&o, 0);
+}
 
 static void test_out_of_memory_shapes(void)
 {
@@ -149,6 +174,8 @@ static void test_out_of_memory_shapes(void)
 		{ "unit", call_unit },              { "unit_profiles", call_profiles },
 		{ "convert_unit", call_convert_unit },
 		{ "unit_to_profile", call_unit_to_profile },
+		{ "events_octet_hex", call_events_hex },
+		{ "convert_rational", call_convert_rational },
 	};
 	for (size_t e = 0; e < sizeof entries / sizeof entries[0]; e++) {
 		long total;

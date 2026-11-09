@@ -314,8 +314,12 @@ API and implements spec 1.2.
   exact input). The package's single-file module — the inlined build the web
   playground ships — is now held to the same answers as the multi-file one on
   every surface, options and policies included, so that artifact cannot go
-  stale in a way no test notices; the README also states which build needs
-  Node's globals or `window` and which needs neither.
+  stale in a way no test notices; the exact wrapper+core pair the page loads
+  is imported the way the page imports it, and the corpus differential now
+  compares example values even where `bovnar convert` marks its output LOSSY
+  (it still prints the projection), so the units and binary documents in it
+  are no longer skipped. The README also states which build needs Node's
+  globals or `window` and which needs neither.
 
 ### Changed
 
@@ -576,6 +580,10 @@ API and implements spec 1.2.
   - *The DOM surfaces did not report the document's version directive.*
     `toJSON()` and `doc()` now carry `declared_version`, peeked over the
     leading bytes exactly as the reader surfaces report it.
+  - *An integer whose rendering allocation failed was reported as `"text":"0"`
+    with `value: null` from `doc()`, and as `null` with `ok: true` from
+    `toJSON()`* — a wrong number and a valid-looking projection in place of an
+    exhaustion. The whole result is the out-of-memory object now.
   - *The playground's key scanner did not mask octet-stream payloads,* so a
     `"` or `#` inside binary data put the rest of the document "inside a
     string" and every later assignment got the fallback line, a `.key =` byte

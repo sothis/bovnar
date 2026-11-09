@@ -237,9 +237,11 @@ spelling survives. `unit_source` is absent where the value has no unit.
 
 - `line` is 1-based. `column` counts **characters**, not bytes, and a tab
   advances to the next multiple of 4 — unit symbols are routinely non-ASCII, so
-  this differs often from a byte count. `offset` is the 0-based **byte** index
-  into the input: use it to index the buffer. `byte` is the offending input
-  byte's value, or 0 where the error is not attributable to one.
+  this differs often from a byte count. A binary octet region counts as **one**
+  column (its opener's): the reader skips its bytes, and a newline inside it is
+  payload, not a line break. `offset` is the 0-based **byte** index into the
+  input: use it to index the buffer. `byte` is the offending input byte's
+  value, or 0 where the error is not attributable to one.
 - On a `data` event, `base: 0` means "no explicit base was written", which is
   decimal 10 (`bvn_effective_base`).
 - On a **datetime**, an event's `base` field is the **epoch index**, not a

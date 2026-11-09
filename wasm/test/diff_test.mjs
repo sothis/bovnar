@@ -1,7 +1,10 @@
 // Differential + smoke test for the Bovnar WASM module.
 //
 // Compares the WebAssembly build against the native `bovnar` CLI (the reference)
-// across the example corpus and a set of deliberately malformed snippets:
+// across the example corpus and a set of deliberately malformed snippets. The
+// example values are compared even where `bovnar convert` calls its output
+// LOSSY (it still prints the projection); the package's single-file module and
+// the exact wrapper+core chain the web page loads are held to the same answers.
 //
 //   validate : HARD assertion — WASM and the CLI must agree on ok/error_name.
 //   toJSON   : SOFT check — JSON.parse deep-equality (neutralises float
@@ -146,9 +149,14 @@ for (const { name, text } of examples) {
   // HARD: the values must agree too. This was a soft warning, which is why the
   // shipped module could drift 35 commits behind the library -- answering the
   // pre-fix value for a tai leap second -- without anything failing.
+  //
+  // `lossy: true` on purpose: most examples carry units or octet streams, so
+  // `bovnar convert` exits 1 with a LOSSY report while still printing the JSON
+  // projection. Without it every one of those was skipped, and the corpus
+  // comparison covered almost nothing.
   if (w.ok && c.ok) {
     const wj = b.toJSON(text);
-    const cj = cliJson(text);
+    const cj = cliJson(text, { lossy: true });
     if (cj !== undefined && wj.ok) {
       ok(deepEq(wj.value, cj),
          `toJSON ${name}: wasm=${JSON.stringify(wj.value)} cli=${JSON.stringify(cj)}`);
@@ -503,6 +511,24 @@ console.log('# octet payloads (octets: hex)');
      `octets: one hex per chunk (${JSON.stringify(two)})`);
   ok(throws(() => b.validate(text, { octets: 'hex' })),
      'octets: validate has no event stream and refuses it');
+  // The three views of one stream agree: toJSON's whole-stream hex, the
+  // per-chunk hex of the event stream, and doc()'s byte total. Control bytes
+  // and newlines in the payload prove the framing is counted, not scanned.
+  const split = (chunks) => '\x00' + chunks.map(c =>
+      '\x01' + String.fromCharCode(c.length) + '\x00' + c).join('') + '\x00';
+  for (const chunks of [['a\x01b\x7f'], ['hi', 'there'], ['A\nB', '\r', 'xyz']]) {
+    const d = '.bin = ' + split(chunks) + ';\n';
+    const want = chunks.join('').split('')
+      .map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+    const j = b.toJSON(d), ev = b.events(d, { octets: 'hex' }), doc = b.doc(d);
+    const oct = ev.events.filter(e => e.tok === 'octet_stream');
+    ok(j.ok && j.value.bin === want, `octets: toJSON hex (${JSON.stringify(j.value)})`);
+    ok(oct.map(e => e.hex).join('') === want,
+       `octets: per-chunk hex (${JSON.stringify(oct.map(e => e.hex))})`);
+    ok(oct.reduce((a, e) => a + e.bytes, 0) === want.length / 2,
+       'octets: the byte counts add up');
+    ok(doc.tree[0].value.total === want.length / 2, 'octets: doc total');
+  }
   ok(throws(() => b.events(text, { octets: 'base64' })),
      "octets: only 'hex' is offered");
 }
@@ -835,6 +861,7 @@ console.log('# the single-file build (the playground ships this one)');
       '.a = @;\n.b = 1;\n',
       '#!bovnar 1.1\n.t = <datetime:64> 2026-06-15T12:00:00.5Z;',
       '.s = "";\n.n = null;\n.w = <uint:128> 340282366920938463463374607431768211455;',
+      '.bin = \x00\x01\x02\x00hi\x00;\n.after = 1;',
     ];
     for (const text of sample) {
       for (const fn of ['validate', 'toJSON', 'doc', 'events', 'errors', 'parse']) {
@@ -859,6 +886,37 @@ console.log('# the single-file build (the playground ships this one)');
        single.unitToProfile('k~m/s').unit === 'km.s-1' &&
        single.unitProfiles().profiles.includes('ucum'),
        'single: the unit helpers work');
+    const sh = single.events('.bin = \x00\x01\x02\x00hi\x00;', { octets: 'hex' })
+      .events.find(e => e.tok === 'octet_stream');
+    ok(sh && sh.hex === '6869', `single: octets hex (${JSON.stringify(sh)})`);
+  }
+}
+
+// --- the chain the web page actually loads --------------------------------
+// The page imports web/bovnar_wasm.js: the generated wrapper (wasm/index.mjs
+// with its core import rewritten to a cache-stamped URL) over
+// web/bovnar_wasm_core.js. The single-file check above covers the core's
+// bytes; this one proves the committed pair works together and that the
+// `?v=` import resolves.
+console.log('# the web page chain');
+{
+  const webPath = join(ROOT, 'web', 'bovnar_wasm.js');
+  let web = null, why = '';
+  try {
+    web = await (await import(pathToFileURL(webPath).href)).loadBovnar();
+  } catch (e) { why = String(e && e.message || e); }
+  ok(web !== null, `web chain: loads (${why})`);
+  if (web) {
+    ok(web.version() === b.version(), 'web chain: version');
+    ok(web.validate('.v = <float:64,m/s> 9.81 kg;').error_name === 'unit_mismatch',
+       'web chain: validate');
+    ok(web.validate('.a = 1;', { maxFileSize: 100 }).ok, 'web chain: options');
+    const p = web.createPolicy().requireUnit();
+    ok(!web.validate('.a = 1;', { policy: p }).ok, 'web chain: policy');
+    p.dispose();
+    const h = web.events('.bin = \x00\x01\x02\x00hi\x00;', { octets: 'hex' })
+      .events.find(e => e.tok === 'octet_stream');
+    ok(h && h.hex === '6869', `web chain: octets hex (${JSON.stringify(h)})`);
   }
 }
 

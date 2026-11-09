@@ -609,19 +609,19 @@ static void json_emit_node(sb_t *b, const bvn_dom_node_t *node)
 	}
 	case BVN_DOM_INT: {
 		char *s = bvn_dom_int_to_str(node, 10);
-		if (s) {
-			/* Integers wider than 64 bits cannot survive JSON's double-backed
-			 * number type, so emit them as a JSON string (matching the CLI's
-			 * `convert`); narrow ints stay as number tokens. */
-			if (bvn_dom_get_bigint(node)) {
-				sb_putc(b, '"'); sb_puts(b, s); sb_putc(b, '"');
-			} else {
-				sb_puts(b, s);
-			}
-			bvn_dom_free_string(s);
+		/* NULL here is an allocation failure: an INT node always renders. The
+		 * old fallback wrote `null` with ok:true, which reported a valid
+		 * integer as JSON's null; make it the out-of-memory result instead. */
+		if (!s) { b->oom = 1; break; }
+		/* Integers wider than 64 bits cannot survive JSON's double-backed
+		 * number type, so emit them as a JSON string (matching the CLI's
+		 * `convert`); narrow ints stay as number tokens. */
+		if (bvn_dom_get_bigint(node)) {
+			sb_putc(b, '"'); sb_puts(b, s); sb_putc(b, '"');
 		} else {
-			sb_puts(b, "null");
+			sb_puts(b, s);
 		}
+		bvn_dom_free_string(s);
 		break;
 	}
 	case BVN_DOM_FLOAT: {
@@ -1179,7 +1179,10 @@ static void sb_json_bigint(sb_t *b, const char *name,
 	int bits = bvn_int_bitlen(n);
 	if (bits < 0) bits = 0;
 	size_t cap = bvn_int_str_bufsize((uint32_t)bits, 10);
-	char *tmp = (char *)malloc(cap);
+	/* realloc(NULL, ...) rather than malloc: the native exhaustion sweep
+	 * replaces this file's realloc to fail each buffer growth in turn, and
+	 * this scratch is a buffer growth like any other. */
+	char *tmp = (char *)realloc(NULL, cap);
 	if (!tmp) { b->oom = 1; return; }
 	int32_t len = bvn_int_to_str(n, tmp, cap, 10);
 	if (len < 0) { free(tmp); b->oom = 1; return; }
@@ -1871,17 +1874,19 @@ static void wdoc_emit_value(sb_t *b, const bvn_dom_node_t *node)
 	}
 	case BVN_DOM_INT: {
 		char *s = bvn_dom_int_to_str(node, 10);
+		/* NULL is an allocation failure; the old fallback said "0" with a null
+		 * value, a wrong number rather than an honest exhaustion. */
+		if (!s) { b->oom = 1; break; }
 		bool big = bvn_dom_get_bigint(node) != NULL;
 		value_type_spec_t vt = bvn_dom_get_value_type(node);
 		sb_puts(b, "{\"type\":\"scalar\",\"kind\":");
 		sb_json_cstr(b, vt.family == vt_datetime ? "datetime" : "number");
 		sb_puts(b, ",\"text\":");
-		sb_json_cstr(b, s ? s : "0");
+		sb_json_cstr(b, s);
 		sb_puts(b, ",\"value\":");
-		if (!s)        sb_puts(b, "null");
-		else if (big) { sb_putc(b, '"'); sb_puts(b, s); sb_putc(b, '"'); }
-		else           sb_puts(b, s);
-		if (s) bvn_dom_free_string(s);
+		if (big) { sb_putc(b, '"'); sb_puts(b, s); sb_putc(b, '"'); }
+		else     sb_puts(b, s);
+		bvn_dom_free_string(s);
 		/* A datetime written with sub-second digits keeps them here: the node's
 		 * integer is the whole-second epoch count, and the fraction has nowhere
 		 * else to live. toJSON() refuses such a document rather than truncate

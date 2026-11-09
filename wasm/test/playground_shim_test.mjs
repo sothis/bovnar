@@ -589,6 +589,116 @@ console.log('# a float_fix q parameter reaches the translated stream');
      `shim q param: ${show(evs)}`);
 }
 
+/* An octet stream is raw binary, and a payload may contain '"', '#' or a
+   '.key =' byte sequence. The scanner masks string and comment spans so it can
+   find keys; before it masked octet payloads too, a quote inside one put the
+   whole rest of the document "inside a string" and every later assignment got
+   the fallback line, and a key-like payload could steal the next key's site. */
+console.log('# keys after an octet payload keep their lines');
+{
+  const cases = [
+    { name: 'quote and hash in the payload',
+      text: '.bin = \x00\x01\x05\x00a"b#c\x01\x03\x00x.y\x00;\n.after = 1;\n.next = 2;\n',
+      want: [['bin', 1], ['after', 2], ['next', 3]] },
+    { name: 'a key-like payload',
+      text: '.bin = \x00\x01\x0a\x00.next = 9;\x00;\n.after = 1;\n',
+      want: [['bin', 1], ['after', 2]] },
+    { name: 'a newline in the payload is binary, not a line',
+      text: '.bin = \x00\x01\x03\x00a\nb\x00;\n.after = 1;\n',
+      want: [['bin', 1], ['after', 2]] },
+    // The reader's display column counts a whole binary region as ONE column
+    // (its opener's), so a key after one on the same line is not pushed right
+    // by the payload's length. `@` in `.after = @` is column 20 in the C;
+    // `.after` therefore starts at 11.
+    { name: 'a key after an octet on the same line',
+      text: '.bin = \x00\x01\x03\x00abc\x00; .after = 1;\n',
+      want: [['bin', 1], ['after', 1]], cols: [1, 11] },
+    { name: 'an escaped quote is still a string',
+      text: '.s = "a\\"b";\n.after = 1;\n',
+      want: [['s', 1], ['after', 2]] },
+  ];
+  for (const { name, text, want, cols } of cases) {
+    const r = P.parseFaithful(text);
+    const got = r.tree.children.map(a => [a.key, a.line]);
+    ok(show(got) === show(want), `octet scan ${name}: ${show(got)} expected ${show(want)}`);
+    if (cols) {
+      const gotCols = r.tree.children.map(a => a.col);
+      ok(show(gotCols) === show(cols),
+         `octet scan ${name}: columns ${show(gotCols)} expected ${show(cols)}`);
+    }
+    ok(r.errors.length === 0,
+       `octet scan ${name}: no errors (${show(r.errors.map(e => e.code))})`);
+  }
+}
+
+/* Randomized: payload bytes that are legal inside a chunk but would confuse a
+ * text scanner if it were naive (0x0A/0x0D newline and carriage return, quotes,
+ * '#' comments, dots, '=', spaces) must not move the keys that follow. Bytes are
+ * kept to ASCII without 0x00: a 0x00 ends the chunk on the wire, and a non-ASCII
+ * byte is two UTF-8 bytes while a textarea holds one character (the shim's
+ * documented limit for binary input). */
+console.log('# random octet payloads do not move later keys');
+{
+  let seed = 1;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const alphabet = [0x01, 0x0a, 0x0d, 0x22, 0x23, 0x2e, 0x3d, 0x41, 0x20, 0x7f];
+  for (let n = 0; n < 100; n++) {
+    const len = 1 + Math.floor(rnd() * 12);
+    let payload = '';
+    for (let i = 0; i < len; i++)
+      payload += String.fromCharCode(alphabet[Math.floor(rnd() * alphabet.length)]);
+    const text = `.bin = \x00\x01${String.fromCharCode(len)}\x00${payload}\x00;\n` +
+                 '.k0 = 1;\n.k1 = 2;\n';
+    const r = P.parseFaithful(text);
+    const got = r.tree.children.map(a => [a.key, a.line]);
+    ok(show(got) === show([['bin', 1], ['k0', 2], ['k1', 3]]),
+       `octet scan random ${n}: ${show(got)} for ${JSON.stringify(payload)}`);
+    ok(r.errors.length === 0,
+       `octet scan random ${n}: no errors (${show(r.errors.map(e => e.code))})`);
+  }
+}
+
+/* Randomized mixing of every masked span: strings with escaped quotes, '#'
+ * comments, octet streams and same-line structs. Each top-level assignment
+ * sits on its own line, so its line is known by construction; if any masker
+ * path missed or over-ran a character, the offsets and every later line
+ * would drift. */
+console.log('# comments, strings and octets keep the line map');
+{
+  let seed = 7;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const pick = (a) => a[Math.floor(rnd() * a.length)];
+  for (let n = 0; n < 60; n++) {
+    const lines = [];
+    const keys = [];
+    if (rnd() < 0.5) lines.push('# a comment with .fake = 1; and "quotes"');
+    const count = 2 + Math.floor(rnd() * 4);
+    for (let i = 0; i < count; i++) {
+      const key = `k${n}_${i}`;
+      const kind = Math.floor(rnd() * 5);
+      let value;
+      if (kind === 0) value = `"a\\"b#c\\\\d"`;
+      else if (kind === 1) value = 'sym';
+      else if (kind === 2) {
+        const len = 1 + Math.floor(rnd() * 6);
+        let p = '';
+        for (let k = 0; k < len; k++) p += pick(['\x0a', '"', '#', '.', '=', 'A', ' ']);
+        value = `\x00\x01${String.fromCharCode(len)}\x00${p}\x00`;
+      } else if (kind === 3) value = '{.x = 1; .y = "q#";}';
+      else value = String(Math.floor(rnd() * 1000));
+      lines.push(`.${key} = ${value};`);
+      keys.push([key, lines.length]);
+    }
+    const r = P.parseFaithful(lines.join('\n') + '\n');
+    const got = r.tree.children.map(a => [a.key, a.line]);
+    ok(show(got) === show(keys),
+       `line map ${n}: ${show(got)} expected ${show(keys)}`);
+    ok(r.errors.length === 0,
+       `line map ${n}: no errors (${show(r.errors.map(e => e.code))}) in ` +
+       JSON.stringify(lines.join('\n')));
+  }
+}
+
 /* Spelled out separately from the differential above, which can only compare
    documents the DOM accepts — and the version of this that started it all,
    `.a = [{.b=3;},{.c=4;}];`, is rejected. Every read here is guarded: on the

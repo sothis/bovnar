@@ -54,33 +54,79 @@
       if (window.console) console.warn('bovnar: WASM parser failed to load', e);
     });
 
-  /* Blank out string literals ("…") and '#' comments — replacing their bytes with
-   * spaces while preserving offsets and newlines — so the key scanner below can
-   * never match a '.key =' that merely appears inside a string or a comment.
-   * (Octet-stream content is base64/hex, which can't contain '.', '#' or '"', so
-   * it needs no masking.) */
+  /* Blank out string literals ("…"), '#' comments and octet-stream payloads —
+   * replacing their bytes with spaces while preserving offsets and newlines —
+   * so the key scanner below can never match a '.key =' that merely appears
+   * inside one, and a quote or '#' inside binary data cannot put the scanner
+   * into string or comment mode for the rest of the document.
+   *
+   * An octet stream is raw binary, not base64/hex: 0x00 { 0x01 len16 data } 0x00
+   * (spec §9.2). A 0x00 outside one is illegal everywhere, so treating every
+   * 0x00 in code mode as an opener is safe. The whole region is masked to
+   * SPACES, newlines included: the reader does not count a line inside binary
+   * data (a 0x0A there is payload, or a length byte), so counting one here
+   * would put every later key on the wrong line. The length counts BYTES; a
+   * textarea holds characters, and an ASCII payload — the only kind a JS-string
+   * input can carry through UTF-8 — has one of each. Whenever the frame stops
+   * making sense (a non-0x01 tag, a truncated chunk), the rest is masked: that
+   * only affects line numbers for a document the C has already rejected.
+   *
+   * Returns { masked, binary }, the second an ascending list of [start, end)
+   * offsets into the source: colAt() needs them because the reader's display
+   * column counts a whole binary region as ONE column (the opener's). */
   function maskStringsAndComments(text) {
-    var out = '', n = text.length, mode = 0;   // 0 = code, 1 = string, 2 = comment
-    for (var i = 0; i < n; i++) {
+    var out = '', n = text.length, i = 0, mode = 0;   // 0 = code, 1 = string, 2 = comment
+    var binary = [];
+    while (i < n) {
       var c = text[i];
-      if (mode === 2) { if (c === '\n') { mode = 0; out += '\n'; } else out += ' '; continue; }
-      if (mode === 1) {
-        if (c === '\\') { out += ' '; if (i + 1 < n) { out += (text[i + 1] === '\n' ? '\n' : ' '); i++; } continue; }
-        if (c === '"') { mode = 0; out += ' '; continue; }
-        out += (c === '\n') ? '\n' : ' '; continue;
+      if (mode === 2) {
+        if (c === '\n') { mode = 0; out += '\n'; } else out += ' ';
+        i++; continue;
       }
-      if (c === '#') { mode = 2; out += ' '; continue; }
-      if (c === '"') { mode = 1; out += ' '; continue; }
-      out += c;
+      if (mode === 1) {
+        if (c === '\\') {
+          out += ' ';
+          if (i + 1 < n) { out += (text[i + 1] === '\n' ? '\n' : ' '); i += 2; }
+          else i++;
+          continue;
+        }
+        if (c === '"') { mode = 0; out += ' '; i++; continue; }
+        out += (c === '\n') ? '\n' : ' ';
+        i++; continue;
+      }
+      if (c === '#') { mode = 2; out += ' '; i++; continue; }
+      if (c === '"') { mode = 1; out += ' '; i++; continue; }
+      if (c === '\x00') {
+        var open = i;
+        out += ' '; i++;
+        while (i < n) {
+          if (text[i] === '\x00') { out += ' '; i++; break; }   // trailing marker
+          if (text[i] !== '\x01') { out += ' '; i++; continue; } // desynced
+          if (i + 2 >= n) { for (; i < n; i++) out += ' '; break; }
+          var lo = text.charCodeAt(i + 1) & 0xff;
+          var hi = text.charCodeAt(i + 2) & 0xff;
+          out += '   ';                       // tag + two length bytes
+          i += 3;
+          var len = lo | (hi << 8);
+          if (len === 0) len = 65536;
+          var end = Math.min(n, i + len);
+          for (; i < end; i++) out += ' ';
+        }
+        binary.push({ start: open, end: i });
+        continue;
+      }
+      out += c; i++;
     }
-    return out;
+    return { masked: out, binary: binary };
   }
 
   /* ── source line / explicit-annotation scanner ───────────────────────── */
   function makeScan(text) {
     // Structural scanning runs on the masked copy (offsets map 1:1 to the source,
     // so line numbers and the value slice below are still correct).
-    var masked = maskStringsAndComments(text);
+    var maskedText = maskStringsAndComments(text);
+    var masked = maskedText.masked;
+    var binary = maskedText.binary;
     var pos = 0;
     // Incremental line counter. This used to rescan from offset 0 on every call,
     // and next() calls it once per assignment -- O(assignments x document), i.e.
@@ -100,10 +146,21 @@
     }
     /* The DISPLAY column the C lexer reports: 1-based, one per code point, and a
        tab advances to the next multiple of 4 (the playground's jumpTo converts it
-       back). Only ever asked for at a key, so it walks a single line. */
+       back). An octet-stream region is ONE column, at its opener -- the reader
+       does not count the binary bytes -- so the spans from the masker are
+       skipped, adding a single column where each begins. Only ever asked for a
+       key, so it walks a single line. */
     function colAt(idx) {
-      var col = 1;
+      var col = 1, si = 0;
+      while (si < binary.length && binary[si].end <= lastNL + 1) si++;
       for (var i = lastNL + 1; i < idx; i++) {
+        var sp = binary[si];
+        if (sp && i >= sp.start) {
+          if (i === sp.start) col++;
+          i = Math.min(sp.end, idx) - 1;
+          if (sp.end <= idx) si++;
+          continue;
+        }
         var c = masked.charCodeAt(i);
         if (c === 9) col = (((col - 1) >> 2) + 1) * 4 + 1;
         else if (c < 0xdc00 || c > 0xdfff) col++;   // skip a surrogate pair's tail

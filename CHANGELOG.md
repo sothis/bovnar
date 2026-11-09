@@ -567,6 +567,16 @@ API and implements spec 1.2.
   - *The DOM surfaces did not report the document's version directive.*
     `toJSON()` and `doc()` now carry `declared_version`, peeked over the
     leading bytes exactly as the reader surfaces report it.
+  - *The playground's key scanner did not mask octet-stream payloads,* so a
+    `"` or `#` inside binary data put the rest of the document "inside a
+    string" and every later assignment got the fallback line, a `.key =` byte
+    sequence in a payload could steal the next key's site, and a 0x0A in a
+    payload or a length byte was counted as a line the reader does not count.
+    The masker now walks the wire framing (`0x00 { 0x01 len16 data } 0x00`)
+    and blanks the whole region, newlines included, which is what the reader's
+    line counter sees; it also records the region's span, because the reader's
+    display column counts a whole binary region as ONE column and the shim
+    counted every byte.
 - **Fixes from a review of the unreleased work (2026-11-09, second pass).**
   - *The push-fed readers refuse a call from inside their own callbacks.* A
     callback-mode demux fed again from `on_message` re-lexed the window the

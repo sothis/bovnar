@@ -1086,6 +1086,16 @@ pub(crate) fn type_spec(family: ValueTypeFamily, width: u32, base: u32) -> Value
     }
 }
 
+/// The byte cap of a sink writer: `usize::MAX` is no cap, also on a 32-bit
+/// target, where it would otherwise be a 4 GiB one.
+fn sink_cap(cap: usize) -> u64 {
+    if cap == usize::MAX {
+        u64::MAX
+    } else {
+        cap as u64
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1187,15 +1197,5 @@ mod tests {
         w.write_string("a", "x").unwrap();
         assert!(w.finish().is_err());
         assert!(w.finish().is_err());
-    }
-}
-
-/// The byte cap of a sink writer: `usize::MAX` is no cap, also on a 32-bit
-/// target, where it would otherwise be a 4 GiB one.
-fn sink_cap(cap: usize) -> u64 {
-    if cap == usize::MAX {
-        u64::MAX
-    } else {
-        cap as u64
     }
 }

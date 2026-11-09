@@ -55,7 +55,8 @@
  * bvnr_wasm_version_number / bvnr_wasm_spec_version / bvnr_wasm_peek_version,
  * bvnr_wasm_error_name, bvnr_wasm_unit (parse + canonical spelling + profile
  * flag), bvnr_wasm_units_equal, bvnr_wasm_units_convertible,
- * bvnr_wasm_convert_unit and bvnr_wasm_unit_profiles.
+ * bvnr_wasm_convert_unit, bvnr_wasm_unit_to_profile and
+ * bvnr_wasm_unit_profiles.
  *
  * The caller passes a pointer+length (NOT a NUL-terminated string), because a
  * .bvnr document may carry octet streams with embedded NULs. Every returning
@@ -741,10 +742,13 @@ static void emit_declared_version(sb_t *b, const bvnr_reader_t *r)
 
 /* The common result for a call that could not even start: a unit policy or an
  * options block the wrapper handed over in a shape this build refuses, or a
- * reader that could not be created. `events`/`errors` say which of the two
- * array fields the surface carries, so the result keeps that surface's shape. */
+ * reader that could not be created. The array fields say which of the payload
+ * arrays the surface carries (parse() carries both), so the result keeps that
+ * surface's shape -- a caller must not have to know that a refusal took a
+ * different path to have r.events. */
 static char *wasm_refusal(error_code_t err, const char *detail,
-			  const char *array_field, bool tier)
+			  const char *array_field,
+			  const char *array_field2, bool tier)
 {
 	sb_t b; sb_init(&b);
 	sb_putc(&b, '{');
@@ -757,9 +761,11 @@ static char *wasm_refusal(error_code_t err, const char *detail,
 	emit_position(&b, 0, 0, 0, 0);
 	sb_puts(&b, ",\"recovery_count\":0,\"skipped_bytes\":0,"
 		    "\"declared_version\":null");
-	if (array_field) {
+	const char *fields[2] = { array_field, array_field2 };
+	for (int i = 0; i < 2; i++) {
+		if (!fields[i]) continue;
 		sb_puts(&b, ",\"");
-		sb_puts(&b, array_field);
+		sb_puts(&b, fields[i]);
 		sb_puts(&b, "\":[]");
 	}
 	sb_putc(&b, '}');
@@ -783,12 +789,18 @@ static char *wasm_refusal(error_code_t err, const char *detail,
  * whose README says it reports what the CLI reports, while toJSON() and doc()
  * in the SAME module refused them.
  */
-static error_code_t wasm_document_tier(const char *buf, int len)
+static error_code_t wasm_document_tier(const char *buf, int len, bool *internal)
 {
+	if (internal) *internal = false;
 	bvn_dom_doc_t *doc = bvn_dom_parse(buf, (uint32_t)len);
-	error_code_t err = doc ? bvn_dom_doc_get_parse_error(doc)
-	                       : error_invalid_argument;
-	if (doc) bvn_dom_doc_destroy(doc);
+	if (!doc) {
+		/* Not a finding about the document: the DOM could not be built. The
+		 * caller must not label this a document-tier error. */
+		if (internal) *internal = true;
+		return error_invalid_argument;
+	}
+	error_code_t err = bvn_dom_doc_get_parse_error(doc);
+	bvn_dom_doc_destroy(doc);
 	return err;
 }
 
@@ -914,7 +926,7 @@ static char *validate_impl(const char *buf, int len,
 	bvnr_read_flags_t flags;
 	if (!wasm_read_flags(&flags, opts))
 		return wasm_refusal(error_invalid_argument,
-				    "unrecognized reader options", NULL, true);
+				    "unrecognized reader options", NULL, NULL, true);
 	flags.continue_on_error = false;
 
 	bvnr_reader_t *r = bvnr_reader_create();
@@ -922,11 +934,11 @@ static char *validate_impl(const char *buf, int len,
 		/* Not a document error and not a position: report it as the
 		 * internal failure it is, with tier null rather than the "stream"
 		 * a caller might place a caret at. */
-		return wasm_refusal(error_invalid_argument, "out of memory", NULL, true);
+		return wasm_refusal(error_invalid_argument, "out of memory", NULL, NULL, true);
 	if (!policy_install(policy, r)) {
 		bvnr_reader_destroy(r);
 		return wasm_refusal(error_invalid_argument,
-				    "the unit policy was refused", NULL, true);
+				    "the unit policy was refused", NULL, NULL, true);
 	}
 	/* Match every other front end: the CLI (src/bovnar.c), the Python bindings
 	 * and the DOM builder all raise BOTH of these to 255. Left at the library
@@ -959,13 +971,22 @@ static char *validate_impl(const char *buf, int len,
 	 * keys are properties of the document, not of the unit the consumer asked
 	 * its values to be delivered in. */
 	const char *tier = (err == error_none) ? NULL : "stream";
+	const char *detail = NULL;
 	if (opened && err == error_none) {
-		err = wasm_document_tier(buf, len);
-		if (err != error_none) tier = "document";
+		bool internal = false;
+		err = wasm_document_tier(buf, len, &internal);
+		if (err != error_none) {
+			if (internal) detail = "out of memory";
+			else          tier = "document";
+		}
 	}
 
 	sb_putc(&b, '{');
 	emit_status(&b, err);
+	if (detail) {
+		sb_puts(&b, ",\"detail\":");
+		sb_json_cstr(&b, detail);
+	}
 	sb_puts(&b, ",\"tier\":");
 	if (tier) sb_json_cstr(&b, tier);
 	else      sb_puts(&b, "null");
@@ -1271,13 +1292,13 @@ static char *events_impl(const char *buf, int len,
 	bvnr_read_flags_t flags;
 	if (!wasm_read_flags(&flags, opts))
 		return wasm_refusal(error_invalid_argument,
-				    "unrecognized reader options", "events", false);
+				    "unrecognized reader options", "events", NULL, false);
 
 	bvnr_reader_t *r = bvnr_reader_create();
 	if (r && !policy_install(policy, r)) {
 		bvnr_reader_destroy(r);
 		return wasm_refusal(error_invalid_argument,
-				    "the unit policy was refused", "events", false);
+				    "the unit policy was refused", "events", NULL, false);
 	}
 	flags.userdata = &ud;
 	flags.on_verified = evt_cb;
@@ -1389,14 +1410,14 @@ static char *events_convert_impl(const char *buf, int len, const char *unit,
 	 * rest of the domain is bvnr's own: 2..62, 64 and 85. */
 	if (base < 0 || (base != 0 && !bvn_rational_base_valid((uint32_t)base)))
 		return wasm_refusal(error_invalid_argument,
-				    "unusable output base", "events", false);
+				    "unusable output base", "events", NULL, false);
 	if (unit && unit[0]) {
 		bool ok = false;
 		target = bvn_parse_unit((const uint8_t *)unit, &ok);
 		if (!ok)
 			return wasm_refusal(error_unit_illegal,
 					    "the conversion target is not a unit",
-					    "events", false);
+					    "events", NULL, false);
 		tp = &target;
 	}
 	return events_impl(buf, len, tp, (uint32_t)base,
@@ -1488,13 +1509,13 @@ static char *errors_impl(const char *buf, int len,
 	bvnr_read_flags_t flags;
 	if (!wasm_read_flags(&flags, opts))
 		return wasm_refusal(error_invalid_argument,
-				    "unrecognized reader options", "errors", false);
+				    "unrecognized reader options", "errors", NULL, false);
 
 	bvnr_reader_t *r = bvnr_reader_create();
 	if (r && !policy_install(policy, r)) {
 		bvnr_reader_destroy(r);
 		return wasm_refusal(error_invalid_argument,
-				    "the unit policy was refused", "errors", false);
+				    "the unit policy was refused", "errors", NULL, false);
 	}
 	flags.userdata          = &ctx;
 	flags.on_error          = err_collect;
@@ -1509,9 +1530,15 @@ static char *errors_impl(const char *buf, int len,
 	 * does not resync, so over a document with stream errors it could only
 	 * repeat the first of them.) Without this, errors() said {"ok":true,
 	 * "errors":[]} for a duplicate key. */
+	error_code_t internal_err = error_none;
 	if (opened && ctx.count == 0) {
-		error_code_t derr = wasm_document_tier(buf, len);
-		if (derr != error_none) {
+		bool internal = false;
+		error_code_t derr = wasm_document_tier(buf, len, &internal);
+		if (internal) {
+			/* The DOM could not be built: an internal failure, not an entry
+			 * about the document. The result is ok:false with an empty list. */
+			internal_err = derr;
+		} else if (derr != error_none) {
 			ctx.first = derr;
 			sb_printf(&ebuf, "{\"error\":%d,\"error_name\":", (int)derr);
 			sb_json_cstr(&ebuf, bvn_error_to_string(derr));
@@ -1522,8 +1549,9 @@ static char *errors_impl(const char *buf, int len,
 	}
 
 	error_code_t err = ctx.count > 0 ? ctx.first
-	                                 : (r ? bvnr_reader_get_error(r)
-	                                      : error_invalid_argument);
+	                                 : (internal_err != error_none ? internal_err
+	                                    : (r ? bvnr_reader_get_error(r)
+	                                         : error_invalid_argument));
 	if (!opened && err == error_none) err = error_invalid_argument;
 
 	sb_putc(&b, '{');
@@ -1614,13 +1642,13 @@ static char *parse_impl(const char *buf, int len,
 	bvnr_read_flags_t flags;
 	if (!wasm_read_flags(&flags, opts))
 		return wasm_refusal(error_invalid_argument,
-				    "unrecognized reader options", NULL, false);
+				    "unrecognized reader options", "events", "errors", false);
 
 	bvnr_reader_t *r = bvnr_reader_create();
 	if (r && !policy_install(policy, r)) {
 		bvnr_reader_destroy(r);
 		return wasm_refusal(error_invalid_argument,
-				    "the unit policy was refused", NULL, false);
+				    "the unit policy was refused", "events", "errors", false);
 	}
 	flags.userdata          = &ud;
 	flags.on_verified       = both_evt_cb;
@@ -1994,17 +2022,20 @@ uint32_t bvnr_wasm_spec_version(void)
 }
 
 /* A document's leading "#!bovnar <major>.<minor>" directive without a full
- * parse. Same packing as bvnr_wasm_spec_version; (uint32_t)-1 means the buffer
- * carries no well-formed directive (bvnr_peek_version returns false for both
- * "absent" and "malformed", and so does this). */
-#define BVNR_WASM_NO_VERSION ((uint32_t)0xffffffffu)
+ * parse. Same packing as bvnr_wasm_spec_version; *found (may be NULL) says
+ * whether there was a well-formed directive. The out-parameter exists rather
+ * than an in-band sentinel because the packed form can hold every value a
+ * directive can declare -- 65535.65535 is 0xFFFFFFFF, and a sentinel would
+ * make that document indistinguishable from one with no directive. */
 WASM_EXPORT
-uint32_t bvnr_wasm_peek_version(const char *buf, int len)
+uint32_t bvnr_wasm_peek_version(const char *buf, int len, int *found)
 {
+	if (found) *found = 0;
 	if (len < 0) len = 0;
 	uint16_t maj = 0, min = 0;
 	if (!bvnr_peek_version(buf, (uint64_t)len, &maj, &min))
-		return BVNR_WASM_NO_VERSION;
+		return 0;
+	if (found) *found = 1;
 	return ((uint32_t)maj << 16) | (uint32_t)min;
 }
 
@@ -2110,6 +2141,39 @@ char *bvnr_wasm_convert_unit(double value, const char *from, const char *to)
 	sb_puts(&b, ",\"value\":");
 	if (err == error_none) sb_printf(&b, "%.17g", out);
 	else sb_puts(&b, "null");
+	sb_putc(&b, '}');
+	return sb_finish(&b);
+}
+
+/* bvn_unit_to_profile / bvn_unit_to_ucum: a unit written as a code in a
+ * profile's vocabulary (the "ucum" case is the one every FHIR-shaped consumer
+ * wants). Returns { ok, error, error_name, unit }, where `unit` is the code
+ * WITHOUT the "ns:" prefix, or null when the unit is valid but that vocabulary
+ * has no code for it -- the two are partial by construction (a currency, an
+ * opaque unit of another profile, a compound in a flat vocabulary). An
+ * unparseable input is a refusal with its own code, as in bvnr_wasm_unit. */
+WASM_EXPORT
+char *bvnr_wasm_unit_to_profile(const char *text, const char *ns)
+{
+	sb_t b; sb_init(&b);
+	bool ok = false;
+	value_unit_t u = bvn_parse_unit((const uint8_t *)(text ? text : ""), &ok);
+	error_code_t err = error_none;
+	char ub[BVNR_UNIT_STRING_MAX];
+	int32_t n = -1;
+	if (!ok) {
+		err = bvn_unit_error_code((const uint8_t *)(text ? text : ""),
+					  (uint32_t)(text ? strlen(text) : 0));
+	} else if (ns && ns[0]) {
+		n = bvn_unit_to_profile(ns, u, ub, sizeof ub);
+	} else {
+		n = bvn_unit_to_ucum(u, ub, sizeof ub);
+	}
+	sb_putc(&b, '{');
+	emit_status(&b, err);
+	sb_puts(&b, ",\"unit\":");
+	if (err == error_none && n >= 0) sb_json_cstr(&b, ub);
+	else                              sb_puts(&b, "null");
 	sb_putc(&b, '}');
 	return sb_finish(&b);
 }

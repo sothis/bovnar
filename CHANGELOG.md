@@ -298,11 +298,15 @@ API and implements spec 1.2.
   reader API: `versionNumber` (`bvnr_version`), `specVersion`
   (`bvnr_spec_version`), `peekVersion` (`bvnr_peek_version`), `errorName`
   (`bvn_error_to_string`), `parseUnit`/`unitsEqual`/`unitsConvertible`/
-  `convertUnit`/`unitProfiles` (`bvn_parse_unit`, `bvn_unit_to_string`,
-  `bvn_unit_error_code`, `bvn_unit_is_profile_only`, `bvn_unit_equal`,
-  `bvn_units_convertible`, `bvn_unit_convert_value`, the profile table). The
+  `convertUnit`/`unitToProfile`/`unitProfiles` (`bvn_parse_unit`,
+  `bvn_unit_to_string`, `bvn_unit_error_code`, `bvn_unit_is_profile_only`,
+  `bvn_unit_equal`, `bvn_units_convertible`, `bvn_unit_convert_value`,
+  `bvn_unit_to_ucum` / `bvn_unit_to_profile`, the profile table). The
   old exports stay, and the wrapper feature-tests the new ones so a current
   wrapper paired with a stale core refuses an option rather than dropping it.
+  Input may now also be an `ArrayBuffer`, and the README states that a JS
+  string is UTF-8-encoded (a lone surrogate becomes U+FFFD; pass bytes for
+  exact input).
 
 ### Changed
 
@@ -522,6 +526,32 @@ API and implements spec 1.2.
   - *`doc()` dropped the unit's written spelling and a datetime's sub-second
     digits,* the two things the DOM keeps and the event stream cannot always
     reconstruct. A node now carries `unitSource` and `frac`.
+  - *A policy handle from another `loadBovnar()` instance was used as if it
+    were local.* Each call loads its own WebAssembly memory, so the foreign
+    pointer referred to whatever sat at that address there — in practice an
+    all-zero block, which read as an empty policy, so `requireUnit()` was
+    silently dropped. Policies are branded with their module and a foreign one
+    throws.
+  - *`parse()`'s refusal results carried no `events`/`errors` arrays,* so a
+    caller reading `r.events.length` had to special-case a refusal; every
+    surface's early return now keeps that surface's shape.
+  - *`peekVersion()`'s in-band "absent" sentinel was `0xFFFFFFFF`, which is
+    also what `#!bovnar 65535.65535` packs to* — the directive read as absent.
+    A found-out-parameter replaces the sentinel.
+  - *A DOM allocation failure in the document tier was reported as a
+    document-tier error* (`tier: "document"` with `error_invalid_argument`);
+    it is an internal failure with `tier: null` and a detail now, and `errors()`
+    reports it as a failed read with an empty list rather than an entry about
+    the document.
+  - *Option values were coerced* (`maxTextBytes: "10"` and even `true` were
+    accepted as limits), and the policy builder's refusals passed the C side's
+    single catch-all message through — a ninth target was reported as a bad
+    *unit*. Counts and bases are checked in JS now, with messages that name
+    them; units and rule paths still defer to the library.
+  - *A converting policy makes `toJSON`/`doc` judge the document after
+    conversion,* so they can accept an array `validate()` refuses — the C DOM's
+    own behaviour, and what `bovnar query --unit` does. Documented beside the
+    two-tier note, with the mixed-unit array pinned in the tests.
 - **Fixes from a review of the unreleased work (2026-11-09, second pass).**
   - *The push-fed readers refuse a call from inside their own callbacks.* A
     callback-mode demux fed again from `on_message` re-lexed the window the

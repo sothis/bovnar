@@ -408,6 +408,15 @@ console.log('# reader options');
      'options maxNumberLength: exact at the boundary');
   ok(!b.events('.a = 12345;', { maxNumberLength: 3 }).ok,
      'options maxNumberLength: one over');
+  ok(b.validate(`.s = "${'x'.repeat(20)}";`, { maxStringLength: 5 }).error_name
+     === 'string_too_long', 'options maxStringLength');
+  ok(b.validate(`.s = ${'x'.repeat(20)};`, { maxSymbolLength: 5 }).error_name
+     === 'symbol_too_long', 'options maxSymbolLength');
+  ok(b.validate(`.r = &.${'x'.repeat(20)};`, { maxReferenceLength: 5 }).error_name
+     === 'reference_too_long', 'options maxReferenceLength');
+  // 64-bit limits accept a BigInt, and only then is a value past 2^53 exact.
+  ok(b.validate('.a = 1;', { maxFileSize: 2n ** 40n }).ok,
+     'options: a BigInt limit is accepted');
   // Nesting defaults to the format's hard limit (255) on every WASM surface.
   const deep = `${'.a = '.repeat(1)}${'['.repeat(65)}${']'.repeat(65)};`;
   ok(b.validate(deep).ok, 'options: 65 nested arrays parse at the default');
@@ -563,12 +572,77 @@ console.log('# unit policy (vs the CLI)');
   ok(throws(() => p.rule('.a', 'm', { mode: 'nonsense' })),
      'policy: a bad mode throws');
   ok(throws(() => p.target('m', 1)), 'policy: an unwritable base throws');
+  ok(throws(() => p.target('m', 63)), 'policy: base 63 throws');
   ok(p.target('m') === p, 'policy: methods chain');
   p.dispose();
   ok(p.disposed === true && throws(() => p.target('m')),
      'policy: a disposed policy refuses to be used');
   ok(throws(() => b.validate('.a = 1;', { policy: p })),
      'policy: a disposed policy is refused by a surface');
+
+  // Count limits are the library's (8 of each); the JS builder names the limit
+  // rather than passing the C side's catch-all refusal through.
+  const many = b.createPolicy();
+  for (let i = 0; i < 8; i++) many.target('m');
+  let countMsg = '';
+  try { many.target('m'); } catch (e) { countMsg = e.message; }
+  ok(/at most 8 targets/.test(countMsg),
+     `policy: the 9th target names the limit (${countMsg})`);
+  many.dispose();
+  const rules = b.createPolicy();
+  for (let i = 0; i < 8; i++) rules.rule(`.k${i}`, 'm');
+  ok(throws(() => rules.rule('.k8', 'm')), 'policy: the 9th rule is refused');
+  rules.dispose();
+  const dims = b.createPolicy();
+  for (let i = 0; i < 8; i++) dims.requireConvertibleTo('m');
+  ok(throws(() => dims.requireConvertibleTo('m')),
+     'policy: the 9th requireConvertibleTo is refused');
+  dims.dispose();
+
+  // A policy handle belongs to the module that made it: another
+  // loadBovnar() is a different WebAssembly memory, and passing the handle to
+  // it must throw rather than read whatever sits at that address.
+  {
+    const other = await loadBovnar();
+    const foreign = other.createPolicy().requireUnit();
+    ok(throws(() => b.validate('.a = 1;', { policy: foreign })),
+       'policy: a handle from another module instance throws');
+    foreign.dispose();
+  }
+
+  // Unsetting works: requireUnit(false) and normaliseSI(false) put the policy
+  // back, so the same document passes again.
+  {
+    const toggle = b.createPolicy().requireUnit().normaliseSI();
+    ok(!b.validate('.a = 1;', { policy: toggle }).ok, 'policy: toggles on');
+    toggle.requireUnit(false).normaliseSI(false);
+    ok(b.validate('.a = 1;', { policy: toggle }).ok, 'policy: toggles off');
+    toggle.dispose();
+  }
+
+  // A converting policy and the DOM's second pass: the DOM stores converted
+  // values, so homogeneity is checked over them — the same verdict
+  // `bovnar query --unit` gives, and the opposite of `validate`'s as-written
+  // one. Pinned so neither side drifts silently.
+  {
+    const text = '.a = [<float:64,km> 1.0, <float:64,m> 2.0];';
+    const conv = b.createPolicy().target('m');
+    ok(b.validate(text).error_name === 'array_element_type_mismatch',
+       'policy DOM tier: validate judges the document as written');
+    ok(cliValidate(text).error_name === 'array_element_type_mismatch',
+       'policy DOM tier: the CLI validate agrees');
+    ok(b.validate(text, { policy: conv }).error_name
+       === 'array_element_type_mismatch',
+       'policy DOM tier: validate still judges it as written under a policy');
+    const d = b.doc(text, { policy: conv });
+    ok(d.ok, `policy DOM tier: doc accepts the converted tree (${d.error_name})`);
+    const els = d.tree[0].value.rows[0].elements;
+    ok(els.length === 2 && els.every(e => e.unit === 'm'),
+       `policy DOM tier: both elements are metres (${JSON.stringify(els.map(e => e.unit))})`);
+    const q = cliQuery(text, '.a', ['--unit', 'm']);
+    ok(q.ok, `policy DOM tier: query --unit accepts it (${q.out})`);
+    conv.dispose();
+  }
 }
 
 // --- version, error-name and unit helpers -----------------------------------
@@ -584,6 +658,12 @@ console.log('# version / error / unit helpers');
   ok(b.peekVersion('.a = 1;') === null, 'peekVersion: no directive is null');
   ok(b.peekVersion('#!bovnar 9\n.a = 1;') === null,
      'peekVersion: a malformed directive is null');
+  // Every value a directive can declare must survive the crossing: 65535.65535
+  // packs to the bits an in-band "absent" sentinel would have used, which is
+  // why the result carries an out-parameter instead.
+  const big = b.peekVersion('#!bovnar 65535.65535\n.a = 1;');
+  ok(big && big.major === 65535 && big.minor === 65535,
+     `peekVersion: 65535.65535 survives (${JSON.stringify(big)})`);
 
   ok(b.errorName(0) === 'none' && b.errorName(38) === 'unit_mismatch',
      'errorName: codes map to the names in results');
@@ -605,6 +685,15 @@ console.log('# version / error / unit helpers');
   ok(!b.unitsConvertible('m', 's'), 'unitsConvertible: lengths and times are not');
   ok(throws(() => b.unitsConvertible('m', 'nope')),
      'unitsConvertible: a non-unit throws');
+  const up = b.unitToProfile('k~m/s', 'ucum');
+  ok(up.ok && up.unit === 'km.s-1',
+     `unitToProfile: the UCUM code (${JSON.stringify(up)})`);
+  ok(b.unitToProfile('k~m/s').unit === 'km.s-1',
+     'unitToProfile: ucum is the default namespace');
+  ok(b.unitToProfile('$USD', 'ucum').unit === null,
+     'unitToProfile: a unit with no code in the vocabulary is null, not an error');
+  ok(b.unitToProfile('not a unit').ok === false,
+     'unitToProfile: an unparseable unit is a refusal');
   const c = b.convertUnit(0, '°C', 'K');
   ok(c.ok && Math.abs(c.value - 273.15) < 1e-9,
      `convertUnit: 0 °C is 273.15 K (${JSON.stringify(c)})`);

@@ -20,14 +20,16 @@
 //   bvnr.eventsConvert('.v = 9.81 k~m/s;', 'm/s'); // -> events with `converted`
 //   bvnr.version();                                // -> "2.0.2"
 //
-// `input` may be a string (UTF-8 encoded for you) or a Uint8Array (passed
-// through verbatim — required if the document embeds octet streams with NULs).
+// `input` may be a string (UTF-8 encoded for you), a Uint8Array or an
+// ArrayBuffer (passed through verbatim — required if the document embeds octet
+// streams with NULs, or if the bytes are not valid UTF-8: a JS string cannot
+// carry a lone surrogate, and TextEncoder replaces one with U+FFFD).
 //
 // Every parsing surface also takes an optional options object carrying the
 // reader-side C API: the bvnr_read_flags_t assertions and limits, and a unit
 // policy. See "Reader options" below.
 
-import createBovnar from './bovnar_wasm_core.js?v=84f0a1ef69e0';
+import createBovnar from './bovnar_wasm_core.js?v=7115d45ef55e';
 
 const enc = new TextEncoder();
 
@@ -56,8 +58,10 @@ const DOM_OPTIONS = ['policy'];
 
 function toBytes(input) {
   if (input instanceof Uint8Array) return input;
+  if (input instanceof ArrayBuffer) return new Uint8Array(input);
   if (typeof input === 'string') return enc.encode(input);
-  throw new TypeError('bovnar: input must be a string or Uint8Array');
+  throw new TypeError(
+    'bovnar: input must be a string, Uint8Array or ArrayBuffer');
 }
 
 export async function loadBovnar(opts) {
@@ -126,6 +130,22 @@ export async function loadBovnar(opts) {
     }
   }
 
+  // Two NUL-terminated strings: the unit text and a profile namespace.
+  function callJsonCString2(fnName, a, b) {
+    const pa = stringPtr(a, 'a unit');
+    let pb = 0, outPtr = 0;
+    try {
+      pb = stringPtr(b, 'a profile namespace');
+      outPtr = Module.ccall(fnName, 'number',
+                            ['number', 'number'], [pa, pb]);
+      return readJson(outPtr);
+    } finally {
+      Module._free(pa);
+      if (pb) Module._free(pb);
+      if (outPtr) Module.ccall('bvnr_wasm_free', 'void', ['number'], [outPtr]);
+    }
+  }
+
   // Call a `char* fn(void)` export returning a JSON string.
   function callJsonNoArg(fnName) {
     const outPtr = Module.ccall(fnName, 'number', [], []);
@@ -159,17 +179,25 @@ export async function loadBovnar(opts) {
   // fields default to 255 — the limit every WASM surface has always run at —
   // rather than to the reader's own default of 64.
   function u64(v, name) {
-    let b;
-    try { b = BigInt(v); } catch { b = -1n; }
-    if (b < 0n || b > 0xffffffffffffffffn)
+    // A number and a BigInt are both accepted; a string or a boolean is a typo,
+    // not a limit. BigInt(number) is exact for an integer-valued double, so a
+    // value above 2^53 keeps the digits the double actually holds.
+    if (typeof v === 'bigint') {
+      if (v < 0n || v > 0xffffffffffffffffn)
+        throw new RangeError(`bovnar: ${name} must be an integer in 0..2^64-1`);
+      return v;
+    }
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < 0)
+      throw new RangeError(`bovnar: ${name} must be an integer in 0..2^64-1`);
+    const b = BigInt(v);
+    if (b > 0xffffffffffffffffn)
       throw new RangeError(`bovnar: ${name} must be an integer in 0..2^64-1`);
     return b;
   }
   function uint(v, max, name) {
-    const n = Number(v);
-    if (!Number.isInteger(n) || n < 0 || n > max)
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > max)
       throw new RangeError(`bovnar: ${name} must be an integer in 0..${max}`);
-    return n;
+    return v;
   }
 
   function optionWork(options, allowed, label) {
@@ -190,15 +218,42 @@ export async function loadBovnar(opts) {
     if (options === undefined || options === null) return { ptr: 0, policy: 0 };
     let policy = 0;
     if (options.policy != null) {
-      if (typeof options.policy._handle !== 'function')
+      if (typeof options.policy._handle !== 'function' ||
+          options.policy._module !== Module)
         throw new TypeError(
-          `bovnar: ${label}: options.policy must come from createPolicy()`);
+          `bovnar: ${label}: options.policy must come from this module's ` +
+          `createPolicy method; a handle from another loadBovnar instance ` +
+          `points into a different WebAssembly memory`);
       policy = options.policy._handle();
       if (!policy)
         throw new Error(`bovnar: ${label}: the unit policy has been disposed`);
     }
     const set = allowed.filter(k => k !== 'policy' && options[k] !== undefined);
     if (!set.length) return { ptr: 0, policy };
+    // Validate every value BEFORE allocating: a RangeError thrown after the
+    // malloc would leak the block, and a caller retrying a bad option would
+    // leak one per attempt.
+    const fields = {
+      maxFileSize: u64(options.maxFileSize ?? 0, 'maxFileSize'),
+      maxTextBytes: u64(options.maxTextBytes ?? 0, 'maxTextBytes'),
+      maxArrayItems: u64(options.maxArrayItems ?? 0, 'maxArrayItems'),
+      maxConversionLength:
+        uint(options.maxConversionLength ?? 0, 0xffffffff, 'maxConversionLength'),
+      maxIdentifierLength:
+        uint(options.maxIdentifierLength ?? 0, 0xffff, 'maxIdentifierLength'),
+      maxStringLength:
+        uint(options.maxStringLength ?? 0, 0xffff, 'maxStringLength'),
+      maxNumberLength:
+        uint(options.maxNumberLength ?? 0, 0xffff, 'maxNumberLength'),
+      maxSymbolLength:
+        uint(options.maxSymbolLength ?? 0, 0xffff, 'maxSymbolLength'),
+      maxReferenceLength:
+        uint(options.maxReferenceLength ?? 0, 0xffff, 'maxReferenceLength'),
+      maxStructNesting:
+        uint(options.maxStructNesting ?? 0, 255, 'maxStructNesting'),
+      maxArrayNesting:
+        uint(options.maxArrayNesting ?? 0, 255, 'maxArrayNesting'),
+    };
     const ptr = malloc(OPTS_SIZE);
     // Re-read HEAPU8 after the malloc: growth swaps the ArrayBuffer and detaches
     // any view captured earlier.
@@ -208,25 +263,17 @@ export async function loadBovnar(opts) {
     if (options.strictVersion) flags |= OPT_STRICT_VERSION;
     if (options.textOnly) flags |= OPT_TEXT_ONLY;
     dv.setUint32(4, flags, true);
-    dv.setBigUint64(8, u64(options.maxFileSize ?? 0, 'maxFileSize'), true);
-    dv.setBigUint64(16, u64(options.maxTextBytes ?? 0, 'maxTextBytes'), true);
-    dv.setBigUint64(24, u64(options.maxArrayItems ?? 0, 'maxArrayItems'), true);
-    dv.setUint32(32, uint(options.maxConversionLength ?? 0, 0xffffffff,
-                          'maxConversionLength'), true);
-    dv.setUint32(36, uint(options.maxIdentifierLength ?? 0, 0xffff,
-                          'maxIdentifierLength'), true);
-    dv.setUint32(40, uint(options.maxStringLength ?? 0, 0xffff,
-                          'maxStringLength'), true);
-    dv.setUint32(44, uint(options.maxNumberLength ?? 0, 0xffff,
-                          'maxNumberLength'), true);
-    dv.setUint32(48, uint(options.maxSymbolLength ?? 0, 0xffff,
-                          'maxSymbolLength'), true);
-    dv.setUint32(52, uint(options.maxReferenceLength ?? 0, 0xffff,
-                          'maxReferenceLength'), true);
-    dv.setUint32(56, uint(options.maxStructNesting ?? 0, 255,
-                          'maxStructNesting'), true);
-    dv.setUint32(60, uint(options.maxArrayNesting ?? 0, 255,
-                          'maxArrayNesting'), true);
+    dv.setBigUint64(8, fields.maxFileSize, true);
+    dv.setBigUint64(16, fields.maxTextBytes, true);
+    dv.setBigUint64(24, fields.maxArrayItems, true);
+    dv.setUint32(32, fields.maxConversionLength, true);
+    dv.setUint32(36, fields.maxIdentifierLength, true);
+    dv.setUint32(40, fields.maxStringLength, true);
+    dv.setUint32(44, fields.maxNumberLength, true);
+    dv.setUint32(48, fields.maxSymbolLength, true);
+    dv.setUint32(52, fields.maxReferenceLength, true);
+    dv.setUint32(56, fields.maxStructNesting, true);
+    dv.setUint32(60, fields.maxArrayNesting, true);
     dv.setUint32(64, 0, true);
     dv.setUint32(68, 0, true);
     return { ptr, policy };
@@ -335,10 +382,24 @@ export async function loadBovnar(opts) {
     if (!handle) throw new Error('bovnar: out of memory');
     let disposed = false;
     let normalise = 0, base = 0, onInexact = 0;
+    // BVNR_MAX_UNIT_TARGETS / BVNR_MAX_UNIT_RULES. Counted here so an
+    // over-limit add names the limit instead of the catch-all "check the
+    // unit" message the C side's single bool forces.
+    let nTargets = 0, nRules = 0, nRequire = 0;
 
     function live() {
       if (disposed) throw new Error('bovnar: the unit policy has been disposed');
       return handle;
+    }
+    // bvn_rational_base_valid: 0 (the value's own) or a base bvnr can write.
+    function baseValid(b) {
+      return b === 0 || (b >= 2 && b <= 62) || b === 64 || b === 85;
+    }
+    function needBase(b, what) {
+      if (!baseValid(b))
+        throw new RangeError(
+          `bovnar: ${what} base ${b} is not one bovnar can write ` +
+          `(0 or 2..62, 64, 85)`);
     }
     function need(ok, what) {
       if (!ok) {
@@ -369,21 +430,29 @@ export async function loadBovnar(opts) {
       /** Convert every numeric value to the first target it validly converts
        *  to; `base` renders the result in that base (0 keeps the value's). */
       target(unit, targetBase = 0) {
+        if (nTargets >= 8)
+          throw new RangeError('bovnar: a unit policy takes at most 8 targets');
+        const b = uint(targetBase, 0x7fffffff, 'target base');
+        needBase(b, 'target');
         need(withString(unit, (p) => Module.ccall(
                'bvnr_wasm_policy_target', 'number',
-               ['number', 'number', 'number'],
-               [live(), p, uint(targetBase, 0x7fffffff, 'target base')])),
+               ['number', 'number', 'number'], [live(), p, b])),
              `target ${JSON.stringify(String(unit))}`);
+        nTargets++;
         return api;
       },
       /** Every numeric value must be validly CONVERTIBLE to `unit` (the
        *  document's own unit and value are kept). Named for the C field it
        *  fills, require_dimension_of. */
       requireConvertibleTo(unit) {
+        if (nRequire >= 8)
+          throw new RangeError(
+            'bovnar: a unit policy takes at most 8 requireConvertibleTo units');
         need(withString(unit, (p) => Module.ccall(
                'bvnr_wasm_policy_require_dimension', 'number',
                ['number', 'number'], [live(), p])),
              `requireConvertibleTo ${JSON.stringify(String(unit))}`);
+        nRequire++;
         return api;
       },
       /** A rule about one key path. `mode` is 'convert' (deliver converted) or
@@ -393,12 +462,16 @@ export async function loadBovnar(opts) {
         const modes = { convert: 0, require: 1 };
         if (!(mode in modes))
           throw new TypeError("bovnar: rule mode must be 'convert' or 'require'");
+        if (nRules >= 8)
+          throw new RangeError('bovnar: a unit policy takes at most 8 rules');
+        const b = uint(ruleBase, 0x7fffffff, 'rule base');
+        needBase(b, 'rule');
         need(withString(path, (pp) => withString(unit, (up) => Module.ccall(
                'bvnr_wasm_policy_rule', 'number',
                ['number', 'number', 'number', 'number', 'number'],
-               [live(), pp, up,
-                uint(ruleBase, 0x7fffffff, 'rule base'), modes[mode]]))),
+               [live(), pp, up, b, modes[mode]]))),
              `rule ${JSON.stringify(String(path))}`);
+        nRules++;
         return api;
       },
       /** Deliver everything the targets did not match in coherent SI base
@@ -409,7 +482,9 @@ export async function loadBovnar(opts) {
       },
       /** Output base for normaliseSI (0 keeps each value's own). */
       base(n) {
-        setMode(normalise, uint(n, 0x7fffffff, 'policy base'), onInexact);
+        const b = uint(n, 0x7fffffff, 'policy base');
+        needBase(b, 'policy');
+        setMode(normalise, b, onInexact);
         return api;
       },
       /** What a policy conversion that cannot be delivered exactly does:
@@ -429,7 +504,13 @@ export async function loadBovnar(opts) {
         Module.ccall('bvnr_wasm_policy_destroy', 'void', ['number'], [handle]);
       },
       get disposed() { return disposed; },
+      /** Internal: the handle, or 0 once disposed. */
       _handle() { return disposed ? 0 : handle; },
+      /** Internal: which module this handle belongs to. A policy from another
+       *  loadBovnar() instance is a pointer into a different WebAssembly
+       *  memory; buildOptions refuses it rather than letting the core read
+       *  whatever sits at that address in this one. */
+      _module: Module,
     };
 
     function setMode(n, b, i) {
@@ -608,14 +689,21 @@ export async function loadBovnar(opts) {
       needExport('bvnr_wasm_peek_version', 'peekVersion');
       const bytes = toBytes(input);
       const inPtr = malloc(bytes.length || 1);
+      let foundPtr = 0;
+      // An out-parameter rather than a sentinel: 65535.65535 packs to the same
+      // 32 bits a sentinel would have to use.
       try {
+        foundPtr = malloc(4);
         if (bytes.length) Module.HEAPU8.set(bytes, inPtr);
         const p = Module.ccall('bvnr_wasm_peek_version', 'number',
-                               ['number', 'number'], [inPtr, bytes.length]);
-        if (p === -1) return null;
+                               ['number', 'number', 'number'],
+                               [inPtr, bytes.length, foundPtr]);
+        if (!new DataView(Module.HEAPU8.buffer, foundPtr, 4)
+              .getUint32(0, true)) return null;
         return { major: (p >>> 16) & 0xffff, minor: p & 0xffff };
       } finally {
         Module._free(inPtr);
+        if (foundPtr) Module._free(foundPtr);
       }
     },
 
@@ -637,6 +725,21 @@ export async function loadBovnar(opts) {
     parseUnit: (text) => {
       needExport('bvnr_wasm_unit', 'parseUnit');
       return callJsonCString('bvnr_wasm_unit', text);
+    },
+
+    /** A unit written as a code in a profile's vocabulary: bvn_unit_to_profile,
+     *  with 'ucum' the default (bvn_unit_to_ucum). Returns
+     *  { ok, error, error_name, unit }, where `unit` is the code WITHOUT its
+     *  "ns:" prefix, or null for a VALID unit that vocabulary has no code for.
+     *  Both directions are partial: a currency has no UCUM code, a compound has
+     *  no flat-vocabulary code, and an unknown namespace is null for every
+     *  unit. An unparseable input is a refusal, as in parseUnit(). */
+    unitToProfile: (text, ns = 'ucum') => {
+      needExport('bvnr_wasm_unit_to_profile', 'unitToProfile');
+      // null means "the default namespace" as undefined does; otherwise
+      // String(null) would become a namespace literally called "null".
+      return callJsonCString2('bvnr_wasm_unit_to_profile', text,
+                              ns == null ? 'ucum' : ns);
     },
 
     /** Whether two unit strings denote the same unit. Throws TypeError when

@@ -46,8 +46,10 @@ bvnr.events('.x = <uint:16> 7;');
 bvnr.version();  // "2.0.2"
 ```
 
-`input` is a string (UTF-8 encoded for you) or a `Uint8Array` (pass bytes
-directly when the document embeds octet streams containing NUL bytes).
+`input` is a string (UTF-8 encoded for you), a `Uint8Array` or an
+`ArrayBuffer` (pass bytes directly when the document embeds octet streams
+containing NUL bytes, or is not valid UTF-8 — a JS string cannot carry a lone
+surrogate, and encoding one yields U+FFFD).
 
 ### Single-file build
 
@@ -78,6 +80,7 @@ import { loadBovnar } from 'bovnar-wasm/single';
 | `peekVersion(in)` | `{ major, minor }` or `null` — a document's leading `#!bovnar` directive, without parsing it |
 | `errorName(code)` | the `error_name` a numeric result code maps to (`"none"` for 0) |
 | `parseUnit(text)` | `{ ok, unit, error, error_name, profile_only }` — a unit's canonical spelling and why a string was refused |
+| `unitToProfile(text, ns = 'ucum')` | `{ ok, unit, error, error_name }` — the unit as a code in that vocabulary (no `ns:` prefix), or `null` for a valid unit the vocabulary has no code for |
 | `unitsEqual(a, b)` | whether two unit strings denote the same unit; throws `TypeError` if either is not a unit |
 | `unitsConvertible(a, b)` | `bvn_units_convertible`, the screen for a conversion target; a screen, not a guarantee |
 | `convertUnit(value, from, to)` | `{ ok, value }` or `{ ok: false, error, error_name, value: null }` — one number through `bvn_unit_convert_value` (the **double** path; affine scales such as °C/°F included) |
@@ -111,8 +114,8 @@ bvnr.events(doc, { policy: bvnr.createPolicy().requireUnit() });
 policy and no read flags, so passing `strictVersion`, `textOnly` or a limit
 there **throws** rather than being silently ignored — the same reason
 `bovnar query` refuses `--text-only`. An unknown option always throws (a typo
-is not a setting). The limits are exact up to 2^53; pass a `BigInt` for
-`maxFileSize` above that.
+is not a setting). The three 64-bit limits (`maxFileSize`, `maxTextBytes`,
+`maxArrayItems`) are exact up to 2^53; pass a `BigInt` for one above that.
 
 ### Unit policy
 
@@ -140,9 +143,12 @@ policy.dispose();
 A rule that matches nothing is **satisfied** (the C contract); a value at a
 rule's path that cannot be converted is `unit_mismatch`. `onInexact('leave')`
 applies to policy-chosen targets, not to `rule`-named ones, which stay strict.
-A policy may be used by any number of calls and lives until `dispose()`, after
-which using it throws. See `doc/06_bovnar_unit_policy.md` for the full
-semantics.
+On `eventsConvert()` the reader's `want_unit` hook is armed for every numeric
+value and wins over a policy's `target`/`normalise` settings — the C API's
+precedence — though the policy's assertions (`requireUnit`, rules,
+`requireConvertibleTo`) still apply. A policy may be used by any number of
+calls and lives until `dispose()`, after which using it throws. See
+`doc/06_bovnar_unit_policy.md` for the full semantics.
 
 ### Two tiers of validity
 
@@ -172,6 +178,14 @@ the library refuses, a refused conversion base, an allocation failure — is
 neither tier: on `validate()` it is `tier: null` with
 `error_invalid_argument`, and it has no position to place.
 
+A **converting** policy is applied before the DOM's document-tier rules — the
+C DOM stores converted values, and `bvn_dom_parse_policy` checks homogeneity
+over the converted tree. So `toJSON(doc, { policy })` and `doc(doc, { policy })`
+can accept a document `validate()` refuses: `[<float:64,km> 1.0,
+<float:64,m> 2.0]` is two units as written (`array_element_type_mismatch`) and
+one unit in metres after conversion. That is exactly what `bovnar query --unit
+m` does; `bovnar validate` and `convert`, which use the plain DOM, refuse it.
+
 Where several errors are reported, `error` / `error_name` always name the
 **first**, and the top-level `line`/`column`/`byte`/`offset` place it. An
 allocation failure inside the module is reported in the same shape as any other
@@ -199,12 +213,36 @@ spelling survives. `unit_source` is absent where the value has no unit.
   byte's value, or 0 where the error is not attributable to one.
 - On a `data` event, `base: 0` means "no explicit base was written", which is
   decimal 10 (`bvn_effective_base`).
-- On a **datetime**, the type's `base` field is the **epoch index**, not a
+- On a **datetime**, an event's `base` field is the **epoch index**, not a
   radix: 0 is unix, 1 is tai, and the epoch's name is beside it in `epoch`.
+  (`doc()` reports `base: null` for a datetime and the epoch by name.)
 - Numbers in `text` are the source spelling, not a JS number. A wide integer's
   digits live only there (or in `converted_num`/`converted_den`).
 - A `float_fix` value's `q` is its fixed-point scaling; a `type_q` parameter
   event carries it as `q`, never as `base`.
+
+### The event stream
+
+Each `events` entry is `{ seq, ev, tok, ... }`, where `ev` is one of the C
+`bvnr_event_t` members and `tok` the `token_type_t` of its payload:
+
+| `ev` | C event | Payload |
+| ---- | ------- | ------- |
+| `stream_start`, `stream_end` | `ev_stream_start`, `ev_stream_end` | none |
+| `assign_start` | `ev_assignment_start` | `text`: the key |
+| `struct_open`, `struct_close` | `ev_struct_start`, `ev_struct_end` | none |
+| `array_row_start`, `array_row_end`, `array_dim_start` | `ev_array_row_start`, `ev_array_row_end`, `ev_array_dim_start` | none |
+| `octet_start`, `octet_end` | `ev_octet_stream_start`, `ev_octet_stream_end` | none (each octet chunk is a `data` event with `bytes`) |
+| `data` | `ev_data` | `text` (the value's spelling; octet chunks carry `bytes` instead), `family`, `width`, `base`, `unit`, `unit_source`, `epoch`, `frac`, and `converted*` where a conversion applied |
+| `type_start`, `type_end` | `ev_type_annotation_start`, `ev_type_annotation_end` | `text`: the annotation as written; resolved `family`/`width`/`base`/`unit` |
+| `type_family` | `ev_type_annotation_type_family` | the same resolved fields |
+| `type_param` | `ev_type_annotation_type_family_parameter` | `tok` says which: `type_width` → `width`, `type_base` → `base`, `type_q` → `q`, `unit` → `text` (the unit or a datetime epoch name) |
+
+`tok` is one of `identifier`, `string`, `number`, `symbol`, `reference`,
+`array_number`, `array_string`, `type`, `octet_stream`, `null`, `structure`,
+`unit`, `type_width`, `type_base`, `type_q`, `bool`, `unknown`. A number's
+`text` is its source spelling; `data` events carry no pre-parsed JS number
+(use `doc()` or `converted` when you need one).
 
 ### `eventsConvert`: the exact rational
 
@@ -216,7 +254,9 @@ carriers the value has in that mode. They are omitted when `converted` is a
 string; that text is already exact. An unparseable `unit` is
 `unit_illegal`; a `base` that is neither 0 nor a base bovnar can write
 (`2..62`, `64`, `85`) is `invalid_argument`, refused before the document is
-read.
+read. Bases 64 and 85 have no sign character, so a negative result in one is
+`invalid_argument` too — the exactness contract will not write `-` as a digit
+that means something else.
 
 ### `toJSON` projection notes
 
@@ -243,14 +283,20 @@ drops unit/type metadata (use `events()` to recover that). Specifically:
 
 ### `doc`: the tree shape
 
-`doc()` returns the DOM's own view, not a projection: every node carries
+`doc()` returns the DOM's own view, not a projection: every value node carries
 `familyName`, `width`, `base`, `unit`, `unitSource` and `epoch` (null where the
 field does not apply), a scalar's number `text` beside its JSON `value`, a
 datetime's sub-second digits as `frac`, a struct's `children`, an array's
-`dims` and `rows`, and an octet stream's `total`/`chunks`. An integer wider
-than 64 bits is a string in `value`, as in `toJSON`; unit/type metadata is
-kept. This is what the web playground's parser shim uses to cross-check its
-event-stream reconstruction.
+`dims` and `rows`; an octet stream is `{ type: "octet", total, chunks }`. An
+integer wider than 64 bits is a string in `value`, as in `toJSON`; unit/type
+metadata is kept. This is what the web playground's parser shim uses to
+cross-check its event-stream reconstruction.
+
+Two notes on the fields. `base` is the TYPE's base (or the conversion's), not
+the base `text` is written in: the DOM stores a numeric value, and `text` and
+`value` are its canonical **decimal** rendering, so `<uint:64,_16> "F"` is
+`"15"` with `base: 16`. And `unitSource` is camelCase because the tree is its
+own shape — the event stream spells the same thing `unit_source`.
 
 ## What is not exposed
 
@@ -258,9 +304,11 @@ This module is the **reader**. The C API's writer (typed `bvnr_write_*`
 helpers, `bvnr_write_event`, the writer-side unit policy), the push-fed readers
 (`bvnr_read_feed` / `bvnr_read_finish`), the `BVF1` frame codec, octet
 multiplexing, the producer-side validation predicates (`bvn_validate_identifier`
-and friends) and the `on_unverified` (pre-validation) event view have no
-JavaScript surface here. Use the native library or the Python/Rust bindings for
-those.
+and friends), the `on_unverified` (pre-validation) event view, the `bvn_dt_*`
+civil-date helpers, and the unit module's structural/formatting rest
+(`bvn_unit_reduce`, `bvn_unit_si_normal_form`, `bvn_unit_dimension_vector`,
+prefix exponents) have no JavaScript surface here. Use the native library or
+the Python/Rust bindings for those.
 
 
 ## License

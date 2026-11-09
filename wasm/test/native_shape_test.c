@@ -116,6 +116,16 @@ static char *call_profiles(const char *buf, int len)
 	(void)buf; (void)len;
 	return bvnr_wasm_unit_profiles();
 }
+static char *call_convert_unit(const char *buf, int len)
+{
+	(void)buf; (void)len;
+	return bvnr_wasm_convert_unit(1.5, "km", "m");
+}
+static char *call_unit_to_profile(const char *buf, int len)
+{
+	(void)buf; (void)len;
+	return bvnr_wasm_unit_to_profile("k~m/s", "ucum");
+}
 
 static void test_out_of_memory_shapes(void)
 {
@@ -132,6 +142,8 @@ static void test_out_of_memory_shapes(void)
 		{ "eventsConvert", call_convert },
 		{ "validate_ex", call_validate_ex }, { "events_ex", call_events_ex },
 		{ "unit", call_unit },              { "unit_profiles", call_profiles },
+		{ "convert_unit", call_convert_unit },
+		{ "unit_to_profile", call_unit_to_profile },
 	};
 	for (size_t e = 0; e < sizeof entries / sizeof entries[0]; e++) {
 		long total;
@@ -268,6 +280,18 @@ static void test_read_options_and_policy(void)
 	CHECK(has(j, "\"error_name\":\"invalid_argument\"") &&
 	      has(j, "unrecognized reader options"),
 	      "an unknown options layout is refused: %s", j);
+	free(j);
+	/* A refusal keeps the surface's own shape: parse() carries both arrays. */
+	j = bvnr_wasm_parse_ex(oct, LEN(oct), (uintptr_t)&o, 0);
+	CHECK(has(j, "\"events\":[]") && has(j, "\"errors\":[]") &&
+	      has(j, "unrecognized reader options"),
+	      "a parse() refusal keeps its events and errors arrays: %s", j);
+	free(j);
+	j = bvnr_wasm_events_ex(oct, LEN(oct), (uintptr_t)&o, 0);
+	CHECK(has(j, "\"events\":[]"), "an events() refusal has events: %s", j);
+	free(j);
+	j = bvnr_wasm_errors_ex(oct, LEN(oct), (uintptr_t)&o, 0);
+	CHECK(has(j, "\"errors\":[]"), "an errors() refusal has errors: %s", j);
 	free(j);
 	o.version = BVNR_WASM_OPTS_VERSION;
 
@@ -419,10 +443,23 @@ static void test_helpers(void)
 	CHECK(bvnr_wasm_spec_version() == (((uint32_t)smaj << 16) | smin),
 	      "spec_version matches bvnr_spec_version");
 	static const char dir[] = "#!bovnar 1.2\n.a = 1;";
-	CHECK(bvnr_wasm_peek_version(dir, (int)(sizeof dir - 1)) ==
-	      (((uint32_t)1 << 16) | 2u), "peek_version reads the directive");
-	CHECK(bvnr_wasm_peek_version(".a = 1;", 7) == 0xffffffffu,
+	int found = 0;
+	CHECK(bvnr_wasm_peek_version(dir, (int)(sizeof dir - 1), &found) ==
+	      (((uint32_t)1 << 16) | 2u) && found,
+	      "peek_version reads the directive");
+	CHECK(bvnr_wasm_peek_version(".a = 1;", 7, &found) == 0 && !found,
 	      "peek_version says there is none");
+	/* The packed form must not lose a directive that lands on the old
+	 * sentinel's bits: 65535.65535 is 0xFFFFFFFF when the library accepts it. */
+	static const char big[] = "#!bovnar 65535.65535\n.a = 1;";
+	uint16_t bmaj = 0, bmin = 0;
+	bool bfound = bvnr_peek_version(big, sizeof big - 1, &bmaj, &bmin);
+	found = 0;
+	uint32_t packed = bvnr_wasm_peek_version(big, (int)(sizeof big - 1), &found);
+	CHECK((bool)found == bfound &&
+	      (!bfound || packed == (((uint32_t)bmaj << 16) | bmin)),
+	      "peek_version survives the uint32 boundary: found=%d/%d packed=%x",
+	      found, bfound, packed);
 
 	j = bvnr_wasm_unit("k~m/s");
 	CHECK(has(j, "\"ok\":true") && has(j, "\"unit\":\"k~m/s\"") &&
@@ -449,6 +486,18 @@ static void test_helpers(void)
 	j = bvnr_wasm_convert_unit(1.0, "m", "s");
 	CHECK(has(j, "\"error_name\":\"unit_mismatch\"") &&
 	      has(j, "\"value\":null"), "convert_unit: incompatible units: %s", j);
+	free(j);
+	j = bvnr_wasm_unit_to_profile("k~m/s", "ucum");
+	CHECK(has(j, "\"ok\":true") && has(j, "\"unit\":\"km.s-1\""),
+	      "unit_to_profile: the UCUM code: %s", j);
+	free(j);
+	j = bvnr_wasm_unit_to_profile("$USD", "ucum");
+	CHECK(has(j, "\"ok\":true") && has(j, "\"unit\":null"),
+	      "unit_to_profile: no code is null, not an error: %s", j);
+	free(j);
+	j = bvnr_wasm_unit_to_profile("not a unit", "ucum");
+	CHECK(has(j, "\"error_name\":\"unit_illegal\""),
+	      "unit_to_profile: a bad unit refuses: %s", j);
 	free(j);
 	j = bvnr_wasm_unit_profiles();
 	CHECK(has(j, "\"ok\":true") && has(j, "\"ucum\"") &&

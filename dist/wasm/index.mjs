@@ -33,6 +33,19 @@ import createBovnar from './bovnar.mjs';
 
 const enc = new TextEncoder();
 
+// The brand on a policy object. A Symbol captured in this module's closure is
+// unforgeable from outside: the public `_module` property this replaces could
+// be copied onto any object, and the handle behind it then reached the core as
+// a bare pointer into arbitrary memory.
+const POLICY = Symbol('bovnar.policy');
+
+// The { module, handle } behind a policy object, or null for anything that did
+// not come from createPolicy().
+function policyInfo(p) {
+  const get = p != null && p[POLICY];
+  return typeof get === 'function' ? get() : null;
+}
+
 // bvnr_wasm_opts_t, as laid out by the C compiler: four 32-bit fields, three
 // 64-bit limits (8-aligned), six 32-bit limits, two 32-bit nesting fields and
 // two reserved words. The version field makes a stale wrapper/core pair refuse
@@ -165,8 +178,14 @@ export async function loadBovnar(opts) {
       throw new TypeError(`bovnar: ${what} cannot contain NUL`);
     const bytes = enc.encode(s);
     const p = malloc(bytes.length + 1);
-    Module.HEAPU8.set(bytes, p);
-    Module.HEAPU8[p + bytes.length] = 0;
+    try {
+      Module.HEAPU8.set(bytes, p);
+      Module.HEAPU8[p + bytes.length] = 0;
+    } catch (e) {
+      // A detached heap view would otherwise leak the block.
+      Module._free(p);
+      throw e;
+    }
     return p;
   }
 
@@ -218,13 +237,15 @@ export async function loadBovnar(opts) {
     if (options === undefined || options === null) return { ptr: 0, policy: 0 };
     let policy = 0;
     if (options.policy != null) {
-      if (typeof options.policy._handle !== 'function' ||
-          options.policy._module !== Module)
+      const info = policyInfo(options.policy);
+      if (!info)
         throw new TypeError(
-          `bovnar: ${label}: options.policy must come from this module's ` +
-          `createPolicy method; a handle from another loadBovnar instance ` +
-          `points into a different WebAssembly memory`);
-      policy = options.policy._handle();
+          `bovnar: ${label}: options.policy must come from createPolicy`);
+      if (info.module !== Module)
+        throw new TypeError(
+          `bovnar: ${label}: the unit policy belongs to another loadBovnar ` +
+          `instance; its handle points into a different WebAssembly memory`);
+      policy = info.handle;
       if (!policy)
         throw new Error(`bovnar: ${label}: the unit policy has been disposed`);
     }
@@ -430,13 +451,14 @@ export async function loadBovnar(opts) {
       /** Convert every numeric value to the first target it validly converts
        *  to; `base` renders the result in that base (0 keeps the value's). */
       target(unit, targetBase = 0) {
+        const h = live();
         if (nTargets >= 8)
           throw new RangeError('bovnar: a unit policy takes at most 8 targets');
         const b = uint(targetBase, 0x7fffffff, 'target base');
         needBase(b, 'target');
         need(withString(unit, (p) => Module.ccall(
                'bvnr_wasm_policy_target', 'number',
-               ['number', 'number', 'number'], [live(), p, b])),
+               ['number', 'number', 'number'], [h, p, b])),
              `target ${JSON.stringify(String(unit))}`);
         nTargets++;
         return api;
@@ -445,12 +467,13 @@ export async function loadBovnar(opts) {
        *  document's own unit and value are kept). Named for the C field it
        *  fills, require_dimension_of. */
       requireConvertibleTo(unit) {
+        const h = live();
         if (nRequire >= 8)
           throw new RangeError(
             'bovnar: a unit policy takes at most 8 requireConvertibleTo units');
         need(withString(unit, (p) => Module.ccall(
                'bvnr_wasm_policy_require_dimension', 'number',
-               ['number', 'number'], [live(), p])),
+               ['number', 'number'], [h, p])),
              `requireConvertibleTo ${JSON.stringify(String(unit))}`);
         nRequire++;
         return api;
@@ -459,6 +482,7 @@ export async function loadBovnar(opts) {
        *  'require' (assert but deliver as written). First match wins; a rule
        *  that matches nothing is satisfied. */
       rule(path, unit, { base: ruleBase = 0, mode = 'convert' } = {}) {
+        const h = live();
         const modes = { convert: 0, require: 1 };
         if (!(mode in modes))
           throw new TypeError("bovnar: rule mode must be 'convert' or 'require'");
@@ -469,7 +493,7 @@ export async function loadBovnar(opts) {
         need(withString(path, (pp) => withString(unit, (up) => Module.ccall(
                'bvnr_wasm_policy_rule', 'number',
                ['number', 'number', 'number', 'number', 'number'],
-               [live(), pp, up, b, modes[mode]]))),
+               [h, pp, up, b, modes[mode]]))),
              `rule ${JSON.stringify(String(path))}`);
         nRules++;
         return api;
@@ -482,6 +506,7 @@ export async function loadBovnar(opts) {
       },
       /** Output base for normaliseSI (0 keeps each value's own). */
       base(n) {
+        live();
         const b = uint(n, 0x7fffffff, 'policy base');
         needBase(b, 'policy');
         setMode(normalise, b, onInexact);
@@ -491,6 +516,7 @@ export async function loadBovnar(opts) {
        *  'error' (abort, the want_unit default) or 'leave' (deliver the value
        *  untouched; read `converted` to see which happened). */
       onInexact(mode) {
+        live();
         const m = { error: 0, leave: 1 }[mode];
         if (m === undefined)
           throw new TypeError("bovnar: onInexact must be 'error' or 'leave'");
@@ -504,13 +530,10 @@ export async function loadBovnar(opts) {
         Module.ccall('bvnr_wasm_policy_destroy', 'void', ['number'], [handle]);
       },
       get disposed() { return disposed; },
-      /** Internal: the handle, or 0 once disposed. */
-      _handle() { return disposed ? 0 : handle; },
-      /** Internal: which module this handle belongs to. A policy from another
-       *  loadBovnar() instance is a pointer into a different WebAssembly
-       *  memory; buildOptions refuses it rather than letting the core read
-       *  whatever sits at that address in this one. */
-      _module: Module,
+      /** Internal: what policyInfo() reads. A Symbol method, so no object
+       *  outside this closure can present itself as a policy — and a handle
+       *  is never handed to the core from one that did not come from here. */
+      [POLICY]() { return { module: Module, handle: disposed ? 0 : handle }; },
     };
 
     function setMode(n, b, i) {
@@ -561,9 +584,9 @@ export async function loadBovnar(opts) {
                    input, options, READ_OPTIONS, 'errors'),
 
     /** Parse and project the validated DOM to plain JSON. Returns
-     *  { ok, error, error_name, value }. Unit/type metadata is dropped from
-     *  `value`; use events() for that. Takes only `{ policy }` from the
-     *  options -- the DOM entry points take no read flags.
+     *  { ok, error, error_name, declared_version, value }. Unit/type metadata
+     *  is dropped from `value`; use events() for that. Takes only `{ policy }`
+     *  from the options -- the DOM entry points take no read flags.
      *
      *  One valid document is refused, as `bovnar convert` refuses it: a
      *  datetime written with sub-second digits, whose JSON form would be a
@@ -655,10 +678,11 @@ export async function loadBovnar(opts) {
     /** Full document tree in document order, each value carrying its resolved
      *  type fields (familyName/width/base/unit/unitSource/epoch), a datetime's
      *  sub-second digits as `frac`, and struct/array/octet shapes. Returns
-     *  { ok, error, error_name, tree: [{ key, value }] }. Built from the DOM,
-     *  so `ok` covers both tiers (the error carries no tier field: the DOM
-     *  reports the code alone). Used by the web playground's parser shim to
-     *  reconstruct the tree + event-stream shapes. Takes only `{ policy }`. */
+     *  { ok, error, error_name, declared_version, tree: [{ key, value }] }.
+     *  Built from the DOM, so `ok` covers both tiers (the error carries no
+     *  tier field: the DOM reports the code alone). Used by the web
+     *  playground's parser shim to reconstruct the tree + event-stream shapes.
+     *  Takes only `{ policy }`. */
     doc: (input, options) =>
       callJsonOpts('bvnr_wasm_doc', 'bvnr_wasm_doc_ex',
                    input, options, DOM_OPTIONS, 'doc', true),

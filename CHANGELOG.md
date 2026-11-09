@@ -552,6 +552,21 @@ API and implements spec 1.2.
     conversion,* so they can accept an array `validate()` refuses — the C DOM's
     own behaviour, and what `bovnar query --unit` does. Documented beside the
     two-tier note, with the mixed-unit array pinned in the tests.
+  - *An empty string's event carried no `text` at all,* so `.s = ""` was
+    indistinguishable from a token with no textual payload (a null literal) and
+    `e.text.length` threw. `text` is `""` for it; the library normalises a
+    missing payload to a shared empty sentinel before the callback, so the test
+    is the token type, not the pointer.
+  - *The policy brand was a public `_module` property,* so any object could
+    copy it (and `Module` is exported) and smuggle an arbitrary number into the
+    core as a handle; a module-private `Symbol` now carries `{ module, handle }`
+    and only `createPolicy()` can produce one.
+  - *A disposed policy reported argument errors before the disposal,* so
+    `disposed.target('m', 63)` complained about the base. Disposal is the first
+    check in every mutator now.
+  - *The DOM surfaces did not report the document's version directive.*
+    `toJSON()` and `doc()` now carry `declared_version`, peeked over the
+    leading bytes exactly as the reader surfaces report it.
 - **Fixes from a review of the unreleased work (2026-11-09, second pass).**
   - *The push-fed readers refuse a call from inside their own callbacks.* A
     callback-mode demux fed again from `on_message` re-lexed the window the

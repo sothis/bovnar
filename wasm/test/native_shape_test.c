@@ -34,14 +34,18 @@
 #include "bovnar.h"
 #include "bovnar_dom.h"
 
-/* Fail the (fail_at)-th GROWTH made by bvnr_wasm.c itself, and every one after
- * it; 0 never fails. Only that file's calls are counted -- the library's own
- * allocations go to the real allocator -- and only realloc, which is how every
- * buffer in it grows: the shape of a real exhaustion is a large buffer that can
- * no longer be extended while a hundred bytes for the error object can still be
- * had. (When not even those can, the export returns NULL and the JS wrapper
- * throws; there is no payload to have a shape.) */
+/* Fail the (fail_at)-th allocation made by bvnr_wasm.c itself, and every one
+ * after it; 0 never fails. Only that file's calls are counted -- the library's
+ * own allocations go to the real allocator. realloc is how every result buffer
+ * in it grows, so that sweep is a large buffer that can no longer be extended
+ * while a hundred bytes for the error object can still be had. (When not even
+ * those can, the export returns NULL and the JS wrapper throws; there is no
+ * payload to have a shape.) malloc joins the same counter only when
+ * count_malloc is set: the policy builder's fault injection needs its array
+ * growths and string copies failed in one sequence, while the result-shape
+ * sweep must keep the error object allocatable. */
 static long alloc_calls = 0, fail_at = 0;
+static int count_malloc = 0;
 static void *test_realloc(void *p, size_t n)
 {
 	if (fail_at && ++alloc_calls >= fail_at) return NULL;
@@ -50,6 +54,7 @@ static void *test_realloc(void *p, size_t n)
 static void *test_malloc(void *unused, size_t n)
 {
 	(void)unused;
+	if (count_malloc && fail_at && ++alloc_calls >= fail_at) return NULL;
 	return malloc(n);
 }
 #define realloc(p, n) test_realloc((p), (n))
@@ -372,6 +377,16 @@ static void test_new_event_and_doc_fields(void)
 	      "a q parameter is not stamped with the resolved type: %s", j);
 	free(j);
 
+	/* An empty string is a value with a zero-byte payload: `text` is "" and
+	 * not absent. (A null literal has no payload, so it has no text field.) */
+	static const char empty[] = ".s = \"\";\n.n = null;";
+	j = bvnr_wasm_events(empty, LEN(empty));
+	CHECK(has(j, "\"tok\":\"string\",\"text\":\"\""),
+	      "an empty string carries text: %s", j);
+	CHECK(!has(j, "\"tok\":\"null\",\"text\""),
+	      "a null literal carries no text: %s", j);
+	free(j);
+
 	static const char bad[] = ".a = @;\n.b = 1;\n";
 	j = bvnr_wasm_events(bad, LEN(bad));
 	CHECK(has(j, "\"error_name\":\"unexpected_input_byte\"") &&
@@ -505,10 +520,72 @@ static void test_helpers(void)
 	free(j);
 }
 
+/*
+ * Fault injection for the policy builder's allocation paths. Each add is a
+ * sequence of allocations (array growth, string copies) followed by the
+ * library's own acceptance check; failing any one of them must make the add
+ * report failure, leave the handle EMPTY (no half-added entry), and succeed
+ * when memory comes back. The revert paths had never been exercised: they only
+ * run when an allocation fails, which a healthy heap never does.
+ */
+typedef int (*policy_add_fn)(void *);
+static int add_target(void *p) { return bvnr_wasm_policy_target(p, "m", 0); }
+static int add_rule(void *p)   { return bvnr_wasm_policy_rule(p, ".a", "m", 0, 0); }
+static int add_dim(void *p)    { return bvnr_wasm_policy_require_dimension(p, "m"); }
+
+static void policy_oom_one(const char *label, policy_add_fn add)
+{
+	static const char bare[] = ".a = 1;";
+	int ok;
+	count_malloc = 1;   /* one counter over the add's reallocs and mallocs */
+	fail_at = 0; alloc_calls = 0;
+	void *p = bvnr_wasm_policy_create();
+	CHECK(p != NULL, "%s: create", label);
+	/* Count the allocations one successful add makes, without failing. */
+	fail_at = 1000000000L; alloc_calls = 0;
+	ok = add(p);
+	long total = alloc_calls;
+	fail_at = 0;
+	CHECK(ok == 1, "%s: the baseline add succeeds", label);
+	CHECK(total > 0, "%s: the add allocates", label);
+	bvnr_wasm_policy_destroy(p);
+
+	bool refused = false;
+	for (long at = 1; at <= total; at++) {
+		p = bvnr_wasm_policy_create();
+		CHECK(p != NULL, "%s: create for %ld", label, at);
+		fail_at = at; alloc_calls = 0;
+		ok = add(p);
+		fail_at = 0;
+		if (ok) { bvnr_wasm_policy_destroy(p); continue; }
+		refused = true;
+		/* The handle must still be the empty policy: a bare number validates
+		 * against an empty policy, and the same add succeeds now. */
+		char *j = bvnr_wasm_validate_ex(bare, (int)(sizeof bare - 1), 0,
+						(uintptr_t)p);
+		CHECK(has(j, "\"ok\":true"),
+		      "%s: the handle is empty after OOM at %ld: %s", label, at, j);
+		free(j);
+		CHECK(add(p) == 1, "%s: the add retries after OOM at %ld", label, at);
+		bvnr_wasm_policy_destroy(p);
+	}
+	CHECK(refused, "%s: at least one injection refused the add", label);
+	count_malloc = 0;
+}
+
+static void test_policy_oom(void)
+{
+	policy_oom_one("target", add_target);
+	policy_oom_one("rule", add_rule);
+	policy_oom_one("require_dimension", add_dim);
+	fail_at = 0;
+}
+
 int main(void)
 {
 	test_result_shapes();
 	test_read_options_and_policy();
+	test_policy_oom();
 	test_new_event_and_doc_fields();
 	test_helpers();
 	test_out_of_memory_shapes();

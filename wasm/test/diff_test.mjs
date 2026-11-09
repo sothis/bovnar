@@ -479,6 +479,18 @@ console.log('# a float_fix q parameter');
      `q data: ${JSON.stringify(data)}`);
 }
 
+// --- an empty string's text is "", not absent -------------------------------
+// The event for `.s = ""` had no `text` at all, so it read like a token that
+// carries none (a null literal) and `e.text.length` threw.
+console.log('# an empty string carries an empty text');
+{
+  const e = b.events('.s = "";\n.n = null;').events.filter(x => x.ev === 'data');
+  ok(e.length === 2 && e[0].tok === 'string' && e[0].text === '',
+     `empty string: ${JSON.stringify(e[0])}`);
+  ok(e[1].tok === 'null' && !('text' in e[1]),
+     `null carries no text: ${JSON.stringify(e[1])}`);
+}
+
 // --- the exact rational behind a non-terminating conversion ------------------
 // "converted": null carried no value at all: the rational is the only carrier
 // in that mode, and it was unreachable (the Python binding had already had this
@@ -579,6 +591,12 @@ console.log('# unit policy (vs the CLI)');
      'policy: a disposed policy refuses to be used');
   ok(throws(() => b.validate('.a = 1;', { policy: p })),
      'policy: a disposed policy is refused by a surface');
+  // Disposal is the first thing a mutator checks, not the last: a bad argument
+  // on a dead handle must not read as a bad argument.
+  let disposedMsg = '';
+  try { p.target('m', 63); } catch (e) { disposedMsg = e.message; }
+  ok(/disposed/.test(disposedMsg),
+     `policy: disposal is reported before argument checks (${disposedMsg})`);
 
   // Count limits are the library's (8 of each); the JS builder names the limit
   // rather than passing the C side's catch-all refusal through.
@@ -608,6 +626,11 @@ console.log('# unit policy (vs the CLI)');
     ok(throws(() => b.validate('.a = 1;', { policy: foreign })),
        'policy: a handle from another module instance throws');
     foreign.dispose();
+    // The brand is a module-private Symbol, so an object that merely imitates
+    // the old shape cannot smuggle an arbitrary pointer into the core.
+    ok(throws(() => b.validate('.a = 1;', {
+      policy: { _handle: () => 5, _module: b.Module },
+    })), 'policy: a forged handle throws');
   }
 
   // Unsetting works: requireUnit(false) and normaliseSI(false) put the policy
@@ -705,6 +728,15 @@ console.log('# version / error / unit helpers');
   const fp = b.unitProfiles();
   ok(fp.ok && fp.profiles.includes('ucum') && fp.profiles.includes('udunits'),
      `unitProfiles: ${JSON.stringify(fp)}`);
+
+  // The DOM surfaces report the version directive too (peeked, not parsed).
+  ok(b.toJSON('#!bovnar 1.2\n.a = 1;').declared_version === '1.2',
+     'declared_version: toJSON');
+  ok(b.doc('#!bovnar 1.2\n.a = 1;').declared_version === '1.2',
+     'declared_version: doc');
+  ok(b.toJSON('.a = 1;').declared_version === null &&
+     b.doc('.a = 1;').declared_version === null,
+     'declared_version: null without a directive');
 }
 
 // --- the document tree keeps the spelling and the fraction -------------------

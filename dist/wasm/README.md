@@ -69,11 +69,11 @@ import { loadBovnar } from 'bovnar-wasm/single';
 | ------ | ------- |
 | `validate(in, options?)` | `{ ok, error, error_name, tier, line, column, byte, offset, recovery_count, skipped_bytes, declared_version }` — the verdict of `bovnar validate`: stops at the first error |
 | `errors(in, options?)` | `{ ok, error, error_name, line, column, byte, offset, recovery_count, skipped_bytes, declared_version, errors: [{ error, error_name, line, column, byte, offset, tier }] }` — reads on past each error and reports them all |
-| `toJSON(in, options?)` | `{ ok, error, error_name, value }` — the DOM projected to plain JSON |
+| `toJSON(in, options?)` | `{ ok, error, error_name, declared_version, value }` — the DOM projected to plain JSON |
 | `events(in, options?)` | `{ ok, error, error_name, line, column, byte, offset, recovery_count, skipped_bytes, declared_version, events: [...] }` — the reference event stream (streaming tier only) |
 | `parse(in, options?)` | `{ ok, error, error_name, line, column, byte, offset, recovery_count, skipped_bytes, declared_version, events: [...], errors: [...] }` — `events` and `errors` in one pass (streaming tier only) |
 | `eventsConvert(in, unit = '', base = 0, allowNonterminating = false, options?)` | as `events`; each numeric `data` event that can be delivered in `unit` also carries `converted`, `converted_base` and `converted_unit` |
-| `doc(in, options?)` | `{ ok, error, error_name, tree: [{ key, value }, ...] }` — the document as a tree of keyed nodes |
+| `doc(in, options?)` | `{ ok, error, error_name, declared_version, tree: [{ key, value }, ...] }` — the document as a tree of keyed nodes |
 | `version()` | library version string, e.g. `"2.0.2"` (`BVNR_VERSION_STRING`) |
 | `versionNumber()` | the same as the monotonic integer `BVNR_VERSION` (2.0.2 → 20002) |
 | `specVersion()` | `{ major, minor }` — the highest bovnar *spec* version this build understands (1.2) |
@@ -116,6 +116,29 @@ there **throws** rather than being silently ignored — the same reason
 `bovnar query` refuses `--text-only`. An unknown option always throws (a typo
 is not a setting). The three 64-bit limits (`maxFileSize`, `maxTextBytes`,
 `maxArrayItems`) are exact up to 2^53; pass a `BigInt` for one above that.
+
+### Results and throws
+
+A malformed or invalid **document** is always a result — `ok: false` with a
+code and, where the tier has one, a position — never a throw. A throw means the
+**call** was wrong or the module could not proceed:
+
+- `TypeError` — a bad argument: input of an unsupported type, an unknown option
+  key (a typo is not a setting), options that are not an object, a read flag
+  passed to `toJSON`/`doc`, a policy from another `loadBovnar()` instance, a
+  string containing NUL, or a non-unit passed to `unitsEqual`/
+  `unitsConvertible`.
+- `RangeError` — an option value out of range (a negative or fractional limit,
+  nesting above 255, a base bvnr cannot write), or more than 8 policy entries
+  of one kind.
+- `Error` — the module ran out of memory, the policy builder refused an entry
+  the library cannot parse (the message names what was added), or a core
+  export this wrapper needs is missing (a stale core paired with a current
+  wrapper).
+- `parseUnit`, `unitToProfile` and `convertUnit` treat a bad unit as **data**:
+  they return `{ ok: false, error_name: "unit_illegal" }` (or
+  `unit_profile_*`) and never throw for it, so a unit arriving from a user can
+  be checked without try/catch.
 
 ### Unit policy
 
@@ -233,7 +256,7 @@ Each `events` entry is `{ seq, ev, tok, ... }`, where `ev` is one of the C
 | `struct_open`, `struct_close` | `ev_struct_start`, `ev_struct_end` | none |
 | `array_row_start`, `array_row_end`, `array_dim_start` | `ev_array_row_start`, `ev_array_row_end`, `ev_array_dim_start` | none |
 | `octet_start`, `octet_end` | `ev_octet_stream_start`, `ev_octet_stream_end` | none (each octet chunk is a `data` event with `bytes`) |
-| `data` | `ev_data` | `text` (the value's spelling; octet chunks carry `bytes` instead), `family`, `width`, `base`, `unit`, `unit_source`, `epoch`, `frac`, and `converted*` where a conversion applied |
+| `data` | `ev_data` | `text` (the value as text: a number keeps its source spelling — `007`, `1.50`, `ninf`; a string is decoded from its escapes; a bool is normalised to `true`/`false`, so `on` reads as `true`; an empty string is `""`; a null literal and an octet chunk carry none, the latter with `bytes` instead), `family`, `width`, `base`, `unit`, `unit_source`, `epoch`, `frac`, and `converted*` where a conversion applied |
 | `type_start`, `type_end` | `ev_type_annotation_start`, `ev_type_annotation_end` | `text`: the annotation as written; resolved `family`/`width`/`base`/`unit` |
 | `type_family` | `ev_type_annotation_type_family` | the same resolved fields |
 | `type_param` | `ev_type_annotation_type_family_parameter` | `tok` says which: `type_width` → `width`, `type_base` → `base`, `type_q` → `q`, `unit` → `text` (the unit or a datetime epoch name) |

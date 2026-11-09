@@ -443,7 +443,12 @@ static bool policy_install(const wasm_policy_t *policy, bvnr_reader_t *r)
 WASM_EXPORT
 void *bvnr_wasm_policy_create(void)
 {
-	wasm_policy_t *p = (wasm_policy_t *)calloc(1, sizeof *p);
+	/* malloc + memset rather than calloc: the native test replaces this file's
+	 * allocator to fail each allocation in turn, and only malloc/realloc are
+	 * intercepted there. (A zeroed handle is the empty policy, which the
+	 * library accepts and treats as inactive.) */
+	wasm_policy_t *p = (wasm_policy_t *)malloc(sizeof *p);
+	if (p) memset(p, 0, sizeof *p);
 	return p;
 }
 
@@ -740,6 +745,20 @@ static void emit_declared_version(sb_t *b, const bvnr_reader_t *r)
 		sb_puts(b, ",\"declared_version\":null");
 }
 
+/* The same field for the surfaces that never hold a reader: the directive is
+ * scanned directly (bvnr_peek_version) over the leading bytes, so toJSON() and
+ * doc() report the version they were given for the same reason every reader
+ * surface does. A malformed directive is null here; the parse error itself is
+ * the DOM's to report. */
+static void emit_peeked_version(sb_t *b, const char *buf, int len)
+{
+	uint16_t maj = 0, min = 0;
+	if (bvnr_peek_version(buf, (uint64_t)(len > 0 ? len : 0), &maj, &min))
+		sb_printf(b, ",\"declared_version\":\"%u.%u\"", maj, min);
+	else
+		sb_puts(b, ",\"declared_version\":null");
+}
+
 /* The common result for a call that could not even start: a unit policy or an
  * options block the wrapper handed over in a shape this build refuses, or a
  * reader that could not be created. The array fields say which of the payload
@@ -884,6 +903,7 @@ static char *to_json_impl(const char *buf, int len,
 		sb_json_str_body(&b, frac_key, strlen(frac_key));
 		sb_puts(&b, "')\"");
 	}
+	emit_peeked_version(&b, buf, len);
 	sb_puts(&b, ",\"value\":");
 	if (doc && err == error_none)
 		json_emit_entries(&b, bvn_dom_doc_entries(doc), bvn_dom_doc_count(doc));
@@ -1173,10 +1193,19 @@ static bool evt_cb(void *ud, bvnr_event_t e, bvnr_data_t *d)
 	sb_puts(b, ",\"tok\":");
 	sb_json_cstr(b, evt_tok(d->type));
 
-	/* textual payload (skip raw octet bytes; report their length instead) */
+	/* textual payload (skip raw octet bytes; report their length instead).
+	 * `length > 0` is not enough on its own: an EMPTY STRING is a value with a
+	 * zero-byte payload, and omitting `text` for it made the event for
+	 * `.s = ""` indistinguishable from a token that carries no text at all (a
+	 * null literal, whose data is the library's shared empty sentinel). The
+	 * string types are therefore emitted even at zero length; every other
+	 * textless event (stream boundaries, width/base/q parameters, a null) has
+	 * no text field. */
 	if (d->type == token_is_octet_stream) {
 		sb_printf(b, ",\"bytes\":%u", d->length);
-	} else if (d->data && d->length) {
+	} else if (d->length ||
+		   d->type == token_is_string ||
+		   d->type == token_is_array_string) {
 		sb_puts(b, ",\"text\":\"");
 		sb_json_str_body(b, (const char *)d->data, d->length);
 		sb_putc(b, '"');
@@ -1967,6 +1996,7 @@ static char *doc_impl(const char *buf, int len, const wasm_policy_t *policy)
 	 * parsing the document again through another entry point. */
 	sb_putc(&b, '{');
 	emit_status(&b, err);
+	emit_peeked_version(&b, buf, len);
 	sb_puts(&b, ",\"tree\":[");
 	if (doc) {
 		const bvn_dom_entry_t *e = bvn_dom_doc_entries(doc);

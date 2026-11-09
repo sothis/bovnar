@@ -40,6 +40,7 @@ the C library; `import bovnar` itself never loads it.
     - 6.2 [Properties and methods](#62-properties-and-methods)
     - 6.3 [Lossless numeric access (`float_dec`, `float_fix`, `float:128`/`256`)](#63-lossless-numeric-access-float_dec-float_fix-float128256)
     - 6.4 [`dumps()` integration](#64-dumps-integration)
+    - 6.5 [Civil time and calendars](#65-civil-time-and-calendars)
 7. [`write_array` helper](#7-write_array-helper)
 8. [pint bridge](#8-pint-bridge)
     - 8.1 [Prefixes ride in the unit, never the magnitude](#81-prefixes-ride-in-the-unit-never-the-magnitude)
@@ -1229,6 +1230,7 @@ is stored under the format's own spelling (`inf`, `ninf`, `nan`).
 | `q.ieee_bits` | `bytes` | IEEE-754 interchange bytes (binary16…256 for `float`, decimal16…256 for `float_dec`), little-endian word order |
 | `q.epoch_name` | `str \| None` | For a `datetime`, the epoch name (`"unix"`, `"tai"`, …); `None` otherwise |
 | `q.epoch_mjd` | `int \| None` | For a `datetime`, the epoch's Modified Julian Day; `None` otherwise |
+| `q.to_civil()` | `CivilDateTime` | For a `datetime`, its UTC date and time ([§6.5](#65-civil-time-and-calendars)); raises otherwise |
 | `q.datetime_fraction` | `str \| None` | For a `datetime` written as a literal with a fractional second, the verbatim sub-second digits (spec 1.1); `None` otherwise |
 | `q.unit_source` | `str \| None` | The unit exactly as the document spelled it (library 2.0) — `ucum:mL{total}` where `q.unit` is `m~L`. Set by `loads(typed=True)`, or by the `unit_source=` constructor argument; `dumps()` writes it back, and refuses one that does not parse to `q.unit` — including a spelling on a `Quantity` that has no unit at all. `None` writes the canonical form |
 
@@ -1296,6 +1298,111 @@ result passes the *document* tier: `dumps()` writes what `loads()` reads, and
 `loads()` reads heterogeneous and ragged arrays that `dom_parse` and
 `bovnar validate` refuse. See the note in
 [§4.1](#41-high-level-api-loads--dumps).
+
+
+### 6.5 Civil time and calendars
+
+A `datetime` value is a count of seconds since its epoch
+([§19](#19-spec-11-additions)). `bovnar.timekeeping` turns such counts into
+civil dates and times and back, and carries the rest of the C library's
+calendar: `bvn_datetime.h` and `bvn_gregorian_date.h`. Every result is computed
+by the C functions, so the binding gives the answers the reader and writer use
+when they read and print an ISO literal. Nothing is read from the host's time
+zone or clock.
+
+```python
+import bovnar
+from bovnar.timekeeping import (
+    CivilDateTime, Epoch, GregorianDate, easter_sunday, epoch_seconds_to_utc,
+    tai_second_is_dls_in_europe, tai_seconds_to_local_time, tai_seconds_to_utc,
+    utc_to_tai_seconds,
+)
+
+q = bovnar.loads(b'#!bovnar 1.1\n.t = <datetime:64,tai> 1861920036;',
+                 typed=True)['t']
+str(q.to_civil())                                   # → '2016-12-31T23:59:60'
+
+leap = CivilDateTime(2016, 12, 31, 23, 59, 60)
+utc_to_tai_seconds(leap)                            # → 1861920036
+str(tai_seconds_to_utc(1861920037))                 # → '2017-01-01T00:00:00'
+str(epoch_seconds_to_utc(1750000000, Epoch.UNIX))   # → '2025-06-15T15:06:40'
+
+t = utc_to_tai_seconds(CivilDateTime(2024, 7, 1, 12))
+str(tai_seconds_to_local_time(t, 3600, tai_second_is_dls_in_europe(t)))  # → '2024-07-01T14:00:00'
+
+GregorianDate(2000, 1, 1).to_mjd()                  # → 51544
+str(GregorianDate.normalize(2024, 2, 30))           # → '2024-03-01'
+str(easter_sunday(2025))                            # → '2025-04-20'
+GregorianDate(2024, 3, 29).is_federal_holiday_in_germany()      # → True  (Good Friday)
+str(GregorianDate(2024, 3, 5).last_banking_day_in_month())      # → '2024-03-28'
+```
+
+**The types.** `GregorianDate(year, month, day)` is a date of the proleptic
+Gregorian calendar (`bvn_gregorian_date_t`), with astronomical years (1 BC is
+year 0) from `YEAR_MIN` to `YEAR_MAX`, about ±2.5·10¹⁶. The constructor takes
+only a real date; `GregorianDate.normalize(year, month, day)` carries an
+out-of-range month or day into the next field instead, as `mktime` does. Its
+`leap`, `wday` (0 = Sunday) and `yday` (0 = 1 January) come from the library.
+`CivilDateTime(year, month, day, hour=0, minute=0, second=0)` adds a time of
+day (`bvn_datetime_t`) and checks hour 0–23, minute 0–59 and second 0–60;
+`.date` is its `GregorianDate` and `.mjd` the date's Modified Julian Day. Both
+are frozen and hashable, compare with the C equality functions, order
+chronologically, print as ISO 8601 (`2016-12-31T23:59:60`) and convert to
+`datetime.date` / `datetime.datetime` with `to_date()` / `to_datetime()` where
+those can hold the value (years 1–9999, no leap second). `Epoch` is
+`bvn_epoch_t`: each member's value is its epoch's MJD, so `Epoch(q.epoch_mjd)`
+is the epoch of a datetime `Quantity`, and an epoch argument may also be given
+as that int or as the library's name (`"unix"`, `"y2000"`, …).
+
+**Seconds and epochs.**
+
+| Function | C function | Result |
+|---|---|---|
+| `epoch_seconds_to_datetime(seconds, epoch)` | `bvn_dt_epoch_seconds_to_datetime` | The civil time `seconds` after `epoch` on a uniform scale (86400 s a day, no leap seconds); every int64 |
+| `datetime_to_epoch_seconds(dt, epoch)` | `bvn_dt_datetime_to_epoch_seconds` | Its inverse; `second == 60` counts as the next minute's first second |
+| `convert_epoch_seconds(seconds, epoch_from, epoch_to)` | `bvn_dt_convert_epoch_seconds` | The same count relabelled to another origin; the time scale does not change |
+| `utc_to_tai_seconds(dt)` | `bvn_dt_utc_to_tai_seconds` | UTC to TAI seconds with the leap-second table (10 s before 1972, 37 s since 2017) |
+| `tai_seconds_to_utc(tai_seconds)` | `bvn_dt_tai_seconds_to_utc` | Its inverse; an inserted leap second is `23:59:60` |
+| `tai_seconds_to_local_time(tai_seconds, utc_offset_seconds, dls_active)` | `bvn_dt_tai_seconds_to_local_time` | Wall-clock time at a fixed offset, one hour later when `dls_active`; the offset must be whole minutes |
+| `tai_second_is_dls_in_europe(tai_second)` | `bvn_dt_tai_second_is_dls_in_europe` | Whether German/European summer time is in force (none before 1980) |
+| `epoch_seconds_from_gps_time(time_of_week_ms, week, epoch)`, `tai_seconds_from_gps_time(time_of_week_ms, week)` | `bvn_dt_epoch_seconds_from_gps_time`, `bvn_dt_tai_seconds_from_gps_time` | GPS week + time of week (ms, rounded to the second) as seconds; GPS time except on `Epoch.TAI`, where the 19 s are added |
+| `epoch_seconds_from_galileo_time(…)`, `tai_seconds_from_galileo_time(…)` | `bvn_dt_epoch_seconds_from_galileo_time`, `bvn_dt_tai_seconds_from_galileo_time` | The same for Galileo System Time |
+| `epoch_seconds_to_utc(seconds, epoch)`, `utc_to_epoch_seconds(dt, epoch)` | — | A datetime value's UTC time and back, as the reader and writer convert an ISO literal: the leap-second table on tai, the uniform scale on unix, mjd, ntp and y2000; the GNSS epochs raise |
+| `Quantity.to_civil()` | — | `epoch_seconds_to_utc` of a `datetime` quantity; the sub-second digits stay in `datetime_fraction` |
+| `a == b`, `a.is_date_equal(b)`, `a.is_time_equal(b)` | `bvn_dt_is_equal`, `bvn_dt_is_date_equal`, `bvn_dt_is_time_equal` | Field-wise comparison of two `CivilDateTime` |
+
+GPS and Galileo seconds stay in their own scale: for UTC, take
+`tai_seconds_from_gps_time` to `tai_seconds_to_utc`. A datetime on a GNSS epoch
+has no civil form in the library, which is why `epoch_seconds_to_utc` and
+`to_civil()` refuse it.
+
+**The calendar.**
+
+| Function or method | C function |
+|---|---|
+| `GregorianDate.from_mjd(mjd)`, `d.to_mjd()`, `GregorianDate.normalize(y, m, d)`, `a == b` | `bvn_gregorian_date_from_mjd`, `_to_mjd`, `_normalize`, `_is_equal` |
+| `mjd_to_wday(mjd)`, `mjd_to_yday(mjd)`, `mjd_in_leap_year(mjd)` | `bvn_gregorian_date_mjd_to_wday`, `_mjd_to_yday`, `_mjd_in_leap_year` |
+| `easter_sunday_mjd(year)`; `easter_sunday(year)`, `good_friday`, `easter_monday`, `ascension_day`, `whit_monday` | `bvn_gregorian_date_easter_sunday_mjd`; `bvn_gregorian_date_calc_*` |
+| `d.is_federal_holiday_in_germany()`, `d.is_banking_day_in_germany()`, `d.is_business_day_in_germany()` | `bvn_gregorian_date_is_*_in_germany` |
+| `d.last_banking_day_in_month()`, `penultimate_…`, `mid_…`, `first_…`, `d.last_sunday_in_month()`, `d.last_saturday_in_month()` | `bvn_gregorian_date_get_*_in_month` |
+| `d.last_banking_day_in_quarter(q)`, `d.first_banking_day_in_quarter(q)` | `bvn_gregorian_date_get_*_banking_day_in_quarter` |
+| `d.is_last_banking_day_in_month()` and the other three; `d.is_last_banking_day_in_quarter(q)`, `d.is_first_banking_day_in_quarter(q)` | `bvn_gregorian_date_is_*_banking_day_in_*` |
+| `d.is_daylight_saving_switch_in_germany()`, `d.is_day_before_daylight_saving_switch_in_germany()` | `bvn_gregorian_date_is_*daylight_saving_switch_in_germany` |
+
+The federal holidays are the nine that hold in all of Germany, by the rules in
+force that year: 3 October from 1990, 17 June from 1954 to 1989, 1 May from 1933.
+A banking day is Monday to Friday, not a holiday and not 24 or 31 December; a
+business day is Monday to Saturday and not a holiday. The mid banking day is the
+first one on or after the 15th. The summer-time switch days follow the German
+rule of each year: none before 1980, the end in September until 1995.
+
+**Errors.** Where a C function signals failure with a sentinel, a `false` or an
+untouched output — an overflow, an MJD or year outside the supported range, a
+quarter outside 1–4 — the binding raises `BovnarArgumentError`, as it does for an
+argument that is not an int or does not fit in int64. Not bound:
+`bvn_gregorian_date_to_mjd_fast` (undefined behaviour out of range; `to_mjd()`
+is the checked form) and `bvn_dt_dump` / `bvn_dt_print`, which print to stdout
+(`str()` and `repr()` take their place).
 
 ---
 
@@ -2119,6 +2226,7 @@ bovnar/
 ├── reader.py        # Reader, EventPayload, UnitPolicy, UnitRule
 ├── stream.py        # framing, octet multiplexing, document-in-document, the feeds, the live writers
 ├── structs.py       # ctypes Structure/Union definitions + ValueUnitPrefix + make_* helpers
+├── timekeeping.py   # civil time and calendars: GregorianDate, CivilDateTime, Epoch (bvn_datetime.h)
 ├── unit.py          # Unit — a ValueUnit with equality, hashing and its operations
 ├── units.py         # unit_to_si_factor, unit_convert_factor, etc.
 └── writer.py        # Writer class
@@ -2139,6 +2247,7 @@ tests/
 ├── test_roundtrip_property.py, test_writers_agree.py, test_dumps_directive.py
 ├── test_escapes.py, test_unicode_normalisation.py
 ├── test_datetime.py, test_datetime_oracle.py
+├── test_timekeeping.py                  # bovnar.timekeeping: calendar, leap seconds, GNSS time
 ├── test_lossless_floats.py, test_hex_float_decode.py, test_decimal_tie_rounding.py
 ├── test_bigint_digits.py                # integers past the 4300-digit str limit
 ├── test_units.py, test_unit_object.py, test_unit_physics.py, test_unit_source.py
@@ -2420,7 +2529,8 @@ exposed as:
   out-of-range `\u` is `ErrorCode.INVALID_CODEPOINT`.
 - **Datetime family:** `loads` decodes a `<datetime:width,epoch>` value to a
   plain `int` (signed epoch seconds). With `typed=True` it is a `Quantity` whose
-  `.epoch_name` (`"unix"`, `"tai"`, …) and `.epoch_mjd` recover the epoch;
+  `.epoch_name` (`"unix"`, `"tai"`, …) and `.epoch_mjd` recover the epoch, and
+  `.to_civil()` its UTC date and time ([§6.5](#65-civil-time-and-calendars));
   `bovnar.datetime_epoch_index(name)` goes the other way, to the index a
   datetime `ValueTypeSpec` holds in `base`
   (`make_type_spec(ValueTypeFamily.DATETIME, 64,

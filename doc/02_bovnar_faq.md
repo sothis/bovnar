@@ -280,7 +280,8 @@ The epoch parameter is one of `unix` (default), `tai`, `gps`, `mjd`, `ntp`,
 (negative = before the epoch); a numeric base/unit/`q` is `error_illegal_value_type`
 and a fractional value is `error_type_value_mismatch`. Being a 1.1 feature it
 requires a `#!bovnar 1.1` declaration. Convert to civil time with the
-`bvn_datetime.h` helpers.
+`bvn_datetime.h` helpers, which the Python and Rust bindings carry as
+`bovnar.timekeeping` / `bovnar::timekeeping`.
 
 You can also write the value as an **ISO-8601 literal** instead of a raw
 integer — `2026-06-15`, `2026-06-15T12:00:00`, a trailing `Z`, or a numeric

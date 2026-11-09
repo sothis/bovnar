@@ -777,3 +777,65 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvn_float_fix_in_range.argtypes = [c_void_p, c_uint32, c_uint32]
     lib.bvn_float_str_fits_fix.restype  = c_bool
     lib.bvn_float_str_fits_fix.argtypes = [c_char_p, c_uint32, c_uint32, c_uint32]
+
+    # --- timekeeping (bvn_datetime.h, bvn_gregorian_date.h) ---
+    # bovnar.timekeeping. bvn_epoch_t is a C enum, passed as int. Not declared:
+    # bvn_gregorian_date_to_mjd_fast (undefined behaviour outside the range the
+    # checked bvn_gregorian_date_to_mjd tests for) and bvn_dt_dump/bvn_dt_print
+    # (they print to stdout).
+    from .structs import BvnGregorianDate, BvnDatetime
+    PGD, PDT = P(BvnGregorianDate), P(BvnDatetime)
+    for name, res, args in (
+        ('bvn_dt_datetime_to_epoch_seconds', c_int64, [PDT, c_int]),
+        ('bvn_dt_epoch_seconds_to_datetime', None, [PDT, c_int, c_int64]),
+        ('bvn_dt_convert_epoch_seconds', c_int64, [c_int, c_int, c_int64]),
+        ('bvn_dt_epoch_seconds_from_gps_time', c_int64, [c_int64, c_int64, c_int]),
+        ('bvn_dt_tai_seconds_from_gps_time', c_int64, [c_int64, c_int64]),
+        ('bvn_dt_epoch_seconds_from_galileo_time', c_int64,
+         [c_int64, c_int64, c_int]),
+        ('bvn_dt_tai_seconds_from_galileo_time', c_int64, [c_int64, c_int64]),
+        ('bvn_dt_utc_to_tai_seconds', c_int64, [PDT]),
+        ('bvn_dt_tai_seconds_to_utc', None, [PDT, c_int64]),
+        ('bvn_dt_tai_seconds_to_local_time', None, [PDT, c_int64, c_int64, c_int]),
+        ('bvn_dt_is_date_equal', c_int, [PDT, PDT]),
+        ('bvn_dt_is_time_equal', c_int, [PDT, PDT]),
+        ('bvn_dt_is_equal', c_int, [PDT, PDT]),
+        ('bvn_dt_tai_second_is_dls_in_europe', c_int, [c_int64]),
+        ('bvn_gregorian_date_to_mjd', c_int64, [PGD]),
+        ('bvn_gregorian_date_mjd_to_wday', c_int32, [c_int64]),
+        ('bvn_gregorian_date_mjd_in_leap_year', c_bool, [c_int64]),
+        ('bvn_gregorian_date_mjd_to_yday', c_int32, [c_int64]),
+        ('bvn_gregorian_date_from_mjd', None, [PGD, c_int64]),
+        ('bvn_gregorian_date_normalize', c_bool, [PGD]),
+        ('bvn_gregorian_date_is_equal', c_bool, [PGD, PGD]),
+        ('bvn_gregorian_date_easter_sunday_mjd', c_int64, [c_int64]),
+    ):
+        fn = getattr(lib, name)
+        fn.restype, fn.argtypes = res, args
+    # (gdate, year) -> bool: Easter Sunday and the feasts that hang off it.
+    for feast in ('easter_sunday', 'good_friday', 'easter_monday',
+                  'ascension_day', 'whit_monday'):
+        fn = getattr(lib, 'bvn_gregorian_date_calc_' + feast)
+        fn.restype, fn.argtypes = c_bool, [PGD, c_int64]
+    # (date) -> bool predicates.
+    for pred in ('federal_holiday', 'banking_day', 'business_day'):
+        fn = getattr(lib, f'bvn_gregorian_date_is_{pred}_in_germany')
+        fn.restype, fn.argtypes = c_bool, [PGD]
+    for which in ('last', 'penultimate', 'mid', 'first'):
+        fn = getattr(lib, f'bvn_gregorian_date_is_{which}_banking_day_in_month')
+        fn.restype, fn.argtypes = c_bool, [PGD]
+        # (res, date): res is left untouched when there is no answer.
+        fn = getattr(lib, f'bvn_gregorian_date_get_{which}_banking_day_in_month')
+        fn.restype, fn.argtypes = None, [PGD, PGD]
+    for day in ('sunday', 'saturday'):
+        fn = getattr(lib, f'bvn_gregorian_date_get_last_{day}_in_month')
+        fn.restype, fn.argtypes = None, [PGD, PGD]
+    for which in ('last', 'first'):
+        fn = getattr(lib, f'bvn_gregorian_date_is_{which}_banking_day_in_quarter')
+        fn.restype, fn.argtypes = c_bool, [c_int, PGD]
+        fn = getattr(lib, f'bvn_gregorian_date_get_{which}_banking_day_in_quarter')
+        fn.restype, fn.argtypes = None, [c_int, PGD, PGD]
+    for name in ('bvn_gregorian_date_is_daylight_saving_switch_in_germany',
+                 'bvn_gregorian_date_is_day_before_daylight_saving_switch_in_germany'):
+        fn = getattr(lib, name)
+        fn.restype, fn.argtypes = c_bool, [PGD]

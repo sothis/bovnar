@@ -45,6 +45,8 @@ _MIRRORS = {
     S.BvnrDocStreamOpts:  ("bvnr_doc_stream_opts_t", False),
     S.BvnrDemuxItem:      ("bvnr_demux_item_t", False),
     S.BvnDomEntry:        ("bvn_dom_entry_t", False),
+    S.BvnGregorianDate:   ("bvn_gregorian_date_t", False),
+    S.BvnDatetime:        ("bvn_datetime_t", False),
 }
 
 # Structs whose ctypes _fields_ are a faithful field-by-field mirror of the C
@@ -58,6 +60,7 @@ _FIELD_CHECKED = {
     "bvnr_demux_item_t",
     "bvn_dom_entry_t", "bvnr_read_flags_t", "bvnr_write_flags_t",
     "bvnr_unit_target_t", "bvnr_unit_rule_t", "bvnr_unit_policy_t",
+    "bvn_gregorian_date_t", "bvn_datetime_t",
 }
 
 

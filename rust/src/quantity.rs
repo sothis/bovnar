@@ -159,6 +159,26 @@ impl Quantity {
             .then(|| ffi::datetime_epoch(self.vtype).1)
     }
 
+    /// A datetime's UTC date and time, as the library renders the value as
+    /// an ISO literal ([`crate::timekeeping::epoch_seconds_to_utc`]): through
+    /// the leap-second table on tai, uniformly on unix, mjd, ntp and y2000.
+    /// An error for any other type, a typed null and the GNSS epochs. The
+    /// sub-second digits stay in `frac`.
+    pub fn to_civil(&self) -> Result<crate::timekeeping::CivilDateTime> {
+        use crate::timekeeping::{Epoch, epoch_seconds_to_utc};
+        let (Some(mjd), Some(raw)) = (self.epoch_mjd(), self.raw.as_deref()) else {
+            return Err(Error::argument(
+                "to_civil() needs a datetime value, not another type or a typed null",
+            ));
+        };
+        let seconds: i64 = raw
+            .parse()
+            .map_err(|_| Error::argument(format!("datetime carrier {raw:?} is not an i64")))?;
+        let epoch = Epoch::from_mjd(mjd)
+            .ok_or_else(|| Error::argument(format!("unknown datetime epoch MJD {mjd}")))?;
+        epoch_seconds_to_utc(seconds, epoch)
+    }
+
     /// The canonical unit spelling, empty when unitless.
     pub fn unit_str(&self) -> String {
         self.unit.to_string()

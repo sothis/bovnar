@@ -29,6 +29,7 @@ pub mod live;
 pub mod quantity;
 pub mod reader;
 pub mod stream;
+pub mod timekeeping;
 pub mod unit;
 pub mod units;
 pub mod writer;

@@ -313,6 +313,26 @@ class Quantity:
         from ._ffi import get_library
         return int(get_library().bvnr_datetime_epoch_mjd(self.vtype))
 
+    def to_civil(self):
+        """For a `datetime` quantity, its UTC date and time as a
+        :class:`bovnar.timekeeping.CivilDateTime`, as the library renders the
+        value as an ISO literal (:func:`bovnar.timekeeping.epoch_seconds_to_utc`):
+        through the leap-second table on tai, uniformly on unix, mjd, ntp and
+        y2000. Raises :class:`BovnarArgumentError` for any other family, a
+        typed null, and the GNSS epochs. The sub-second digits stay in
+        `datetime_fraction`."""
+        if self.vtype.family != int(ValueTypeFamily.DATETIME) or self.raw is None:
+            raise BovnarArgumentError(
+                "to_civil() needs a datetime value, not %s"
+                % ("a typed null" if self.raw is None else "this type"))
+        from .timekeeping import epoch_seconds_to_utc
+        try:
+            seconds = int(self.raw)
+        except ValueError:
+            raise BovnarArgumentError(
+                f"datetime carrier {self.raw!r} is not an integer") from None
+        return epoch_seconds_to_utc(seconds, self.epoch_mjd)
+
     # ── lossless numeric access ────────────────────────────────────────────
     # ``value`` decodes through a C double and loses precision for float_dec,
     # float_fix, and the wide binary floats (float:128 and wider). These

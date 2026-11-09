@@ -45,6 +45,7 @@
 #include "bovnar_dom.h"
 #include "bovnar_stream.h"
 #include "bovnar_currency.h"
+#include "bvn_datetime.h"
 
 #define ABI_STRUCT(st)     printf("STRUCT %s %zu\n", #st, sizeof(st))
 #define ABI_FIELD(st, f)   printf("FIELD %s %s %zu %zu\n", #st, #f, \
@@ -190,6 +191,22 @@ int main(void)
 	ABI_FIELD(bvn_currency_info_t, minor_unit);
 	ABI_FIELD(bvn_currency_info_t, is_crypto);
 	ABI_FIELD(bvn_currency_info_t, name);
+
+	ABI_STRUCT(bvn_gregorian_date_t);
+	ABI_FIELD(bvn_gregorian_date_t, year);
+	ABI_FIELD(bvn_gregorian_date_t, month);
+	ABI_FIELD(bvn_gregorian_date_t, day);
+	ABI_FIELD(bvn_gregorian_date_t, leap);
+	ABI_FIELD(bvn_gregorian_date_t, wday);
+	ABI_FIELD(bvn_gregorian_date_t, yday);
+
+	ABI_STRUCT(bvn_datetime_t);
+	ABI_FIELD(bvn_datetime_t, date);
+	ABI_FIELD(bvn_datetime_t, hour);
+	ABI_FIELD(bvn_datetime_t, minute);
+	ABI_FIELD(bvn_datetime_t, second);
+	ABI_FIELD(bvn_datetime_t, mjd);
+	ABI_FIELD(bvn_datetime_t, submjd);
 
 	return 0;
 }

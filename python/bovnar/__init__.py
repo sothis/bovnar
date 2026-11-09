@@ -60,6 +60,7 @@ from .units   import (
 )
 from . import currency
 from . import stream
+from . import timekeeping
 # pint bridge: functions only; pint itself is imported lazily on first use, so
 # importing bovnar never requires pint to be installed.
 from ._pint_bridge import to_pint, to_pint_unit, from_pint, from_pint_unit
@@ -76,7 +77,7 @@ __all__ = [
     'loads', 'dumps', 'load', 'dump', 'dom_parse',
     'version', 'version_number', 'spec_version', 'peek_version',
     'datetime_epoch_index', 'error_message',
-    'currency', 'stream',
+    'currency', 'stream', 'timekeeping',
     'unit_factor', 'unit_to_str', 'parse_unit',
     'Unit',
     'unit_to_profile', 'unit_to_ucum', 'unit_is_profile_only',

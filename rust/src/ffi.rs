@@ -3416,6 +3416,11 @@ mod abi_tests {
         layout!(v, BvnCurrencyInfo, "bvn_currency_info_t" {
             code, numeric_code, minor_unit, is_crypto, name,
         });
+        use timekeeping_fns::{BvnDatetime, BvnGregorianDate};
+        layout!(v, BvnGregorianDate, "bvn_gregorian_date_t" {
+            year, month, day, leap, wday, yday,
+        });
+        layout!(v, BvnDatetime, "bvn_datetime_t" { date, hour, minute, second, mjd, submjd });
         v
     }
 
@@ -3529,5 +3534,333 @@ mod abi_tests {
             rust_layout().len() + 2,
             "fields mirrored vs. C manifest"
         );
+    }
+}
+
+/// The civil-time and calendar functions of `bvn_datetime.h` and
+/// `bvn_gregorian_date.h`, behind `bovnar::timekeeping`. Not declared:
+/// `bvn_gregorian_date_to_mjd_fast` (undefined behaviour outside the range
+/// the checked `bvn_gregorian_date_to_mjd` tests for) and `bvn_dt_dump` /
+/// `bvn_dt_print` (they print to stdout).
+pub mod timekeeping_fns {
+    use std::ffi::c_int;
+
+    /// `bvn_gregorian_date_t`.
+    #[repr(C)]
+    #[derive(Clone, Copy, Debug, Default)]
+    pub struct BvnGregorianDate {
+        pub year: i64,
+        pub month: i64,
+        pub day: i64,
+        pub leap: i32,
+        pub wday: i32,
+        pub yday: i32,
+    }
+
+    /// `bvn_datetime_t`.
+    #[repr(C)]
+    #[derive(Clone, Copy, Debug, Default)]
+    pub struct BvnDatetime {
+        pub date: BvnGregorianDate,
+        pub hour: i64,
+        pub minute: i64,
+        pub second: i64,
+        pub mjd: i64,
+        pub submjd: i64,
+    }
+
+    /// `BVN_GDATE_OVF`: the int64 functions' "no value" sentinel.
+    pub const GDATE_OVF: i64 = i64::MIN;
+
+    type Date = BvnGregorianDate;
+
+    // bvn_epoch_t is a C enum: an int.
+    unsafe extern "C" {
+        fn bvn_dt_datetime_to_epoch_seconds(dt: *mut BvnDatetime, epoch: c_int) -> i64;
+        fn bvn_dt_epoch_seconds_to_datetime(dt: *mut BvnDatetime, epoch: c_int, seconds: i64);
+        fn bvn_dt_convert_epoch_seconds(from: c_int, to: c_int, seconds: i64) -> i64;
+        fn bvn_dt_epoch_seconds_from_gps_time(tow_ms: i64, week: i64, epoch: c_int) -> i64;
+        fn bvn_dt_tai_seconds_from_gps_time(tow_ms: i64, week: i64) -> i64;
+        fn bvn_dt_epoch_seconds_from_galileo_time(tow_ms: i64, week: i64, epoch: c_int) -> i64;
+        fn bvn_dt_tai_seconds_from_galileo_time(tow_ms: i64, week: i64) -> i64;
+        fn bvn_dt_utc_to_tai_seconds(dt: *mut BvnDatetime) -> i64;
+        fn bvn_dt_tai_seconds_to_utc(dt: *mut BvnDatetime, tai_seconds: i64);
+        fn bvn_dt_tai_seconds_to_local_time(
+            dt: *mut BvnDatetime,
+            tai_seconds: i64,
+            timezone_offset_seconds: i64,
+            dls_active: c_int,
+        );
+        fn bvn_dt_is_date_equal(a: *mut BvnDatetime, b: *mut BvnDatetime) -> c_int;
+        fn bvn_dt_is_time_equal(a: *mut BvnDatetime, b: *mut BvnDatetime) -> c_int;
+        fn bvn_dt_is_equal(a: *mut BvnDatetime, b: *mut BvnDatetime) -> c_int;
+        fn bvn_dt_tai_second_is_dls_in_europe(tai_second: i64) -> c_int;
+
+        fn bvn_gregorian_date_to_mjd(g: *const Date) -> i64;
+        fn bvn_gregorian_date_mjd_to_wday(mjd: i64) -> i32;
+        fn bvn_gregorian_date_mjd_in_leap_year(mjd: i64) -> bool;
+        fn bvn_gregorian_date_mjd_to_yday(mjd: i64) -> i32;
+        fn bvn_gregorian_date_from_mjd(g: *mut Date, mjd: i64);
+        fn bvn_gregorian_date_normalize(g: *mut Date) -> bool;
+        fn bvn_gregorian_date_is_equal(a: *mut Date, b: *mut Date) -> bool;
+        fn bvn_gregorian_date_easter_sunday_mjd(year: i64) -> i64;
+        fn bvn_gregorian_date_calc_easter_sunday(g: *mut Date, year: i64) -> bool;
+        fn bvn_gregorian_date_calc_good_friday(g: *mut Date, year: i64) -> bool;
+        fn bvn_gregorian_date_calc_easter_monday(g: *mut Date, year: i64) -> bool;
+        fn bvn_gregorian_date_calc_ascension_day(g: *mut Date, year: i64) -> bool;
+        fn bvn_gregorian_date_calc_whit_monday(g: *mut Date, year: i64) -> bool;
+        fn bvn_gregorian_date_is_federal_holiday_in_germany(d: *mut Date) -> bool;
+        fn bvn_gregorian_date_is_banking_day_in_germany(d: *mut Date) -> bool;
+        fn bvn_gregorian_date_is_business_day_in_germany(d: *mut Date) -> bool;
+        fn bvn_gregorian_date_get_last_banking_day_in_month(res: *mut Date, d: *mut Date);
+        fn bvn_gregorian_date_get_penultimate_banking_day_in_month(res: *mut Date, d: *mut Date);
+        fn bvn_gregorian_date_get_mid_banking_day_in_month(res: *mut Date, d: *mut Date);
+        fn bvn_gregorian_date_get_last_sunday_in_month(res: *mut Date, d: *mut Date);
+        fn bvn_gregorian_date_get_last_saturday_in_month(res: *mut Date, d: *mut Date);
+        fn bvn_gregorian_date_get_first_banking_day_in_month(res: *mut Date, d: *mut Date);
+        fn bvn_gregorian_date_get_last_banking_day_in_quarter(
+            q: c_int,
+            res: *mut Date,
+            d: *mut Date,
+        );
+        fn bvn_gregorian_date_get_first_banking_day_in_quarter(
+            q: c_int,
+            res: *mut Date,
+            d: *mut Date,
+        );
+        fn bvn_gregorian_date_is_last_banking_day_in_month(d: *mut Date) -> bool;
+        fn bvn_gregorian_date_is_penultimate_banking_day_in_month(d: *mut Date) -> bool;
+        fn bvn_gregorian_date_is_mid_banking_day_in_month(d: *mut Date) -> bool;
+        fn bvn_gregorian_date_is_first_banking_day_in_month(d: *mut Date) -> bool;
+        fn bvn_gregorian_date_is_last_banking_day_in_quarter(q: c_int, d: *mut Date) -> bool;
+        fn bvn_gregorian_date_is_first_banking_day_in_quarter(q: c_int, d: *mut Date) -> bool;
+        fn bvn_gregorian_date_is_daylight_saving_switch_in_germany(d: *mut Date) -> bool;
+        fn bvn_gregorian_date_is_day_before_daylight_saving_switch_in_germany(d: *mut Date)
+        -> bool;
+    }
+
+    macro_rules! by_value {
+        ($($name:ident => $c:ident($($a:ident: $t:ty),*) -> $r:ty;)*) => {$(
+            #[doc = concat!("`", stringify!($c), "`.")]
+            pub fn $name($($a: $t),*) -> $r {
+                // SAFETY: plain values in, a plain value out.
+                unsafe { $c($($a),*) }
+            }
+        )*};
+    }
+
+    by_value! {
+        convert_epoch_seconds => bvn_dt_convert_epoch_seconds(
+            from: c_int, to: c_int, seconds: i64) -> i64;
+        epoch_seconds_from_gps_time => bvn_dt_epoch_seconds_from_gps_time(
+            tow_ms: i64, week: i64, epoch: c_int) -> i64;
+        tai_seconds_from_gps_time => bvn_dt_tai_seconds_from_gps_time(
+            tow_ms: i64, week: i64) -> i64;
+        epoch_seconds_from_galileo_time => bvn_dt_epoch_seconds_from_galileo_time(
+            tow_ms: i64, week: i64, epoch: c_int) -> i64;
+        tai_seconds_from_galileo_time => bvn_dt_tai_seconds_from_galileo_time(
+            tow_ms: i64, week: i64) -> i64;
+        mjd_to_wday => bvn_gregorian_date_mjd_to_wday(mjd: i64) -> i32;
+        mjd_in_leap_year => bvn_gregorian_date_mjd_in_leap_year(mjd: i64) -> bool;
+        mjd_to_yday => bvn_gregorian_date_mjd_to_yday(mjd: i64) -> i32;
+        easter_sunday_mjd => bvn_gregorian_date_easter_sunday_mjd(year: i64) -> i64;
+    }
+
+    /// `bvn_dt_tai_second_is_dls_in_europe`.
+    pub fn tai_second_is_dls_in_europe(tai_second: i64) -> bool {
+        // SAFETY: a plain value in, a plain value out.
+        unsafe { bvn_dt_tai_second_is_dls_in_europe(tai_second) != 0 }
+    }
+
+    /// `bvn_dt_epoch_seconds_to_datetime`; fills every field for any int64.
+    pub fn epoch_seconds_to_datetime(epoch: c_int, seconds: i64) -> BvnDatetime {
+        let mut dt = BvnDatetime::default();
+        // SAFETY: `dt` is writable for the call.
+        unsafe { bvn_dt_epoch_seconds_to_datetime(&mut dt, epoch, seconds) };
+        dt
+    }
+
+    /// `bvn_dt_datetime_to_epoch_seconds` on a copy of `dt` (C normalizes
+    /// it in place); `GDATE_OVF` on overflow.
+    pub fn datetime_to_epoch_seconds(mut dt: BvnDatetime, epoch: c_int) -> i64 {
+        // SAFETY: `dt` is a local, writable for the call.
+        unsafe { bvn_dt_datetime_to_epoch_seconds(&mut dt, epoch) }
+    }
+
+    /// `bvn_dt_utc_to_tai_seconds` on a copy of `dt`; `GDATE_OVF` on
+    /// overflow.
+    pub fn utc_to_tai_seconds(mut dt: BvnDatetime) -> i64 {
+        // SAFETY: `dt` is a local, writable for the call.
+        unsafe { bvn_dt_utc_to_tai_seconds(&mut dt) }
+    }
+
+    /// `bvn_dt_tai_seconds_to_utc`; `None` where C leaves the output
+    /// untouched (the offset does not fit in int64). Day 0 never comes out
+    /// of the library, so it marks "untouched".
+    pub fn tai_seconds_to_utc(tai_seconds: i64) -> Option<BvnDatetime> {
+        let mut dt = BvnDatetime::default();
+        // SAFETY: `dt` is writable for the call.
+        unsafe { bvn_dt_tai_seconds_to_utc(&mut dt, tai_seconds) };
+        (dt.date.day != 0).then_some(dt)
+    }
+
+    /// `bvn_dt_tai_seconds_to_local_time`; `None` as for
+    /// [`tai_seconds_to_utc`].
+    pub fn tai_seconds_to_local_time(
+        tai_seconds: i64,
+        offset_seconds: i64,
+        dls_active: bool,
+    ) -> Option<BvnDatetime> {
+        let mut dt = BvnDatetime::default();
+        // SAFETY: `dt` is writable for the call.
+        unsafe {
+            bvn_dt_tai_seconds_to_local_time(
+                &mut dt,
+                tai_seconds,
+                offset_seconds,
+                c_int::from(dls_active),
+            )
+        };
+        (dt.date.day != 0).then_some(dt)
+    }
+
+    macro_rules! dt_compare {
+        ($($name:ident => $c:ident;)*) => {$(
+            #[doc = concat!("`", stringify!($c), "`.")]
+            pub fn $name(mut a: BvnDatetime, mut b: BvnDatetime) -> bool {
+                // SAFETY: two locals, only read by C.
+                unsafe { $c(&mut a, &mut b) != 0 }
+            }
+        )*};
+    }
+
+    dt_compare! {
+        dt_is_date_equal => bvn_dt_is_date_equal;
+        dt_is_time_equal => bvn_dt_is_time_equal;
+        dt_is_equal => bvn_dt_is_equal;
+    }
+
+    /// `bvn_gregorian_date_to_mjd`; `GDATE_OVF` out of range.
+    pub fn date_to_mjd(g: BvnGregorianDate) -> i64 {
+        // SAFETY: a valid pointer to a local, only read.
+        unsafe { bvn_gregorian_date_to_mjd(&g) }
+    }
+
+    /// `bvn_gregorian_date_from_mjd`; `None` where C leaves the output
+    /// untouched (`mjd` out of range).
+    pub fn date_from_mjd(mjd: i64) -> Option<BvnGregorianDate> {
+        let mut g = BvnGregorianDate::default();
+        // SAFETY: `g` is writable for the call.
+        unsafe { bvn_gregorian_date_from_mjd(&mut g, mjd) };
+        (g.day != 0).then_some(g)
+    }
+
+    /// `bvn_gregorian_date_normalize` of a copy of `g`; `None` on overflow.
+    pub fn date_normalize(mut g: BvnGregorianDate) -> Option<BvnGregorianDate> {
+        // SAFETY: `g` is a local, writable for the call.
+        unsafe { bvn_gregorian_date_normalize(&mut g) }.then_some(g)
+    }
+
+    /// `bvn_gregorian_date_is_equal`.
+    pub fn date_is_equal(mut a: BvnGregorianDate, mut b: BvnGregorianDate) -> bool {
+        // SAFETY: two locals, only read by C.
+        unsafe { bvn_gregorian_date_is_equal(&mut a, &mut b) }
+    }
+
+    macro_rules! feast {
+        ($($name:ident => $c:ident;)*) => {$(
+            #[doc = concat!("`", stringify!($c), "`; `None` when C returns false.")]
+            pub fn $name(year: i64) -> Option<BvnGregorianDate> {
+                let mut g = BvnGregorianDate::default();
+                // SAFETY: `g` is writable for the call.
+                unsafe { $c(&mut g, year) }.then_some(g)
+            }
+        )*};
+    }
+
+    feast! {
+        calc_easter_sunday => bvn_gregorian_date_calc_easter_sunday;
+        calc_good_friday => bvn_gregorian_date_calc_good_friday;
+        calc_easter_monday => bvn_gregorian_date_calc_easter_monday;
+        calc_ascension_day => bvn_gregorian_date_calc_ascension_day;
+        calc_whit_monday => bvn_gregorian_date_calc_whit_monday;
+    }
+
+    macro_rules! date_pred {
+        ($($name:ident => $c:ident;)*) => {$(
+            #[doc = concat!("`", stringify!($c), "`.")]
+            pub fn $name(mut d: BvnGregorianDate) -> bool {
+                // SAFETY: a local, only read by C.
+                unsafe { $c(&mut d) }
+            }
+        )*};
+    }
+
+    date_pred! {
+        is_federal_holiday_in_germany => bvn_gregorian_date_is_federal_holiday_in_germany;
+        is_banking_day_in_germany => bvn_gregorian_date_is_banking_day_in_germany;
+        is_business_day_in_germany => bvn_gregorian_date_is_business_day_in_germany;
+        is_last_banking_day_in_month => bvn_gregorian_date_is_last_banking_day_in_month;
+        is_penultimate_banking_day_in_month =>
+            bvn_gregorian_date_is_penultimate_banking_day_in_month;
+        is_mid_banking_day_in_month => bvn_gregorian_date_is_mid_banking_day_in_month;
+        is_first_banking_day_in_month => bvn_gregorian_date_is_first_banking_day_in_month;
+        is_daylight_saving_switch_in_germany =>
+            bvn_gregorian_date_is_daylight_saving_switch_in_germany;
+        is_day_before_daylight_saving_switch_in_germany =>
+            bvn_gregorian_date_is_day_before_daylight_saving_switch_in_germany;
+    }
+
+    macro_rules! date_get {
+        ($($name:ident => $c:ident;)*) => {$(
+            #[doc = concat!("`", stringify!($c), "`; `None` where C leaves `res` untouched.")]
+            pub fn $name(mut d: BvnGregorianDate) -> Option<BvnGregorianDate> {
+                let mut res = BvnGregorianDate::default();
+                // SAFETY: two distinct locals; C writes `res` only.
+                unsafe { $c(&mut res, &mut d) };
+                (res.day != 0).then_some(res)
+            }
+        )*};
+    }
+
+    date_get! {
+        last_banking_day_in_month => bvn_gregorian_date_get_last_banking_day_in_month;
+        penultimate_banking_day_in_month =>
+            bvn_gregorian_date_get_penultimate_banking_day_in_month;
+        mid_banking_day_in_month => bvn_gregorian_date_get_mid_banking_day_in_month;
+        first_banking_day_in_month => bvn_gregorian_date_get_first_banking_day_in_month;
+        last_sunday_in_month => bvn_gregorian_date_get_last_sunday_in_month;
+        last_saturday_in_month => bvn_gregorian_date_get_last_saturday_in_month;
+    }
+
+    /// `bvn_gregorian_date_get_{last,first}_banking_day_in_quarter`; `None`
+    /// where C leaves `res` untouched.
+    pub fn banking_day_in_quarter(
+        last: bool,
+        quarter: c_int,
+        mut d: BvnGregorianDate,
+    ) -> Option<BvnGregorianDate> {
+        let mut res = BvnGregorianDate::default();
+        // SAFETY: two distinct locals; C writes `res` only.
+        unsafe {
+            if last {
+                bvn_gregorian_date_get_last_banking_day_in_quarter(quarter, &mut res, &mut d)
+            } else {
+                bvn_gregorian_date_get_first_banking_day_in_quarter(quarter, &mut res, &mut d)
+            }
+        };
+        (res.day != 0).then_some(res)
+    }
+
+    /// `bvn_gregorian_date_is_{last,first}_banking_day_in_quarter`.
+    pub fn is_banking_day_in_quarter(last: bool, quarter: c_int, mut d: BvnGregorianDate) -> bool {
+        // SAFETY: a local, only read by C.
+        unsafe {
+            if last {
+                bvn_gregorian_date_is_last_banking_day_in_quarter(quarter, &mut d)
+            } else {
+                bvn_gregorian_date_is_first_banking_day_in_quarter(quarter, &mut d)
+            }
+        }
     }
 }

@@ -957,3 +957,33 @@ def make_unit_compound(components: list[dict]) -> ValueUnit:
             c.prefix.system  = int(PrefixSystem.SI)
             c.prefix.id.si   = int(comp.get('si_prefix', SIPrefix.NONE))
     return vu
+
+
+# --- timekeeping (bvn_datetime.h, bvn_gregorian_date.h) ---
+# The two structs the civil-time and calendar functions take; bovnar.timekeeping
+# wraps them in GregorianDate and CivilDateTime.
+
+class BvnGregorianDate(ctypes.Structure):
+    """``bvn_gregorian_date_t``: a proleptic Gregorian date. ``leap``, ``wday``
+    (0 = Sunday) and ``yday`` (0 = 1 January) are output only."""
+    _fields_ = [
+        ('year',  ctypes.c_int64),
+        ('month', ctypes.c_int64),
+        ('day',   ctypes.c_int64),
+        ('leap',  ctypes.c_int32),
+        ('wday',  ctypes.c_int32),
+        ('yday',  ctypes.c_int32),
+    ]
+
+
+class BvnDatetime(ctypes.Structure):
+    """``bvn_datetime_t``: a date and a time of day. ``mjd`` and ``submjd``
+    (the time of day in 1e-5 day units) are output-only caches."""
+    _fields_ = [
+        ('date',   BvnGregorianDate),
+        ('hour',   ctypes.c_int64),
+        ('minute', ctypes.c_int64),
+        ('second', ctypes.c_int64),
+        ('mjd',    ctypes.c_int64),
+        ('submjd', ctypes.c_int64),
+    ]

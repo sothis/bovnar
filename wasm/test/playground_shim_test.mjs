@@ -570,6 +570,25 @@ console.log('# every annotation sits on the element the C emitted it for');
   }
 }
 
+/* A float_fix annotation's q is a parameter of its own, not a radix. The C
+   event carries "q": 8; the shim used to read a `text` the event never had, so
+   parseBovnar rendered {kind:'q', text:undefined}. Pinned against the C so a
+   further shuffle of the parameter fields cannot silently blank it. */
+console.log('# a float_fix q parameter reaches the translated stream');
+{
+  const evs = [];
+  P.parseBovnar('.v = <float_fix:16,q8> 1.5;', (ev) => {
+    if (ev.type === P.EV.TYPE_ANN_PARAM) evs.push(ev.data);
+  });
+  const c = bvnr.events('.v = <float_fix:16,q8> 1.5;').events
+    .filter(e => e.ev === 'type_param' && e.tok === 'type_q');
+  ok(c.length === 1 && c[0].q === 8 && !('base' in c[0]),
+     `C q param: ${show(c)}`);
+  const q = evs.find(x => x.kind === 'q');
+  ok(q && q.text === 'q8' && q.value === 8,
+     `shim q param: ${show(evs)}`);
+}
+
 /* Spelled out separately from the differential above, which can only compare
    documents the DOM accepts — and the version of this that started it all,
    `.a = [{.b=3;},{.c=4;}];`, is rejected. Every read here is guarded: on the

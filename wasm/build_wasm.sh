@@ -32,7 +32,9 @@ python3 "$ROOT/amalgamate.py" "$AMALG"
 
 # Symbols the JS glue calls. The leading underscore is the C name mangling
 # emscripten applies; _malloc/_free let the JS side pass byte buffers in.
-EXPORTS='_bvnr_wasm_validate,_bvnr_wasm_errors,_bvnr_wasm_to_json,_bvnr_wasm_events,_bvnr_wasm_events_convert,_bvnr_wasm_parse,_bvnr_wasm_doc,_bvnr_wasm_version,_bvnr_wasm_free,_malloc,_free'
+# The _ex twins carry the reader options + unit policy; the small helpers mirror
+# the stateless reader-side C API (versions, error names, unit introspection).
+EXPORTS='_bvnr_wasm_validate,_bvnr_wasm_validate_ex,_bvnr_wasm_errors,_bvnr_wasm_errors_ex,_bvnr_wasm_to_json,_bvnr_wasm_to_json_ex,_bvnr_wasm_events,_bvnr_wasm_events_ex,_bvnr_wasm_events_convert,_bvnr_wasm_events_convert_ex,_bvnr_wasm_parse,_bvnr_wasm_parse_ex,_bvnr_wasm_doc,_bvnr_wasm_doc_ex,_bvnr_wasm_version,_bvnr_wasm_version_number,_bvnr_wasm_spec_version,_bvnr_wasm_peek_version,_bvnr_wasm_error_name,_bvnr_wasm_unit,_bvnr_wasm_units_equal,_bvnr_wasm_units_convertible,_bvnr_wasm_convert_unit,_bvnr_wasm_unit_profiles,_bvnr_wasm_policy_create,_bvnr_wasm_policy_destroy,_bvnr_wasm_policy_require_unit,_bvnr_wasm_policy_target,_bvnr_wasm_policy_require_dimension,_bvnr_wasm_policy_rule,_bvnr_wasm_policy_normalise,_bvnr_wasm_free,_malloc,_free'
 RUNTIME='ccall,cwrap,UTF8ToString,lengthBytesUTF8,stringToUTF8,HEAPU8'
 
 COMMON=(
@@ -47,7 +49,11 @@ COMMON=(
 	# whoever built the bundle into the shipped .wasm -- which also made the
 	# committed artifact differ byte-for-byte when rebuilt anywhere else.
 	"-ffile-prefix-map=$ROOT=."
-	-I "$AMALG" -I "$ROOT/wasm"
+	# include/ is on the path for bvnr_wasm.c's own `#include
+	# "bovnar_si_units.h"` (the exact-rational formatter and the base check).
+	# The amalgamated bovnar.h is found first, so its merged copy of the same
+	# header satisfies the include guard and nothing is defined twice.
+	-I "$AMALG" -I "$ROOT/wasm" -I "$ROOT/include"
 	-std=c11
 	"$AMALG/bovnar.c" "$ROOT/wasm/bvnr_wasm.c"
 	-sEXPORTED_FUNCTIONS="$EXPORTS"

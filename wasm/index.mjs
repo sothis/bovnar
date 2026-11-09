@@ -22,10 +22,37 @@
 //
 // `input` may be a string (UTF-8 encoded for you) or a Uint8Array (passed
 // through verbatim — required if the document embeds octet streams with NULs).
+//
+// Every parsing surface also takes an optional options object carrying the
+// reader-side C API: the bvnr_read_flags_t assertions and limits, and a unit
+// policy. See "Reader options" below.
 
 import createBovnar from './bovnar.mjs';
 
 const enc = new TextEncoder();
+
+// bvnr_wasm_opts_t, as laid out by the C compiler: four 32-bit fields, three
+// 64-bit limits (8-aligned), six 32-bit limits, two 32-bit nesting fields and
+// two reserved words. The version field makes a stale wrapper/core pair refuse
+// the block instead of reading a layout it does not know.
+const OPTS_SIZE = 72;
+const OPTS_VERSION = 1;
+const OPT_STRICT_VERSION = 0x1;
+const OPT_TEXT_ONLY = 0x2;
+
+const READ_OPTIONS = [
+  'strictVersion', 'textOnly',
+  'maxFileSize', 'maxTextBytes', 'maxArrayItems', 'maxConversionLength',
+  'maxIdentifierLength', 'maxStringLength', 'maxNumberLength',
+  'maxSymbolLength', 'maxReferenceLength',
+  'maxStructNesting', 'maxArrayNesting',
+  'policy',
+];
+// The DOM entry points (bvn_dom_parse_policy) take a unit policy but no read
+// flags. Accepting a flag here would be the "assertion the caller believes is
+// in force but which is quietly ignored" that --text-only on `bovnar query`
+// refuses, so these surfaces refuse it too.
+const DOM_OPTIONS = ['policy'];
 
 function toBytes(input) {
   if (input instanceof Uint8Array) return input;
@@ -36,28 +63,203 @@ function toBytes(input) {
 export async function loadBovnar(opts) {
   const Module = await createBovnar(opts);
 
+  const hasExport = (name) => typeof Module['_' + name] === 'function';
+
+  function malloc(n) {
+    const p = Module._malloc(n);
+    // emscripten's malloc RETURNS 0 on failure, it does not throw.
+    if (!p) throw new Error('bovnar: out of memory');
+    return p;
+  }
+
+  function needExport(name, what) {
+    if (!hasExport(name))
+      throw new Error(
+        `bovnar: this WASM core does not export ${name}, so it is older ` +
+        `than this wrapper and cannot take ${what}. Rebuild the module ` +
+        `(source ~/emsdk/emsdk_env.sh && wasm/build_wasm.sh) and reload.`);
+  }
+
+  function readJson(ptr) {
+    // A null result is the C side failing to allocate even its own error
+    // object. JSON.parse('') turned that into "SyntaxError: Unexpected end of
+    // JSON input", which names neither the cause nor this library.
+    if (!ptr) throw new Error('bovnar: out of memory');
+    return JSON.parse(Module.UTF8ToString(ptr));
+  }
+
   // Call a `char* fn(const char* buf, int len)` export with a byte buffer,
   // then read back + free the returned NUL-terminated JSON string.
   function callJson(fnName, input) {
     const bytes = toBytes(input);
     const len = bytes.length;
-    const inPtr = Module._malloc(len || 1);
+    const inPtr = malloc(len || 1);
     // emscripten's malloc RETURNS 0 on failure, it does not throw. Without this
     // check a large paste that exhausts the heap would memcpy the input over
     // address 0 -- the null page and the module's static data -- silently
     // corrupting the parser for the rest of the session instead of failing.
-    if (!inPtr) throw new Error('bovnar: out of memory');
-    if (len) Module.HEAPU8.set(bytes, inPtr);
     let outPtr = 0;
     try {
-      outPtr = Module.ccall(fnName, 'number', ['number', 'number'], [inPtr, len]);
+      if (len) Module.HEAPU8.set(bytes, inPtr);
+      outPtr = Module.ccall(fnName, 'number', ['number', 'number'],
+                            [inPtr, len]);
       // A null result is the C side failing to allocate even its own error
       // object. JSON.parse('') turned that into "SyntaxError: Unexpected end of
       // JSON input", which names neither the cause nor this library.
-      if (!outPtr) throw new Error('bovnar: out of memory');
-      return JSON.parse(Module.UTF8ToString(outPtr));
+      return readJson(outPtr);
     } finally {
       Module._free(inPtr);
+      if (outPtr) Module.ccall('bvnr_wasm_free', 'void', ['number'], [outPtr]);
+    }
+  }
+
+  // Call a `char* fn(const char* text)` export with a NUL-terminated C string.
+  function callJsonCString(fnName, text) {
+    const p = stringPtr(text, 'a unit or key path');
+    let outPtr = 0;
+    try {
+      outPtr = Module.ccall(fnName, 'number', ['number'], [p]);
+      return readJson(outPtr);
+    } finally {
+      Module._free(p);
+      if (outPtr) Module.ccall('bvnr_wasm_free', 'void', ['number'], [outPtr]);
+    }
+  }
+
+  // Call a `char* fn(void)` export returning a JSON string.
+  function callJsonNoArg(fnName) {
+    const outPtr = Module.ccall(fnName, 'number', [], []);
+    let out = 0;
+    try {
+      out = outPtr;
+      return readJson(out);
+    } finally {
+      if (out) Module.ccall('bvnr_wasm_free', 'void', ['number'], [out]);
+    }
+  }
+
+  // A NUL-terminated UTF-8 copy in the module's heap. The caller frees it.
+  function stringPtr(text, what) {
+    const s = String(text);
+    if (s.includes('\0'))
+      throw new TypeError(`bovnar: ${what} cannot contain NUL`);
+    const bytes = enc.encode(s);
+    const p = malloc(bytes.length + 1);
+    Module.HEAPU8.set(bytes, p);
+    Module.HEAPU8[p + bytes.length] = 0;
+    return p;
+  }
+
+  // ---- reader options ------------------------------------------------------
+  //
+  // bvnr_read_flags_t, which had no way in from JavaScript: strict_version,
+  // text_only, the byte/count caps, max_conversion_length and the length and
+  // nesting limits. 0 means what it means in C for every numeric field (the
+  // library's own default; for maxFileSize, unlimited), and the two nesting
+  // fields default to 255 — the limit every WASM surface has always run at —
+  // rather than to the reader's own default of 64.
+  function u64(v, name) {
+    let b;
+    try { b = BigInt(v); } catch { b = -1n; }
+    if (b < 0n || b > 0xffffffffffffffffn)
+      throw new RangeError(`bovnar: ${name} must be an integer in 0..2^64-1`);
+    return b;
+  }
+  function uint(v, max, name) {
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < 0 || n > max)
+      throw new RangeError(`bovnar: ${name} must be an integer in 0..${max}`);
+    return n;
+  }
+
+  function optionWork(options, allowed, label) {
+    if (options === undefined || options === null) return false;
+    if (typeof options !== 'object' || Array.isArray(options))
+      throw new TypeError(`bovnar: ${label}: options must be an object`);
+    for (const k of Object.keys(options))
+      if (!allowed.includes(k))
+        throw new TypeError(`bovnar: ${label}: unknown option "${k}"`);
+    for (const k of allowed)
+      if (k !== 'policy' && options[k] !== undefined) return true;
+    return options.policy != null;
+  }
+
+  // Returns { ptr, policy }: a bvnr_wasm_opts_t in the module's heap (0 when
+  // every field is at its default) and the policy handle (0 when none).
+  function buildOptions(options, allowed, label) {
+    if (options === undefined || options === null) return { ptr: 0, policy: 0 };
+    let policy = 0;
+    if (options.policy != null) {
+      if (typeof options.policy._handle !== 'function')
+        throw new TypeError(
+          `bovnar: ${label}: options.policy must come from createPolicy()`);
+      policy = options.policy._handle();
+      if (!policy)
+        throw new Error(`bovnar: ${label}: the unit policy has been disposed`);
+    }
+    const set = allowed.filter(k => k !== 'policy' && options[k] !== undefined);
+    if (!set.length) return { ptr: 0, policy };
+    const ptr = malloc(OPTS_SIZE);
+    // Re-read HEAPU8 after the malloc: growth swaps the ArrayBuffer and detaches
+    // any view captured earlier.
+    const dv = new DataView(Module.HEAPU8.buffer, ptr, OPTS_SIZE);
+    dv.setUint32(0, OPTS_VERSION, true);
+    let flags = 0;
+    if (options.strictVersion) flags |= OPT_STRICT_VERSION;
+    if (options.textOnly) flags |= OPT_TEXT_ONLY;
+    dv.setUint32(4, flags, true);
+    dv.setBigUint64(8, u64(options.maxFileSize ?? 0, 'maxFileSize'), true);
+    dv.setBigUint64(16, u64(options.maxTextBytes ?? 0, 'maxTextBytes'), true);
+    dv.setBigUint64(24, u64(options.maxArrayItems ?? 0, 'maxArrayItems'), true);
+    dv.setUint32(32, uint(options.maxConversionLength ?? 0, 0xffffffff,
+                          'maxConversionLength'), true);
+    dv.setUint32(36, uint(options.maxIdentifierLength ?? 0, 0xffff,
+                          'maxIdentifierLength'), true);
+    dv.setUint32(40, uint(options.maxStringLength ?? 0, 0xffff,
+                          'maxStringLength'), true);
+    dv.setUint32(44, uint(options.maxNumberLength ?? 0, 0xffff,
+                          'maxNumberLength'), true);
+    dv.setUint32(48, uint(options.maxSymbolLength ?? 0, 0xffff,
+                          'maxSymbolLength'), true);
+    dv.setUint32(52, uint(options.maxReferenceLength ?? 0, 0xffff,
+                          'maxReferenceLength'), true);
+    dv.setUint32(56, uint(options.maxStructNesting ?? 0, 255,
+                          'maxStructNesting'), true);
+    dv.setUint32(60, uint(options.maxArrayNesting ?? 0, 255,
+                          'maxArrayNesting'), true);
+    dv.setUint32(64, 0, true);
+    dv.setUint32(68, 0, true);
+    return { ptr, policy };
+  }
+
+  // The _ex twin of callJson. Called only when there is an option or a policy
+  // to pass; the plain export stays the path for a wrapper paired with a core
+  // that predates the _ex symbols.
+  //
+  // The DOM surfaces' _ex exports take THREE arguments -- (buf, len, policy) --
+  // because bvn_dom_parse_policy takes a policy and no read flags; the reader
+  // surfaces' take four (buf, len, opts, policy). `dom` says which.
+  function callJsonOpts(plainFn, exFn, input, options, allowed, label, dom) {
+    if (!optionWork(options, allowed, label))
+      return callJson(plainFn, input);
+    needExport(exFn, `${label} options`);
+    const bytes = toBytes(input);
+    const len = bytes.length;
+    const o = buildOptions(options, allowed, label);
+    let inPtr = 0, outPtr = 0;
+    try {
+      inPtr = malloc(len || 1);
+      if (len) Module.HEAPU8.set(bytes, inPtr);
+      outPtr = dom
+        ? Module.ccall(exFn, 'number',
+            ['number', 'number', 'number'], [inPtr, len, o.policy])
+        : Module.ccall(exFn, 'number',
+            ['number', 'number', 'number', 'number'],
+            [inPtr, len, o.ptr, o.policy]);
+      return readJson(outPtr);
+    } finally {
+      if (inPtr) Module._free(inPtr);
+      if (o.ptr) Module._free(o.ptr);
       if (outPtr) Module.ccall('bvnr_wasm_free', 'void', ['number'], [outPtr]);
     }
   }
@@ -65,15 +267,23 @@ export async function loadBovnar(opts) {
   // A base crosses as a C int. `base | 0` wrapped 4294967306 to 10 and turned
   // 2.5 into 2, each reported as a successful conversion; anything that is not
   // a non-negative integer the C side can hold goes over as -1, which it
-  // refuses as error_invalid_argument.
+  // refuses as error_invalid_argument. The C side additionally checks that the
+  // value is a base bovnar can write (2..62, 64, 85, or 0 for "the value's
+  // own"), so a document with no numeric value cannot slip an unusable base
+  // past the reader.
   function wasmBase(base) {
     const b = Number(base);
     return Number.isInteger(b) && b >= 0 && b <= 0x7fffffff ? b : -1;
   }
 
-  // Same, for the conversion variant: (buf, len, unit, base, allow) where
-  // `unit` is a NUL-terminated C string we allocate alongside the document.
-  function callJsonConvert(input, unit, base, allowNonterminating) {
+  // (buf, len, unit, base, allow) where `unit` is a NUL-terminated C string we
+  // allocate alongside the document; the _ex form appends options + policy.
+  function callJsonConvert(input, unit, base, allowNonterminating, options) {
+    const withOptions = optionWork(options, READ_OPTIONS, 'eventsConvert');
+    const fnName = withOptions
+      ? 'bvnr_wasm_events_convert_ex' : 'bvnr_wasm_events_convert';
+    if (withOptions)
+      needExport('bvnr_wasm_events_convert_ex', 'eventsConvert options');
     const bytes = toBytes(input);
     const len = bytes.length;
     // The unit crosses as a NUL-terminated C string, so a NUL inside it ended it
@@ -83,31 +293,155 @@ export async function loadBovnar(opts) {
     // every other bad unit). Swapping the NUL for another control byte keeps
     // the string whole and just as unparseable.
     const unitBytes = enc.encode(String(unit || '').replace(/\0/g, '\x01'));
+    const o = withOptions ? buildOptions(options, READ_OPTIONS, 'eventsConvert')
+                          : { ptr: 0, policy: 0 };
     // Both allocations happen before the try, so a failure in the second used to
     // leak the first. Allocate, check for the null emscripten returns on OOM,
     // and let the finally below release whichever succeeded.
     let inPtr = 0, uPtr = 0, outPtr = 0;
     try {
-      inPtr = Module._malloc(len || 1);
-      if (!inPtr) throw new Error('bovnar: out of memory');
-      uPtr = Module._malloc(unitBytes.length + 1);
-      if (!uPtr) throw new Error('bovnar: out of memory');
+      inPtr = malloc(len || 1);
+      uPtr = malloc(unitBytes.length + 1);
       // Re-read HEAPU8 after every _malloc: growth swaps the ArrayBuffer and
       // detaches any view captured earlier.
       if (len) Module.HEAPU8.set(bytes, inPtr);
       Module.HEAPU8.set(unitBytes, uPtr);
       Module.HEAPU8[uPtr + unitBytes.length] = 0;
-      outPtr = Module.ccall(
-        'bvnr_wasm_events_convert', 'number',
-        ['number', 'number', 'number', 'number', 'number'],
-        [inPtr, len, uPtr, wasmBase(base), allowNonterminating ? 1 : 0]);
-      if (!outPtr) throw new Error('bovnar: out of memory');
-      return JSON.parse(Module.UTF8ToString(outPtr));
+      const args = [inPtr, len, uPtr, wasmBase(base),
+                    allowNonterminating ? 1 : 0];
+      if (withOptions) args.push(o.ptr, o.policy);
+      outPtr = Module.ccall(fnName, 'number',
+        args.map(() => 'number'), args);
+      return readJson(outPtr);
     } finally {
       if (inPtr) Module._free(inPtr);
       if (uPtr) Module._free(uPtr);
+      if (o.ptr) Module._free(o.ptr);
       if (outPtr) Module.ccall('bvnr_wasm_free', 'void', ['number'], [outPtr]);
     }
+  }
+
+  // ---- unit policy ---------------------------------------------------------
+  //
+  // bvnr_reader_set_unit_policy / bvn_dom_parse_policy, as data: what the
+  // document must contain, and what unit the consumer wants values delivered
+  // in. The C setter parses every unit string and rule path when it is
+  // installed, so each add below is checked by installing the whole candidate
+  // policy on a throwaway reader — the library is the oracle for what it
+  // accepts, and a refused add leaves the policy as it was.
+  function createPolicy() {
+    needExport('bvnr_wasm_policy_create', 'unit policies');
+    const handle = Module.ccall('bvnr_wasm_policy_create', 'number', [], []);
+    if (!handle) throw new Error('bovnar: out of memory');
+    let disposed = false;
+    let normalise = 0, base = 0, onInexact = 0;
+
+    function live() {
+      if (disposed) throw new Error('bovnar: the unit policy has been disposed');
+      return handle;
+    }
+    function need(ok, what) {
+      if (!ok) {
+        throw new Error(
+          `bovnar: the unit policy refused ${what}: a unit must be one ` +
+          `bovnar can parse, a base one it can write (0 or 2..62, 64, 85), ` +
+          `and a rule path must start with '.', be at most 96 bytes and ` +
+          `cannot be just '.*'`);
+      }
+    }
+    function withString(text, fn) {
+      const p = stringPtr(text, 'a unit policy string');
+      try {
+        return fn(p);
+      } finally {
+        Module._free(p);
+      }
+    }
+
+    const api = {
+      /** Every numeric value must carry a unit. */
+      requireUnit(on = true) {
+        need(Module.ccall('bvnr_wasm_policy_require_unit', 'number',
+                          ['number', 'number'], [live(), on ? 1 : 0]),
+             'requireUnit');
+        return api;
+      },
+      /** Convert every numeric value to the first target it validly converts
+       *  to; `base` renders the result in that base (0 keeps the value's). */
+      target(unit, targetBase = 0) {
+        need(withString(unit, (p) => Module.ccall(
+               'bvnr_wasm_policy_target', 'number',
+               ['number', 'number', 'number'],
+               [live(), p, uint(targetBase, 0x7fffffff, 'target base')])),
+             `target ${JSON.stringify(String(unit))}`);
+        return api;
+      },
+      /** Every numeric value must be validly CONVERTIBLE to `unit` (the
+       *  document's own unit and value are kept). Named for the C field it
+       *  fills, require_dimension_of. */
+      requireConvertibleTo(unit) {
+        need(withString(unit, (p) => Module.ccall(
+               'bvnr_wasm_policy_require_dimension', 'number',
+               ['number', 'number'], [live(), p])),
+             `requireConvertibleTo ${JSON.stringify(String(unit))}`);
+        return api;
+      },
+      /** A rule about one key path. `mode` is 'convert' (deliver converted) or
+       *  'require' (assert but deliver as written). First match wins; a rule
+       *  that matches nothing is satisfied. */
+      rule(path, unit, { base: ruleBase = 0, mode = 'convert' } = {}) {
+        const modes = { convert: 0, require: 1 };
+        if (!(mode in modes))
+          throw new TypeError("bovnar: rule mode must be 'convert' or 'require'");
+        need(withString(path, (pp) => withString(unit, (up) => Module.ccall(
+               'bvnr_wasm_policy_rule', 'number',
+               ['number', 'number', 'number', 'number', 'number'],
+               [live(), pp, up,
+                uint(ruleBase, 0x7fffffff, 'rule base'), modes[mode]]))),
+             `rule ${JSON.stringify(String(path))}`);
+        return api;
+      },
+      /** Deliver everything the targets did not match in coherent SI base
+       *  units (prefixes folded out). Values with no SI form are left alone. */
+      normaliseSI(on = true) {
+        setMode(on ? 1 : 0, base, onInexact);
+        return api;
+      },
+      /** Output base for normaliseSI (0 keeps each value's own). */
+      base(n) {
+        setMode(normalise, uint(n, 0x7fffffff, 'policy base'), onInexact);
+        return api;
+      },
+      /** What a policy conversion that cannot be delivered exactly does:
+       *  'error' (abort, the want_unit default) or 'leave' (deliver the value
+       *  untouched; read `converted` to see which happened). */
+      onInexact(mode) {
+        const m = { error: 0, leave: 1 }[mode];
+        if (m === undefined)
+          throw new TypeError("bovnar: onInexact must be 'error' or 'leave'");
+        setMode(normalise, base, m);
+        return api;
+      },
+      /** Release the policy. Using it afterwards throws; idempotent. */
+      dispose() {
+        if (disposed) return;
+        disposed = true;
+        Module.ccall('bvnr_wasm_policy_destroy', 'void', ['number'], [handle]);
+      },
+      get disposed() { return disposed; },
+      _handle() { return disposed ? 0 : handle; },
+    };
+
+    function setMode(n, b, i) {
+      const ok = Module.ccall('bvnr_wasm_policy_normalise', 'number',
+                              ['number', 'number', 'number', 'number'],
+                              [live(), n, b, i]);
+      if (!ok)
+        throw new RangeError('bovnar: the unit policy refused this ' +
+                             'normalise/base/onInexact combination');
+      normalise = n; base = b; onInexact = i;
+    }
+    return api;
   }
 
   return {
@@ -116,35 +450,52 @@ export async function loadBovnar(opts) {
      *  document tier, which holds the rules no single value can break: array
      *  homogeneity, one shape per array of records, no repeated key. Returns
      *  { ok, error, error_name, tier, line, column, byte, offset,
-     *  recovery_count, declared_version }.
+     *  recovery_count, skipped_bytes, declared_version }.
      *
      *  `tier` is null when ok, 'stream' for an error at a position, and
      *  'document' for a whole-document rule -- which HAS no position: line,
-     *  column, byte and offset are 0 then, and must not be shown as 0:0. */
-    validate: (input) => callJson('bvnr_wasm_validate', input),
+     *  column, byte and offset are 0 then, and must not be shown as 0:0. It is
+     *  also null for an internal failure that has no position at all (an
+     *  options or policy refusal, or an allocation failure): those report
+     *  error_invalid_argument.
+     *
+     *  `byte` is the offending input byte's VALUE; `offset` is its 0-based
+     *  index into the input. `column` counts characters, not bytes. */
+    validate: (input, options) =>
+      callJsonOpts('bvnr_wasm_validate', 'bvnr_wasm_validate_ex',
+                   input, options, READ_OPTIONS, 'validate'),
 
     /** Validate in resync mode, collecting EVERY error. Returns
-     *  { ok, errors: [{ error, error_name, line, column, byte, offset, tier }],
-     *  declared_version }.
+     *  { ok, error, error_name, line, column, byte, offset, recovery_count,
+     *  skipped_bytes, declared_version,
+     *  errors: [{ error, error_name, line, column, byte, offset, tier }] }.
+     *  `error`/`error_name` name the first, as on every other surface.
      *
      *  When the streaming pass finds nothing, the document tier is consulted
      *  as in validate(), and its error -- there is at most one -- is the single
      *  entry, with tier 'document' and a zero position. So `ok` here and in
      *  validate() always agree. */
-    errors: (input) => callJson('bvnr_wasm_errors', input),
+    errors: (input, options) =>
+      callJsonOpts('bvnr_wasm_errors', 'bvnr_wasm_errors_ex',
+                   input, options, READ_OPTIONS, 'errors'),
 
     /** Parse and project the validated DOM to plain JSON. Returns
      *  { ok, error, error_name, value }. Unit/type metadata is dropped from
-     *  `value`; use events() for that.
+     *  `value`; use events() for that. Takes only `{ policy }` from the
+     *  options -- the DOM entry points take no read flags.
      *
      *  One valid document is refused, as `bovnar convert` refuses it: a
      *  datetime written with sub-second digits, whose JSON form would be a
      *  different instant. That comes back as value_out_of_range with a
      *  `detail` string naming the key. */
-    toJSON: (input) => callJson('bvnr_wasm_to_json', input),
+    toJSON: (input, options) =>
+      callJsonOpts('bvnr_wasm_to_json', 'bvnr_wasm_to_json_ex',
+                   input, options, DOM_OPTIONS, 'toJSON', true),
 
     /** The reference (verified) event stream. Returns { ok, error, error_name,
-     *  events: [{ seq, ev, tok, text?, family?, width?, base?, unit?, ... }] }.
+     *  line, column, byte, offset, recovery_count, skipped_bytes,
+     *  declared_version, events: [{ seq, ev, tok, text?, family?, width?,
+     *  base?, unit?, unit_source?, converted?, ... }] }.
      *
      *  This is the STREAMING tier, and `ok` speaks for that tier only: it is
      *  what a reader's on_verified callback sees, and a reader does not know
@@ -155,11 +506,20 @@ export async function loadBovnar(opts) {
      *  Runs in resync mode, so a broken assignment is skipped rather than
      *  aborting the read and its events are simply absent. `ok` accounts for
      *  that: it is false if ANY error was reported, including a recovered one,
-     *  and `error`/`error_name` name the first. */
-    events: (input) => callJson('bvnr_wasm_events', input),
+     *  and `error`/`error_name` name the first, with its position and the
+     *  reader's recovery statistics beside it.
+     *
+     *  A unit crosses twice: `unit` is the canonical form ("m~L") and
+     *  `unit_source` the spelling the document used ("ucum:mL{total}"), when
+     *  they differ. `base` 0 on a value means "no explicit base", i.e. decimal
+     *  10; on a datetime it is the EPOCH INDEX, whose name is in `epoch`. */
+    events: (input, options) =>
+      callJsonOpts('bvnr_wasm_events', 'bvnr_wasm_events_ex',
+                   input, options, READ_OPTIONS, 'events'),
 
     /** Events AND errors from a SINGLE reader pass:
-     *  { ok, error, error_name, events:[...], errors:[...], declared_version }.
+     *  { ok, error, error_name, line, column, byte, offset, recovery_count,
+     *  skipped_bytes, declared_version, events:[...], errors:[...] }.
      *  Prefer this over calling events() and errors() for the same document —
      *  that walks it twice and pays two JSON round-trips.
      *
@@ -182,38 +542,179 @@ export async function loadBovnar(opts) {
      *  and an unconditional definition would make that test lie and turn a
      *  recoverable fallback into a throw. */
     ...(typeof Module._bvnr_wasm_parse === 'function'
-        ? { parse: (input) => callJson('bvnr_wasm_parse', input) }
+        ? { parse: (input, options) =>
+              callJsonOpts('bvnr_wasm_parse', 'bvnr_wasm_parse_ex',
+                           input, options, READ_OPTIONS, 'parse') }
         : {}),
 
     /** The event stream with the reader's LOSSLESS unit/base conversion armed,
      *  so numeric events also carry `converted` (the exact value, or null when
      *  it has no finite expansion in `base`), `converted_base` and
-     *  `converted_unit`.
+     *  `converted_unit`. When `converted` is null the exact result has no
+     *  finite expansion in `base`, and the exact rational is carried as
+     *  `converted_num`/`converted_den` decimal strings instead (its exact value
+     *  in that case; they are always the exact reduced rational, den > 0).
      *
      *  `unit` is a unit string ("m", "k~m/s"); pass '' to keep each value's own
      *  unit, which together with a `base` is a pure base conversion. `base` is
      *  the output base (0 keeps the value's own; otherwise 2..62, 64 or 85).
      *  With `allowNonterminating` a result that is exact as a rational but does
      *  not terminate in `base` arrives as `"converted": null` instead of being
-     *  skipped. An unparseable `unit` comes back as error_unit_illegal.
+     *  skipped. An unparseable `unit` comes back as error_unit_illegal and an
+     *  unusable `base` as error_invalid_argument, before any parsing.
      *
      *  Note: this surface runs in resync mode, so a value the conversion
      *  rejects is skipped along with its assignment rather than aborting the
      *  call — it will not appear in `events` — but `ok` is then false and
-     *  `error_name` names the rejection (unit_mismatch, unit_inexact). A
-     *  `base` that is not 0 or a non-negative integer is invalid_argument. */
-    eventsConvert: (input, unit = '', base = 0, allowNonterminating = false) =>
-      callJsonConvert(input, unit, base, allowNonterminating),
+     *  `error_name` names the rejection (unit_mismatch, unit_inexact). */
+    eventsConvert: (input, unit = '', base = 0, allowNonterminating = false,
+                    options) =>
+      callJsonConvert(input, unit, base, allowNonterminating, options),
 
     /** Full document tree in document order, each value carrying its resolved
-     *  type fields (familyName/width/base/unit/epoch). Returns
+     *  type fields (familyName/width/base/unit/unitSource/epoch), a datetime's
+     *  sub-second digits as `frac`, and struct/array/octet shapes. Returns
      *  { ok, error, error_name, tree: [{ key, value }] }. Built from the DOM,
-     *  so `ok` covers both tiers. Used by the web playground's parser
-     *  shim to reconstruct the tree + event-stream shapes. */
-    doc: (input) => callJson('bvnr_wasm_doc', input),
+     *  so `ok` covers both tiers (the error carries no tier field: the DOM
+     *  reports the code alone). Used by the web playground's parser shim to
+     *  reconstruct the tree + event-stream shapes. Takes only `{ policy }`. */
+    doc: (input, options) =>
+      callJsonOpts('bvnr_wasm_doc', 'bvnr_wasm_doc_ex',
+                   input, options, DOM_OPTIONS, 'doc', true),
 
-    /** Library version string, e.g. "2.0.2". */
+    /** Library version string, e.g. "2.0.2" (BVNR_VERSION_STRING). */
     version: () => Module.ccall('bvnr_wasm_version', 'string', [], []),
+
+    /** The same version as the monotonic integer BVNR_VERSION, for comparison
+     *  (#if-style: 2.0.2 is 20002). */
+    versionNumber: () => {
+      needExport('bvnr_wasm_version_number', 'versionNumber');
+      return Module.ccall('bvnr_wasm_version_number', 'number', [], []);
+    },
+
+    /** Highest bovnar SPEC version this build understands, e.g.
+     *  { major: 1, minor: 2 }. Not the library version: a document declares
+     *  its own with a "#!bovnar" directive. */
+    specVersion: () => {
+      needExport('bvnr_wasm_spec_version', 'specVersion');
+      const p = Module.ccall('bvnr_wasm_spec_version', 'number', [], []);
+      return { major: (p >>> 16) & 0xffff, minor: p & 0xffff };
+    },
+
+    /** The spec version a document declares in its leading "#!bovnar <maj>.<min>"
+     *  directive, without parsing it: { major, minor }, or null when there is
+     *  no well-formed directive. */
+    peekVersion: (input) => {
+      needExport('bvnr_wasm_peek_version', 'peekVersion');
+      const bytes = toBytes(input);
+      const inPtr = malloc(bytes.length || 1);
+      try {
+        if (bytes.length) Module.HEAPU8.set(bytes, inPtr);
+        const p = Module.ccall('bvnr_wasm_peek_version', 'number',
+                               ['number', 'number'], [inPtr, bytes.length]);
+        if (p === -1) return null;
+        return { major: (p >>> 16) & 0xffff, minor: p & 0xffff };
+      } finally {
+        Module._free(inPtr);
+      }
+    },
+
+    /** Name for a numeric error code, as error_name spells it in every result
+     *  ("none" for 0; "unknown_error" for a code this build does not define,
+     *  which is bvn_error_to_string's own answer). */
+    errorName: (code) => {
+      needExport('bvnr_wasm_error_name', 'errorName');
+      return Module.ccall('bvnr_wasm_error_name', 'string',
+                          ['number'], [code | 0]);
+    },
+
+    /** Parse a unit string: { ok, unit, error, error_name, profile_only }.
+     *  `unit` is the canonical spelling, or null for a unit that parses but has
+     *  no text (an opaque profile unit beside another component, say -- see
+     *  bvn_unit_to_string in the C API). `profile_only` says the unit has no
+     *  native spelling. A refusal names WHY: unit_illegal, profile_unknown or
+     *  profile_unsupported. */
+    parseUnit: (text) => {
+      needExport('bvnr_wasm_unit', 'parseUnit');
+      return callJsonCString('bvnr_wasm_unit', text);
+    },
+
+    /** Whether two unit strings denote the same unit. Throws TypeError when
+     *  either is not a unit at all (parseUnit() reports that as data). */
+    unitsEqual: (a, b) => {
+      needExport('bvnr_wasm_units_equal', 'unit comparison');
+      const pa = stringPtr(a, 'a unit');
+      let pb = 0;
+      try {
+        pb = stringPtr(b, 'a unit');
+        const r = Module.ccall('bvnr_wasm_units_equal', 'number',
+                               ['number', 'number'], [pa, pb]);
+        if (r < 0)
+          throw new TypeError(
+            'bovnar: unitsEqual: one of the arguments is not a unit');
+        return r === 1;
+      } finally {
+        Module._free(pa);
+        if (pb) Module._free(pb);
+      }
+    },
+
+    /** Whether `a` could be converted to `b` at all -- bvn_units_convertible,
+     *  the predicate the C API says to SCREEN a conversion target with. It is
+     *  a screen, not a guarantee: `s/°C` passes it and the conversion still
+     *  declines. Throws TypeError when either argument is not a unit. */
+    unitsConvertible: (a, b) => {
+      needExport('bvnr_wasm_units_convertible', 'unit compatibility');
+      const pa = stringPtr(a, 'a unit');
+      let pb = 0;
+      try {
+        pb = stringPtr(b, 'a unit');
+        const r = Module.ccall('bvnr_wasm_units_convertible', 'number',
+                               ['number', 'number'], [pa, pb]);
+        if (r < 0)
+          throw new TypeError(
+            'bovnar: unitsConvertible: one of the arguments is not a unit');
+        return r === 1;
+      } finally {
+        Module._free(pa);
+        if (pb) Module._free(pb);
+      }
+    },
+
+    /** Convert one number from one unit to another: bvn_unit_convert_value,
+     *  the C API's double path (affine scales such as °C/°F included). Returns
+     *  { ok, value } or { ok:false, error, error_name, value:null }.
+     *
+     *  This rounds where a double rounds. The EXACT arbitrary-precision path is
+     *  the reader's want_unit hook -- eventsConvert() -- and that is where a
+     *  consumer that must not round should go. */
+    convertUnit: (value, from, to) => {
+      needExport('bvnr_wasm_convert_unit', 'convertUnit');
+      const pa = stringPtr(from, 'a unit');
+      let pb = 0, outPtr = 0;
+      try {
+        pb = stringPtr(to, 'a unit');
+        outPtr = Module.ccall('bvnr_wasm_convert_unit', 'number',
+          ['number', 'number', 'number'], [Number(value), pa, pb]);
+        return readJson(outPtr);
+      } finally {
+        Module._free(pa);
+        if (pb) Module._free(pb);
+        if (outPtr)
+          Module.ccall('bvnr_wasm_free', 'void', ['number'], [outPtr]);
+      }
+    },
+
+    /** The compiled-in unit profiles: { ok, profiles: ["ucum", ...] }. */
+    unitProfiles: () => {
+      needExport('bvnr_wasm_unit_profiles', 'unit profile listing');
+      return callJsonNoArg('bvnr_wasm_unit_profiles');
+    },
+
+    /** Create a unit policy (bvnr_reader_set_unit_policy / bvn_dom_parse_policy
+     *  as data). Chain the methods, pass the result as `options.policy` on any
+     *  surface, and dispose() it when done. See createPolicy above. */
+    createPolicy,
 
     /** The raw emscripten Module, for advanced use. */
     Module,

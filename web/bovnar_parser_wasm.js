@@ -44,7 +44,7 @@
   };
 
   var wasm = null;
-  import('./bovnar_wasm.js?v=642f14bfe9a4')
+  import('./bovnar_wasm.js?v=ea1391d77aff')
     .then(function (m) { return m.loadBovnar(); })
     .then(function (b) {
       wasm = b;
@@ -772,7 +772,7 @@
           else if (e.tok === 'type_base')  d = { kind: 'base',  value: e.base,  text: '_' + e.base };
           else if (e.tok === 'unit')     { if (e.text === 'no_unit') break;   // synthesized "no unit" sentinel — not a real unit
                                            d = { kind: 'unit', text: e.text }; }
-          else if (e.tok === 'type_q')     d = { kind: 'q',     text: e.text };
+          else if (e.tok === 'type_q')     d = { kind: 'q', value: e.q, text: 'q' + e.q };
           else                             d = { kind: 'param', text: e.text };
           E(EV.TYPE_ANN_PARAM, d);
           break;

@@ -284,6 +284,25 @@ API and implements spec 1.2.
     `write_type_annotation`, and `unit_source=` on the numeric writers.
   - The per-type `bvnr_write_*` helpers not named above are covered by the
     bindings' own writer methods (doc/09 §12.11, doc/14 §11.10).
+- **WASM: the reader-side C API, which the module had no way to reach.**
+  Every parsing surface (`validate`, `errors`, `events`, `parse`,
+  `eventsConvert`) takes an optional options object carrying
+  `bvnr_read_flags_t`: `strictVersion`, `textOnly`, `maxFileSize`,
+  `maxTextBytes`, `maxArrayItems`, `maxConversionLength` and the five
+  per-token length caps, plus the two nesting limits. `createPolicy()` builds a
+  `bvnr_reader_set_unit_policy` / `bvn_dom_parse_policy` policy — `requireUnit`,
+  `target`, `requireConvertibleTo`, `rule`, `normaliseSI`, `base`,
+  `onInexact` — and any surface takes it as `options.policy`; `toJSON` and
+  `doc` reach the DOM's policy path, and refuse read flags they cannot honour
+  instead of ignoring them. Small stateless helpers mirror the rest of the
+  reader API: `versionNumber` (`bvnr_version`), `specVersion`
+  (`bvnr_spec_version`), `peekVersion` (`bvnr_peek_version`), `errorName`
+  (`bvn_error_to_string`), `parseUnit`/`unitsEqual`/`unitsConvertible`/
+  `convertUnit`/`unitProfiles` (`bvn_parse_unit`, `bvn_unit_to_string`,
+  `bvn_unit_error_code`, `bvn_unit_is_profile_only`, `bvn_unit_equal`,
+  `bvn_units_convertible`, `bvn_unit_convert_value`, the profile table). The
+  old exports stay, and the wrapper feature-tests the new ones so a current
+  wrapper paired with a stale core refuses an option rather than dropping it.
 
 ### Changed
 
@@ -475,6 +494,34 @@ API and implements spec 1.2.
 
 ### Fixed
 
+- **WASM: the gaps a review of the bindings against the C API turned up.**
+  - *`events()`/`parse()` reported an error with no position,* while
+    `validate()` and `errors()[0]` placed the same error; the first error's
+    line, column, byte and offset now cross on both, and `errors()` carries
+    them at the top level too. `recovery_count` and `skipped_bytes` — the only
+    way a resync consumer can learn that values went missing — are on every
+    resync surface.
+  - *`errors()` had no top-level `error`/`error_name`,* so `if (!r.ok)
+    show(r.error_name)` read `undefined`; it names the first error now, as the
+    README already claimed every surface did. It also reported `ok: true` when
+    the reader could not even be created.
+  - *A `float_fix` q parameter was emitted with no `q`,* stamped instead with
+    the resolved type (`family`, width, and the q in `base`) — `<float_fix:16,
+    q8>` read as "base 8", a radix the value does not have. It is `"q": 8`
+    now, and the playground shim (which read a `text` that was never there)
+    reads it.
+  - *A non-terminating conversion had no value at all.* `converted: null` is
+    the documented result of `allowNonterminating`, and the exact rational is
+    the only carrier of the value in that mode, but the event JSON dropped
+    `conv.num`/`conv.den` — the dead end the Python binding had already had
+    fixed (`converted_rational()`). They now arrive as `converted_num` /
+    `converted_den` decimal strings.
+  - *`eventsConvert()` accepted a base the library cannot write* (1, 63, 86 …)
+    and rejected it only if the document had a numeric value to convert; it is
+    refused before the document is read, as the unit already was.
+  - *`doc()` dropped the unit's written spelling and a datetime's sub-second
+    digits,* the two things the DOM keeps and the event stream cannot always
+    reconstruct. A node now carries `unitSource` and `frac`.
 - **Fixes from a review of the unreleased work (2026-11-09, second pass).**
   - *The push-fed readers refuse a call from inside their own callbacks.* A
     callback-mode demux fed again from `on_message` re-lexed the window the

@@ -32,17 +32,33 @@ const fails = [];
 function ok(cond, msg) { if (cond) pass++; else { fail++; fails.push(msg); } }
 
 // --- CLI helpers -----------------------------------------------------------
-function cliValidate(text) {
+function cliValidate(text, extra = []) {
   const f = join(tmp, 'in.bvnr');
   writeFileSync(f, text);
   try {
-    execFileSync(CLI, ['validate', f], { encoding: 'utf8' });
+    execFileSync(CLI, ['validate', ...extra, f], { encoding: 'utf8' });
     return { ok: true, error_name: 'none' };
   } catch (e) {
     const out = (e.stdout || '') + (e.stderr || '');
     const m = out.match(/Validation failed:\s*(\w+)/);
     return { ok: false, error_name: m ? m[1] : '?' };
   }
+}
+/* `bovnar query [opts] <path> <file>` -- the CLI's DOM-under-a-unit-policy
+ * surface, which is what toJSON({policy}) and doc({policy}) project. */
+function cliQuery(text, path, extra = []) {
+  const f = join(tmp, 'in.bvnr');
+  writeFileSync(f, text);
+  try {
+    const out = execFileSync(CLI, ['query', ...extra, path, f],
+                             { encoding: 'utf8' });
+    return { ok: true, out: out.trim() };
+  } catch (e) {
+    return { ok: false, out: ((e.stdout || '') + (e.stderr || '')).trim() };
+  }
+}
+function throws(fn) {
+  try { fn(); return false; } catch { return true; }
 }
 /* `convert` exits 1 when the JSON it wrote cannot be converted back to the same
    document -- a unit, a wide integer, and (since the report learned of them) a
@@ -349,6 +365,283 @@ for (const [label, text] of docTierCases) {
   const good = b.eventsConvert('.v = 1 k~m;\n', 'm');
   ok(good.ok && good.events.some(x => x.converted === '1000'), 'NUL in unit: plain unit still converts');
 }
+
+// --- reader options ----------------------------------------------------------
+// bvnr_read_flags_t's assertions and limits, which had no way in from JS. Where
+// the CLI has the same switch, it is the reference; the limits have no CLI
+// equivalent and are pinned to the error the library documents.
+console.log('# reader options');
+{
+  const oct = Buffer.from('.a = \x00\x01\x02\x00hi\x00;\n', 'latin1');
+  ok(b.validate(oct).ok, 'options: premise — the octet document is valid');
+  const w = b.validate(oct, { textOnly: true });
+  const c = cliValidate(oct, ['--text-only']);
+  ok(!w.ok && w.error_name === c.error_name && !c.ok,
+     `options textOnly: wasm=${w.error_name} cli=${c.error_name}`);
+  ok(b.events(oct, { textOnly: true }).error_name === c.error_name,
+     'options textOnly: events agrees');
+  ok(b.parse(oct, { textOnly: true }).error_name === c.error_name,
+     'options textOnly: parse agrees');
+
+  // A document declaring a spec version this build does not know is ACCEPTED by
+  // default (the CLI does the same) and refused under strictVersion.
+  const fut = '#!bovnar 9.9\n.a = 1;';
+  const plain = b.validate(fut);
+  ok(plain.ok && plain.declared_version === '9.9',
+     `options strictVersion: accepted by default (${plain.declared_version})`);
+  const s = b.validate(fut, { strictVersion: true });
+  ok(!s.ok && s.error_name === 'unsupported_spec_version' &&
+     s.declared_version === '9.9',
+     `options strictVersion: ${JSON.stringify(s).slice(0, 120)}`);
+  ok(b.parse(fut, { strictVersion: true }).error_name === s.error_name,
+     'options strictVersion: parse agrees');
+
+  ok(b.validate('.averylongkey = 1;', { maxIdentifierLength: 4 }).error_name
+     === 'identifier_too_long', 'options maxIdentifierLength');
+  ok(b.validate('.a = 1;', { maxFileSize: 2 }).error_name === 'file_too_long',
+     'options maxFileSize');
+  ok(b.validate('.a = [1,2];', { maxArrayItems: 2 }).ok,
+     'options maxArrayItems: exact at the boundary');
+  ok(b.validate('.a = [1,2,3];', { maxArrayItems: 2 }).error_name
+     === 'too_many_array_items', 'options maxArrayItems: one over');
+  ok(b.events('.a = 1;', { maxNumberLength: 1 }).ok,
+     'options maxNumberLength: exact at the boundary');
+  ok(!b.events('.a = 12345;', { maxNumberLength: 3 }).ok,
+     'options maxNumberLength: one over');
+  // Nesting defaults to the format's hard limit (255) on every WASM surface.
+  const deep = `${'.a = '.repeat(1)}${'['.repeat(65)}${']'.repeat(65)};`;
+  ok(b.validate(deep).ok, 'options: 65 nested arrays parse at the default');
+
+  // An unknown option is a typo, not something to ignore — the same reason a
+  // read flag cannot be passed to a DOM surface and be quietly dropped.
+  ok(throws(() => b.validate('.a=1;', { strictVersions: true })),
+     'options: an unknown option throws');
+  ok(throws(() => b.toJSON('.a=1;', { textOnly: true })),
+     'options: toJSON refuses a read flag it cannot honour');
+  ok(throws(() => b.doc('.a=1;', { maxFileSize: 10 })),
+     'options: doc refuses a read flag it cannot honour');
+}
+
+// --- first-error position and what resync cost -------------------------------
+// events() had no position at all while validate() and errors()[0] did, and no
+// surface said how much of the document recovery had skipped.
+console.log('# the first error position and what resync cost');
+for (const [label, text] of [
+  ['bad byte', '.a = @;\n.b = 1;\n'],
+  ['range', '.a = <uint:8> 999;\n.b = 2;\n'],
+]) {
+  const v = b.validate(text);
+  const e = b.events(text);
+  const p = typeof b.parse === 'function' ? b.parse(text) : null;
+  const r = b.errors(text);
+  ok(!v.ok && e.error_name === v.error_name, `position ${label}: premise`);
+  ok(e.line === v.line && e.column === v.column && e.offset === v.offset,
+     `position ${label}: events=${e.line}:${e.column}@${e.offset} ` +
+     `validate=${v.line}:${v.column}@${v.offset}`);
+  if (p)
+    ok(p.line === v.line && p.column === v.column && p.offset === v.offset,
+       `position ${label}: parse=${p.line}:${p.column}@${p.offset}`);
+  ok(r.error_name === v.error_name && r.line === v.line && r.offset === v.offset,
+     `position ${label}: errors names and places the first error`);
+  ok(e.recovery_count === r.recovery_count &&
+     e.skipped_bytes === r.skipped_bytes,
+     `position ${label}: events and errors agree on the recovery cost`);
+  ok(e.recovery_count >= 1,
+     `position ${label}: the reader recovered (${e.recovery_count})`);
+}
+// A clean document has no recovery and no position.
+{
+  const e = b.events('.a = 1;\n.b = 2;\n');
+  ok(e.ok && e.recovery_count === 0 && e.skipped_bytes === 0 &&
+     e.line === 0 && e.offset === 0, 'position clean: zeros');
+  const r = b.errors('.a = 1;\n');
+  ok(r.ok && r.error_name === 'none' && r.error === 0, 'errors clean: none');
+}
+
+// --- a float_fix's q is q, not a base ---------------------------------------
+console.log('# a float_fix q parameter');
+{
+  const e = b.events('.v = <float_fix:16,q8> 1.5;');
+  const q = (e.events || []).find(x => x.tok === 'type_q');
+  ok(q && q.q === 8 && !('base' in q) && !('family' in q),
+     `q param: ${JSON.stringify(q)}`);
+  const data = (e.events || []).find(x => x.ev === 'data');
+  ok(data && data.family === 'float_fix' && data.base === 8,
+     `q data: ${JSON.stringify(data)}`);
+}
+
+// --- the exact rational behind a non-terminating conversion ------------------
+// "converted": null carried no value at all: the rational is the only carrier
+// in that mode, and it was unreachable (the Python binding had already had this
+// exact dead end fixed).
+console.log('# converted_num / converted_den');
+{
+  const e = b.eventsConvert('.v = <float:64,k~m/h> 100.0;', 'm/s', 10, true);
+  const d = (e.events || []).find(x => x.ev === 'data');
+  ok(d && d.converted === null, `rational: converted null (${JSON.stringify(d)})`);
+  ok(d && d.converted_num === '250' && d.converted_den === '9',
+     `rational: exact 250/9, got ${d && d.converted_num}/${d && d.converted_den}`);
+  // 100 km/h = 250/9 m/s; check the decimal text of a terminating conversion
+  // is unchanged and carries no rational fields.
+  const t = b.eventsConvert('.v = <float:64,km> 1.5;', 'm', 10, false);
+  const td = (t.events || []).find(x => x.ev === 'data');
+  ok(t.ok && td && td.converted === '1500' && !('converted_num' in td),
+     `rational: a terminating conversion is its text (${JSON.stringify(td)})`);
+  // A base the library cannot write is refused before the document is read —
+  // including when the document has no numeric value to reject it on.
+  for (const bad of [1, 63, 86, 1000]) {
+    const z = b.eventsConvert('.a = "text only";', '', bad);
+    ok(!z.ok && z.error_name === 'invalid_argument' && z.events.length === 0,
+       `rational: base ${bad} refused up front`);
+  }
+}
+
+// --- the unit policy --------------------------------------------------------
+// bvnr_reader_set_unit_policy / bvn_dom_parse_policy, which had no JS path at
+// all. The CLI's --require-unit / --field / --require-dimension are the
+// reference for the reader half; `bovnar query --unit` for the DOM half.
+console.log('# unit policy (vs the CLI)');
+{
+  const doc = '.a = 1;\n.b = 2 m;\n';
+  const req = b.createPolicy().requireUnit();
+  const w = b.validate(doc, { policy: req });
+  const c = cliValidate(doc, ['--require-unit']);
+  ok(!w.ok && w.error_name === c.error_name,
+     `policy requireUnit: wasm=${w.error_name} cli=${c.error_name}`);
+  ok(!b.events(doc, { policy: req }).ok,
+     'policy requireUnit: the event reader rejects it too');
+  req.dispose();
+
+  const tgt = b.createPolicy().target('m');
+  const j = b.toJSON('.v = <float:64,km> 1.5;', { policy: tgt });
+  const q = cliQuery('.v = <float:64,km> 1.5;', '.v', ['--unit', 'm']);
+  ok(j.ok && q.ok && String(j.value.v) === q.out,
+     `policy target: toJSON=${JSON.stringify(j.value)} cli=${q.out}`);
+  const ev = b.events('.v = <float:64,km> 1.5;', { policy: tgt });
+  const ed = (ev.events || []).find(x => x.ev === 'data');
+  ok(ed && ed.converted === '1500' && ed.converted_unit === 'm',
+     `policy target: the event carries the conversion (${JSON.stringify(ed)})`);
+  tgt.dispose();
+
+  // A rule names one field, asserts it, and converts it. A rule that matches
+  // NOTHING is satisfied — the C contract, and the opposite of a value it
+  // cannot check.
+  const rule = b.createPolicy().rule('.speed', 'm/s');
+  const bad = '.speed = 2 kg;';
+  ok(b.validate(bad, { policy: rule }).error_name ===
+     cliValidate(bad, ['--require-field', '.speed=m/s']).error_name,
+     'policy rule: a wrong unit is refused, as the CLI refuses it');
+  ok(b.validate('.speed = 2 m/s;', { policy: rule }).ok,
+     'policy rule: a convertible value passes');
+  ok(b.validate('.other = 1;', { policy: rule }).ok,
+     'policy rule: a rule that matches nothing is satisfied');
+  rule.dispose();
+
+  const dim = b.createPolicy().requireConvertibleTo('m');
+  ok(b.validate('.a = 1;', { policy: dim }).error_name ===
+     cliValidate('.a = 1;', ['--require-dimension', 'm']).error_name,
+     'policy requireConvertibleTo: a bare number is refused, as by the CLI');
+  ok(b.validate('.a = 2 ft;', { policy: dim }).ok,
+     'policy requireConvertibleTo: a length in another unit passes');
+  dim.dispose();
+
+  // SI normalisation converts what has a coherent SI form and leaves the rest
+  // (a currency has none) alone.
+  const si = b.createPolicy().normaliseSI();
+  const nev = b.events('.a = 1 k~m;\n.b = 2 $USD;', { policy: si });
+  const ds = (nev.events || []).filter(x => x.ev === 'data');
+  ok(nev.ok && ds.length === 2 && ds[0].converted === '1000' &&
+     ds[1].converted === undefined,
+     `policy normaliseSI: ${JSON.stringify(ds)}`);
+  si.dispose();
+
+  // The builder refuses what the library refuses, at the call that adds it.
+  const p = b.createPolicy();
+  ok(throws(() => p.target('not a unit')), 'policy: an unparseable target throws');
+  ok(throws(() => p.requireConvertibleTo('zzz:x')), 'policy: an unknown profile throws');
+  ok(throws(() => p.rule('no-dot', 'm')), 'policy: a bad path throws');
+  ok(throws(() => p.rule('.a', 'm', { mode: 'nonsense' })),
+     'policy: a bad mode throws');
+  ok(throws(() => p.target('m', 1)), 'policy: an unwritable base throws');
+  ok(p.target('m') === p, 'policy: methods chain');
+  p.dispose();
+  ok(p.disposed === true && throws(() => p.target('m')),
+     'policy: a disposed policy refuses to be used');
+  ok(throws(() => b.validate('.a = 1;', { policy: p })),
+     'policy: a disposed policy is refused by a surface');
+}
+
+// --- version, error-name and unit helpers -----------------------------------
+console.log('# version / error / unit helpers');
+{
+  const [maj, min, pat] = b.version().split('.').map(Number);
+  ok(b.versionNumber() === maj * 10000 + min * 100 + pat,
+     `versionNumber: ${b.versionNumber()} vs ${b.version()}`);
+  const sv = b.specVersion();
+  ok(sv.major === 1 && sv.minor === 2, `specVersion: ${JSON.stringify(sv)}`);
+  const pv = b.peekVersion('#!bovnar 1.2\n.a = 1;');
+  ok(pv && pv.major === 1 && pv.minor === 2, `peekVersion: ${JSON.stringify(pv)}`);
+  ok(b.peekVersion('.a = 1;') === null, 'peekVersion: no directive is null');
+  ok(b.peekVersion('#!bovnar 9\n.a = 1;') === null,
+     'peekVersion: a malformed directive is null');
+
+  ok(b.errorName(0) === 'none' && b.errorName(38) === 'unit_mismatch',
+     'errorName: codes map to the names in results');
+
+  const u = b.parseUnit('k~m/s');
+  ok(u.ok && u.unit === 'k~m/s' && u.profile_only === false,
+     `parseUnit: ${JSON.stringify(u)}`);
+  const prof = b.parseUnit('ucum:mm[Hg]');
+  ok(prof.ok && prof.unit === 'mmHg', `parseUnit profile: ${JSON.stringify(prof)}`);
+  const opaque = b.parseUnit('ucum:[IU]');
+  ok(opaque.ok && opaque.profile_only === true, `parseUnit opaque: ${JSON.stringify(opaque)}`);
+  ok(b.parseUnit('zzz:x').error_name === 'unit_profile_unknown',
+     'parseUnit: an unknown profile says so');
+  ok(b.parseUnit('1').error_name === 'unit_illegal', 'parseUnit: illegal input');
+  ok(b.unitsEqual('m/s', 'm·s⁻¹'), 'unitsEqual: canonical spellings agree');
+  ok(!b.unitsEqual('m', 's'), 'unitsEqual: different units differ');
+  ok(throws(() => b.unitsEqual('m', 'nope')), 'unitsEqual: a non-unit throws');
+  ok(b.unitsConvertible('m', 'ft'), 'unitsConvertible: lengths are convertible');
+  ok(!b.unitsConvertible('m', 's'), 'unitsConvertible: lengths and times are not');
+  ok(throws(() => b.unitsConvertible('m', 'nope')),
+     'unitsConvertible: a non-unit throws');
+  const c = b.convertUnit(0, '°C', 'K');
+  ok(c.ok && Math.abs(c.value - 273.15) < 1e-9,
+     `convertUnit: 0 °C is 273.15 K (${JSON.stringify(c)})`);
+  const m = b.convertUnit(1.5, 'km', 'm');
+  ok(m.ok && m.value === 1500, `convertUnit: 1.5 km is 1500 m (${JSON.stringify(m)})`);
+  const bad = b.convertUnit(1, 'm', 's');
+  ok(!bad.ok && bad.error_name === 'unit_mismatch' && bad.value === null,
+     `convertUnit: incompatible units (${JSON.stringify(bad)})`);
+  const fp = b.unitProfiles();
+  ok(fp.ok && fp.profiles.includes('ucum') && fp.profiles.includes('udunits'),
+     `unitProfiles: ${JSON.stringify(fp)}`);
+}
+
+// --- the document tree keeps the spelling and the fraction -------------------
+console.log('# doc(): unitSource and a datetime fraction');
+{
+  const d = b.doc('#!bovnar 1.2\n.a = <float:64,ucum:mL{total}> 1.0;\n.b = 2 km;\n.c = 3 m;');
+  const [a, bb, cc] = d.tree.map(x => x.value);
+  ok(a.unit === 'm~L' && a.unitSource === 'ucum:mL{total}',
+     `doc unitSource: annotated ${JSON.stringify(a)}`);
+  ok(bb.unit === 'k~m' && bb.unitSource === 'km',
+     `doc unitSource: non-canonical spelling ${JSON.stringify(bb)}`);
+  ok(cc.unit === 'm' && cc.unitSource === null,
+     `doc unitSource: canonical spelling is null ${JSON.stringify(cc)}`);
+  const f = b.doc('#!bovnar 1.1\n.t = <datetime:64> 2026-06-15T12:00:00.5Z;');
+  const tv = f.tree[0].value;
+  ok(tv.kind === 'datetime' && tv.frac === '5' && tv.epoch === 'unix',
+     `doc frac: ${JSON.stringify(tv)}`);
+  // The DOM surface takes a policy and applies it: the converted node has the
+  // target unit and loses the document's spelling.
+  const pol = b.createPolicy().target('m');
+  const conv = b.doc('.v = <float:64,km> 1.5;', { policy: pol });
+  pol.dispose();
+  ok(conv.tree[0].value.unit === 'm' && conv.tree[0].value.unitSource === null,
+     `doc policy: ${JSON.stringify(conv.tree[0].value)}`);
+}
+
 
 // --- report ----------------------------------------------------------------
 console.log(`\nhard: ${pass} passed, ${fail} failed   |   soft toJSON diffs: ${soft}`);

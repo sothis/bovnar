@@ -58,7 +58,7 @@ the C library; `import bovnar` itself never loads it.
     - 11.2 [`read_mem`](#112-read_mem)
     - 11.3 [`read_fd`](#113-read_fd)
     - 11.4 [`read_file`](#114-read_file)
-    - 11.5 [`iter_mem(data, *, verified_only, max_file_size)`](#115-iter_memdata--verified_only-max_file_size)
+    - 11.5 [`iter_mem(data, *, verified_only, **options)`](#115-iter_memdata--verified_only-options)
     - 11.6 [Error-state properties](#116-error-state-properties)
     - 11.7 [`MAX_FILESIZE_BYTES`](#117-max_filesize_bytes)
     - 11.8 [`read_stream`](#118-read_stream)
@@ -71,6 +71,7 @@ the C library; `import bovnar` itself never loads it.
     - 12.6 [Version directive](#126-version-directive)
     - 12.7 [Array helpers](#127-array-helpers)
     - 12.8 [Low-level `emit`](#128-low-level-emit)
+    - 12.9 [Octets, embedded documents and mux streams](#129-octets-embedded-documents-and-mux-streams)
 13. [DOM API](#13-dom-api)
     - 13.1 [`dom_parse(data) -> DomDoc`](#131-dom_parsedata---domdoc)
     - 13.2 [`DomDoc`](#132-domdoc)
@@ -191,6 +192,11 @@ assert recovered["sensor_id"] == 42
 
 `nan`, `inf` and `ninf` come back as `float`, under an integer type as well
 (`<uint:8> nan`, spec §6.4), as `dom_parse()` gives them.
+
+`loads` and `load` take the read options of `Reader.read_mem` as keywords
+(§11.2): `bovnar.loads(data, max_file_size=1 << 20, strict_version=True,
+max_string_length=4096)` reads untrusted input under tighter limits than the
+defaults.
 
 `loads` accepts an optional `typed` flag that wraps typed values in `Quantity`
 objects instead of decoding them to native Python scalars.  This preserves the
@@ -416,6 +422,18 @@ object in place of bytes and read it to its end, parsing as they pull;
 `file=` to write to instead of returning bytes. The results are those of the
 in-memory calls.
 
+`load_documents`, `mux_load` and `parse_embedded` take the read options of
+`Reader.read_mem` (`bovnar.READ_OPTIONS`, §11.2) as keywords, and read under
+them: `load_documents` each document, with `max_file_size` capping one
+document and `max_document_size` one frame; `mux_load` the document around the
+stream. All three read with no total cap by default.
+
+To write a mux stream, or an embedded document, inside a document of any
+shape — values after it, more than one stream — use the `Writer` (§12.9):
+`mux_begin(key)`, `mux_send(channel, payload)`, `mux_end()` and
+`embed_document(key, doc)`. `mux_dump` and `MuxWriter` end the document with
+their stream.
+
 ### 4.7 Live streams: feeding in pieces
 
 The functions above take the whole input, or read a stream to its end. For
@@ -429,11 +447,16 @@ stream and are handed bytes in pieces of any size, cut anywhere:
 | `DemuxFeed` | a document carrying a mux stream | `Message(channel, payload)` per message; with `values=True` the values before and after the stream, in document order; with `events=True` the document's events |
 | `FrameFeed` | a `BVF1` frame stream | each document's bytes; with `parse=True` each document parsed, as `load_documents` parses it |
 
-The options besides those: `DocumentFeed` takes `Reader.read_mem`'s, `typed`
-and `max_file_size`; `DemuxFeed(key=None, max_message=0, typed=False,
-view=False, max_file_size=0)`; `FrameFeed(parse=False, typed=False,
-continue_past_failed=False, max_document_size=0, view=False)`, where `typed`
-and `continue_past_failed` need `parse=True` and `view` needs `parse=False`
+All three take the read options of `Reader.read_mem` (`bovnar.READ_OPTIONS`,
+§11.2): `max_file_size`, the text, array, length and nesting caps,
+`continue_on_error`, `strict_version`, `text_only` and the rest. Besides those:
+`DocumentFeed` takes `typed`, `want_unit` and `on_error`; `DemuxFeed(key=None,
+max_message=0, typed=False, view=False)`, whose `recovery_count`,
+`skipped_bytes` and `declared_version` are those of its reader, as on
+`DocumentFeed`; `FrameFeed(parse=False, typed=False, continue_past_failed=False,
+max_document_size=0, view=False)`, where `typed`, `continue_past_failed` and
+the read options need `parse=True` (each parsed document is read under them,
+`max_file_size` capping one document) and `view` needs `parse=False`
 (otherwise `BovnarArgumentError`). `DemuxFeed`'s `key=None` demultiplexes every
 octet stream of the document, as `mux_load` does, while `mux_dump` and
 `MuxWriter` write under `key="mux"`: a document with any other octet stream —
@@ -500,15 +523,12 @@ text of a fed document is capped as `Reader`'s is, at 2 147 483 647 bytes
 (`TEXT_DATA_TOO_LONG`, doc/10 §1), and an array at as many items: pass
 `max_text_bytes=stream.BVNR_NO_LIMIT` (and `max_array_items`) for a document
 that does not end. `DemuxFeed` and a parsing `FrameFeed` take both as well.
-`DocumentFeed` takes the reading options of `Reader.read_mem`
-(`continue_on_error`, `strict_version`, `text_only`, `want_unit`,
-`want_unit_allow_nonterminating`, `max_file_size`, `max_conversion_length`,
-`max_text_bytes`, `max_array_items`),
-not its callbacks, which the feed's
-items stand in for; with `values=True`, `typed=True` gives `Quantity` values as
+`DocumentFeed` takes the read options of `Reader.read_mem` and its `want_unit`
+and `on_error`, not its event callbacks, which the feed's items stand in for;
+with `values=True`, `typed=True` gives `Quantity` values as
 `loads(typed=True)` does (`typed` without `values`, or neither `events` nor
-`values`, is refused). A `want_unit` callback runs inside the C call, so it may
-not close the feed or feed it again (`BovnarArgumentError`). One feed reads one
+`values`, is refused). A `want_unit` or `on_error` callback runs inside the C
+call, so it may not close the feed or feed it again (`BovnarArgumentError`). One feed reads one
 document: make a new one for the next.
 
 ```python
@@ -827,6 +847,13 @@ r = unit_reduce(vu)                   # r.unit, r.scale
 
 # Convert a scalar value between units (handles affine conversions)
 kelvin = convert_value(25.0, vu_celsius, vu_kelvin)
+
+# ... or EXACTLY, as the reader's want_unit does: (Fraction, exact). exact is
+# False for an irrational factor (° to rad); a float is refused, pass Fraction(x)
+from fractions import Fraction
+from bovnar import convert_rational
+v, exact = convert_rational(42, parse_unit("k~m/h"), parse_unit("m/s"))
+# v == Fraction(35, 3), exact is True
 
 # Serialise with formatting options (see UnitFlags below)
 s = unit_to_str_ex(vu, UnitFlags.ASCII_EXP)   # use ^N instead of Unicode superscripts
@@ -1654,17 +1681,23 @@ nested parse, and close the first one after its read returns.
 
 ### 11.2 `read_mem`
 
-`read_mem(data, *, on_verified, on_unverified, max_file_size, continue_on_error,
-strict_version, text_only, want_unit, want_unit_allow_nonterminating,
-max_conversion_length, max_text_bytes, max_array_items)`
+`read_mem(data, *, on_verified, on_unverified, want_unit, on_error, **options)`
 
-Parse BVNR from a `bytes`, `bytearray`, or `memoryview` object.
+Parse BVNR from a `bytes`, `bytearray`, or `memoryview` object. The callbacks
+are named parameters; every other keyword is a **read option**, one of the
+names in `bovnar.READ_OPTIONS`. That table is the one list every reading entry
+point takes its keywords from — `read_*`, `iter_mem`, `loads` / `load`, the
+feeds (§4.7) and the `bovnar.stream` readers — so an option is never reachable
+from one and missing from another. An unknown keyword is a `TypeError`, a value
+outside its C field (a negative one, `max_string_length=70000`) a
+`BovnarArgumentError`. Every option defaults to `0` / `False`.
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `data` | `bytes \| bytearray \| memoryview` | — | Input buffer |
 | `on_verified` | `Callable[[Event, BvnrData \| None], bool] \| None` | `None` | Callback for validated events |
 | `on_unverified` | `Callable[[Event, BvnrData \| None], bool] \| None` | `None` | Callback for raw pre-validation events |
+| `on_error` | `Callable[[BovnarParseError], None] \| None` | `None` | Called for every error the reader reports, as a `BovnarParseError` with its code and position: under `continue_on_error`, each error it recovers from — reported nowhere else — and the error that ends a read, before the read raises it. Its return value is ignored; an exception it raises stops the read at the next event and is re-raised |
 | `max_file_size` | `int` | `0` (unlimited) | Hard limit on bytes consumed |
 | `continue_on_error` | `bool` | `False` | Enable resync mode |
 | `strict_version` | `bool` | `False` | Reject a declared spec version newer than this build (`error_unsupported_spec_version`) |
@@ -1674,6 +1707,18 @@ Parse BVNR from a `bytes`, `bytearray`, or `memoryview` object.
 | `max_conversion_length` | `int` | `0` (default 1024) | Longest converted text a conversion may produce, in characters; a longer exact result aborts with `error_value_out_of_range` |
 | `max_text_bytes` | `int` | `0` (default 2147483647) | Most bytes of text in the document (octet-stream payloads not counted); past it the read fails with `TEXT_DATA_TOO_LONG`. `stream.BVNR_NO_LIMIT` (2**64 − 1) lifts it |
 | `max_array_items` | `int` | `0` (default 2147483647) | Most items in one array; past it the read fails with `TOO_MANY_ARRAY_ITEMS`. `stream.BVNR_NO_LIMIT` lifts it |
+| `max_identifier_length` | `int` | `0` (default 255) | Longest key, in bytes (`IDENTIFIER_TOO_LONG`) |
+| `max_string_length` | `int` | `0` (default 65535) | Longest string value, in bytes (`STRING_TOO_LONG`) |
+| `max_number_length` | `int` | `0` (default 65535) | Longest number literal (`NUMBER_TOO_LONG`) |
+| `max_symbol_length` | `int` | `0` (default 255) | Longest symbol (`SYMBOL_TOO_LONG`) |
+| `max_reference_length` | `int` | `0` (default 65535) | Longest reference (`REFERENCE_TOO_LONG`) |
+| `max_struct_nesting` | `int` | `0` (255) | Deepest struct nesting, at most 255 (`STRUCT_NESTING_TOO_HIGH`). `0` is the format's limit of 255, what the DOM and the CLI read at — not the C reader's own default of 64 |
+| `max_array_nesting` | `int` | `0` (255) | Deepest array nesting, as `max_struct_nesting` (`ARRAY_NESTING_TOO_HIGH`) |
+
+The five length caps and the two nesting caps are for untrusted input: lower
+them to what the consumer can take. The length caps are the width of their C
+field (`uint16_t`); a key or symbol longer than 255 bytes is accepted at a
+higher cap, but `dumps()` and `bovnar validate` keep to the default.
 
 ### 11.3 `read_fd`
 
@@ -1690,7 +1735,7 @@ Convenience wrapper: opens `path` with `os.O_RDONLY`, calls `read_fd`, closes
 the fd in a `finally` block. The `max_file_size` default is `MAX_FILESIZE_BYTES`
 (16 MiB) rather than unlimited.
 
-### 11.5 `iter_mem(data, *, verified_only, max_file_size)`
+### 11.5 `iter_mem(data, *, verified_only, **options)`
 
 Generator that collects all events from `read_mem` and yields
 `EventPayload(event, raw, value_type, value_unit)` objects.
@@ -1698,7 +1743,7 @@ Generator that collects all events from `read_mem` and yields
 | Parameter | Default | Description |
 |---|---|---|
 | `verified_only` | `True` | When `False`, both callbacks fire and events may appear twice |
-| `max_file_size` | `0` | Forwarded to `read_mem` |
+| `**options` | — | The read options, forwarded to `read_mem` |
 
 `EventPayload` fields:
 
@@ -1727,7 +1772,11 @@ were recovered, and `recovery_count` is how to tell that any were (spec §13.4).
 | `error_line` | `int` | 1-based line number of the error |
 | `error_column` | `int` | 1-based column of the error |
 | `error_offset` | `int` | Byte offset of the error |
+| `error_byte` | `int` | The byte the error was raised on, `0` where it is not one byte's fault |
 | `recovery_count` | `int` | Number of times resync was entered (incremented at error entry, not at resync completion) |
+
+To see the errors a `continue_on_error` read recovered from, pass `on_error`
+(§11.2): it is called with each one.
 
 ### 11.7 `MAX_FILESIZE_BYTES`
 
@@ -1893,6 +1942,37 @@ whose literal must be quoted); `_TOKEN_IS_NUMBER` otherwise. The base field of
 `float_fix` (Q), `float_dec` and `datetime` (the epoch index) is not a radix and
 never makes the value a string.
 
+### 12.9 Octets, embedded documents and mux streams
+
+```python
+from bovnar import Writer, stream
+
+w = Writer.to_mem(pretty=False)
+w.write_uint("before", 1)
+w.mux_begin("media")              # .media = <multiplexed octet stream>
+w.mux_send(1, b"frame-1")         # one message on channel 1
+w.mux_send(2, b"audio")
+w.mux_end()
+w.embed_document("inner", b".x = 5;")   # a document as an octet value
+w.write_octets("raw", b"\x00\x01")       # any bytes-like object
+w.write_uint("after", 2)
+w.finish()
+doc = w.get_output()
+stream.mux_load(doc, key="media")       # → [(1, b'frame-1'), (2, b'audio')]
+stream.parse_embedded(bovnar.loads(doc)["inner"])   # → {'x': 5}
+```
+
+`mux_begin`, `mux_send` and `mux_end` wrap `bvnr_mux_begin` / `_send` /
+`_end`: the stream is one value of the document being written, so values may
+come before it (read back before the first message) and after it, and a
+document may carry more than one. The bytes of a stream are those `mux_dump`
+writes. `embed_document` wraps `bvnr_embed_document`, embedding into the
+document being written rather than making a document of one key, as
+`stream.embed_document` does. A key is held to the rule of `dumps()`
+(`BovnarArgumentError`), a channel to the unsigned 64-bit range. On a
+`to_stream` writer, call `flush()` after `mux_send` for a consumer reading
+live (§4.8).
+
 ---
 
 ## 13. DOM API
@@ -1917,8 +1997,8 @@ tree; any `DomNode` derived from it becomes invalid after that point.
 | Method / property | Description |
 |---|---|
 | `DomDoc.parse(data)` | Class method. Parse `bytes \| bytearray \| memoryview`. |
-| `DomDoc.parse_fd(fd)` | Class method. Parse from an open file descriptor. A read error raises the matching `OSError` (`EBADF` for a bad descriptor, `IsADirectoryError` for a directory, …), input over the 256 MiB cap `BovnarParseError(FILE_TOO_LONG)`. |
-| `DomDoc.parse_file(path)` | Class method. Open path and parse (fd closed in `finally`). Applies an internal hard cap of `BVN_DOM_FD_MAX_BYTES` (256 MiB) via the C function `bvn_dom_parse_fd`. This ceiling is distinct from `Reader.read_file`'s `MAX_FILESIZE_BYTES` (16 MiB). Raises as `parse_fd` does, with the path on the `OSError`. |
+| `DomDoc.parse_fd(fd, policy=None, *, max_bytes=0)` | Class method. Parse from an open file descriptor. A read error raises the matching `OSError` (`EBADF` for a bad descriptor, `IsADirectoryError` for a directory, …), input over the cap `BovnarParseError(FILE_TOO_LONG)`. `max_bytes` lowers the cap of 256 MiB (`bvn_dom_parse_fd_ex`); `0`, or more than 256 MiB, keeps it. |
+| `DomDoc.parse_file(path, policy=None, *, max_bytes=0)` | Class method. Open path and parse (fd closed in `finally`), under the cap of `parse_fd`. This ceiling is distinct from `Reader.read_file`'s `MAX_FILESIZE_BYTES` (16 MiB). Raises as `parse_fd` does, with the path on the `OSError`. |
 | `doc.parse_error` | `ErrorCode` — `NONE` on success. |
 | `doc[key]` | Return a `DomNode` by key; raises `KeyError` when absent. `key` goes to the path lookup, so `doc["server"]` is a top-level entry and a dotted or indexed path reaches below it: `doc["server.tls"]` is `doc["server"]["tls"]`, `doc["matrix[1][0]"]` an element. A key cannot contain `.` or `[`, so the two readings never collide. |
 | `key in doc` | `True` when `doc[key]` would succeed — the same path rule. A non-`str` is never in a document. |
@@ -1929,11 +2009,20 @@ tree; any `DomNode` derived from it becomes invalid after that point.
 | `doc.to_dict()` | Convert entire document to a plain Python dict, dropping type and unit info. |
 
 > **File-size limits:** `DomDoc.parse_fd` and `DomDoc.parse_file` apply an internal
-> ceiling of `BVN_DOM_FD_MAX_BYTES` (256 MiB). This is 16× larger than
-> `Reader.read_file`'s `MAX_FILESIZE_BYTES` (16 MiB). The C library's
-> `bvn_dom_parse_fd_ex` can lower that ceiling (never raise it), but it is
-> C-only — the binding does not wrap it. From Python, to bound the input
-> yourself, read at most the bytes you allow and pass them to `DomDoc.parse`.
+> ceiling of `BVN_DOM_FD_MAX_BYTES` (256 MiB, `bovnar.dom.DOM_FD_MAX_BYTES`).
+> This is 16× larger than `Reader.read_file`'s `MAX_FILESIZE_BYTES` (16 MiB).
+> `max_bytes=` lowers it, as the C library's `bvn_dom_parse_fd_ex` does; there
+> is no way to raise it, and no unlimited mode.
+>
+> **The DOM takes no read options.** The C DOM parse functions read with a
+> fixed set (no total cap besides the one above, the 255-level nesting, and the
+> reader's defaults for everything else), and neither binding can pass more:
+> read with a `Reader` (§11) or `loads` for the limits of §11.2.
+>
+> **No builder.** The C DOM's tree-building calls (`bvn_dom_doc_create`,
+> `bvn_dom_node_from_*`, `bvn_dom_struct_add`, …) make a tree that cannot be
+> written out and are meant for the library's test fixtures; they are not
+> wrapped. Build a document with `dumps()` or the `Writer`.
 >
 > **Errors:** the C fd functions return `NULL` for an allocation failure, a read
 > error and input over the cap alike; the binding tells them apart by `errno`.
@@ -2068,7 +2157,9 @@ bench/
 
 ## 16. Error handling
 
-All errors surface as subclasses of `BovnarError`:
+All errors surface as subclasses of `BovnarError`. `bovnar.error_message(code)`
+is the library's text for an `ErrorCode` (`bvn_error_to_string`):
+`"string_too_long"` for `ErrorCode.STRING_TOO_LONG`.
 
 | Exception | When raised |
 |---|---|
@@ -2076,6 +2167,7 @@ All errors surface as subclasses of `BovnarError`:
 | `BovnarParseError` | Parse error in `Reader` (carries `code`, `line`, `column`, `offset`, `byte`) |
 | `BovnarWriteError` | Write error in `Writer` (carries `code`, `offset`) |
 | `BovnarArgumentError` | Invalid argument passed to a helper (e.g. bad unit string, closed reader/writer) |
+| `TypeError` | An unknown keyword where read options are taken (`max_string_lenght=`) |
 | `OSError` | `DomDoc.parse_fd` / `parse_file` could not read the input (the `errno` subclass: `IsADirectoryError`, …); an over-cap input is `BovnarParseError(FILE_TOO_LONG)` instead |
 | `MemoryError` | The C library could not allocate (a reader, writer, or DOM tree) |
 
@@ -2314,19 +2406,25 @@ kept spelling or a profile-only unit needs it. The 1.1 features (all gated on a
 `#!bovnar 1.1` directive — an unversioned document is treated as 1.0) are
 exposed as:
 
-- **Version:** `bovnar.version()` (library version string), `bovnar.spec_version()`
+- **Version:** `bovnar.version()` (library version string),
+  `bovnar.version_number()` (the same as one int, `major * 10000 + minor * 100
+  + patch`: 20100 for 2.1.0), `bovnar.spec_version()`
   → `(major, minor)` of the highest spec understood, and
   `bovnar.peek_version(data)` → the `(major, minor)` a document declares, or
-  `None`. `Reader.declared_version` gives the same after a read; `read_mem`/
-  `read_fd`/`read_file` accept `strict_version=True` to reject a too-new version
-  (`ErrorCode.UNSUPPORTED_SPEC_VERSION`). `loads` does not take `strict_version`;
-  use a `Reader` when you need it.
+  `None`. `Reader.declared_version` gives the same after a read; every reading
+  entry point (`read_*`, `loads`, the feeds and stream readers) accepts
+  `strict_version=True` to reject a too-new version
+  (`ErrorCode.UNSUPPORTED_SPEC_VERSION`).
 - **Richer escapes:** `\u{…}` and `\xHH` in string literals are decoded by the C
   reader, so `loads` returns the resulting text transparently. A surrogate /
   out-of-range `\u` is `ErrorCode.INVALID_CODEPOINT`.
 - **Datetime family:** `loads` decodes a `<datetime:width,epoch>` value to a
   plain `int` (signed epoch seconds). With `typed=True` it is a `Quantity` whose
-  `.epoch_name` (`"unix"`, `"tai"`, …) and `.epoch_mjd` recover the epoch.
+  `.epoch_name` (`"unix"`, `"tai"`, …) and `.epoch_mjd` recover the epoch;
+  `bovnar.datetime_epoch_index(name)` goes the other way, to the index a
+  datetime `ValueTypeSpec` holds in `base`
+  (`make_type_spec(ValueTypeFamily.DATETIME, 64,
+  bovnar.datetime_epoch_index("gps"))`), `None` for an unknown name.
   `dumps()` emits the `<datetime:…>` annotation and prepends `#!bovnar 1.1`
   automatically when the object contains a datetime. With `typed=True` the
   sub-second fraction of an ISO-8601 literal (spec 1.1) is preserved on the

@@ -27,6 +27,10 @@
 //! panic in either reaches the caller. `WouldBlock` is not retried: it is a
 //! failure like any other, so a non-blocking input belongs in
 //! [`crate::live`].
+//!
+//! The readers read with the default [`ReadOptions`] (no total cap, the
+//! 255-level nesting); each has a `*_with_options` twin that takes the
+//! [`ReadOptions`] its documents are read under, as [`crate::Reader`] does.
 
 use std::cell::RefCell;
 
@@ -35,7 +39,7 @@ use crate::enums::ErrorCode;
 use crate::error::{Error, Position, Result};
 use crate::ffi::{self, BvnrReadFlags, BvnrSource, DemuxError, Handlers, ReaderHandle};
 use crate::io;
-use crate::reader::{EventData, wrap};
+use crate::reader::{EventData, ReadOptions, wrap};
 use crate::writer;
 use crate::{Value, to_string};
 
@@ -47,14 +51,6 @@ pub const BVNR_DOC_DEFAULT_MAX: u64 = 256 * 1024 * 1024;
 pub const BVNR_MUX_DEFAULT_MAX: u64 = 64 * 1024 * 1024;
 /// Largest payload a single mux frame carries.
 pub const BVNR_MUX_MAX_MESSAGE: u64 = 65536 - 20;
-
-fn read_flags() -> BvnrReadFlags {
-    let mut flags = BvnrReadFlags::zeroed();
-    flags.max_file_size = BVNR_FILESIZE_UNLIMITED;
-    flags.max_struct_nesting = 255;
-    flags.max_array_nesting = 255;
-    flags
-}
 
 fn parse_error(code: i32) -> Error {
     Error::parse_code(code)
@@ -107,8 +103,26 @@ pub fn load_documents(
     continue_past_failed: bool,
     max_document_size: u64,
 ) -> Result<Vec<Option<Value>>> {
+    load_documents_with_options(
+        data,
+        typed,
+        continue_past_failed,
+        max_document_size,
+        &ReadOptions::default(),
+    )
+}
+
+/// [`load_documents`] with each document read under `options`
+/// (`max_file_size` caps one document; `max_document_size` bounds a frame).
+pub fn load_documents_with_options(
+    data: &[u8],
+    typed: bool,
+    continue_past_failed: bool,
+    max_document_size: u64,
+    options: &ReadOptions,
+) -> Result<Vec<Option<Value>>> {
     ffi::with_mem_source(data, |src| {
-        load_from(src, typed, continue_past_failed, max_document_size)
+        load_from(src, typed, continue_past_failed, max_document_size, options)
     })
 }
 
@@ -117,6 +131,7 @@ fn load_from(
     typed: bool,
     continue_past_failed: bool,
     max_document_size: u64,
+    options: &ReadOptions,
 ) -> Result<Vec<Option<Value>>> {
     let parser = RefCell::new(DictParser::new(typed));
     let mut results = Vec::new();
@@ -137,7 +152,7 @@ fn load_from(
     };
     let (ok, _, error) = ffi::doc_stream_read(
         src,
-        read_flags(),
+        options.flags(),
         continue_past_failed,
         max_document_size,
         &mut h,
@@ -156,13 +171,31 @@ fn load_from(
 /// stream; for an endless one, feed a [`crate::live::FrameParser`] or a
 /// [`crate::live::FramePull`].
 pub fn load_documents_reader(
-    mut input: impl std::io::Read,
+    input: impl std::io::Read,
     typed: bool,
     continue_past_failed: bool,
     max_document_size: u64,
 ) -> Result<Vec<Option<Value>>> {
+    load_documents_reader_with_options(
+        input,
+        typed,
+        continue_past_failed,
+        max_document_size,
+        &ReadOptions::default(),
+    )
+}
+
+/// [`load_documents_reader`] with each document read under `options`, as
+/// [`load_documents_with_options`].
+pub fn load_documents_reader_with_options(
+    mut input: impl std::io::Read,
+    typed: bool,
+    continue_past_failed: bool,
+    max_document_size: u64,
+    options: &ReadOptions,
+) -> Result<Vec<Option<Value>>> {
     io::from_reader(&mut input, |src| {
-        load_from(src, typed, continue_past_failed, max_document_size)
+        load_from(src, typed, continue_past_failed, max_document_size, options)
     })
 }
 
@@ -195,20 +228,31 @@ fn borrowed<P: AsRef<[u8]>>(messages: &[(u64, P)]) -> Vec<(u64, &[u8])> {
 /// The `(channel, payload)` messages of a multiplexed document, in order.
 /// `max_message` 0 is the default cap; `key` `None` accepts any.
 pub fn mux_load(data: &[u8], max_message: u64, key: Option<&str>) -> Result<Vec<(u64, Vec<u8>)>> {
-    mux_load_with(|r, f, h| r.read_mem(data, f, h), max_message, key)
+    mux_load_with_options(data, max_message, key, &ReadOptions::default())
+}
+
+/// [`mux_load`] with the document read under `options`.
+pub fn mux_load_with_options(
+    data: &[u8],
+    max_message: u64,
+    key: Option<&str>,
+    options: &ReadOptions,
+) -> Result<Vec<(u64, Vec<u8>)>> {
+    mux_load_by(|r, f, h| r.read_mem(data, f, h), max_message, key, options)
 }
 
 /// [`mux_load`] of the document `read` reads.
-fn mux_load_with(
+fn mux_load_by(
     read: impl FnOnce(&mut ReaderHandle, BvnrReadFlags, &mut Handlers<'_>) -> bool,
     max_message: u64,
     key: Option<&str>,
+    options: &ReadOptions,
 ) -> Result<Vec<(u64, Vec<u8>)>> {
     let key = key
         .map(std::ffi::CString::new)
         .transpose()
         .map_err(|_| Error::argument("mux key contains a NUL byte"))?;
-    ffi::demux_read(read, read_flags(), max_message, key.as_deref()).map_err(|e| match e {
+    ffi::demux_read(read, options.flags(), max_message, key.as_deref()).map_err(|e| match e {
         DemuxError::Demux(code) => parse_error(code),
         DemuxError::Read(r) => Error::Parse {
             code: r.code,
@@ -226,12 +270,27 @@ fn mux_load_with(
 /// [`mux_load`] over any [`std::io::Read`]. It returns once `input` has
 /// ended; for messages as they arrive, feed a [`crate::live::Demux`].
 pub fn mux_load_reader(
-    mut input: impl std::io::Read,
+    input: impl std::io::Read,
     max_message: u64,
     key: Option<&str>,
 ) -> Result<Vec<(u64, Vec<u8>)>> {
+    mux_load_reader_with_options(input, max_message, key, &ReadOptions::default())
+}
+
+/// [`mux_load_reader`] with the document read under `options`.
+pub fn mux_load_reader_with_options(
+    mut input: impl std::io::Read,
+    max_message: u64,
+    key: Option<&str>,
+    options: &ReadOptions,
+) -> Result<Vec<(u64, Vec<u8>)>> {
     io::from_reader(&mut input, |src| {
-        mux_load_with(|r, f, h| r.read_source(src, f, h), max_message, key)
+        mux_load_by(
+            |r, f, h| r.read_source(src, f, h),
+            max_message,
+            key,
+            options,
+        )
     })
 }
 
@@ -257,30 +316,49 @@ pub fn embed_document_to(
 
 /// Parses an embedded document (the payload [`embed_document`] wrote).
 pub fn parse_embedded(inner: &[u8], typed: bool) -> Result<Value> {
-    parse_embedded_with(typed, |flags, h| Ok(ffi::parse_embedded(inner, flags, h)))
+    parse_embedded_with_options(inner, typed, &ReadOptions::default())
+}
+
+/// [`parse_embedded`] under `options`.
+pub fn parse_embedded_with_options(
+    inner: &[u8],
+    typed: bool,
+    options: &ReadOptions,
+) -> Result<Value> {
+    parse_embedded_by(typed, options, |flags, h| {
+        Ok(ffi::parse_embedded(inner, flags, h))
+    })
 }
 
 /// [`parse_embedded`] of the document `read` reads with the flags and
 /// handlers it is given.
-fn parse_embedded_with(
+fn parse_embedded_by(
     typed: bool,
+    options: &ReadOptions,
     read: impl FnOnce(BvnrReadFlags, &mut Handlers<'_>) -> Result<bool>,
 ) -> Result<Value> {
     let mut parser = DictParser::new(typed);
-    let (ok, first_error) = {
+    // The last error reported is the one that ended the parse; under
+    // continue_on_error the ones before it were recovered from.
+    let mut last_error = None;
+    let ok = {
         let mut on_event = |d: &EventData<'_>| {
             parser.on_event(d);
             true
         };
         let mut verified = wrap(&mut on_event);
+        let mut on_error = |code, line, column, byte, offset| {
+            last_error = Some((code, line, column, byte, offset));
+        };
         let mut h = ffi::Handlers {
             verified: Some(&mut verified),
+            on_error: Some(&mut on_error),
             ..ffi::Handlers::default()
         };
-        (read(read_flags(), &mut h)?, h.first_error)
+        read(options.flags(), &mut h)?
     };
     if !ok {
-        return Err(match first_error {
+        return Err(match last_error {
             Some((code, line, column, byte, offset)) => Error::Parse {
                 code,
                 position: Some(Position {
@@ -297,8 +375,17 @@ fn parse_embedded_with(
 }
 
 /// [`parse_embedded`] over any [`std::io::Read`], parsed as it is read.
-pub fn parse_embedded_reader(mut input: impl std::io::Read, typed: bool) -> Result<Value> {
-    parse_embedded_with(typed, |flags, h| {
+pub fn parse_embedded_reader(input: impl std::io::Read, typed: bool) -> Result<Value> {
+    parse_embedded_reader_with_options(input, typed, &ReadOptions::default())
+}
+
+/// [`parse_embedded_reader`] under `options`.
+pub fn parse_embedded_reader_with_options(
+    mut input: impl std::io::Read,
+    typed: bool,
+    options: &ReadOptions,
+) -> Result<Value> {
+    parse_embedded_by(typed, options, |flags, h| {
         let mut reader = ReaderHandle::new().ok_or(Error::OutOfMemory("bvnr_reader_create()"))?;
         io::from_reader(&mut input, |src| Ok(reader.read_source(src, flags, h)))
     })

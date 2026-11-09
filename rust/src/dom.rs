@@ -52,11 +52,17 @@ pub struct DomDoc {
 /// `BVN_DOM_FD_MAX_BYTES`, the cap of `bvn_dom_parse_fd`.
 pub const DOM_READ_MAX_BYTES: u64 = 256 * 1024 * 1024;
 
-/// Reads a DOM document from `input`, refusing one over
-/// [`DOM_READ_MAX_BYTES`].
-fn read_dom_input(input: impl std::io::Read) -> Result<Vec<u8>> {
-    let data = crate::io::read_capped(input, Some(DOM_READ_MAX_BYTES))?;
-    if data.len() as u64 > DOM_READ_MAX_BYTES {
+/// Reads a DOM document from `input`, refusing one over `max_bytes`, which
+/// is clamped to [`DOM_READ_MAX_BYTES`] as `bvn_dom_parse_fd_ex` clamps it:
+/// 0, or anything larger, is that cap.
+fn read_dom_input(input: impl std::io::Read, max_bytes: u64) -> Result<Vec<u8>> {
+    let cap = if max_bytes == 0 {
+        DOM_READ_MAX_BYTES
+    } else {
+        max_bytes.min(DOM_READ_MAX_BYTES)
+    };
+    let data = crate::io::read_capped(input, Some(cap))?;
+    if data.len() as u64 > cap {
         return Err(Error::parse_code(ErrorCode::FileTooLong.into()));
     }
     Ok(data)
@@ -104,7 +110,15 @@ impl DomDoc {
     /// no document. A failing `input` is an
     /// [`Error::Io`] with `reading_from_source_fd`.
     pub fn parse_reader(input: impl std::io::Read) -> Result<Self> {
-        Self::parse(&read_dom_input(input)?)
+        Self::parse(&read_dom_input(input, 0)?)
+    }
+
+    /// [`DomDoc::parse_reader`] with a lower cap, as `bvn_dom_parse_fd_ex`
+    /// takes one: an input over `max_bytes` is an [`Error::Parse`] with
+    /// `file_too_long`. 0, or anything above [`DOM_READ_MAX_BYTES`], keeps
+    /// that cap; there is no unlimited mode.
+    pub fn parse_reader_capped(input: impl std::io::Read, max_bytes: u64) -> Result<Self> {
+        Self::parse(&read_dom_input(input, max_bytes)?)
     }
 
     /// [`DomDoc::parse_with_policy`] over any [`std::io::Read`]. Reads
@@ -114,7 +128,18 @@ impl DomDoc {
         input: impl std::io::Read,
         policy: &crate::reader::UnitPolicy,
     ) -> Result<Self> {
-        Self::parse_with_policy(&read_dom_input(input)?, policy)
+        Self::parse_with_policy(&read_dom_input(input, 0)?, policy)
+    }
+
+    /// [`DomDoc::parse_reader_with_policy`] with the cap of
+    /// [`DomDoc::parse_reader_capped`], as `bvn_dom_parse_fd_policy` takes
+    /// one.
+    pub fn parse_reader_capped_with_policy(
+        input: impl std::io::Read,
+        max_bytes: u64,
+        policy: &crate::reader::UnitPolicy,
+    ) -> Result<Self> {
+        Self::parse_with_policy(&read_dom_input(input, max_bytes)?, policy)
     }
 
     /// `handle` is `None` when the input is over the C API's 4 GiB (a

@@ -106,7 +106,7 @@ the C library; <code>import bovnar</code> itself never loads it.</p>
 <li>11.2 <a href="#112-read_mem"><code>read_mem</code></a></li>
 <li>11.3 <a href="#113-read_fd"><code>read_fd</code></a></li>
 <li>11.4 <a href="#114-read_file"><code>read_file</code></a></li>
-<li>11.5 <a href="#115-iter_memdata--verified_only-max_file_size"><code>iter_mem(data, *, verified_only, max_file_size)</code></a></li>
+<li>11.5 <a href="#115-iter_memdata--verified_only-options"><code>iter_mem(data, *, verified_only, **options)</code></a></li>
 <li>11.6 <a href="#116-error-state-properties">Error-state properties</a></li>
 <li>11.7 <a href="#117-max_filesize_bytes"><code>MAX_FILESIZE_BYTES</code></a></li>
 <li>11.8 <a href="#118-read_stream"><code>read_stream</code></a></li>
@@ -121,6 +121,7 @@ the C library; <code>import bovnar</code> itself never loads it.</p>
 <li>12.6 <a href="#126-version-directive">Version directive</a></li>
 <li>12.7 <a href="#127-array-helpers">Array helpers</a></li>
 <li>12.8 <a href="#128-low-level-emit">Low-level <code>emit</code></a></li>
+<li>12.9 <a href="#129-octets-embedded-documents-and-mux-streams">Octets, embedded documents and mux streams</a></li>
 </ul>
 </li>
 <li><a href="#13-dom-api">DOM API</a><ul>
@@ -251,6 +252,10 @@ failed (<code>not found</code>, or the loader's error).</p>
 
 <p><code>nan</code>, <code>inf</code> and <code>ninf</code> come back as <code>float</code>, under an integer type as well
 (<code>&lt;uint:8&gt; nan</code>, spec §6.4), as <code>dom_parse()</code> gives them.</p>
+<p><code>loads</code> and <code>load</code> take the read options of <code>Reader.read_mem</code> as keywords
+(§11.2): <code>bovnar.loads(data, max_file_size=1 &lt;&lt; 20, strict_version=True,
+max_string_length=4096)</code> reads untrusted input under tighter limits than the
+defaults.</p>
 <p><code>loads</code> accepts an optional <code>typed</code> flag that wraps typed values in <code>Quantity</code>
 objects instead of decoding them to native Python scalars.  This preserves the
 original text representation, exact type width, numeral base, and physical unit
@@ -506,6 +511,16 @@ object in place of bytes and read it to its end, parsing as they pull;
 <code>frame_documents</code>, <code>dump_documents</code>, <code>mux_dump</code> and <code>embed_document</code> take a
 <code>file=</code> to write to instead of returning bytes. The results are those of the
 in-memory calls.</p>
+<p><code>load_documents</code>, <code>mux_load</code> and <code>parse_embedded</code> take the read options of
+<code>Reader.read_mem</code> (<code>bovnar.READ_OPTIONS</code>, §11.2) as keywords, and read under
+them: <code>load_documents</code> each document, with <code>max_file_size</code> capping one
+document and <code>max_document_size</code> one frame; <code>mux_load</code> the document around the
+stream. All three read with no total cap by default.</p>
+<p>To write a mux stream, or an embedded document, inside a document of any
+shape — values after it, more than one stream — use the <code>Writer</code> (§12.9):
+<code>mux_begin(key)</code>, <code>mux_send(channel, payload)</code>, <code>mux_end()</code> and
+<code>embed_document(key, doc)</code>. <code>mux_dump</code> and <code>MuxWriter</code> end the document with
+their stream.</p>
 <h3 id="47-live-streams-feeding-in-pieces">4.7 Live streams: feeding in pieces</h3>
 <p>The functions above take the whole input, or read a stream to its end. For
 input that arrives when it arrives — a non-blocking socket, an event loop, a
@@ -537,11 +552,16 @@ stream and are handed bytes in pieces of any size, cut anywhere:</p>
 </tr>
 </tbody>
 </table>
-<p>The options besides those: <code>DocumentFeed</code> takes <code>Reader.read_mem</code>'s, <code>typed</code>
-and <code>max_file_size</code>; <code>DemuxFeed(key=None, max_message=0, typed=False,
-view=False, max_file_size=0)</code>; <code>FrameFeed(parse=False, typed=False,
-continue_past_failed=False, max_document_size=0, view=False)</code>, where <code>typed</code>
-and <code>continue_past_failed</code> need <code>parse=True</code> and <code>view</code> needs <code>parse=False</code>
+<p>All three take the read options of <code>Reader.read_mem</code> (<code>bovnar.READ_OPTIONS</code>,
+§11.2): <code>max_file_size</code>, the text, array, length and nesting caps,
+<code>continue_on_error</code>, <code>strict_version</code>, <code>text_only</code> and the rest. Besides those:
+<code>DocumentFeed</code> takes <code>typed</code>, <code>want_unit</code> and <code>on_error</code>; <code>DemuxFeed(key=None,
+max_message=0, typed=False, view=False)</code>, whose <code>recovery_count</code>,
+<code>skipped_bytes</code> and <code>declared_version</code> are those of its reader, as on
+<code>DocumentFeed</code>; <code>FrameFeed(parse=False, typed=False, continue_past_failed=False,
+max_document_size=0, view=False)</code>, where <code>typed</code>, <code>continue_past_failed</code> and
+the read options need <code>parse=True</code> (each parsed document is read under them,
+<code>max_file_size</code> capping one document) and <code>view</code> needs <code>parse=False</code>
 (otherwise <code>BovnarArgumentError</code>). <code>DemuxFeed</code>'s <code>key=None</code> demultiplexes every
 octet stream of the document, as <code>mux_load</code> does, while <code>mux_dump</code> and
 <code>MuxWriter</code> write under <code>key="mux"</code>: a document with any other octet stream —
@@ -601,15 +621,12 @@ text of a fed document is capped as <code>Reader</code>'s is, at 2 147 483 647 b
 (<code>TEXT_DATA_TOO_LONG</code>, doc/10 §1), and an array at as many items: pass
 <code>max_text_bytes=stream.BVNR_NO_LIMIT</code> (and <code>max_array_items</code>) for a document
 that does not end. <code>DemuxFeed</code> and a parsing <code>FrameFeed</code> take both as well.
-<code>DocumentFeed</code> takes the reading options of <code>Reader.read_mem</code>
-(<code>continue_on_error</code>, <code>strict_version</code>, <code>text_only</code>, <code>want_unit</code>,
-<code>want_unit_allow_nonterminating</code>, <code>max_file_size</code>, <code>max_conversion_length</code>,
-<code>max_text_bytes</code>, <code>max_array_items</code>),
-not its callbacks, which the feed's
-items stand in for; with <code>values=True</code>, <code>typed=True</code> gives <code>Quantity</code> values as
+<code>DocumentFeed</code> takes the read options of <code>Reader.read_mem</code> and its <code>want_unit</code>
+and <code>on_error</code>, not its event callbacks, which the feed's items stand in for;
+with <code>values=True</code>, <code>typed=True</code> gives <code>Quantity</code> values as
 <code>loads(typed=True)</code> does (<code>typed</code> without <code>values</code>, or neither <code>events</code> nor
-<code>values</code>, is refused). A <code>want_unit</code> callback runs inside the C call, so it may
-not close the feed or feed it again (<code>BovnarArgumentError</code>). One feed reads one
+<code>values</code>, is refused). A <code>want_unit</code> or <code>on_error</code> callback runs inside the C
+call, so it may not close the feed or feed it again (<code>BovnarArgumentError</code>). One feed reads one
 document: make a new one for the next.</p>
 <div class="codehilite"><pre><span></span><code><span class="n">frames</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">FrameFeed</span><span class="p">(</span><span class="n">parse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">blob</span> <span class="o">=</span> <span class="n">stream</span><span class="o">.</span><span class="n">dump_documents</span><span class="p">([{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">},</span> <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">}])</span>
@@ -972,6 +989,13 @@ out) wherever it takes a <code>ValueUnit</code>, so <code>unit_to_str(q.unit)</c
 
 <span class="c1"># Convert a scalar value between units (handles affine conversions)</span>
 <span class="n">kelvin</span> <span class="o">=</span> <span class="n">convert_value</span><span class="p">(</span><span class="mf">25.0</span><span class="p">,</span> <span class="n">vu_celsius</span><span class="p">,</span> <span class="n">vu_kelvin</span><span class="p">)</span>
+
+<span class="c1"># ... or EXACTLY, as the reader&#39;s want_unit does: (Fraction, exact). exact is</span>
+<span class="c1"># False for an irrational factor (° to rad); a float is refused, pass Fraction(x)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">fractions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Fraction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">convert_rational</span>
+<span class="n">v</span><span class="p">,</span> <span class="n">exact</span> <span class="o">=</span> <span class="n">convert_rational</span><span class="p">(</span><span class="mi">42</span><span class="p">,</span> <span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;k~m/h&quot;</span><span class="p">),</span> <span class="n">parse_unit</span><span class="p">(</span><span class="s2">&quot;m/s&quot;</span><span class="p">))</span>
+<span class="c1"># v == Fraction(35, 3), exact is True</span>
 
 <span class="c1"># Serialise with formatting options (see UnitFlags below)</span>
 <span class="n">s</span> <span class="o">=</span> <span class="n">unit_to_str_ex</span><span class="p">(</span><span class="n">vu</span><span class="p">,</span> <span class="n">UnitFlags</span><span class="o">.</span><span class="n">ASCII_EXP</span><span class="p">)</span>   <span class="c1"># use ^N instead of Unicode superscripts</span>
@@ -1779,10 +1803,15 @@ start another read on it, or <code>set_unit_policy()</code>: each raises
 running parse and is re-raised from the read. Use a second <code>Reader</code> for a
 nested parse, and close the first one after its read returns.</p>
 <h3 id="112-read_mem">11.2 <code>read_mem</code></h3>
-<p><code>read_mem(data, *, on_verified, on_unverified, max_file_size, continue_on_error,
-strict_version, text_only, want_unit, want_unit_allow_nonterminating,
-max_conversion_length, max_text_bytes, max_array_items)</code></p>
-<p>Parse BVNR from a <code>bytes</code>, <code>bytearray</code>, or <code>memoryview</code> object.</p>
+<p><code>read_mem(data, *, on_verified, on_unverified, want_unit, on_error, **options)</code></p>
+<p>Parse BVNR from a <code>bytes</code>, <code>bytearray</code>, or <code>memoryview</code> object. The callbacks
+are named parameters; every other keyword is a <strong>read option</strong>, one of the
+names in <code>bovnar.READ_OPTIONS</code>. That table is the one list every reading entry
+point takes its keywords from — <code>read_*</code>, <code>iter_mem</code>, <code>loads</code> / <code>load</code>, the
+feeds (§4.7) and the <code>bovnar.stream</code> readers — so an option is never reachable
+from one and missing from another. An unknown keyword is a <code>TypeError</code>, a value
+outside its C field (a negative one, <code>max_string_length=70000</code>) a
+<code>BovnarArgumentError</code>. Every option defaults to <code>0</code> / <code>False</code>.</p>
 <table>
 <thead>
 <tr>
@@ -1810,6 +1839,12 @@ max_conversion_length, max_text_bytes, max_array_items)</code></p>
 <td><code>Callable[[Event, BvnrData \| None], bool] \| None</code></td>
 <td><code>None</code></td>
 <td>Callback for raw pre-validation events</td>
+</tr>
+<tr>
+<td><code>on_error</code></td>
+<td><code>Callable[[BovnarParseError], None] \| None</code></td>
+<td><code>None</code></td>
+<td>Called for every error the reader reports, as a <code>BovnarParseError</code> with its code and position: under <code>continue_on_error</code>, each error it recovers from — reported nowhere else — and the error that ends a read, before the read raises it. Its return value is ignored; an exception it raises stops the read at the next event and is re-raised</td>
 </tr>
 <tr>
 <td><code>max_file_size</code></td>
@@ -1865,8 +1900,54 @@ max_conversion_length, max_text_bytes, max_array_items)</code></p>
 <td><code>0</code> (default 2147483647)</td>
 <td>Most items in one array; past it the read fails with <code>TOO_MANY_ARRAY_ITEMS</code>. <code>stream.BVNR_NO_LIMIT</code> lifts it</td>
 </tr>
+<tr>
+<td><code>max_identifier_length</code></td>
+<td><code>int</code></td>
+<td><code>0</code> (default 255)</td>
+<td>Longest key, in bytes (<code>IDENTIFIER_TOO_LONG</code>)</td>
+</tr>
+<tr>
+<td><code>max_string_length</code></td>
+<td><code>int</code></td>
+<td><code>0</code> (default 65535)</td>
+<td>Longest string value, in bytes (<code>STRING_TOO_LONG</code>)</td>
+</tr>
+<tr>
+<td><code>max_number_length</code></td>
+<td><code>int</code></td>
+<td><code>0</code> (default 65535)</td>
+<td>Longest number literal (<code>NUMBER_TOO_LONG</code>)</td>
+</tr>
+<tr>
+<td><code>max_symbol_length</code></td>
+<td><code>int</code></td>
+<td><code>0</code> (default 255)</td>
+<td>Longest symbol (<code>SYMBOL_TOO_LONG</code>)</td>
+</tr>
+<tr>
+<td><code>max_reference_length</code></td>
+<td><code>int</code></td>
+<td><code>0</code> (default 65535)</td>
+<td>Longest reference (<code>REFERENCE_TOO_LONG</code>)</td>
+</tr>
+<tr>
+<td><code>max_struct_nesting</code></td>
+<td><code>int</code></td>
+<td><code>0</code> (255)</td>
+<td>Deepest struct nesting, at most 255 (<code>STRUCT_NESTING_TOO_HIGH</code>). <code>0</code> is the format's limit of 255, what the DOM and the CLI read at — not the C reader's own default of 64</td>
+</tr>
+<tr>
+<td><code>max_array_nesting</code></td>
+<td><code>int</code></td>
+<td><code>0</code> (255)</td>
+<td>Deepest array nesting, as <code>max_struct_nesting</code> (<code>ARRAY_NESTING_TOO_HIGH</code>)</td>
+</tr>
 </tbody>
 </table>
+<p>The five length caps and the two nesting caps are for untrusted input: lower
+them to what the consumer can take. The length caps are the width of their C
+field (<code>uint16_t</code>); a key or symbol longer than 255 bytes is accepted at a
+higher cap, but <code>dumps()</code> and <code>bovnar validate</code> keep to the default.</p>
 <h3 id="113-read_fd">11.3 <code>read_fd</code></h3>
 <p><code>read_fd(fd, *, …)</code> — the keyword parameters of <code>read_mem</code>, unchanged.</p>
 <p>Parse BVNR from an open POSIX file descriptor. Parameters identical to
@@ -1876,7 +1957,7 @@ max_conversion_length, max_text_bytes, max_array_items)</code></p>
 <p>Convenience wrapper: opens <code>path</code> with <code>os.O_RDONLY</code>, calls <code>read_fd</code>, closes
 the fd in a <code>finally</code> block. The <code>max_file_size</code> default is <code>MAX_FILESIZE_BYTES</code>
 (16 MiB) rather than unlimited.</p>
-<h3 id="115-iter_memdata--verified_only-max_file_size">11.5 <code>iter_mem(data, *, verified_only, max_file_size)</code></h3>
+<h3 id="115-iter_memdata--verified_only-options">11.5 <code>iter_mem(data, *, verified_only, **options)</code></h3>
 <p>Generator that collects all events from <code>read_mem</code> and yields
 <code>EventPayload(event, raw, value_type, value_unit)</code> objects.</p>
 <table>
@@ -1894,9 +1975,9 @@ the fd in a <code>finally</code> block. The <code>max_file_size</code> default i
 <td>When <code>False</code>, both callbacks fire and events may appear twice</td>
 </tr>
 <tr>
-<td><code>max_file_size</code></td>
-<td><code>0</code></td>
-<td>Forwarded to <code>read_mem</code></td>
+<td><code>**options</code></td>
+<td>—</td>
+<td>The read options, forwarded to <code>read_mem</code></td>
 </tr>
 </tbody>
 </table>
@@ -1988,12 +2069,19 @@ were recovered, and <code>recovery_count</code> is how to tell that any were (sp
 <td>Byte offset of the error</td>
 </tr>
 <tr>
+<td><code>error_byte</code></td>
+<td><code>int</code></td>
+<td>The byte the error was raised on, <code>0</code> where it is not one byte's fault</td>
+</tr>
+<tr>
 <td><code>recovery_count</code></td>
 <td><code>int</code></td>
 <td>Number of times resync was entered (incremented at error entry, not at resync completion)</td>
 </tr>
 </tbody>
 </table>
+<p>To see the errors a <code>continue_on_error</code> read recovered from, pass <code>on_error</code>
+(§11.2): it is called with each one.</p>
 <h3 id="117-max_filesize_bytes">11.7 <code>MAX_FILESIZE_BYTES</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">MAX_FILESIZE_BYTES</span>   <span class="c1"># 16 * 1024 * 1024  (16 MiB)</span>
 </code></pre></div>
@@ -2151,6 +2239,34 @@ is a radix other than 10 (<code>uint</code>, <code>sint</code> or <code>float</c
 whose literal must be quoted); <code>_TOKEN_IS_NUMBER</code> otherwise. The base field of
 <code>float_fix</code> (Q), <code>float_dec</code> and <code>datetime</code> (the epoch index) is not a radix and
 never makes the value a string.</p>
+<h3 id="129-octets-embedded-documents-and-mux-streams">12.9 Octets, embedded documents and mux streams</h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">Writer</span><span class="p">,</span> <span class="n">stream</span>
+
+<span class="n">w</span> <span class="o">=</span> <span class="n">Writer</span><span class="o">.</span><span class="n">to_mem</span><span class="p">(</span><span class="n">pretty</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">w</span><span class="o">.</span><span class="n">write_uint</span><span class="p">(</span><span class="s2">&quot;before&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="n">w</span><span class="o">.</span><span class="n">mux_begin</span><span class="p">(</span><span class="s2">&quot;media&quot;</span><span class="p">)</span>              <span class="c1"># .media = &lt;multiplexed octet stream&gt;</span>
+<span class="n">w</span><span class="o">.</span><span class="n">mux_send</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;frame-1&quot;</span><span class="p">)</span>         <span class="c1"># one message on channel 1</span>
+<span class="n">w</span><span class="o">.</span><span class="n">mux_send</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;audio&quot;</span><span class="p">)</span>
+<span class="n">w</span><span class="o">.</span><span class="n">mux_end</span><span class="p">()</span>
+<span class="n">w</span><span class="o">.</span><span class="n">embed_document</span><span class="p">(</span><span class="s2">&quot;inner&quot;</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;.x = 5;&quot;</span><span class="p">)</span>   <span class="c1"># a document as an octet value</span>
+<span class="n">w</span><span class="o">.</span><span class="n">write_octets</span><span class="p">(</span><span class="s2">&quot;raw&quot;</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;</span><span class="se">\x00\x01</span><span class="s2">&quot;</span><span class="p">)</span>       <span class="c1"># any bytes-like object</span>
+<span class="n">w</span><span class="o">.</span><span class="n">write_uint</span><span class="p">(</span><span class="s2">&quot;after&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+<span class="n">w</span><span class="o">.</span><span class="n">finish</span><span class="p">()</span>
+<span class="n">doc</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">get_output</span><span class="p">()</span>
+<span class="n">stream</span><span class="o">.</span><span class="n">mux_load</span><span class="p">(</span><span class="n">doc</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="s2">&quot;media&quot;</span><span class="p">)</span>       <span class="c1"># → [(1, b&#39;frame-1&#39;), (2, b&#39;audio&#39;)]</span>
+<span class="n">stream</span><span class="o">.</span><span class="n">parse_embedded</span><span class="p">(</span><span class="n">bovnar</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">doc</span><span class="p">)[</span><span class="s2">&quot;inner&quot;</span><span class="p">])</span>   <span class="c1"># → {&#39;x&#39;: 5}</span>
+</code></pre></div>
+
+<p><code>mux_begin</code>, <code>mux_send</code> and <code>mux_end</code> wrap <code>bvnr_mux_begin</code> / <code>_send</code> /
+<code>_end</code>: the stream is one value of the document being written, so values may
+come before it (read back before the first message) and after it, and a
+document may carry more than one. The bytes of a stream are those <code>mux_dump</code>
+writes. <code>embed_document</code> wraps <code>bvnr_embed_document</code>, embedding into the
+document being written rather than making a document of one key, as
+<code>stream.embed_document</code> does. A key is held to the rule of <code>dumps()</code>
+(<code>BovnarArgumentError</code>), a channel to the unsigned 64-bit range. On a
+<code>to_stream</code> writer, call <code>flush()</code> after <code>mux_send</code> for a consumer reading
+live (§4.8).</p>
 <hr />
 <h2 id="13-dom-api">13. DOM API</h2>
 <p>The DOM API parses a complete BVNR document into an in-memory tree for
@@ -2177,12 +2293,12 @@ tree; any <code>DomNode</code> derived from it becomes invalid after that point.
 <td>Class method. Parse <code>bytes \| bytearray \| memoryview</code>.</td>
 </tr>
 <tr>
-<td><code>DomDoc.parse_fd(fd)</code></td>
-<td>Class method. Parse from an open file descriptor. A read error raises the matching <code>OSError</code> (<code>EBADF</code> for a bad descriptor, <code>IsADirectoryError</code> for a directory, …), input over the 256 MiB cap <code>BovnarParseError(FILE_TOO_LONG)</code>.</td>
+<td><code>DomDoc.parse_fd(fd, policy=None, *, max_bytes=0)</code></td>
+<td>Class method. Parse from an open file descriptor. A read error raises the matching <code>OSError</code> (<code>EBADF</code> for a bad descriptor, <code>IsADirectoryError</code> for a directory, …), input over the cap <code>BovnarParseError(FILE_TOO_LONG)</code>. <code>max_bytes</code> lowers the cap of 256 MiB (<code>bvn_dom_parse_fd_ex</code>); <code>0</code>, or more than 256 MiB, keeps it.</td>
 </tr>
 <tr>
-<td><code>DomDoc.parse_file(path)</code></td>
-<td>Class method. Open path and parse (fd closed in <code>finally</code>). Applies an internal hard cap of <code>BVN_DOM_FD_MAX_BYTES</code> (256 MiB) via the C function <code>bvn_dom_parse_fd</code>. This ceiling is distinct from <code>Reader.read_file</code>'s <code>MAX_FILESIZE_BYTES</code> (16 MiB). Raises as <code>parse_fd</code> does, with the path on the <code>OSError</code>.</td>
+<td><code>DomDoc.parse_file(path, policy=None, *, max_bytes=0)</code></td>
+<td>Class method. Open path and parse (fd closed in <code>finally</code>), under the cap of <code>parse_fd</code>. This ceiling is distinct from <code>Reader.read_file</code>'s <code>MAX_FILESIZE_BYTES</code> (16 MiB). Raises as <code>parse_fd</code> does, with the path on the <code>OSError</code>.</td>
 </tr>
 <tr>
 <td><code>doc.parse_error</code></td>
@@ -2220,11 +2336,18 @@ tree; any <code>DomNode</code> derived from it becomes invalid after that point.
 </table>
 <blockquote>
 <p><strong>File-size limits:</strong> <code>DomDoc.parse_fd</code> and <code>DomDoc.parse_file</code> apply an internal
-ceiling of <code>BVN_DOM_FD_MAX_BYTES</code> (256 MiB). This is 16× larger than
-<code>Reader.read_file</code>'s <code>MAX_FILESIZE_BYTES</code> (16 MiB). The C library's
-<code>bvn_dom_parse_fd_ex</code> can lower that ceiling (never raise it), but it is
-C-only — the binding does not wrap it. From Python, to bound the input
-yourself, read at most the bytes you allow and pass them to <code>DomDoc.parse</code>.</p>
+ceiling of <code>BVN_DOM_FD_MAX_BYTES</code> (256 MiB, <code>bovnar.dom.DOM_FD_MAX_BYTES</code>).
+This is 16× larger than <code>Reader.read_file</code>'s <code>MAX_FILESIZE_BYTES</code> (16 MiB).
+<code>max_bytes=</code> lowers it, as the C library's <code>bvn_dom_parse_fd_ex</code> does; there
+is no way to raise it, and no unlimited mode.</p>
+<p><strong>The DOM takes no read options.</strong> The C DOM parse functions read with a
+fixed set (no total cap besides the one above, the 255-level nesting, and the
+reader's defaults for everything else), and neither binding can pass more:
+read with a <code>Reader</code> (§11) or <code>loads</code> for the limits of §11.2.</p>
+<p><strong>No builder.</strong> The C DOM's tree-building calls (<code>bvn_dom_doc_create</code>,
+<code>bvn_dom_node_from_*</code>, <code>bvn_dom_struct_add</code>, …) make a tree that cannot be
+written out and are meant for the library's test fixtures; they are not
+wrapped. Build a document with <code>dumps()</code> or the <code>Writer</code>.</p>
 <p><strong>Errors:</strong> the C fd functions return <code>NULL</code> for an allocation failure, a read
 error and input over the cap alike; the binding tells them apart by <code>errno</code>.
 A read error is the matching <code>OSError</code>, input over the cap is
@@ -2423,7 +2546,9 @@ bench/
 
 <hr />
 <h2 id="16-error-handling">16. Error handling</h2>
-<p>All errors surface as subclasses of <code>BovnarError</code>:</p>
+<p>All errors surface as subclasses of <code>BovnarError</code>. <code>bovnar.error_message(code)</code>
+is the library's text for an <code>ErrorCode</code> (<code>bvn_error_to_string</code>):
+<code>"string_too_long"</code> for <code>ErrorCode.STRING_TOO_LONG</code>.</p>
 <table>
 <thead>
 <tr>
@@ -2447,6 +2572,10 @@ bench/
 <tr>
 <td><code>BovnarArgumentError</code></td>
 <td>Invalid argument passed to a helper (e.g. bad unit string, closed reader/writer)</td>
+</tr>
+<tr>
+<td><code>TypeError</code></td>
+<td>An unknown keyword where read options are taken (<code>max_string_lenght=</code>)</td>
 </tr>
 <tr>
 <td><code>OSError</code></td>
@@ -2909,19 +3038,21 @@ kept spelling or a profile-only unit needs it. The 1.1 features (all gated on a
 <code>#!bovnar 1.1</code> directive — an unversioned document is treated as 1.0) are
 exposed as:</p>
 <ul>
-<li><strong>Version:</strong> <code>bovnar.version()</code> (library version string), <code>bovnar.spec_version()</code>
-  → <code>(major, minor)</code> of the highest spec understood, and
-  <code>bovnar.peek_version(data)</code> → the <code>(major, minor)</code> a document declares, or
-  <code>None</code>. <code>Reader.declared_version</code> gives the same after a read; <code>read_mem</code>/
-  <code>read_fd</code>/<code>read_file</code> accept <code>strict_version=True</code> to reject a too-new version
-  (<code>ErrorCode.UNSUPPORTED_SPEC_VERSION</code>). <code>loads</code> does not take <code>strict_version</code>;
-  use a <code>Reader</code> when you need it.</li>
+<li><strong>Version:</strong> <code>bovnar.version()</code> (library version string),
+  <code>bovnar.version_number()</code> (the same as one int, `major * 10000 + minor * 100</li>
+<li>patch<code>: 20100 for 2.1.0),</code>bovnar.spec_version()<code>→</code>(major, minor)<code>of the highest spec understood, and</code>bovnar.peek_version(data)<code>→ the</code>(major, minor)<code>a document declares, or</code>None<code>.</code>Reader.declared_version<code>gives the same after a read; every reading
+  entry point (</code>read_*<code>,</code>loads<code>, the feeds and stream readers) accepts</code>strict_version=True<code>to reject a too-new version
+  (</code>ErrorCode.UNSUPPORTED_SPEC_VERSION`).</li>
 <li><strong>Richer escapes:</strong> <code>\u{…}</code> and <code>\xHH</code> in string literals are decoded by the C
   reader, so <code>loads</code> returns the resulting text transparently. A surrogate /
   out-of-range <code>\u</code> is <code>ErrorCode.INVALID_CODEPOINT</code>.</li>
 <li><strong>Datetime family:</strong> <code>loads</code> decodes a <code>&lt;datetime:width,epoch&gt;</code> value to a
   plain <code>int</code> (signed epoch seconds). With <code>typed=True</code> it is a <code>Quantity</code> whose
-  <code>.epoch_name</code> (<code>"unix"</code>, <code>"tai"</code>, …) and <code>.epoch_mjd</code> recover the epoch.
+  <code>.epoch_name</code> (<code>"unix"</code>, <code>"tai"</code>, …) and <code>.epoch_mjd</code> recover the epoch;
+  <code>bovnar.datetime_epoch_index(name)</code> goes the other way, to the index a
+  datetime <code>ValueTypeSpec</code> holds in <code>base</code>
+  (<code>make_type_spec(ValueTypeFamily.DATETIME, 64,
+  bovnar.datetime_epoch_index("gps"))</code>), <code>None</code> for an unknown name.
   <code>dumps()</code> emits the <code>&lt;datetime:…&gt;</code> annotation and prepends <code>#!bovnar 1.1</code>
   automatically when the object contains a datetime. With <code>typed=True</code> the
   sub-second fraction of an ISO-8601 literal (spec 1.1) is preserved on the

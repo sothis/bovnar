@@ -381,6 +381,11 @@ class DomNode:
         return f"DomNode(type={self.dom_type.name}, ptr=0x{self._ptr:x})"
 
 
+# BVN_DOM_FD_MAX_BYTES: the input cap of DomDoc.parse_fd / parse_file, which
+# their max_bytes can lower but not raise.
+DOM_FD_MAX_BYTES = 256 * 1024 * 1024
+
+
 class DomDoc:
     """
     Owning wrapper around a bvn_dom_doc_t.  Destruction of this object
@@ -456,25 +461,33 @@ class DomDoc:
         return doc
 
     @classmethod
-    def parse_fd(cls, fd: int, policy=None) -> 'DomDoc':
+    def parse_fd(cls, fd: int, policy=None, *, max_bytes: int = 0) -> 'DomDoc':
         """Parse BVNR from an open file descriptor into a DOM tree.
 
         The whole input is read into memory first. A read error raises the
         matching OSError (EBADF for a bad fd, EISDIR for a directory, ...),
-        input over the 256 MiB cap BovnarParseError(FILE_TOO_LONG), and an
+        input over the cap BovnarParseError(FILE_TOO_LONG), and an
         allocation failure MemoryError; a malformed document raises
         BovnarParseError with its parse code, as :meth:`parse` does.
+
+        ``max_bytes`` lowers the cap of 256 MiB (``DOM_FD_MAX_BYTES``), as
+        ``bvn_dom_parse_fd_ex`` does; ``0``, or anything above 256 MiB, keeps
+        it. There is no unlimited mode.
         """
+        if type(max_bytes) is not int or not 0 <= max_bytes < (1 << 64):
+            raise BovnarArgumentError(
+                f"max_bytes must be an int from 0 to 2**64 - 1, not {max_bytes!r}")
         cp, _keep = cls._c_policy(policy)
         lib = get_library()
         ctypes.set_errno(0)
         if cp is None:
-            ptr = lib.bvn_dom_parse_fd(ctypes.c_int(fd))
+            ptr = lib.bvn_dom_parse_fd_ex(ctypes.c_int(fd),
+                                          ctypes.c_uint64(max_bytes))
         else:
             ptr = lib.bvn_dom_parse_fd_policy(
-                ctypes.c_int(fd), ctypes.c_uint64(0), ctypes.byref(cp))
+                ctypes.c_int(fd), ctypes.c_uint64(max_bytes), ctypes.byref(cp))
         if not ptr:
-            raise cls._fd_failure(fd, ctypes.get_errno())
+            raise cls._fd_failure(fd, ctypes.get_errno(), max_bytes)
         doc = cls(ptr)
         err = doc.parse_error
         if err != ErrorCode.NONE:
@@ -482,15 +495,16 @@ class DomDoc:
         return doc
 
     @staticmethod
-    def _fd_failure(fd: int, err: int) -> BaseException:
+    def _fd_failure(fd: int, err: int, max_bytes: int = 0) -> BaseException:
         """The exception for a NULL from bvn_dom_parse_fd*.
 
         Unlike bvn_dom_parse(), the fd forms return NULL for three different
         failures and no code to tell them apart; errno does. A failed read()
         leaves its errno (EBADF, EISDIR, EIO, ...) and becomes the matching
         OSError subclass; ENOMEM is a MemoryError; no errno at all means the
-        input passed the 256 MiB cap (BVN_DOM_FD_MAX_BYTES), reported as
-        FILE_TOO_LONG -- the code the streaming reader uses for its own cap.
+        input passed the cap (max_bytes, at most BVN_DOM_FD_MAX_BYTES of
+        256 MiB), reported as FILE_TOO_LONG -- the code the streaming reader
+        uses for its own cap.
         """
         import errno as _errno
         import os
@@ -498,24 +512,30 @@ class DomDoc:
             return MemoryError(f"out of memory reading fd {fd} into the DOM")
         if err:
             return OSError(err, f"{os.strerror(err)} (reading fd {fd} into the DOM)")
+        if 0 < max_bytes < DOM_FD_MAX_BYTES:
+            return BovnarParseError(
+                ErrorCode.FILE_TOO_LONG,
+                message=f"fd {fd} holds more than max_bytes={max_bytes}")
         return BovnarParseError(
             ErrorCode.FILE_TOO_LONG,
             message=f"fd {fd} holds more than the DOM's 256 MiB input cap; "
                     f"read it with Reader.read_fd() instead")
 
     @classmethod
-    def parse_file(cls, path: str, policy=None) -> 'DomDoc':
+    def parse_file(cls, path: str, policy=None, *,
+                   max_bytes: int = 0) -> 'DomDoc':
         """Parse a BVNR file by path.
 
         An unreadable path raises the OSError ``os.open``/``read`` gives (a
-        directory is IsADirectoryError); input over the DOM's 256 MiB cap is
-        BovnarParseError(FILE_TOO_LONG). See :meth:`parse_fd`.
+        directory is IsADirectoryError); input over the cap (``max_bytes``,
+        at most the DOM's 256 MiB) is BovnarParseError(FILE_TOO_LONG). See
+        :meth:`parse_fd`.
         """
         import os
         fd = os.open(path, os.O_RDONLY)
         try:
             try:
-                return cls.parse_fd(fd, policy)
+                return cls.parse_fd(fd, policy, max_bytes=max_bytes)
             except OSError as e:
                 if e.filename is None:
                     e.filename = path

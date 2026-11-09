@@ -44,7 +44,9 @@ pub use error::{Error, ErrorKind, Position, Result};
 pub use ffi::ValueTypeSpec;
 pub use quantity::ExactNumber;
 pub use quantity::Quantity;
-pub use reader::{EventData, EventPayload, ReadOptions, Reader, UnitPolicy, UnitRule};
+pub use reader::{
+    EventData, EventPayload, ReadHandlers, ReadOptions, Reader, UnitPolicy, UnitRule,
+};
 pub use unit::{MAX_UNIT_COMPONENTS, Unit, UnitComponent};
 pub use writer::{Base, EmitSpec, Signedness, Writer};
 
@@ -85,6 +87,22 @@ pub enum Value {
 /// The library version, e.g. `"2.0.2"`.
 pub fn version() -> String {
     ffi::version_string()
+}
+
+/// The library version as one number, `major * 10000 + minor * 100 +
+/// patch` (`bvnr_version`): 20100 for 2.1.0, for comparing against a
+/// minimum.
+pub fn version_number() -> u32 {
+    ffi::version_number()
+}
+
+/// The index of the datetime epoch called `name` (`"unix"`, `"tai"`,
+/// `"gps"`, `"mjd"`, `"ntp"`, `"galileo"`, `"glonass"`, `"y2000"`,
+/// `"beidou"`): what a datetime [`ValueTypeSpec`] holds in `base`
+/// (`bvnr_datetime_epoch_index`). `""` is unix, 0; `None` is a name the
+/// library does not know. The inverse is [`Quantity::epoch_name`].
+pub fn datetime_epoch_index(name: &str) -> Option<u32> {
+    ffi::datetime_epoch_index(name)
 }
 
 /// The newest format version the library implements, as `(major, minor)`.
@@ -131,16 +149,33 @@ pub fn parse_typed_reader(input: impl std::io::Read) -> Result<Value> {
     parse_input(input, true)
 }
 
-fn parse_with(data: &[u8], typed: bool) -> Result<Value> {
+/// [`parse`], or with `typed` [`parse_typed`], under `options`: the
+/// limits, `strict_version`, `text_only` and `continue_on_error` of
+/// [`ReadOptions`], which `parse` leaves at their defaults.
+pub fn parse_with_options(data: &[u8], typed: bool, options: &ReadOptions) -> Result<Value> {
     collect(typed, |r, on_event| {
-        r.read_mem(data, &ReadOptions::default(), Some(on_event), None)
+        r.read_mem(data, options, Some(on_event), None)
     })
 }
 
-fn parse_input(input: impl std::io::Read, typed: bool) -> Result<Value> {
+/// [`parse_reader`], or with `typed` [`parse_typed_reader`], under
+/// `options`, as [`parse_with_options`].
+pub fn parse_reader_with_options(
+    input: impl std::io::Read,
+    typed: bool,
+    options: &ReadOptions,
+) -> Result<Value> {
     collect(typed, |r, on_event| {
-        r.read_reader(input, &ReadOptions::default(), Some(on_event), None)
+        r.read_reader(input, options, Some(on_event), None)
     })
+}
+
+fn parse_with(data: &[u8], typed: bool) -> Result<Value> {
+    parse_with_options(data, typed, &ReadOptions::default())
+}
+
+fn parse_input(input: impl std::io::Read, typed: bool) -> Result<Value> {
+    parse_reader_with_options(input, typed, &ReadOptions::default())
 }
 
 /// The value of the document `read` reads with a fresh reader, delivering

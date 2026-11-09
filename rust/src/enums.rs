@@ -194,6 +194,12 @@ pub enum ErrorCode {
 }
 
 impl ErrorCode {
+    /// The library's text for this code (`bvn_error_to_string`), such as
+    /// `"unexpected_input_byte"`.
+    pub fn name(self) -> &'static str {
+        crate::ffi::error_name(self as i32)
+    }
+
     /// The variant for a raw C value, or `None` for a value this binding
     /// does not know.
     pub fn from_raw(raw: i32) -> Option<Self> {

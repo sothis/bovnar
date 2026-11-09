@@ -65,11 +65,11 @@ from ._fileio import PullSource, PushSink, is_stream
 from .enums import ErrorCode, Event
 from .exceptions import BovnarParseError, BovnarWriteError, BovnarArgumentError
 from .structs import (
-    BvnrSink, BvnrSource, BvnrReadFlags, BvnrDocStreamOpts, BvnrData,
+    BvnrSink, BvnrSource, BvnrDocStreamOpts, BvnrData,
     BvnrDemuxItem,
     EVENT_CALLBACK_FUNC, ON_DOCUMENT_FUNC, MUX_ON_MSG_FUNC, ON_ERROR_FUNC,
 )
-from .reader import Reader, _read_limit
+from .reader import Reader, read_flags
 from .writer import Writer
 
 # Mirrors of the C constants (bovnar.h / bovnar_stream.h).
@@ -180,7 +180,8 @@ def load_documents(data,
                    *,
                    typed: bool = False,
                    continue_past_failed: bool = False,
-                   max_document_size: int = 0) -> list:
+                   max_document_size: int = 0,
+                   **options) -> list:
     """Parse a frame stream into a list of documents (one dict per frame).
 
     With ``continue_past_failed=False`` (default) the first malformed document
@@ -193,9 +194,15 @@ def load_documents(data,
     pulled, each gathered whole first (up to ``max_document_size``), never the
     stream. For a stream that does not end, or to stream each frame's payload
     into the parser as it arrives, use :class:`FrameFeed`.
+
+    Each document is read under the read options of :meth:`Reader.read_mem`
+    (:data:`bovnar.reader.READ_OPTIONS`): ``max_file_size`` caps one document,
+    ``max_text_bytes``, ``strict_version``, ``text_only`` and the rest apply
+    as there.
     """
     from . import _DictParser, _TypedDictParser  # deferred (import cycle)
     lib  = get_library()
+    flags = read_flags('load_documents', options)
     source = PullSource(data) if is_stream(data) else None
     if source is None:
         data = _as_bytes(data)
@@ -229,12 +236,7 @@ def load_documents(data,
             return False
     cb_doc = ON_DOCUMENT_FUNC(_c_on_doc)
 
-    flags = BvnrReadFlags()
-    flags.max_file_size      = BVNR_FILESIZE_UNLIMITED
-    flags.max_array_nesting  = 255
-    flags.max_struct_nesting = 255
     flags.on_verified        = cb_event
-    flags.continue_on_error  = False               # strict per-document parsing
 
     opts = BvnrDocStreamOpts()
     opts.flags                = ctypes.pointer(flags)
@@ -403,7 +405,8 @@ def _mux_open(w: Writer, key: bytes, preamble: dict | None) -> None:
         w._raise_error()
 
 
-def mux_load(data, *, max_message: int = 0, key: str | None = None) -> list:
+def mux_load(data, *, max_message: int = 0, key: str | None = None,
+             **options) -> list:
     """Demultiplex an octet-stream document, returning a list of
     ``(channel:int, payload:bytes)`` in arrival order.
 
@@ -415,8 +418,13 @@ def mux_load(data, *, max_message: int = 0, key: str | None = None) -> list:
     ``data`` may also be a socket or a binary file object, read until it
     reports end of input and demultiplexed as it is pulled. For a stream that
     does not end, or to read the values around the mux stream, use
-    :class:`DemuxFeed`."""
+    :class:`DemuxFeed`.
+
+    The document is read under the read options of :meth:`Reader.read_mem`
+    (:data:`bovnar.reader.READ_OPTIONS`); ``max_file_size`` caps it (``0``,
+    the default: no cap)."""
     lib  = get_library()
+    flags = read_flags('mux_load', options)
     source = PullSource(data) if is_stream(data) else None
     if source is None:
         data = _as_bytes(data)
@@ -452,11 +460,6 @@ def mux_load(data, *, max_message: int = 0, key: str | None = None) -> list:
         def _trampoline(_ud, ev, dptr):
             return lib.bvnr_demux_on_event(dm, ev, dptr)
         cb_ev = EVENT_CALLBACK_FUNC(_trampoline)
-
-        flags = BvnrReadFlags()
-        flags.max_file_size      = BVNR_FILESIZE_UNLIMITED
-        flags.max_array_nesting  = 255
-        flags.max_struct_nesting = 255
         flags.on_verified        = cb_ev
 
         if source is not None:
@@ -551,10 +554,13 @@ def embed_document(inner, *, key: str = 'payload', pretty: bool = True,
             w.destroy()
 
 
-def parse_embedded(inner, *, typed: bool = False) -> dict:
+def parse_embedded(inner, *, typed: bool = False, **options) -> dict:
     """Parse an embedded document's bytes (as extracted from an octet stream)
-    into a dict — a thin wrapper over the C ``bvnr_parse_embedded``."""
+    into a dict — a thin wrapper over the C ``bvnr_parse_embedded``. The
+    keywords besides ``typed`` are the read options of :meth:`Reader.read_mem`
+    (:data:`bovnar.reader.READ_OPTIONS`)."""
     from . import _DictParser, _TypedDictParser  # deferred (import cycle)
+    flags  = read_flags('parse_embedded', options)
     lib    = get_library()
     inner  = _as_bytes(inner)
     parser = _TypedDictParser() if typed else _DictParser()
@@ -565,20 +571,16 @@ def parse_embedded(inner, *, typed: bool = False) -> dict:
     # hit is gone by the time it returns -- and every failure used to be
     # reported as GOT_INCOMPLETE_BVNR_STREAM, an unexpected byte included. The
     # reader does tell its on_error hook what went wrong and where; that is the
-    # only place the code survives, so it is caught there. The first report is
-    # the one that stopped the parse.
+    # only place the code survives, so it is caught there. The last report is
+    # the one that stopped the parse (under continue_on_error the ones before
+    # it were recovered from).
     seen: list = []
 
     def _on_error(_ud, err, line, column, byte, offset):
-        if not seen:
-            seen.append((int(err), int(line), int(column), int(offset),
-                         int(byte)))
+        seen[:] = [(int(err), int(line), int(column), int(offset),
+                    int(byte))]
     cb_err = ON_ERROR_FUNC(_on_error)
 
-    flags = BvnrReadFlags()
-    flags.max_file_size      = BVNR_FILESIZE_UNLIMITED
-    flags.max_array_nesting  = 255
-    flags.max_struct_nesting = 255
     flags.on_verified        = cb
     flags.on_error           = cb_err
 
@@ -709,17 +711,6 @@ def _held_bytes(data) -> bytes:
     except TypeError:
         raise BovnarArgumentError(
             f"feed() takes a bytes-like object, not {type(data).__name__}") from None
-
-
-def _flags_255(max_file_size: int, max_text_bytes: int = 0,
-               max_array_items: int = 0) -> BvnrReadFlags:
-    flags = BvnrReadFlags()
-    flags.max_file_size      = max_file_size
-    flags.max_text_bytes     = _read_limit('max_text_bytes', max_text_bytes)
-    flags.max_array_items    = _read_limit('max_array_items', max_array_items)
-    flags.max_array_nesting  = 255
-    flags.max_struct_nesting = 255
-    return flags
 
 
 class _Feed:
@@ -902,11 +893,13 @@ class DocumentFeed(_Feed):
     ``BovnarParseError`` for a document cut off part-way, as ``Reader`` does.
     Any other error raises from the ``feed()`` whose bytes hit it, with the
     position the reader reports, and the items that call had completed are
-    dropped. An exception from ``want_unit`` is re-raised unchanged; it runs
-    inside the C call, so it may not close or feed this feed. The keyword
-    options are the reading options of :meth:`Reader.read_mem` (not its
-    callbacks: the items stand in for them). ``typed`` applies to
-    ``values=True``. One feed reads one document.
+    dropped. An exception from ``want_unit`` or ``on_error`` is re-raised
+    unchanged; they run inside the C call, so they may not close or feed this
+    feed. The keyword options are the reading options of
+    :meth:`Reader.read_mem` (:data:`bovnar.reader.READ_OPTIONS`), with its
+    ``want_unit`` and ``on_error`` but not its event callbacks: the items
+    stand in for them. ``typed`` applies to ``values=True``. One feed reads
+    one document.
 
     The text of a document is capped at 2147483647 bytes
     (``TEXT_DATA_TOO_LONG``) and an array at as many items
@@ -920,15 +913,9 @@ class DocumentFeed(_Feed):
                  events: bool = True,
                  values: bool = False,
                  typed: bool = False,
-                 max_file_size: int = 0,
-                 continue_on_error: bool = False,
-                 strict_version: bool = False,
-                 text_only: bool = False,
                  want_unit=None,
-                 want_unit_allow_nonterminating: bool = False,
-                 max_conversion_length: int = 0,
-                 max_text_bytes: int = 0,
-                 max_array_items: int = 0) -> None:
+                 on_error=None,
+                 **options) -> None:
         super().__init__()
         self._busy   = False
         if typed and not values:
@@ -940,10 +927,8 @@ class DocumentFeed(_Feed):
         self._events = events
         self._parser = _top_level_parser(typed) if values else None
         self._flags, self._cb_refs = self._reader._build_flags(
-            self._on_event, None, max_file_size, continue_on_error,
-            strict_version, text_only, want_unit,
-            want_unit_allow_nonterminating, max_conversion_length,
-            max_text_bytes=max_text_bytes, max_array_items=max_array_items)
+            'DocumentFeed', self._on_event, None, want_unit, on_error,
+            options)
         if not self._lib.bvnr_open_read_feed(self._reader._ptr, None,
                                              ctypes.byref(self._flags)):
             self._reader._raise_error()
@@ -1045,8 +1030,11 @@ class FrameFeed(_Feed):
       ``None`` for a failed document), each payload streamed into one reused
       reader as it arrives, so a frame is never held whole.
 
-    ``max_text_bytes`` and ``max_array_items`` apply to each parsed document,
-    as for :class:`DocumentFeed`. ``max_document_size`` is that of
+    The read options of :meth:`Reader.read_mem`
+    (:data:`bovnar.reader.READ_OPTIONS`: ``max_text_bytes``,
+    ``max_array_items``, ``strict_version``, ``text_only`` and the rest) apply
+    to each parsed document, as for :class:`DocumentFeed`; ``max_file_size``
+    caps one document. ``max_document_size`` is that of
     :func:`load_documents` (``0`` selects
     ``BVNR_DOC_DEFAULT_MAX``). A failed document (without
     ``continue_past_failed``) raises ``BovnarParseError`` with its own code, as
@@ -1065,8 +1053,7 @@ class FrameFeed(_Feed):
                  continue_past_failed: bool = False,
                  max_document_size: int = 0,
                  view: bool = False,
-                 max_text_bytes: int = 0,
-                 max_array_items: int = 0) -> None:
+                 **options) -> None:
         super().__init__()
         self._fr     = None
         self._fed    = None
@@ -1074,11 +1061,14 @@ class FrameFeed(_Feed):
         self._as_view = view
         self._continue = continue_past_failed
         lib = self._lib
+        # The read options are checked whether or not they apply, so a typo
+        # is a TypeError in either mode.
+        read_flags('FrameFeed', options)
         if not parse:
-            if typed or continue_past_failed or max_text_bytes or max_array_items:
+            if typed or continue_past_failed or any(options.values()):
                 raise BovnarArgumentError(
-                    "typed, continue_past_failed, max_text_bytes and "
-                    "max_array_items apply to parse=True")
+                    "typed, continue_past_failed and the read options "
+                    "apply to parse=True")
             self._fr = lib.bvnr_frame_reader_create_pull(max_document_size)
             if not self._fr:
                 raise MemoryError("bvnr_frame_reader_create_pull() returned NULL")
@@ -1116,10 +1106,10 @@ class FrameFeed(_Feed):
 
         self._cb_event = Reader._wrap_callback(on_event)
         self._cb_doc   = ON_DOCUMENT_FUNC(on_document)
-        flags = _flags_255(BVNR_FILESIZE_UNLIMITED, max_text_bytes,
-                           max_array_items)
+        # Each document is read under these options (max_file_size caps one
+        # document, not the stream; max_document_size bounds a frame).
+        flags = read_flags('FrameFeed', options)
         flags.on_verified       = self._cb_event
-        flags.continue_on_error = False            # strict per-document parsing
         opts = BvnrDocStreamOpts()
         opts.flags                = ctypes.pointer(flags)
         opts.on_document          = self._cb_doc
@@ -1259,9 +1249,13 @@ class DemuxFeed(_Feed):
     4096-channel limit and every error are those of :func:`mux_load`, raised
     as the same ``BovnarParseError`` codes, from the iteration that reaches
     them (the items before them come out first), or from ``finish()``.
-    ``max_file_size`` caps the document (``0``: no cap); ``max_text_bytes``
-    and ``max_array_items`` are those of :class:`DocumentFeed`, for the values
-    around the stream.
+    The read options of :meth:`Reader.read_mem`
+    (:data:`bovnar.reader.READ_OPTIONS`) apply to the document:
+    ``max_file_size`` caps it (``0``: no cap), and ``max_text_bytes``,
+    ``max_array_items``, ``continue_on_error``, ``strict_version``,
+    ``text_only`` and the rest are those of :class:`DocumentFeed`, for the
+    values around the stream. ``recovery_count``, ``skipped_bytes`` and
+    ``declared_version`` are those of the demux's reader.
 
     The fed bytes are referenced until the feed is drained (iterated until it
     stops), and feeding again before that raises ``BovnarArgumentError``. A
@@ -1288,11 +1282,10 @@ class DemuxFeed(_Feed):
                  events: bool = False,
                  typed: bool = False,
                  view: bool = False,
-                 max_file_size: int = 0,
-                 max_text_bytes: int = 0,
-                 max_array_items: int = 0) -> None:
+                 **options) -> None:
         super().__init__()
         self._dm = None
+        flags = read_flags('DemuxFeed', options)
         if typed and not values:
             raise BovnarArgumentError("typed applies to values=True")
         lib = self._lib
@@ -1303,7 +1296,6 @@ class DemuxFeed(_Feed):
         self._key = _filter_key(key)
         if self._key is not None and not lib.bvnr_demux_set_key(dm, self._key):
             raise MemoryError("bvnr_demux_set_key() failed")
-        flags = _flags_255(max_file_size, max_text_bytes, max_array_items)
         if not lib.bvnr_demux_open_feed(dm, ctypes.byref(flags),
                                         values or events):
             raise MemoryError("bvnr_demux_open_feed() failed")
@@ -1429,6 +1421,30 @@ class DemuxFeed(_Feed):
         lib = self._lib
         raise _demux_error(lib, lib.bvnr_demux_error(self._dm),
                            lib.bvnr_demux_get_reader(self._dm))
+
+    def _demux_reader(self):
+        if not self._dm:
+            raise BovnarArgumentError("DemuxFeed has been closed")
+        return self._lib.bvnr_demux_get_reader(self._dm)
+
+    @property
+    def recovery_count(self) -> int:
+        """How often a ``continue_on_error`` read of the document recovered."""
+        return self._lib.bvnr_reader_get_recovery_count(self._demux_reader())
+
+    @property
+    def skipped_bytes(self) -> int:
+        """Bytes a recovering read of the document discarded."""
+        return self._lib.bvnr_reader_get_skipped_bytes(self._demux_reader())
+
+    @property
+    def declared_version(self):
+        """The ``#!bovnar M.N`` the document declared, or ``None``."""
+        maj, mn = ctypes.c_uint16(0), ctypes.c_uint16(0)
+        if self._lib.bvnr_reader_get_declared_version(
+                self._demux_reader(), ctypes.byref(maj), ctypes.byref(mn)):
+            return (maj.value, mn.value)
+        return None
 
     def finish(self) -> 'DemuxFeed':
         """Declare the end of the document and return the feed, iterating over

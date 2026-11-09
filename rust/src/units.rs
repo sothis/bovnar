@@ -208,6 +208,41 @@ pub fn convert_value(value: f64, from: &Unit, to: &Unit) -> Result<f64> {
         .ok_or_else(|| Error::argument(format!("cannot convert a value from {from} to {to}")))
 }
 
+/// `value` in `from` converted to `to` EXACTLY, by the arbitrary-precision
+/// engine behind the reader's `want_unit` hook
+/// (`bvn_unit_convert_rational`). The `bool` is false when the true factor
+/// between the units is irrational (a π-based angle such as ° to rad): the
+/// result is then only an approximation, which a lossless consumer must
+/// refuse. An error for incompatible or invalid units, and for a value or
+/// result past the library's 32768-bit bignums.
+pub fn convert_rational(
+    value: &num_rational::BigRational,
+    from: &Unit,
+    to: &Unit,
+) -> Result<(num_rational::BigRational, bool)> {
+    use num_bigint::BigInt;
+    let (num, den, exact) = unit_fns::convert_rational(
+        &value.numer().to_string(),
+        &value.denom().to_string(),
+        from.0,
+        to.0,
+    )
+    .ok_or_else(|| {
+        Error::argument(format!(
+            "cannot convert a value exactly from {from} to {to}: incompatible units, \
+             or a value past 32768 bits"
+        ))
+    })?;
+    let parse = |t: &str| {
+        t.parse::<BigInt>()
+            .map_err(|e| Error::argument(e.to_string()))
+    };
+    Ok((
+        num_rational::BigRational::new(parse(&num)?, parse(&den)?),
+        exact,
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

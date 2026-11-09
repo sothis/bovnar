@@ -28,11 +28,34 @@ pub struct ReadOptions {
     pub strict_version: bool,
     /// Refuse a document containing an octet stream.
     pub text_only: bool,
-    /// Let a `want_unit` conversion deliver a non-terminating expansion as
-    /// a rounded literal (its exact `num/den` stays available in C).
+    /// Let a `want_unit` conversion whose result has no terminating
+    /// expansion in the output base through instead of failing the read: it
+    /// arrives with `converted` set, an empty `converted_text`, and the exact
+    /// value in [`EventData::converted_rational`].
     pub want_unit_allow_nonterminating: bool,
     /// Longest converted literal; 0 is the library default.
     pub max_conversion_length: u32,
+    /// Longest key, in bytes; 0 is the library default of 255. A longer one
+    /// fails with `identifier_too_long`.
+    pub max_identifier_length: u16,
+    /// Longest string value, in bytes; 0 is the library default of 65 535
+    /// (`string_too_long`).
+    pub max_string_length: u16,
+    /// Longest number literal, in bytes; 0 is the library default of 65 535
+    /// (`number_too_long`).
+    pub max_number_length: u16,
+    /// Longest symbol, in bytes; 0 is the library default of 255
+    /// (`symbol_too_long`).
+    pub max_symbol_length: u16,
+    /// Longest reference, in bytes; 0 is the library default of 65 535
+    /// (`reference_too_long`).
+    pub max_reference_length: u16,
+    /// Deepest struct nesting; 0 is 255, the format's limit and what the DOM
+    /// and the CLI read at (the C reader's own default is 64).
+    pub max_struct_nesting: u8,
+    /// Deepest array nesting; 0 is 255, as for
+    /// [`max_struct_nesting`](Self::max_struct_nesting).
+    pub max_array_nesting: u8,
 }
 
 /// A rule about one field, named by its dotted key path (`".a.b"`, or
@@ -381,10 +404,17 @@ impl ReadOptions {
         flags.max_file_size = self.max_file_size;
         flags.max_text_bytes = self.max_text_bytes;
         flags.max_array_items = self.max_array_items;
+        flags.max_identifier_length = self.max_identifier_length;
+        flags.max_string_length = self.max_string_length;
+        flags.max_number_length = self.max_number_length;
+        flags.max_symbol_length = self.max_symbol_length;
+        flags.max_reference_length = self.max_reference_length;
         // A Reader opens at the 255-level cap in both directions, like the
-        // CLI and the DOM; zero would select the C default of 64.
-        flags.max_struct_nesting = 255;
-        flags.max_array_nesting = 255;
+        // CLI and the DOM, unless told otherwise; zero would select the C
+        // default of 64.
+        let nesting = |n: u8| if n == 0 { 255 } else { n };
+        flags.max_struct_nesting = nesting(self.max_struct_nesting);
+        flags.max_array_nesting = nesting(self.max_array_nesting);
         flags.continue_on_error = self.continue_on_error;
         flags.strict_version = self.strict_version;
         flags.text_only = self.text_only;
@@ -406,6 +436,28 @@ pub type WantUnit<'h> = &'h mut dyn FnMut(&EventData<'_>) -> Option<(Unit, u32)>
 
 /// A handler for reader events; returning false stops the read.
 pub type EventHandler<'h> = &'h mut dyn FnMut(&EventData<'_>) -> bool;
+
+/// A handler for the reader's errors (`bvnr_read_flags_t.on_error`): each
+/// is an [`Error::Parse`] with its position. Under
+/// [`ReadOptions::continue_on_error`] it is called for every error the
+/// reader recovers from, the only place those are reported; the error that
+/// ends a read comes here too before the read returns it.
+pub type ErrorHandler<'h> = &'h mut dyn FnMut(&Error);
+
+/// Every handler a read can take, for [`Reader::read_mem_with`] and
+/// [`Reader::read_reader_with`]; each one is optional.
+#[derive(Default)]
+pub struct ReadHandlers<'h> {
+    /// Each event the validator accepted.
+    pub on_verified: Option<EventHandler<'h>>,
+    /// Each raw lexer event, before validation.
+    pub on_unverified: Option<EventHandler<'h>>,
+    /// The unit (and base) each numeric value is delivered in, as for
+    /// [`Reader::read_mem_want_unit`].
+    pub want_unit: Option<WantUnit<'h>>,
+    /// Each error, recovered or not.
+    pub on_error: Option<ErrorHandler<'h>>,
+}
 
 /// A streaming BVNR reader.
 pub struct Reader {
@@ -501,6 +553,29 @@ impl Reader {
         )
     }
 
+    /// [`Reader::read_mem`] with any set of [`ReadHandlers`]: `want_unit`
+    /// beside `on_unverified`, and the `on_error` handler that sees each
+    /// error a `continue_on_error` read recovers from.
+    pub fn read_mem_with(
+        &mut self,
+        data: &[u8],
+        options: &ReadOptions,
+        handlers: ReadHandlers<'_>,
+    ) -> Result<()> {
+        self.read_handlers(Input::Mem(data), options, handlers)
+    }
+
+    /// [`Reader::read_mem_with`] over any [`std::io::Read`]. Reads `input`
+    /// as [`Reader::read_reader`] does.
+    pub fn read_reader_with(
+        &mut self,
+        mut input: impl std::io::Read,
+        options: &ReadOptions,
+        handlers: ReadHandlers<'_>,
+    ) -> Result<()> {
+        self.read_handlers(Input::Read(&mut input), options, handlers)
+    }
+
     /// Installs a unit policy for every following read; `None` clears it.
     pub fn set_unit_policy(&mut self, policy: Option<&UnitPolicy>) -> Result<()> {
         if let Some(p) = policy {
@@ -545,6 +620,30 @@ impl Reader {
         on_unverified: Option<EventHandler<'h>>,
         want_unit: Option<WantUnit<'h>>,
     ) -> Result<()> {
+        self.read_handlers(
+            input,
+            options,
+            ReadHandlers {
+                on_verified,
+                on_unverified,
+                want_unit,
+                on_error: None,
+            },
+        )
+    }
+
+    fn read_handlers(
+        &mut self,
+        input: Input<'_>,
+        options: &ReadOptions,
+        handlers: ReadHandlers<'_>,
+    ) -> Result<()> {
+        let ReadHandlers {
+            on_verified,
+            on_unverified,
+            want_unit,
+            on_error,
+        } = handlers;
         let flags = options.flags();
         let mut verified = on_verified.map(wrap);
         let mut unverified = on_unverified.map(wrap);
@@ -554,10 +653,14 @@ impl Reader {
                 f(&d).map(|(u, base)| (u.0, base))
             }
         });
+        let mut errors = on_error.map(wrap_error);
         let mut handlers = ffi::Handlers {
             verified: verified.as_mut().map(|f| f as ffi::Handler<'_>),
             unverified: unverified.as_mut().map(|f| f as ffi::Handler<'_>),
             want_unit: want.as_mut().map(|f| f as ffi::WantUnit<'_>),
+            on_error: errors
+                .as_mut()
+                .map(|f| f as &mut dyn FnMut(i32, u64, u64, u32, u64)),
             ..ffi::Handlers::default()
         };
         let handle = &mut self.handle;
@@ -610,6 +713,18 @@ impl Reader {
         self.handle.error().line
     }
 
+    /// Where the last error was: line, character column, byte offset and
+    /// the offending byte, all 0 after a clean read.
+    pub fn error_position(&self) -> Position {
+        let e = self.handle.error();
+        Position {
+            line: e.line,
+            column: e.column,
+            offset: e.offset,
+            byte: e.byte,
+        }
+    }
+
     fn error(&self) -> Error {
         reader_error(self.handle.error())
     }
@@ -625,6 +740,22 @@ pub(crate) fn reader_error(e: ffi::ReaderError) -> Error {
             offset: e.offset,
             byte: e.byte,
         }),
+    }
+}
+
+/// Adapts a public error handler to the raw (code, line, column, byte,
+/// offset) the FFI layer reports.
+pub(crate) fn wrap_error<'h>(f: ErrorHandler<'h>) -> impl FnMut(i32, u64, u64, u32, u64) + 'h {
+    move |code, line, column, byte, offset| {
+        f(&Error::Parse {
+            code,
+            position: Some(Position {
+                line,
+                column,
+                offset,
+                byte,
+            }),
+        })
     }
 }
 

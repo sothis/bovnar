@@ -39,7 +39,8 @@ from .exceptions import (
     BovnarError, BovnarLibraryNotFound,
     BovnarParseError, BovnarWriteError, BovnarArgumentError,
 )
-from .reader   import Reader, EventPayload, UnitPolicy, UnitRule, MAX_FILESIZE_BYTES
+from .reader   import (Reader, EventPayload, UnitPolicy, UnitRule,
+                       MAX_FILESIZE_BYTES, READ_OPTIONS)
 from .writer   import Writer
 from .dom      import DomDoc, DomNode, DomType
 from .quantity import Quantity
@@ -55,7 +56,7 @@ from .units   import (
     unit_dimension_vector, unit_reduce,
     unit_to_str_ex,
     exponent_to_int, int_to_exponent,
-    convert_value,
+    convert_value, convert_rational,
 )
 from . import currency
 from . import stream
@@ -73,7 +74,8 @@ from ._bigint import (int_from_text as _int_from_text,
 __all__ = [
     'BvnFloat',
     'loads', 'dumps', 'load', 'dump', 'dom_parse',
-    'version', 'spec_version', 'peek_version',
+    'version', 'version_number', 'spec_version', 'peek_version',
+    'datetime_epoch_index', 'error_message',
     'currency', 'stream',
     'unit_factor', 'unit_to_str', 'parse_unit',
     'Unit',
@@ -106,7 +108,7 @@ __all__ = [
     'unit_dimension_vector', 'unit_reduce',
     'unit_to_str_ex',
     'exponent_to_int', 'int_to_exponent',
-    'convert_value',
+    'convert_value', 'convert_rational',
 
     'to_pint', 'to_pint_unit', 'from_pint', 'from_pint_unit',
     'to_numpy', 'to_pint_array', 'from_numpy', 'from_pint_array', 'array_to_bvnr',
@@ -114,7 +116,7 @@ __all__ = [
     'BovnarError', 'BovnarLibraryNotFound',
     'BovnarParseError', 'BovnarWriteError', 'BovnarArgumentError',
 
-    'MAX_FILESIZE_BYTES',
+    'MAX_FILESIZE_BYTES', 'READ_OPTIONS',
 ]
 
 __version__ = '2.0.2'
@@ -124,6 +126,39 @@ def version() -> str:
     """Runtime library version string of the loaded shared library."""
     from ._ffi import get_library
     return get_library().bvnr_version_string().decode('ascii')
+
+
+def version_number() -> int:
+    """The loaded library's version as one int, ``major * 10000 + minor *
+    100 + patch`` (``bvnr_version``, the runtime ``BVNR_VERSION``): 20100 for
+    2.1.0, for comparing against a minimum."""
+    from ._ffi import get_library
+    return int(get_library().bvnr_version())
+
+
+def datetime_epoch_index(name: str) -> int | None:
+    """The index of the datetime epoch called ``name`` (``"unix"``,
+    ``"tai"``, ``"gps"``, ``"mjd"``, ``"ntp"``, ``"galileo"``, ``"glonass"``,
+    ``"y2000"``, ``"beidou"``) -- what a datetime :class:`ValueTypeSpec`
+    stores in ``base``, as in ``make_type_spec(ValueTypeFamily.DATETIME, 64,
+    datetime_epoch_index("gps"))`` -- or ``None`` for a name the library does
+    not know (``bvnr_datetime_epoch_index``). ``""`` is unix, index 0. The
+    inverse is :attr:`Quantity.epoch_name`."""
+    from ._ffi import get_library
+    if not isinstance(name, str) or '\0' in name:
+        raise BovnarArgumentError(f"an epoch name is a str without NUL, not {name!r}")
+    idx = get_library().bvnr_datetime_epoch_index(name.encode('utf-8'))
+    return None if idx < 0 else int(idx)
+
+
+def error_message(code) -> str:
+    """The library's text for an error code (an :class:`ErrorCode` or its
+    int), as ``bvn_error_to_string`` gives it: ``"string_too_long"`` for
+    ``ErrorCode.STRING_TOO_LONG``. A code the library does not know gives its
+    own placeholder text."""
+    from ._ffi import get_library
+    msg = get_library().bvn_error_to_string(int(code))
+    return msg.decode('utf-8') if msg else ''
 
 
 def spec_version() -> tuple[int, int]:
@@ -152,8 +187,7 @@ def peek_version(data: bytes | bytearray | str | memoryview):
 def loads(data: bytes | bytearray | str | memoryview,
           *,
           typed: bool = False,
-          max_file_size: int = 0,
-          continue_on_error: bool = False) -> dict:
+          **options) -> dict:
     """Parse a BVNR document into a dict.
 
     With ``typed=True`` each scalar is returned as a :class:`Quantity` (its
@@ -167,25 +201,26 @@ def loads(data: bytes | bytearray | str | memoryview,
     matrix rectangularity. A document that ``bovnar validate`` (the CLI) or
     :func:`dom_parse` would reject for one of those can still load here, mirroring
     the C streaming reader. Use :func:`dom_parse` when you need full validation.
+
+    The other keywords are the read options of :meth:`Reader.read_mem`
+    (:data:`bovnar.reader.READ_OPTIONS`): ``max_file_size``,
+    ``continue_on_error``, ``strict_version``, ``text_only``, the text, array,
+    length and nesting limits.
     """
+    from .reader import read_flags
+    read_flags('loads', options)        # a bad keyword names loads()
     if isinstance(data, str):
         data = data.encode('utf-8')
     parser = _TypedDictParser() if typed else _DictParser()
     with Reader() as r:
-        r.read_mem(
-            data,
-            on_verified=parser.on_event,
-            max_file_size=max_file_size,
-            continue_on_error=continue_on_error,
-        )
+        r.read_mem(data, on_verified=parser.on_event, **options)
     return parser.result()
 
 
 def load(stream,
          *,
          typed: bool = False,
-         max_file_size: int = 0,
-         continue_on_error: bool = False) -> dict:
+         **options) -> dict:
     """Parse a BVNR document read from a socket or a binary file object.
 
     :func:`loads` for a stream: the same options and the same result, but the
@@ -193,14 +228,11 @@ def load(stream,
     (see :meth:`Reader.read_stream`). The document ends where the object
     reports end of input. An exception the object raises is re-raised as it is.
     """
+    from .reader import read_flags
+    read_flags('load', options)         # a bad keyword names load()
     parser = _TypedDictParser() if typed else _DictParser()
     with Reader() as r:
-        r.read_stream(
-            stream,
-            on_verified=parser.on_event,
-            max_file_size=max_file_size,
-            continue_on_error=continue_on_error,
-        )
+        r.read_stream(stream, on_verified=parser.on_event, **options)
     return parser.result()
 
 
@@ -1448,8 +1480,9 @@ def _emit_octets(w: Writer, payload: bytes) -> None:
 _BAD_TEXT_RX = _re.compile('[\x00-\x08\x0e-\x1f\x7f]')
 
 # The reader's default max_identifier_length (bvn_val_impl.h), which loads(),
-# dom_parse() and `bovnar validate` all read with and which Python has no knob
-# for. The writer itself takes keys up to 65 535 bytes.
+# dom_parse() and `bovnar validate` all read with unless told otherwise (the
+# max_identifier_length read option). The writer itself takes keys up to
+# 65 535 bytes.
 _MAX_KEY_BYTES = 255
 
 

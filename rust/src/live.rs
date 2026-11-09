@@ -843,6 +843,25 @@ impl Demux {
         }
     }
 
+    /// The `#!bovnar M.N` directive of the current document, once read.
+    pub fn declared_version(&self) -> Option<(u16, u16)> {
+        self.handle
+            .reader_counters()
+            .and_then(|c| c.declared_version)
+    }
+
+    /// How many errors a `continue_on_error` document recovered from.
+    pub fn recovery_count(&self) -> u64 {
+        self.handle
+            .reader_counters()
+            .map_or(0, |c| c.recovery_count)
+    }
+
+    /// How many input bytes a `continue_on_error` document skipped.
+    pub fn skipped_bytes(&self) -> u64 {
+        self.handle.reader_counters().map_or(0, |c| c.skipped_bytes)
+    }
+
     /// Starts the next document: the channel buffers are kept; the channel
     /// ids (and with them the 4096-channel count), the error and all progress
     /// are reset.

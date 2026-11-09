@@ -197,26 +197,77 @@ API and implements spec 1.2.
   `on_document` veto, or a failed document's own code. An export-only ABI
   addition; `bovnar frames list` names the error with it.
 
+- **C API the bindings could not reach.** From the same review:
+  - *Both:* the cap on a DOM parse from a stream (`bvn_dom_parse_fd_ex`):
+    `DomDoc.parse_fd` / `parse_file(..., max_bytes=)` in Python,
+    `DomDoc::parse_reader_capped` / `parse_reader_capped_with_policy` in Rust;
+    the demux's reader counters (`bvnr_demux_get_reader`): `recovery_count`,
+    `skipped_bytes` and `declared_version` on `DemuxFeed` and `live::Demux`, as
+    on the document feeds; exact unit conversion of a given value
+    (`bvn_unit_convert_rational`), the engine behind `want_unit`:
+    `bovnar.convert_rational(value, from, to)` → `(Fraction, exact)` and
+    `units::convert_rational(&BigRational, &from, &to)`; the epoch index of a
+    datetime type from its name (`bvnr_datetime_epoch_index`):
+    `datetime_epoch_index(name)`; the numeric library version (`bvnr_version`):
+    `version_number()`; an error code's text (`bvn_error_to_string`):
+    `bovnar.error_message(code)` and `ErrorCode::name()`.
+  - *Python:* `Writer.mux_begin`, `mux_send` and `mux_end` (`bvnr_mux_*`), so
+    a mux stream can sit inside a document of any shape — values after it,
+    more than one stream — as Rust's `Writer` could already write;
+    `Writer.embed_document` (`bvnr_embed_document`) and `Writer.write_octets`.
+  - Left unwrapped on purpose: the C DOM's tree builder, which is for the
+    library's test fixtures and makes a tree that cannot be written out (now
+    said so in doc/09 and doc/14); the per-type `bvnr_write_*` helpers and the
+    low-level bignum, float and digit helpers, which both bindings implement
+    on their own terms.
+
 ### Changed
 
-- **The text and array caps can be lifted from Rust and Python.** An endless
-  text document read with a live feed stopped at the library's default of
-  2 147 483 647 bytes of text (`text_data_too_long`), and an array at as many
-  items, with no way to raise either from a binding. Both now pass to
-  `bvnr_read_flags_t` as given, 0 keeping the library default:
-  - *Rust:* `ReadOptions` gains `max_text_bytes` and `max_array_items`
-    (`u64::MAX` lifts the cap), honoured by every reader that takes
-    `ReadOptions` (`Reader`, the live feeds, `FrameParser`, `Demux`).
+- **Every read option reaches every reading entry point, in Rust and Python.**
+  An endless text document read with a live feed stopped at the library's
+  default of 2 147 483 647 bytes of text (`text_data_too_long`), and an array
+  at as many items, with no way to raise either from a binding. A review of the
+  whole C API against both bindings found the same gap across
+  `bvnr_read_flags_t`: the five length caps (`max_identifier_length`,
+  `max_string_length`, `max_number_length`, `max_symbol_length`,
+  `max_reference_length`) and the two nesting caps (fixed at 255) could not be
+  set at all, `on_error` — the only report of an error `continue_on_error`
+  recovers from — was not reachable, and most stream readers built flags of
+  their own that took no options. All of it now passes to C as given, 0 keeping
+  the library default (255 for the nesting caps, the format's limit, as before):
+  - *Rust:* `ReadOptions` gains `max_text_bytes`, `max_array_items`
+    (`u64::MAX` lifts either cap), the five length caps and
+    `max_struct_nesting` / `max_array_nesting`, honoured by every reader that
+    takes `ReadOptions` (`Reader`, the live feeds, `FrameParser`, `Demux`).
+    New: `parse_with_options` / `parse_reader_with_options`;
+    `stream::load_documents_with_options`, `mux_load_with_options`,
+    `parse_embedded_with_options` and their `*_reader_*` twins;
+    `Reader::read_mem_with` / `read_reader_with`, which take a `ReadHandlers`
+    of `on_verified`, `on_unverified`, `want_unit` (now usable beside
+    `on_unverified`) and `on_error`, an `FnMut(&Error)` called with each error
+    and its position; `Reader::error_position`. The doc comment of
+    `want_unit_allow_nonterminating` said the value arrived rounded; it
+    arrives as the exact rational, with no text.
     **Source-incompatible** for code that builds `ReadOptions` with a struct
-    literal naming every field: add `..ReadOptions::default()` (or the two
-    fields). Code using `ReadOptions::default()` or `..Default::default()` is
-    unaffected, as is every default behaviour. Released in a minor version
-    (2.1.0) on the maintainer's word; no known user names every field.
-  - *Python:* the `max_text_bytes=` and `max_array_items=` keywords of
-    `Reader.read_mem`, `read_fd`, `read_file` and `read_stream`, of
-    `DocumentFeed` and `DemuxFeed`, and of a parsing `FrameFeed`;
-    `stream.BVNR_NO_LIMIT` (2**64 − 1) lifts the cap, and a value that does
-    not fit a `uint64_t` is refused rather than wrapped.
+    literal naming every field: add `..ReadOptions::default()`. Code using
+    `ReadOptions::default()` or `..Default::default()` is unaffected, as is
+    every default behaviour. Released in a minor version (2.1.0) on the
+    maintainer's word; no known user names every field.
+  - *Python:* the read options are one table, `bovnar.READ_OPTIONS`, from
+    which every reading entry point takes its keywords — `Reader.read_mem`,
+    `read_fd`, `read_file`, `read_stream`, `iter_mem`, `loads`, `load`,
+    `DocumentFeed`, `DemuxFeed`, a parsing `FrameFeed`, `load_documents`,
+    `mux_load` and `parse_embedded` — so an option can no longer be reachable
+    from one and missing from another. `loads` / `load` took only
+    `max_file_size` and `continue_on_error`, the stream functions none, and
+    `load_documents` and `FrameFeed` forced `continue_on_error` off. An unknown
+    keyword is a `TypeError`, a value that does not fit its C field a
+    `BovnarArgumentError` (it used to be wrapped by ctypes);
+    `stream.BVNR_NO_LIMIT` (2**64 − 1) lifts the text and array caps. New
+    `on_error=` on the `Reader` methods and `DocumentFeed`, called with a
+    `BovnarParseError` per error; `Reader.error_byte`.
+  - `parse_embedded` (both) under `continue_on_error` reports the error that
+    ended the parse, not the first one it recovered from.
 
 - **The canonical text of a double is its nearest shortest decimal.**
   `bvn_format_double`, which writes every float the writer formats, chose

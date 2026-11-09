@@ -33,7 +33,7 @@ from .exceptions import BovnarParseError, BovnarArgumentError
 from .structs import (
     BvnrSource, BvnrSink, BvnrReadFlags, BvnrData, ValueUnit,
     build_unit_policy, describe_unit_policy_refusal, MAX_UNIT_TARGETS,
-    EVENT_CALLBACK_FUNC, WANT_UNIT_FUNC,
+    EVENT_CALLBACK_FUNC, WANT_UNIT_FUNC, ON_ERROR_FUNC,
     make_unit_dimensionless,
 )
 from .unit import _as_vu
@@ -168,13 +168,73 @@ class EventPayload:
     def __repr__(self) -> str:
         return f"EventPayload(event={self.event.name}, text={self.text!r})"
 
-def _read_limit(name: str, value) -> int:
-    """A max_text_bytes / max_array_items value: an int that fits the C
-    uint64_t (ctypes would wrap a negative one or cut a large one silently)."""
-    if type(value) is not int or not 0 <= value < (1 << 64):
+def _read_limit(name: str, value, bits: int = 64) -> int:
+    """A read limit: an int that fits its C field of `bits` bits (ctypes
+    would wrap a negative one or cut a large one silently)."""
+    if type(value) is not int or not 0 <= value < (1 << bits):
         raise BovnarArgumentError(
-            f"{name} must be an int from 0 to 2**64 - 1, not {value!r}")
+            f"{name} must be an int from 0 to 2**{bits} - 1, not {value!r}")
     return value
+
+
+# Every field of bvnr_read_flags_t that is a limit or a switch, with the width
+# of its C field (0 for a bool), in the one table each reading entry point takes
+# its keywords from -- Reader.read_*, the feeds, loads/load and the stream
+# functions -- so a field added in C is added everywhere at once. Every
+# default is 0 / False: 0 selects the library's own default for a limit
+# (max_file_size 0 is no total-byte cap), except the two nesting limits,
+# where 0 is 255, the format's limit and what the DOM and the CLI read at (the
+# C reader's own default is 64).
+READ_OPTIONS = {
+    'max_file_size':                  64,
+    'max_text_bytes':                 64,
+    'max_array_items':                64,
+    'max_identifier_length':          16,
+    'max_string_length':              16,
+    'max_number_length':              16,
+    'max_symbol_length':              16,
+    'max_reference_length':           16,
+    'max_struct_nesting':             8,
+    'max_array_nesting':              8,
+    'max_conversion_length':          32,
+    'continue_on_error':              0,
+    'strict_version':                 0,
+    'text_only':                      0,
+    'want_unit_allow_nonterminating': 0,
+}
+
+
+def read_flags(where: str, options: dict,
+               flags: BvnrReadFlags | None = None) -> BvnrReadFlags:
+    """`flags` (a fresh BvnrReadFlags by default) with the READ_OPTIONS in
+    `options` set, each checked; an unknown keyword is a TypeError naming
+    `where`, as Python reports one for a function."""
+    if flags is None:
+        flags = BvnrReadFlags()
+    for name in options:
+        if name not in READ_OPTIONS:
+            raise TypeError(
+                f"{where}() got an unexpected keyword argument {name!r}")
+    for name, bits in READ_OPTIONS.items():
+        value = options.get(name, 0)
+        if bits:
+            value = _read_limit(name, value, bits)
+        else:
+            value = bool(value)
+        setattr(flags, name, value)
+    if not flags.max_struct_nesting:
+        flags.max_struct_nesting = 255
+    if not flags.max_array_nesting:
+        flags.max_array_nesting = 255
+    return flags
+
+
+def _parse_error(lib, code: int, line: int, column: int, offset: int,
+                 byte: int, prefix: str = '') -> BovnarParseError:
+    msg_b = lib.bvn_error_to_string(int(code))
+    msg   = msg_b.decode('utf-8') if msg_b else ''
+    return BovnarParseError(ErrorCode(code), line, column, offset, byte,
+                            prefix + msg)
 
 
 class Reader:
@@ -242,58 +302,39 @@ class Reader:
             self._busy = False
 
     def _build_flags(self,
-                     on_verified,
-                     on_unverified,
-                     max_file_size: int,
-                     continue_on_error: bool,
-                     strict_version: bool = False,
-                     text_only: bool = False,
+                     where: str,
+                     on_verified=None,
+                     on_unverified=None,
                      want_unit=None,
-                     want_unit_allow_nonterminating: bool = False,
-                     max_conversion_length: int = 0,
-                     *,
-                     max_text_bytes: int = 0,
-                     max_array_items: int = 0) -> tuple:
-
-        flags    = BvnrReadFlags()
-        cb_refs  = []
-
-        flags.max_file_size = max_file_size
-        # 0 selects the library's default of 2147483647 for both, as in C; an
-        # endless text document needs max_text_bytes lifted (BVNR_NO_LIMIT).
-        flags.max_text_bytes  = _read_limit('max_text_bytes', max_text_bytes)
-        flags.max_array_items = _read_limit('max_array_items', max_array_items)
-        # Match the nesting limit used by the CLI, the DOM builder and stream.py
-        # (the uint8_t hard cap, 255) rather than the reader's bare 64 default,
-        # so loads()/read_mem accept the same documents those paths do. Leaving
-        # these at 0 would default to 64 and surprise users with a rejection at
-        # depth 65 for a document the CLI and dom_parse() accept.
-        flags.max_struct_nesting = 255
-        flags.max_array_nesting  = 255
+                     on_error=None,
+                     options: dict | None = None) -> tuple:
+        """The C read flags for `options` (READ_OPTIONS keywords) and the
+        callbacks, with the ctypes callbacks to keep alive. The callbacks
+        share one state, so the first exception any of them raises stops the
+        others and is the one re-raised."""
+        flags   = read_flags(where, options or {})
+        cb_refs = []
+        state   = {'exc': None}
 
         if on_verified is not None:
-            cb = self._wrap_callback(on_verified)
+            cb = self._wrap_callback(on_verified, state)
             cb_refs.append(cb)
             flags.on_verified = cb
 
         if on_unverified is not None:
-            cb = self._wrap_callback(on_unverified)
+            cb = self._wrap_callback(on_unverified, state)
             cb_refs.append(cb)
             flags.on_unverified = cb
 
         if want_unit is not None:
-            cb = self._wrap_want_unit(want_unit)
+            cb = self._wrap_want_unit(want_unit, state)
             cb_refs.append(cb)
             flags.want_unit = cb
 
-        flags.continue_on_error = continue_on_error
-        flags.strict_version    = strict_version
-        flags.text_only         = text_only
-        flags.want_unit_allow_nonterminating = want_unit_allow_nonterminating
-        # 0 selects the C default (BVNR_DEFAULT_MAX_CONVERSION_LENGTH). This is a
-        # work limit: rendering an exact expansion is quadratic in its digit
-        # count, and the count follows the value's exponent, not its length.
-        flags.max_conversion_length = max_conversion_length
+        if on_error is not None:
+            cb = self._wrap_on_error(on_error, state, self._lib)
+            cb_refs.append(cb)
+            flags.on_error = cb
         return flags, cb_refs
 
     @staticmethod
@@ -349,14 +390,17 @@ class Reader:
         return snap
 
     @staticmethod
-    def _wrap_callback(py_fn: Callable):
+    def _wrap_callback(py_fn: Callable, state: dict | None = None):
 
-        state = {'exc': None}
+        if state is None:
+            state = {'exc': None}
         # Each event gets a fresh BvnrData that owns everything it points at
         # (see _snapshot), so a callback may keep it -- or a sub-struct view
         # like d.value_type -- and use every accessor after the reader is gone.
 
         def _c_cb(userdata_void, event_int: int, data_ptr) -> bool:
+            if state['exc'] is not None:
+                return False
             try:
                 ev = Event(event_int)
                 data = Reader._snapshot(data_ptr.contents) if data_ptr else None
@@ -372,7 +416,25 @@ class Reader:
         return cb
 
     @staticmethod
-    def _wrap_want_unit(py_fn: Callable):
+    def _wrap_on_error(py_fn: Callable, state: dict, lib):
+        # on_error(BovnarParseError) for every error the reader reports, the
+        # recovered ones of continue_on_error included; C ignores what it
+        # returns. An exception it raises stops the read at the next event.
+        def _c_cb(userdata_void, err, line, column, byte, offset) -> None:
+            if state['exc'] is not None:
+                return
+            try:
+                py_fn(_parse_error(lib, int(err), int(line), int(column),
+                                   int(offset), int(byte)))
+            except BaseException as exc:
+                state['exc'] = exc
+
+        cb = ON_ERROR_FUNC(_c_cb)
+        cb._bvnr_state = state
+        return cb
+
+    @staticmethod
+    def _wrap_want_unit(py_fn: Callable, state: dict | None = None):
         # Wrap a Python want_unit(data) into the C want_unit contract
         #   bool(*)(void*, const bvnr_data_t*, value_unit_t*, uint32_t*).
         # The Python callback returns one of:
@@ -386,10 +448,13 @@ class Reader:
         # unusable base error_invalid_argument — each aborts the parse. So does a
         # result that does not terminate in the output base, unless the reader was
         # given want_unit_allow_nonterminating=True.
-        state = {'exc': None}
+        if state is None:
+            state = {'exc': None}
         unit_size = ctypes.sizeof(ValueUnit)
 
         def _c_cb(userdata_void, data_ptr, want_ptr, want_base_ptr) -> bool:
+            if state['exc'] is not None:
+                return False
             try:
                 # Snapshot, never the raw view: a callback that stashes the
                 # object away would otherwise be holding freed reader memory.
@@ -423,31 +488,42 @@ class Reader:
         return cb
 
     def _raise_error(self) -> None:
-
-        code   = ErrorCode(self._lib.bvnr_reader_get_error(self._ptr))
-        line   = self._lib.bvnr_reader_get_error_line(self._ptr)
-        column = self._lib.bvnr_reader_get_error_column(self._ptr)
-        offset = self._lib.bvnr_reader_get_error_offset(self._ptr)
-        byte   = self._lib.bvnr_reader_get_error_byte(self._ptr)
-        msg_b  = self._lib.bvn_error_to_string(int(code))
-        msg    = msg_b.decode('utf-8') if msg_b else ''
-        raise BovnarParseError(code, line, column, offset, byte, msg)
+        lib = self._lib
+        raise _parse_error(lib, lib.bvnr_reader_get_error(self._ptr),
+                           lib.bvnr_reader_get_error_line(self._ptr),
+                           lib.bvnr_reader_get_error_column(self._ptr),
+                           lib.bvnr_reader_get_error_offset(self._ptr),
+                           lib.bvnr_reader_get_error_byte(self._ptr))
 
     def read_mem(self,
                  data: bytes | bytearray | memoryview,
                  *,
                  on_verified: Callable | None = None,
                  on_unverified: Callable | None = None,
-                 max_file_size: int = 0,
-                 continue_on_error: bool = False,
-                 strict_version: bool = False,
-                 text_only: bool = False,
                  want_unit: Callable | None = None,
-                 want_unit_allow_nonterminating: bool = False,
-                 max_conversion_length: int = 0,
-                 max_text_bytes: int = 0,
-                 max_array_items: int = 0) -> None:
+                 on_error: Callable | None = None,
+                 **options) -> None:
+        """Parse a document held in memory.
 
+        ``on_verified(event, data)`` gets every event the validator accepted,
+        ``on_unverified`` every raw lexer event; returning ``False`` stops the
+        read. ``want_unit(data)`` picks the unit (and base) a numeric value is
+        delivered in. ``on_error(err)`` gets each error the reader reports as
+        a :class:`BovnarParseError` with its position -- under
+        ``continue_on_error`` the errors it recovers from, which are reported
+        nowhere else, and the one that ends a read.
+
+        The other keywords are the read options of :data:`READ_OPTIONS`, each
+        ``0`` / ``False`` by default: the limits ``max_file_size`` (0: no
+        total-byte cap), ``max_text_bytes``, ``max_array_items``,
+        ``max_identifier_length``, ``max_string_length``,
+        ``max_number_length``, ``max_symbol_length``,
+        ``max_reference_length``, ``max_struct_nesting`` and
+        ``max_array_nesting`` (0: 255), and ``max_conversion_length`` (0
+        selects the library's default for each), and the switches
+        ``continue_on_error``, ``strict_version``, ``text_only`` and
+        ``want_unit_allow_nonterminating``.
+        """
         self._check_open()
         self._check_not_busy()
         if isinstance(data, memoryview):
@@ -456,11 +532,8 @@ class Reader:
             raise BovnarArgumentError("data must be bytes, bytearray, or memoryview")
 
         flags, cb_refs = self._build_flags(
-            on_verified, on_unverified, max_file_size, continue_on_error,
-            strict_version, text_only, want_unit,
-            want_unit_allow_nonterminating, max_conversion_length,
-            max_text_bytes=max_text_bytes, max_array_items=max_array_items
-        )
+            'read_mem', on_verified, on_unverified, want_unit, on_error,
+            options)
 
         buf = (ctypes.c_char * len(data)).from_buffer_copy(data)
         ok = self._run_read(lambda: self._lib.bvnr_open_read_mem(
@@ -488,27 +561,19 @@ class Reader:
                 *,
                 on_verified: Callable | None = None,
                 on_unverified: Callable | None = None,
-                max_file_size: int = 0,
-                continue_on_error: bool = False,
-                strict_version: bool = False,
-                text_only: bool = False,
                 want_unit: Callable | None = None,
-                want_unit_allow_nonterminating: bool = False,
-                max_conversion_length: int = 0,
-                max_text_bytes: int = 0,
-                max_array_items: int = 0) -> None:
-
+                on_error: Callable | None = None,
+                **options) -> None:
+        """Parse a document read from file descriptor ``fd``; the keywords
+        are those of :meth:`read_mem`."""
         self._check_open()
         self._check_not_busy()
         if not isinstance(fd, int) or fd < 0:
             raise BovnarArgumentError(f"Invalid file descriptor: {fd!r}")
 
         flags, cb_refs = self._build_flags(
-            on_verified, on_unverified, max_file_size, continue_on_error,
-            strict_version, text_only, want_unit,
-            want_unit_allow_nonterminating, max_conversion_length,
-            max_text_bytes=max_text_bytes, max_array_items=max_array_items
-        )
+            'read_fd', on_verified, on_unverified, want_unit, on_error,
+            options)
 
         src = BvnrSource()
         self._lib.bvnr_source_from_fd(ctypes.byref(src), fd)
@@ -519,15 +584,9 @@ class Reader:
                     *,
                     on_verified: Callable | None = None,
                     on_unverified: Callable | None = None,
-                    max_file_size: int = 0,
-                    continue_on_error: bool = False,
-                    strict_version: bool = False,
-                    text_only: bool = False,
                     want_unit: Callable | None = None,
-                    want_unit_allow_nonterminating: bool = False,
-                    max_conversion_length: int = 0,
-                    max_text_bytes: int = 0,
-                    max_array_items: int = 0) -> None:
+                    on_error: Callable | None = None,
+                    **options) -> None:
         """Parse a document pulled from a socket or a binary file object.
 
         The keyword parameters are those of :meth:`read_mem`. The bytes are
@@ -538,13 +597,10 @@ class Reader:
         """
         self._check_open()
         self._check_not_busy()
-        source = PullSource(stream)
         flags, cb_refs = self._build_flags(
-            on_verified, on_unverified, max_file_size, continue_on_error,
-            strict_version, text_only, want_unit,
-            want_unit_allow_nonterminating, max_conversion_length,
-            max_text_bytes=max_text_bytes, max_array_items=max_array_items
-        )
+            'read_stream', on_verified, on_unverified, want_unit, on_error,
+            options)
+        source = PullSource(stream)
         self._read_source(source.handle, flags, cb_refs, source)
 
     def _read_source(self, src, flags, cb_refs, source=None) -> None:
@@ -575,33 +631,26 @@ class Reader:
                   *,
                   on_verified: Callable | None = None,
                   on_unverified: Callable | None = None,
-                  max_file_size: int = MAX_FILESIZE_BYTES,
-                  continue_on_error: bool = False,
-                  strict_version: bool = False,
-                  text_only: bool = False,
                   want_unit: Callable | None = None,
-                  want_unit_allow_nonterminating: bool = False,
-                  max_conversion_length: int = 0,
-                  max_text_bytes: int = 0,
-                  max_array_items: int = 0) -> None:
-        # Forwards every read_fd option; dropping any of them here would make a
-        # conversion or strict-version read impossible from a path.
+                  on_error: Callable | None = None,
+                  max_file_size: int = MAX_FILESIZE_BYTES,
+                  **options) -> None:
+        """Parse the file at ``path``; the keywords are those of
+        :meth:`read_mem`, except that ``max_file_size`` defaults to
+        ``MAX_FILESIZE_BYTES`` (16 MiB) here."""
         import os
+        # Check the keywords before opening the file.
+        read_flags('read_file', options)
         fd = os.open(path, os.O_RDONLY)
         try:
             self.read_fd(
                 fd,
                 on_verified=on_verified,
                 on_unverified=on_unverified,
-                max_file_size=max_file_size,
-                continue_on_error=continue_on_error,
-                strict_version=strict_version,
-                text_only=text_only,
                 want_unit=want_unit,
-                want_unit_allow_nonterminating=want_unit_allow_nonterminating,
-                max_conversion_length=max_conversion_length,
-                max_text_bytes=max_text_bytes,
-                max_array_items=max_array_items,
+                on_error=on_error,
+                max_file_size=max_file_size,
+                **options,
             )
         finally:
             os.close(fd)
@@ -610,7 +659,10 @@ class Reader:
                  data: bytes | bytearray | memoryview,
                  *,
                  verified_only: bool = True,
-                 max_file_size: int = 0) -> Generator[EventPayload, None, None]:
+                 **options) -> Generator[EventPayload, None, None]:
+        """Read ``data`` and yield its events as :class:`EventPayload`
+        objects, verified ones only unless ``verified_only`` is false. The
+        other keywords are the read options of :meth:`read_mem`."""
 
         events: list[EventPayload] = []
 
@@ -624,14 +676,13 @@ class Reader:
             events.append(EventPayload(ev, raw, vt, vu, cvd, ctxt, cbase))
             return True
 
-        kwargs = dict(max_file_size=max_file_size)
         if verified_only:
-            self.read_mem(data, on_verified=collector, **kwargs)
+            self.read_mem(data, on_verified=collector, **options)
         else:
             self.read_mem(data,
                           on_verified=collector,
                           on_unverified=collector,
-                          **kwargs)
+                          **options)
 
         yield from events
 
@@ -654,6 +705,13 @@ class Reader:
     def error_offset(self) -> int:
         self._check_open()
         return self._lib.bvnr_reader_get_error_offset(self._ptr)
+
+    @property
+    def error_byte(self) -> int:
+        """The byte the last error was raised on, or 0 where it is not one
+        byte's fault."""
+        self._check_open()
+        return self._lib.bvnr_reader_get_error_byte(self._ptr)
 
     @property
     def recovery_count(self) -> int:

@@ -243,6 +243,9 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvnr_datetime_epoch_mjd.restype  = c_int32
     lib.bvnr_datetime_epoch_mjd.argtypes = [ValueTypeSpec]
 
+    lib.bvnr_datetime_epoch_index.restype  = c_int32
+    lib.bvnr_datetime_epoch_index.argtypes = [c_char_p]
+
     lib.bvnr_writer_create.restype  = c_void_p
     lib.bvnr_writer_create.argtypes = []
 
@@ -413,6 +416,16 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvn_int_to_str.restype  = c_int32
     lib.bvn_int_to_str.argtypes = [c_void_p, c_char_p, c_size_t, c_uint32]
 
+    lib.bvn_int_from_str.restype  = c_bool
+    lib.bvn_int_from_str.argtypes = [c_void_p, c_char_p, c_uint32]
+
+    # units.convert_rational: the exact conversion want_unit runs, on a value
+    # given as a fraction.
+    lib.bvn_unit_convert_rational.restype  = c_bool
+    lib.bvn_unit_convert_rational.argtypes = [
+        c_void_p, c_void_p, ValueUnit, ValueUnit, c_void_p, c_void_p, P(c_bool),
+    ]
+
     # bvn_int.h -- owned copies. A snapshot taken inside a reader callback
     # copies conv.num/conv.den into bignums IT owns, so converted_rational()
     # and converted_in_base() still work once the reader has freed its own.
@@ -481,6 +494,9 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
 
     lib.bvn_dom_parse_fd.restype  = c_void_p
     lib.bvn_dom_parse_fd.argtypes = [c_int]
+
+    lib.bvn_dom_parse_fd_ex.restype  = c_void_p
+    lib.bvn_dom_parse_fd_ex.argtypes = [c_int, c_uint64]
 
     lib.bvn_dom_doc_get_parse_error.restype  = c_int
     lib.bvn_dom_doc_get_parse_error.argtypes = [c_void_p]

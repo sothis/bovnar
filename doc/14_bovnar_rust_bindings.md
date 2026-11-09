@@ -313,6 +313,29 @@ does the same into any `std::io::Write`, and `parse_reader(input)` /
 `parse_typed_reader(input)` read from any `std::io::Read`
 ([§4.7](#47-files-and-io-streams-stdioread--write)).
 
+`parse` and its siblings read with the default `ReadOptions`;
+`parse_with_options(data, typed, &options)` and
+`parse_reader_with_options(input, typed, &options)` take any of them
+([§10.3](#103-readoptions)) — a total cap, `strict_version`, `text_only`, the
+length and nesting caps — with `typed` choosing between `parse` and
+`parse_typed`:
+
+```rust
+use bovnar::{ErrorCode, ReadOptions};
+
+fn main() {
+    let untrusted = ReadOptions {
+        max_file_size: 1 << 20,
+        max_string_length: 4096,
+        strict_version: true,
+        ..ReadOptions::default()
+    };
+    let err = bovnar::parse_with_options(b"#!bovnar 9.0\n.a = 1;", false, &untrusted)
+        .unwrap_err();
+    assert_eq!(err.code(), Some(ErrorCode::UnsupportedSpecVersion));
+}
+```
+
 > **`to_string()` writes what `parse()` reads — the streaming tier, not the
 > document tier.** `parse()` checks the grammar and each value's own type, unit
 > and range and stops there; `to_string()` is its inverse and stops in the same
@@ -522,6 +545,13 @@ All arguments are positional:
 `parse_embedded` returns an `Error::Parse` carrying the inner document's own
 error code and, where the library reported one, its position. `mux_dump`
 channels are `u64`, so the channel range is checked by the type.
+
+The readers read with the default `ReadOptions`. Each has a twin that takes
+them as its last argument — `load_documents_with_options`,
+`mux_load_with_options`, `parse_embedded_with_options`, and the same for the
+`*_reader` functions — and reads under them: `load_documents` each document,
+with `max_file_size` capping one document and `max_document_size` one frame;
+`mux_load` the document around the stream.
 
 Each function has a twin for `std::io::Read` or `std::io::Write`
 ([§4.7](#47-files-and-io-streams-stdioread--write)).
@@ -979,7 +1009,8 @@ out before its first message, and a `ValueBuilder` makes values of it. After
 refused with an `Error::Argument`); `reset()`
 starts the next document: the channel buffers are kept, the channel ids (and
 with them the 4096-channel count) start afresh, as `codec::MuxReader::reset`
-does.
+does. `recovery_count()`, `skipped_bytes()` and `declared_version()` are those
+of the demux's reader, as on `DocumentFeed`.
 
 ```rust
 use bovnar::live::{Demux, DemuxItem, DemuxOptions, ValueBuilder};
@@ -1311,6 +1342,14 @@ fn main() -> Result<(), bovnar::Error> {
     // Convert a scalar value between units (handles affine conversions)
     let kelvin = convert_value(25.0, &Unit::parse("°C")?, &Unit::parse("K")?)?;
     assert!((kelvin - 298.15).abs() < 1e-9);
+
+    // ... or EXACTLY, as the reader's want_unit does: (BigRational, exact),
+    // exact false for an irrational factor (° to rad)
+    let v = num_rational::BigRational::from_integer(42.into());
+    let (ms, exact) =
+        bovnar::units::convert_rational(&v, &Unit::parse("k~m/h")?, &Unit::parse("m/s")?)?;
+    assert_eq!(ms, num_rational::BigRational::new(35.into(), 3.into()));
+    assert!(exact);
 
     // Serialise with formatting options (see UnitFlags below)
     let force = Unit::parse("k~g·m/s²")?;
@@ -2111,10 +2150,16 @@ read_mem(data: &[u8], options: &ReadOptions,
 
 read_mem_want_unit(data, options, want_unit: &mut dyn FnMut(&EventData) -> Option<(Unit, u32)>,
                    on_verified) -> Result<()>
+
+read_mem_with(data, options, handlers: ReadHandlers) -> Result<()>
 ```
 
 Parse BVNR from a byte slice. The options are the `ReadOptions` struct, and the
-`want_unit` hook is the separate method `read_mem_want_unit`.
+`want_unit` hook is the separate method `read_mem_want_unit`. `read_mem_with`
+(and `read_reader_with` over a `std::io::Read`) takes every handler at once, as
+a `ReadHandlers` whose fields are all optional: `on_verified`, `on_unverified`,
+`want_unit` — so a hook can sit beside an `on_unverified` callback — and
+`on_error`.
 
 | Parameter | Type | Description |
 |---|---|---|
@@ -2123,9 +2168,27 @@ Parse BVNR from a byte slice. The options are the `ReadOptions` struct, and the
 | `on_verified` | `Option<&mut dyn FnMut(&EventData) -> bool>` | Callback for validated events |
 | `on_unverified` | `Option<&mut dyn FnMut(&EventData) -> bool>` | Callback for raw pre-validation events |
 | `want_unit` | `&mut dyn FnMut(&EventData) -> Option<(Unit, u32)>` | Read-time lossless unit/base conversion hook. Called per numeric value; return `Some((unit, base))` to request a conversion (the exact result arrives on the payload as `converted` and `converted_text`, with `converted_rational()` / `converted_in_base()` beside it — see §4.2), or `None` to leave the value untouched. An inexact conversion aborts the read (`error_unit_inexact`) |
+| `on_error` | `&mut dyn FnMut(&Error)` (in `ReadHandlers`) | Called for every error the reader reports, as an `Error::Parse` with its position: under `continue_on_error`, each error it recovers from — reported nowhere else — and the error that ends a read, before the read returns it. A panic in it stops the read and reaches the caller |
+
+```rust
+use bovnar::{Error, ReadHandlers, ReadOptions, Reader};
+
+fn main() -> Result<(), Error> {
+    let mut recovered = Vec::new();
+    let mut on_error = |e: &Error| recovered.push(e.position().unwrap().offset);
+    let options = ReadOptions { continue_on_error: true, ..ReadOptions::default() };
+    let _ = Reader::new()?.read_mem_with(
+        b".a = 1; .b = @; .c = 2;",
+        &options,
+        ReadHandlers { on_error: Some(&mut on_error), ..ReadHandlers::default() },
+    );
+    assert_eq!(recovered.first(), Some(&13)); // the '@'
+    Ok(())
+}
+```
 
 A reader opens at the 255-level struct and array nesting cap, in both
-directions, like the CLI and the DOM.
+directions, like the CLI and the DOM, unless `ReadOptions` lowers it.
 
 The file-descriptor entry points `read_fd` and `read_file` are `read_reader` and
 `read_reader_want_unit`, over any `std::io::Read` — see
@@ -2144,8 +2207,22 @@ rest with `..ReadOptions::default()`.
 | `continue_on_error` | `bool` | `false` | Enable resync mode |
 | `strict_version` | `bool` | `false` | Reject a declared spec version newer than this build (`error_unsupported_spec_version`) |
 | `text_only` | `bool` | `false` | Refuse a document that contains an octet stream (`error_octet_stream_forbidden`), for a channel that is not byte-transparent |
-| `want_unit_allow_nonterminating` | `bool` | `false` | Deliver an exact-rational-but-non-terminating conversion (e.g. km/h→m/s) as a rational — `converted_rational()` returns the exact pair — instead of aborting with `error_unit_inexact` |
+| `want_unit_allow_nonterminating` | `bool` | `false` | Deliver an exact-rational-but-non-terminating conversion (e.g. km/h→m/s) as a rational — `converted_text` is empty, `converted_rational()` returns the exact pair — instead of aborting with `error_unit_inexact` |
 | `max_conversion_length` | `u32` | `0` (default 1024) | Longest converted text a conversion may produce, in characters; a longer exact result aborts with `error_value_out_of_range` |
+| `max_identifier_length` | `u16` | `0` (default 255) | Longest key, in bytes (`identifier_too_long`) |
+| `max_string_length` | `u16` | `0` (default 65 535) | Longest string value, in bytes (`string_too_long`) |
+| `max_number_length` | `u16` | `0` (default 65 535) | Longest number literal (`number_too_long`) |
+| `max_symbol_length` | `u16` | `0` (default 255) | Longest symbol (`symbol_too_long`) |
+| `max_reference_length` | `u16` | `0` (default 65 535) | Longest reference (`reference_too_long`) |
+| `max_struct_nesting` | `u8` | `0` (255) | Deepest struct nesting (`struct_nesting_too_high`). `0` is the format's limit of 255, what the DOM and the CLI read at — not the C reader's own default of 64 |
+| `max_array_nesting` | `u8` | `0` (255) | Deepest array nesting, as `max_struct_nesting` (`array_nesting_too_high`) |
+
+Every field of `bvnr_read_flags_t` that is a limit or a switch is here, and
+every reading entry point takes the whole struct: `Reader`, the `live` feeds,
+`parse_with_options` / `parse_reader_with_options` (§4.1), and the
+`*_with_options` twins of the `stream` readers (§4.6). The five length caps and
+the two nesting caps are for untrusted input: lower them to what the consumer
+can take.
 
 `max_file_size` is 0 by default, which means no cap; set it where a cap matters.
 `max_text_bytes` and `max_array_items` are 0 by default too, but 0 selects the
@@ -2183,6 +2260,8 @@ iterator: the read has finished when it returns.
 | `verified_only` | When `false`, both callbacks fire and events may appear twice |
 | `max_file_size` | Forwarded to `read_mem`; `0` is unlimited |
 
+For any other option, call `read_mem` with a collecting handler.
+
 ### 10.6 Error-state accessors
 
 These query the C reader object after a failed parse. They describe the error
@@ -2196,12 +2275,15 @@ and `recovery_count()` is how to tell that any were (spec §13.4).
 |---|---|---|
 | `error_code()` | `Option<ErrorCode>` | The error that ended the read; `ErrorCode::None` after a successful one |
 | `error_line()` | `u64` | 1-based line number of the error |
+| `error_position()` | `Position` | Line, character column, byte offset and offending byte of the error, all 0 after a clean read |
 | `recovery_count()` | `u64` | Number of times resync was entered (incremented at error entry, not at resync completion) |
 | `skipped_bytes()` | `u64` | How many input bytes a `continue_on_error` read skipped |
 | `declared_version()` | `Option<(u16, u16)>` | The `#!bovnar M.N` directive of the last read, or `None` when the document carried none |
 
-The column and the byte offset of the error are on the `Error` itself — see
-[§13](#13-error-handling) — as `position()`.
+The same position is on the `Error` itself — see
+[§13](#13-error-handling) — as `position()`. To see the errors a
+`continue_on_error` read recovered from, pass an `on_error` handler
+([§10.2](#102-read_mem)).
 
 ---
 
@@ -2547,6 +2629,7 @@ Owning wrapper around `bvn_dom_doc_t`. Dropping it frees the entire tree; the
 | `DomDoc::parse(data)` | Parse a byte slice |
 | `DomDoc::parse_reader(input)` | `parse` over any `std::io::Read`; see the note below |
 | `DomDoc::parse_reader_with_policy(input, &policy)` | `parse_reader` under a policy |
+| `DomDoc::parse_reader_capped(input, max_bytes)` / `parse_reader_capped_with_policy(input, max_bytes, &policy)` | `parse_reader` with a lower cap, as `bvn_dom_parse_fd_ex` takes one; see the note below |
 | `DomDoc::parse_with_policy(data, &policy)` | Parse under a [`UnitPolicy`](#56-unitpolicy--validation-and-conversion-without-a-callback): values arrive converted, and a document breaking the policy fails with `unit_mismatch` |
 | `doc.get(key)` | The top-level value assigned to `key`, as `Option<DomNode>` |
 | `doc.lookup(path)` | Dot-separated path lookup, e.g. `"server.tls.cert"`, with indexed elements (`"matrix[1][0]"`). `None` when absent |
@@ -2558,7 +2641,16 @@ Owning wrapper around `bvn_dom_doc_t`. Dropping it frees the entire tree; the
 > any `std::io::Read` and apply the same ceiling, `DOM_READ_MAX_BYTES`
 > (256 MiB, `BVN_DOM_FD_MAX_BYTES`). A longer input is an `Error::Parse` with
 > `file_too_long`, where the C function returns no document. Input over 4 GiB is refused as well (the C API's length is a
-> `uint32_t`).
+> `uint32_t`). `parse_reader_capped` lowers the ceiling to `max_bytes`; 0, or
+> anything above 256 MiB, keeps it — there is no unlimited mode, as in C.
+>
+> **The DOM takes no read options.** The C DOM parse functions read with a
+> fixed set (the 255-level nesting, the reader's defaults for everything else),
+> so `ReadOptions` cannot reach them; read with a `Reader` or
+> `parse_with_options` for those limits. The C DOM's tree-building calls
+> (`bvn_dom_node_from_*`, `bvn_dom_struct_add`, …) make a tree that cannot be
+> written out, for the library's own test fixtures, and are not wrapped: build
+> a document as a `Value` or with the `Writer`.
 
 Membership is `get(key).is_some()`, and iteration is `entries()`.
 
@@ -2658,6 +2750,9 @@ fn main() {
 `position()` is `None` for errors the library locates no better than by code: the
 DOM parser, and the stream helpers' framing errors. `kind()` is `None` for an
 argument error caught before the library and for an allocation failure.
+`ErrorCode::name()` is the library's text for a code on its own
+(`bvn_error_to_string`): `ErrorCode::StringTooLong.name()` is
+`"string_too_long"`.
 
 **`unit_convert_factor` error semantics.** The C function uses the
 `(ok, requires_affine)` pair to signal four distinct outcomes:
@@ -2983,19 +3078,23 @@ kept spelling or a profile-only unit needs it. The 1.1 features (all gated on a
 exposed as:
 
 - **Version:** `bovnar::version()` (library version string),
-  `bovnar::spec_version()` → `(major, minor)` of the highest spec understood, and
+  `bovnar::version_number()` (the same as one number, `major * 10000 + minor *
+  100 + patch`: 20100 for 2.1.0), `bovnar::spec_version()` → `(major, minor)`
+  of the highest spec understood, and
   `bovnar::peek_version(data)` → the `(major, minor)` a document declares, or
   `None`. `Reader::declared_version()` gives the same after a read;
   `ReadOptions { strict_version: true, .. }` rejects a too-new version
-  (`ErrorCode::UnsupportedSpecVersion`). `parse` takes no options; use a
-  `Reader` when you need it.
+  (`ErrorCode::UnsupportedSpecVersion`), from a `Reader`, a feed, or
+  `parse_with_options`.
 - **Richer escapes:** `\u{…}` and `\xHH` in string literals are decoded by the C
   reader, so `parse` returns the resulting text transparently. A surrogate /
   out-of-range `\u` is `ErrorCode::InvalidCodepoint`.
 - **Datetime family:** `parse` decodes a `<datetime:width,epoch>` value to a
   plain `Value::Int` (signed epoch seconds). With `parse_typed` it is a
   `Quantity` whose `epoch_name()` (`"unix"`, `"tai"`, …) and `epoch_mjd()`
-  recover the epoch. `to_string()` emits the `<datetime:…>` annotation and
+  recover the epoch; `bovnar::datetime_epoch_index(name)` goes the other way,
+  to the index a datetime `ValueTypeSpec` holds in `base`, `None` for an
+  unknown name. `to_string()` emits the `<datetime:…>` annotation and
   prepends `#!bovnar 1.1` automatically when the value contains a datetime. With
   `parse_typed` the sub-second fraction of an ISO-8601 literal (spec 1.1) is
   preserved on the `Quantity` (`q.frac`) and re-emitted, so a

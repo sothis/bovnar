@@ -705,6 +705,64 @@ class Writer:
         if not ok:
             self._raise_error()
 
+    def write_octets(self, key: str, value) -> None:
+        """``.key = <octet stream>;`` with the bytes of ``value`` (any
+        bytes-like object), as :func:`bovnar.dumps` writes a ``bytes``
+        value."""
+        from . import _emit_octets  # deferred: avoids an import cycle
+        from .stream import _as_bytes
+        self._check_writable()
+        self.emit(Event.ASSIGNMENT_START, key=key)
+        _emit_octets(self, _as_bytes(value))
+
+    def embed_document(self, key: str, doc) -> None:
+        """``.key = <octets>;`` where the octets are the document ``doc``
+        (``bvnr_embed_document``), for :func:`bovnar.stream.parse_embedded`
+        to read back. Unlike :func:`bovnar.stream.embed_document`, which makes
+        a whole document of one key, this embeds into the document being
+        written, one after another if need be."""
+        from .stream import _writer_key, _void_copy, _as_bytes
+        self._check_writable()
+        kb = _writer_key(key)
+        doc = _as_bytes(doc)
+        dptr, _keep = _void_copy(doc)
+        if not self._lib.bvnr_embed_document(self._ptr, kb, dptr, len(doc)):
+            self._raise_error()
+
+    def mux_begin(self, key: str) -> None:
+        """Open a multiplexed octet stream under ``key`` (``bvnr_mux_begin``):
+        send messages with :meth:`mux_send` and close it with
+        :meth:`mux_end`. Values written before it are read back before the
+        first message, and the document may go on after it -- more values, or
+        another stream -- as :class:`bovnar.stream.DemuxFeed` and
+        :func:`bovnar.stream.mux_load` read it."""
+        from .stream import _writer_key
+        self._check_writable()
+        if not self._lib.bvnr_mux_begin(self._ptr, _writer_key(key)):
+            self._raise_error()
+
+    def mux_send(self, channel: int, payload) -> None:
+        """One message on ``channel`` (an unsigned 64-bit int) of the open
+        mux stream (``bvnr_mux_send``), split over as many octet chunks as it
+        needs. Call :meth:`flush` after it for a consumer reading live."""
+        from .stream import _mux_channel, _as_bytes
+        self._check_writable()
+        ch = _mux_channel(channel)
+        data = payload if type(payload) is bytes else _as_bytes(payload)
+        if not self._lib.bvnr_mux_send(self._ptr, ch, data, len(data)):
+            self._raise_error()
+
+    def mux_end(self) -> None:
+        """Close the open mux stream (``bvnr_mux_end``)."""
+        self._check_writable()
+        if not self._lib.bvnr_mux_end(self._ptr):
+            self._raise_error()
+
+    def _check_writable(self) -> None:
+        if self._ptr is None:
+            raise BovnarArgumentError("Writer has been destroyed")
+        self._check_not_in_sink()
+
     def begin_struct(self, key: str) -> None:
 
         self.emit(Event.ASSIGNMENT_START, key=key)

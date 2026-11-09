@@ -299,6 +299,7 @@ unsafe extern "C" {
     pub fn bvnr_write_version(w: *mut c_void, major: u16, minor: u16) -> bool;
     pub fn bvnr_datetime_epoch_name(vt: ValueTypeSpec) -> *const c_char;
     pub fn bvnr_datetime_epoch_mjd(vt: ValueTypeSpec) -> i32;
+    pub fn bvnr_datetime_epoch_index(name: *const c_char) -> i32;
     pub fn bvnr_writer_create() -> *mut c_void;
     pub fn bvnr_writer_destroy(w: *mut c_void);
     pub fn bvnr_sink_to_fd(s: *mut BvnrSink, fd: c_int);
@@ -400,6 +401,18 @@ unsafe extern "C" {
         exact: *mut bool,
     ) -> i32;
     pub fn bvn_int_bitlen(n: *mut c_void) -> c_int;
+    pub fn bvn_int_alloc() -> *mut c_void;
+    pub fn bvn_int_free(n: *mut c_void);
+    pub fn bvn_int_from_str(n: *mut c_void, s: *const c_char, base: u32) -> bool;
+    pub fn bvn_unit_convert_rational(
+        vnum: *const c_void,
+        vden: *const c_void,
+        from: ValueUnit,
+        to: ValueUnit,
+        out_num: *mut c_void,
+        out_den: *mut c_void,
+        exact: *mut bool,
+    ) -> bool;
     pub fn bvn_int_str_bufsize(bits: u32, base: u32) -> usize;
     pub fn bvn_int_to_str(n: *mut c_void, buf: *mut c_char, bufsize: usize, base: u32) -> i32;
     pub fn bvn_unit_dimension_vector(u: ValueUnit, dims: *mut i32) -> bool;
@@ -753,6 +766,9 @@ pub struct Handlers<'h> {
     pub on_document: Option<&'h mut dyn FnMut(u64, bool, c_int) -> bool>,
     /// The first error `on_error` reported: (code, line, column, byte, offset).
     pub first_error: Option<(c_int, u64, u64, u32, u64)>,
+    /// Called for every error `on_error` reports, recovered or not, with the
+    /// same (code, line, column, byte, offset).
+    pub on_error: Option<&'h mut dyn FnMut(c_int, u64, u64, u32, u64)>,
     pub panic: Option<Box<dyn std::any::Any + Send>>,
 }
 
@@ -841,6 +857,11 @@ extern "C" fn on_error_trampoline(
     let h = unsafe { handlers(ud) };
     h.first_error
         .get_or_insert((err, line, column, byte, offset));
+    h.guard((), |h| {
+        if let Some(f) = h.on_error.as_mut() {
+            f(err, line, column, byte, offset);
+        }
+    });
 }
 
 extern "C" fn on_verified_trampoline(ud: *mut c_void, ev: c_int, d: *const BvnrData) -> bool {
@@ -1815,6 +1836,51 @@ pub mod unit_fns {
         (f, ok, affine)
     }
 
+    /// `bvn_unit_convert_rational` of the decimal fraction `num/den`: the
+    /// exact result as decimal (numerator, denominator) and whether the
+    /// factor was exact. `None` for incompatible or invalid units, a value
+    /// or result past the library's bignum capacity, or no memory.
+    pub fn convert_rational(
+        num: &str,
+        den: &str,
+        from: ValueUnit,
+        to: ValueUnit,
+    ) -> Option<(String, String, bool)> {
+        /// Four bignums freed on every path.
+        struct Ints([*mut c_void; 4]);
+        impl Drop for Ints {
+            fn drop(&mut self) {
+                for n in self.0 {
+                    // SAFETY: NULL or a bignum allocated below, freed once.
+                    unsafe { bvn_int_free(n) };
+                }
+            }
+        }
+        // SAFETY: no arguments; each result is freed by `Ints`.
+        let ints = Ints(std::array::from_fn(|_| unsafe { bvn_int_alloc() }));
+        if ints.0.iter().any(|n| n.is_null()) {
+            return None;
+        }
+        let [vnum, vden, onum, oden] = ints.0;
+        let (num, den) = (CString::new(num).ok()?, CString::new(den).ok()?);
+        let mut exact = false;
+        // SAFETY: live bignums and NUL-terminated strings; the outputs are
+        // writable for the call.
+        let ok = unsafe {
+            bvn_int_from_str(vnum, num.as_ptr(), 10)
+                && bvn_int_from_str(vden, den.as_ptr(), 10)
+                && bvn_unit_convert_rational(vnum, vden, from, to, onum, oden, &mut exact)
+        };
+        if !ok {
+            return None;
+        }
+        Some((
+            super::int_to_decimal(onum)?,
+            super::int_to_decimal(oden)?,
+            exact,
+        ))
+    }
+
     /// `bvn_unit_convert_value`.
     pub fn convert_value(value: f64, from: ValueUnit, to: ValueUnit) -> Option<f64> {
         let mut out = 0.0;
@@ -1901,6 +1967,22 @@ pub fn version_string() -> String {
     unsafe { CStr::from_ptr(bvnr_version_string()) }
         .to_string_lossy()
         .into_owned()
+}
+
+/// `bvnr_version`: the library version as `major * 10000 + minor * 100 +
+/// patch`.
+pub fn version_number() -> u32 {
+    // SAFETY: no arguments; returns a constant.
+    unsafe { bvnr_version() }
+}
+
+/// `bvnr_datetime_epoch_index`: the epoch index of `name`, or `None` for a
+/// name the library does not know (or one holding a NUL byte).
+pub fn datetime_epoch_index(name: &str) -> Option<u32> {
+    let name = CString::new(name).ok()?;
+    // SAFETY: a NUL-terminated string, only read during the call.
+    let idx = unsafe { bvnr_datetime_epoch_index(name.as_ptr()) };
+    u32::try_from(idx).ok()
 }
 
 /// `bvnr_spec_version`: the newest format version the library implements.
@@ -3087,6 +3169,14 @@ pub struct DemuxHandle {
     attached: Attached,
 }
 
+/// What a reader counts beside its error: recoveries, the bytes they
+/// skipped, and the declared `#!bovnar` version.
+pub struct ReaderCounters {
+    pub recovery_count: u64,
+    pub skipped_bytes: u64,
+    pub declared_version: Option<(u16, u16)>,
+}
+
 impl DemuxHandle {
     /// A demux for messages up to `max_message` (0 for the default), only of
     /// streams under `key` when there is one. `Err` names the call that could
@@ -3200,6 +3290,27 @@ impl DemuxHandle {
     pub fn error(&self) -> c_int {
         // SAFETY: the demux is live.
         unsafe { bvnr_demux_error(self.dm.as_ptr()) }
+    }
+
+    /// The fed reader's recovery count, skipped bytes and declared version
+    /// (`bvnr_demux_get_reader`), when the demux has been opened.
+    pub fn reader_counters(&self) -> Option<ReaderCounters> {
+        // SAFETY: the demux is live; the reader it returns is NULL or owned
+        // by the demux, and only read here.
+        let r = unsafe { bvnr_demux_get_reader(self.dm.as_ptr()) }.cast_mut();
+        if r.is_null() {
+            return None;
+        }
+        let (mut major, mut minor) = (0u16, 0u16);
+        // SAFETY: as above; the version getter writes two u16 out-params.
+        unsafe {
+            let declared = bvnr_reader_get_declared_version(r, &mut major, &mut minor);
+            Some(ReaderCounters {
+                recovery_count: bvnr_reader_get_recovery_count(r),
+                skipped_bytes: bvnr_reader_get_skipped_bytes(r),
+                declared_version: declared.then_some((major, minor)),
+            })
+        }
     }
 
     /// The error of the fed reader, when the demux has been opened.

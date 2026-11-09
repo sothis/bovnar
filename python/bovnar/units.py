@@ -464,6 +464,64 @@ def convert_value(value: float,
     return out.value
 
 
+def convert_rational(value, from_unit: ValueUnit, to_unit: ValueUnit):
+    """Convert *value* (an int, a :class:`fractions.Fraction` or anything
+    ``Fraction()`` takes exactly, such as a ``Decimal``) from *from_unit* to
+    *to_unit* EXACTLY, with the arbitrary-precision engine behind the reader's
+    ``want_unit`` hook (``bvn_unit_convert_rational``).
+
+    Returns ``(Fraction, exact)``. ``exact`` is ``False`` when the true factor
+    between the two units is irrational (a π-based angle such as ° to rad):
+    the result is then only an approximation, which a lossless consumer must
+    refuse. Raises BovnarArgumentError for incompatible or invalid units, for
+    a value that is not exact (a ``float`` is refused: pass
+    ``Fraction(x)`` to convert its binary value), and when the exact result
+    needs more than the library's 32768 bits.
+    """
+    import fractions
+    if isinstance(value, float):
+        raise BovnarArgumentError(
+            "convert_rational takes an exact value; pass Fraction(x) to "
+            "convert the float's own binary value")
+    try:
+        value = fractions.Fraction(value)
+    except (TypeError, ValueError) as e:
+        raise BovnarArgumentError(f"convert_rational: {e}") from None
+    lib = get_library()
+    ints = [lib.bvn_int_alloc() for _ in range(4)]
+    try:
+        if not all(ints):
+            raise MemoryError("bvn_int_alloc() returned NULL")
+        vnum, vden, onum, oden = ints
+        # In hex both ways: Python caps decimal conversion of a big int at
+        # 4300 digits, and a 32768-bit value has nearly 10000.
+        if not (lib.bvn_int_from_str(vnum, format(value.numerator, 'x').encode(),
+                                     16)
+                and lib.bvn_int_from_str(vden,
+                                         format(value.denominator, 'x').encode(),
+                                         16)):
+            raise BovnarArgumentError(
+                "convert_rational: the value needs more than 32768 bits")
+        exact = ctypes.c_bool(False)
+        if not lib.bvn_unit_convert_rational(
+                vnum, vden, _as_vu(from_unit), _as_vu(to_unit), onum, oden,
+                ctypes.byref(exact)):
+            raise BovnarArgumentError(
+                "convert_rational: incompatible or invalid units, or an exact "
+                "result past 32768 bits")
+
+        def _int(n) -> int:
+            size = lib.bvn_int_str_bufsize(lib.bvn_int_bitlen(n), 16)
+            buf = ctypes.create_string_buffer(size)
+            if lib.bvn_int_to_str(n, buf, size, 16) < 0:
+                raise MemoryError("bvn_int_to_str() failed")
+            return int(buf.value, 16)
+        return fractions.Fraction(_int(onum), _int(oden)), bool(exact.value)
+    finally:
+        for n in ints:
+            lib.bvn_int_free(n)
+
+
 __all__ = [
     'UnitFlags',
     'SIConversion', 'UnitConversion', 'ReducedUnit', 'SI_DIM_NAMES',
@@ -476,6 +534,6 @@ __all__ = [
     'unit_dimension_vector', 'unit_reduce',
     'unit_to_str_ex',
     'exponent_to_int', 'int_to_exponent',
-    'convert_value',
+    'convert_value', 'convert_rational',
     'make_unit_compound',
 ]

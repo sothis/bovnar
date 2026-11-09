@@ -319,11 +319,11 @@
     /* The current annotation group, for the one family whose synthesised flag
        the type_base signal cannot state: a datetime emits no type_base at all
        (its slot holds the epoch index, and a base parameter is illegal for it),
-       so a bare datetime literal's default group looks exactly like an
-       explicit `<datetime>`+width one. The reader's own sign is the group's
-       TEXT: the synthesised default is spelled "datetime" and resolves a
-       width (one parameter), while an explicit `<datetime>` spells "datetime"
-       with no parameters and `<datetime:64>` spells its width into the text. */
+       so the type_base signal is silent for a defaulted datetime. The reader's
+       own sign is the group's TEXT beside its parameter count: the synthesised
+       default is spelled "datetime" and resolves a width (one parameter),
+       while an explicit `<datetime>` spells "datetime" with no parameters, and
+       `<datetime:64>` spells its width into the text. */
     var annText = '', annParams = 0, annFamily = null;
     var oct = null;       // the octet node currently collecting chunks
     /* struct_close events already spent by a resynced array_row_end (below) */

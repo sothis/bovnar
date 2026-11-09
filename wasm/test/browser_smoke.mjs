@@ -153,6 +153,9 @@ ok(/✓/.test(industrialMsg) && /reactor/.test(industrialMsg),
 const frameNo = /id="s-frame"[^>]*>(\d+)</.exec(dom);
 ok(frameNo && Number(frameNo[1]) > 0,
    `mission frame counter is "${frameNo ? frameNo[1] : ''}", expected it to advance`);
+const met = textOf('s-met');
+ok(/^\d+:\d\d:\d\d$/.test(met),
+   `mission MET is "${met}", expected a h:mm:ss clock`);
 const frames = windowOf('framesrc');
 ok(frames.includes('#!bovnar') && frames.includes('bvh-key'),
    'mission telemetry frame is not shown with its syntax classes');

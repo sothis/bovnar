@@ -675,7 +675,41 @@ console.log('# unit policy (vs the CLI)');
     .events.find(x => x.ev === 'data');
   ok(baseEv && baseEv.converted === '7d0' && baseEv.converted_base === 16,
      `policy rule base: ${JSON.stringify(baseEv)}`);
+  ok(b.validate('.speed = 2 km;', { policy: baseRule }).ok ===
+     cliValidate('.speed = 2 km;', ['--field', '.speed=m', '--base', '16']).ok,
+     'policy rule base: agrees with --field --base');
   baseRule.dispose();
+
+  // The rest of the builder's mapping, against the flags that name the same
+  // thing: leave-inexact (and its strict opposite), target order, and the
+  // normalise output base.
+  const inexactDoc = '.x = <float:64,k~m/h> 100.0;';   // 250/9 m/s
+  const leave = b.createPolicy().target('m/s').onInexact('leave');
+  ok(b.validate(inexactDoc, { policy: leave }).ok &&
+     cliValidate(inexactDoc, ['--unit', 'm/s', '--leave-inexact']).ok,
+     'policy onInexact leave: agrees with --leave-inexact');
+  leave.dispose();
+  const strict = b.createPolicy().target('m/s');
+  ok(b.validate(inexactDoc, { policy: strict }).error_name ===
+     cliValidate(inexactDoc, ['--unit', 'm/s']).error_name,
+     'policy strict conversion: agrees with the CLI error');
+  strict.dispose();
+  const order = b.createPolicy().target('s').target('m');
+  const orderEv = b.events('.x = 2 km;', { policy: order }).events
+    .find(x => x.ev === 'data');
+  ok(b.validate('.x = 2 km;', { policy: order }).ok ===
+     cliValidate('.x = 2 km;', ['--unit', 's', '--unit', 'm']).ok &&
+     orderEv && orderEv.converted === '2000',
+     `policy target order: first convertible target wins ${JSON.stringify(orderEv)}`);
+  order.dispose();
+  const siBase = b.createPolicy().normaliseSI().base(16);
+  const siEv = b.events('.x = 2 km;', { policy: siBase }).events
+    .find(x => x.ev === 'data');
+  ok(b.validate('.x = 2 km;', { policy: siBase }).ok ===
+     cliValidate('.x = 2 km;', ['--si', '--base', '16']).ok &&
+     siEv && siEv.converted === '7d0' && siEv.converted_base === 16,
+     `policy normaliseSI base: ${JSON.stringify(siEv)}`);
+  siBase.dispose();
 
   const dim = b.createPolicy().requireConvertibleTo('m');
   ok(b.validate('.a = 1;', { policy: dim }).error_name ===

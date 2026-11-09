@@ -30,11 +30,34 @@ attempt=${3:-}
 
 # Each API answer is fetched into a variable first, so that a failing call stops the
 # script (set -e) instead of reading as an empty answer.
-info=$(gh api "repos/$repo/actions/runs/$run" --jq '"\(.head_branch) \(.head_sha)"')
+info=$(gh api "repos/$repo/actions/runs/$run" --jq '"\(.head_branch // "") \(.head_sha // "")"')
 read -r ref sha <<< "$info"
 [ -n "$ref" ] && [ -n "$sha" ] || { echo "keep: run $run names no branch or commit"; exit 0; }
-if ! gh api "repos/$repo/git/ref/tags/$ref" --silent 2>/dev/null; then
-  head=$(gh api "repos/$repo/branches/$ref" --jq .commit.sha 2>/dev/null || true)
+
+# gh api where a 404 is an answer: prints the response and returns 0, returns 1
+# for a 404, and fails with status 2 on anything else (a 5xx, a rate limit), so
+# that a transient error is not read as "no such tag" or "the branch moved on".
+errf=$(mktemp)
+trap 'rm -f "$errf"' EXIT
+api_or_404() {
+  local out
+  if out=$(gh api "$@" 2>"$errf"); then
+    printf '%s\n' "$out"
+    return 0
+  fi
+  grep -q 'HTTP 404' "$errf" && return 1
+  cat "$errf" >&2
+  exit 2
+}
+
+# A tag run always qualifies; a branch run only while the branch is still at
+# the run's commit.
+tag_rc=0
+api_or_404 "repos/$repo/git/ref/tags/$ref" --silent > /dev/null || tag_rc=$?
+if [ "$tag_rc" -ne 0 ]; then
+  head_rc=0
+  head=$(api_or_404 "repos/$repo/branches/$ref" --jq .commit.sha) || head_rc=$?
+  [ "$head_rc" -le 1 ] || exit "$head_rc"
   if [ "$head" != "$sha" ]; then
     echo "keep: $ref has moved on from ${sha:0:12}"
     exit 0

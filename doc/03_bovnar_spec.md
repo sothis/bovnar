@@ -2765,10 +2765,13 @@ void bvnr_source_from_fd(bvnr_source_t* s, int fd);
 void bvnr_source_from_mem(bvnr_source_t* s, const void* buf, uint64_t len);
 void bvnr_sink_to_fd(bvnr_sink_t* s, int fd);
 void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint64_t cap);
+void bvnr_source_from_callback(bvnr_source_t* s, bvnr_pull_fn pull, void* userdata);
+void bvnr_sink_to_callback(bvnr_sink_t* s, bvnr_push_fn push,
+                           bvnr_flush_fn flush, void* userdata);
 uint64_t bvnr_sink_bytes_written(const bvnr_sink_t* s);
 ```
 
-`bvnr_sink_bytes_written` queries the total bytes written to a memory sink created with `bvnr_sink_to_mem` **by the caller**; `bvnr_open_write_sink` copies the sink, so writer output never advances the caller's struct and this stays 0. For writer output use `bvnr_writer_bytes_written` (read/write API §2.4, §2.10).
+The callback constructors take the I/O from the caller's functions (read/write API §1.14, §2.17). `bvnr_sink_bytes_written` queries the total bytes written to a sink **by the caller**; `bvnr_open_write_sink` copies the sink, so writer output never advances the caller's struct and this stays 0. For writer output use `bvnr_writer_bytes_written` (read/write API §2.4, §2.10).
 
 ### 16.6 Reading
 
@@ -2782,6 +2785,12 @@ bool bvnr_open_read_mem(bvnr_reader_t* r, const void* buf, uint64_t len,
                         bvnr_read_flags_t* options);
 
 bool bvnr_read(bvnr_reader_t* r);
+
+/* Push-fed reading: bytes handed over in pieces (read/write API §1.15) */
+bool bvnr_open_read_feed(bvnr_reader_t* r, const bvnr_sink_t* src_mirror,
+                         bvnr_read_flags_t* options);
+bool bvnr_read_feed(bvnr_reader_t* r, const void* buf, uint64_t len);
+bool bvnr_read_finish(bvnr_reader_t* r);
 
 bvnr_reader_t* bvnr_reader_create(void);   /* the reader is opaque */
 void           bvnr_reader_destroy(bvnr_reader_t* r);

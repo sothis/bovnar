@@ -344,3 +344,97 @@ class TestReviewFixes:
             mw.send(1, b'y')
         assert isinstance(later.value.__cause__, ConnectionResetError)
         mw.close()
+
+
+class TestThirdReviewFixes:
+    """What a third review of the sources and payloads found (2026-11-09)."""
+
+    def test_a_buffered_io_base_with_only_read(self):
+        # Its inherited readinto1 calls read1, which it does not have.
+        class OnlyRead(io.BufferedIOBase):
+            def __init__(self, data):
+                self._b = io.BytesIO(data)
+
+            def readable(self):
+                return True
+
+            def read(self, n=-1):
+                return self._b.read(n)
+        assert bovnar.load(OnlyRead(b'.a = 1;')) == {'a': 1}
+        blob = stream.frame_documents([b'.a = 1;', b'.b = 2;'])
+        assert stream.load_documents(OnlyRead(blob)) == [{'a': 1}, {'b': 2}]
+        assert bovnar.canonicalize(OnlyRead(b'.a = 1;')) == \
+            bovnar.canonicalize(b'.a = 1;')
+
+    def test_an_mmap_is_bytes_not_a_stream(self):
+        # It has read(), and was read from its position: the end once it had
+        # been written to, so every loader saw an empty input.
+        import mmap
+
+        def written(data):
+            mm = mmap.mmap(-1, len(data))
+            mm.write(data)
+            return mm
+        blob = stream.frame_documents([b'.a = 1;', b'.b = 2;'])
+        assert stream.load_documents(written(blob)) == [{'a': 1}, {'b': 2}]
+        mux = stream.mux_dump([(1, b'abc')])
+        assert stream.mux_load(written(mux)) == [(1, b'abc')]
+        assert bovnar.canonicalize(written(b'.a = 1;')) == \
+            bovnar.canonicalize(b'.a = 1;')
+
+    @pytest.mark.parametrize('bad', [[1, 2, 3], {1: 2}, range(3), None, 1.5, 5])
+    def test_a_payload_is_bytes_like(self, bad):
+        # bytes() of a list sent its items, of a dict its keys.
+        with pytest.raises(BovnarArgumentError):
+            stream.mux_dump([(1, bad)])
+        with pytest.raises(BovnarArgumentError):
+            stream.frame_documents([bad])
+        with pytest.raises(BovnarArgumentError):
+            stream.embed_document(bad)
+        with pytest.raises(BovnarArgumentError):
+            stream.FrameWriter(io.BytesIO()).write(bad)
+        with pytest.raises(BovnarArgumentError):
+            stream.MuxWriter(io.BytesIO()).send(1, bad)
+        w = bovnar.Writer.to_mem()
+        with pytest.raises(BovnarArgumentError):
+            w.write_octets('k', bad)
+        assert w.bytes_written == 0               # nothing written first
+
+    def test_payloads_that_are_bytes_like_or_str(self):
+        import array
+        want = stream.mux_dump([(1, b'hi')])
+        for p in (b'hi', bytearray(b'hi'), memoryview(b'hi'), 'hi',
+                  array.array('B', b'hi')):
+            assert stream.mux_dump([(1, p)]) == want
+
+    @pytest.mark.parametrize('bad', [-1, 1 << 64, 1.5, '10', None])
+    def test_a_size_cap_ctypes_would_wrap_is_refused(self, bad):
+        with pytest.raises(BovnarArgumentError):
+            stream.load_documents(b'', max_document_size=bad)
+        with pytest.raises(BovnarArgumentError):
+            stream.mux_load(stream.mux_dump([]), max_message=bad)
+
+    def test_a_lone_surrogate_in_a_key_filter(self):
+        with pytest.raises(BovnarArgumentError):
+            stream.mux_load(stream.mux_dump([]), key='\udc00')
+
+    def test_canonicalize_frees_its_observer_when_the_reader_fails(
+            self, monkeypatch):
+        from bovnar import reader as reader_mod
+        from bovnar._ffi import get_library
+        lib = get_library()
+        destroyed = []
+        real = lib.bvnr_canon_observer_destroy
+
+        def spy(obs):
+            destroyed.append(obs)
+            return real(obs)
+
+        class NoReader:
+            def __init__(self):
+                raise MemoryError("no reader")
+        monkeypatch.setattr(lib, 'bvnr_canon_observer_destroy', spy)
+        monkeypatch.setattr(reader_mod, 'Reader', NoReader)
+        with pytest.raises(MemoryError):
+            bovnar.canonicalize(b'.a = 1;')
+        assert len(destroyed) == 1

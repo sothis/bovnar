@@ -163,7 +163,8 @@ it: a writer never limits how much it writes.)</p>
 </table>
 <div class="codehilite"><pre><span></span><code><span class="n">bvnr_read_flags_t</span><span class="w"> </span><span class="n">fl</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="p">.</span><span class="n">on_verified</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="n">my_cb</span><span class="p">,</span>
-<span class="w">    </span><span class="p">.</span><span class="n">max_file_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BVNR_FILESIZE_UNLIMITED</span><span class="p">,</span><span class="w">   </span><span class="cm">/* endless */</span>
+<span class="w">    </span><span class="p">.</span><span class="n">max_file_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BVNR_FILESIZE_UNLIMITED</span><span class="p">,</span><span class="w">   </span><span class="cm">/* no total cap */</span>
+<span class="w">    </span><span class="p">.</span><span class="n">max_text_bytes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">UINT64_MAX</span><span class="p">,</span><span class="w">               </span><span class="cm">/* endless text too */</span>
 <span class="p">};</span>
 </code></pre></div>
 
@@ -294,7 +295,10 @@ reader is <strong>fed</strong> instead (§8), and keeps one reader for the whole
 <p>Feeding never fails for want of input; <code>bvnr_frame_reader_finish</code> is where a
 stream cut inside a header or a payload is <code>error_got_incomplete_bvnr_stream</code>. A
 bad magic is <code>error_unexpected_input_byte</code>, a declared length over the cap
-<code>error_value_out_of_range</code>.</p>
+<code>error_value_out_of_range</code>. The frame reader is not re-entrant: a feed or
+finish from inside <code>on_document</code> or one of the reader's callbacks fails the
+stream with <code>error_invalid_argument</code>, and the feed running stops after the
+event that made the call.</p>
 <hr />
 <h2 id="3-octet-multiplexing-out-of-band-channels-cross-chunk">3. Octet multiplexing (out-of-band channels, cross-chunk)</h2>
 <p>Many logical channels interleaved inside a <strong>single octet-stream value</strong>. The
@@ -477,13 +481,17 @@ values after it:</p>
 <p>A message that lies whole in the fed buffer is handed out from it without a
 copy, one whole in a chunk that arrived split across feeds from the reader's
 chunk buffer, and one split across chunks is reassembled in the channel's
-buffer.
+buffer. (The reader takes a fed buffer in windows of 1 MiB, and a chunk that
+straddles a window's end is gathered like one split across feeds.)
 Everything an item points to is valid until the next call on the demux, and the
 fed buffer must stay valid until <code>bvnr_demux_next</code> has returned
 <code>BVNR_NEXT_NONE</code> (feeding before that is refused). Truncation is a finish
 result, as for any fed reader: <code>bvnr_demux_finish</code> returns what <code>bvnr_read</code> would
 for the document, and a message the stream's end cut short is still the latched,
-non-fatal <code>error_octet_stream_truncated</code>.</p>
+non-fatal <code>error_octet_stream_truncated</code>. The demux is not re-entrant: a feed,
+next, finish or re-open from inside <code>on_message</code> or one of the reader's
+callbacks fails the stream with <code>error_invalid_argument</code>, and the call running
+stops after the event that made it.</p>
 <hr />
 <h2 id="4-document-in-document">4. Document-in-document</h2>
 <p>Embed a complete Bovnar document as the octet-stream payload of a key. The outer
@@ -533,7 +541,7 @@ strict-vs-resilient document policy behave identically):</p>
 </code></pre></div>
 
 <p><code>stream.BVNR_FILESIZE_UNLIMITED</code> (<code>== 0</code>) selects endless mode for
-<strong><code>max_file_size</code></strong> only. Note it does <strong>not</strong> lift the framing/mux guards:
+<strong><code>max_file_size</code></strong> only (the text stays capped by <code>max_text_bytes</code>, §1). Note it does <strong>not</strong> lift the framing/mux guards:
 for <code>max_document_size</code> and <code>max_message</code>, <code>0</code> selects their finite defaults
 (<code>BVNR_DOC_DEFAULT_MAX</code> / <code>BVNR_MUX_DEFAULT_MAX</code>), so pass an explicit large
 value there to raise them. See <a href="https://www.bovnar.io/docs/python/">Python Bindings</a>
@@ -644,8 +652,9 @@ beside it, every reader limit. See
 <li>A <strong>frame stream</strong> (2) can carry documents that each <strong>embed</strong> sub-documents (4).</li>
 <li>A <strong>multiplexed</strong> octet stream (3) is itself just one value in a document, which
   can be one frame in a frame stream (2).</li>
-<li>Any of the above is <strong>endless</strong> (1) by default (<code>max_file_size</code> 0 ==
-  <code>BVNR_FILESIZE_UNLIMITED</code>); set a positive <code>max_file_size</code> to impose a cap.</li>
+<li>Any of the above has no total-byte cap (1) by default (<code>max_file_size</code> 0 ==
+  <code>BVNR_FILESIZE_UNLIMITED</code>); set a positive <code>max_file_size</code> to impose one.
+  Octet streams are then endless; text is capped by <code>max_text_bytes</code> (§1).</li>
 </ul>
 <p>Because each is a thin application over the public event API, you can also write
 your own consumer/producer at the same seam without touching the core.</p>

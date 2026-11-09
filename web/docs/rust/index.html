@@ -1202,6 +1202,10 @@ of its own), and they are latched:</p>
 <td><code>finish()</code> before the stream opened, or before its <code>;</code></td>
 <td><code>got_incomplete_bvnr_stream</code></td>
 </tr>
+<tr>
+<td>A comment after the <code>;</code> that is not UTF-8, or that the input ends inside a character of (<code>finish()</code>)</td>
+<td><code>invalid_utf8_byte</code></td>
+</tr>
 </tbody>
 </table>
 <p><strong>Frames.</strong> <code>codec::frame_header(len)</code>, <code>write_frame(&amp;mut vec, doc)</code> and
@@ -1506,7 +1510,10 @@ key scope, <code>max_message</code>, the 4096-channel limit and every error of
 <code>stream::mux_load</code>. Each <code>next</code> returns a <code>DemuxItem::Message { channel,
 payload }</code> or, with <code>deliver_events</code>, a <code>DemuxItem::Event</code> for every event but
 the stream's chunks, in document order: the metadata before the stream comes
-out before its first message, and a <code>ValueBuilder</code> makes values of it. After
+out before its first message, and a <code>ValueBuilder</code> makes values of it (the
+demux withholds the stream's chunks but not its start and end, so the builder
+also hands out the stream's own key, as an empty <code>Value::Bytes</code>, once the
+stream ends; Python's <code>DemuxFeed(values=True)</code> leaves it out). After
 <code>finish()</code>, <code>next</code> on an empty slice hands out the closing events (more input is
 refused with an <code>Error::Argument</code>); <code>reset()</code>
 starts the next document: the channel buffers are kept, the channel ids (and

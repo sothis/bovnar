@@ -2418,6 +2418,10 @@ bool bvnr_read(bvnr_reader_t* r)
 			r->val.last_error = error_invalid_argument;
 			if (r->lex.feed_mode)
 				r->lex.feed_ended = true;
+			/* From inside a callback: the feed running stops after
+			 * the event that called. */
+			if (r->lex.feed_busy)
+				bvn_lex_pause(r);
 		}
 		return false;
 	}
@@ -2461,6 +2465,19 @@ bool bvnr_reader_get_declared_version(
 	return true;
 }
 /*
+ * A feed, finish or re-open from inside one of the reader's own callbacks,
+ * while bvnr_read_feed is lexing: the read ends with error_invalid_argument,
+ * and the feed running stops right after the event that called (it then
+ * returns false too).
+ */
+static void bvn_feed_reentered(bvnr_reader_t* r)
+{
+	if (!r->lex.feed_ended)
+		r->val.last_error = error_invalid_argument;
+	r->lex.feed_ended = true;
+	bvn_lex_pause(r);
+}
+/*
  * Bind a reader to a source and arm it for bvnr_read. Clears any previous
  * lexer state first so a single reader can be reused for many documents; its
  * buffers are kept (bvn_lex_reset), so a re-open allocates nothing.
@@ -2475,6 +2492,12 @@ bool bvnr_open_read_source(
 {
 	if (!r)
 		return false;
+	/* Re-opened from inside one of its own callbacks: the feed running
+	 * still uses the buffers a re-open would free. */
+	if (r->lex.feed_busy) {
+		bvn_feed_reentered(r);
+		return false;
+	}
 	bvn_lex_reset(&r->lex);
 	if (!src || !bvn_source_impl_c(src)->pull)
 		return false;
@@ -2494,6 +2517,12 @@ bool bvnr_open_read_feed(
 {
 	if (!r)
 		return false;
+	/* Re-opened from inside one of its own callbacks: the feed running
+	 * still uses the buffers a re-open would free. */
+	if (r->lex.feed_busy) {
+		bvn_feed_reentered(r);
+		return false;
+	}
 	bvn_lex_reset(&r->lex);
 	if (!bvn_lex_init(&r->lex, NULL, dbg_sink, options))
 		return false;
@@ -2520,13 +2549,21 @@ bool bvnr_read_feed(bvnr_reader_t* r, const void* buf, uint64_t len)
 {
 	if (!bvn_feed_usable(r))
 		return false;
+	if (r->lex.feed_busy) {
+		bvn_feed_reentered(r);
+		return false;
+	}
 	if ((!buf && len) || bvn_lex_feed_pending(&r->lex)) {
 		r->val.last_error = error_invalid_argument;
 		r->lex.feed_ended = true;
 		return false;
 	}
 	bvn_lex_feed_attach(r, (const uint8_t*)buf, len);
-	if (bvn_lex_feed_run(r) == BVN_FEED_ERROR) {
+	r->lex.feed_busy = true;
+	int rc = bvn_lex_feed_run(r);
+	r->lex.feed_busy = false;
+	/* feed_ended is set here only by a call from inside a callback. */
+	if (rc == BVN_FEED_ERROR || r->lex.feed_ended) {
 		r->lex.feed_ended = true;
 		return false;
 	}
@@ -2536,6 +2573,10 @@ bool bvnr_read_finish(bvnr_reader_t* r)
 {
 	if (!bvn_feed_usable(r))
 		return false;
+	if (r->lex.feed_busy) {
+		bvn_feed_reentered(r);
+		return false;
+	}
 	r->lex.feed_ended = true;
 	if (bvn_lex_feed_pending(&r->lex)) {
 		r->val.last_error = error_invalid_argument;

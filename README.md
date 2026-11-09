@@ -92,7 +92,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
 - **Browser playground** — the real C reference parser, compiled to WebAssembly (`bovnar_parser_wasm.js` over `bovnar_wasm_core.js`), runs the reference verified event stream (with full type/unit/value validation) in the browser and powers an interactive web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
-- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 470-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), Python and Rust test suites with cargo-fuzz targets for the crate, and a built-in benchmark mode (`bovnar bench`).
+- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 470-case conformance suite, fuzz harnesses (reader, push-fed reader, writer, DOM, utils), Python and Rust test suites with cargo-fuzz targets for the crate, and a built-in benchmark mode (`bovnar bench`).
 
 ---
 
@@ -300,7 +300,10 @@ bovnar/
 │       ├── reader.py
 │       ├── writer.py
 │       ├── dom.py
-│       ├── stream.py        # Framing / multiplexing streaming API
+│       ├── stream.py        # Framing / multiplexing, push-fed feeds and live writers
+│       ├── timekeeping.py   # Civil time, epochs and calendars
+│       ├── literals.py      # Literal helpers and type annotations
+│       ├── unit.py          # The Unit object
 │       ├── units.py
 │       ├── currency.py
 │       ├── quantity.py
@@ -308,6 +311,8 @@ bovnar/
 │       ├── enums.py
 │       ├── exceptions.py
 │       ├── _ffi.py          # ctypes FFI layer
+│       ├── _fileio.py       # File objects as sources and sinks
+│       ├── _bigint.py       # Integer text past int_max_str_digits
 │       ├── _bvnfloat.py     # float16 / decimal-float helpers
 │       └── _numpy.py, _pint_bridge.py, _pint_units.py   # optional NumPy / Pint bridges
 ├── rust/                    # Rust crate: build.rs compiles the C library in
@@ -612,7 +617,7 @@ CTest additionally runs every file in `examples/` through `bovnar events` and `b
 
 ### Python tests
 
-Python binding tests are registered automatically when a Python 3 interpreter is found at configure time — no extra flag is required:
+Python binding tests are registered automatically when a Python 3 interpreter with `pytest` is found at configure time, on a non-Windows host, in a build with every unit profile (`BVNR_ALL_PROFILES`, the default) — no extra flag is required:
 
 ```bash
 cmake -B build .
@@ -836,7 +841,7 @@ cd web && ./httpd.sh          # python3 -m http.server
 
 - **Scientific and measurement data** — numbers with explicit physical units travel with the payload.
 - **Financial and crypto data** — monetary amounts carry their ISO 4217 or cryptocurrency unit and minor-unit precision inline, removing ambiguity between currencies and scales.
-- **Embedded systems / IoT** — the streaming parser has a small, allocation-friendly footprint; no heap required for the lexer itself.
+- **Embedded systems / IoT** — the streaming parser has a small, allocation-friendly footprint: the lexer's buffers are allocated once per reader and reused for every document.
 - **Hardware and software configuration** — typed values eliminate range ambiguity (e.g., `<uint:16>` for a port number).
 - **Mixed text + binary payloads** — log entries with attached raw memory dumps, firmware images, or sensor frames.
 - **Multi-dimensional data** — matrices, image frames, time-series batches, any tabular structure where rows are a natural unit.

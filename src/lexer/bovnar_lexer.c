@@ -2146,6 +2146,12 @@ static bool bvn_lex_octet(bvnr_reader_t* p, const uint8_t* data, uint32_t len,
 				return true;
 			}
 			if (tag != 0x01) {
+				/* The mirror gets the bytes through the bad tag, as the
+				 * text path's gets them through the byte its error is
+				 * at; the read has failed whatever it does with them. */
+				if (l->use_dbg && pos > mirrored)
+					(void)bvn_sink_push(&l->src_dbg,
+						data + mirrored, pos - mirrored);
 				bvn_capture_os_error(p, error_octet_stream_out_of_sync,
 						     len - pos);
 				/* The tag has been consumed, so the position reached is

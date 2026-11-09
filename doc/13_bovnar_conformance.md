@@ -49,12 +49,13 @@ compliant behaviour.  The reference implementation (this repository) is
 used both as the test driver and as the oracle against which candidate
 implementations are judged.
 
-Two use modes are supported:
+Three use modes are supported:
 
 | Mode | Description |
 |------|-------------|
 | **Self-test** (default) | Runs the corpus against the reference libbvnr directly |
 | **IUT test** (`--iut`) | Invokes an external binary and compares its output to the reference |
+| **Feed equivalence** (`--feed`) | Feeds every case to the push-fed reader (`bvnr_read_feed`) cut at every byte, and byte by byte, and checks it reads exactly as `bvnr_read` reads it whole |
 
 ---
 
@@ -160,9 +161,12 @@ bvnr_conformance [OPTIONS]
 Options:
   --iut <binary>   Path to the IUT binary to test
   --filter <group> Run only cases in the specified group
+  --feed           Instead of the expectations, check that every case fed
+                   to bvnr_read_feed in pieces (cut at every byte, and byte
+                   by byte) reads exactly as bvnr_read reads it whole
   --list           List all test case IDs and descriptions
   --verbose        Print additional diagnostic information
-  --help           Show this help and exit
+  --help, -h       Show this help and exit
 ```
 
 ### 5.2 Examples
@@ -659,14 +663,15 @@ cmake --build build --target bvnr_conformance
 
 ## 11. CMake Integration
 
-Two CTest tests are registered:
+Three CTest tests are registered:
 
 | CTest name | What it runs |
 |------------|-------------|
 | `bvnr_conformance_self` | Conformance suite against the reference implementation |
 | `bvnr_conformance_iut_self` | Conformance suite using the IUT adapter as the external binary |
+| `bvnr_conformance_feed` | Feed equivalence (`--feed`): every case through the push-fed reader |
 
-Both are in the `conformance` label group and can be run with:
+All three are in the `conformance` label group and can be run with:
 
 ```sh
 ctest -L conformance --output-on-failure

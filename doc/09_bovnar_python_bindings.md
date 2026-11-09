@@ -452,6 +452,11 @@ them: `load_documents` each document, with `max_file_size` capping one
 document and `max_document_size` one frame; `mux_load` the document around the
 stream; `parse_embedded` the embedded document, as a document of its own, with
 `max_file_size` capping its bytes. All three read with no total cap by default.
+`max_document_size` and `max_message` are held to the rule of the read limits:
+an int from 0 to 2**64 − 1, or `BovnarArgumentError`. Bytes handed to these
+functions — a payload, a document, the input — are any bytes-like object (an
+`mmap` is read whole, not from its position) or a `str`, taken as UTF-8;
+anything else is a `BovnarArgumentError`.
 
 To write a mux stream, or an embedded document, inside a document of any
 shape — values after it, more than one stream — use the `Writer` (§12.9):
@@ -726,7 +731,11 @@ call that pushed — the constructor, `send`, `write`, `flush` or `close` —
 unchanged. The writer has failed then: `MuxWriter.close()` only releases it,
 and a `FrameWriter`, which may have written half a frame, refuses further
 documents. Leaving a `MuxWriter`'s `with` block by an exception does not end the
-stream either, so a reader sees it cut off rather than complete.
+stream either, so a reader sees it cut off rather than complete. The object's
+own `write()` and `flush()` may not call back into the writer that called them —
+send, write, flush or close it, or for `Writer.to_stream` write a value: that
+raises `BovnarArgumentError`, where the bytes written from there would land
+inside those being handed over.
 `Writer.to_stream(...).flush()` (§12.2) does the same for a document written
 value by value.
 
@@ -1618,7 +1627,9 @@ rule of each year: none before 1980, the end in September until 1995.
 **Errors.** Where a C function signals failure with a sentinel, a `false` or an
 untouched output — an overflow, an MJD or year outside the supported range, a
 quarter outside 1–4 — the binding raises `BovnarArgumentError`, as it does for an
-argument that is not an int or does not fit in int64. Not bound:
+argument that is not an int or does not fit in int64. The seconds functions mark
+an overflow with `BVN_GDATE_OVF`, which is the int64 minimum itself, so a result
+of exactly `-2**63` cannot be told from one and raises too. Not bound:
 `bvn_gregorian_date_to_mjd_fast` (undefined behaviour out of range; `to_mjd()`
 is the checked form) and `bvn_dt_dump` / `bvn_dt_print`, which print to stdout
 (`str()` and `repr()` take their place).
@@ -1998,8 +2009,8 @@ with Reader() as r:
 `Reader.__init__` calls `bvnr_reader_create` immediately.  Use as a context
 manager or call `r.close()` explicitly to release the C object.
 
-A reader is not re-entrant. While `read_mem`, `read_fd`, `read_file` or
-`iter_mem` is running, the reader's own callbacks must not call `close()`,
+A reader is not re-entrant. While `read_mem`, `read_fd`, `read_file`,
+`read_stream` or `iter_mem` is running, the reader's own callbacks must not call `close()`,
 start another read on it, or `set_unit_policy()`: each raises
 `BovnarArgumentError("Reader is in use by its own callback")`, which aborts the
 running parse and is re-raised from the read. Use a second `Reader` for a
@@ -2353,7 +2364,9 @@ document may carry more than one. The bytes of a stream are those `mux_dump`
 writes. `embed_document` wraps `bvnr_embed_document`, embedding into the
 document being written rather than making a document of one key, as
 `stream.embed_document` does. A key is held to the rule of `dumps()`
-(`BovnarArgumentError`), a channel to the unsigned 64-bit range. On a
+(`BovnarArgumentError`), that of `write_octets` too, a channel to the unsigned
+64-bit range, and a payload or a document must be bytes-like (or a `str`,
+written as UTF-8). On a
 `to_stream` writer, call `flush()` after `mux_send` for a consumer reading
 live (§4.8).
 
@@ -2411,8 +2424,9 @@ w.get_output().split(b"\n")[1]      # → b'.mode=auto;.t=<datetime:64,tai>17500
 (`bvnr_write_plain`): `.mode = auto;`. The C writer refuses a value that is
 not a symbol or is a reserved word (`null`, `true`, `false`, `on`, `off`,
 `nan`, `inf`, `ninf`) with `TYPE_VALUE_MISMATCH`, an empty one with
-`EMPTY_IDENTIFIER` and one too long with `SYMBOL_TOO_LONG`; a NUL in it is a
-`BovnarArgumentError`.
+`EMPTY_IDENTIFIER` and one too long with `SYMBOL_TOO_LONG`. A NUL or a lone
+surrogate in it is a `BovnarArgumentError`, and so is a key `dumps()` would
+refuse, both raised before anything is written.
 
 `write_datetime(key, value, *, width=64, epoch=None)` writes `value`, signed
 seconds since `epoch` (`"unix"`, the default, `"tai"`, `"gps"`, `"mjd"`,

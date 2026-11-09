@@ -885,6 +885,7 @@ of its own), and they are latched:
 | The octet stream closes inside a message or its length | `octet_stream_truncated` |
 | `finish()` inside the octet stream | `read_complete_chunk_failed` |
 | `finish()` before the stream opened, or before its `;` | `got_incomplete_bvnr_stream` |
+| A comment after the `;` that is not UTF-8, or that the input ends inside a character of (`finish()`) | `invalid_utf8_byte` |
 
 **Frames.** `codec::frame_header(len)`, `write_frame(&mut vec, doc)` and
 `write_frame_to(&mut out, doc)` (one vectored write, no copy) write what
@@ -1126,7 +1127,10 @@ key scope, `max_message`, the 4096-channel limit and every error of
 `stream::mux_load`. Each `next` returns a `DemuxItem::Message { channel,
 payload }` or, with `deliver_events`, a `DemuxItem::Event` for every event but
 the stream's chunks, in document order: the metadata before the stream comes
-out before its first message, and a `ValueBuilder` makes values of it. After
+out before its first message, and a `ValueBuilder` makes values of it (the
+demux withholds the stream's chunks but not its start and end, so the builder
+also hands out the stream's own key, as an empty `Value::Bytes`, once the
+stream ends; Python's `DemuxFeed(values=True)` leaves it out). After
 `finish()`, `next` on an empty slice hands out the closing events (more input is
 refused with an `Error::Argument`); `reset()`
 starts the next document: the channel buffers are kept, the channel ids (and

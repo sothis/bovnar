@@ -44,7 +44,9 @@
 //! around the `=` but no comment between it and the stream), `;`, and then
 //! only whitespace and comments, which may also come before the `;`. An
 //! octet stream in the preamble, a statement after the stream, or any other
-//! byte after it is an error. To pull a
+//! byte after it is an error, so a byte stream holds one such document:
+//! documents sent back to back on one connection need framing
+//! ([`FrameReader`]) around each. To pull a
 //! multiplexed stream out of a general document, parse it with
 //! [`crate::stream::mux_load`] or [`crate::Reader`].
 //!

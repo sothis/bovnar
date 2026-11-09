@@ -902,8 +902,10 @@ def _canonicalize(where: str, data, out, pretty: bool, options: dict) -> None:
                                          bool(pretty))
     if not obs:
         raise MemoryError("bvnr_canon_observer_create() returned NULL")
-    reader = Reader()
+    reader = None
     try:
+        # Inside the try: the observer is destroyed if this fails.
+        reader = Reader()
         flags.on_verified = _canon_callback(lib)
         flags.userdata = obs
         # The first error a continue_on_error read recovered from: on_error
@@ -966,7 +968,8 @@ def _canonicalize(where: str, data, out, pretty: bool, options: dict) -> None:
                                    "bvnr_canon_observer_finish failed")
     finally:
         lib.bvnr_canon_observer_destroy(obs)
-        reader.close()
+        if reader is not None:
+            reader.close()
 
 
 def canonicalize(data, *, pretty: bool = False, **options) -> bytes:

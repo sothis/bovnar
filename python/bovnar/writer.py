@@ -327,8 +327,9 @@ class Writer:
         stream = getattr(self, '_stream', None)
         if stream is not None and stream.busy:
             raise BovnarArgumentError(
-                "the writer is in use by its own sink: it cannot be finished, "
-                "flushed or destroyed from the object's write() or flush()")
+                "the writer is in use by its own sink: it cannot be written "
+                "to, finished, flushed or destroyed from the object's write() "
+                "or flush()")
         self._check_not_observing()
 
     def _check_not_observing(self) -> None:
@@ -461,8 +462,8 @@ class Writer:
 
         if self._ptr is None:
             raise BovnarArgumentError("Writer has been destroyed")
-        if self._observer_state is not None:
-            self._check_not_observing()
+        if self._observer_state is not None or self._stream is not None:
+            self._check_not_in_sink()
 
         d     = BvnrData()
         _keep = []
@@ -797,16 +798,18 @@ class Writer:
         (``bvnr_write_plain``): ``.mode = auto;``. The C writer refuses a
         value that is not a symbol or is a reserved word (``null``, ``true``,
         ``false``, ``on``, ``off``, ``nan``, ``inf``, ``ninf``) with
-        ``TYPE_VALUE_MISMATCH``, an empty one with ``EMPTY_IDENTIFIER``, one
-        too long with ``SYMBOL_TOO_LONG``, and a ``key`` that is not an
-        identifier; a NUL in ``value`` is a ``BovnarArgumentError``."""
-        from .stream import _writer_key     # deferred: avoids an import cycle
+        ``TYPE_VALUE_MISMATCH``, an empty one with ``EMPTY_IDENTIFIER`` and
+        one too long with ``SYMBOL_TOO_LONG``. A ``key`` is refused first,
+        as :func:`bovnar.dumps` refuses it, with ``BovnarArgumentError``, and
+        so is a ``value`` holding NUL or a lone surrogate."""
+        from .stream import _utf8, _writer_key  # deferred: avoids an import cycle
         self._check_writable()
         if not isinstance(value, str) or '\0' in value:
             raise BovnarArgumentError(
                 f"write_plain() takes a str without NUL bytes, not {value!r}")
-        if not self._lib.bvnr_write_plain(self._ptr, _writer_key(key),
-                                          value.encode('utf-8')):
+        kb = _writer_key(key)
+        if not self._lib.bvnr_write_plain(self._ptr, kb,
+                                          _utf8(value, "a plain value")):
             self._raise_error()
 
     def write_datetime(self, key: str, value: int, *, width: int = 64,
@@ -922,12 +925,15 @@ class Writer:
     def write_octets(self, key: str, value) -> None:
         """``.key = <octet stream>;`` with the bytes of ``value`` (any
         bytes-like object), as :func:`bovnar.dumps` writes a ``bytes``
-        value."""
+        value. ``key`` and ``value`` are checked before anything is
+        written, ``key`` as :func:`bovnar.dumps` checks it."""
         from . import _emit_octets  # deferred: avoids an import cycle
-        from .stream import _as_bytes
+        from .stream import _as_bytes, _writer_key
         self._check_writable()
+        _writer_key(key)
+        data = _as_bytes(value)
         self.emit(Event.ASSIGNMENT_START, key=key)
-        _emit_octets(self, _as_bytes(value))
+        _emit_octets(self, data)
 
     def embed_document(self, key: str, doc) -> None:
         """``.key = <octets>;`` where the octets are the document ``doc``

@@ -82,7 +82,8 @@ Semantics — **`0` is unlimited and the default**:
 ```c
 bvnr_read_flags_t fl = {
     .on_verified   = my_cb,
-    .max_file_size = BVNR_FILESIZE_UNLIMITED,   /* endless */
+    .max_file_size = BVNR_FILESIZE_UNLIMITED,   /* no total cap */
+    .max_text_bytes = UINT64_MAX,               /* endless text too */
 };
 ```
 
@@ -215,7 +216,10 @@ Two kinds, chosen when it is created:
 Feeding never fails for want of input; `bvnr_frame_reader_finish` is where a
 stream cut inside a header or a payload is `error_got_incomplete_bvnr_stream`. A
 bad magic is `error_unexpected_input_byte`, a declared length over the cap
-`error_value_out_of_range`.
+`error_value_out_of_range`. The frame reader is not re-entrant: a feed or
+finish from inside `on_document` or one of the reader's callbacks fails the
+stream with `error_invalid_argument`, and the feed running stops after the
+event that made the call.
 
 
 ---
@@ -427,13 +431,17 @@ while (bvnr_demux_next(dm, &it) > 0) { /* the closing events */ }
 A message that lies whole in the fed buffer is handed out from it without a
 copy, one whole in a chunk that arrived split across feeds from the reader's
 chunk buffer, and one split across chunks is reassembled in the channel's
-buffer.
+buffer. (The reader takes a fed buffer in windows of 1 MiB, and a chunk that
+straddles a window's end is gathered like one split across feeds.)
 Everything an item points to is valid until the next call on the demux, and the
 fed buffer must stay valid until `bvnr_demux_next` has returned
 `BVNR_NEXT_NONE` (feeding before that is refused). Truncation is a finish
 result, as for any fed reader: `bvnr_demux_finish` returns what `bvnr_read` would
 for the document, and a message the stream's end cut short is still the latched,
-non-fatal `error_octet_stream_truncated`.
+non-fatal `error_octet_stream_truncated`. The demux is not re-entrant: a feed,
+next, finish or re-open from inside `on_message` or one of the reader's
+callbacks fails the stream with `error_invalid_argument`, and the call running
+stops after the event that made it.
 
 
 ---
@@ -496,7 +504,7 @@ inner = stream.parse_embedded(bovnar.loads(outer)["payload"])   # {"v": 1}
 ```
 
 `stream.BVNR_FILESIZE_UNLIMITED` (`== 0`) selects endless mode for
-**`max_file_size`** only. Note it does **not** lift the framing/mux guards:
+**`max_file_size`** only (the text stays capped by `max_text_bytes`, §1). Note it does **not** lift the framing/mux guards:
 for `max_document_size` and `max_message`, `0` selects their finite defaults
 (`BVNR_DOC_DEFAULT_MAX` / `BVNR_MUX_DEFAULT_MAX`), so pass an explicit large
 value there to raise them. See [Python Bindings](09_bovnar_python_bindings.md)
@@ -623,8 +631,9 @@ The four compose cleanly because they live at different layers:
 - A **frame stream** (2) can carry documents that each **embed** sub-documents (4).
 - A **multiplexed** octet stream (3) is itself just one value in a document, which
   can be one frame in a frame stream (2).
-- Any of the above is **endless** (1) by default (`max_file_size` 0 ==
-  `BVNR_FILESIZE_UNLIMITED`); set a positive `max_file_size` to impose a cap.
+- Any of the above has no total-byte cap (1) by default (`max_file_size` 0 ==
+  `BVNR_FILESIZE_UNLIMITED`); set a positive `max_file_size` to impose one.
+  Octet streams are then endless; text is capped by `max_text_bytes` (§1).
 
 Because each is a thin application over the public event API, you can also write
 your own consumer/producer at the same seam without touching the core.

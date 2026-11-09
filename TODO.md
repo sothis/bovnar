@@ -1,5 +1,24 @@
 # TODO
 
+## State 2026-11-09 — main is ahead of 2.0.2
+
+main carries the unreleased 2.1.0 work (CHANGELOG, Unreleased): the streaming
+layer for both bindings and the binding plumbing, with three review passes
+fixed (the last on 2026-11-09, CHANGELOG Fixed, "second pass"). The tree
+still says 2.0.2 (`-dev` in the CLI), and the web pages on main already
+describe the 2.1.0 API: publish the site after the tag, not before.
+
+What the 2.1.0 release commit has to move (nothing gates the doc lines):
+CMakeLists.txt `project(VERSION)`; `bovnar.h` version macros, with
+`BVNR_VERSION_SUFFIX` back to `""`; pyproject.toml (version and the
+cibuildwheel test command); `python/bovnar/__init__.py` `__version__`;
+`python/tests/test_version.py`; rust/Cargo.toml, rust/Cargo.lock,
+rust/fuzz/Cargo.lock; `rust/tests/test_version.rs`; CITATION.cff `version`
+and `date-released`; RELEASE_NOTES_v2.1.0.md (the release job fails without
+it); SECURITY.md's supported-versions table; the CHANGELOG heading and links;
+rust/README.md and the "2.0.2" lines in doc/02, doc/03, doc/09, doc/11 and
+doc/14; the IETF draft date and the doc/wiki infoboxes.
+
 ## State 2026-11-04 — 2.0.2 released
 
 `v2.0.2` is tagged on b374191 and published by CI: the GitHub release (seven
@@ -90,6 +109,25 @@ or harmless, and changing it means picking a side. None blocks 2.1.0.
 9. **`canonicalize` with both sides failing.** Rust reports the output's error
    first (it is what stopped the read), Python the input's. Both failing in one
    call is near impossible; align if the code is touched again.
+
+Added by the second review pass the same day (also design choices):
+
+10. **A failing feed and the values before the error.** Rust's
+    `ValueFeed::feed` appends the assignments completed before the error;
+    Python's `DocumentFeed(values=True)` drops what the failing `feed()`
+    completed (doc/09 §4.7). Each is documented; they disagree.
+11. **Parity gaps nothing documents.** Rust `live::DocumentFeed` has
+    `set_unit_policy`, Python's `DocumentFeed` no unit policy at all. Rust has
+    `stream::parse_embedded_reader`; Python's `parse_embedded` takes bytes
+    only. A mux stream's own key comes out of Rust's `ValueBuilder` as an
+    empty `Bytes` value, not out of Python's `DemuxFeed(values=True)` (doc/14
+    §4.9 says so now).
+12. **float:16/32 subnormals print more digits than they need.**
+    `bvn_format_double` takes the precision of a binary32/binary16 subnormal
+    from the format's width (24 or 11 bits), not from the bits the subnormal
+    has, so 2⁻¹⁴⁹ as `float:32` is `1.4012984643e-45`. It round-trips; the
+    shortest form depends on how a reader rounds a `float:32` it reads as a
+    double, which is the open question.
 
 ## Done — incremental streaming for Rust and Python (asked 2026-11-08)
 

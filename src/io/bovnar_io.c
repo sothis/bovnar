@@ -175,6 +175,7 @@ static bool push_mem(bvnr_sink_t* s, const void* buf, uint32_t len)
  */
 void bvnr_source_from_fd(bvnr_source_t* s, int fd)
 {
+	if (!s) return;
 	memset(s, 0, sizeof(*s));
 	bvn_source_impl_t* impl = bvn_source_impl(s);
 	impl->pull = pull_fd;
@@ -182,6 +183,7 @@ void bvnr_source_from_fd(bvnr_source_t* s, int fd)
 }
 void bvnr_source_from_mem(bvnr_source_t* s, const void* buf, uint64_t len)
 {
+	if (!s) return;
 	memset(s, 0, sizeof(*s));
 	bvn_source_impl_t* impl = bvn_source_impl(s);
 	impl->pull     = bvn_pull_mem;
@@ -190,6 +192,7 @@ void bvnr_source_from_mem(bvnr_source_t* s, const void* buf, uint64_t len)
 }
 void bvnr_sink_to_fd(bvnr_sink_t* s, int fd)
 {
+	if (!s) return;
 	memset(s, 0, sizeof(*s));
 	bvn_sink_impl_t* impl = bvn_sink_impl(s);
 	impl->push  = push_fd;
@@ -198,6 +201,7 @@ void bvnr_sink_to_fd(bvnr_sink_t* s, int fd)
 }
 void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint64_t cap)
 {
+	if (!s) return;
 	memset(s, 0, sizeof(*s));
 	bvn_sink_impl_t* impl = bvn_sink_impl(s);
 	impl->push        = push_mem;
@@ -252,5 +256,5 @@ void* bvnr_sink_get_userdata(const bvnr_sink_t* s)
  */
 uint64_t bvnr_sink_bytes_written(const bvnr_sink_t* s)
 {
-	return bvn_sink_impl_c(s)->mem_written;
+	return s ? bvn_sink_impl_c(s)->mem_written : 0;
 }

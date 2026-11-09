@@ -114,15 +114,15 @@ while (($#)); do
     shift
 done
 
-OUT=./build/merged
-mkdir -p "$OUT"
-OUTABS="$(cd "$OUT" && pwd)"
-
 [[ -f ./strip_lang_comments.py ]] || {
     printf 'merge.sh: ./strip_lang_comments.py not found — run this from the '\
 'repo root\n' >&2
     exit 1
 }
+
+OUT=./build/merged
+mkdir -p "$OUT"
+OUTABS="$(cd "$OUT" && pwd)"
 
 DUMPS=(bvnr_src bvnr_py_src bvnr_py_src_exmpl bvnr_py_src_exmpl_doc
        bvnr_py_src_exmpl_doc_web)
@@ -140,8 +140,9 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 # ---------------------------------------------------------------- file list --
-# Everything that is not a VCS, editor, cache or build artefact.  Build trees
-# are matched by pattern: build/, build-asan/, build_release/, cmake-build-*/.
+# Everything that is not a VCS, CI (.github), editor, cache or build
+# artefact.  Build trees are matched by pattern: build/, build-asan/,
+# build_release/, cmake-build-*/.
 find . \( -type d \( -name .git -o -name .github -o -name .claude \
         -o -name .idea -o -name .cache -o -name .pytest_cache \
         -o -name __pycache__ -o -name node_modules -o -name pdf \

@@ -414,6 +414,67 @@ class TestSinkReentry:
         assert seen and 'own sink' in str(seen[0])
         mw.close()                                # from outside: fine
 
+    def test_a_write_from_the_sinks_write_is_refused(self):
+        # It went into the writer's buffer while the writer was handing that
+        # buffer over, and was lost.
+        w = None
+        seen = []
+
+        class Sink:
+            def __init__(self):
+                self.buf = bytearray()
+
+            def write(self, b):
+                self.buf += b
+                if w is not None:
+                    try:
+                        w.write_uint("x", 7)
+                    except BovnarArgumentError as exc:
+                        seen.append(exc)
+                return len(b)
+        out = Sink()
+        w = Writer.to_stream(out, pretty=False)
+        w.write_uint("a", 1)
+        w.flush()
+        assert len(seen) == 1 and 'own sink' in str(seen[0])
+        w.write_uint("b", 2)                      # from outside: fine
+        w.finish()
+        w.destroy()
+        assert bovnar.loads(bytes(out.buf)) == {"a": 1, "b": 2}
+
+    def test_a_frame_from_the_objects_write_or_flush_is_refused(self):
+        # A frame written from there landed inside the one being written.
+        fw = None
+        seen = []
+
+        class Sink:
+            def __init__(self):
+                self.buf = bytearray()
+
+            def write(self, b):
+                self.buf += b
+                self._again()
+                return len(b)
+
+            def flush(self):
+                self._again()
+
+            def _again(self):
+                if fw is not None:
+                    for call in (lambda: fw.write(b'.y = 2;'), fw.flush,
+                                 fw.close):
+                        try:
+                            call()
+                        except BovnarArgumentError as exc:
+                            seen.append(exc)
+        out = Sink()
+        fw = stream.FrameWriter(out)
+        fw.write(b'.x = 1;')
+        assert seen and all('own object' in str(e) for e in seen)
+        assert len(seen) % 3 == 0
+        fw.close()                                # from outside: fine
+        assert stream.load_documents(bytes(out.buf)) == [{'x': 1}]
+
     def test_a_non_blocking_socket_is_refused(self):
         a, b = socket.socketpair()
         try:

@@ -19,6 +19,7 @@ Participants are expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 - [Generated Files](#generated-files)
 - [Code Style](#code-style)
 - [Documentation](#documentation)
+- [Unit profiles](#unit-profiles)
 - [Commit Messages](#commit-messages)
 - [Licensing](#licensing)
 
@@ -131,7 +132,8 @@ is a data change plus a regeneration rather than a code change. See
 
 Requirements: CMake ≥ 3.21, a C99 compiler, and Python 3. Python is optional,
 but without it the Python binding tests and the documentation checks are not
-registered at configure time. The Rust crate in `rust/` additionally needs
+registered at configure time; the Python binding tests also need `pytest`, a
+non-Windows host and every unit profile (`BVNR_ALL_PROFILES`, the default). The Rust crate in `rust/` additionally needs
 Cargo with Rust 1.88 or newer; it is built and tested on its own, not by CMake.
 
 ```bash
@@ -183,7 +185,9 @@ git config core.hooksPath githooks
 
 ## Before You Open a Pull Request
 
-CI runs all of the following; running it locally is faster than waiting for it.
+CI runs the equivalent of all of the following (the fuzz harnesses through
+their registered CTest tests, at fixed iteration counts, rather than through
+`run_tests.sh`); running it locally is faster than waiting for it.
 
 ```bash
 # 1. Warnings as errors, as in CI.
@@ -196,7 +200,8 @@ cmake -B build-asan -DBVNR_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug .
 cmake --build build-asan -j"$(nproc)"
 ctest --test-dir build-asan -LE python --output-on-failure
 
-# 3. The fuzz harnesses.
+# 3. The fuzz harnesses, swept at a count you choose (run_tests.sh builds,
+#    runs every registered test, then the sweep).
 ./run_tests.sh
 
 # 4. The Rust crate, if you have Cargo.

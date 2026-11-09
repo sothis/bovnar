@@ -38,7 +38,7 @@ done
 echo "Modified files that would be DISCARDED:"
 git diff --name-only HEAD | sed 's/^/  /' || true
 echo "Untracked files that would be REMOVED:"
-git clean -xdn | sed 's/^/  /' || true
+git clean -xdffn | sed 's/^/  /' || true
 
 if [[ $DRY -eq 1 ]]; then
     exit 0

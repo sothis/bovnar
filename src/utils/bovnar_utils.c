@@ -2518,12 +2518,17 @@ static bool bvn_parse_prefix_ok(const char* s, bool allow_sign)
 
 /* strtoll/strtoull in base 16 also skip a "0x"/"0X" prefix, which no literal
  * of the format carries (the reader refuses `<uint:64,_16> 0x10`): without
- * this screen "0x10" parsed as 16. */
+ * this screen "0x10" parsed as 16. C23's strtoll (glibc 2.38 and later, when
+ * the amalgamation is compiled as C23) skips "0b"/"0B" in base 2 the same
+ * way; in every other base above 11 'b' is a digit, and below it no prefix
+ * parses. */
 static bool bvn_parse_hex_prefix(const char* s, uint32_t base)
 {
-	if (base != 16u) return false;
+	if (base != 16u && base != 2u) return false;
 	if (*s == '-') s++;
-	return s[0] == '0' && (s[1] == 'x' || s[1] == 'X');
+	if (s[0] != '0') return false;
+	return base == 16u ? (s[1] == 'x' || s[1] == 'X')
+	                   : (s[1] == 'b' || s[1] == 'B');
 }
 
 bool bvn_parse_int64(const char* s, value_type_spec_t vt, int64_t* out)

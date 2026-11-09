@@ -4078,6 +4078,20 @@ static int cli_main(int argc, char **argv)
 {
 	if (argc < 2) { usage(stderr, argv[0]); return 2; }
 	const char *cmd = argv[1];
+	/* `bovnar <command> --help` is help that was asked for, as `bovnar --help`
+	 * is: the usage, on stdout, exit 0. bench has a help of its own. */
+	if (argc == 3 && (strcmp(argv[2], "--help") == 0 ||
+	                  strcmp(argv[2], "-h") == 0) &&
+	    strcmp(cmd, "bench") != 0 && cmd[0] != '-') {
+		static const char *const known[] = { "validate", "query",
+			"pretty-print", "convert", "events", "frames", "mux",
+			"version" };
+		for (size_t k = 0; k < sizeof known / sizeof known[0]; k++)
+			if (strcmp(cmd, known[k]) == 0) {
+				usage(stdout, argv[0]);
+				return 0;
+			}
+	}
 	/* Extra positional arguments were silently ignored, so a typo or a shell
 	 * glob that matched more than intended ("validate *.bvnr") checked only the
 	 * first file and still exited 0. Refuse instead of half-doing the job. That

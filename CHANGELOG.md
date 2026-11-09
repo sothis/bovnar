@@ -177,7 +177,8 @@ API and implements spec 1.2.
   and `MuxWriter` write the canonical vectors byte for byte, as do
   `bvnr_frame_write`, `codec::write_frame`, `frame_documents` and `FrameWriter`
   the frame streams, so each side reads what the others write. `bovnar mux
-  list` and `frames list` read every vector as the manifest says. New CTest
+  list` and `frames list` read every vector as the manifest says, short of
+  the `max_message` and `max_document_size` the CLI cannot set. New CTest
   tests: `bvnr_stream_vectors_test`, `bvnr_stream_vectors_fresh` (the committed
   files are a fresh generation) and `bvnr_cli_stream_vectors`. doc/10 §9.
 - **Rust: `Writer::flush`** wraps `bvnr_write_flush`: a `to_writer` writer
@@ -296,7 +297,8 @@ API and implements spec 1.2.
   set at all, `on_error` — the only report of an error `continue_on_error`
   recovers from — was not reachable, and most stream readers built flags of
   their own that took no options. All of it now passes to C as given, 0 keeping
-  the library default (255 for the nesting caps, the format's limit, as before):
+  the library default; for the two nesting caps the bindings pass 255, the
+  format's limit, as before (the C reader's own default is 64):
   - *Rust:* `ReadOptions` gains `max_text_bytes`, `max_array_items`
     (`u64::MAX` lifts either cap), the five length caps and
     `max_struct_nesting` / `max_array_nesting`, honoured by every reader that
@@ -383,6 +385,69 @@ API and implements spec 1.2.
   `bvnr_read` and `bvnr_demux_on_event` went from about 7.2 µs to 0.25 µs each.
 
 ### Fixed
+
+- **Fixes from a review of the unreleased work (2026-11-09, second pass).**
+  - *The push-fed readers refuse a call from inside their own callbacks.* A
+    callback-mode demux fed again from `on_message` re-lexed the window the
+    outer feed was still in and underflowed its length, reading out of bounds;
+    a fed reader, a frame reader or a demux fed, finished or re-opened from one
+    of its callbacks could also go on reading as if nothing had happened.
+    `bvnr_read_feed`, `bvnr_read_finish`, `bvnr_read` and `bvnr_open_read_*`
+    on a running fed reader, `bvnr_frame_reader_feed`/`finish` from
+    `on_document` or the reader's callbacks, and `bvnr_demux_feed`/`next`/
+    `finish`/`open_feed` from `on_message` or the reader's callbacks now fail
+    the read with `error_invalid_argument`, and the call running stops after
+    the event that made the call. The headers, doc/08 §1.15 and doc/10 §2.4
+    and §3.4 say so, and that destroying the object from there is not allowed.
+  - *`bvnr_doc_stream_read_ex` reports a reader it could not open for want of
+    memory as `error_invalid_argument`,* as its header says, instead of the
+    previous document's error.
+  - *An octet stream's bad chunk tag reaches the mirror,* as the bytes up to a
+    text error do; the push-fed rewrite of the octet reader had stopped
+    mirroring it.
+  - *`bvn_parse_int64`/`bvn_parse_uint64` refuse a `0b` prefix in base 2*, which
+    C23's `strtoll` (glibc 2.38 and later, an amalgamation compiled as C23)
+    skips as every `strtoll` skips `0x` in base 16.
+  - *`bvnr_source_from_fd`/`_mem`, `bvnr_sink_to_fd`/`_mem` and
+    `bvnr_sink_bytes_written` accept a `NULL` handle,* as the callback
+    constructors do, instead of writing through it.
+  - *Rust: `stream::mux_load_with_options` and `mux_load_reader_with_options`
+    honour `ReadOptions::max_file_size`.* They set it to 0 (no cap) whatever
+    the caller passed, unlike `live::Demux`.
+  - *Rust: `usize::MAX` is no cap for `Writer::to_writer_with` and
+    `to_writer_with_options` on 32-bit targets too,* where it was a 4 GiB one.
+  - *Rust: a panic in a `DocumentFeed` or `ValueFeed` handler leaves the
+    document failed* (it stayed open until the next call found out), and a
+    reset no longer resumes a mirror's panic from the document before. The
+    error of a call needing a handler its fed reader was not started with names
+    the right handlers and remedy for `FrameParser` and `Demux`.
+  - *Python: `max_document_size` and `max_message` are checked like the read
+    limits.* A negative value wrapped to 2**64 − 1 and lifted the cap; a
+    negative, out-of-range or non-int one is now a `BovnarArgumentError`.
+  - *Python: a stream payload must be bytes-like or a `str`.* A list, dict or
+    range of ints was sent as bytes of its items; it, `None` and a float are
+    now a `BovnarArgumentError`, as for the feeds.
+  - *Python: an `mmap` or any other buffer is read whole* by `load_documents`,
+    `mux_load` and `canonicalize`, not from its current position as a stream;
+    and the stream readers take an `io.BufferedIOBase` that implements only
+    `read`/`readinto` (its inherited `readinto1` raised).
+  - *Python: `DocumentFeed` and `FrameFeed(parse=True)` form no reference
+    cycle,* so a dropped feed frees its C reader at once rather than at the
+    next garbage collection.
+  - *Python: with `view=True`, a buffer made from a view of the fed bytes never
+    makes the next call refuse,* as doc/09 §4.7 says: `FrameFeed` hands such
+    documents out as views of the fed bytes, and `DemuxFeed` no longer refused
+    once on a held export. `DemuxFeed` stops iterating after `close()`.
+  - *Python: writing to a `Writer.to_stream` writer or a `FrameWriter` from
+    inside the object's own `write()`/`flush()` is a `BovnarArgumentError`,*
+    where the value was lost or a frame landed inside another.
+  - *Python: `Writer.write_octets` holds its key to the `dumps()` rule,* like
+    the other new writer methods, and checks key and payload before writing; a
+    lone surrogate in a `write_plain` value or a demux key filter is a
+    `BovnarArgumentError`; `canonicalize` frees its observer when the reader
+    cannot be created.
+  - *Docs:* doc/09 notes that a civil-time result of exactly −2**63 is
+    reported as an overflow (it is the C API's `BVN_GDATE_OVF`).
 
 - **Fixes from a review of the binding work (2026-11-09).**
   - *`float:16` and `float:32` are rounded to IEEE binary16 and binary32 by
@@ -6247,6 +6312,7 @@ arrays (including the homogeneity rules), structs, octet streams, references,
 and the error-code values. See [`RELEASE_NOTES_v1.0.0.md`](RELEASE_NOTES_v1.0.0.md)
 for the full notes.
 
+[Unreleased]: https://github.com/sothis/bovnar/compare/v2.0.2...HEAD
 [2.0.2]: https://github.com/sothis/bovnar/releases/tag/v2.0.2
 [2.0.1]: https://github.com/sothis/bovnar/releases/tag/v2.0.1
 [2.0.0]: https://github.com/sothis/bovnar/releases/tag/v2.0.0

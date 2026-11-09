@@ -2999,6 +2999,144 @@ static void test_read_on_finished_feed(void)
 	bvnr_reader_destroy(r);
 }
 
+/* A call into a fed reader, a demux or a parsing frame reader from inside one
+ * of its own callbacks is refused: the read fails with error_invalid_argument
+ * and the call running stops right after the event that made it. Before the
+ * guard, a demux fed again from on_message re-lexed the window the outer feed
+ * was still in and underflowed its length. */
+typedef struct {
+	bvnr_reader_t*		r;
+	bvnr_demux_t*		dm;
+	bvnr_frame_reader_t*	fr;
+	int			mode;
+	int			events;
+	int			inner_ok;
+} reenter_t;
+
+static bool reenter_on_verified(void* ud, bvnr_event_t e, bvnr_data_t* d)
+{
+	reenter_t* t = (reenter_t*)ud;
+	(void)d;
+	t->events++;
+	if (e != ev_assignment_start || t->events > 4)
+		return true;
+	switch (t->mode) {
+	case 0: t->inner_ok += bvnr_read_feed(t->r, LIT(".z = 9;")); break;
+	case 1: t->inner_ok += bvnr_read_finish(t->r); break;
+	case 2: t->inner_ok += bvnr_open_read_feed(t->r, NULL, NULL); break;
+	case 3: t->inner_ok += bvnr_read(t->r); break;
+	default: t->inner_ok += bvnr_frame_reader_feed(t->fr, LIT("x")); break;
+	}
+	return true;
+}
+
+static bool reenter_on_message(void* ud, uint64_t channel,
+	const uint8_t* data, uint64_t len)
+{
+	reenter_t* t = (reenter_t*)ud;
+	(void)channel;
+	t->events++;
+	if (t->mode == 0)
+		t->inner_ok += bvnr_demux_feed(t->dm, data, len);
+	else
+		t->inner_ok += bvnr_demux_finish(t->dm);
+	return true;
+}
+
+static bool reenter_on_document(void* ud, uint64_t index, bool ok,
+	error_code_t err)
+{
+	reenter_t* t = (reenter_t*)ud;
+	(void)index; (void)ok; (void)err;
+	t->events++;
+	t->inner_ok += bvnr_frame_reader_feed(t->fr, LIT("x"));
+	return true;
+}
+
+static void test_reentry(void)
+{
+	printf("re-entry: feeding a reader from inside its own callbacks\n");
+	static const char doc[] = ".a = 1; .b = 2; .c = 3; .d = 4; .e = 5;";
+	for (int mode = 0; mode < 4; mode++) {
+		reenter_t t = { .mode = mode };
+		bvnr_read_flags_t f = { .userdata = &t,
+			.on_verified = reenter_on_verified };
+		t.r = bvnr_reader_create();
+		bvnr_open_read_feed(t.r, NULL, &f);
+		ASSERT_TRUE(!bvnr_read_feed(t.r, LIT(doc)),
+			"re-entry: the outer feed fails");
+		ASSERT_EQ_UINT(t.inner_ok, 0, "re-entry: the inner call is refused");
+		ASSERT_EQ_UINT(bvnr_reader_get_error(t.r), error_invalid_argument,
+			"re-entry: invalid argument");
+		/* Stopped after the first assignment's start: two events. */
+		ASSERT_EQ_UINT(t.events, 2, "re-entry: the outer feed stops");
+		ASSERT_TRUE(!bvnr_read_finish(t.r), "re-entry: the read is over");
+		/* The reader is still usable for the next document. */
+		t.mode = 9;
+		f.on_verified = NULL;
+		ASSERT_TRUE(bvnr_open_read_feed(t.r, NULL, &f) &&
+			bvnr_read_feed(t.r, LIT(doc)) && bvnr_read_finish(t.r),
+			"re-entry: the next document reads");
+		bvnr_reader_destroy(t.r);
+	}
+
+	/* The demux, callback mode: fed or finished from on_message. */
+	uint8_t out[4096];
+	bvnr_writer_t* w = bvnr_writer_create();
+	bvnr_open_write_mem(w, out, sizeof(out), false, NULL);
+	bvnr_mux_begin(w, "mux");
+	for (int i = 0; i < 8; i++)
+		bvnr_mux_send(w, 1, "\x01payload", 8);
+	bvnr_mux_end(w);
+	ASSERT_TRUE(bvnr_write_finish(w), "re-entry: mux document written");
+	uint64_t n = bvnr_writer_bytes_written(w);
+	bvnr_writer_destroy(w);
+	for (int mode = 0; mode < 2; mode++) {
+		reenter_t t = { .mode = mode };
+		t.dm = bvnr_demux_create(reenter_on_message, &t, 0);
+		ASSERT_TRUE(bvnr_demux_open_feed(t.dm, NULL, false),
+			"re-entry: demux open");
+		ASSERT_TRUE(!bvnr_demux_feed(t.dm, out, n),
+			"re-entry: the outer demux feed fails");
+		ASSERT_EQ_UINT(t.inner_ok, 0, "re-entry: the inner demux call is "
+			"refused");
+		ASSERT_EQ_UINT(t.events, 1, "re-entry: no message after it");
+		ASSERT_EQ_UINT(bvnr_demux_error(t.dm), error_invalid_argument,
+			"re-entry: demux invalid argument");
+		ASSERT_TRUE(!bvnr_demux_finish(t.dm), "re-entry: demux over");
+		bvnr_demux_destroy(t.dm);
+	}
+
+	/* The parsing frame reader, from on_document and from the reader's own
+	 * on_verified. */
+	uint8_t frames[256];
+	bvnr_sink_t sink;
+	bvnr_sink_to_mem(&sink, frames, sizeof(frames));
+	bvnr_frame_write(&sink, LIT(".a = 1;"));
+	bvnr_frame_write(&sink, LIT(".b = 2;"));
+	uint64_t fn = bvnr_sink_bytes_written(&sink);
+	for (int mode = 0; mode < 2; mode++) {
+		reenter_t t = { .mode = 4 };
+		bvnr_read_flags_t f = { .userdata = &t,
+			.on_verified = reenter_on_verified };
+		bvnr_doc_stream_opts_t o = { .userdata = &t };
+		if (mode == 0)
+			o.on_document = reenter_on_document;
+		else
+			o.flags = &f;
+		t.fr = bvnr_frame_reader_create(&o);
+		ASSERT_TRUE(!bvnr_frame_reader_feed(t.fr, frames, fn),
+			"re-entry: the outer frame feed fails");
+		ASSERT_EQ_UINT(t.inner_ok, 0, "re-entry: the inner frame feed is "
+			"refused");
+		ASSERT_EQ_UINT(bvnr_frame_reader_error(t.fr), error_invalid_argument,
+			"re-entry: frame reader invalid argument");
+		ASSERT_EQ_UINT(bvnr_frame_reader_count(t.fr), mode == 0 ? 1 : 0,
+			"re-entry: no document after it");
+		bvnr_frame_reader_destroy(t.fr);
+	}
+}
+
 int main(int argc, char** argv)
 {
 	corpus_builtin();
@@ -3027,6 +3165,7 @@ int main(int argc, char** argv)
 	test_mux_send_latches();
 	test_pull_overclaim();
 	test_read_on_finished_feed();
+	test_reentry();
 
 	for (size_t i = 0; i < g_ndocs; i++) {
 		free(g_docs[i].name);

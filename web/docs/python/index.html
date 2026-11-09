@@ -538,7 +538,12 @@ in-memory calls.</p>
 them: <code>load_documents</code> each document, with <code>max_file_size</code> capping one
 document and <code>max_document_size</code> one frame; <code>mux_load</code> the document around the
 stream; <code>parse_embedded</code> the embedded document, as a document of its own, with
-<code>max_file_size</code> capping its bytes. All three read with no total cap by default.</p>
+<code>max_file_size</code> capping its bytes. All three read with no total cap by default.
+<code>max_document_size</code> and <code>max_message</code> are held to the rule of the read limits:
+an int from 0 to 2**64 − 1, or <code>BovnarArgumentError</code>. Bytes handed to these
+functions — a payload, a document, the input — are any bytes-like object (an
+<code>mmap</code> is read whole, not from its position) or a <code>str</code>, taken as UTF-8;
+anything else is a <code>BovnarArgumentError</code>.</p>
 <p>To write a mux stream, or an embedded document, inside a document of any
 shape — values after it, more than one stream — use the <code>Writer</code> (§12.9):
 <code>mux_begin(key)</code>, <code>mux_send(channel, payload)</code>, <code>mux_end()</code> and
@@ -856,7 +861,11 @@ call that pushed — the constructor, <code>send</code>, <code>write</code>, <co
 unchanged. The writer has failed then: <code>MuxWriter.close()</code> only releases it,
 and a <code>FrameWriter</code>, which may have written half a frame, refuses further
 documents. Leaving a <code>MuxWriter</code>'s <code>with</code> block by an exception does not end the
-stream either, so a reader sees it cut off rather than complete.
+stream either, so a reader sees it cut off rather than complete. The object's
+own <code>write()</code> and <code>flush()</code> may not call back into the writer that called them —
+send, write, flush or close it, or for <code>Writer.to_stream</code> write a value: that
+raises <code>BovnarArgumentError</code>, where the bytes written from there would land
+inside those being handed over.
 <code>Writer.to_stream(...).flush()</code> (§12.2) does the same for a document written
 value by value.</p>
 <p><strong>What it costs.</strong> Measured with <code>python/bench/bench_stream.py</code> on the machine
@@ -1884,7 +1893,9 @@ rule of each year: none before 1980, the end in September until 1995.</p>
 <p><strong>Errors.</strong> Where a C function signals failure with a sentinel, a <code>false</code> or an
 untouched output — an overflow, an MJD or year outside the supported range, a
 quarter outside 1–4 — the binding raises <code>BovnarArgumentError</code>, as it does for an
-argument that is not an int or does not fit in int64. Not bound:
+argument that is not an int or does not fit in int64. The seconds functions mark
+an overflow with <code>BVN_GDATE_OVF</code>, which is the int64 minimum itself, so a result
+of exactly <code>-2**63</code> cannot be told from one and raises too. Not bound:
 <code>bvn_gregorian_date_to_mjd_fast</code> (undefined behaviour out of range; <code>to_mjd()</code>
 is the checked form) and <code>bvn_dt_dump</code> / <code>bvn_dt_print</code>, which print to stdout
 (<code>str()</code> and <code>repr()</code> take their place).</p>
@@ -2257,8 +2268,8 @@ or unknown codes.</p>
 
 <p><code>Reader.__init__</code> calls <code>bvnr_reader_create</code> immediately.  Use as a context
 manager or call <code>r.close()</code> explicitly to release the C object.</p>
-<p>A reader is not re-entrant. While <code>read_mem</code>, <code>read_fd</code>, <code>read_file</code> or
-<code>iter_mem</code> is running, the reader's own callbacks must not call <code>close()</code>,
+<p>A reader is not re-entrant. While <code>read_mem</code>, <code>read_fd</code>, <code>read_file</code>,
+<code>read_stream</code> or <code>iter_mem</code> is running, the reader's own callbacks must not call <code>close()</code>,
 start another read on it, or <code>set_unit_policy()</code>: each raises
 <code>BovnarArgumentError("Reader is in use by its own callback")</code>, which aborts the
 running parse and is re-raised from the read. Use a second <code>Reader</code> for a
@@ -2791,7 +2802,9 @@ document may carry more than one. The bytes of a stream are those <code>mux_dump
 writes. <code>embed_document</code> wraps <code>bvnr_embed_document</code>, embedding into the
 document being written rather than making a document of one key, as
 <code>stream.embed_document</code> does. A key is held to the rule of <code>dumps()</code>
-(<code>BovnarArgumentError</code>), a channel to the unsigned 64-bit range. On a
+(<code>BovnarArgumentError</code>), that of <code>write_octets</code> too, a channel to the unsigned
+64-bit range, and a payload or a document must be bytes-like (or a <code>str</code>,
+written as UTF-8). On a
 <code>to_stream</code> writer, call <code>flush()</code> after <code>mux_send</code> for a consumer reading
 live (§4.8).</p>
 <h3 id="1210-observing-the-output-on_event">12.10 Observing the output: <code>on_event</code></h3>
@@ -2842,8 +2855,9 @@ writer (<code>BovnarArgumentError</code>). It costs a Python call per event.</p>
 (<code>bvnr_write_plain</code>): <code>.mode = auto;</code>. The C writer refuses a value that is
 not a symbol or is a reserved word (<code>null</code>, <code>true</code>, <code>false</code>, <code>on</code>, <code>off</code>,
 <code>nan</code>, <code>inf</code>, <code>ninf</code>) with <code>TYPE_VALUE_MISMATCH</code>, an empty one with
-<code>EMPTY_IDENTIFIER</code> and one too long with <code>SYMBOL_TOO_LONG</code>; a NUL in it is a
-<code>BovnarArgumentError</code>.</p>
+<code>EMPTY_IDENTIFIER</code> and one too long with <code>SYMBOL_TOO_LONG</code>. A NUL or a lone
+surrogate in it is a <code>BovnarArgumentError</code>, and so is a key <code>dumps()</code> would
+refuse, both raised before anything is written.</p>
 <p><code>write_datetime(key, value, *, width=64, epoch=None)</code> writes <code>value</code>, signed
 seconds since <code>epoch</code> (<code>"unix"</code>, the default, <code>"tai"</code>, <code>"gps"</code>, <code>"mjd"</code>,
 <code>"ntp"</code>, <code>"galileo"</code>, <code>"glonass"</code>, <code>"y2000"</code>, <code>"beidou"</code>), as

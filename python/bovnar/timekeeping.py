@@ -33,7 +33,9 @@ Every result is computed by the C library; nothing here re-derives a date. A
 :class:`GregorianDate` and a :class:`CivilDateTime` are always real ones (the
 constructors refuse 30 February and hour 24), and an input or a result outside
 what the C functions support raises :class:`BovnarArgumentError` where C would
-return a sentinel, false, or leave its output untouched.
+return a sentinel, false, or leave its output untouched. The seconds functions'
+sentinel for an overflow is the int64 minimum, so a result of exactly
+``-2**63`` raises as one too.
 """
 
 import ctypes
@@ -460,6 +462,9 @@ def _civil(dt) -> CivilDateTime:
 
 
 def _seconds(result, what) -> int:
+    # The C functions report an overflow as BVN_GDATE_OVF, which is INT64_MIN
+    # itself: a result that is exactly -2**63 cannot be told from it, and
+    # raises as an overflow too. That is the C API's contract.
     if result == _OVF:                    # BVN_GDATE_OVF
         raise BovnarArgumentError(f"{what}: the result does not fit in int64")
     return int(result)
@@ -486,7 +491,7 @@ def datetime_to_epoch_seconds(dt: CivilDateTime, epoch) -> int:
     """Uniform seconds from ``epoch`` to ``dt`` (86400 per day, no leap
     seconds; ``bvn_dt_datetime_to_epoch_seconds``). ``second == 60`` counts
     as the first second of the next minute. Raises when the result does not
-    fit in int64."""
+    fit in int64, and for ``-2**63``, the C library's overflow mark."""
     s = _civil(dt)._c()
     return _seconds(_lib().bvn_dt_datetime_to_epoch_seconds(
         ctypes.byref(s), int(_epoch(epoch))), str(dt))
@@ -497,7 +502,7 @@ def convert_epoch_seconds(seconds: int, epoch_from, epoch_to) -> int:
     ``epoch_to``: the same uniform instant, a whole number of days shifted
     (``bvn_dt_convert_epoch_seconds``). It changes the origin only, never the
     time scale: GPS seconds stay GPS time. Raises when the result does not
-    fit in int64."""
+    fit in int64, and for ``-2**63``, the C library's overflow mark."""
     return _seconds(_lib().bvn_dt_convert_epoch_seconds(
         int(_epoch(epoch_from)), int(_epoch(epoch_to)),
         _int('seconds', seconds)), f"{seconds} s")
@@ -546,7 +551,8 @@ def utc_to_tai_seconds(dt: CivilDateTime) -> int:
     leap-second table (``bvn_dt_utc_to_tai_seconds``). ``23:59:60`` on a day
     the table records an inserted leap second is that second; anywhere else
     it is the following second. Before 1972 the offset is the initial 10 s.
-    Raises when the result does not fit in int64."""
+    Raises when the result does not fit in int64, and for ``-2**63``, the C
+    library's overflow mark."""
     s = _civil(dt)._c()
     return _seconds(_lib().bvn_dt_utc_to_tai_seconds(ctypes.byref(s)), str(dt))
 

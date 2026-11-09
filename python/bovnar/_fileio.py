@@ -41,9 +41,18 @@ from .structs import BvnrSink, BvnrSource, PULL_FUNC, PUSH_FUNC, FLUSH_FUNC
 
 def is_stream(obj) -> bool:
     """True for an object this module can read from: a socket or a binary
-    file-like object, as opposed to a buffer of bytes."""
+    file-like object, as opposed to a buffer of bytes.
+
+    Whatever has a buffer is bytes, even with a ``read``: an ``mmap`` is read
+    whole, not from its current position (which is its end once it has been
+    written to)."""
     if isinstance(obj, (bytes, bytearray, memoryview, str)):
         return False
+    try:
+        memoryview(obj).release()
+        return False
+    except TypeError:
+        pass
     return any(hasattr(obj, name)
                for name in ('recv_into', 'readinto1', 'readinto', 'read'))
 
@@ -78,7 +87,10 @@ class PullSource:
     A socket is read with ``recv_into``; a file object with ``readinto1`` when
     it has one (one raw read, so a pipe or a socket file hands over what has
     arrived instead of blocking until the C reader's whole request is filled),
-    else ``readinto``, else ``read``. A short read is fine; an empty one is
+    else ``readinto``, else ``read``. A method that raises
+    ``io.UnsupportedOperation`` is given up for the next one: an
+    ``io.BufferedIOBase`` subclass that implements only ``read`` inherits a
+    ``readinto1`` that raises it. A short read is fine; an empty one is
     end of input, as the C pull contract has it. A non-blocking object with
     nothing to read has no way to say "later" through a pull source, so that is
     an error here: feed such a transport to a DocumentFeed, FrameFeed or
@@ -93,10 +105,14 @@ class PullSource:
         _refuse_text(obj)
         self.exc = None
         recv_into = getattr(obj, 'recv_into', None)
-        readinto = (getattr(obj, 'readinto1', None) or
-                    getattr(obj, 'readinto', None))
-        read = getattr(obj, 'read', None)
-        if recv_into is None and readinto is None and read is None:
+        # The file object's methods in order of preference: (True, readinto1),
+        # (True, readinto), (False, read).
+        chain = []
+        for name in ('readinto1', 'readinto', 'read'):
+            fn = getattr(obj, name, None)
+            if fn is not None:
+                chain.append((name != 'read', fn))
+        if recv_into is None and not chain:
             raise BovnarArgumentError(
                 f"cannot read from {type(obj).__name__}: it has no recv_into, "
                 f"readinto or read")
@@ -105,10 +121,17 @@ class PullSource:
             try:
                 if recv_into is not None:
                     n = recv_into((ctypes.c_ubyte * want).from_address(buf), want)
-                elif readinto is not None:
-                    n = readinto((ctypes.c_ubyte * want).from_address(buf))
                 else:
-                    n = _read_into(read, buf, want)
+                    while True:
+                        into, fn = chain[0]
+                        try:
+                            n = (fn((ctypes.c_ubyte * want).from_address(buf))
+                                 if into else _read_into(fn, buf, want))
+                            break
+                        except io.UnsupportedOperation:
+                            if len(chain) == 1:
+                                raise
+                            del chain[0]
                 if n is None:
                     raise BlockingIOError(
                         "the source is non-blocking and has no data yet; a "

@@ -34,7 +34,10 @@
 //! next call (the borrow checker holds you to it). Unlike the readers of
 //! [`crate::codec`], which advance the slice past each item they return, these
 //! leave it as it is until a call returns `None`, which empties it: pass the
-//! same slice to every call until then, as another one is refused.
+//! same slice to every call until then, as another one is refused. The check
+//! compares the slice's address and length only, so the bytes behind it must
+//! stay the same too: refilling a reused buffer before `None` hands the
+//! reader new bytes where it expects the rest of the old ones.
 //!
 //! # [`Demux`] or [`crate::codec::MuxReader`]?
 //!
@@ -61,12 +64,13 @@ use crate::reader::{
 use crate::{ErrorCode, Value};
 
 /// The error of a call that needs a callback the C object of a document (or
-/// of a frame stream) was not started with.
-fn hooks_fixed() -> Error {
-    Error::argument(
-        "the C reader takes its callbacks when a document starts (a frame stream: when it \
-         starts): pass on_unverified and want_unit from the first call on it, or reset() first",
-    )
+/// of a frame stream) was not started with. `which` names the handlers that
+/// object fixes, `remedy` how to start over.
+fn hooks_fixed(which: &str, remedy: &str) -> Error {
+    Error::argument(format!(
+        "the C reader takes its callbacks when it starts: pass {which} from the first call \
+         on it, or {remedy}"
+    ))
 }
 
 /// A mirror a feed owns, which [`DocumentFeed::take_mirror`] hands back as
@@ -95,6 +99,10 @@ enum State {
     Open,
     Finished,
     Failed(Error),
+    /// A handler or the mirror panicked while a call ran: the document
+    /// failed, and the error of the call that finds it is made then, so a
+    /// warm feed allocates nothing.
+    Panicked,
 }
 
 /// A document parser that is fed bytes: one C reader (`bvnr_open_read_feed`)
@@ -282,6 +290,10 @@ impl DocumentFeed {
             ..hooks_of(&handlers)
         })?;
         self.started = true;
+        // Failed until the C call returns: a panic in a handler or the
+        // mirror unwinds past the rest of this function, and the document
+        // it ended has failed.
+        self.state = State::Panicked;
         let handle = &mut self.handle;
         let mirror = self.mirror.as_deref_mut();
         let lent = self.lent.as_mut();
@@ -295,12 +307,14 @@ impl DocumentFeed {
                 _ => run(h),
             }
         });
+        // A failing mirror is what ended the document (a panic in it is
+        // resumed here, the document failed).
+        let mirror_failure = self.lent.as_mut().and_then(ffi::LentSink::take_failure);
+        self.state = State::Open;
         if !ok {
             self.fail();
         }
-        // A failing mirror is what ended the document (a panic in it is
-        // resumed here, the document failed).
-        if let Some(e) = self.lent.as_mut().and_then(ffi::LentSink::take_failure) {
+        if let Some(e) = mirror_failure {
             let e = Error::io(ErrorCode::WritingToSink, &e);
             self.state = State::Failed(e.clone());
             return Err(e);
@@ -321,7 +335,7 @@ impl DocumentFeed {
         if self.hooks == needed || (self.started && self.hooks.covers(needed)) {
             Ok(())
         } else if self.started {
-            Err(hooks_fixed())
+            Err(hooks_fixed("on_unverified and want_unit", "reset() first"))
         } else {
             self.open(needed)
         }
@@ -333,7 +347,7 @@ impl DocumentFeed {
         }
         // An error a mirror failed with belongs to the document it ended.
         if let Some(lent) = self.lent.as_mut() {
-            lent.take_failure();
+            lent.discard_failure();
         }
         let mirror = match (&self.mirror, &self.lent) {
             (Some(_), Some(lent)) => Some(lent.sink()),
@@ -392,6 +406,9 @@ impl DocumentFeed {
         match &self.state {
             State::Open => Ok(()),
             State::Failed(e) => Err(e.clone()),
+            State::Panicked => Err(Error::argument(
+                "a handler or the mirror panicked; reset() starts the next document",
+            )),
             State::Finished => Err(Error::argument(
                 "the document is finished; reset() starts the next one",
             )),
@@ -800,7 +817,10 @@ impl FrameParser {
             return Ok(());
         }
         if self.started {
-            return Err(hooks_fixed());
+            return Err(hooks_fixed(
+                "on_unverified and want_unit",
+                "start a new FrameParser",
+            ));
         }
         self.handle = ffi::FrameParseHandle::new(
             self.options.flags(),
@@ -1213,7 +1233,10 @@ impl Demux {
         if self.hooks == needed || (self.started && self.hooks.covers(needed)) {
             Ok(())
         } else if self.started {
-            Err(hooks_fixed())
+            Err(hooks_fixed(
+                "on_verified, on_unverified and want_unit",
+                "reset() first",
+            ))
         } else {
             self.open(needed)
         }

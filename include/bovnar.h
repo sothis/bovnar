@@ -996,8 +996,8 @@ BVN_API void bvnr_sink_to_callback(bvnr_sink_t* s, bvnr_push_fn push,
 	bvnr_flush_fn flush, void* userdata);
 BVN_API void* bvnr_source_get_userdata(const bvnr_source_t* s);
 BVN_API void* bvnr_sink_get_userdata(const bvnr_sink_t* s);
-/* Bytes pushed into a bvnr_sink_to_mem or bvnr_sink_to_callback sink (for the
- * latter, what its push accepted). Counts only what the CALLER pushed:
+/* Bytes pushed into a sink -- memory, fd or callback (for the latter, what
+ * its push accepted). Counts only what the CALLER pushed:
  * bvnr_open_write_sink() takes a copy of the sink, so writer output advances the
  * copy and this stays 0 for the writer's whole lifetime. For writer output use
  * bvnr_writer_bytes_written(), and read it before bvnr_writer_destroy(). */
@@ -1064,6 +1064,12 @@ BVN_API bool bvnr_read(bvnr_reader_t* r);
  * read another document. A feed or finish on a reader that was not opened with
  * bvnr_open_read_feed returns false with error_invalid_argument, as does a feed
  * with a NULL buffer and a non-zero length (which also ends the read).
+ *
+ * Not re-entrant: a feed, finish, bvnr_read or re-open (bvnr_open_read_*) from
+ * inside one of the reader's own callbacks while a feed runs returns false and
+ * ends the read with error_invalid_argument, and the feed running stops after
+ * the event that made the call (it returns false too). bvnr_reader_destroy
+ * must not be called from there.
  */
 BVN_API bool bvnr_open_read_feed(
 	bvnr_reader_t* r, const bvnr_sink_t* src_mirror,

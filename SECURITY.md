@@ -72,7 +72,8 @@ report does not have to guess.
   `max_array_items` default to 2³¹ − 1. A consumer of untrusted input is
   expected to set every limit of spec §12.2 to what it can afford —
   `max_file_size`, `max_text_bytes`, `max_array_items` and the two nesting
-  depths (64 by default) above all. See the limits section of the
+  depths above all (64 by default in C; the Python and Rust bindings default
+  to 255, the format's limit). See the limits section of the
   specification.
 - **Data loss in recovery mode.** `-c` / resync deliberately skips a broken
   assignment and continues. A consumer that does not check the recovery counters
@@ -96,9 +97,9 @@ report does not have to guess.
 `BVNR_HARDEN` is on by default (stack protector on the CLI, `_FORTIFY_SOURCE=2`,
 `-Wformat` security checks). CI runs the test suite a second time under
 ASan and UBSan with `-fno-sanitize-recover=all` (all but the Python tests, which
-load the library into an unsanitized interpreter), and the reader, writer, DOM and
-utility layers each have a self-contained fuzz harness registered as a CTest
-target, with optional libFuzzer and AFL++ builds behind `BVNR_FUZZ_EXTERNAL`.
+load the library into an unsanitized interpreter), and the reader, push-fed
+reader, writer, DOM and utility layers each have a self-contained fuzz harness
+registered as a CTest target, with optional libFuzzer and AFL++ builds behind `BVNR_FUZZ_EXTERNAL`.
 
 GCC has no MemorySanitizer, so uninitialized *heap* reads are not covered by the
 sanitizer runs above; a clang/MSan finding is therefore especially welcome.

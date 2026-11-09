@@ -69,7 +69,7 @@ from .structs import (
     BvnrDemuxItem,
     EVENT_CALLBACK_FUNC, ON_DOCUMENT_FUNC, MUX_ON_MSG_FUNC, ON_ERROR_FUNC,
 )
-from .reader import Reader, read_flags
+from .reader import Reader, _read_limit, read_flags
 from .writer import Writer
 
 # Mirrors of the C constants (bovnar.h / bovnar_stream.h).
@@ -107,13 +107,31 @@ _NEXT_EVENT = 2
 
 
 def _as_bytes(x) -> bytes:
+    """The bytes of a payload: a bytes-like object, or a str as UTF-8.
+
+    Only what has a buffer is taken, as _held_bytes takes it: bytes() of a
+    list, a range or a dict of ints made bytes of its items or keys, and
+    bytes(5) five NUL bytes, none of them what the caller meant."""
+    if isinstance(x, bytes):
+        return x
     if isinstance(x, str):
-        return x.encode('utf-8')
-    # bytes(5) is five NUL bytes, never what a payload of 5 meant.
-    if isinstance(x, int):
+        return _utf8(x, "a payload")
+    try:
+        return memoryview(x).tobytes()
+    except TypeError:
         raise BovnarArgumentError(
-            f"a payload is bytes-like or str, not {type(x).__name__}")
-    return bytes(x)
+            f"a payload is bytes-like or str, not {type(x).__name__}") from None
+
+
+def _utf8(text: str, what: str) -> bytes:
+    """``text`` as UTF-8; a lone surrogate, which has no UTF-8 form, is
+    refused with BovnarArgumentError rather than a UnicodeEncodeError."""
+    try:
+        return text.encode('utf-8')
+    except UnicodeEncodeError:
+        raise BovnarArgumentError(
+            f"{what} holds a lone surrogate, which has no UTF-8 form: "
+            f"{text!r}") from None
 
 
 def _void_copy(data: bytes):
@@ -207,6 +225,7 @@ def load_documents(data,
     from . import _DictParser, _TypedDictParser  # deferred (import cycle)
     lib  = get_library()
     flags = read_flags('load_documents', options)
+    max_document_size = _read_limit('max_document_size', max_document_size)
     if return_errors and not continue_past_failed:
         raise BovnarArgumentError(
             "return_errors applies to continue_past_failed=True: without it "
@@ -393,7 +412,7 @@ def _filter_key(key: str | None) -> bytes | None:
             f"a stream key is a str, not {type(key).__name__}")
     if '\x00' in key:
         raise BovnarArgumentError(f"a stream key cannot hold NUL: {key!r}")
-    return key.encode('utf-8')
+    return _utf8(key, "a stream key")
 
 
 def _mux_channel(channel) -> int:
@@ -450,6 +469,7 @@ def mux_load(data, *, max_message: int = 0, key: str | None = None,
     the default: no cap)."""
     lib  = get_library()
     flags = read_flags('mux_load', options)
+    max_message = _read_limit('max_message', max_message)
     source = PullSource(data) if is_stream(data) else None
     if source is None:
         data = _as_bytes(data)
@@ -747,6 +767,8 @@ class _Feed:
         self._queue    = deque()
         self._view     = None
         self._view_mem = None
+        self._fed      = None     # the bytes C reads from, until drained
+        self._fed_at   = None     # their address, found on demand
         self._failure  = None     # an error kept for the iteration to raise
         self._finished = False
         self._closed   = False
@@ -774,20 +796,39 @@ class _Feed:
         return None
 
     # -- memoryview lifetime -----------------------------------------------
-    def _hand_out(self, ptr: int, n: int, keep=None) -> memoryview:
-        # Read-only, as a view of the fed bytes is: the memory is the demux's.
+    def _fed_address(self) -> int:
+        at = self._fed_at
+        if at is None:
+            at = self._fed_at = ctypes.cast(self._fed, ctypes.c_void_p).value
+        return at
+
+    def _view_of(self, ptr: int, n: int) -> memoryview:
+        """A read-only view of the n bytes at ptr. Where they lie whole in
+        the fed bytes it is a slice of those, which keeps them alive by
+        itself, so a buffer made from it never makes a call refuse; else it
+        is a view of the C object's memory (_hand_out)."""
+        fed = self._fed
+        if n and fed is not None:
+            at = (ptr or 0) - self._fed_address()
+            if 0 <= at <= len(fed) - n:
+                view = memoryview(fed)[at:at + n]
+                self._view = view
+                return view
+        return self._hand_out(ptr, n)
+
+    def _hand_out(self, ptr: int, n: int) -> memoryview:
+        # Read-only, as a view of the fed bytes is: the memory is the C
+        # object's.
         if not n:
             view = memoryview(b'')
         else:
             mem = (ctypes.c_ubyte * n).from_address(ptr)
             # Whatever is made from the view (memoryview(view),
             # numpy.frombuffer(view)) keeps `mem` alive, and `mem` keeps the
-            # feed (and `keep`, the Python bytes the memory may lie in), so
-            # the memory is not freed under it; the weak reference tells
-            # whether anything still points there, and frees the C object of
-            # a feed closed meanwhile once nothing does.
+            # feed, so the memory is not freed under it; the weak reference
+            # tells whether anything still points there, and frees the C
+            # object of a feed closed meanwhile once nothing does.
             mem._bvnr_owner = self
-            mem._bvnr_keep = keep
             self._view_mem = weakref.ref(mem, self._view_gone)
             view = memoryview(mem).toreadonly()
         self._view = view
@@ -817,7 +858,11 @@ class _Feed:
             try:
                 view.release()
             except BufferError:
-                return True
+                # A view of the fed bytes (a bytes object) points at nothing
+                # C reuses, and its exports keep those bytes alive: not in
+                # use. One of the C object's memory is.
+                if not isinstance(view.obj, bytes):
+                    return True
         mem = self._view_mem
         if mem is not None:
             if mem() is not None:
@@ -895,6 +940,21 @@ class _Feed:
 # DocumentFeed
 # ---------------------------------------------------------------------------
 
+def _feed_events(queue: deque, events: bool, parser):
+    """DocumentFeed's on_verified: each event queued as a DocumentEvent
+    (events), and each top-level value the parser completes as a Value."""
+    def on_event(ev, data) -> bool:
+        if events:
+            queue.append(DocumentEvent(ev, data))
+        if parser is not None:
+            parser.on_event(ev, data)
+            if parser.completed:
+                queue.extend(parser.completed)
+                parser.completed.clear()
+        return True
+    return on_event
+
+
 class DocumentFeed(_Feed):
     """One document, fed in pieces of any size (``bvnr_open_read_feed``).
 
@@ -955,28 +1015,19 @@ class DocumentFeed(_Feed):
             raise BovnarArgumentError(
                 "DocumentFeed needs events=True or values=True")
         self._reader = Reader()
-        self._events = events
         self._parser = _top_level_parser(typed) if values else None
+        # The callback closes over the queue and the parser, not the feed: it
+        # lives on the feed, and a cycle would leave the C reader to the
+        # garbage collector.
         self._flags, self._cb_refs = self._reader._build_flags(
-            'DocumentFeed', self._on_event, on_unverified, want_unit,
-            on_error, options)
+            'DocumentFeed', _feed_events(self._queue, events, self._parser),
+            on_unverified, want_unit, on_error, options)
         self._mirror = push_sink(mirror) if mirror is not None else None
         if not self._lib.bvnr_open_read_feed(
                 self._reader._ptr,
                 ctypes.byref(self._mirror.handle) if self._mirror else None,
                 ctypes.byref(self._flags)):
             self._reader._raise_error()
-
-    def _on_event(self, ev, data) -> bool:
-        if self._events:
-            self._queue.append(DocumentEvent(ev, data))
-        parser = self._parser
-        if parser is not None:
-            parser.on_event(ev, data)
-            if parser.completed:
-                self._queue.extend(parser.completed)
-                parser.completed.clear()
-        return True
 
     def _check(self, ok: bool, queued: int) -> None:
         mirror = self._mirror
@@ -1100,7 +1151,6 @@ class FrameFeed(_Feed):
                  **options) -> None:
         super().__init__()
         self._fr     = None
-        self._fed    = None
         self._parse  = parse
         self._as_view = view
         self._continue = continue_past_failed
@@ -1108,6 +1158,7 @@ class FrameFeed(_Feed):
         # The read options are checked whether or not they apply, so a typo
         # is a TypeError in either mode.
         read_flags('FrameFeed', options)
+        max_document_size = _read_limit('max_document_size', max_document_size)
         if not parse:
             if (typed or continue_past_failed or return_errors
                     or any(options.values())):
@@ -1131,21 +1182,24 @@ class FrameFeed(_Feed):
 
         from . import _DictParser, _TypedDictParser  # deferred (import cycle)
         new_parser = _TypedDictParser if typed else _DictParser
-        self._state = {'exc': None, 'parser': new_parser(),
-                       'index': None, 'err': None}
+        # The callbacks close over this state and the queue, not the feed:
+        # they live on the feed, and a cycle would leave the C frame reader
+        # to the garbage collector.
+        st = self._state = {'exc': None, 'parser': new_parser(),
+                            'index': None, 'err': None}
+        queue = self._queue
 
         def on_event(ev, d):
-            return self._state['parser'].on_event(ev, d)
+            return st['parser'].on_event(ev, d)
 
         def on_document(_ud, index, ok, err):
-            st = self._state
             try:
                 # Without continue_past_failed a failed document is the
                 # stream's error, not an item.
                 if ok:
-                    self._queue.append(st['parser'].result())
-                elif self._continue:
-                    self._queue.append(
+                    queue.append(st['parser'].result())
+                elif continue_past_failed:
+                    queue.append(
                         _failed_document(lib, int(index), int(err))
                         if return_errors else None)
                 if not ok and st['index'] is None:
@@ -1186,7 +1240,7 @@ class FrameFeed(_Feed):
             if buf:
                 if not self._lib.bvnr_frame_reader_feed(self._fr, buf, len(buf)):
                     self._raise_error()
-                self._fed = buf
+                self._fed, self._fed_at = buf, None
             return self
         buf = data if isinstance(data, bytes) else _held_bytes(data)
         ok = self._lib.bvnr_frame_reader_feed(self._fr, buf, len(buf))
@@ -1240,8 +1294,9 @@ class FrameFeed(_Feed):
         if rc == _NEXT_ITEM:
             n = self._len.value
             if self._as_view:
-                # A document whole in the fed bytes lies in them.
-                return self._hand_out(self._doc.value, n, keep=self._fed)
+                # A document whole in the fed bytes is a slice of them; one
+                # gathered across feeds lies in the frame reader's buffer.
+                return self._view_of(self._doc.value, n)
             return ctypes.string_at(self._doc.value, n) if n else b''
         self._fed = None
         if rc == _NEXT_NONE:
@@ -1339,6 +1394,7 @@ class DemuxFeed(_Feed):
         super().__init__()
         self._dm = None
         flags = read_flags('DemuxFeed', options)
+        max_message = _read_limit('max_message', max_message)
         if typed and not values:
             raise BovnarArgumentError("typed applies to values=True")
         lib = self._lib
@@ -1352,8 +1408,6 @@ class DemuxFeed(_Feed):
         if not lib.bvnr_demux_open_feed(dm, ctypes.byref(flags),
                                         values or events):
             raise MemoryError("bvnr_demux_open_feed() failed")
-        self._fed     = None
-        self._fed_at  = 0
         self._as_view = view
         self._events  = events
         self._parser  = _top_level_parser(typed) if values else None
@@ -1385,6 +1439,8 @@ class DemuxFeed(_Feed):
 
     def __next__(self):
         # The per-message path, kept flat: everything else is _resume's.
+        if self._closed:
+            raise StopIteration
         if self._view is not None or self._view_mem is not None:
             self._release()
         if self._queue:
@@ -1430,22 +1486,11 @@ class DemuxFeed(_Feed):
                 self._raise_error()
             rc = self._next(self._dm, self._item_ref)
 
-    def _fed_address(self) -> int:
-        at = self._fed_at
-        if at is None:
-            at = self._fed_at = ctypes.cast(self._fed, ctypes.c_void_p).value
-        return at
-
     def _payload(self, item, as_view: bool):
         n = item.length
         if not as_view:
             return ctypes.string_at(item.data, n) if n else b''
-        at = (item.data or 0) - self._fed_address()
-        if n and 0 <= at <= len(self._fed) - n:
-            view = memoryview(self._fed)[at:at + n]
-            self._view = view
-            return view
-        return self._hand_out(item.data, n)
+        return self._view_of(item.data, n)
 
     def _on_event(self, item) -> None:
         ev = Event(item.event)
@@ -1676,10 +1721,13 @@ class FrameWriter:
 
     An exception the object raises is re-raised, unchanged, from the call
     that pushed. A frame may then be half written, so the writer refuses
-    further documents.
+    further documents. The object's own ``write`` and ``flush`` may not
+    write to, flush or close the writer (``BovnarArgumentError``): a frame
+    written from there would land inside the one being written.
     """
 
     def __init__(self, file, *, flush_each: bool = True) -> None:
+        self._busy = False
         self._sink = PushSink(file)
         self._sink_ref = ctypes.byref(self._sink.handle)
         flush = getattr(file, 'flush', None)
@@ -1702,6 +1750,8 @@ class FrameWriter:
             raise BovnarArgumentError(
                 "FrameWriter has been closed" if self._closed else
                 "FrameWriter failed part-way through a frame")
+        if self._sink.busy or self._busy:
+            self._check_not_in_sink()
         data = document if type(document) is bytes else _as_bytes(document)
         if not self._write(self._sink_ref, data, len(data)):
             self._failed = True
@@ -1711,13 +1761,26 @@ class FrameWriter:
             raise BovnarWriteError(ErrorCode.WRITING_TO_SINK,
                                    message="bvnr_frame_write failed")
         self._count += 1
-        flush = self._flush_each
-        if flush is not None:
+        if self._flush_each is not None:
             try:
-                flush()
+                self._call_flush()
             except BaseException:
                 self._failed = True
                 raise
+
+    def _check_not_in_sink(self) -> None:
+        if self._sink.busy or self._busy:
+            raise BovnarArgumentError(
+                "the FrameWriter is in use by its own object: it cannot be "
+                "written to, flushed or closed from the object's write() or "
+                "flush()")
+
+    def _call_flush(self) -> None:
+        self._busy = True
+        try:
+            self._flush_obj()
+        finally:
+            self._busy = False
 
     def dump(self, obj: dict, *, pretty: bool = True) -> None:
         """Serialise ``obj`` with :func:`bovnar.dumps` and write it as a
@@ -1729,17 +1792,19 @@ class FrameWriter:
         """Call the object's ``flush`` when it has one."""
         if self._closed:
             raise BovnarArgumentError("FrameWriter has been closed")
+        self._check_not_in_sink()
         if self._flush_obj is not None:
-            self._flush_obj()
+            self._call_flush()
 
     def close(self) -> None:
         """Flush the object and refuse further documents. Safe to call
         twice."""
         if self._closed:
             return
+        self._check_not_in_sink()
         self._closed = True
         if self._flush_obj is not None and not self._failed:
-            self._flush_obj()
+            self._call_flush()
 
     def __enter__(self) -> 'FrameWriter':
         return self

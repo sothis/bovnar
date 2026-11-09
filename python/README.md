@@ -100,6 +100,18 @@ msg  = stream.mux_dump([(1, b"hello"), (42, b"world")])   # multiplex channels
 print(stream.mux_load(msg))                               # [(1, b"hello"), (42, b"world")]
 ```
 
+For streams that never end, `stream.DocumentFeed`, `stream.FrameFeed` and
+`stream.DemuxFeed` are fed bytes in pieces of any size, from a non-blocking
+socket or an event loop, and hand over each event, value, document or message
+as it completes; `stream.MuxWriter` and `stream.FrameWriter` write one message
+or one document at a time to a socket or a file. `bovnar.load` and
+`bovnar.dump` read and write a socket or a binary file object,
+`bovnar.canonicalize` gives a document's canonical form, `bovnar.timekeeping`
+binds the library's civil-time and calendar functions, and `bovnar.literals`
+its literal validators, parsers and formatters.
+[doc/09](https://github.com/sothis/bovnar/blob/main/doc/09_bovnar_python_bindings.md)
+has the details.
+
 ## Links
 
 - Web: https://bovnar.io

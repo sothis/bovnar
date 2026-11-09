@@ -36,6 +36,9 @@
  *                               now 0, the zero-init default): uncaps the byte
  *                               counter so a single document or octet stream can
  *                               run to 2^64-1 bytes with no accumulated limit.
+ *                               The document's text stays capped by
+ *                               max_text_bytes (0: 2 GiB - 1; raise it for an
+ *                               endless text stream).
  *   2. Multi-document framing — a length-prefixed record codec carrying a
  *                               sequence of independent documents over one
  *                               transport (file/socket/pipe).
@@ -188,8 +191,11 @@ BVN_API bool bvnr_doc_stream_read_ex(
  * so a frame is never buffered whole, however large. One consequence: the
  * events of a document whose frame the stream cuts off have been delivered up
  * to the cut (without its ev_stream_end or an on_document call), where
- * bvnr_doc_stream_read, which reads a frame whole first, delivers none. opts
- * and *opts->flags are copied.
+ * bvnr_doc_stream_read, which reads a frame whole first, delivers none.
+ * Another: on a 32-bit host bvnr_doc_stream_read also refuses a frame longer
+ * than SIZE_MAX (error_value_out_of_range), which it could not buffer; the
+ * parse mode streams such a frame under max_document_size alone. opts and
+ * *opts->flags are copied.
  *
  * bvnr_frame_reader_create_pull(max_document_size) hands documents out instead,
  * as bytes, through bvnr_frame_reader_next; the caller parses them as it likes.
@@ -220,7 +226,14 @@ BVN_API bool bvnr_doc_stream_read_ex(
  * cut-off document is not reported to on_document, as with
  * bvnr_doc_stream_read, though in parse mode its events up to the cut have
  * been delivered), false if the stream had already failed. In pull mode
- * it refuses, changing nothing, while fed bytes are left undrained.
+ * it refuses, changing nothing, while fed bytes are left undrained. After a
+ * finish, further feed and finish calls return false and leave
+ * bvnr_frame_reader_error as it was (error_none after a clean end).
+ *
+ * Not re-entrant: a feed or finish from inside on_document or one of the
+ * reader's callbacks fails the stream with error_invalid_argument, and the
+ * feed running stops after the event that made the call (it returns false).
+ * bvnr_frame_reader_destroy must not be called from there.
  *
  * bvnr_frame_reader_count is the number of documents seen (parsed or handed
  * out), bvnr_frame_reader_error the error that ended the stream (error_none
@@ -334,7 +347,9 @@ BVN_API void bvnr_demux_destroy(bvnr_demux_t* dm);
  * multiplexed; set a key so a document can mix one mux stream with ordinary
  * binary octet payloads (those under other keys are ignored). Pass key == NULL
  * to clear the filter and restore the demux-every-stream default. The key string
- * is copied. Returns false on a NULL demux or an allocation failure. */
+ * is copied. Returns false on a NULL demux or an allocation failure; check it,
+ * since a later bvnr_demux_open_feed clears the error the failure latched and
+ * the demux then reads with no filter. */
 BVN_API bool bvnr_demux_set_key(bvnr_demux_t* dm, const char* key);
 
 /*
@@ -393,7 +408,9 @@ BVN_API error_code_t bvnr_demux_error(const bvnr_demux_t* dm);
  *                      without a copy, one whole in a chunk that arrived
  *                      split across feeds from the reader's chunk buffer, and
  *                      one split across chunks is reassembled in the
- *                      channel's buffer.
+ *                      channel's buffer. (The reader takes a fed buffer in
+ *                      windows of 1 MiB; a chunk that straddles a window's
+ *                      end is gathered like one split across feeds.)
  *   BVNR_NEXT_EVENT    item->event, item->value: a document event (only when
  *                      opened with deliver_events). Every verified event except
  *                      the mux stream's chunks, in document order and in order
@@ -416,6 +433,15 @@ BVN_API error_code_t bvnr_demux_error(const bvnr_demux_t* dm);
  * stream's end cut short (error_octet_stream_truncated) -- and false when it is
  * not. In pull mode it refuses, changing nothing, while fed bytes are left
  * undrained; after it, bvnr_demux_next hands out the closing events.
+ *
+ * After a finish, further feed and finish calls return false and leave
+ * bvnr_demux_error as it was (error_none after a clean end).
+ *
+ * Not re-entrant: a feed, next, finish or bvnr_demux_open_feed from inside
+ * on_message or one of the reader's callbacks fails the stream with
+ * error_invalid_argument, and the call running stops after the event that
+ * made it (it returns false or BVNR_NEXT_ERROR). bvnr_demux_destroy must not
+ * be called from there.
  *
  * bvnr_demux_get_reader gives the fed reader, for the error position, the
  * recovery counters and the declared version (NULL before bvnr_demux_open_feed).

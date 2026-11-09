@@ -507,3 +507,30 @@ def test_narrow_float_widths_round_to_ieee_in_the_writer():
     with pytest.raises(BovnarWriteError) as e:
         w.write_float('a', 1e5, width=16)
     assert e.value.code == ErrorCode.VALUE_OUT_OF_RANGE
+
+
+@pytest.mark.parametrize('key', ['k' * 300, 'a\0b', 'not a key', '', '\udc00'])
+def test_every_writer_key_method_follows_the_dumps_rule(key):
+    # write_octets went through emit: a 300-byte key was written (and then
+    # refused on read), a NUL key was a BovnarWriteError.
+    with pytest.raises(BovnarArgumentError):
+        bovnar.dumps({key: b'x'})
+    calls = [
+        lambda w: w.write_octets(key, b'x'),
+        lambda w: w.embed_document(key, b'.a = 1;'),
+        lambda w: w.mux_begin(key),
+        lambda w: w.write_plain(key, 'auto'),
+        lambda w: w.write_datetime(key, 1),
+    ]
+    for call in calls:
+        w = Writer.to_mem(emit_version=True)
+        before = w.bytes_written
+        with pytest.raises(BovnarArgumentError):
+            call(w)
+        assert w.bytes_written == before          # nothing written first
+
+
+def test_write_plain_refuses_a_lone_surrogate():
+    w = Writer.to_mem()
+    with pytest.raises(BovnarArgumentError):
+        w.write_plain('a', 'x\udc00')

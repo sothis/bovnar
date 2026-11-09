@@ -337,6 +337,12 @@ def test_convert_epoch_seconds():
         convert_epoch_seconds(I64_MAX, Epoch.UNIX, Epoch.TAI)
     with pytest.raises(BovnarArgumentError):
         convert_epoch_seconds(I64_MIN, Epoch.TAI, Epoch.UNIX)
+    # The C overflow mark is INT64_MIN itself, so that result raises too
+    # (doc/09 §6.5).
+    with pytest.raises(BovnarArgumentError):
+        convert_epoch_seconds(I64_MIN, Epoch.UNIX, Epoch.UNIX)
+    assert convert_epoch_seconds(I64_MIN + 1, Epoch.UNIX, Epoch.UNIX) \
+        == I64_MIN + 1
 
 
 def test_leap_seconds():

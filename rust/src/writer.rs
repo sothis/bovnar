@@ -280,7 +280,7 @@ impl Writer {
         options: WriteOptions,
     ) -> Result<Self> {
         let pretty = options.pretty;
-        let state = ffi::PushState::owned(Box::new(out), cap as u64);
+        let state = ffi::PushState::owned(Box::new(out), sink_cap(cap));
         Self::open(options, |h, flags| h.open_sink(state, pretty, flags))
     }
 
@@ -308,8 +308,9 @@ impl Writer {
         )
     }
 
-    /// [`Writer::to_writer`] for a document of at most `cap` bytes, with the
-    /// output options [`Writer::to_mem_with`] takes. Output past `cap` fails
+    /// [`Writer::to_writer`] for a document of at most `cap` bytes
+    /// (`usize::MAX` for no cap), with the output options
+    /// [`Writer::to_mem_with`] takes. Output past `cap` fails
     /// with `sink_buffer_exhausted`, as with [`Writer::to_mem`], but only when
     /// it is pushed to `out`: the write that fills a 64 KiB block past the
     /// cap, or the [`Writer::flush`] or [`Writer::finish`] that pushes it, is
@@ -323,7 +324,7 @@ impl Writer {
         emit_version: bool,
     ) -> Result<Self> {
         Self::to_sink(
-            ffi::PushState::owned(Box::new(out), cap as u64),
+            ffi::PushState::owned(Box::new(out), sink_cap(cap)),
             pretty,
             unit_flags,
             emit_version,
@@ -1186,5 +1187,15 @@ mod tests {
         w.write_string("a", "x").unwrap();
         assert!(w.finish().is_err());
         assert!(w.finish().is_err());
+    }
+}
+
+/// The byte cap of a sink writer: `usize::MAX` is no cap, also on a 32-bit
+/// target, where it would otherwise be a 4 GiB one.
+fn sink_cap(cap: usize) -> u64 {
+    if cap == usize::MAX {
+        u64::MAX
+    } else {
+        cap as u64
     }
 }

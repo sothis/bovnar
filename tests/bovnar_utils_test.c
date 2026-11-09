@@ -537,6 +537,19 @@ static void test_parse_helpers_respect_declared_width(void)
 			ASSERT_FALSE(bvn_parse_double(bad[k], f64, &d),
 				"bvn_parse_double refuses text that is not a float token");
 		ASSERT_TRUE(d == 7.0, "...and leaves the out parameter alone");
+		/* C23's strtoll skips "0b" in base 2, as every strtoll skips "0x" in
+		 * base 16; no literal of the format has either prefix. */
+		{
+			int64_t iv = 7;
+			uint64_t uv = 7;
+			value_type_spec_t s2 = { .family = vt_sint, .width = 64, .base = 2 };
+			value_type_spec_t u2 = { .family = vt_uint, .width = 64, .base = 2 };
+			ASSERT_FALSE(bvn_parse_int64("0b101", s2, &iv), "0b101 in base 2");
+			ASSERT_FALSE(bvn_parse_int64("-0B1", s2, &iv), "-0B1 in base 2");
+			ASSERT_FALSE(bvn_parse_uint64("0b101", u2, &uv), "unsigned 0b101");
+			ASSERT_TRUE(bvn_parse_int64("101", s2, &iv) && iv == 5, "101 in base 2");
+			ASSERT_TRUE(bvn_parse_uint64("0", u2, &uv) && uv == 0, "0 in base 2");
+		}
 		ASSERT_TRUE(bvn_parse_double("1", f64, &d) && d == 1.0, "1");
 		/* A leading '+' is NOT bad text: the reader accepts it on a quoted
 		 * float literal in every base (`<float:64> "+5"`, `<float:64,_16>

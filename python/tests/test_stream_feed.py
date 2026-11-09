@@ -451,15 +451,28 @@ class TestDemuxFeed:
         dm.close()
 
     def test_an_exported_view_stops_the_next_call(self):
+        # A message over one chunk is reassembled in the channel's buffer,
+        # which the next call reuses.
+        data = stream.mux_dump([(1, b'a' * 70_000), (2, b'def')])
+        dm = DemuxFeed(view=True)
+        it = dm.feed(data)
+        hold = pickle.PickleBuffer(next(it).payload)   # holds a buffer export
+        with pytest.raises(BovnarArgumentError):
+            next(it)
+        hold.release()                             # the last reference to it
+        assert next(it) == (2, memoryview(b'def'))
+        assert list(it) == []
+
+    def test_an_exported_view_of_the_fed_bytes_stops_nothing(self):
+        # A message whole in the fed bytes is a view of them, which the
+        # export keeps alive by itself (doc/09 §4.7).
         data = stream.mux_dump([(1, b'abc'), (2, b'def')])
         dm = DemuxFeed(view=True)
         it = dm.feed(data)
         a = next(it)
-        hold = pickle.PickleBuffer(a.payload)      # holds a buffer export
-        with pytest.raises(BovnarArgumentError):
-            next(it)
-        hold.release()
+        hold = pickle.PickleBuffer(a.payload)
         assert next(it) == (2, memoryview(b'def'))
+        assert bytes(hold) == b'abc'
         assert list(it) == []
 
     def test_closed(self):
@@ -846,3 +859,87 @@ class TestReadLimits:
             Reader().read_mem(self.DOC, max_text_bytes=bad)
         with pytest.raises(BovnarArgumentError):
             DocumentFeed(max_array_items=bad)
+
+
+class TestThirdReviewFixes:
+    """What a third review of the feeds found (2026-11-09)."""
+
+    @pytest.mark.parametrize('bad', [-1, 1 << 64, 1.5, '10', None])
+    def test_a_size_cap_ctypes_would_wrap_is_refused(self, bad):
+        # -1 went to C as 2**64 - 1, which lifted the cap.
+        with pytest.raises(BovnarArgumentError):
+            FrameFeed(max_document_size=bad)
+        with pytest.raises(BovnarArgumentError):
+            FrameFeed(parse=True, max_document_size=bad)
+        with pytest.raises(BovnarArgumentError):
+            DemuxFeed(max_message=bad)
+
+    @pytest.mark.parametrize('make', [
+        lambda: DocumentFeed(),
+        lambda: DocumentFeed(events=False, values=True),
+        lambda: FrameFeed(parse=True),
+        lambda: FrameFeed(),
+        lambda: DemuxFeed(values=True),
+    ])
+    def test_a_dropped_feed_is_freed_without_the_collector(self, make):
+        import gc
+        import weakref
+        gc.disable()
+        try:
+            feed = make()
+            ref = weakref.ref(feed)
+            del feed
+            assert ref() is None
+        finally:
+            gc.enable()
+
+    def test_a_frame_view_of_the_fed_bytes_stops_nothing(self):
+        blob = stream.frame_documents([b'.a = 1;', b'.b = 2;'])
+        fr = FrameFeed(view=True)
+        it = fr.feed(blob)
+        first = next(it)
+        held = memoryview(first)                   # a buffer made from it
+        assert bytes(next(it)) == b'.b = 2;'
+        assert bytes(held) == b'.a = 1;'
+        assert list(it) == []
+
+    def test_a_frame_view_of_the_reader_buffer_still_stops(self):
+        # A document cut across two feeds is gathered in the frame reader's
+        # buffer, which the next call reuses.
+        blob = stream.frame_documents([b'.a = 1;', b'.b = 2;'])
+        fr = FrameFeed(view=True)
+        assert list(fr.feed(blob[:15])) == []
+        first = next(iter(fr.feed(blob[15:])))
+        held = memoryview(first)
+        with pytest.raises(BovnarArgumentError):
+            next(fr)
+        del held
+        assert bytes(next(fr)) == b'.b = 2;'
+
+    def test_a_held_fed_view_does_not_refuse_once(self):
+        import struct
+        dm = DemuxFeed(view=True)
+        it = dm.feed(stream.mux_dump([(1, b'abc'), (2, b'def')]))
+        rows = struct.iter_unpack('B', next(it).payload)   # a real export
+        assert next(it) == (2, memoryview(b'def'))
+        assert [r[0] for r in rows] == list(b'abc')
+
+    def test_a_closed_demux_stops_with_a_view_held(self):
+        dm = DemuxFeed(view=True)
+        it = dm.feed(stream.mux_dump([(1, b'x' * 70_000), (2, b'y')]))
+        held = memoryview(next(it).payload)        # the channel's buffer
+        dm.close()
+        assert list(it) == []
+        with pytest.raises(StopIteration):
+            next(dm)
+        del held
+
+    def test_an_mmap_is_fed_whole(self):
+        import mmap
+        doc = b'.a = 1; .b = 2;'
+        mm = mmap.mmap(-1, len(doc))
+        mm.write(doc)                              # its position is the end
+        f = DocumentFeed(events=False, values=True)
+        got = list(f.feed(mm)) + list(f.finish())
+        assert got == [Value('a', 1), Value('b', 2)]
+        mm.close()

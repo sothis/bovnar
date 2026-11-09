@@ -937,7 +937,7 @@ byte.)
 - `bvnr_open_read_feed` arms the reader as `bvnr_open_read_source` does — it may
   be a reader used before, the unit policy survives — with no source. The
   optional `src_mirror` receives the bytes as they are consumed. `bvnr_read` on
-  a fed reader returns `false` with `error_invalid_argument`.
+  a fed reader returns `false` with `error_invalid_argument` and ends the read.
 - `bvnr_read_feed` lexes the bytes and returns when they are consumed; the
   buffer may be reused at once. The first call delivers `ev_stream_start`. It
   returns `false` only when the read has ended in an error — the same errors at
@@ -950,6 +950,13 @@ byte.)
   `error_read_complete_chunk_failed` inside an octet stream.
 - After an error or a finish the read is over: further calls return `false` and
   leave the getters (§1.7) as they were. Re-open to read the next document.
+- A feed with a `NULL` buffer and a non-zero length returns `false` with
+  `error_invalid_argument` and ends the read.
+- **Not re-entrant.** A feed, finish, `bvnr_read` or re-open from inside one of
+  the reader's own callbacks while a feed runs returns `false` and ends the
+  read with `error_invalid_argument`; the feed running stops after the event
+  that made the call and returns `false` too. Do not destroy the reader from
+  there.
 
 **A stream with metadata.** A document can carry ordinary values before (and
 after) a binary or multiplexed octet stream — `.meta = { .codec = "av1"; };`
@@ -1035,7 +1042,8 @@ bvnr_sink_to_mem(&sink, out, sizeof(out));
 uint64_t bvnr_sink_bytes_written(const bvnr_sink_t *s);
 ```
 
-Return the number of bytes pushed into a memory sink so far. Only meaningful for sinks created with `bvnr_sink_to_mem`.
+Return the number of bytes pushed into a sink so far: a memory sink, an fd sink,
+or a callback sink (for that one, what its push accepted). A `NULL` sink is 0.
 
 **Not for writer output.** `bvnr_open_write_sink` takes a *copy* of the sink, so
 everything a writer emits advances the copy and never the caller's struct — this

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
-//! Hand-written declarations of the C API in `bovnar.h`: its functions and
+//! Hand-written declarations of the C API (`bovnar.h`, `bovnar_stream.h`,
+//! `bovnar_dom.h` and the other public headers): its functions and
 //! the layouts of the structs passed by value.
 //!
 //! This is the only module allowed to use `unsafe`. Besides the raw
@@ -2513,7 +2514,7 @@ extern "C" fn on_message_trampoline(
 /// [`ReaderHandle::read_source`]).
 pub fn demux_read(
     read: impl FnOnce(&mut ReaderHandle, BvnrReadFlags, &mut Handlers<'_>) -> bool,
-    mut flags: BvnrReadFlags,
+    flags: BvnrReadFlags,
     max_message: u64,
     key: Option<&CStr>,
 ) -> Result<Vec<(u64, Vec<u8>)>, DemuxError> {
@@ -2549,7 +2550,6 @@ pub fn demux_read(
         verified: Some(&mut forward),
         ..Handlers::default()
     };
-    flags.max_file_size = 0;
     let ok = read(&mut reader, flags, &mut h);
     // SAFETY: `dm` is live; it is destroyed exactly once, after its last use.
     let derr = unsafe {
@@ -3611,6 +3611,15 @@ impl LentSink {
             std::panic::resume_unwind(payload);
         }
         st.error.take()
+    }
+
+    /// Drops the failure of an earlier document, a parked panic included,
+    /// without resuming it: it belongs to the document it ended.
+    pub fn discard_failure(&mut self) {
+        // SAFETY: the state is live, and no push is running.
+        let st = unsafe { &mut *self.state };
+        st.panic = None;
+        st.error = None;
     }
 }
 

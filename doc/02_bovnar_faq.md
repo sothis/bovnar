@@ -1197,9 +1197,10 @@ bvnr_reader_create()
   → bvnr_reader_destroy()
 ```
 
-The reader does not allocate during `bvnr_read`; all buffering is internal to
-the reader struct. The `bvnr_read_flags_t` struct is read only during
-`bvnr_open_read_source` and may live on the stack.
+The reader's buffers are allocated by the first `bvnr_open_read_*` and reused
+by every later open of the same reader; `bvnr_read` itself allocates only for
+unit conversions and wide numbers. The `bvnr_read_flags_t` struct is read only
+during `bvnr_open_read_source` and may live on the stack.
 
 ---
 
@@ -1423,10 +1424,14 @@ In both bindings a nesting cap of `0` means **255**, the format's limit, not 64.
 
 **Does `bvnr_read` allocate heap memory?**
 
-No. The reader does not allocate during `bvnr_read`. All buffering is internal
-to the `bvnr_reader_t` struct, which is allocated once by `bvnr_reader_create`.
-Event data pointers (`d->data`) point into the reader's internal buffer and are
-valid only for the duration of the callback invocation.
+Rarely. The reader's buffers (about 120 KB of scratch space and the nesting
+stacks) are allocated by the first `bvnr_open_read_*` on a reader and kept for
+every later open of it, so a reused reader allocates nothing per document.
+During `bvnr_read` only a unit conversion (the converted value's text and
+exact rational) and a number wider than 64 bits allocate. Event data pointers
+(`d->data`) point into the reader's internal buffer, or for a fed reader into
+the bytes being fed, and are valid only for the duration of the callback
+invocation.
 
 ---
 
@@ -1436,8 +1441,8 @@ Performance depends heavily on the input profile (scalars, typed values, structs
 arrays, units) and hardware. The CLI's benchmark subcommand (`bovnar bench`) can
 measure MB/s, assignments/s, and events/s across configurable profiles and
 payload sizes. Run `bovnar bench --profile all --size 1024,65536 --iterations 200`
-for a representative baseline. Use `--min-overhead` to isolate raw lexer
-throughput by skipping the `on_verified` callback.
+for a representative baseline. Use `--min-overhead` to drop the `on_unverified`
+(lexer) callback and keep only `on_verified`.
 
 ---
 

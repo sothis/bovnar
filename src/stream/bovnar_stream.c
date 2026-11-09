@@ -260,9 +260,13 @@ bool bvnr_doc_stream_read_ex(
 			if (rc != 1) { error = doc_stream_read_error(rc); break; }
 		}
 
-		bool ok = bvnr_open_read_mem(r, len ? buf : (const void*)"", len,
-					NULL, 0, opts ? opts->flags : NULL)
-			&& bvnr_read(r);
+		/* The open fails only for want of memory, before the reader has
+		 * an error of its own: what the header promises for that. */
+		if (!bvnr_open_read_mem(r, len ? buf : (const void*)"", len,
+					NULL, 0, opts ? opts->flags : NULL)) {
+			error = error_invalid_argument; break;
+		}
+		bool ok = bvnr_read(r);
 		error_code_t err = bvnr_reader_get_error(r);
 
 		/* Count the document the moment it has been read and parsed, *before*
@@ -445,6 +449,9 @@ struct bvnr_demux_s {
 	bool			failed;
 	bool			finished;
 	bool			has_chunk;
+	/* Set while a call runs the reader, so that a call from inside one of
+	 * the callbacks it makes is refused (demux_reentered). */
+	bool			busy;
 	uint32_t		chunk_chan;
 	const uint8_t*		chunk;
 	uint32_t		chunk_len;
@@ -897,10 +904,25 @@ static bool demux_feed_want_unit(void* ud, const bvnr_data_t* d,
 					want_base);
 }
 
+/* A feed, next, finish or re-open from inside one of the callbacks a call
+ * running the reader makes: the stream fails with error_invalid_argument,
+ * and the call running stops right after the event that called. */
+static bool demux_reentered(bvnr_demux_t* dm)
+{
+	if (!dm->failed && dm->error == error_none)
+		dm->error = error_invalid_argument;
+	dm->failed = true;
+	bvn_lex_pause(dm->reader);
+	return false;
+}
+
 bool bvnr_demux_open_feed(bvnr_demux_t* dm, const bvnr_read_flags_t* flags,
 	bool deliver_events)
 {
 	if (!dm) return false;
+	/* The reader a re-open would tear down is the one running. */
+	if (dm->busy)
+		return demux_reentered(dm);
 	/* Not open until the reader is: a failed re-open must not leave the
 	 * demux feeding a reader that open has torn down. */
 	dm->feeding   = false;
@@ -952,6 +974,8 @@ bool bvnr_demux_feed(bvnr_demux_t* dm, const void* buf, uint64_t len)
 	if (!dm || !dm->feeding || dm->finished || dm->failed ||
 	    (!buf && len))
 		return false;
+	if (dm->busy)
+		return demux_reentered(dm);
 	if (!dm->on_message) {
 		/* Pull mode reads lazily, in bvnr_demux_next, so that a message can
 		 * be handed out from this very buffer. */
@@ -961,17 +985,22 @@ bool bvnr_demux_feed(bvnr_demux_t* dm, const void* buf, uint64_t len)
 		return true;
 	}
 	bvn_lex_feed_attach(dm->reader, (const uint8_t*)buf, len);
-	if (bvn_lex_feed_run(dm->reader) == BVN_FEED_ERROR) {
+	dm->busy = true;
+	int rc = bvn_lex_feed_run(dm->reader);
+	dm->busy = false;
+	if (rc == BVN_FEED_ERROR)
 		dm->failed = true;
-		return false;
-	}
-	return true;
+	return !dm->failed;
 }
 
 int bvnr_demux_next(bvnr_demux_t* dm, bvnr_demux_item_t* item)
 {
 	if (!dm || !item || !dm->feeding || dm->on_message)
 		return BVNR_NEXT_ERROR;
+	if (dm->busy) {
+		demux_reentered(dm);
+		return BVNR_NEXT_ERROR;
+	}
 	for (;;) {
 		if (dm->ev_head < dm->ev_count) {
 			const demux_event_t* e = &dm->events[dm->ev_head++];
@@ -1023,7 +1052,10 @@ int bvnr_demux_next(bvnr_demux_t* dm, bvnr_demux_item_t* item)
 		if (!bvn_lex_feed_pending(&dm->reader->lex))
 			return BVNR_NEXT_NONE;
 		/* An error still lets the events queued before it out first. */
-		if (bvn_lex_feed_run(dm->reader) == BVN_FEED_ERROR)
+		dm->busy = true;
+		int rc = bvn_lex_feed_run(dm->reader);
+		dm->busy = false;
+		if (rc == BVN_FEED_ERROR)
 			dm->failed = true;
 	}
 }
@@ -1032,16 +1064,19 @@ bool bvnr_demux_finish(bvnr_demux_t* dm)
 {
 	if (!dm || !dm->feeding || dm->finished)
 		return false;
+	if (dm->busy)
+		return demux_reentered(dm);
 	if (!dm->on_message && !dm->failed && demux_undrained(dm))
 		return false;
 	dm->finished = true;
 	if (dm->failed)
 		return false;
-	if (!bvn_lex_feed_end(dm->reader)) {
+	dm->busy = true;
+	bool ok = bvn_lex_feed_end(dm->reader);
+	dm->busy = false;
+	if (!ok)
 		dm->failed = true;
-		return false;
-	}
-	return true;
+	return !dm->failed;
 }
 
 const bvnr_reader_t* bvnr_demux_get_reader(const bvnr_demux_t* dm)
@@ -1077,6 +1112,9 @@ struct bvnr_frame_reader_s {
 	error_code_t		error;
 	bool			failed;
 	bool			finished;
+	/* Parse mode: set while a feed runs, so that a feed or finish from
+	 * inside on_document or the reader's callbacks is refused. */
+	bool			busy;
 };
 
 static bvnr_frame_reader_t* frame_reader_new(uint64_t max_document_size)
@@ -1160,6 +1198,8 @@ static bool frame_header(bvnr_frame_reader_t* fr, const uint8_t** p,
 static bool frame_document_done(bvnr_frame_reader_t* fr)
 {
 	bool ok = bvnr_read_finish(fr->reader);
+	if (fr->failed)		/* a callback called back in */
+		return false;
 	error_code_t err = bvnr_reader_get_error(fr->reader);
 	uint64_t index = fr->count++;
 	fr->in_payload = false;
@@ -1172,6 +1212,16 @@ static bool frame_document_done(bvnr_frame_reader_t* fr)
 		return frame_fail(fr, err != error_none
 			? err : error_got_incomplete_bvnr_stream);
 	return true;
+}
+
+static bool frame_feed_parse(bvnr_frame_reader_t* fr, const uint8_t* p,
+	uint64_t len);
+
+/* A feed or finish from inside a callback of a running feed. */
+static bool frame_reentered(bvnr_frame_reader_t* fr)
+{
+	bvn_lex_pause(fr->reader);
+	return fr->failed ? false : frame_fail(fr, error_invalid_argument);
 }
 
 bool bvnr_frame_reader_feed(bvnr_frame_reader_t* fr, const void* buf,
@@ -1187,7 +1237,21 @@ bool bvnr_frame_reader_feed(bvnr_frame_reader_t* fr, const void* buf,
 		fr->in_left = len;
 		return true;
 	}
-	while (len) {
+	/* From inside on_document or one of the reader's callbacks: the feed
+	 * running fails too, its reader right after the event that called. */
+	if (fr->busy)
+		return frame_reentered(fr);
+	fr->busy = true;
+	bool ok = frame_feed_parse(fr, p, len);
+	fr->busy = false;
+	return ok && !fr->failed;
+}
+
+/* Parse mode's feed: the frames of `len` bytes at `p`. */
+static bool frame_feed_parse(bvnr_frame_reader_t* fr, const uint8_t* p,
+	uint64_t len)
+{
+	while (len && !fr->failed) {
 		if (!fr->in_payload) {
 			if (!frame_header(fr, &p, &len)) {
 				if (fr->failed) return false;
@@ -1207,6 +1271,8 @@ bool bvnr_frame_reader_feed(bvnr_frame_reader_t* fr, const void* buf,
 		/* A document that has already failed reads to the end of its frame
 		 * regardless: the frame says where the next one starts. */
 		(void)bvnr_read_feed(fr->reader, p, take);
+		if (fr->failed)		/* a callback called back in */
+			return false;
 		fr->have += take;
 		p   += take;
 		len -= take;
@@ -1276,6 +1342,8 @@ bool bvnr_frame_reader_finish(bvnr_frame_reader_t* fr)
 {
 	if (!fr || fr->finished)
 		return false;
+	if (fr->busy)
+		return frame_reentered(fr);
 	if (fr->pull && !fr->failed && fr->in_left)
 		return false;
 	fr->finished = true;

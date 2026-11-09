@@ -301,6 +301,24 @@ fn stream_functions_take_read_options() {
         )),
         Some(ErrorCode::OctetStreamForbidden)
     );
+    // max_file_size caps the whole mux document, as it does for live::Demux.
+    let small = ReadOptions {
+        max_file_size: 4,
+        ..Default::default()
+    };
+    assert_eq!(
+        code(stream::mux_load_with_options(&mux, 0, None, &small)),
+        Some(ErrorCode::FileTooLong)
+    );
+    assert_eq!(
+        code(stream::mux_load_reader_with_options(
+            &mux[..],
+            0,
+            None,
+            &small
+        )),
+        Some(ErrorCode::FileTooLong)
+    );
 
     let inner = b".abc = 1;";
     let key = ReadOptions {

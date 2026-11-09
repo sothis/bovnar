@@ -74,7 +74,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
 - **Browser playground** — the real C reference parser, compiled to WebAssembly (`bovnar_parser_wasm.js` over `bovnar_wasm_core.js`), runs the reference verified event stream (with full type/unit/value validation) in the browser and powers an interactive web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
-- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 470-case conformance suite, fuzz harnesses (reader, writer, DOM, utils), Python and Rust test suites with cargo-fuzz targets for the crate, and a built-in benchmark mode (`bovnar bench`).
+- **Extensively tested** — Unit tests, socket-pair round-trip tests, a 470-case conformance suite, fuzz harnesses (reader, push-fed reader, writer, DOM, utils), Python and Rust test suites with cargo-fuzz targets for the crate, and a built-in benchmark mode (`bovnar bench`).
 
 ---
 
@@ -2414,9 +2414,10 @@ bvnr_reader_create()
   → bvnr_reader_destroy()
 ```
 
-The reader does not allocate during `bvnr_read`; all buffering is internal to
-the reader struct. The `bvnr_read_flags_t` struct is read only during
-`bvnr_open_read_source` and may live on the stack.
+The reader's buffers are allocated by the first `bvnr_open_read_*` and reused
+by every later open of the same reader; `bvnr_read` itself allocates only for
+unit conversions and wide numbers. The `bvnr_read_flags_t` struct is read only
+during `bvnr_open_read_source` and may live on the stack.
 
 ---
 
@@ -2640,10 +2641,14 @@ In both bindings a nesting cap of `0` means **255**, the format's limit, not 64.
 
 **Does `bvnr_read` allocate heap memory?**
 
-No. The reader does not allocate during `bvnr_read`. All buffering is internal
-to the `bvnr_reader_t` struct, which is allocated once by `bvnr_reader_create`.
-Event data pointers (`d->data`) point into the reader's internal buffer and are
-valid only for the duration of the callback invocation.
+Rarely. The reader's buffers (about 120 KB of scratch space and the nesting
+stacks) are allocated by the first `bvnr_open_read_*` on a reader and kept for
+every later open of it, so a reused reader allocates nothing per document.
+During `bvnr_read` only a unit conversion (the converted value's text and
+exact rational) and a number wider than 64 bits allocate. Event data pointers
+(`d->data`) point into the reader's internal buffer, or for a fed reader into
+the bytes being fed, and are valid only for the duration of the callback
+invocation.
 
 ---
 
@@ -2653,8 +2658,8 @@ Performance depends heavily on the input profile (scalars, typed values, structs
 arrays, units) and hardware. The CLI's benchmark subcommand (`bovnar bench`) can
 measure MB/s, assignments/s, and events/s across configurable profiles and
 payload sizes. Run `bovnar bench --profile all --size 1024,65536 --iterations 200`
-for a representative baseline. Use `--min-overhead` to isolate raw lexer
-throughput by skipping the `on_verified` callback.
+for a representative baseline. Use `--min-overhead` to drop the `on_unverified`
+(lexer) callback and keep only `on_verified`.
 
 ---
 
@@ -5548,10 +5553,13 @@ void bvnr_source_from_fd(bvnr_source_t* s, int fd);
 void bvnr_source_from_mem(bvnr_source_t* s, const void* buf, uint64_t len);
 void bvnr_sink_to_fd(bvnr_sink_t* s, int fd);
 void bvnr_sink_to_mem(bvnr_sink_t* s, void* buf, uint64_t cap);
+void bvnr_source_from_callback(bvnr_source_t* s, bvnr_pull_fn pull, void* userdata);
+void bvnr_sink_to_callback(bvnr_sink_t* s, bvnr_push_fn push,
+                           bvnr_flush_fn flush, void* userdata);
 uint64_t bvnr_sink_bytes_written(const bvnr_sink_t* s);
 ```
 
-`bvnr_sink_bytes_written` queries the total bytes written to a memory sink created with `bvnr_sink_to_mem` **by the caller**; `bvnr_open_write_sink` copies the sink, so writer output never advances the caller's struct and this stays 0. For writer output use `bvnr_writer_bytes_written` (read/write API §2.4, §2.10).
+The callback constructors take the I/O from the caller's functions (read/write API §1.14, §2.17). `bvnr_sink_bytes_written` queries the total bytes written to a sink **by the caller**; `bvnr_open_write_sink` copies the sink, so writer output never advances the caller's struct and this stays 0. For writer output use `bvnr_writer_bytes_written` (read/write API §2.4, §2.10).
 
 ### 16.6 Reading
 
@@ -5565,6 +5573,12 @@ bool bvnr_open_read_mem(bvnr_reader_t* r, const void* buf, uint64_t len,
                         bvnr_read_flags_t* options);
 
 bool bvnr_read(bvnr_reader_t* r);
+
+/* Push-fed reading: bytes handed over in pieces (read/write API §1.15) */
+bool bvnr_open_read_feed(bvnr_reader_t* r, const bvnr_sink_t* src_mirror,
+                         bvnr_read_flags_t* options);
+bool bvnr_read_feed(bvnr_reader_t* r, const void* buf, uint64_t len);
+bool bvnr_read_finish(bvnr_reader_t* r);
 
 bvnr_reader_t* bvnr_reader_create(void);   /* the reader is opaque */
 void           bvnr_reader_destroy(bvnr_reader_t* r);
@@ -12608,7 +12622,7 @@ byte.)
 - `bvnr_open_read_feed` arms the reader as `bvnr_open_read_source` does — it may
   be a reader used before, the unit policy survives — with no source. The
   optional `src_mirror` receives the bytes as they are consumed. `bvnr_read` on
-  a fed reader returns `false` with `error_invalid_argument`.
+  a fed reader returns `false` with `error_invalid_argument` and ends the read.
 - `bvnr_read_feed` lexes the bytes and returns when they are consumed; the
   buffer may be reused at once. The first call delivers `ev_stream_start`. It
   returns `false` only when the read has ended in an error — the same errors at
@@ -12621,6 +12635,13 @@ byte.)
   `error_read_complete_chunk_failed` inside an octet stream.
 - After an error or a finish the read is over: further calls return `false` and
   leave the getters (§1.7) as they were. Re-open to read the next document.
+- A feed with a `NULL` buffer and a non-zero length returns `false` with
+  `error_invalid_argument` and ends the read.
+- **Not re-entrant.** A feed, finish, `bvnr_read` or re-open from inside one of
+  the reader's own callbacks while a feed runs returns `false` and ends the
+  read with `error_invalid_argument`; the feed running stops after the event
+  that made the call and returns `false` too. Do not destroy the reader from
+  there.
 
 **A stream with metadata.** A document can carry ordinary values before (and
 after) a binary or multiplexed octet stream — `.meta = { .codec = "av1"; };`
@@ -12706,7 +12727,8 @@ bvnr_sink_to_mem(&sink, out, sizeof(out));
 uint64_t bvnr_sink_bytes_written(const bvnr_sink_t *s);
 ```
 
-Return the number of bytes pushed into a memory sink so far. Only meaningful for sinks created with `bvnr_sink_to_mem`.
+Return the number of bytes pushed into a sink so far: a memory sink, an fd sink,
+or a callback sink (for that one, what its push accepted). A `NULL` sink is 0.
 
 **Not for writer output.** `bvnr_open_write_sink` takes a *copy* of the sink, so
 everything a writer emits advances the copy and never the caller's struct — this
@@ -14700,6 +14722,11 @@ them: `load_documents` each document, with `max_file_size` capping one
 document and `max_document_size` one frame; `mux_load` the document around the
 stream; `parse_embedded` the embedded document, as a document of its own, with
 `max_file_size` capping its bytes. All three read with no total cap by default.
+`max_document_size` and `max_message` are held to the rule of the read limits:
+an int from 0 to 2**64 − 1, or `BovnarArgumentError`. Bytes handed to these
+functions — a payload, a document, the input — are any bytes-like object (an
+`mmap` is read whole, not from its position) or a `str`, taken as UTF-8;
+anything else is a `BovnarArgumentError`.
 
 To write a mux stream, or an embedded document, inside a document of any
 shape — values after it, more than one stream — use the `Writer` (§12.9):
@@ -14974,7 +15001,11 @@ call that pushed — the constructor, `send`, `write`, `flush` or `close` —
 unchanged. The writer has failed then: `MuxWriter.close()` only releases it,
 and a `FrameWriter`, which may have written half a frame, refuses further
 documents. Leaving a `MuxWriter`'s `with` block by an exception does not end the
-stream either, so a reader sees it cut off rather than complete.
+stream either, so a reader sees it cut off rather than complete. The object's
+own `write()` and `flush()` may not call back into the writer that called them —
+send, write, flush or close it, or for `Writer.to_stream` write a value: that
+raises `BovnarArgumentError`, where the bytes written from there would land
+inside those being handed over.
 `Writer.to_stream(...).flush()` (§12.2) does the same for a document written
 value by value.
 
@@ -15866,7 +15897,9 @@ rule of each year: none before 1980, the end in September until 1995.
 **Errors.** Where a C function signals failure with a sentinel, a `false` or an
 untouched output — an overflow, an MJD or year outside the supported range, a
 quarter outside 1–4 — the binding raises `BovnarArgumentError`, as it does for an
-argument that is not an int or does not fit in int64. Not bound:
+argument that is not an int or does not fit in int64. The seconds functions mark
+an overflow with `BVN_GDATE_OVF`, which is the int64 minimum itself, so a result
+of exactly `-2**63` cannot be told from one and raises too. Not bound:
 `bvn_gregorian_date_to_mjd_fast` (undefined behaviour out of range; `to_mjd()`
 is the checked form) and `bvn_dt_dump` / `bvn_dt_print`, which print to stdout
 (`str()` and `repr()` take their place).
@@ -16246,8 +16279,8 @@ with Reader() as r:
 `Reader.__init__` calls `bvnr_reader_create` immediately.  Use as a context
 manager or call `r.close()` explicitly to release the C object.
 
-A reader is not re-entrant. While `read_mem`, `read_fd`, `read_file` or
-`iter_mem` is running, the reader's own callbacks must not call `close()`,
+A reader is not re-entrant. While `read_mem`, `read_fd`, `read_file`,
+`read_stream` or `iter_mem` is running, the reader's own callbacks must not call `close()`,
 start another read on it, or `set_unit_policy()`: each raises
 `BovnarArgumentError("Reader is in use by its own callback")`, which aborts the
 running parse and is re-raised from the read. Use a second `Reader` for a
@@ -16601,7 +16634,9 @@ document may carry more than one. The bytes of a stream are those `mux_dump`
 writes. `embed_document` wraps `bvnr_embed_document`, embedding into the
 document being written rather than making a document of one key, as
 `stream.embed_document` does. A key is held to the rule of `dumps()`
-(`BovnarArgumentError`), a channel to the unsigned 64-bit range. On a
+(`BovnarArgumentError`), that of `write_octets` too, a channel to the unsigned
+64-bit range, and a payload or a document must be bytes-like (or a `str`,
+written as UTF-8). On a
 `to_stream` writer, call `flush()` after `mux_send` for a consumer reading
 live (§4.8).
 
@@ -16659,8 +16694,9 @@ w.get_output().split(b"\n")[1]      # → b'.mode=auto;.t=<datetime:64,tai>17500
 (`bvnr_write_plain`): `.mode = auto;`. The C writer refuses a value that is
 not a symbol or is a reserved word (`null`, `true`, `false`, `on`, `off`,
 `nan`, `inf`, `ninf`) with `TYPE_VALUE_MISMATCH`, an empty one with
-`EMPTY_IDENTIFIER` and one too long with `SYMBOL_TOO_LONG`; a NUL in it is a
-`BovnarArgumentError`.
+`EMPTY_IDENTIFIER` and one too long with `SYMBOL_TOO_LONG`. A NUL or a lone
+surrogate in it is a `BovnarArgumentError`, and so is a key `dumps()` would
+refuse, both raised before anything is written.
 
 `write_datetime(key, value, *, width=64, epoch=None)` writes `value`, signed
 seconds since `epoch` (`"unix"`, the default, `"tai"`, `"gps"`, `"mjd"`,
@@ -17341,7 +17377,8 @@ Semantics — **`0` is unlimited and the default**:
 ```c
 bvnr_read_flags_t fl = {
     .on_verified   = my_cb,
-    .max_file_size = BVNR_FILESIZE_UNLIMITED,   /* endless */
+    .max_file_size = BVNR_FILESIZE_UNLIMITED,   /* no total cap */
+    .max_text_bytes = UINT64_MAX,               /* endless text too */
 };
 ```
 
@@ -17474,7 +17511,10 @@ Two kinds, chosen when it is created:
 Feeding never fails for want of input; `bvnr_frame_reader_finish` is where a
 stream cut inside a header or a payload is `error_got_incomplete_bvnr_stream`. A
 bad magic is `error_unexpected_input_byte`, a declared length over the cap
-`error_value_out_of_range`.
+`error_value_out_of_range`. The frame reader is not re-entrant: a feed or
+finish from inside `on_document` or one of the reader's callbacks fails the
+stream with `error_invalid_argument`, and the feed running stops after the
+event that made the call.
 
 
 ---
@@ -17686,13 +17726,17 @@ while (bvnr_demux_next(dm, &it) > 0) { /* the closing events */ }
 A message that lies whole in the fed buffer is handed out from it without a
 copy, one whole in a chunk that arrived split across feeds from the reader's
 chunk buffer, and one split across chunks is reassembled in the channel's
-buffer.
+buffer. (The reader takes a fed buffer in windows of 1 MiB, and a chunk that
+straddles a window's end is gathered like one split across feeds.)
 Everything an item points to is valid until the next call on the demux, and the
 fed buffer must stay valid until `bvnr_demux_next` has returned
 `BVNR_NEXT_NONE` (feeding before that is refused). Truncation is a finish
 result, as for any fed reader: `bvnr_demux_finish` returns what `bvnr_read` would
 for the document, and a message the stream's end cut short is still the latched,
-non-fatal `error_octet_stream_truncated`.
+non-fatal `error_octet_stream_truncated`. The demux is not re-entrant: a feed,
+next, finish or re-open from inside `on_message` or one of the reader's
+callbacks fails the stream with `error_invalid_argument`, and the call running
+stops after the event that made it.
 
 
 ---
@@ -17755,7 +17799,7 @@ inner = stream.parse_embedded(bovnar.loads(outer)["payload"])   # {"v": 1}
 ```
 
 `stream.BVNR_FILESIZE_UNLIMITED` (`== 0`) selects endless mode for
-**`max_file_size`** only. Note it does **not** lift the framing/mux guards:
+**`max_file_size`** only (the text stays capped by `max_text_bytes`, §1). Note it does **not** lift the framing/mux guards:
 for `max_document_size` and `max_message`, `0` selects their finite defaults
 (`BVNR_DOC_DEFAULT_MAX` / `BVNR_MUX_DEFAULT_MAX`), so pass an explicit large
 value there to raise them. See [Python Bindings](09_bovnar_python_bindings.md)
@@ -17882,8 +17926,9 @@ The four compose cleanly because they live at different layers:
 - A **frame stream** (2) can carry documents that each **embed** sub-documents (4).
 - A **multiplexed** octet stream (3) is itself just one value in a document, which
   can be one frame in a frame stream (2).
-- Any of the above is **endless** (1) by default (`max_file_size` 0 ==
-  `BVNR_FILESIZE_UNLIMITED`); set a positive `max_file_size` to impose a cap.
+- Any of the above has no total-byte cap (1) by default (`max_file_size` 0 ==
+  `BVNR_FILESIZE_UNLIMITED`); set a positive `max_file_size` to impose one.
+  Octet streams are then endless; text is capped by `max_text_bytes` (§1).
 
 Because each is a thin application over the public event API, you can also write
 your own consumer/producer at the same seam without touching the core.
@@ -22795,12 +22840,13 @@ compliant behaviour.  The reference implementation (this repository) is
 used both as the test driver and as the oracle against which candidate
 implementations are judged.
 
-Two use modes are supported:
+Three use modes are supported:
 
 | Mode | Description |
 |------|-------------|
 | **Self-test** (default) | Runs the corpus against the reference libbvnr directly |
 | **IUT test** (`--iut`) | Invokes an external binary and compares its output to the reference |
+| **Feed equivalence** (`--feed`) | Feeds every case to the push-fed reader (`bvnr_read_feed`) cut at every byte, and byte by byte, and checks it reads exactly as `bvnr_read` reads it whole |
 
 ---
 
@@ -22906,9 +22952,12 @@ bvnr_conformance [OPTIONS]
 Options:
   --iut <binary>   Path to the IUT binary to test
   --filter <group> Run only cases in the specified group
+  --feed           Instead of the expectations, check that every case fed
+                   to bvnr_read_feed in pieces (cut at every byte, and byte
+                   by byte) reads exactly as bvnr_read reads it whole
   --list           List all test case IDs and descriptions
   --verbose        Print additional diagnostic information
-  --help           Show this help and exit
+  --help, -h       Show this help and exit
 ```
 
 ### 5.2 Examples
@@ -23405,14 +23454,15 @@ cmake --build build --target bvnr_conformance
 
 ## 11. CMake Integration
 
-Two CTest tests are registered:
+Three CTest tests are registered:
 
 | CTest name | What it runs |
 |------------|-------------|
 | `bvnr_conformance_self` | Conformance suite against the reference implementation |
 | `bvnr_conformance_iut_self` | Conformance suite using the IUT adapter as the external binary |
+| `bvnr_conformance_feed` | Feed equivalence (`--feed`): every case through the push-fed reader |
 
-Both are in the `conformance` label group and can be run with:
+All three are in the `conformance` label group and can be run with:
 
 ```sh
 ctest -L conformance --output-on-failure
@@ -24330,6 +24380,7 @@ of its own), and they are latched:
 | The octet stream closes inside a message or its length | `octet_stream_truncated` |
 | `finish()` inside the octet stream | `read_complete_chunk_failed` |
 | `finish()` before the stream opened, or before its `;` | `got_incomplete_bvnr_stream` |
+| A comment after the `;` that is not UTF-8, or that the input ends inside a character of (`finish()`) | `invalid_utf8_byte` |
 
 **Frames.** `codec::frame_header(len)`, `write_frame(&mut vec, doc)` and
 `write_frame_to(&mut out, doc)` (one vectored write, no copy) write what
@@ -24571,7 +24622,10 @@ key scope, `max_message`, the 4096-channel limit and every error of
 `stream::mux_load`. Each `next` returns a `DemuxItem::Message { channel,
 payload }` or, with `deliver_events`, a `DemuxItem::Event` for every event but
 the stream's chunks, in document order: the metadata before the stream comes
-out before its first message, and a `ValueBuilder` makes values of it. After
+out before its first message, and a `ValueBuilder` makes values of it (the
+demux withholds the stream's chunks but not its start and end, so the builder
+also hands out the stream's own key, as an empty `Value::Bytes`, once the
+stream ends; Python's `DemuxFeed(values=True)` leaves it out). After
 `finish()`, `next` on an empty slice hands out the closing events (more input is
 refused with an `Error::Argument`); `reset()`
 starts the next document: the channel buffers are kept, the channel ids (and

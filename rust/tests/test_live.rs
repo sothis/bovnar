@@ -279,6 +279,10 @@ fn a_panic_in_a_fed_handler_reaches_the_caller() {
     }))
     .unwrap_err();
     assert_eq!(payload.downcast_ref::<&str>(), Some(&"boom"));
+    // The panic ended the document: it has failed, and stays failed.
+    assert!(!feed.is_finished());
+    let e = feed.feed(b".b = 2;", &mut |_| true).unwrap_err();
+    assert!(matches!(e, bovnar::Error::Argument { .. }), "{e:?}");
     feed.reset().unwrap();
     let mut n = 0;
     feed.feed(b".a = 1;", &mut |_| {

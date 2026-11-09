@@ -218,6 +218,10 @@ _case(bench_help_stdout 0 "--min-overhead +Drop the on_unverified" "^$" "" bench
 # ── 12. one rule for arguments, one meaning per exit status ──────────────────
 _case(help_stdout          0 "Usage: .* <command>" "^$" "" --help)
 _case(help_short_stdout    0 "Usage: .* <command>" "^$" "" -h)
+# Help asked for after a command is help too, as the README says.
+_case(validate_help_stdout 0 "Usage: .* <command>" "^$" "" validate --help)
+_case(mux_help_stdout      0 "Usage: .* <command>" "^$" "" mux -h)
+_case(version_help_stdout  0 "Usage: .* <command>" "^$" "" version --help)
 _case(no_args_is_usage     2 "^$" "Usage: " "")
 _case(unknown_command      2 "^$" "Unknown command: nope" "" nope)
 _case(validate_no_file     2 "" "Usage: .* validate" "" validate)

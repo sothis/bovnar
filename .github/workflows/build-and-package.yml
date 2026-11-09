@@ -343,7 +343,8 @@ jobs:
         run: |
           printf '.a = <uint:8> 7;\n.b = <float:64> 3.5;\n' > smoke.bvnr
           ./build/bovnar validate smoke.bvnr
-          ./build/bovnar pretty-print smoke.bvnr | grep -q '<uint:8>'
+          out=$(./build/bovnar pretty-print smoke.bvnr)
+          grep -q '<uint:8>' <<< "$out"
           printf '.x = "hi";\n' | ./build/bovnar events -
 
   macos:
@@ -399,7 +400,8 @@ jobs:
         run: |
           printf '.a = <uint:8> 7;\n.b = <float:64> 3.5;\n' > smoke.bvnr
           arch -arm64 ./build/bovnar validate smoke.bvnr
-          arch -arm64 ./build/bovnar pretty-print smoke.bvnr | grep -q '<uint:8>'
+          out=$(arch -arm64 ./build/bovnar pretty-print smoke.bvnr)
+          grep -q '<uint:8>' <<< "$out"
           printf '.x = "hi";\n' | arch -arm64 ./build/bovnar events -
 
       - name: smoke - the x86_64 slice, under Rosetta
@@ -409,12 +411,13 @@ jobs:
             exit 0
           fi
           arch -x86_64 ./build/bovnar validate smoke.bvnr
-          arch -x86_64 ./build/bovnar pretty-print smoke.bvnr | grep -q '<uint:8>'
+          out=$(arch -x86_64 ./build/bovnar pretty-print smoke.bvnr)
+          grep -q '<uint:8>' <<< "$out"
 
   # The Rust binding in rust/: a thin wrapper that compiles the C sources above
   # through build.rs (no system library). Tested on the toolchains the C
-  # library ships for -- MSVC and MinGW64 on Windows, and the Linux and macOS
-  # runners of the wheel matrix -- plus wasm32-wasip2 under wasmtime. The C suite the
+  # library ships for -- MSVC and MinGW64 on Windows, Linux x64 and aarch64,
+  # and macOS -- plus wasm32-wasip2 under wasmtime. The C suite the
   # binding wraps runs, unchanged, in the `tests` job.
   rust_version:
     name: Rust crate version

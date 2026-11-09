@@ -348,13 +348,16 @@ typedef struct bvnr_lexer_s {
 	 * not consumed, which is non-empty only after a pause. pause_req is set by
 	 * an internal consumer (the feed-mode demux) from inside an event callback,
 	 * and stops the lexer right after the byte that delivered the event (for
-	 * an octet chunk, right after the chunk).
+	 * an octet chunk, right after the chunk). feed_busy is set while
+	 * bvnr_read_feed runs the lexer, so that a feed, finish, read or re-open
+	 * from inside one of the reader's own callbacks is refused.
 	 */
 	bool			feed_mode;
 	bool			feed_begun;
 	bool			feed_ended;
 	bool			win_over_cap;
 	bool			pause_req;
+	bool			feed_busy;
 	const uint8_t*		feed_ptr;
 	uint64_t		feed_left;
 	const uint8_t*		win_ptr;

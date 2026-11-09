@@ -947,7 +947,7 @@ byte.)</p>
 <li><code>bvnr_open_read_feed</code> arms the reader as <code>bvnr_open_read_source</code> does — it may
   be a reader used before, the unit policy survives — with no source. The
   optional <code>src_mirror</code> receives the bytes as they are consumed. <code>bvnr_read</code> on
-  a fed reader returns <code>false</code> with <code>error_invalid_argument</code>.</li>
+  a fed reader returns <code>false</code> with <code>error_invalid_argument</code> and ends the read.</li>
 <li><code>bvnr_read_feed</code> lexes the bytes and returns when they are consumed; the
   buffer may be reused at once. The first call delivers <code>ev_stream_start</code>. It
   returns <code>false</code> only when the read has ended in an error — the same errors at
@@ -960,6 +960,13 @@ byte.)</p>
   <code>error_read_complete_chunk_failed</code> inside an octet stream.</li>
 <li>After an error or a finish the read is over: further calls return <code>false</code> and
   leave the getters (§1.7) as they were. Re-open to read the next document.</li>
+<li>A feed with a <code>NULL</code> buffer and a non-zero length returns <code>false</code> with
+  <code>error_invalid_argument</code> and ends the read.</li>
+<li><strong>Not re-entrant.</strong> A feed, finish, <code>bvnr_read</code> or re-open from inside one of
+  the reader's own callbacks while a feed runs returns <code>false</code> and ends the
+  read with <code>error_invalid_argument</code>; the feed running stops after the event
+  that made the call and returns <code>false</code> too. Do not destroy the reader from
+  there.</li>
 </ul>
 <p><strong>A stream with metadata.</strong> A document can carry ordinary values before (and
 after) a binary or multiplexed octet stream — <code>.meta = { .codec = "av1"; };</code>
@@ -1023,7 +1030,8 @@ writes <code>.b=true;.b=true;</code> and both calls succeed, and that output is 
 <div class="codehilite"><pre><span></span><code><span class="kt">uint64_t</span><span class="w"> </span><span class="nf">bvnr_sink_bytes_written</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_sink_t</span><span class="w"> </span><span class="o">*</span><span class="n">s</span><span class="p">);</span>
 </code></pre></div>
 
-<p>Return the number of bytes pushed into a memory sink so far. Only meaningful for sinks created with <code>bvnr_sink_to_mem</code>.</p>
+<p>Return the number of bytes pushed into a sink so far: a memory sink, an fd sink,
+or a callback sink (for that one, what its push accepted). A <code>NULL</code> sink is 0.</p>
 <p><strong>Not for writer output.</strong> <code>bvnr_open_write_sink</code> takes a <em>copy</em> of the sink, so
 everything a writer emits advances the copy and never the caller's struct — this
 counter stays 0 for the whole lifetime of the writer. Use it only when you push

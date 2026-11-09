@@ -25,6 +25,72 @@ has not moved on (tags always). `.github/scripts/runner-shortage.sh REPO RUN
 [ATTEMPT]` prints its verdict for any run. It takes effect from its first push
 to main; its first real use is the evidence it works.
 
+## Open 2026-11-09 — what the binding review left to the maintainer
+
+The review of the binding work (a7ba940..6ff3ed8; fixes in baa4eb7) found
+these. Each is a design choice rather than a bug: the behaviour is documented
+or harmless, and changing it means picking a side. None blocks 2.1.0.
+
+1. **Feed callbacks differ between the bindings.** Rust's `FrameParser`
+   (`feed_with`) and `live::Demux` (`next_with`/`finish_with`) take
+   `ReadHandlers` (`on_error`, `want_unit`, `on_unverified`) on each call.
+   Python's `FrameFeed` and `DemuxFeed` take only the `READ_OPTIONS`, as do
+   `load_documents`, `mux_load`, `parse_embedded`, `loads`/`load` and
+   `canonicalize`; only `Reader.read_*` and `DocumentFeed` take the callbacks.
+   Either add `on_error`/`want_unit`/`on_unverified` to the Python feeds, or
+   say in doc/09 that they are for `DocumentFeed` and `Reader` only. The other
+   way round, Python's `FrameFeed(return_errors=True)` has a Rust equivalent
+   only in batch form (`stream::load_documents_results`).
+2. **Writer limits are not bound.** `WriteOptions` (Rust) and the `Writer.to_*`
+   keywords (Python) expose the nesting caps and `on_event`, but not the five
+   length caps, `max_array_items`, `max_text_bytes`, `max_file_size`,
+   `continue_on_error` or `on_error` of `bvnr_write_flags_t`. The read side now
+   binds every flag. `dumps`/`dump` expose neither `on_event` nor the nesting
+   caps.
+3. **Size-cap defaults and meanings disagree.** `Reader.read_file` defaults to
+   `max_file_size=16 MiB` (`MAX_FILESIZE_BYTES`); `read_mem`, `read_fd`,
+   `read_stream`, `loads`, `load` and the stream functions default to 0, which
+   is no cap. `DomDoc.parse_fd`/`parse_file(max_bytes=0)` and Rust's
+   `parse_reader_capped(0)` mean the 256 MiB DOM cap, not unlimited.
+   `max_file_size` caps one document in `load_documents`/`FrameFeed` but the
+   whole stream in `mux_load`/`DemuxFeed` (documented). One meaning for 0, and
+   one default, would be easier to explain; either is a behaviour change.
+4. **A refused DOM builder node.** When `DomDoc::add` refuses a key (a
+   duplicate, a non-identifier), Rust destroys the node; Python leaves it with
+   the caller, who may add it elsewhere. Rust's `add` returns `()`, Python's the
+   new `DomNode`; Rust's duplicate-key error carries `DuplicateStructKey`,
+   Python's is a plain `BovnarArgumentError`. Align on one model.
+5. **Python error types for a wrong argument type are mixed.**
+   `BovnarArgumentError` in timekeeping, `datetime_epoch_index`,
+   `write_datetime` and the read options; `TypeError` in the literal helpers,
+   `parse_type_annotation`, `char_to_digit` and the DOM builder; a raw
+   `ctypes.ArgumentError` from `convert_rational`/`convert_value` given a `str`
+   unit (and `convert_rational(True, …)` is taken as 1). Pick one rule (likely
+   `TypeError` for the wrong type, `BovnarArgumentError` for a bad value) and
+   apply it.
+6. **Recovered documents return quietly.** Under `continue_on_error`,
+   `parse_with_options`, `parse_embedded_with_options`, the `stream::*_with_options`
+   functions and their Python counterparts return what was recovered without
+   an error; only `canonicalize` refuses a recovered read. The errors reach
+   `on_error`, where there is one, and `recovery_count` on the reader. Decide
+   whether the convenience functions should say so (an error, a flag, or a
+   doc line).
+7. **An exception or panic in `on_error` cannot stop a read by itself.** The C
+   `on_error` callback returns nothing, so the binding parks the exception and
+   the read stops at the next `on_verified`/`on_unverified`/`want_unit` call,
+   or runs to the end with none installed, then re-raises (documented in
+   doc/09 and doc/14). Stopping it at once would need a C change: a `bool`
+   return, or a stop flag the reader checks.
+8. **Rust `_with` means three things.** `Reader::read_mem_with` takes
+   `ReadHandlers`, `Writer::to_mem_with` positional pretty/unit_flags/
+   emit_version, `DocumentFeed::feed_with` handlers per call; `_with_options`
+   takes an options struct. `DomDoc::parse_reader_capped_with_policy` sits next
+   to `parse_reader_with_policy`. Renaming is source-breaking; settle it before
+   the names are released in 2.1.0, or leave it.
+9. **`canonicalize` with both sides failing.** Rust reports the output's error
+   first (it is what stopped the read), Python the input's. Both failing in one
+   call is near impossible; align if the code is touched again.
+
 ## Done — incremental streaming for Rust and Python (asked 2026-11-08)
 
 **Status 2026-11-09:** every item has shipped on main (unreleased:

@@ -315,6 +315,18 @@ static int bvn_dec_digit_prefilter(const char* d, uint32_t max_digits)
 	return -1;
 }
 /*
+ * The base-10 paths below hand the text to strtoull/strtoll and the decimal
+ * comparators, which skip leading whitespace and read "" as 0: `""` and `" 5"`
+ * passed as in range. A literal is one or more digits, so check that first.
+ */
+static bool bvn_all_dec_digits(const char* p)
+{
+	if (!*p) return false;
+	for (; *p; p++)
+		if (*p < '0' || *p > '9') return false;
+	return true;
+}
+/*
  * Does the unsigned literal `s` (in `base`) fit in `w` bits?
  *
  * Two regimes: for w<=64 it parses to a uint64 (strtoull for base 10, manual
@@ -322,6 +334,8 @@ static int bvn_dec_digit_prefilter(const char* d, uint32_t max_digits)
  * types it normalises to decimal, tries the length prefilter, and only on an
  * ambiguous length materialises the exact bound 2^w-1 for a string compare.
  * w==0 means "width unspecified" and always passes; nan/inf pass through.
+ * Empty text, and in base 10 anything but digits after an optional sign, is
+ * out (the digit check of other bases happens in the loops).
  * bvn_validate_sint_range mirrors this with the asymmetric signed bounds and a
  * 2^(w-1) magnitude limit.
  */
@@ -340,6 +354,8 @@ bool bvn_validate_uint_range(const char* s, uint32_t w, uint32_t base)
 	}
 	const char* p = s;
 	if (uses_sign && *p == '+') p++;
+	if (!*p) return false;
+	if (base == 10 && !bvn_all_dec_digits(p)) return false;
 	if (w <= 64) {
 		uint64_t maxv = (w >= 64) ? UINT64_MAX : (1ULL << w) - 1ULL;
 		if (base == 10) {
@@ -413,6 +429,8 @@ bool bvn_validate_sint_range(const char* s, uint32_t w, uint32_t base)
 	bool neg = (s[0] == '-');
 	const char* abs = s;
 	if (neg || s[0] == '+') abs++;
+	if (!*abs) return false;
+	if (base == 10 && !bvn_all_dec_digits(abs)) return false;
 	if (w <= 64) {
 		if (base == 10) {
 			char* end;
@@ -2498,11 +2516,22 @@ static bool bvn_parse_prefix_ok(const char* s, bool allow_sign)
 	return true;
 }
 
+/* strtoll/strtoull in base 16 also skip a "0x"/"0X" prefix, which no literal
+ * of the format carries (the reader refuses `<uint:64,_16> 0x10`): without
+ * this screen "0x10" parsed as 16. */
+static bool bvn_parse_hex_prefix(const char* s, uint32_t base)
+{
+	if (base != 16u) return false;
+	if (*s == '-') s++;
+	return s[0] == '0' && (s[1] == 'x' || s[1] == 'X');
+}
+
 bool bvn_parse_int64(const char* s, value_type_spec_t vt, int64_t* out)
 {
 	if (!s || !out) return false;
 	if (!bvn_parse_prefix_ok(s, true)) return false;
 	uint32_t base = bvn_effective_base(vt);
+	if (bvn_parse_hex_prefix(s, base)) return false;
 	if (base >= 2u && base <= 36u) {
 		char* end;
 		errno = 0;
@@ -2557,6 +2586,7 @@ bool bvn_parse_uint64(const char* s, value_type_spec_t vt, uint64_t* out)
 	 * base fails it. */
 	if (base <= 36u) {
 		if (!bvn_parse_prefix_ok(s, false)) return false;
+		if (bvn_parse_hex_prefix(s, base)) return false;
 	} else if (!*s) {
 		return false;
 	}
@@ -2668,6 +2698,33 @@ bool bvn_looks_like_double(const char* s)
 			return true;
 	return false;
 }
+/*
+ * `value` rounded to the IEEE binary16 or binary32 grid, as a double, through
+ * the packer the reader decodes with. False when the packer cannot run or a
+ * finite value rounds to infinity: the format cannot hold it.
+ */
+static bool bvn_narrow_ieee(double value, uint32_t width, double* out)
+{
+	bvn_limb_t a[BVN_FLOAT_NLIMBS(64u)], b[BVN_FLOAT_NLIMBS(64u)];
+	bvn_float_t fa, fb;
+	bvn_float_init_buf(&fa, 64u, a, BVN_FLOAT_NLIMBS(64u));
+	bvn_float_init_buf(&fb, 64u, b, BVN_FLOAT_NLIMBS(64u));
+	if (!bvn_float_from_double(&fa, value)) return false;
+	bool ok;
+	if (width == 16u) {
+		uint16_t bits = 0;
+		bvn_float_to_bin16(&fa, &bits);
+		ok = bvn_float_from_bin16(&fb, bits);
+	} else {
+		uint32_t bits = 0;
+		bvn_float_to_bin32(&fa, &bits);
+		ok = bvn_float_from_bin32(&fb, bits);
+	}
+	if (!ok || !bvn_float_to_double(&fb, out)) return false;
+	/* Finite without <math.h>: inf - inf and nan - nan are nan, != 0. */
+	return !(value - value == 0.0) || *out - *out == 0.0;
+}
+
 int32_t bvn_format_double(char* buf, size_t bufsize, double value,
 						  value_type_spec_t vt)
 {
@@ -2698,6 +2755,20 @@ int32_t bvn_format_double(char* buf, size_t bufsize, double value,
 			if (sig < prec) prec = sig;
 		}
 	}
+	/* float:16 and float:32 are IEEE binary16 and binary32: round the value
+	 * to that format first -- its significand, exponent range and subnormals
+	 * -- as bvnr_write_float always did. Without it the width alone set the
+	 * precision, and the bindings' writers, which format through here, put
+	 * 2049 into a float:16 (binary16 holds 2048) and 16777217 into a float:32.
+	 * The digits are then those of a 16- or 32-bit significand, more than the
+	 * shortest IEEE spelling: a reader takes the text as a double and does not
+	 * round it to the declared format, so 65504 goes out as 6.5504e+4, which
+	 * reads back as 65504, not as the 6.55e+4 a binary16 reader would also
+	 * accept. A finite value the format cannot hold is refused rather than
+	 * written as the infinity it rounds to. */
+	if (vt.family == vt_float && (vt.width == 16u || vt.width == 32u) &&
+	    !bvn_narrow_ieee(value, vt.width, &value))
+		return -1;
 	/* For float_fix and float_dec the width is the FIELD (a Q-format integer,
 	 * a decimal interchange format), not a binary significand. Rounding the
 	 * double to `width` bits first and leaving the reader to round again to

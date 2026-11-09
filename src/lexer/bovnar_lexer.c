@@ -2992,8 +2992,22 @@ static bool bvn_lex_window(bvnr_reader_t* r, const uint8_t* data, uint32_t nb,
 				break;
 			continue;
 		}
-		if (!bvn_interpret_input_buffer(r, data + off, nb - off, &used))
+		uint64_t lexed0 = l->text_bytes + l->octet_bytes;
+		if (!bvn_interpret_input_buffer(r, data + off, nb - off, &used)) {
+			/* The mirror used to get a piece only once it was lexed, so the
+			 * piece an error stopped in never reached it: a failed read of
+			 * one memory buffer mirrored nothing. Hand it the bytes the lexer
+			 * took, through the one the error is at -- what a debugging
+			 * mirror is there for. The read has failed already; a mirror
+			 * that refuses these too changes nothing. */
+			uint64_t took = l->text_bytes + l->octet_bytes - lexed0;
+			if (took > (uint64_t)(nb - off))
+				took = (uint64_t)(nb - off);
+			if (l->use_dbg && took)
+				(void)bvn_sink_push(&l->src_dbg, data + off,
+				                    (uint32_t)took);
 			return false;
+		}
 		if (l->use_dbg && used &&
 		    !bvn_sink_push(&l->src_dbg, data + off, used)) {
 			bvn_set_eof_error(r, error_writing_to_sink);

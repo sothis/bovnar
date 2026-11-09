@@ -249,13 +249,26 @@ fn mirror_receives_exactly_the_input() {
 }
 
 #[test]
-fn mirror_stops_before_the_piece_with_the_error() {
+fn mirror_gets_the_input_through_the_error() {
     let mut feed = DocumentFeed::new(&ReadOptions::default()).unwrap();
     feed.set_mirror(Vec::<u8>::new()).unwrap();
     feed.feed(b".a = 1; ", &mut |_| true).unwrap();
     let err = feed.feed(b".b = @; .c = 2;", &mut |_| true).unwrap_err();
     assert_eq!(err.code(), Some(ErrorCode::UnexpectedInputByte));
-    assert_eq!(feed.take_mirror::<Vec<u8>>().unwrap(), b".a = 1; ");
+    assert_eq!(feed.take_mirror::<Vec<u8>>().unwrap(), b".a = 1; .b = @");
+
+    let mut out = Vec::new();
+    let err = Reader::new()
+        .unwrap()
+        .read_mem_mirror(
+            b".a = 1; .b = @; .c = 2;",
+            &ReadOptions::default(),
+            ReadHandlers::default(),
+            &mut out,
+        )
+        .unwrap_err();
+    assert_eq!(err.code(), Some(ErrorCode::UnexpectedInputByte));
+    assert_eq!(out, b".a = 1; .b = @");
 }
 
 #[test]
@@ -704,4 +717,61 @@ fn writer_into_a_flushed_writer_with_options() {
         parse(&sink).unwrap(),
         Value::Struct(vec![("a".into(), Value::Null)])
     );
+}
+
+#[test]
+fn a_recovered_document_is_refused_before_any_output_is_flushed() {
+    let lenient = ReadOptions {
+        continue_on_error: true,
+        ..ReadOptions::default()
+    };
+    let mut out = Vec::new();
+    let err = canonicalize_reader(&b".a = @; .b = 1;"[..], &mut out, false, &lenient).unwrap_err();
+    assert_eq!(err.code(), Some(ErrorCode::UnexpectedInputByte));
+    assert!(out.is_empty(), "{:?}", String::from_utf8_lossy(&out));
+}
+
+#[test]
+fn a_canonicalize_inside_another_keeps_the_outer_first_error() {
+    // The outer read's input runs a whole canonicalisation of its own on the
+    // same thread; the outer refusal still names the outer document's error.
+    struct Nested<'a>(&'a [u8], bool);
+    impl std::io::Read for Nested<'_> {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            if !self.1 {
+                self.1 = true;
+                canonicalize(b".x = 1;", false, &ReadOptions::default()).unwrap();
+            }
+            self.0.read(buf)
+        }
+    }
+    let lenient = ReadOptions {
+        continue_on_error: true,
+        ..ReadOptions::default()
+    };
+    let err = canonicalize_reader(
+        Nested(b".a = 1;\n.b = @;", false),
+        Vec::new(),
+        false,
+        &lenient,
+    )
+    .unwrap_err();
+    assert_eq!(err.code(), Some(ErrorCode::UnexpectedInputByte));
+    assert_eq!(err.position().unwrap().line, 2);
+}
+
+#[test]
+fn narrow_float_widths_round_to_ieee_in_the_writer() {
+    let mut w = Writer::to_mem(4096, false).unwrap();
+    w.write_float("a", 2049.0, 16).unwrap();
+    w.write_float("b", 16_777_217.0, 32).unwrap();
+    w.write_float("c", 65504.0, 16).unwrap();
+    w.finish().unwrap();
+    assert_eq!(
+        w.get_output(),
+        b".a=<float:16>2.048e+3;.b=<float:32>1.6777216e+7;.c=<float:16>6.5504e+4;"
+    );
+    let mut w = Writer::to_mem(4096, false).unwrap();
+    let err = w.write_float("a", 1e5, 16).unwrap_err();
+    assert_eq!(err.code(), Some(ErrorCode::ValueOutOfRange));
 }

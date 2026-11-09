@@ -439,11 +439,24 @@ impl Writer {
         self.write_scalar(key, vt, &text)
     }
 
-    /// `.key = <float:width> value;`
+    /// `.key = <float:width> value;` A `float:16` or `float:32` value is
+    /// rounded to IEEE binary16 or binary32, and a finite value the format
+    /// cannot hold is an `Error::Write` with `ValueOutOfRange`.
     pub fn write_float(&mut self, key: &str, value: f64, width: u32) -> Result<()> {
         let vt = type_spec(ValueTypeFamily::Float, width, 0);
-        let text = ffi::format_f64(value, vt)
-            .ok_or_else(|| Error::argument(format!("cannot format {value}")))?;
+        let text = ffi::format_f64(value, vt).ok_or_else(|| {
+            // float:16 and float:32 round to IEEE binary16 and binary32, and a
+            // finite value the format cannot hold is refused, as the C writer
+            // refuses it.
+            if matches!(width, 16 | 32) && value.is_finite() {
+                Error::Write {
+                    code: ErrorCode::ValueOutOfRange as i32,
+                    offset: 0,
+                }
+            } else {
+                Error::argument(format!("cannot format {value}"))
+            }
+        })?;
         self.write_scalar(key, vt, &text)
     }
 

@@ -23,6 +23,7 @@
 
 
 import ctypes
+import math
 
 from ._ffi import get_library
 from ._fileio import PushSink
@@ -102,6 +103,12 @@ class Writer:
         flags.emit_version       = bool(emit_version)
         return flags
 
+    @staticmethod
+    def _check_observer(on_event) -> None:
+        if on_event is not None and not callable(on_event):
+            raise BovnarArgumentError(
+                f"on_event must be callable, not {type(on_event).__name__}")
+
     def _install_observer(self, flags: BvnrWriteFlags, on_event) -> None:
         """Point ``flags.on_event`` at a callback running ``on_event(event,
         data)`` after each event is serialised, with what reached the output
@@ -111,9 +118,7 @@ class Writer:
         it raises fails it too, and is re-raised from the write call."""
         if on_event is None:
             return
-        if not callable(on_event):
-            raise BovnarArgumentError(
-                f"on_event must be callable, not {type(on_event).__name__}")
+        self._check_observer(on_event)
         from .reader import Reader          # deferred, as the package root does
         snapshot = Reader._snapshot
         # No reference to self: the callback lives on the writer, and a cycle
@@ -123,10 +128,16 @@ class Writer:
         def _c_cb(_ud, ev, dptr) -> bool:
             if state['exc'] is not None:
                 return False
+            try:
+                event = Event(ev)
+            except ValueError:
+                # An event this binding does not know (a newer library):
+                # skipped, as the Rust observer skips it.
+                return True
             state['busy'] = True
             try:
                 data = snapshot(dptr.contents) if dptr else None
-                result = on_event(Event(ev), data)
+                result = on_event(event, data)
                 return True if result is None else bool(result)
             except BaseException as exc:            # noqa: BLE001 (re-raised by the write)
                 state['exc'] = exc
@@ -263,6 +274,7 @@ class Writer:
         # Check the options before the file is created or truncated.
         cls._make_flags(unit_flags, emit_version, max_struct_nesting,
                         max_array_nesting)
+        cls._check_observer(on_event)
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
         try:
             w = cls.to_fd(fd, pretty=pretty, unit_flags=unit_flags,
@@ -783,8 +795,11 @@ class Writer:
     def write_plain(self, key: str, value: str) -> None:
         """``.key = value;`` with ``value`` written bare, as a plain symbol
         (``bvnr_write_plain``): ``.mode = auto;``. The C writer refuses a
-        value that is not a symbol (``ILLEGAL_SYMBOL``) and a ``key`` that is
-        not an identifier."""
+        value that is not a symbol or is a reserved word (``null``, ``true``,
+        ``false``, ``on``, ``off``, ``nan``, ``inf``, ``ninf``) with
+        ``TYPE_VALUE_MISMATCH``, an empty one with ``EMPTY_IDENTIFIER``, one
+        too long with ``SYMBOL_TOO_LONG``, and a ``key`` that is not an
+        identifier; a NUL in ``value`` is a ``BovnarArgumentError``."""
         from .stream import _writer_key     # deferred: avoids an import cycle
         self._check_writable()
         if not isinstance(value, str) or '\0' in value:
@@ -818,6 +833,11 @@ class Writer:
             raise BovnarArgumentError(f"invalid datetime width {width!r}")
         ep = None
         if epoch is not None:
+            # A NUL would end the name early in C: 'tai\0x' wrote tai.
+            if not isinstance(epoch, str) or '\0' in epoch:
+                raise BovnarArgumentError(
+                    f"write_datetime() takes the epoch as a str without NUL "
+                    f"bytes, not {epoch!r}")
             ep = epoch.encode('utf-8')
             if self._lib.bvnr_datetime_epoch_index(ep) < 0:
                 raise BovnarArgumentError(f"unknown datetime epoch {epoch!r}")
@@ -1088,6 +1108,14 @@ class Writer:
         buf = ctypes.create_string_buffer(128)
         n   = lib.bvn_format_double(buf, 128, value, vt)
         if n < 0:
+            # float:16 and float:32 round to IEEE binary16 and binary32, and
+            # a finite value the format cannot hold is refused, as the C
+            # writer refuses it.
+            if (vt.family == ValueTypeFamily.FLOAT and vt.width in (16, 32)
+                    and math.isfinite(value)):
+                raise BovnarWriteError(
+                    ErrorCode.VALUE_OUT_OF_RANGE, 0,
+                    f"{value!r} does not fit a float:{vt.width}")
             raise BovnarWriteError(ErrorCode.NONE, message="bvn_format_double overflow")
         return buf.value.decode('ascii')
 

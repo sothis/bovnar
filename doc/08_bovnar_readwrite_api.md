@@ -1359,11 +1359,11 @@ int32_t bvn_format_double(char *buf, size_t bufsize,
                             double value, value_type_spec_t vt);
 ```
 
-Produce the value string that goes into `bvnr_data_t.data` when writing numeric values. All three return the number of bytes written (excluding NUL terminator), or `-1` on buffer overflow.
+Produce the value string that goes into `bvnr_data_t.data` when writing numeric values. All three return the number of bytes written (excluding NUL terminator), or `-1` on buffer overflow (and `bvn_format_double` on the cases below).
 
 - `base` — numeric base (2–62, 64, 85). Use `10` for the common case.
 - `min_digits` — zero-pad to at least this many digits. Pass `0` for no padding.
-- For `bvn_format_double`, the type spec `vt` controls the output precision according to `vt.width`. Because the input is a C `double`, the effective precision is capped at the 64-bit format (a wider `vt.width` yields no extra digits); render the full precision of a 128/256-bit value with the arbitrary-precision writer `bvnr_write_bvnf_base` instead.
+- For `bvn_format_double`, the type spec `vt` controls the output precision according to `vt.width`. A `float:16` or `float:32` value is first rounded to IEEE binary16 or binary32 (its significand, exponent range and subnormals), as `bvnr_write_float` writes it: `2049` under `float:16` is `2.048e+3`, `16777217` under `float:32` is `1.6777216e+7`, and a finite value the format cannot hold (`1e5` under `float:16`) returns `-1`. The digits are then those of a 16- or 32-bit significand, so the text reads back as the rounded value even by a reader that does not round it to the declared format (`65504` is `6.5504e+4`). A `float_fix` or `float_dec` value is written as the double it is. Because the input is a C `double`, the effective precision is capped at the 64-bit format (a wider `vt.width` yields no extra digits); render the full precision of a 128/256-bit value with the arbitrary-precision writer `bvnr_write_bvnf_base` instead.
 
 ```c
 char buf[32];

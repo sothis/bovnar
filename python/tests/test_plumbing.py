@@ -225,20 +225,20 @@ def test_feed_mirror_in_pieces():
         assert bytes(out) == DOC, size
 
 
-def test_mirror_stops_before_the_piece_with_the_error():
-    # The reader mirrors a piece once it has parsed it, so the piece holding
-    # the error never reaches the mirror.
+def test_mirror_gets_the_input_through_the_error():
+    # The piece an error stops in is mirrored up to the byte the error is
+    # at, not dropped (a failed read of one buffer used to mirror nothing).
     out = bytearray()
     f = DocumentFeed(mirror=out)
     list(f.feed(b'.a = 1; '))
     with pytest.raises(BovnarParseError) as e:
         f.feed(b'.b = @; .c = 2;')
     assert e.value.code == ErrorCode.UNEXPECTED_INPUT_BYTE
-    assert bytes(out) == b'.a = 1; '
+    assert bytes(out) == b'.a = 1; .b = @'
     out = bytearray()
     with pytest.raises(BovnarParseError):
         Reader().read_mem(b'.a = 1; .b = @; .c = 2;', mirror=out)
-    assert bytes(out) == b''
+    assert bytes(out) == b'.a = 1; .b = @'
 
 
 def test_mirror_exception_reaches_the_caller():
@@ -458,3 +458,52 @@ def test_write_helpers_refuse_what_c_would_mangle():
     w = Writer.to_mem()
     with pytest.raises(BovnarWriteError):
         w.write_plain('a', 'not a symbol')
+
+
+# -- review fixes ----------------------------------------------------------
+
+def test_to_file_checks_on_event_before_truncating(tmp_path):
+    path = tmp_path / 'keep.bvnr'
+    path.write_bytes(b'.a = 1;\n')
+    with pytest.raises(BovnarArgumentError):
+        Writer.to_file(str(path), on_event=5)
+    assert path.read_bytes() == b'.a = 1;\n'
+
+
+def test_write_datetime_refuses_a_bad_epoch_argument():
+    w = Writer.to_mem(emit_version=True)
+    for bad in ('tai\0junk', 5, b'tai'):
+        with pytest.raises(BovnarArgumentError):
+            w.write_datetime('t', 5, epoch=bad)
+    w.write_datetime('t', 5, epoch='tai')
+    w.finish()
+    assert b'<datetime:64,tai>' in w.get_output()
+
+
+def test_read_switches_take_a_bool_only():
+    for bad in ('no', 2, None, 1.0):
+        with pytest.raises(BovnarArgumentError):
+            bovnar.loads(b'.a = 1;', continue_on_error=bad)
+    assert bovnar.loads(b'.a = 1;', continue_on_error=1) == {'a': 1}
+    assert bovnar.loads(b'.a = 1;', strict_version=False) == {'a': 1}
+
+
+def test_return_errors_needs_continue_past_failed():
+    with pytest.raises(BovnarArgumentError):
+        load_documents(b'', return_errors=True)
+    with pytest.raises(BovnarArgumentError):
+        FrameFeed(parse=True, return_errors=True)
+
+
+def test_narrow_float_widths_round_to_ieee_in_the_writer():
+    w = Writer.to_mem(pretty=False)
+    w.write_float('a', 2049.0, width=16)
+    w.write_float('b', 16777217.0, width=32)
+    w.write_float('c', 65504.0, width=16)
+    w.finish()
+    assert w.get_output() == (b'.a=<float:16>2.048e+3;.b=<float:32>1.6777216e+7;'
+                              b'.c=<float:16>6.5504e+4;')
+    w = Writer.to_mem()
+    with pytest.raises(BovnarWriteError) as e:
+        w.write_float('a', 1e5, width=16)
+    assert e.value.code == ErrorCode.VALUE_OUT_OF_RANGE

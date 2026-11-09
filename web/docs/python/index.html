@@ -537,7 +537,8 @@ in-memory calls.</p>
 <code>Reader.read_mem</code> (<code>bovnar.READ_OPTIONS</code>, §11.2) as keywords, and read under
 them: <code>load_documents</code> each document, with <code>max_file_size</code> capping one
 document and <code>max_document_size</code> one frame; <code>mux_load</code> the document around the
-stream. All three read with no total cap by default.</p>
+stream; <code>parse_embedded</code> the embedded document, as a document of its own, with
+<code>max_file_size</code> capping its bytes. All three read with no total cap by default.</p>
 <p>To write a mux stream, or an embedded document, inside a document of any
 shape — values after it, more than one stream — use the <code>Writer</code> (§12.9):
 <code>mux_begin(key)</code>, <code>mux_send(channel, payload)</code>, <code>mux_end()</code> and
@@ -578,7 +579,8 @@ stream and are handed bytes in pieces of any size, cut anywhere:</p>
 §11.2): <code>max_file_size</code>, the text, array, length and nesting caps,
 <code>continue_on_error</code>, <code>strict_version</code>, <code>text_only</code> and the rest. Besides those:
 <code>DocumentFeed</code> takes <code>typed</code>, <code>want_unit</code>, <code>on_error</code>, <code>on_unverified</code> and
-<code>mirror</code>; <code>DemuxFeed(key=None,
+<code>mirror</code>, and has the <code>recovery_count</code>, <code>skipped_bytes</code> and <code>declared_version</code>
+of its reader (§11.6); <code>DemuxFeed(key=None,
 max_message=0, typed=False, view=False)</code>, whose <code>recovery_count</code>,
 <code>skipped_bytes</code> and <code>declared_version</code> are those of its reader, as on
 <code>DocumentFeed</code>; <code>FrameFeed(parse=False, typed=False, continue_past_failed=False,
@@ -645,9 +647,8 @@ text of a fed document is capped as <code>Reader</code>'s is, at 2 147 483 647 b
 (<code>TEXT_DATA_TOO_LONG</code>, doc/10 §1), and an array at as many items: pass
 <code>max_text_bytes=stream.BVNR_NO_LIMIT</code> (and <code>max_array_items</code>) for a document
 that does not end. <code>DemuxFeed</code> and a parsing <code>FrameFeed</code> take both as well.
-<code>DocumentFeed</code> takes the read options of <code>Reader.read_mem</code> and its
-<code>want_unit</code>, <code>on_error</code>, <code>on_unverified</code> and <code>mirror</code>, but not <code>on_verified</code>,
-which the feed's items stand in for; with <code>values=True</code>, <code>typed=True</code> gives
+<code>DocumentFeed</code> takes no <code>on_verified</code>, which the feed's items stand in for;
+with <code>values=True</code>, <code>typed=True</code> gives
 <code>Quantity</code> values as <code>loads(typed=True)</code> does (<code>typed</code> without <code>values</code>, or
 neither <code>events</code> nor <code>values</code>, is refused). <code>on_unverified(event, data)</code> sees
 the raw lexer events of the bytes each <code>feed()</code> hands over, inside that call:
@@ -1337,8 +1338,10 @@ refuses together (§5.6), and the distinction survives a round trip:</p>
 (<code>bovnar.h</code>): the tests the writer applies to keys, symbols, references and
 numbers, the integer and float parsers and formatters behind it, and the parser
 of a type annotation. Each function is the C function of the same name without
-its <code>bvn_</code> prefix, and answers as it does. Text holding NUL is none of the
-things they check: a validator answers <code>False</code> for it, a parser raises.</p>
+its <code>bvn_</code> prefix (<code>escape_repl_table</code> is <code>bvn_get_escape_repl_table</code>), and
+answers as it does. Text holding NUL is none of the things they check: a
+validator answers <code>False</code> for it, a parser raises — except <code>validate_string</code>,
+which takes bytes and checks only that they are UTF-8, so NUL passes.</p>
 <p><strong>Type annotations.</strong> <code>parse_type_annotation(text)</code> parses the text between the
 angle brackets, as the reader does, into a frozen <code>TypeAnnotation</code> of
 <code>value_type</code> (a <code>ValueTypeSpec</code>), <code>unit</code> (a <code>ValueUnit</code>, with no components when
@@ -1447,12 +1450,13 @@ epoch is no unit: its index is in <code>value_type.base</code> (<code>datetime_e
 <span class="n">literals</span><span class="o">.</span><span class="n">validate_sint_range</span><span class="p">(</span><span class="s2">&quot;-80&quot;</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">16</span><span class="p">)</span>     <span class="c1"># → True</span>
 </code></pre></div>
 
-<p>Three of them are narrower than their names. The range checks test the range
-only, on text the digit check has already passed: <code>validate_uint_range("", 8)</code>
-and <code>validate_uint_range(" 5", 8)</code> are <code>True</code>. <code>validate_digits_for_base</code> does
-not check the base against the ones a type may declare: in base 1 the one digit
-is <code>0</code>. And <code>validate_string</code> is the same test as <code>data.decode('utf-8')</code>; NUL and
-the other control bytes the writer refuses in a string pass it.</p>
+<p>Two of them are narrower than their names. <code>validate_digits_for_base</code> does not
+check the base against the ones a type may declare: in base 1 the one digit is
+<code>0</code>. And <code>validate_string</code> is the same test as <code>data.decode('utf-8')</code>; NUL and
+the other control bytes the writer refuses in a string pass it. The range
+checks are meant for text the digit check has passed: they refuse an empty
+literal, and in base 10 anything but digits after an optional sign
+(<code>validate_uint_range(" 5", 8)</code> is <code>False</code>), but they take a leading <code>+</code>.</p>
 <p><strong>Digits.</strong> <code>char_to_digit(ch, base)</code> is the value of one digit, <code>None</code> when it
 is no digit of <code>base</code>: up to base 36 a letter's case does not matter, above it
 <code>A</code> to <code>Z</code> are 36 to 61, and bases 64 and 85 use the Base64 and Ascii85
@@ -1491,7 +1495,7 @@ Each raises <code>BovnarArgumentError</code> where the C one returns <code>false
 </tr>
 <tr>
 <td><code>format_double(value, vt)</code></td>
-<td>The literal the writer emits under <code>vt</code>: the shortest digits that read back to the same double, in base 10 or 16 (any other base raises). A <code>float</code> width below 53 rounds first to a significand of that many bits: 16 for <code>float:16</code> and 32 for <code>float:32</code>, not IEEE binary16's 11 and binary32's 24</td>
+<td>The literal the writer emits under <code>vt</code>: the shortest digits that read back to the same double, in base 10 or 16 (any other base raises). A <code>float:16</code> or <code>float:32</code> value is first rounded to IEEE binary16 or binary32 (<code>2049.0</code> is <code>2.048e+3</code> under <code>float:16</code>) and printed with the digits of a 16- or 32-bit significand, so it reads back as that value without rounding to the format (<code>65504.0</code> is <code>6.5504e+4</code>); a finite value the format cannot hold raises</td>
 </tr>
 <tr>
 <td><code>escape_repl_table()</code></td>
@@ -1509,11 +1513,9 @@ Each raises <code>BovnarArgumentError</code> where the C one returns <code>false
 </code></pre></div>
 
 <blockquote>
-<p><strong><code>0x</code> in base 16.</strong> In bases up to 36 the integer parsers are <code>strtoll</code> and
-<code>strtoull</code>, which take a <code>0x</code> prefix in base 16:
-<code>parse_uint64("0x10", make_type_spec(ValueTypeFamily.UINT, 64, 16))</code> is 16,
-though no document can carry that literal (the reader refuses <code>0x10</code>). Check
-with <code>validate_digits_for_base</code> first where that matters.</p>
+<p><strong>No <code>0x</code> in base 16.</strong> The integer parsers take what the reader takes, so
+<code>parse_uint64("0x10", make_type_spec(ValueTypeFamily.UINT, 64, 16))</code> raises,
+though <code>strtoull</code>, which they read with, would skip the prefix.</p>
 </blockquote>
 <p><code>bvn_looks_like_double</code> is not bound. It answers whether the text contains one
 of <code>.</code>, <code>e</code>, <code>E</code>, <code>p</code> and <code>P</code>, so <code>deadbeef</code> looks like a float to it and <code>inf</code>
@@ -1750,7 +1752,10 @@ chronologically, print as ISO 8601 (<code>2016-12-31T23:59:60</code>) and conver
 those can hold the value (years 1–9999, no leap second). <code>Epoch</code> is
 <code>bvn_epoch_t</code>: each member's value is its epoch's MJD, so <code>Epoch(q.epoch_mjd)</code>
 is the epoch of a datetime <code>Quantity</code>, and an epoch argument may also be given
-as that int or as the library's name (<code>"unix"</code>, <code>"y2000"</code>, …).</p>
+as that int or as the library's name (<code>"unix"</code>, <code>"y2000"</code>, …).
+<code>Epoch.from_name(name)</code> resolves such a name through the library
+(<code>bvnr_datetime_epoch_index</code>, <code>bvnr_datetime_epoch_mjd</code>): <code>Epoch.Y2000</code> for
+<code>"y2000"</code>, <code>Epoch.UNIX</code> for <code>""</code>, <code>None</code> for a name it does not know.</p>
 <p><strong>Seconds and epochs.</strong></p>
 <table>
 <thead>
@@ -2300,7 +2305,7 @@ outside its C field (a negative one, <code>max_string_length=70000</code>) a
 <td><code>on_error</code></td>
 <td><code>Callable[[BovnarParseError], None] \| None</code></td>
 <td><code>None</code></td>
-<td>Called for every error the reader reports, as a <code>BovnarParseError</code> with its code and position: under <code>continue_on_error</code>, each error it recovers from — reported nowhere else — and the error that ends a read, before the read raises it. Its return value is ignored; an exception it raises stops the read at the next event and is re-raised</td>
+<td>Called for every error the reader reports, as a <code>BovnarParseError</code> with its code and position: under <code>continue_on_error</code>, each error it recovers from — reported nowhere else — and the error that ends a read, before the read raises it. Its return value is ignored. An exception it raises is kept and re-raised from the read once C returns; it stops the read at the next event only when an <code>on_verified</code>, <code>on_unverified</code> or <code>want_unit</code> callback is installed — with <code>on_error</code> alone the read runs to the end first</td>
 </tr>
 <tr>
 <td><code>mirror</code></td>
@@ -2412,8 +2417,7 @@ reader consumes, the comments and the octet-stream payloads included, so what
 it holds after a read that succeeded is the input. The bytes reach it a piece
 at a time, each once the reader has parsed it: a buffer pulled (up to 64 KiB),
 a piece fed to a <code>DocumentFeed</code>, an octet-stream chunk. A read that fails, or a
-callback stops, has mirrored the input up to the start of the piece it
-stopped in. An exception the object raises ends the read and is re-raised from
+callback stops, has mirrored the input up to the byte it stopped at. An exception the object raises ends the read and is re-raised from
 it, unchanged. <code>read_fd</code>, <code>read_file</code>, <code>read_stream</code>, <code>iter_mem</code> and
 <code>DocumentFeed</code> (§4.7) take it too; the frame readers and the demux do not,
 as the C objects behind them take no mirror (their caller holds the bytes it
@@ -2559,6 +2563,16 @@ were recovered, and <code>recovery_count</code> is how to tell that any were (sp
 <td><code>int</code></td>
 <td>Number of times resync was entered (incremented at error entry, not at resync completion)</td>
 </tr>
+<tr>
+<td><code>skipped_bytes</code></td>
+<td><code>int</code></td>
+<td>Bytes a <code>continue_on_error</code> read consumed and discarded while recovering; they were never parsed, so no callback mentions them, and a non-zero value means the callbacks did not see the whole document</td>
+</tr>
+<tr>
+<td><code>declared_version</code></td>
+<td><code>tuple[int, int] \| None</code></td>
+<td>The <code>(major, minor)</code> of a leading <code>#!bovnar M.N</code> directive, <code>None</code> when the document declared none; valid after a read</td>
+</tr>
 </tbody>
 </table>
 <p>To see the errors a <code>continue_on_error</code> read recovered from, pass <code>on_error</code>
@@ -2683,19 +2697,19 @@ for a value without a unit is a <code>BovnarArgumentError</code>.</p>
 <span class="n">w</span><span class="o">.</span><span class="n">get_output</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>       <span class="c1"># → b&#39;.vol=&lt;float:64,ucum:mL{total}&gt;5e+0;&#39;</span>
 </code></pre></div>
 
-<h4 id="write_uintkey-value--width64-base10-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear-unit_iec_basenone-unit_iec_prefixiecprefixnone"><code>write_uint(key, value, *, width=64, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR, unit_iec_base=None, unit_iec_prefix=IECPrefix.NONE)</code></h4>
+<h4 id="write_uintkey-value--width64-base10-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear-unit_iec_basenone-unit_iec_prefixiecprefixnone-unit_sourcenone"><code>write_uint(key, value, *, width=64, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR, unit_iec_base=None, unit_iec_prefix=IECPrefix.NONE, unit_source=None)</code></h4>
 <p>Write an unsigned integer. <code>base</code> selects the numeral system (10 or 16 for
 inline values; any Bovnar-supported base for <code>write_bvni</code>).</p>
-<h4 id="write_sintkey-value--width64-base10-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear"><code>write_sint(key, value, *, width=64, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)</code></h4>
+<h4 id="write_sintkey-value--width64-base10-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear-unit_sourcenone"><code>write_sint(key, value, *, width=64, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR, unit_source=None)</code></h4>
 <p>Write a signed integer. <code>base</code> 64 and 85 are <strong>unsigned</strong> — <code>+</code> and <code>-</code> are
 digits in those alphabets — and raise <code>BovnarArgumentError</code> here and for a
 signed <code>write_bvni</code>.</p>
-<h4 id="write_floatkey-value--width64-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear"><code>write_float(key, value, *, width=64, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)</code></h4>
+<h4 id="write_floatkey-value--width64-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear-unit_sourcenone"><code>write_float(key, value, *, width=64, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR, unit_source=None)</code></h4>
 <p>Write an IEEE 754 binary float.</p>
-<h4 id="write_float_fixkey-value--width64-q0-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear"><code>write_float_fix(key, value, *, width=64, q=0, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)</code></h4>
+<h4 id="write_float_fixkey-value--width64-q0-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear-unit_sourcenone"><code>write_float_fix(key, value, *, width=64, q=0, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR, unit_source=None)</code></h4>
 <p>Write a Q-format fixed-point value. <code>q</code> is the number of fractional bits
 (<code>0 ≤ q &lt; width</code>).</p>
-<h4 id="write_float_deckey-value--width64-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear"><code>write_float_dec(key, value, *, width=64, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)</code></h4>
+<h4 id="write_float_deckey-value--width64-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear-unit_sourcenone"><code>write_float_dec(key, value, *, width=64, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR, unit_source=None)</code></h4>
 <p>Write an IEEE 754-2008 decimal float.</p>
 <h4 id="write_stringkey-value"><code>write_string(key, value)</code></h4>
 <p>Write a bare quoted UTF-8 string with no type annotation:</p>
@@ -2708,11 +2722,11 @@ signed <code>write_bvni</code>.</p>
 <h4 id="write_nullkey"><code>write_null(key)</code></h4>
 <p>Write a null value (empty slot).</p>
 <h3 id="124-extended-integer-writers">12.4 Extended integer writers</h3>
-<h4 id="write_bvnikey-value--width64-base10-signednone-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear"><code>write_bvni(key, value, *, width=64, base=10, signed=None, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)</code></h4>
+<h4 id="write_bvnikey-value--width64-base10-signednone-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear-unit_sourcenone"><code>write_bvni(key, value, *, width=64, base=10, signed=None, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR, unit_source=None)</code></h4>
 <p>Arbitrary-width integer writer that supports all Bovnar numeral bases (<strong>2–62, 64, and 85</strong>). Non-decimal values are formatted using Python's own
 big-integer arithmetic and emitted as quoted strings.  <code>signed</code> defaults to
 <code>True</code> when <code>value &lt; 0</code>.</p>
-<h4 id="write_bvnf_basekey-value_str--width0-base10-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear"><code>write_bvnf_base(key, value_str, *, width=0, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)</code></h4>
+<h4 id="write_bvnf_basekey-value_str--width0-base10-unit_strnone-unit_si_basenone-unit_si_prefixsiprefixnone-unit_si_expexponentlinear-unit_sourcenone"><code>write_bvnf_base(key, value_str, *, width=0, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR, unit_source=None)</code></h4>
 <p>Write a float from a pre-formatted string in base 10 or 16. <code>base</code> must be
 10 or 16; any other value raises <code>BovnarArgumentError</code>.</p>
 <h3 id="125-struct-helpers">12.5 Struct helpers</h3>
@@ -2826,7 +2840,10 @@ writer (<code>BovnarArgumentError</code>). It costs a Python call per event.</p>
 
 <p><code>write_plain(key, value)</code> writes <code>value</code> bare, as a plain symbol
 (<code>bvnr_write_plain</code>): <code>.mode = auto;</code>. The C writer refuses a value that is
-not a symbol (<code>ILLEGAL_SYMBOL</code>); a NUL in it is a <code>BovnarArgumentError</code>.</p>
+not a symbol or is a reserved word (<code>null</code>, <code>true</code>, <code>false</code>, <code>on</code>, <code>off</code>,
+<code>nan</code>, <code>inf</code>, <code>ninf</code>) with <code>TYPE_VALUE_MISMATCH</code>, an empty one with
+<code>EMPTY_IDENTIFIER</code> and one too long with <code>SYMBOL_TOO_LONG</code>; a NUL in it is a
+<code>BovnarArgumentError</code>.</p>
 <p><code>write_datetime(key, value, *, width=64, epoch=None)</code> writes <code>value</code>, signed
 seconds since <code>epoch</code> (<code>"unix"</code>, the default, <code>"tai"</code>, <code>"gps"</code>, <code>"mjd"</code>,
 <code>"ntp"</code>, <code>"galileo"</code>, <code>"glonass"</code>, <code>"y2000"</code>, <code>"beidou"</code>), as
@@ -3189,7 +3206,7 @@ are skipped automatically when <code>numpy</code> / <code>pint</code> is not ins
 ├── exceptions.py    # BovnarError hierarchy
 ├── literals.py      # the C validators, literal parsers/formatters, parse_type_annotation
 ├── quantity.py      # Quantity — typed, unit-annotated scalar for lossless round-trips
-├── reader.py        # Reader, EventPayload, UnitPolicy, UnitRule
+├── reader.py        # Reader, EventPayload, UnitPolicy, UnitRule, READ_OPTIONS, canonicalize, canonicalize_to
 ├── stream.py        # framing, octet multiplexing, document-in-document, the feeds, the live writers
 ├── structs.py       # ctypes Structure/Union definitions + ValueUnitPrefix + make_* helpers
 ├── timekeeping.py   # civil time and calendars: GregorianDate, CivilDateTime, Epoch (bvn_datetime.h)
@@ -3202,6 +3219,8 @@ tests/
 ├── test_abi.py                          # ctypes struct sizes/offsets against the C compiler
 ├── test_enums.py, test_structs.py       # the enum and struct mirrors
 ├── test_version.py                      # library / spec version reporting
+├── test_api_coverage.py                 # every read option at every entry point, on_error, the C API the bindings reach
+├── test_plumbing.py                     # the writer&#39;s observer and nesting caps, the mirror, canonicalize, write_plain
 ├── test_reader.py, test_writer.py       # Reader and Writer
 ├── test_stream.py                       # framing, mux, document-in-document
 ├── test_stream_io.py                    # sockets and file objects as sources and sinks
@@ -3384,9 +3403,11 @@ its <code>unit_flags</code> field (<code>bvn_unit_flags_t</code>, a <code>uint32
 </tbody>
 </table>
 <p>They are set from Python with the <code>unit_flags=</code> keyword of <code>Writer.to_mem</code> /
-<code>to_fd</code> / <code>to_file</code>, as <code>UnitFlags</code> values; <code>emit_version=</code> sets the struct's
-<code>emit_version</code> field. The constructors also set <code>max_struct_nesting</code> and
-<code>max_array_nesting</code> to 255.</p>
+<code>to_fd</code> / <code>to_file</code> / <code>to_stream</code>, as <code>UnitFlags</code> values; <code>emit_version=</code> sets
+the struct's <code>emit_version</code> field. <code>max_struct_nesting=</code> and
+<code>max_array_nesting=</code> set the struct's two nesting fields (<code>0</code> becomes 255,
+1–255 is a lower cap), and <code>on_event=</code> sets its <code>on_event</code> observer
+(<a href="#1210-observing-the-output-on_event">§12.10</a>).</p>
 <p>The writer respects the <code>unit_flags</code> stored inside the C writer object when
 serialising unit annotations. <code>_emit_annotation</code> retrieves the live flags via
 <code>bvnr_writer_unit_flags(w)</code> and passes them to <code>bvn_unit_to_string_ex</code>.</p>
@@ -3405,11 +3426,14 @@ case. Passing <code>unit_si_base</code> or <code>unit_iec_base</code> produces a
 component; the <code>no_unit</code> keyword is only produced when the
 caller explicitly constructs a dimensionless <code>ValueUnit</code> with <code>BaseUnit.NONE</code>.</p>
 <h3 id="175-signals-inside-a-callback">17.5 Signals inside a callback</h3>
-<p>Where C calls back into Python — the event callbacks of <code>Reader</code>, <code>mux_load</code>'s
-per-message callback, <code>load_documents</code>, a parsing <code>FrameFeed</code>, the sources and
-sinks of sockets and file objects — every exception the callback raises is kept,
-the callback answers false so that C stops, and the exception is re-raised once
-the C call has returned. One window is beyond the binding's reach: an exception
+<p>Where C calls back into Python — the event callbacks of <code>Reader</code> and its
+<code>on_error</code> handler, <code>mux_load</code>'s per-message callback, <code>load_documents</code>, a
+parsing <code>FrameFeed</code>, the writer's <code>on_event</code> observer, a reader's <code>mirror=</code>
+sink, the sources and sinks of sockets and file objects — every exception the
+callback raises is kept, the callback answers false so that C stops, and the
+exception is re-raised once the C call has returned. (<code>on_error</code> answers
+nothing, so its exception stops the read at the next event callback, or waits
+for the read to end, §11.2.) One window is beyond the binding's reach: an exception
 raised by a signal handler (<code>KeyboardInterrupt</code> from Ctrl-C) at the very entry
 of a callback, before its body runs. ctypes reports it as "Exception ignored"
 and the call goes on as if the callback had succeeded, so the interrupt is lost

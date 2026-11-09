@@ -404,6 +404,15 @@ fn convert_rational_is_exact() {
     let (got, exact) = convert_rational(&big, &u("k~m"), &u("m")).unwrap();
     assert!(exact);
     assert_eq!(got, big * BigInt::from(1000));
+    // Negative, and near the 32768-bit capacity (~9860 decimal digits).
+    let (got, _) = convert_rational(&ratio(-7, 2), &u("k~m"), &u("m")).unwrap();
+    assert_eq!(got, ratio(-3500, 1));
+    let huge = BigRational::from_integer(BigInt::from(2).pow(32000));
+    let (got, _) = convert_rational(&huge, &u("m"), &u("m")).unwrap();
+    assert_eq!(got, huge);
+    let past = BigRational::from_integer(BigInt::from(2).pow(40000));
+    let err = convert_rational(&past, &u("m"), &u("m")).unwrap_err();
+    assert!(err.to_string().contains("32768 bits"), "{err}");
 }
 
 #[test]

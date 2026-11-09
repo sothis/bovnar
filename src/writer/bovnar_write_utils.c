@@ -273,10 +273,11 @@ bool bvnr_write_bool(bvnr_writer_t *w, const char *key, bool value)
  * The scalar helpers below all follow one pattern, with a no-unit wrapper
  * delegating to a _unit variant: validate width, format the value to text, then
  * emit_numeric. A width of 0 means "unspecified" (the reader infers a default).
- * The BINARY float helper narrows the value through float when width<=32 so the
- * emitted text matches the precision the type promises rather than the full
- * double. The fixed-point and decimal helpers do not: a binary32 is not what
- * either of those types promises (see the notes in them).
+ * The BINARY float helper rounds a float:16 or float:32 value to IEEE binary16
+ * or binary32 (bvn_format_double does) so the emitted text matches the
+ * precision the type promises rather than the full double. The fixed-point and
+ * decimal helpers do not: a binary32 is not what either of those types
+ * promises (see the notes in them).
  */
 bool bvnr_write_uint(bvnr_writer_t *w, const char *key,
 			 uint32_t width, uint64_t value)
@@ -341,35 +342,6 @@ bool bvnr_write_float(bvnr_writer_t *w, const char *key,
 {
 	return bvnr_write_float_unit(w, key, width, value, BVN_UNIT_NONE);
 }
-/*
- * `value` rounded to the binary16 or binary32 grid, as a double. The float:16
- * path used to narrow through a binary32, so float:16 kept 1e10 (beyond
- * binary16's 65504) while float:32 turned 1e300 into inf; and a C cast of a
- * double outside float's range is undefined. Both widths now round to their own
- * format through the packer the reader decodes with.
- */
-static double bvn_w_narrow(double value, uint32_t width)
-{
-	bvn_limb_t a[BVN_FLOAT_NLIMBS(64u)], b[BVN_FLOAT_NLIMBS(64u)];
-	bvn_float_t fa, fb;
-	double      out = value;
-	bvn_float_init_buf(&fa, 64u, a, BVN_FLOAT_NLIMBS(64u));
-	bvn_float_init_buf(&fb, 64u, b, BVN_FLOAT_NLIMBS(64u));
-	if (!bvn_float_from_double(&fa, value)) return value;
-	bool ok;
-	if (width == 16u) {
-		uint16_t bits = 0;
-		bvn_float_to_bin16(&fa, &bits);
-		ok = bvn_float_from_bin16(&fb, bits);
-	} else {
-		uint32_t bits = 0;
-		bvn_float_to_bin32(&fa, &bits);
-		ok = bvn_float_from_bin32(&fb, bits);
-	}
-	if (!ok || !bvn_float_to_double(&fb, &out)) return value;
-	return out;
-}
-
 /* Finite without <math.h>: inf - inf and nan - nan are nan, which is != 0. */
 static bool bvn_w_is_finite(double v) { return v - v == 0.0; }
 
@@ -381,18 +353,15 @@ bool bvnr_write_float_unit(bvnr_writer_t *w, const char *key,
 	 && width != 128u && width != 256u)
 		return bvn_writer_set_error(w, error_invalid_argument);
 	value_type_spec_t vt = BVN_TYPE_FLOAT(width);
-	if (width == 16u || width == 32u) {
-		/* Round to the declared format, and refuse a finite value it cannot
-		 * hold rather than writing the inf it rounds to: the caller handed
-		 * over a number, and a reader would see infinity. */
-		double narrowed = bvn_w_narrow(value, width);
-		if (bvn_w_is_finite(value) && !bvn_w_is_finite(narrowed))
-			return bvn_writer_set_error(w, error_value_out_of_range);
-		value = narrowed;
-	}
 	char buf[64];
 	if (bvn_format_double(buf, sizeof(buf), value, vt) < 0)
 	{
+		/* float:16 and float:32 round to IEEE binary16 and binary32, and
+		 * bvn_format_double refuses a finite value the format cannot hold
+		 * rather than writing the inf it rounds to: the caller handed over a
+		 * number, and a reader would see infinity. */
+		if ((width == 16u || width == 32u) && bvn_w_is_finite(value))
+			return bvn_writer_set_error(w, error_value_out_of_range);
 		w->val.last_error   = error_number_too_long;
 		w->val.error_offset = bvnr_sink_bytes_written(&w->ser.sink)
 		                    + (uint64_t)w->ser.wbuf_pos;

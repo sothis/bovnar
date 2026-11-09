@@ -450,7 +450,8 @@ in-memory calls.
 `Reader.read_mem` (`bovnar.READ_OPTIONS`, §11.2) as keywords, and read under
 them: `load_documents` each document, with `max_file_size` capping one
 document and `max_document_size` one frame; `mux_load` the document around the
-stream. All three read with no total cap by default.
+stream; `parse_embedded` the embedded document, as a document of its own, with
+`max_file_size` capping its bytes. All three read with no total cap by default.
 
 To write a mux stream, or an embedded document, inside a document of any
 shape — values after it, more than one stream — use the `Writer` (§12.9):
@@ -475,7 +476,8 @@ All three take the read options of `Reader.read_mem` (`bovnar.READ_OPTIONS`,
 §11.2): `max_file_size`, the text, array, length and nesting caps,
 `continue_on_error`, `strict_version`, `text_only` and the rest. Besides those:
 `DocumentFeed` takes `typed`, `want_unit`, `on_error`, `on_unverified` and
-`mirror`; `DemuxFeed(key=None,
+`mirror`, and has the `recovery_count`, `skipped_bytes` and `declared_version`
+of its reader (§11.6); `DemuxFeed(key=None,
 max_message=0, typed=False, view=False)`, whose `recovery_count`,
 `skipped_bytes` and `declared_version` are those of its reader, as on
 `DocumentFeed`; `FrameFeed(parse=False, typed=False, continue_past_failed=False,
@@ -549,9 +551,8 @@ text of a fed document is capped as `Reader`'s is, at 2 147 483 647 bytes
 (`TEXT_DATA_TOO_LONG`, doc/10 §1), and an array at as many items: pass
 `max_text_bytes=stream.BVNR_NO_LIMIT` (and `max_array_items`) for a document
 that does not end. `DemuxFeed` and a parsing `FrameFeed` take both as well.
-`DocumentFeed` takes the read options of `Reader.read_mem` and its
-`want_unit`, `on_error`, `on_unverified` and `mirror`, but not `on_verified`,
-which the feed's items stand in for; with `values=True`, `typed=True` gives
+`DocumentFeed` takes no `on_verified`, which the feed's items stand in for;
+with `values=True`, `typed=True` gives
 `Quantity` values as `loads(typed=True)` does (`typed` without `values`, or
 neither `events` nor `values`, is refused). `on_unverified(event, data)` sees
 the raw lexer events of the bytes each `feed()` hands over, inside that call:
@@ -1258,8 +1259,10 @@ bytes(make_unit_none()) != bytes(make_unit_dimensionless())   # True
 (`bovnar.h`): the tests the writer applies to keys, symbols, references and
 numbers, the integer and float parsers and formatters behind it, and the parser
 of a type annotation. Each function is the C function of the same name without
-its `bvn_` prefix, and answers as it does. Text holding NUL is none of the
-things they check: a validator answers `False` for it, a parser raises.
+its `bvn_` prefix (`escape_repl_table` is `bvn_get_escape_repl_table`), and
+answers as it does. Text holding NUL is none of the things they check: a
+validator answers `False` for it, a parser raises — except `validate_string`,
+which takes bytes and checks only that they are UTF-8, so NUL passes.
 
 **Type annotations.** `parse_type_annotation(text)` parses the text between the
 angle brackets, as the reader does, into a frozen `TypeAnnotation` of
@@ -1321,12 +1324,13 @@ literals.validate_uint_range("256", 8)         # → False
 literals.validate_sint_range("-80", 8, 16)     # → True
 ```
 
-Three of them are narrower than their names. The range checks test the range
-only, on text the digit check has already passed: `validate_uint_range("", 8)`
-and `validate_uint_range(" 5", 8)` are `True`. `validate_digits_for_base` does
-not check the base against the ones a type may declare: in base 1 the one digit
-is `0`. And `validate_string` is the same test as `data.decode('utf-8')`; NUL and
-the other control bytes the writer refuses in a string pass it.
+Two of them are narrower than their names. `validate_digits_for_base` does not
+check the base against the ones a type may declare: in base 1 the one digit is
+`0`. And `validate_string` is the same test as `data.decode('utf-8')`; NUL and
+the other control bytes the writer refuses in a string pass it. The range
+checks are meant for text the digit check has passed: they refuse an empty
+literal, and in base 10 anything but digits after an optional sign
+(`validate_uint_range(" 5", 8)` is `False`), but they take a leading `+`.
 
 **Digits.** `char_to_digit(ch, base)` is the value of one digit, `None` when it
 is no digit of `base`: up to base 36 a letter's case does not matter, above it
@@ -1352,7 +1356,7 @@ Each raises `BovnarArgumentError` where the C one returns `false` or -1:
 | `parse_int64(s, vt)` / `parse_uint64(s, vt)` | The integer literal in the type's base; refused when it does not fit the type's width (64 when it declares none), and for a `+` or a space before it |
 | `parse_double(s, vt)` / `parse_double_in_base(s, base)` | The float literal (base 10 or 16; `inf`, `ninf` and `nan`, not `-inf`) as the nearest double, rounded once from its exact value |
 | `format_uint64(value, base=10, min_digits=0)` / `format_int64(...)` | The digits in base 2 to 62, 64 or 85, padded with zero digits to `min_digits` (which the C function caps at 64). A negative value has no form in bases 64 and 85 |
-| `format_double(value, vt)` | The literal the writer emits under `vt`: the shortest digits that read back to the same double, in base 10 or 16 (any other base raises). A `float` width below 53 rounds first to a significand of that many bits: 16 for `float:16` and 32 for `float:32`, not IEEE binary16's 11 and binary32's 24 |
+| `format_double(value, vt)` | The literal the writer emits under `vt`: the shortest digits that read back to the same double, in base 10 or 16 (any other base raises). A `float:16` or `float:32` value is first rounded to IEEE binary16 or binary32 (`2049.0` is `2.048e+3` under `float:16`) and printed with the digits of a 16- or 32-bit significand, so it reads back as that value without rounding to the format (`65504.0` is `6.5504e+4`); a finite value the format cannot hold raises |
 | `escape_repl_table()` | A `dict` of each escape letter to the character it stands for: `t`, `n`, `v`, `f`, `r`, `"` and `\`. The `\x` and `\u` escapes of spec 1.1 take digits and are not in it |
 
 ```python
@@ -1365,11 +1369,9 @@ literals.format_uint64(5, 2, 8)         # → "00000101"
 literals.escape_repl_table()["t"]       # → "\t"
 ```
 
-> **`0x` in base 16.** In bases up to 36 the integer parsers are `strtoll` and
-> `strtoull`, which take a `0x` prefix in base 16:
-> `parse_uint64("0x10", make_type_spec(ValueTypeFamily.UINT, 64, 16))` is 16,
-> though no document can carry that literal (the reader refuses `0x10`). Check
-> with `validate_digits_for_base` first where that matters.
+> **No `0x` in base 16.** The integer parsers take what the reader takes, so
+> `parse_uint64("0x10", make_type_spec(ValueTypeFamily.UINT, 64, 16))` raises,
+> though `strtoull`, which they read with, would skip the prefix.
 
 `bvn_looks_like_double` is not bound. It answers whether the text contains one
 of `.`, `e`, `E`, `p` and `P`, so `deadbeef` looks like a float to it and `inf`
@@ -1567,6 +1569,9 @@ those can hold the value (years 1–9999, no leap second). `Epoch` is
 `bvn_epoch_t`: each member's value is its epoch's MJD, so `Epoch(q.epoch_mjd)`
 is the epoch of a datetime `Quantity`, and an epoch argument may also be given
 as that int or as the library's name (`"unix"`, `"y2000"`, …).
+`Epoch.from_name(name)` resolves such a name through the library
+(`bvnr_datetime_epoch_index`, `bvnr_datetime_epoch_mjd`): `Epoch.Y2000` for
+`"y2000"`, `Epoch.UNIX` for `""`, `None` for a name it does not know.
 
 **Seconds and epochs.**
 
@@ -2018,7 +2023,7 @@ outside its C field (a negative one, `max_string_length=70000`) a
 | `data` | `bytes \| bytearray \| memoryview` | — | Input buffer |
 | `on_verified` | `Callable[[Event, BvnrData \| None], bool] \| None` | `None` | Callback for validated events |
 | `on_unverified` | `Callable[[Event, BvnrData \| None], bool] \| None` | `None` | Callback for raw pre-validation events |
-| `on_error` | `Callable[[BovnarParseError], None] \| None` | `None` | Called for every error the reader reports, as a `BovnarParseError` with its code and position: under `continue_on_error`, each error it recovers from — reported nowhere else — and the error that ends a read, before the read raises it. Its return value is ignored; an exception it raises stops the read at the next event and is re-raised |
+| `on_error` | `Callable[[BovnarParseError], None] \| None` | `None` | Called for every error the reader reports, as a `BovnarParseError` with its code and position: under `continue_on_error`, each error it recovers from — reported nowhere else — and the error that ends a read, before the read raises it. Its return value is ignored. An exception it raises is kept and re-raised from the read once C returns; it stops the read at the next event only when an `on_verified`, `on_unverified` or `want_unit` callback is installed — with `on_error` alone the read runs to the end first |
 | `mirror` | binary file object, socket or `bytearray` \| `None` | `None` | Receives every byte the reader consumes: the input mirror of `bvnr_open_read_source`, a debugging aid (below) |
 | `max_file_size` | `int` | `0` (unlimited) | Hard limit on bytes consumed |
 | `continue_on_error` | `bool` | `False` | Enable resync mode |
@@ -2043,8 +2048,7 @@ reader consumes, the comments and the octet-stream payloads included, so what
 it holds after a read that succeeded is the input. The bytes reach it a piece
 at a time, each once the reader has parsed it: a buffer pulled (up to 64 KiB),
 a piece fed to a `DocumentFeed`, an octet-stream chunk. A read that fails, or a
-callback stops, has mirrored the input up to the start of the piece it
-stopped in. An exception the object raises ends the read and is re-raised from
+callback stops, has mirrored the input up to the byte it stopped at. An exception the object raises ends the read and is re-raised from
 it, unchanged. `read_fd`, `read_file`, `read_stream`, `iter_mem` and
 `DocumentFeed` (§4.7) take it too; the frame readers and the demux do not,
 as the C objects behind them take no mirror (their caller holds the bytes it
@@ -2117,6 +2121,8 @@ were recovered, and `recovery_count` is how to tell that any were (spec §13.4).
 | `error_offset` | `int` | Byte offset of the error |
 | `error_byte` | `int` | The byte the error was raised on, `0` where it is not one byte's fault |
 | `recovery_count` | `int` | Number of times resync was entered (incremented at error entry, not at resync completion) |
+| `skipped_bytes` | `int` | Bytes a `continue_on_error` read consumed and discarded while recovering; they were never parsed, so no callback mentions them, and a non-zero value means the callbacks did not see the whole document |
+| `declared_version` | `tuple[int, int] \| None` | The `(major, minor)` of a leading `#!bovnar M.N` directive, `None` when the document declared none; valid after a read |
 
 To see the errors a `continue_on_error` read recovered from, pass `on_error`
 (§11.2): it is called with each one.
@@ -2217,27 +2223,27 @@ w.finish()
 w.get_output().split(b"\n")[1]       # → b'.vol=<float:64,ucum:mL{total}>5e+0;'
 ```
 
-#### `write_uint(key, value, *, width=64, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR, unit_iec_base=None, unit_iec_prefix=IECPrefix.NONE)`
+#### `write_uint(key, value, *, width=64, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR, unit_iec_base=None, unit_iec_prefix=IECPrefix.NONE, unit_source=None)`
 
 Write an unsigned integer. `base` selects the numeral system (10 or 16 for
 inline values; any Bovnar-supported base for `write_bvni`).
 
-#### `write_sint(key, value, *, width=64, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)`
+#### `write_sint(key, value, *, width=64, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR, unit_source=None)`
 
 Write a signed integer. `base` 64 and 85 are **unsigned** — `+` and `-` are
 digits in those alphabets — and raise `BovnarArgumentError` here and for a
 signed `write_bvni`.
 
-#### `write_float(key, value, *, width=64, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)`
+#### `write_float(key, value, *, width=64, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR, unit_source=None)`
 
 Write an IEEE 754 binary float.
 
-#### `write_float_fix(key, value, *, width=64, q=0, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)`
+#### `write_float_fix(key, value, *, width=64, q=0, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR, unit_source=None)`
 
 Write a Q-format fixed-point value. `q` is the number of fractional bits
 (`0 ≤ q < width`).
 
-#### `write_float_dec(key, value, *, width=64, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)`
+#### `write_float_dec(key, value, *, width=64, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR, unit_source=None)`
 
 Write an IEEE 754-2008 decimal float.
 
@@ -2261,13 +2267,13 @@ Write a null value (empty slot).
 
 ### 12.4 Extended integer writers
 
-#### `write_bvni(key, value, *, width=64, base=10, signed=None, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)`
+#### `write_bvni(key, value, *, width=64, base=10, signed=None, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR, unit_source=None)`
 
 Arbitrary-width integer writer that supports all Bovnar numeral bases (**2–62, 64, and 85**). Non-decimal values are formatted using Python's own
 big-integer arithmetic and emitted as quoted strings.  `signed` defaults to
 `True` when `value < 0`.
 
-#### `write_bvnf_base(key, value_str, *, width=0, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR)`
+#### `write_bvnf_base(key, value_str, *, width=0, base=10, unit_str=None, unit_si_base=None, unit_si_prefix=SIPrefix.NONE, unit_si_exp=Exponent.LINEAR, unit_source=None)`
 
 Write a float from a pre-formatted string in base 10 or 16. `base` must be
 10 or 16; any other value raises `BovnarArgumentError`.
@@ -2403,7 +2409,10 @@ w.get_output().split(b"\n")[1]      # → b'.mode=auto;.t=<datetime:64,tai>17500
 
 `write_plain(key, value)` writes `value` bare, as a plain symbol
 (`bvnr_write_plain`): `.mode = auto;`. The C writer refuses a value that is
-not a symbol (`ILLEGAL_SYMBOL`); a NUL in it is a `BovnarArgumentError`.
+not a symbol or is a reserved word (`null`, `true`, `false`, `on`, `off`,
+`nan`, `inf`, `ninf`) with `TYPE_VALUE_MISMATCH`, an empty one with
+`EMPTY_IDENTIFIER` and one too long with `SYMBOL_TOO_LONG`; a NUL in it is a
+`BovnarArgumentError`.
 
 `write_datetime(key, value, *, width=64, epoch=None)` writes `value`, signed
 seconds since `epoch` (`"unix"`, the default, `"tai"`, `"gps"`, `"mjd"`,
@@ -2645,7 +2654,7 @@ bovnar/
 ├── exceptions.py    # BovnarError hierarchy
 ├── literals.py      # the C validators, literal parsers/formatters, parse_type_annotation
 ├── quantity.py      # Quantity — typed, unit-annotated scalar for lossless round-trips
-├── reader.py        # Reader, EventPayload, UnitPolicy, UnitRule
+├── reader.py        # Reader, EventPayload, UnitPolicy, UnitRule, READ_OPTIONS, canonicalize, canonicalize_to
 ├── stream.py        # framing, octet multiplexing, document-in-document, the feeds, the live writers
 ├── structs.py       # ctypes Structure/Union definitions + ValueUnitPrefix + make_* helpers
 ├── timekeeping.py   # civil time and calendars: GregorianDate, CivilDateTime, Epoch (bvn_datetime.h)
@@ -2658,6 +2667,8 @@ tests/
 ├── test_abi.py                          # ctypes struct sizes/offsets against the C compiler
 ├── test_enums.py, test_structs.py       # the enum and struct mirrors
 ├── test_version.py                      # library / spec version reporting
+├── test_api_coverage.py                 # every read option at every entry point, on_error, the C API the bindings reach
+├── test_plumbing.py                     # the writer's observer and nesting caps, the mirror, canonicalize, write_plain
 ├── test_reader.py, test_writer.py       # Reader and Writer
 ├── test_stream.py                       # framing, mux, document-in-document
 ├── test_stream_io.py                    # sockets and file objects as sources and sinks
@@ -2780,9 +2791,11 @@ its `unit_flags` field (`bvn_unit_flags_t`, a `uint32_t`) and the
 | `BVN_NUM_CANONICAL` | `1 << 2` | Write a float that `BVN_UNIT_REDUCE` rescaled in float shape (`5000.0`, not `5000`), and every annotation in one form (width written out, default `_10` and `no_unit` left out) |
 
 They are set from Python with the `unit_flags=` keyword of `Writer.to_mem` /
-`to_fd` / `to_file`, as `UnitFlags` values; `emit_version=` sets the struct's
-`emit_version` field. The constructors also set `max_struct_nesting` and
-`max_array_nesting` to 255.
+`to_fd` / `to_file` / `to_stream`, as `UnitFlags` values; `emit_version=` sets
+the struct's `emit_version` field. `max_struct_nesting=` and
+`max_array_nesting=` set the struct's two nesting fields (`0` becomes 255,
+1–255 is a lower cap), and `on_event=` sets its `on_event` observer
+([§12.10](#1210-observing-the-output-on_event)).
 
 The writer respects the `unit_flags` stored inside the C writer object when
 serialising unit annotations. `_emit_annotation` retrieves the live flags via
@@ -2812,11 +2825,14 @@ caller explicitly constructs a dimensionless `ValueUnit` with `BaseUnit.NONE`.
 
 ### 17.5 Signals inside a callback
 
-Where C calls back into Python — the event callbacks of `Reader`, `mux_load`'s
-per-message callback, `load_documents`, a parsing `FrameFeed`, the sources and
-sinks of sockets and file objects — every exception the callback raises is kept,
-the callback answers false so that C stops, and the exception is re-raised once
-the C call has returned. One window is beyond the binding's reach: an exception
+Where C calls back into Python — the event callbacks of `Reader` and its
+`on_error` handler, `mux_load`'s per-message callback, `load_documents`, a
+parsing `FrameFeed`, the writer's `on_event` observer, a reader's `mirror=`
+sink, the sources and sinks of sockets and file objects — every exception the
+callback raises is kept, the callback answers false so that C stops, and the
+exception is re-raised once the C call has returned. (`on_error` answers
+nothing, so its exception stops the read at the next event callback, or waits
+for the read to end, §11.2.) One window is beyond the binding's reach: an exception
 raised by a signal handler (`KeyboardInterrupt` from Ctrl-C) at the very entry
 of a callback, before its body runs. ctypes reports it as "Exception ignored"
 and the call goes on as if the callback had succeeded, so the interrupt is lost

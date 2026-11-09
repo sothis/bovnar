@@ -126,7 +126,12 @@ BVN_API int64_t bvn_dt_tai_seconds_from_galileo_time(int64_t timeofweek_ms, int6
  * Callers rendering a bvn_datetime_t must therefore allow second == 60, and
  * callers folding a UTC offset into one must not fold it into `second` (an ISO
  * offset is always whole minutes, so fold into `minute` and the spelling
- * survives).  dt->submjd resolves 1e-5 of a day = 0.864 s and cannot separate
+ * survives).  For the same reason bvn_dt_tai_seconds_to_local_time() needs a
+ * whole-minute timezone_offset_seconds at an inserted leap second: under any
+ * other offset the inserted second falls inside a local minute, where a
+ * bvn_datetime_t has no spelling for it, and its :60 is written into the minute
+ * before that one -- not a time the zone's clock ever showed.  (The Python and
+ * Rust bindings refuse such offsets.)  dt->submjd resolves 1e-5 of a day = 0.864 s and cannot separate
  * :59 from :60; it stays at the :59 value.
  *
  * Of the 28 table entries 27 are insertions; the first establishes the initial

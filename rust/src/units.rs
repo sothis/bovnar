@@ -238,21 +238,26 @@ pub fn convert_rational(
     to: &Unit,
 ) -> Result<(num_rational::BigRational, bool)> {
     use num_bigint::BigInt;
+    use unit_fns::RationalFailure;
     let (num, den, exact) = unit_fns::convert_rational(
-        &value.numer().to_string(),
-        &value.denom().to_string(),
+        &format!("{:x}", value.numer()),
+        &format!("{:x}", value.denom()),
         from.0,
         to.0,
     )
-    .ok_or_else(|| {
-        Error::argument(format!(
-            "cannot convert a value exactly from {from} to {to}: incompatible units, \
-             or a value past 32768 bits"
-        ))
+    .map_err(|e| match e {
+        RationalFailure::Memory => Error::OutOfMemory("bvn_unit_convert_rational()"),
+        RationalFailure::Capacity => {
+            Error::argument("convert_rational: the value needs more than 32768 bits".to_string())
+        }
+        RationalFailure::Convert => Error::argument(format!(
+            "cannot convert a value exactly from {from} to {to}: incompatible or invalid \
+             units, or an exact result past 32768 bits"
+        )),
     })?;
     let parse = |t: &str| {
-        t.parse::<BigInt>()
-            .map_err(|e| Error::argument(e.to_string()))
+        BigInt::parse_bytes(t.as_bytes(), 16)
+            .ok_or_else(|| Error::argument(format!("convert_rational: bad digits {t:?}")))
     };
     Ok((
         num_rational::BigRational::new(parse(&num)?, parse(&den)?),

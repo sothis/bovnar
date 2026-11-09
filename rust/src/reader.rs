@@ -579,9 +579,9 @@ impl Reader {
     /// [`Reader::read_mem_with`] with `mirror` receiving every byte the
     /// reader consumes (`src_mirror`, a debugging aid). The bytes reach it a
     /// piece at a time, each once the reader has parsed it: a buffer pulled
-    /// (up to 64 KiB), a piece fed, an octet-stream chunk. So a read that
-    /// fails or is stopped has mirrored the input up to the start of the
-    /// piece it stopped in. A failing `mirror` ends the read with an
+    /// (up to 64 KiB), a piece fed, an octet-stream chunk. A read that
+    /// fails or is stopped has mirrored the input up to the byte it stopped
+    /// at. A failing `mirror` ends the read with an
     /// [`Error::Io`] with `writing_to_sink`; a panic in it reaches the
     /// caller.
     pub fn read_mem_mirror(

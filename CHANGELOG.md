@@ -197,7 +197,9 @@ API and implements spec 1.2.
   `on_document` veto, or a failed document's own code. An export-only ABI
   addition; `bovnar frames list` names the error with it.
 
-- **C API the bindings could not reach.** From the same review:
+- **C API the bindings could not reach.** From the review of the whole C API
+  against both bindings (under Changed, *Every read option reaches every
+  reading entry point*):
   - *Both:* the cap on a DOM parse from a stream (`bvn_dom_parse_fd_ex`):
     `DomDoc.parse_fd` / `parse_file(..., max_bytes=)` in Python,
     `DomDoc::parse_reader_capped` / `parse_reader_capped_with_policy` in Rust;
@@ -283,6 +285,7 @@ API and implements spec 1.2.
 ### Changed
 
 - **Every read option reaches every reading entry point, in Rust and Python.**
+  (The DOM is the exception: its C parse functions take no read flags.)
   An endless text document read with a live feed stopped at the library's
   default of 2 147 483 647 bytes of text (`text_data_too_long`), and an array
   at as many items, with no way to raise either from a binding. A review of the
@@ -325,8 +328,6 @@ API and implements spec 1.2.
     `stream.BVNR_NO_LIMIT` (2**64 − 1) lifts the text and array caps. New
     `on_error=` on the `Reader` methods and `DocumentFeed`, called with a
     `BovnarParseError` per error; `Reader.error_byte`.
-  - `parse_embedded` (both) under `continue_on_error` reports the error that
-    ended the parse, not the first one it recovered from.
 
 - **The canonical text of a double is its nearest shortest decimal.**
   `bvn_format_double`, which writes every float the writer formats, chose
@@ -382,6 +383,45 @@ API and implements spec 1.2.
   `bvnr_read` and `bvnr_demux_on_event` went from about 7.2 µs to 0.25 µs each.
 
 ### Fixed
+
+- **Fixes from a review of the binding work (2026-11-09).**
+  - *`float:16` and `float:32` are rounded to IEEE binary16 and binary32 by
+    `bvn_format_double` itself.* Only `bvnr_write_float` rounded first; the
+    Python and Rust writers format through `bvn_format_double`, which took the
+    width as the significand, so they wrote 2049 into a `float:16` (binary16
+    holds 2048) and 16777217 into a `float:32`, and wrote the infinity a value
+    past the format's range rounds to. Both now write what the C writer writes
+    and refuse a finite value the format cannot hold with
+    `value_out_of_range`, as it does; `bvn_format_double` returns -1 for one.
+  - *`bvn_parse_int64` and `bvn_parse_uint64` refuse a `0x` prefix in base 16.*
+    `strtoll` skipped it, so `"0x10"` parsed as 16, a literal the reader
+    refuses.
+  - *`bvn_validate_uint_range` and `bvn_validate_sint_range` refuse an empty
+    literal, and in base 10 anything but digits after the sign.* `""` and
+    `" 5"` passed, as `strtoull` reads them as numbers.
+  - *The reader's mirror receives the input up to the byte a read stopped
+    at.* A piece reached it only once lexed, so the piece an error or a
+    stopping callback was in never did, and a failed read of one memory buffer
+    mirrored nothing.
+  - *`bvn_dt_tai_seconds_to_local_time` documents that it needs a whole-minute
+    offset at an inserted leap second* (the bindings refuse others).
+  - *Python.* `Writer.to_file` checks `on_event` before it truncates the file;
+    `write_datetime` refuses an epoch that is not a `str` or holds a NUL (which
+    C read as the name before it); `literals.validate_string(5)` is a
+    `TypeError`, not five NUL bytes; a read switch (`continue_on_error=`,
+    `strict_version=`, …) takes a bool or 0/1 and refuses anything else, where
+    `'no'` turned recovery on; `return_errors=True` without
+    `continue_past_failed=True` is refused instead of ignored; the writer's
+    `on_event` skips an event the binding does not know, as Rust's does; a
+    failed `bvnr_canon_observer_finish` is a `BovnarWriteError`, as in Rust,
+    and `canonicalize` refuses any recovered read.
+  - *Rust.* `canonicalize` no longer leaks the C observer when the input
+    panics, keeps the outer call's first error when another canonicalisation
+    runs inside its input or output, and refuses a recovered document before
+    flushing anything into the output, as Python does.
+    `units::convert_rational` tells an allocation failure, a value past 32768
+    bits and incompatible units apart, and passes hex digits to C, not
+    decimal.
 
 - **Fixes from a second review of the streaming work (2026-11-09).**
   - *The 4096-channel limit is per document on a re-opened demux.*
@@ -496,6 +536,10 @@ API and implements spec 1.2.
   `BVN_UNIT_REDUCE` the writer keeps the rescaled digits of the last value for
   its observer; `bvnr_open_write_*` on a used writer zeroed the pointer without
   freeing it, leaking one allocation per re-open.
+
+- **`parse_embedded` reports the error that ended the parse.** In both
+  bindings, under `continue_on_error`, it reported the first error it had
+  recovered from, not the one that ended the parse.
 
 ## [2.0.2] - 2026-11-04
 

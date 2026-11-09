@@ -29,7 +29,8 @@ from typing import Callable, Generator, IO, Sequence
 from ._ffi import get_library
 from ._fileio import PullSource, push_sink, is_stream
 from .enums import Event, ErrorCode
-from .exceptions import BovnarParseError, BovnarArgumentError
+from .exceptions import (BovnarParseError, BovnarArgumentError,
+                         BovnarWriteError)
 from .structs import (
     BvnrSource, BvnrSink, BvnrReadFlags, BvnrData, ValueUnit,
     build_unit_policy, describe_unit_policy_refusal, MAX_UNIT_TARGETS,
@@ -177,6 +178,15 @@ def _read_limit(name: str, value, bits: int = 64) -> int:
     return value
 
 
+def _read_switch(name: str, value) -> bool:
+    """A read switch: a bool (or 0 / 1). Any other value is refused rather
+    than taken by its truth, where continue_on_error='no' would turn
+    recovery on."""
+    if type(value) is bool or (type(value) is int and value in (0, 1)):
+        return bool(value)
+    raise BovnarArgumentError(f"{name} must be a bool, not {value!r}")
+
+
 # Every field of bvnr_read_flags_t that is a limit or a switch, with the width
 # of its C field (0 for a bool), in the one table each reading entry point takes
 # its keywords from -- Reader.read_*, the feeds, loads/load and the stream
@@ -220,7 +230,7 @@ def read_flags(where: str, options: dict,
         if bits:
             value = _read_limit(name, value, bits)
         else:
-            value = bool(value)
+            value = _read_switch(name, value)
         setattr(flags, name, value)
     if not flags.max_struct_nesting:
         flags.max_struct_nesting = 255
@@ -519,8 +529,8 @@ class Reader:
         consumes: the input mirror of ``bvnr_open_read_source``, a debugging
         aid. The bytes reach it a piece at a time, each once the reader has
         parsed it -- a buffer pulled (up to 64 KiB), a piece fed, an
-        octet-stream chunk -- so a read that fails or is stopped has mirrored
-        the input up to the start of the piece it stopped in. An exception
+        octet-stream chunk -- and a read that fails or is stopped has mirrored
+        the input up to the byte it stopped at. An exception
         the object raises ends the read and is re-raised from here,
         unchanged.
 
@@ -934,11 +944,15 @@ def _canonicalize(where: str, data, out, pretty: bool, options: dict) -> None:
                 raise exc
         if not ok:
             reader._raise_error()
-        if lib.bvnr_reader_get_recovery_count(reader._ptr) and first:
+        if lib.bvnr_reader_get_recovery_count(reader._ptr):
             # doc/08 §3.6: the observer writes what it is fed, and a
             # recovered error leaves a statement without its value, so the
-            # output would not be a document anyone can read.
-            code, line, column, offset, byte = first[0]
+            # output would not be a document anyone can read. (Every
+            # recovery is reported to on_error first; INVALID_ARGUMENT at
+            # 0:0 stands in should one ever not be, as in Rust.)
+            code, line, column, offset, byte = (
+                first[0] if first else (int(ErrorCode.INVALID_ARGUMENT),
+                                        0, 0, 0, 0))
             raise _parse_error(
                 lib, code, line, column, offset, byte,
                 prefix="the document has no canonical form: the read "
@@ -947,8 +961,9 @@ def _canonicalize(where: str, data, out, pretty: bool, options: dict) -> None:
         if not lib.bvnr_canon_observer_finish(obs):
             if sink.exc is not None:
                 raise sink.exc
-            raise BovnarParseError(ErrorCode.WRITING_TO_SINK,
-                                   message="bvnr_canon_observer_finish failed")
+            # The output side failed: a write error, as in Rust.
+            raise BovnarWriteError(ErrorCode.WRITING_TO_SINK, 0,
+                                   "bvnr_canon_observer_finish failed")
     finally:
         lib.bvnr_canon_observer_destroy(obs)
         reader.close()

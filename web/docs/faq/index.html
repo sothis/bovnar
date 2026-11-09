@@ -1262,6 +1262,7 @@ no total-byte cap</strong>. That is not endless: the text is still bounded by
 payload runs without bound. Production deployments should set <code>max_file_size</code>
 explicitly at minimum. For untrusted input, set <code>max_array_items</code>,
 <code>max_text_bytes</code>, and the nesting limits as well.</p>
+<p>In both bindings a nesting cap of <code>0</code> means <strong>255</strong>, the format's limit, not 64.</p>
 <hr />
 <p><strong>Does <code>bvnr_read</code> allocate heap memory?</strong></p>
 <p>No. The reader does not allocate during <code>bvnr_read</code>. All buffering is internal

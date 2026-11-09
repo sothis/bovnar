@@ -53,9 +53,11 @@ looked up at run time. One module is not a wrapper: <code>bovnar::codec</code>, 
 incremental framing codec for live streams, is pure Rust
 (<a href="#48-live-streams-the-framing-codec-bovnarcodec">§4.8</a>). The API stays close to the C library's own shapes:
 <code>parse</code> / <code>to_string</code> over a dynamic <code>Value</code>, <code>Reader</code> callbacks, <code>Writer</code> calls
-and a random-access DOM. There is no serde integration, no builder and no typed
-deserialisation. Where Rust's types can say more at no cost, they do: the C
-enums are Rust enums, and an error carries the library's error kind.</p>
+and a random-access DOM. There is no serde integration, no builder API for
+values and no typed deserialisation; the DOM has the C library's node builder
+(<a href="#125-building-a-tree-newnode">§12.5</a>). Where Rust's types can say more at
+no cost, they do: the C enums are Rust enums, and an error carries the
+library's error kind.</p>
 <hr />
 <h2 id="table-of-contents">Table of Contents</h2>
 <ol>
@@ -785,7 +787,8 @@ them as its last argument — <code>load_documents_with_options</code>,
 <code>mux_load_with_options</code>, <code>parse_embedded_with_options</code>, and the same for the
 <code>*_reader</code> functions — and reads under them: <code>load_documents</code> each document,
 with <code>max_file_size</code> capping one document and <code>max_document_size</code> one frame;
-<code>mux_load</code> the document around the stream.</p>
+<code>mux_load</code> the document around the stream; <code>parse_embedded</code> the embedded
+document, as a document of its own, with <code>max_file_size</code> capping its bytes.</p>
 <p>Each function has a twin for <code>std::io::Read</code> or <code>std::io::Write</code>
 (<a href="#47-files-and-io-streams-stdioread--write">§4.7</a>).</p>
 <p>The <code>Reader</code> and <code>Writer</code> types of <a href="#10-reader-reference">§10</a> and
@@ -866,6 +869,10 @@ pass it in.</p>
 <td><code>parse_typed_reader(input)</code></td>
 </tr>
 <tr>
+<td><code>parse_with_options(data, typed, &amp;options)</code></td>
+<td><code>parse_reader_with_options(input, typed, &amp;options)</code></td>
+</tr>
+<tr>
 <td><code>to_string(value, pretty)</code></td>
 <td><code>write_to(value, pretty, out)</code></td>
 </tr>
@@ -878,6 +885,18 @@ pass it in.</p>
 <td><code>Reader::read_reader_want_unit(input, &amp;options, want_unit, on_verified)</code></td>
 </tr>
 <tr>
+<td><code>Reader::read_mem_with(data, &amp;options, handlers)</code></td>
+<td><code>Reader::read_reader_with(input, &amp;options, handlers)</code></td>
+</tr>
+<tr>
+<td><code>Reader::read_mem_mirror(data, &amp;options, handlers, mirror)</code></td>
+<td><code>Reader::read_reader_mirror(input, &amp;options, handlers, mirror)</code></td>
+</tr>
+<tr>
+<td><code>canonicalize(data, pretty, &amp;options)</code></td>
+<td><code>canonicalize_reader(input, out, pretty, &amp;options)</code></td>
+</tr>
+<tr>
 <td><code>DomDoc::parse(data)</code></td>
 <td><code>DomDoc::parse_reader(input)</code></td>
 </tr>
@@ -886,12 +905,20 @@ pass it in.</p>
 <td><code>DomDoc::parse_reader_with_policy(input, &amp;policy)</code></td>
 </tr>
 <tr>
+<td>—</td>
+<td><code>DomDoc::parse_reader_capped(input, max_bytes)</code>, a lower cap on what is read (<a href="#122-domdoc">§12.2</a>)</td>
+</tr>
+<tr>
 <td><code>Writer::to_mem(cap, pretty)</code></td>
 <td><code>Writer::to_writer(out, pretty)</code></td>
 </tr>
 <tr>
 <td><code>Writer::to_mem_with(cap, pretty, unit_flags, emit_version)</code></td>
 <td><code>Writer::to_writer_with(out, cap, pretty, unit_flags, emit_version)</code></td>
+</tr>
+<tr>
+<td><code>Writer::to_mem_with_options(cap, options)</code></td>
+<td><code>Writer::to_writer_with_options(out, cap, options)</code></td>
 </tr>
 <tr>
 <td><code>stream::frame_documents(docs)</code></td>
@@ -906,6 +933,14 @@ pass it in.</p>
 <td><code>stream::load_documents_reader(input, typed, continue_past_failed, max_document_size)</code></td>
 </tr>
 <tr>
+<td><code>stream::load_documents_with_options(data, typed, continue_past_failed, max_document_size, &amp;options)</code></td>
+<td><code>stream::load_documents_reader_with_options(input, typed, continue_past_failed, max_document_size, &amp;options)</code></td>
+</tr>
+<tr>
+<td><code>stream::load_documents_results(data, typed, max_document_size, &amp;options)</code></td>
+<td><code>stream::load_documents_reader_results(input, typed, max_document_size, &amp;options)</code></td>
+</tr>
+<tr>
 <td><code>stream::mux_dump(messages, key)</code></td>
 <td><code>stream::mux_dump_to(messages, key, out)</code></td>
 </tr>
@@ -914,12 +949,20 @@ pass it in.</p>
 <td><code>stream::mux_load_reader(input, max_message, key)</code></td>
 </tr>
 <tr>
+<td><code>stream::mux_load_with_options(data, max_message, key, &amp;options)</code></td>
+<td><code>stream::mux_load_reader_with_options(input, max_message, key, &amp;options)</code></td>
+</tr>
+<tr>
 <td><code>stream::embed_document(inner, key, pretty)</code></td>
 <td><code>stream::embed_document_to(inner, key, pretty, out)</code></td>
 </tr>
 <tr>
 <td><code>stream::parse_embedded(inner, typed)</code></td>
 <td><code>stream::parse_embedded_reader(input, typed)</code></td>
+</tr>
+<tr>
+<td><code>stream::parse_embedded_with_options(inner, typed, &amp;options)</code></td>
+<td><code>stream::parse_embedded_reader_with_options(input, typed, &amp;options)</code></td>
 </tr>
 </tbody>
 </table>
@@ -1395,8 +1438,8 @@ handler reaches the caller of the call, and the document has failed.</p>
 
 <p><strong>The mirror.</strong> <code>set_mirror(w)</code> gives the feed any <code>std::io::Write + Send</code>
 that receives every byte the reader consumes (<code>src_mirror</code>, a debugging aid):
-each piece fed, once the reader has parsed it, so a document that fails has
-mirrored the input up to the start of the piece the error is in. It starts the
+each piece fed, once the reader has parsed it, and a document that fails has
+mirrored the input up to the byte the error is at. It starts the
 next document, as <code>reset()</code> does, and stays for every document after;
 <code>take_mirror::&lt;W&gt;()</code> hands it back as the type it was given (<code>None</code>, and the
 mirror kept, for another type), and the rest of a document in progress is not
@@ -2284,8 +2327,10 @@ value carrying <code>no_unit</code> explicitly. That is exactly the pair
 (<code>bovnar.h</code>): the tests the writer applies to keys, symbols, references and
 numbers, the integer and float parsers and formatters behind it, and the parser
 of a type annotation. Each function is the C function of the same name without
-its <code>bvn_</code> prefix, and answers as it does. A string holding NUL is none of the
-things they check: a validator answers <code>false</code> for it, a parser fails.</p>
+its <code>bvn_</code> prefix (<code>escape_repl_table</code> is <code>bvn_get_escape_repl_table</code>), and
+answers as it does. A string holding NUL is none of the things they check: a
+validator answers <code>false</code> for it, a parser fails — except <code>validate_string</code>,
+which takes bytes and checks only that they are UTF-8, so NUL passes.</p>
 <p><strong>Type annotations.</strong> <code>parse_type_annotation(text)</code> parses the text between the
 angle brackets, as the reader does, into a <code>TypeAnnotation</code> of <code>value_type</code> (a
 <code>ValueTypeSpec</code>), <code>unit</code> (a <code>Unit</code>, <code>Unit::default()</code> when there is no unit or it
@@ -2393,12 +2438,13 @@ epoch is no unit: its index is in <code>value_type.base</code> (<code>datetime_e
 </tr>
 </tbody>
 </table>
-<p>Three of them are narrower than their names. The range checks test the range
-only, on text the digit check has already passed: <code>validate_uint_range("", 8,
-10)</code> and <code>validate_uint_range(" 5", 8, 10)</code> are <code>true</code>. <code>validate_digits_for_base</code>
-does not check the base against the ones a type may declare: in base 1 the one
-digit is <code>0</code>. And <code>validate_string</code> is the same test as <code>std::str::from_utf8</code>;
-NUL and the other control bytes the writer refuses in a string pass it.</p>
+<p>Two of them are narrower than their names. <code>validate_digits_for_base</code> does not
+check the base against the ones a type may declare: in base 1 the one digit is
+<code>0</code>. And <code>validate_string</code> is the same test as <code>std::str::from_utf8</code>; NUL and
+the other control bytes the writer refuses in a string pass it. The range
+checks are meant for text the digit check has passed: they refuse an empty
+literal, and in base 10 anything but digits after an optional sign
+(<code>validate_uint_range(" 5", 8, 10)</code> is <code>false</code>), but they take a leading <code>+</code>.</p>
 <p><strong>Digits.</strong> <code>char_to_digit(ch, base)</code> is the value of one digit, <code>None</code> when it
 is no digit of <code>base</code>: up to base 36 a letter's case does not matter, above it
 <code>A</code> to <code>Z</code> are 36 to 61, and bases 64 and 85 use the Base64 and Ascii85
@@ -2430,7 +2476,7 @@ Each returns <code>Err(Error::Argument)</code> where the C one returns <code>fal
 </tr>
 <tr>
 <td><code>format_double(value, vt)</code></td>
-<td>The literal the writer emits under <code>vt</code>: the shortest digits that read back to the same <code>f64</code>, in base 10 or 16 (any other base fails). A <code>float</code> width below 53 rounds first to a significand of that many bits: 16 for <code>float:16</code> and 32 for <code>float:32</code>, not IEEE binary16's 11 and binary32's 24</td>
+<td>The literal the writer emits under <code>vt</code>: the shortest digits that read back to the same <code>f64</code>, in base 10 or 16 (any other base fails). A <code>float:16</code> or <code>float:32</code> value is first rounded to IEEE binary16 or binary32 (<code>2049.0</code> is <code>2.048e+3</code> under <code>float:16</code>) and printed with the digits of a 16- or 32-bit significand, so it reads back as that value without rounding to the format (<code>65504.0</code> is <code>6.5504e+4</code>); a finite value the format cannot hold fails</td>
 </tr>
 <tr>
 <td><code>escape_repl_table()</code></td>
@@ -2462,10 +2508,9 @@ Each returns <code>Err(Error::Argument)</code> where the C one returns <code>fal
 </code></pre></div>
 
 <blockquote>
-<p><strong><code>0x</code> in base 16.</strong> In bases up to 36 the integer parsers are <code>strtoll</code> and
-<code>strtoull</code>, which take a <code>0x</code> prefix in base 16: <code>parse_uint64("0x10", …)</code> under
-<code>uint:64,_16</code> is 16, though no document can carry that literal (the reader
-refuses <code>0x10</code>). Check with <code>validate_digits_for_base</code> first where that matters.</p>
+<p><strong>No <code>0x</code> in base 16.</strong> The integer parsers take what the reader takes, so
+<code>parse_uint64("0x10", …)</code> under <code>uint:64,_16</code> fails, though <code>strtoull</code>, which
+they read with, would skip the prefix.</p>
 </blockquote>
 <p><code>bvn_looks_like_double</code> is not bound. It answers whether the text contains one
 of <code>.</code>, <code>e</code>, <code>E</code>, <code>p</code> and <code>P</code>, so <code>deadbeef</code> looks like a float to it and <code>inf</code>
@@ -2809,7 +2854,11 @@ is its epoch, and <code>Epoch::from_name</code> resolves the library's names (<c
 <code>"y2000"</code>, …).</p>
 <p><strong>Seconds and epochs.</strong> The functions are those of the Python binding
 (<a href="https://www.bovnar.io/docs/python/#65-civil-time-and-calendars">doc/09 §6.5</a>),
-under the same names and with the same arguments:</p>
+under the same names and with the arguments in the same order. Two things
+differ: an epoch is an <code>Epoch</code> here, where Python also takes its MJD or its
+name, and <code>is_last_banking_day_in_quarter</code> / <code>is_first_banking_day_in_quarter</code>
+return a <code>Result&lt;bool&gt;</code>, an <code>Error::Argument</code> for a quarter outside 1–4, where
+Python raises:</p>
 <table>
 <thead>
 <tr>
@@ -3127,7 +3176,7 @@ a <code>ReadHandlers</code> whose fields are all optional: <code>on_verified</co
 <tr>
 <td><code>on_error</code></td>
 <td><code>&amp;mut dyn FnMut(&amp;Error)</code> (in <code>ReadHandlers</code>)</td>
-<td>Called for every error the reader reports, as an <code>Error::Parse</code> with its position: under <code>continue_on_error</code>, each error it recovers from — reported nowhere else — and the error that ends a read, before the read returns it. A panic in it stops the read and reaches the caller</td>
+<td>Called for every error the reader reports, as an <code>Error::Parse</code> with its position: under <code>continue_on_error</code>, each error it recovers from — reported nowhere else — and the error that ends a read, before the read returns it. A panic in it is parked: the read stops at the next call of an <code>on_verified</code>, <code>on_unverified</code> or <code>want_unit</code> handler, or, with none installed, runs to the end; then the panic resumes in the caller</td>
 </tr>
 </tbody>
 </table>
@@ -3153,8 +3202,8 @@ input mirror of <code>bvnr_open_read_source</code>, a debugging aid — comments
 octet-stream payloads included, so after a read that succeeded it holds the
 input. The bytes reach it a piece at a time, each once the reader has parsed
 it: a buffer pulled (up to 64 KiB), a piece fed, an octet-stream chunk. A read
-that fails, or that a handler stops, has mirrored the input up to the start of
-the piece it stopped in. A failing <code>mirror</code> ends the read with an <code>Error::Io</code>
+that fails, or that a handler stops, has mirrored the input up to the byte it
+stopped at. A failing <code>mirror</code> ends the read with an <code>Error::Io</code>
 with <code>writing_to_sink</code>; a panic in it reaches the caller. A <code>live::DocumentFeed</code>
 takes one with <code>set_mirror</code> (<a href="#49-live-documents-through-c-bovnarlive">§4.9</a>).</p>
 <div class="codehilite"><pre><span></span><code><span class="k">use</span><span class="w"> </span><span class="n">bovnar</span><span class="p">::{</span><span class="n">ReadHandlers</span><span class="p">,</span><span class="w"> </span><span class="n">ReadOptions</span><span class="p">,</span><span class="w"> </span><span class="n">Reader</span><span class="p">};</span>
@@ -3170,9 +3219,9 @@ takes one with <code>set_mirror</code> (<a href="#49-live-documents-through-c-bo
 
 <p>A reader opens at the 255-level struct and array nesting cap, in both
 directions, like the CLI and the DOM, unless <code>ReadOptions</code> lowers it.</p>
-<p>The file-descriptor entry points <code>read_fd</code> and <code>read_file</code> are <code>read_reader</code> and
-<code>read_reader_want_unit</code>, over any <code>std::io::Read</code> — see
-<a href="#47-files-and-io-streams-stdioread--write">§4.7</a>.</p>
+<p>The file-descriptor entry points <code>read_fd</code> and <code>read_file</code> are <code>read_reader</code>,
+<code>read_reader_want_unit</code>, <code>read_reader_with</code> and <code>read_reader_mirror</code>, over any
+<code>std::io::Read</code> — see <a href="#47-files-and-io-streams-stdioread--write">§4.7</a>.</p>
 <h3 id="103-readoptions">10.3 <code>ReadOptions</code></h3>
 <p><code>ReadOptions</code> is plain data with a <code>Default</code>; fill what you need and leave the
 rest with <code>..ReadOptions::default()</code>.</p>
@@ -3573,6 +3622,13 @@ strings. <code>signed</code> is a
 <code>Signedness</code>: <code>Signed</code>, <code>Unsigned</code>, or <code>Auto</code> — <code>sint</code> for a negative value,
 <code>uint</code> otherwise (the default). <code>format_bigint(value, base)</code> renders an integer in
 any base on its own.</p>
+<h4 id="write_big_intkey-value-bigint-width-base-signed"><code>write_big_int(key, value: &amp;BigInt, width, base, signed)</code></h4>
+<p><code>write_bvni</code> for an integer of any size: <code>value</code> is a <code>num_bigint::BigInt</code>, as
+<code>Value::BigInt</code> carries one past <code>i128</code>, and <code>width</code>, <code>base</code> (<code>Base</code>) and
+<code>signed</code> (<code>Signedness</code>, <code>Auto</code> writing a negative value as <code>sint</code>) are those of
+<code>write_bvni</code>. <code>writer::format_big_int(value, base)</code> renders it on its own. A
+signed value in base 64 or 85 fails with <code>Error::Argument</code>, as for
+<code>write_bvni</code>.</p>
 <h4 id="write_bvnf_basekey-literal-str-width-u32-base-base"><code>write_bvnf_base(key, literal: &amp;str, width: u32, base: Base)</code></h4>
 <p>Write a float from a pre-formatted string in base 10 or 16. <code>base</code> must be
 <code>Base::DECIMAL</code> or <code>Base::HEX</code>; any other value fails with <code>Error::Argument</code>.</p>
@@ -3795,6 +3851,24 @@ inferred: a string token for <code>ValueTypeFamily::Utf8</code>, a number otherw
 <span class="p">}</span>
 </code></pre></div>
 
+<p>Two calls go a level lower, for what an <code>EmitSpec</code> cannot say:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">w</span><span class="p">.</span><span class="n">event</span><span class="p">(</span><span class="n">event</span><span class="p">:</span><span class="w"> </span><span class="nc">Event</span><span class="p">,</span><span class="w"> </span><span class="n">token</span><span class="p">:</span><span class="w"> </span><span class="nc">TokenType</span><span class="p">,</span><span class="w"> </span><span class="n">vt</span><span class="p">:</span><span class="w"> </span><span class="nc">ValueTypeSpec</span><span class="p">,</span><span class="w"> </span><span class="n">data</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="p">[</span><span class="kt">u8</span><span class="p">])</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">()</span><span class="o">&gt;</span>
+<span class="n">w</span><span class="p">.</span><span class="n">annotation</span><span class="p">(</span><span class="n">vt</span><span class="p">:</span><span class="w"> </span><span class="nc">ValueTypeSpec</span><span class="p">,</span><span class="w"> </span><span class="n">unit</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="nc">Unit</span><span class="p">,</span><span class="w"> </span><span class="n">unit_source</span><span class="p">:</span><span class="w"> </span><span class="nb">Option</span><span class="o">&lt;&amp;</span><span class="kt">str</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="p">()</span><span class="o">&gt;</span>
+</code></pre></div>
+
+<p><code>event</code> sends one event with the token type given explicitly
+(<code>bvnr_write_event</code>): a plain symbol is <code>Event::Data</code> with <code>TokenType::Symbol</code>,
+an array item <code>TokenType::ArrayNumber</code> or <code>ArrayString</code>. <code>data</code> longer than
+4 GiB fails with <code>Error::Argument</code>. <code>annotation</code> writes a whole type
+annotation, <code>&lt;family:width[,_base|,qN|,epoch][,unit]&gt;</code>, as the events from
+<code>TypeAnnotationStart</code> to <code>TypeAnnotationEnd</code>: the width of a sized family when
+it is not 0, the base of an integer or float that is not 10, the <code>q</code> of a
+fixed-point value, the epoch of a datetime and the unit when it has components
+(left out for <code>datetime</code> and <code>utf8</code>). <code>unit_source</code> is the unit's spelling to
+write instead of its canonical one, checked by the C writer as for
+<code>bvnr_writer_set_unit_source</code>; a unit the library cannot serialise fails with
+<code>Error::Argument</code>. It goes after the key and before the value, or before an
+array's first row (<a href="#1110-the-c-per-type-helpers">§11.10</a> uses both).</p>
 <h3 id="119-observing-the-output-on_event">11.9 Observing the output: <code>on_event</code></h3>
 <p><code>WriteOptions::on_event</code> is a <code>Box&lt;dyn FnMut(&amp;EventData&lt;'_&gt;) -&gt; bool + Send&gt;</code>
 (<code>WriteObserver</code>), called with each event once it has been serialised
@@ -4199,7 +4273,7 @@ use a <code>Value</code> or the <code>Writer</code>.</p>
 </tbody>
 </table>
 <p>Every constructor returns a <code>Result</code>, <code>Error::OutOfMemory</code> when the C library
-cannot allocate, as <code>Reader::new</code> and <code>Writer::new</code> do.</p>
+cannot allocate, as <code>Reader::new</code> and the <code>Writer</code> constructors do.</p>
 <p><strong>Ownership is a move.</strong> The C attach functions take the node they are given on
 every path: on success the container owns it, and on failure they destroy it.
 <code>add</code> and <code>push</code> take their node by value, so the type system makes that
@@ -4263,7 +4337,7 @@ and <code>to_value()</code> already read an integer of any width).</p>
 </tr>
 <tr>
 <td><code>Error::Io { code, io_kind, message }</code></td>
-<td>The <code>std::io::Read</code> or <code>Write</code> behind <code>read_reader</code>, <code>parse_reader</code>, <code>write_to</code>, <code>to_writer</code> or a <code>stream</code> twin failed. <code>code</code> is what the C library reports for an unreadable fd source or unwritable fd sink (<code>reading_from_source_fd</code>, <code>writing_to_sink</code>); <code>io_kind</code> and <code>message</code> keep what the I/O error said</td>
+<td>The <code>std::io::Read</code> or <code>Write</code> behind <code>read_reader</code>, <code>parse_reader</code>, <code>write_to</code>, <code>to_writer</code> or a <code>stream</code> twin, a reader's <code>mirror</code> (<a href="#102-read_mem">§10.2</a>) or the <code>input</code> or <code>out</code> of <code>canonicalize_reader</code> (<a href="#410-canonical-form">§4.10</a>) failed. <code>code</code> is what the C library reports for an unreadable fd source or unwritable fd sink (<code>reading_from_source_fd</code>, <code>writing_to_sink</code>); <code>io_kind</code> and <code>message</code> keep what the I/O error said</td>
 </tr>
 </tbody>
 </table>
@@ -4455,12 +4529,12 @@ with clang:</p>
 │   ├── literals.rs   # the C validators, literal parsers/formatters, parse_type_annotation
 │   ├── live.rs       # DocumentFeed, ValueFeed, EmbeddedFeed, FrameParser, FramePull, Demux — fed reading through C
 │   ├── quantity.rs   # Quantity — typed, unit-annotated scalar for lossless round-trips
-│   ├── reader.rs     # Reader, ReadOptions, EventData, EventPayload, UnitPolicy, UnitRule
+│   ├── reader.rs     # Reader, ReadOptions, ReadHandlers, EventData, EventPayload, UnitPolicy, UnitRule, canonicalize
 │   ├── stream.rs     # framing, octet multiplexing, document-in-document
 │   ├── timekeeping.rs # civil time and calendars: GregorianDate, CivilDateTime, Epoch
 │   ├── unit.rs       # Unit, UnitComponent — a unit with equality, hashing and its operations
 │   ├── units.rs      # unit_to_si_factor, unit_convert_factor, etc.
-│   └── writer.rs     # Writer, Base, Signedness, EmitSpec
+│   └── writer.rs     # Writer, WriteOptions, WriteObserver, Base, Signedness, EmitSpec
 ├── tests/            # one integration-test file per topic, plus smoke.rs
 ├── benches/          # codec.rs, live.rs: per-message figures of the codec and the fed readers (std only)
 └── fuzz/             # cargo-fuzz targets
@@ -4480,11 +4554,11 @@ with clang:</p>
 </tr>
 <tr>
 <td><code>src/reader.rs</code></td>
-<td><code>Reader</code>, <code>ReadOptions</code>, <code>EventData</code>, <code>EventPayload</code>, <code>UnitPolicy</code>, <code>UnitRule</code></td>
+<td><code>Reader</code>, <code>ReadOptions</code>, <code>ReadHandlers</code>, <code>EventData</code>, <code>EventPayload</code>, <code>UnitPolicy</code>, <code>UnitRule</code>, <code>canonicalize</code>, <code>canonicalize_reader</code></td>
 </tr>
 <tr>
 <td><code>src/writer.rs</code></td>
-<td><code>Writer</code>, <code>Base</code>, <code>Signedness</code>, <code>EmitSpec</code></td>
+<td><code>Writer</code>, <code>WriteOptions</code>, <code>WriteObserver</code>, <code>Base</code>, <code>Signedness</code>, <code>EmitSpec</code></td>
 </tr>
 <tr>
 <td><code>src/dom.rs</code></td>
@@ -4496,7 +4570,7 @@ with clang:</p>
 </tr>
 <tr>
 <td><code>src/enums.rs</code></td>
-<td>the Rust enums behind the C enums, <code>Exponent</code> and <code>Base</code></td>
+<td>the Rust enums behind the C enums, and <code>Exponent</code></td>
 </tr>
 <tr>
 <td><code>src/error.rs</code></td>

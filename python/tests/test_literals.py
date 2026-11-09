@@ -191,7 +191,10 @@ def test_range_validators():
     assert not u("-0", 8) and u("nan", 8) and u("9" * 30, 0)
     assert u(str(2**128 - 1), 128) and not u(str(2**128), 128)
     assert not u("1" * 40, 128)
-    assert u("", 8)                          # a range test only
+    # Not digits: refused, though strtoull reads "" and " 5" as numbers.
+    for bad in ("", "+", " 5", "5 ", "1_0"):
+        assert not u(bad, 8) and not u(bad, 128) and not s(bad, 8)
+    assert not s("-", 8) and not s(" -5", 128)
     assert s("127", 8) and not s("128", 8) and s("-128", 8) and not s("-129", 8)
     assert s("-80", 8, 16) and not s("-81", 8, 16)
     assert s(str(-2**127), 128) and not s(str(-2**127 - 1), 128)
@@ -278,6 +281,16 @@ def test_float_formatter():
     for x in (0.1, 1 / 3, 6.02214076e23, -2.5e-310, 1.7976931348623157e308,
               2.2250738585072014e-308):
         assert literals.parse_double(f(x, f64), f64) == x
+    # float:16 and float:32 round to IEEE binary16 and binary32 first, as
+    # the C writer writes them, and refuse what the format cannot hold.
+    assert f(2049.0, vt(F.FLOAT, 16)) == "2.048e+3"
+    assert f(16777217.0, vt(F.FLOAT, 32)) == "1.6777216e+7"
+    assert f(65504.0, vt(F.FLOAT, 16)) == "6.5504e+4"
+    assert f(0.1, vt(F.FLOAT, 16)) == "9.9976e-2"
+    assert f(math.inf, vt(F.FLOAT, 16)) == "inf"
+    for x, w in ((1e5, 16), (65520.0, 16), (1e39, 32), (-1e300, 32)):
+        with pytest.raises(BovnarArgumentError):
+            f(x, vt(F.FLOAT, w))
     # Base 10 (or 0) and 16 only.
     assert f(1.5, f64) == "1.5e+0"
     for base in (2, 8, 36, 62):
@@ -305,8 +318,14 @@ def test_integer_parsers_bound_by_the_type():
     assert q("-zZ", vt(F.SINT, 64, 62)) == -(35 * 62 + 61)
     assert p("-.", vt(F.UINT, 64, 85)) == 12 * 85 + 13
     assert p("+", vt(F.UINT, 64, 64)) == 62
-    # strtoll's 0x prefix in base 16: taken here, refused by the reader.
-    assert p("0x10", vt(F.UINT, 64, 16)) == 16
+    # strtoll's 0x prefix in base 16 is refused, as the reader refuses it.
+    for bad in ("0x10", "0X10"):
+        with pytest.raises(BovnarArgumentError):
+            p(bad, vt(F.UINT, 64, 16))
+    for bad in ("0x10", "-0x10"):
+        with pytest.raises(BovnarArgumentError):
+            q(bad, vt(F.SINT, 64, 16))
+    assert p("10", vt(F.UINT, 64, 16)) == 16 and q("-0", vt(F.SINT, 8, 16)) == 0
     with pytest.raises(BovnarParseError):
         bovnar.loads(b".a = <uint:64,_16> 0x10;")
 
@@ -537,3 +556,11 @@ def test_unattached_nodes_are_freed_cleanly():
 def test_an_empty_built_document():
     doc = DomDoc.create()
     assert len(doc) == 0 and doc.to_dict() == {} and doc.lookup("a") is None
+
+
+def test_validate_string_refuses_a_non_buffer():
+    for bad in (5, 0, None, [1, 2]):
+        with pytest.raises(TypeError):
+            literals.validate_string(bad)
+    assert literals.validate_string(bytearray(b'ok'))
+    assert literals.validate_string(memoryview(b'\xc3\xa9'))

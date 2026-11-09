@@ -13,9 +13,11 @@ looked up at run time. One module is not a wrapper: `bovnar::codec`, the
 incremental framing codec for live streams, is pure Rust
 ([§4.8](#48-live-streams-the-framing-codec-bovnarcodec)). The API stays close to the C library's own shapes:
 `parse` / `to_string` over a dynamic `Value`, `Reader` callbacks, `Writer` calls
-and a random-access DOM. There is no serde integration, no builder and no typed
-deserialisation. Where Rust's types can say more at no cost, they do: the C
-enums are Rust enums, and an error carries the library's error kind.
+and a random-access DOM. There is no serde integration, no builder API for
+values and no typed deserialisation; the DOM has the C library's node builder
+([§12.5](#125-building-a-tree-newnode)). Where Rust's types can say more at
+no cost, they do: the C enums are Rust enums, and an error carries the
+library's error kind.
 
 ---
 
@@ -581,7 +583,8 @@ them as its last argument — `load_documents_with_options`,
 `mux_load_with_options`, `parse_embedded_with_options`, and the same for the
 `*_reader` functions — and reads under them: `load_documents` each document,
 with `max_file_size` capping one document and `max_document_size` one frame;
-`mux_load` the document around the stream.
+`mux_load` the document around the stream; `parse_embedded` the embedded
+document, as a document of its own, with `max_file_size` capping its bytes.
 
 Each function has a twin for `std::io::Read` or `std::io::Write`
 ([§4.7](#47-files-and-io-streams-stdioread--write)).
@@ -657,20 +660,30 @@ fn main() -> Result<(), bovnar::Error> {
 |---|---|
 | `parse(data)` | `parse_reader(input)` |
 | `parse_typed(data)` | `parse_typed_reader(input)` |
+| `parse_with_options(data, typed, &options)` | `parse_reader_with_options(input, typed, &options)` |
 | `to_string(value, pretty)` | `write_to(value, pretty, out)` |
 | `Reader::read_mem(data, …)` | `Reader::read_reader(input, &options, on_verified, on_unverified)` |
 | `Reader::read_mem_want_unit(data, …)` | `Reader::read_reader_want_unit(input, &options, want_unit, on_verified)` |
+| `Reader::read_mem_with(data, &options, handlers)` | `Reader::read_reader_with(input, &options, handlers)` |
+| `Reader::read_mem_mirror(data, &options, handlers, mirror)` | `Reader::read_reader_mirror(input, &options, handlers, mirror)` |
+| `canonicalize(data, pretty, &options)` | `canonicalize_reader(input, out, pretty, &options)` |
 | `DomDoc::parse(data)` | `DomDoc::parse_reader(input)` |
 | `DomDoc::parse_with_policy(data, &policy)` | `DomDoc::parse_reader_with_policy(input, &policy)` |
+| — | `DomDoc::parse_reader_capped(input, max_bytes)`, a lower cap on what is read ([§12.2](#122-domdoc)) |
 | `Writer::to_mem(cap, pretty)` | `Writer::to_writer(out, pretty)` |
 | `Writer::to_mem_with(cap, pretty, unit_flags, emit_version)` | `Writer::to_writer_with(out, cap, pretty, unit_flags, emit_version)` |
+| `Writer::to_mem_with_options(cap, options)` | `Writer::to_writer_with_options(out, cap, options)` |
 | `stream::frame_documents(docs)` | `stream::frame_documents_to(docs, out)` |
 | `stream::dump_documents(values, pretty)` | `stream::dump_documents_to(values, pretty, out)` |
 | `stream::load_documents(data, typed, continue_past_failed, max_document_size)` | `stream::load_documents_reader(input, typed, continue_past_failed, max_document_size)` |
+| `stream::load_documents_with_options(data, typed, continue_past_failed, max_document_size, &options)` | `stream::load_documents_reader_with_options(input, typed, continue_past_failed, max_document_size, &options)` |
+| `stream::load_documents_results(data, typed, max_document_size, &options)` | `stream::load_documents_reader_results(input, typed, max_document_size, &options)` |
 | `stream::mux_dump(messages, key)` | `stream::mux_dump_to(messages, key, out)` |
 | `stream::mux_load(data, max_message, key)` | `stream::mux_load_reader(input, max_message, key)` |
+| `stream::mux_load_with_options(data, max_message, key, &options)` | `stream::mux_load_reader_with_options(input, max_message, key, &options)` |
 | `stream::embed_document(inner, key, pretty)` | `stream::embed_document_to(inner, key, pretty, out)` |
 | `stream::parse_embedded(inner, typed)` | `stream::parse_embedded_reader(input, typed)` |
+| `stream::parse_embedded_with_options(inner, typed, &options)` | `stream::parse_embedded_reader_with_options(input, typed, &options)` |
 
 **They stream.** A reader twin hands its `Read` to the C library as a callback
 source (`bvnr_source_from_callback`): the library pulls from it as it parses, so
@@ -1041,8 +1054,8 @@ fn main() -> Result<(), bovnar::Error> {
 
 **The mirror.** `set_mirror(w)` gives the feed any `std::io::Write + Send`
 that receives every byte the reader consumes (`src_mirror`, a debugging aid):
-each piece fed, once the reader has parsed it, so a document that fails has
-mirrored the input up to the start of the piece the error is in. It starts the
+each piece fed, once the reader has parsed it, and a document that fails has
+mirrored the input up to the byte the error is at. It starts the
 next document, as `reset()` does, and stays for every document after;
 `take_mirror::<W>()` hands it back as the type it was given (`None`, and the
 mirror kept, for another type), and the rest of a document in progress is not
@@ -1915,8 +1928,10 @@ fn main() -> Result<(), bovnar::Error> {
 (`bovnar.h`): the tests the writer applies to keys, symbols, references and
 numbers, the integer and float parsers and formatters behind it, and the parser
 of a type annotation. Each function is the C function of the same name without
-its `bvn_` prefix, and answers as it does. A string holding NUL is none of the
-things they check: a validator answers `false` for it, a parser fails.
+its `bvn_` prefix (`escape_repl_table` is `bvn_get_escape_repl_table`), and
+answers as it does. A string holding NUL is none of the things they check: a
+validator answers `false` for it, a parser fails — except `validate_string`,
+which takes bytes and checks only that they are UTF-8, so NUL passes.
 
 **Type annotations.** `parse_type_annotation(text)` parses the text between the
 angle brackets, as the reader does, into a `TypeAnnotation` of `value_type` (a
@@ -1976,12 +1991,13 @@ epoch is no unit: its index is in `value_type.base` (`datetime_epoch_index`,
 | `validate_uint_range(s, width, base)` / `validate_sint_range(s, width, base)` | A literal that fits `width` bits (0: any width); `inf`, `ninf` and `nan` pass |
 | `validate_string(bytes)` | Bytes that are well-formed UTF-8 |
 
-Three of them are narrower than their names. The range checks test the range
-only, on text the digit check has already passed: `validate_uint_range("", 8,
-10)` and `validate_uint_range(" 5", 8, 10)` are `true`. `validate_digits_for_base`
-does not check the base against the ones a type may declare: in base 1 the one
-digit is `0`. And `validate_string` is the same test as `std::str::from_utf8`;
-NUL and the other control bytes the writer refuses in a string pass it.
+Two of them are narrower than their names. `validate_digits_for_base` does not
+check the base against the ones a type may declare: in base 1 the one digit is
+`0`. And `validate_string` is the same test as `std::str::from_utf8`; NUL and
+the other control bytes the writer refuses in a string pass it. The range
+checks are meant for text the digit check has passed: they refuse an empty
+literal, and in base 10 anything but digits after an optional sign
+(`validate_uint_range(" 5", 8, 10)` is `false`), but they take a leading `+`.
 
 **Digits.** `char_to_digit(ch, base)` is the value of one digit, `None` when it
 is no digit of `base`: up to base 36 a letter's case does not matter, above it
@@ -1999,7 +2015,7 @@ Each returns `Err(Error::Argument)` where the C one returns `false` or -1:
 | `parse_int64(s, vt)` / `parse_uint64(s, vt)` | The integer literal in the type's base; refused when it does not fit the type's width (64 when it declares none), and for a `+` or a space before it |
 | `parse_double(s, vt)` / `parse_double_in_base(s, base)` | The float literal (base 10 or 16; `inf`, `ninf` and `nan`, not `-inf`) as the nearest `f64`, rounded once from its exact value |
 | `format_uint64(value, base, min_digits)` / `format_int64(...)` | The digits in base 2 to 62, 64 or 85, padded with zero digits to `min_digits` (which the C function caps at 64). A negative value has no form in bases 64 and 85 |
-| `format_double(value, vt)` | The literal the writer emits under `vt`: the shortest digits that read back to the same `f64`, in base 10 or 16 (any other base fails). A `float` width below 53 rounds first to a significand of that many bits: 16 for `float:16` and 32 for `float:32`, not IEEE binary16's 11 and binary32's 24 |
+| `format_double(value, vt)` | The literal the writer emits under `vt`: the shortest digits that read back to the same `f64`, in base 10 or 16 (any other base fails). A `float:16` or `float:32` value is first rounded to IEEE binary16 or binary32 (`2049.0` is `2.048e+3` under `float:16`) and printed with the digits of a 16- or 32-bit significand, so it reads back as that value without rounding to the format (`65504.0` is `6.5504e+4`); a finite value the format cannot hold fails |
 | `escape_repl_table()` | A `&'static [u8; 256]`: for each byte, the byte the escape `\` + that byte stands for, 0 for none. The escapes are `t`, `n`, `v`, `f`, `r`, `"` and `\`; the `\x` and `\u` escapes of spec 1.1 take digits and are not in it |
 
 ```rust
@@ -2026,10 +2042,9 @@ fn main() -> Result<(), bovnar::Error> {
 }
 ```
 
-> **`0x` in base 16.** In bases up to 36 the integer parsers are `strtoll` and
-> `strtoull`, which take a `0x` prefix in base 16: `parse_uint64("0x10", …)` under
-> `uint:64,_16` is 16, though no document can carry that literal (the reader
-> refuses `0x10`). Check with `validate_digits_for_base` first where that matters.
+> **No `0x` in base 16.** The integer parsers take what the reader takes, so
+> `parse_uint64("0x10", …)` under `uint:64,_16` fails, though `strtoull`, which
+> they read with, would skip the prefix.
 
 `bvn_looks_like_double` is not bound. It answers whether the text contains one
 of `.`, `e`, `E`, `p` and `P`, so `deadbeef` looks like a float to it and `inf`
@@ -2328,7 +2343,11 @@ is its epoch, and `Epoch::from_name` resolves the library's names (`"unix"`,
 
 **Seconds and epochs.** The functions are those of the Python binding
 ([doc/09 §6.5](09_bovnar_python_bindings.md#65-civil-time-and-calendars)),
-under the same names and with the same arguments:
+under the same names and with the arguments in the same order. Two things
+differ: an epoch is an `Epoch` here, where Python also takes its MJD or its
+name, and `is_last_banking_day_in_quarter` / `is_first_banking_day_in_quarter`
+return a `Result<bool>`, an `Error::Argument` for a quarter outside 1–4, where
+Python raises:
 
 | Function | C function | Result |
 |---|---|---|
@@ -2575,7 +2594,7 @@ a `ReadHandlers` whose fields are all optional: `on_verified`, `on_unverified`,
 | `on_verified` | `Option<&mut dyn FnMut(&EventData) -> bool>` | Callback for validated events |
 | `on_unverified` | `Option<&mut dyn FnMut(&EventData) -> bool>` | Callback for raw pre-validation events |
 | `want_unit` | `&mut dyn FnMut(&EventData) -> Option<(Unit, u32)>` | Read-time lossless unit/base conversion hook. Called per numeric value; return `Some((unit, base))` to request a conversion (the exact result arrives on the payload as `converted` and `converted_text`, with `converted_rational()` / `converted_in_base()` beside it — see §4.2), or `None` to leave the value untouched. An inexact conversion aborts the read (`error_unit_inexact`) |
-| `on_error` | `&mut dyn FnMut(&Error)` (in `ReadHandlers`) | Called for every error the reader reports, as an `Error::Parse` with its position: under `continue_on_error`, each error it recovers from — reported nowhere else — and the error that ends a read, before the read returns it. A panic in it stops the read and reaches the caller |
+| `on_error` | `&mut dyn FnMut(&Error)` (in `ReadHandlers`) | Called for every error the reader reports, as an `Error::Parse` with its position: under `continue_on_error`, each error it recovers from — reported nowhere else — and the error that ends a read, before the read returns it. A panic in it is parked: the read stops at the next call of an `on_verified`, `on_unverified` or `want_unit` handler, or, with none installed, runs to the end; then the panic resumes in the caller |
 
 ```rust
 use bovnar::{Error, ReadHandlers, ReadOptions, Reader};
@@ -2600,8 +2619,8 @@ input mirror of `bvnr_open_read_source`, a debugging aid — comments and
 octet-stream payloads included, so after a read that succeeded it holds the
 input. The bytes reach it a piece at a time, each once the reader has parsed
 it: a buffer pulled (up to 64 KiB), a piece fed, an octet-stream chunk. A read
-that fails, or that a handler stops, has mirrored the input up to the start of
-the piece it stopped in. A failing `mirror` ends the read with an `Error::Io`
+that fails, or that a handler stops, has mirrored the input up to the byte it
+stopped at. A failing `mirror` ends the read with an `Error::Io`
 with `writing_to_sink`; a panic in it reaches the caller. A `live::DocumentFeed`
 takes one with `set_mirror` ([§4.9](#49-live-documents-through-c-bovnarlive)).
 
@@ -2620,9 +2639,9 @@ fn main() -> Result<(), bovnar::Error> {
 A reader opens at the 255-level struct and array nesting cap, in both
 directions, like the CLI and the DOM, unless `ReadOptions` lowers it.
 
-The file-descriptor entry points `read_fd` and `read_file` are `read_reader` and
-`read_reader_want_unit`, over any `std::io::Read` — see
-[§4.7](#47-files-and-io-streams-stdioread--write).
+The file-descriptor entry points `read_fd` and `read_file` are `read_reader`,
+`read_reader_want_unit`, `read_reader_with` and `read_reader_mirror`, over any
+`std::io::Read` — see [§4.7](#47-files-and-io-streams-stdioread--write).
 
 ### 10.3 `ReadOptions`
 
@@ -2858,6 +2877,15 @@ strings. `signed` is a
 `uint` otherwise (the default). `format_bigint(value, base)` renders an integer in
 any base on its own.
 
+#### `write_big_int(key, value: &BigInt, width, base, signed)`
+
+`write_bvni` for an integer of any size: `value` is a `num_bigint::BigInt`, as
+`Value::BigInt` carries one past `i128`, and `width`, `base` (`Base`) and
+`signed` (`Signedness`, `Auto` writing a negative value as `sint`) are those of
+`write_bvni`. `writer::format_big_int(value, base)` renders it on its own. A
+signed value in base 64 or 85 fails with `Error::Argument`, as for
+`write_bvni`.
+
 #### `write_bvnf_base(key, literal: &str, width: u32, base: Base)`
 
 Write a float from a pre-formatted string in base 10 or 16. `base` must be
@@ -3048,6 +3076,27 @@ fn main() -> Result<(), bovnar::Error> {
     Ok(())
 }
 ```
+
+Two calls go a level lower, for what an `EmitSpec` cannot say:
+
+```rust,ignore
+w.event(event: Event, token: TokenType, vt: ValueTypeSpec, data: &[u8]) -> Result<()>
+w.annotation(vt: ValueTypeSpec, unit: &Unit, unit_source: Option<&str>) -> Result<()>
+```
+
+`event` sends one event with the token type given explicitly
+(`bvnr_write_event`): a plain symbol is `Event::Data` with `TokenType::Symbol`,
+an array item `TokenType::ArrayNumber` or `ArrayString`. `data` longer than
+4 GiB fails with `Error::Argument`. `annotation` writes a whole type
+annotation, `<family:width[,_base|,qN|,epoch][,unit]>`, as the events from
+`TypeAnnotationStart` to `TypeAnnotationEnd`: the width of a sized family when
+it is not 0, the base of an integer or float that is not 10, the `q` of a
+fixed-point value, the epoch of a datetime and the unit when it has components
+(left out for `datetime` and `utf8`). `unit_source` is the unit's spelling to
+write instead of its canonical one, checked by the C writer as for
+`bvnr_writer_set_unit_source`; a unit the library cannot serialise fails with
+`Error::Argument`. It goes after the key and before the value, or before an
+array's first row ([§11.10](#1110-the-c-per-type-helpers) uses both).
 
 ### 11.9 Observing the output: `on_event`
 
@@ -3299,7 +3348,7 @@ fn main() -> Result<(), bovnar::Error> {
 | `len()` / `is_empty()` / `dom_type()` | Members or elements of a `NewStruct` / `NewArray`; a `NewNode`'s kind |
 
 Every constructor returns a `Result`, `Error::OutOfMemory` when the C library
-cannot allocate, as `Reader::new` and `Writer::new` do.
+cannot allocate, as `Reader::new` and the `Writer` constructors do.
 
 **Ownership is a move.** The C attach functions take the node they are given on
 every path: on success the container owns it, and on failure they destroy it.
@@ -3352,7 +3401,7 @@ Every fallible call returns `bovnar::Result<T>`, whose error is `bovnar::Error`.
 | `Error::Write { code, offset }` | Write error in `Writer` |
 | `Error::Argument { code, message }` | Invalid argument passed to a helper (e.g. bad unit string, refused unit policy) |
 | `Error::OutOfMemory(call)` | The library could not allocate; names the call that failed |
-| `Error::Io { code, io_kind, message }` | The `std::io::Read` or `Write` behind `read_reader`, `parse_reader`, `write_to`, `to_writer` or a `stream` twin failed. `code` is what the C library reports for an unreadable fd source or unwritable fd sink (`reading_from_source_fd`, `writing_to_sink`); `io_kind` and `message` keep what the I/O error said |
+| `Error::Io { code, io_kind, message }` | The `std::io::Read` or `Write` behind `read_reader`, `parse_reader`, `write_to`, `to_writer` or a `stream` twin, a reader's `mirror` ([§10.2](#102-read_mem)) or the `input` or `out` of `canonicalize_reader` ([§4.10](#410-canonical-form)) failed. `code` is what the C library reports for an unreadable fd source or unwritable fd sink (`reading_from_source_fd`, `writing_to_sink`); `io_kind` and `message` keep what the I/O error said |
 
 The library is part of the crate, so there is no library-not-found error. `Error`
 implements `std::error::Error` and `Display`, so it works with `?` into
@@ -3544,12 +3593,12 @@ rust/
 │   ├── literals.rs   # the C validators, literal parsers/formatters, parse_type_annotation
 │   ├── live.rs       # DocumentFeed, ValueFeed, EmbeddedFeed, FrameParser, FramePull, Demux — fed reading through C
 │   ├── quantity.rs   # Quantity — typed, unit-annotated scalar for lossless round-trips
-│   ├── reader.rs     # Reader, ReadOptions, EventData, EventPayload, UnitPolicy, UnitRule
+│   ├── reader.rs     # Reader, ReadOptions, ReadHandlers, EventData, EventPayload, UnitPolicy, UnitRule, canonicalize
 │   ├── stream.rs     # framing, octet multiplexing, document-in-document
 │   ├── timekeeping.rs # civil time and calendars: GregorianDate, CivilDateTime, Epoch
 │   ├── unit.rs       # Unit, UnitComponent — a unit with equality, hashing and its operations
 │   ├── units.rs      # unit_to_si_factor, unit_convert_factor, etc.
-│   └── writer.rs     # Writer, Base, Signedness, EmitSpec
+│   └── writer.rs     # Writer, WriteOptions, WriteObserver, Base, Signedness, EmitSpec
 ├── tests/            # one integration-test file per topic, plus smoke.rs
 ├── benches/          # codec.rs, live.rs: per-message figures of the codec and the fed readers (std only)
 └── fuzz/             # cargo-fuzz targets
@@ -3558,11 +3607,11 @@ rust/
 | Module | Contents |
 |---|---|
 | `src/ffi.rs` | the C declarations and the mirrored C structs |
-| `src/reader.rs` | `Reader`, `ReadOptions`, `EventData`, `EventPayload`, `UnitPolicy`, `UnitRule` |
-| `src/writer.rs` | `Writer`, `Base`, `Signedness`, `EmitSpec` |
+| `src/reader.rs` | `Reader`, `ReadOptions`, `ReadHandlers`, `EventData`, `EventPayload`, `UnitPolicy`, `UnitRule`, `canonicalize`, `canonicalize_reader` |
+| `src/writer.rs` | `Writer`, `WriteOptions`, `WriteObserver`, `Base`, `Signedness`, `EmitSpec` |
 | `src/dom.rs` | `DomDoc`, `DomNode`, `DomType`, and the builder's `NewNode`, `NewStruct`, `NewArray` |
 | `src/literals.rs` | the C validators and literal helpers, `parse_type_annotation`, `TypeAnnotation` |
-| `src/enums.rs` | the Rust enums behind the C enums, `Exponent` and `Base` |
+| `src/enums.rs` | the Rust enums behind the C enums, and `Exponent` |
 | `src/error.rs` | `Error`, `ErrorKind`, `Position` |
 | `src/unit.rs` | `Unit`, `UnitComponent` |
 | `src/units.rs` | the unit functions: conversion, dimension vectors, profile notations |

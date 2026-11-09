@@ -312,8 +312,13 @@ fn range_validators_boundaries() {
         128,
         10
     ));
-    // A range test only: it does not judge the digits.
-    assert!(literals::validate_uint_range("", 8, 10));
+    // Not digits: refused, though strtoull reads "" and " 5" as numbers.
+    for bad in ["", "+", " 5", "5 ", "1_0"] {
+        assert!(!literals::validate_uint_range(bad, 8, 10), "{bad:?}");
+        assert!(!literals::validate_uint_range(bad, 128, 10), "{bad:?}");
+        assert!(!literals::validate_sint_range(bad, 8, 10), "{bad:?}");
+    }
+    assert!(!literals::validate_sint_range("-", 8, 10));
 
     assert!(literals::validate_sint_range("127", 8, 10));
     assert!(!literals::validate_sint_range("128", 8, 10));
@@ -457,6 +462,21 @@ fn float_formatter() {
         let text = literals::format_double(x, f64t).unwrap();
         assert_eq!(literals::parse_double(&text, f64t).unwrap(), x, "{text}");
     }
+    // float:16 and float:32 round to IEEE binary16 and binary32 first, as
+    // the C writer writes them, and refuse what the format cannot hold.
+    let (h16, h32) = (
+        vt(ValueTypeFamily::Float, 16, 0),
+        vt(ValueTypeFamily::Float, 32, 0),
+    );
+    assert_eq!(literals::format_double(2049.0, h16).unwrap(), "2.048e+3");
+    assert_eq!(
+        literals::format_double(16777217.0, h32).unwrap(),
+        "1.6777216e+7"
+    );
+    assert_eq!(literals::format_double(65504.0, h16).unwrap(), "6.5504e+4");
+    assert_eq!(literals::format_double(f64::INFINITY, h16).unwrap(), "inf");
+    assert!(literals::format_double(1e5, h16).is_err());
+    assert!(literals::format_double(-1e39, h32).is_err());
     // Base 10 (or 0) and 16 only.
     assert_eq!(
         literals::format_double(1.5, vt(ValueTypeFamily::Float, 64, 0)).unwrap(),
@@ -509,9 +529,14 @@ fn integer_parsers_bound_by_the_type() {
         62
     );
 
-    // strtoll's 0x prefix in base 16: taken here, refused by the reader.
+    // strtoll's 0x prefix in base 16 is refused, as the reader refuses it.
     let h = vt(ValueTypeFamily::Uint, 64, 16);
-    assert_eq!(literals::parse_uint64("0x10", h).unwrap(), 16);
+    assert!(literals::parse_uint64("0x10", h).is_err());
+    assert!(literals::parse_uint64("0X10", h).is_err());
+    assert_eq!(literals::parse_uint64("10", h).unwrap(), 16);
+    let sh = vt(ValueTypeFamily::Sint, 64, 16);
+    assert!(literals::parse_int64("-0x10", sh).is_err());
+    assert_eq!(literals::parse_int64("-10", sh).unwrap(), -16);
     assert!(bovnar::parse(b".a = <uint:64,_16> 0x10;").is_err());
 }
 

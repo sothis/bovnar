@@ -207,6 +207,10 @@ def load_documents(data,
     from . import _DictParser, _TypedDictParser  # deferred (import cycle)
     lib  = get_library()
     flags = read_flags('load_documents', options)
+    if return_errors and not continue_past_failed:
+        raise BovnarArgumentError(
+            "return_errors applies to continue_past_failed=True: without it "
+            "the first failed document raises")
     source = PullSource(data) if is_stream(data) else None
     if source is None:
         data = _as_bytes(data)
@@ -1120,6 +1124,10 @@ class FrameFeed(_Feed):
             return
         if view:
             raise BovnarArgumentError("view applies to parse=False")
+        if return_errors and not continue_past_failed:
+            raise BovnarArgumentError(
+                "return_errors applies to continue_past_failed=True: without "
+                "it the first failed document raises")
 
         from . import _DictParser, _TypedDictParser  # deferred (import cycle)
         new_parser = _TypedDictParser if typed else _DictParser

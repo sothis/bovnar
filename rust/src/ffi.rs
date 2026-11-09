@@ -706,13 +706,18 @@ impl<'a> Rational<'a> {
 
 /// `bvn_int_to_str` in base 10.
 fn int_to_decimal(n: *mut c_void) -> Option<String> {
+    int_to_str(n, 10)
+}
+
+/// A live bignum's digits in `base`, sign included.
+fn int_to_str(n: *mut c_void, base: u32) -> Option<String> {
     // SAFETY: `n` is a live bignum; the getters only read it.
     let bits = unsafe { bvn_int_bitlen(n) }.max(1) as u32;
     // SAFETY: plain values in.
-    let size = unsafe { bvn_int_str_bufsize(bits, 10) };
+    let size = unsafe { bvn_int_str_bufsize(bits, base) };
     let mut buf = vec![0u8; size];
     // SAFETY: `buf` holds `size` bytes, as the library asked for.
-    if unsafe { bvn_int_to_str(n, buf.as_mut_ptr().cast(), size, 10) } < 0 {
+    if unsafe { bvn_int_to_str(n, buf.as_mut_ptr().cast(), size, base) } < 0 {
         return None;
     }
     CStr::from_bytes_until_nul(&buf)
@@ -764,8 +769,6 @@ pub struct Handlers<'h> {
     pub want_unit: Option<WantUnit<'h>>,
     /// Per-document callback of `bvnr_doc_stream_read`: (index, ok, error).
     pub on_document: Option<&'h mut dyn FnMut(u64, bool, c_int) -> bool>,
-    /// The first error `on_error` reported: (code, line, column, byte, offset).
-    pub first_error: Option<ErrorReport>,
     /// Called for every error `on_error` reports, recovered or not, with the
     /// same (code, line, column, byte, offset).
     pub on_error: Option<&'h mut dyn FnMut(c_int, u64, u64, u32, u64)>,
@@ -855,8 +858,6 @@ extern "C" fn on_error_trampoline(
 ) {
     // SAFETY: `ud` is the installed `Handlers`.
     let h = unsafe { handlers(ud) };
-    h.first_error
-        .get_or_insert((err, line, column, byte, offset));
     h.guard((), |h| {
         if let Some(f) = h.on_error.as_mut() {
             f(err, line, column, byte, offset);
@@ -1878,16 +1879,28 @@ pub mod unit_fns {
         (f, ok, affine)
     }
 
-    /// `bvn_unit_convert_rational` of the decimal fraction `num/den`: the
-    /// exact result as decimal (numerator, denominator) and whether the
-    /// factor was exact. `None` for incompatible or invalid units, a value
-    /// or result past the library's bignum capacity, or no memory.
+    /// Why [`convert_rational`] failed.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum RationalFailure {
+        /// A bignum could not be allocated or printed.
+        Memory,
+        /// The value needs more than the library's 32768-bit bignums.
+        Capacity,
+        /// Incompatible or invalid units, or an exact result past capacity.
+        Convert,
+    }
+
+    /// `bvn_unit_convert_rational` of the fraction `num/den`, both in hex
+    /// (as `num_bigint` prints them with `{:x}`, sign included): the exact
+    /// result as hex (numerator, denominator) and whether the factor was
+    /// exact. Hex both ways: a 32768-bit value is ~10000 decimal digits, and
+    /// a decimal parse of that is quadratic.
     pub fn convert_rational(
         num: &str,
         den: &str,
         from: ValueUnit,
         to: ValueUnit,
-    ) -> Option<(String, String, bool)> {
+    ) -> Result<(String, String, bool), RationalFailure> {
         /// Four bignums freed on every path.
         struct Ints([*mut c_void; 4]);
         impl Drop for Ints {
@@ -1901,26 +1914,26 @@ pub mod unit_fns {
         // SAFETY: no arguments; each result is freed by `Ints`.
         let ints = Ints(std::array::from_fn(|_| unsafe { bvn_int_alloc() }));
         if ints.0.iter().any(|n| n.is_null()) {
-            return None;
+            return Err(RationalFailure::Memory);
         }
         let [vnum, vden, onum, oden] = ints.0;
-        let (num, den) = (CString::new(num).ok()?, CString::new(den).ok()?);
-        let mut exact = false;
-        // SAFETY: live bignums and NUL-terminated strings; the outputs are
-        // writable for the call.
-        let ok = unsafe {
-            bvn_int_from_str(vnum, num.as_ptr(), 10)
-                && bvn_int_from_str(vden, den.as_ptr(), 10)
-                && bvn_unit_convert_rational(vnum, vden, from, to, onum, oden, &mut exact)
+        // Hex digits and a sign hold no NUL.
+        let text = |t: &str| CString::new(t).map_err(|_| RationalFailure::Capacity);
+        let (num, den) = (text(num)?, text(den)?);
+        // SAFETY: live bignums and NUL-terminated strings.
+        let parsed = unsafe {
+            bvn_int_from_str(vnum, num.as_ptr(), 16) && bvn_int_from_str(vden, den.as_ptr(), 16)
         };
-        if !ok {
-            return None;
+        if !parsed {
+            return Err(RationalFailure::Capacity);
         }
-        Some((
-            super::int_to_decimal(onum)?,
-            super::int_to_decimal(oden)?,
-            exact,
-        ))
+        let mut exact = false;
+        // SAFETY: live bignums; the outputs are writable for the call.
+        if !unsafe { bvn_unit_convert_rational(vnum, vden, from, to, onum, oden, &mut exact) } {
+            return Err(RationalFailure::Convert);
+        }
+        let out = |n| super::int_to_str(n, 16).ok_or(RationalFailure::Memory);
+        Ok((out(onum)?, out(oden)?, exact))
     }
 
     /// `bvn_unit_convert_value`.
@@ -2448,7 +2461,7 @@ extern "C" fn on_document_trampoline(ud: *mut c_void, index: u64, ok: bool, err:
 }
 
 /// `bvnr_parse_embedded`: `h.verified` sees the inner document's events and
-/// `h.first_error` records why it failed.
+/// `h.on_error` every error the parse reports.
 pub fn parse_embedded(inner: &[u8], mut flags: BvnrReadFlags, h: &mut Handlers<'_>) -> bool {
     h.install(&mut flags);
     // SAFETY: `inner`, `flags` and `h` outlive the call; `inner` is only read.
@@ -2847,16 +2860,17 @@ impl PushState {
     }
 }
 
-/// SAFETY: `s` must be a writer's copy of a sink `WriterHandle::open_sink`
-/// built, whose user pointer is the live `PushState` the handle owns.
+/// SAFETY: `s` must be a library copy of a sink `WriterHandle::open_sink` or
+/// a [`LentSink`] built, whose user pointer is the live `PushState` that handle
+/// or `LentSink` owns.
 unsafe fn push_state<'a>(s: *mut BvnrSink) -> &'a mut PushState {
     // SAFETY: guaranteed by the caller.
     unsafe { &mut *bvnr_sink_get_userdata(s).cast::<PushState>() }
 }
 
 extern "C" fn push_trampoline(s: *mut BvnrSink, buf: *const c_void, len: u32) -> bool {
-    // SAFETY: `s` comes from `open_sink`; `buf` holds `len` bytes for the
-    // call.
+    // SAFETY: `s` comes from `open_sink` or a `LentSink`; `buf` holds `len`
+    // bytes for the call.
     let (st, data) = unsafe { (push_state(s), bytes(buf, len)) };
     // A push must take every byte or fail: write_all retries short writes and
     // `Interrupted`, and a writer that takes nothing is `WriteZero`.
@@ -2864,7 +2878,7 @@ extern "C" fn push_trampoline(s: *mut BvnrSink, buf: *const c_void, len: u32) ->
 }
 
 extern "C" fn flush_trampoline(s: *mut BvnrSink) -> bool {
-    // SAFETY: `s` comes from `open_sink`.
+    // SAFETY: `s` comes from `open_sink` or a `LentSink`.
     let st = unsafe { push_state(s) };
     st.call(0, |w| w.flush())
 }
@@ -2983,15 +2997,6 @@ pub struct Hooks {
 }
 
 impl Hooks {
-    /// The callbacks `h` has handlers for.
-    pub fn of(h: &Handlers<'_>) -> Self {
-        Hooks {
-            verified: h.verified.is_some(),
-            unverified: h.unverified.is_some(),
-            want_unit: h.want_unit.is_some(),
-        }
-    }
-
     /// Whether every callback `other` needs is among these.
     pub fn covers(self, other: Hooks) -> bool {
         (self.verified || !other.verified)
@@ -3646,9 +3651,28 @@ pub type ErrorReport = (c_int, u64, u64, u32, u64);
 thread_local! {
     /// The first error a canonicalising read reported, (code, line, column,
     /// byte, offset): `canon_on_error` has no userdata of its own, as the
-    /// observer is the read's userdata.
+    /// observer is the read's userdata. A canonicalisation started inside
+    /// another's input or output saves the outer one's slot and restores it
+    /// ([`CanonCall`]).
     static CANON_FIRST_ERROR: std::cell::Cell<Option<ErrorReport>> =
         const { std::cell::Cell::new(None) };
+}
+
+/// One canonicalising read's observer and the outer read's first error, both
+/// put back however the read ends, a panic of the input included: the
+/// observer destroyed, the slot restored.
+struct CanonCall {
+    obs: *mut c_void,
+    saved: Option<ErrorReport>,
+}
+
+impl Drop for CanonCall {
+    fn drop(&mut self) {
+        CANON_FIRST_ERROR.with(|c| c.set(self.saved.take()));
+        // SAFETY: created by `canonicalize`, destroyed once, here, after its
+        // last use.
+        unsafe { bvnr_canon_observer_destroy(self.obs) };
+    }
 }
 
 extern "C" fn canon_on_error(
@@ -3745,7 +3769,8 @@ pub struct CanonOutcome {
     /// The errors a `continue_on_error` read recovered from, and the first.
     pub recovered: u64,
     pub first_error: Option<ErrorReport>,
-    /// What `bvnr_canon_observer_finish` returned (false when not called).
+    /// What `bvnr_canon_observer_finish` returned (false when not called:
+    /// after a failed or a recovered read).
     pub finished: bool,
 }
 
@@ -3770,6 +3795,10 @@ pub fn canonicalize(
         if obs.is_null() {
             return None;
         }
+        let call = CanonCall {
+            obs,
+            saved: CANON_FIRST_ERROR.with(|c| c.replace(None)),
+        };
         // SAFETY: the C function has the reader callback's signature
         // (`bool (void*, bvnr_event_t, bvnr_data_t*)`; the binding's
         // EventCallbackFn takes the data as *const, the same ABI), and the
@@ -3785,7 +3814,6 @@ pub fn canonicalize(
         flags.want_unit = None;
         flags.on_error = Some(canon_on_error as OnErrorFn);
         flags.userdata = obs;
-        CANON_FIRST_ERROR.with(|c| c.set(None));
         let read = |src: &mut BvnrSource| {
             // SAFETY: the reader is live; `src` and `flags` outlive both
             // calls, and the observer outlives the read.
@@ -3816,9 +3844,12 @@ pub fn canonicalize(
         let recovered = unsafe { bvnr_reader_get_recovery_count(r) };
         let outcome = ok.map(|ok| {
             let read = if ok { Ok(()) } else { Err(reader.error()) };
+            // A recovered read is refused (doc/08 §3.6), so its unreadable
+            // rest is not flushed into `out`.
             // SAFETY: the observer is live; finishing flushes into the sink,
             // whose destination is still lent.
-            let finished = read.is_ok() && unsafe { bvnr_canon_observer_finish(obs) };
+            let finished =
+                read.is_ok() && recovered == 0 && unsafe { bvnr_canon_observer_finish(obs) };
             CanonOutcome {
                 read,
                 recovered,
@@ -3826,8 +3857,7 @@ pub fn canonicalize(
                 finished,
             }
         });
-        // SAFETY: created above, destroyed once, after its last use.
-        unsafe { bvnr_canon_observer_destroy(obs) };
+        drop(call);
         Some(outcome)
     })?;
     // The output's failure first: it is what stopped the read.

@@ -127,9 +127,9 @@ pub fn validate_number_in_base(s: &str, base: u32) -> bool {
 
 /// `bvn_validate_uint_range`: does the unsigned literal `s` in `base` fit
 /// `width` bits? A width of 0 means unconstrained, and `inf`, `ninf` and
-/// `nan` pass. This is a range test only, made on text the digit check has
-/// already passed: the empty string passes it, and so does text with a
-/// leading space or `+` in base 10.
+/// `nan` pass. It is meant for text the digit check has passed: an empty
+/// string, and in base 10 anything but digits after an optional sign, is
+/// refused, but a leading `+` is taken.
 pub fn validate_uint_range(s: &str, width: u32, base: u32) -> bool {
     c::validate_uint_range(s, width, base)
 }
@@ -190,9 +190,12 @@ pub fn format_int64(value: i64, base: u32, min_digits: u32) -> Result<String> {
 /// `bvn_format_double`: the literal the writer emits for `value` under type
 /// `vt`: the shortest digits that read back to the same double (`0.1` is
 /// `1e-1`), in the type's base, 10 (also for a base of 0) or 16 for a hex
-/// float; any other base fails. A `float` width below 53 rounds the value
-/// first to a significand of that many bits: 16 for `float:16` and 32 for
-/// `float:32`, not the 11 and 24 of IEEE binary16 and binary32.
+/// float; any other base fails. A `float:16` or `float:32` value is first
+/// rounded to IEEE binary16 or binary32, as the writer writes it (2049 is
+/// `2.048e+3` under `float:16`), then printed with the digits of a 16- or
+/// 32-bit significand, enough to read back as that value without rounding to
+/// the format (65504 is `6.5504e+4`); a finite value the format cannot hold
+/// fails.
 pub fn format_double(value: f64, vt: ValueTypeSpec) -> Result<String> {
     c::format_double(value, vt)
         .ok_or_else(|| Error::argument(format!("format_double: {value} under {vt:?}")))
@@ -200,9 +203,8 @@ pub fn format_double(value: f64, vt: ValueTypeSpec) -> Result<String> {
 
 /// `bvn_parse_int64`: the signed literal `s` in the type's base, refused
 /// when it does not fit the type's width (64 when it declares none). No
-/// leading `+` or space. In bases up to 36 the C library reads with
-/// `strtoll`, so in base 16 a `0x` prefix is taken (`"0x10"` is 16), which
-/// no document can carry.
+/// leading `+` or space, and no `0x` prefix in base 16: what the reader
+/// takes.
 pub fn parse_int64(s: &str, vt: ValueTypeSpec) -> Result<i64> {
     c::parse_int64(s, vt).ok_or_else(|| refused("parse_int64", s, vt))
 }

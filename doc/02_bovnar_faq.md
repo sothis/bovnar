@@ -1417,6 +1417,8 @@ payload runs without bound. Production deployments should set `max_file_size`
 explicitly at minimum. For untrusted input, set `max_array_items`,
 `max_text_bytes`, and the nesting limits as well.
 
+In both bindings a nesting cap of `0` means **255**, the format's limit, not 64.
+
 ---
 
 **Does `bvnr_read` allocate heap memory?**

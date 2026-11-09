@@ -16,8 +16,9 @@ and the format itself is described at <https://www.bovnar.io/>.
 
 The API stays close to the C library: `parse`/`to_string` over a dynamic
 `Value`, a DOM, `Reader` callbacks and `Writer` events, rather than serde
-integration, builders or typed deserialisation. The C enums are Rust enums,
-and errors carry the library's error kind.
+integration, a builder API for values or typed deserialisation; the DOM has the
+C library's node builder (`NewNode`). The C enums are Rust enums, and errors
+carry the library's error kind.
 
 ## Versioning
 

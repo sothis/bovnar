@@ -28,7 +28,7 @@ pub(crate) fn grow_write(
     loop {
         let mut w = Writer::to_mem(cap, pretty)?;
         match write(&mut w).and_then(|_| w.finish()) {
-            Ok(()) => return Ok(w.get_output().to_vec()),
+            Ok(()) => return Ok(w.into_output()),
             Err(e) if e.code() == Some(crate::ErrorCode::SinkBufferExhausted) && cap < cap_max => {
                 cap = (cap * 2).min(cap_max);
             }
@@ -784,6 +784,13 @@ impl Writer {
     /// writer, whose output has gone to its destination.
     pub fn get_output(&self) -> &[u8] {
         self.handle.output()
+    }
+
+    /// [`get_output`](Self::get_output) as an owned buffer, for a memory
+    /// writer: its buffer *is* the output, so it is handed over rather than
+    /// copied. Consumes the writer.
+    pub(crate) fn into_output(self) -> Vec<u8> {
+        self.handle.into_output()
     }
 
     pub(crate) fn assignment(&mut self, key: &str) -> Result<()> {

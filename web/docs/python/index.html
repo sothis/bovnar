@@ -719,11 +719,14 @@ it keeps alive by itself, so that one never makes a call refuse.</p>
 <p><strong>What it costs.</strong> Every item crosses the ctypes boundary, so a message costs
 microseconds in Python, not the nanoseconds of the C path (doc/10 §8.4).
 <code>DemuxFeed</code> and the unparsed <code>FrameFeed</code> make one plain C call per item and no
-callback; <code>DocumentFeed</code>, the parsing <code>FrameFeed</code> and the batch <code>mux_load</code> call
-back into Python once per event or message. Measured with
+callback. <code>DocumentFeed</code> and the parsing <code>FrameFeed</code> call back into Python once
+per event. The batch <code>mux_load</code> does so only when its input is a socket or a
+file object; an in-memory document is drained with <code>bvnr_demux_next</code>, as
+<code>DemuxFeed</code> is. Measured with
 <code>python/bench/bench_stream.py</code> (CPython 3.14, one core of an Intel i7-2700K
-pinned with <code>taskset</code>, on a machine shared with other work: load average 3–4,
-so take the ratios rather than the digits), per message, median of seven runs:</p>
+pinned with <code>taskset</code>, on a machine shared with other work: load average about
+2, so take the ratios rather than the digits), per message, median of seven
+runs:</p>
 <table>
 <thead>
 <tr>
@@ -735,44 +738,44 @@ so take the ratios rather than the digits), per message, median of seven runs:</
 </thead>
 <tbody>
 <tr>
-<td><code>mux_load</code> (batch, one callback per message)</td>
-<td style="text-align: right;">4.8 µs</td>
-<td style="text-align: right;">36 µs</td>
-<td style="text-align: right;">383 µs</td>
+<td><code>mux_load</code> (batch, in memory)</td>
+<td style="text-align: right;">2.3 µs</td>
+<td style="text-align: right;">8.5 µs</td>
+<td style="text-align: right;">91 µs</td>
 </tr>
 <tr>
 <td><code>DemuxFeed</code>, whole buffer, <code>bytes</code></td>
-<td style="text-align: right;">3.3 µs</td>
-<td style="text-align: right;">7.1 µs</td>
-<td style="text-align: right;">81 µs</td>
+<td style="text-align: right;">2.9 µs</td>
+<td style="text-align: right;">6.4 µs</td>
+<td style="text-align: right;">70 µs</td>
 </tr>
 <tr>
 <td><code>DemuxFeed</code>, whole buffer, <code>memoryview</code></td>
-<td style="text-align: right;">4.6 µs</td>
-<td style="text-align: right;">4.9 µs</td>
-<td style="text-align: right;">57 µs</td>
+<td style="text-align: right;">4.5 µs</td>
+<td style="text-align: right;">4.7 µs</td>
+<td style="text-align: right;">51 µs</td>
 </tr>
 <tr>
 <td><code>DemuxFeed</code>, 1460 B pieces, <code>bytes</code></td>
-<td style="text-align: right;">4.2 µs</td>
-<td style="text-align: right;">130 µs</td>
-<td style="text-align: right;">1.6 ms</td>
+<td style="text-align: right;">3.8 µs</td>
+<td style="text-align: right;">107 µs</td>
+<td style="text-align: right;">1.35 ms</td>
 </tr>
 <tr>
 <td><code>DemuxFeed</code>, 1460 B pieces, <code>memoryview</code></td>
 <td style="text-align: right;">5.7 µs</td>
-<td style="text-align: right;">131 µs</td>
-<td style="text-align: right;">1.6 ms</td>
+<td style="text-align: right;">114 µs</td>
+<td style="text-align: right;">1.32 ms</td>
 </tr>
 </tbody>
 </table>
 <p>A small message costs a few microseconds whichever way it is read. A large one
-fed whole is sliced out of the fed bytes (or viewed in place) instead of
-copied through a callback, which is the factor of about five. Fed in
-1460-byte pieces — one TCP segment's payload — the cost is the feeds, a few
-microseconds each, twenty of them for a 30 KB message; read from a socket, take
-the largest <code>recv</code> the transport offers. A <code>memoryview</code> saves the copy only
-where there is one to save, from a few kilobytes up.</p>
+fed whole is sliced out of the fed bytes, or viewed in place with <code>view=True</code>,
+instead of copied out of a reassembly buffer. Fed in 1460-byte pieces — one TCP
+segment's payload — the cost is the feeds, a few microseconds each, twenty of
+them for a 30 KB message; read from a socket, take the largest <code>recv</code> the
+transport offers. A <code>memoryview</code> saves the copy only where there is one to
+save, from a few kilobytes up.</p>
 <h3 id="48-live-streams-writing-a-message-at-a-time">4.8 Live streams: writing a message at a time</h3>
 <p><code>mux_dump(..., file=)</code> and <code>dump_documents(..., file=)</code> take every message or
 document at once. The writer behind <code>mux_dump</code> (and <code>embed_document</code>) gathers

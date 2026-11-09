@@ -2906,6 +2906,75 @@ bool bvnr_write_event(
 	return true;
 }
 /*
+ * One octet chunk written straight from the caller's buffers (see
+ * bvn_val_impl.h). bvnr_mux_send used to copy every chunk into the writer's
+ * 64 KiB staging buffer first, so a message cost two copies of its bytes
+ * before it reached the sink; on the hot path that copy is now gone.
+ */
+bool bvn_writer_write_octet_chunk(bvnr_writer_t* w,
+	const uint8_t* hdr, uint32_t hdr_len,
+	const void* data, uint32_t len)
+{
+	if (!w)
+		return false;
+	if (w->val.last_error != error_none)
+		return false;
+	if (w->ser.finished)
+		return bvn_writer_set_error(w, error_invalid_argument);
+	if (!bvn_sink_impl(&w->ser.sink)->push)
+		return bvn_writer_set_error(w, error_invalid_argument);
+	uint64_t body = (uint64_t)hdr_len + (uint64_t)len;
+	/* hdr holds at most the two ten-byte varints (the chunk header is added
+	 * here), and one chunk's body is at most 65536 bytes. */
+	if (!hdr || !hdr_len || hdr_len > 2u * 10u || body == 0 || body > 65536u ||
+	    (!data && len))
+		return bvn_writer_set_error(w, error_invalid_argument);
+
+	/* The event bvnr_write_event would validate and serialise, and no more:
+	 * an octet chunk carries no type or unit of its own. */
+	bvnr_data_t d = {0};
+	d.type   = token_is_octet_stream;
+	d.data   = hdr;
+	d.length = (uint32_t)body;
+
+	if (w->ser.on_event) {
+		/* An observer is shown one contiguous chunk: stage it in the
+		 * writer's mux buffer and let bvnr_write_event deliver it, with the
+		 * observer call and its error handling that has always given. */
+		uint8_t* chunk = bvn_writer_mux_chunk(w);
+		if (!chunk)
+			return bvn_writer_set_error(w, error_invalid_argument);
+		memcpy(chunk, hdr, hdr_len);
+		if (len) memcpy(chunk + hdr_len, data, len);
+		d.data = chunk;
+		return bvnr_write_event(w, ev_data, &d);
+	}
+
+	if (!bvn_writer_validate_event(w, ev_data, &d))
+		return false;
+	w->ser.ser_error = error_none;
+	/* The per-event reset bvnr_write_event makes, so the text of a rescaled
+	 * value does not outlive the event that produced it. */
+	free(w->ser.ser_value_text);
+	w->ser.ser_value_text = NULL;
+	w->ser.ser_value_len  = 0;
+
+	/* The chunk header and the varints as one store, then the payload where
+	 * the caller keeps it. */
+	uint8_t head[3u + 2u * 10u];
+	uint16_t body16 = (uint16_t)body;   /* 65536 wraps to the 0x0000 that means it */
+	head[0] = 0x01;
+	head[1] = (uint8_t)(body16 & 0xFFu);
+	head[2] = (uint8_t)(body16 >> 8);
+	memcpy(head + 3, hdr, hdr_len);
+	if (!bvn_ser_push(&w->ser, head, 3u + hdr_len) ||
+	    (len && !bvn_ser_push(&w->ser, data, len)))
+		return bvn_writer_set_error(w, bvn_sink_impl(&w->ser.sink)->is_mem
+			? error_sink_buffer_exhausted
+			: error_writing_to_sink);
+	return true;
+}
+/*
  * Emit a leading "#!bovnar <major>.<minor>" version directive. Legal only before
  * any output has begun (right after open); afterwards it is error_invalid_argument.
  * The directive is a single comment line, so it never affects separator

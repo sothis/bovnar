@@ -941,12 +941,13 @@ class Writer:
         to read back. Unlike :func:`bovnar.stream.embed_document`, which makes
         a whole document of one key, this embeds into the document being
         written, one after another if need be."""
-        from .stream import _writer_key, _void_copy, _as_bytes
+        from .stream import _writer_key, _as_bytes
         self._check_writable()
         kb = _writer_key(key)
         doc = _as_bytes(doc)
-        dptr, _keep = _void_copy(doc)
-        if not self._lib.bvnr_embed_document(self._ptr, kb, dptr, len(doc)):
+        # bvnr_embed_document copies the bytes into the writer's output
+        # before returning; they are handed over as they are.
+        if not self._lib.bvnr_embed_document(self._ptr, kb, doc, len(doc)):
             self._raise_error()
 
     def mux_begin(self, key: str) -> None:

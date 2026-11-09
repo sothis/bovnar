@@ -629,27 +629,30 @@ dm.close()
 **What it costs.** Every item crosses the ctypes boundary, so a message costs
 microseconds in Python, not the nanoseconds of the C path (doc/10 §8.4).
 `DemuxFeed` and the unparsed `FrameFeed` make one plain C call per item and no
-callback; `DocumentFeed`, the parsing `FrameFeed` and the batch `mux_load` call
-back into Python once per event or message. Measured with
+callback. `DocumentFeed` and the parsing `FrameFeed` call back into Python once
+per event. The batch `mux_load` does so only when its input is a socket or a
+file object; an in-memory document is drained with `bvnr_demux_next`, as
+`DemuxFeed` is. Measured with
 `python/bench/bench_stream.py` (CPython 3.14, one core of an Intel i7-2700K
-pinned with `taskset`, on a machine shared with other work: load average 3–4,
-so take the ratios rather than the digits), per message, median of seven runs:
+pinned with `taskset`, on a machine shared with other work: load average about
+2, so take the ratios rather than the digits), per message, median of seven
+runs:
 
 | Path | 150 B | 30 KB | 400 KB |
 |------|------:|------:|-------:|
-| `mux_load` (batch, one callback per message) | 4.8 µs | 36 µs | 383 µs |
-| `DemuxFeed`, whole buffer, `bytes` | 3.3 µs | 7.1 µs | 81 µs |
-| `DemuxFeed`, whole buffer, `memoryview` | 4.6 µs | 4.9 µs | 57 µs |
-| `DemuxFeed`, 1460 B pieces, `bytes` | 4.2 µs | 130 µs | 1.6 ms |
-| `DemuxFeed`, 1460 B pieces, `memoryview` | 5.7 µs | 131 µs | 1.6 ms |
+| `mux_load` (batch, in memory) | 2.3 µs | 8.5 µs | 91 µs |
+| `DemuxFeed`, whole buffer, `bytes` | 2.9 µs | 6.4 µs | 70 µs |
+| `DemuxFeed`, whole buffer, `memoryview` | 4.5 µs | 4.7 µs | 51 µs |
+| `DemuxFeed`, 1460 B pieces, `bytes` | 3.8 µs | 107 µs | 1.35 ms |
+| `DemuxFeed`, 1460 B pieces, `memoryview` | 5.7 µs | 114 µs | 1.32 ms |
 
 A small message costs a few microseconds whichever way it is read. A large one
-fed whole is sliced out of the fed bytes (or viewed in place) instead of
-copied through a callback, which is the factor of about five. Fed in
-1460-byte pieces — one TCP segment's payload — the cost is the feeds, a few
-microseconds each, twenty of them for a 30 KB message; read from a socket, take
-the largest `recv` the transport offers. A `memoryview` saves the copy only
-where there is one to save, from a few kilobytes up.
+fed whole is sliced out of the fed bytes, or viewed in place with `view=True`,
+instead of copied out of a reassembly buffer. Fed in 1460-byte pieces — one TCP
+segment's payload — the cost is the feeds, a few microseconds each, twenty of
+them for a 30 KB message; read from a socket, take the largest `recv` the
+transport offers. A `memoryview` saves the copy only where there is one to
+save, from a few kilobytes up.
 
 ### 4.8 Live streams: writing a message at a time
 

@@ -545,8 +545,8 @@ with stream.DemuxFeed(key="media", values=True) as dm:
 
 The limits and error codes are those of the batch functions. A message costs
 microseconds in Python — the interpreter and ctypes, not the C path of §8.4:
-about 3 µs for a 150-byte message and 7 µs for a 30 KB one fed whole, against
-5 µs and 36 µs through `mux_load`'s callback, on the machine of §8.4. The
+about 3 µs for a 150-byte message and 6 µs for a 30 KB one fed whole, against
+2 µs and 8 µs through `mux_load`, on the machine of §8.4. The
 figures, and what feeding in small pieces costs, are in
 [Python Bindings §4.7](09_bovnar_python_bindings.md#47-live-streams-feeding-in-pieces)
 (`python/bench/bench_stream.py`).
@@ -693,42 +693,52 @@ fed buffer must stay valid until the drain has returned `BVNR_NEXT_NONE`.
 
 ### 8.4 What it costs
 
-Measured with `bvnr_stream_bench` (`tests/bovnar_stream_bench.c`), release
-build, one core of an Intel i7-2700K (3.5 GHz, 2011); per message, the 400 KB
-message spanning seven chunks. Figures move with the machine; the ratios are the
-point.
+Measured with `bvnr_stream_bench` (`tests/bovnar_stream_bench.c`), an optimized
+build (`RelWithDebInfo`), one core of an Intel i7-2700K (3.5 GHz, 2011); per
+message, the 400 KB message spanning seven chunks. Figures move with the machine
+and with what else runs on it; the ratios are the point. The rows of the table
+were measured together, as the median of five runs, at the 2.1.0 tree.
 
 | Path | 150 B | 30 KB | 400 KB |
 |------|------:|------:|-------:|
-| `bvnr_mux_send` (2.0.2: allocated a 64 KiB chunk per call) | 262 ns | 8.2 µs | 121 µs |
-| `bvnr_mux_send` (chunk buffer kept on the writer) | 202 ns | 8.6 µs | 120 µs |
-| `bvnr_read` + `bvnr_demux_on_event` (2.0.2: copied every message) | 183 ns | 7.2 µs | 116 µs |
-| `bvnr_read` + `bvnr_demux_on_event` (whole-chunk messages not copied) | 134 ns | 0.25 µs | 84 µs |
-| push-fed demux, callback, one feed | 139 ns | 0.25 µs | 83 µs |
-| push-fed demux, `bvnr_demux_next`, one feed | 159 ns | 0.27 µs | 86 µs |
-| push-fed demux, callback, 1460 B feeds | 152 ns | 7.9 µs | 158 µs |
-| push-fed demux, `bvnr_demux_next`, 1460 B feeds | 168 ns | 7.9 µs | 157 µs |
-| push-fed demux, `bvnr_demux_next`, 64 B feeds | 327 ns | 28 µs | 206 µs |
-| `bvnr_mux_send` into a callback sink, batched | 105 ns | 6.1 µs | 86 µs |
-| `bvnr_mux_send` + `bvnr_write_flush` into a callback sink | 113 ns | 6.1 µs | 86 µs |
+| `bvnr_mux_send` | 84 ns | 3.2 µs | 45 µs |
+| `bvnr_read` + `bvnr_demux_on_event` | 63 ns | 0.10 µs | 39 µs |
+| push-fed demux, callback, one feed | 65 ns | 0.10 µs | 39 µs |
+| push-fed demux, `bvnr_demux_next`, one feed | 74 ns | 0.11 µs | 39 µs |
+| push-fed demux, callback, 1460 B feeds | 69 ns | 3.6 µs | 69 µs |
+| push-fed demux, `bvnr_demux_next`, 1460 B feeds | 75 ns | 3.7 µs | 69 µs |
+| push-fed demux, `bvnr_demux_next`, 64 B feeds | 142 ns | 12.7 µs | 188 µs |
+| `bvnr_mux_send` into a callback sink, batched | 92 ns | 4.4 µs | 61 µs |
+| `bvnr_mux_send` + `bvnr_write_flush` into a callback sink | 104 ns | 4.2 µs | 61 µs |
 
-The two callback-sink rows are from a later run (§8.5), where `bvnr_mux_send`
-into a memory sink measured 100 ns, 4.8 µs and 69 µs: the sink copies what it
-is pushed, as a socket's send does, minus the system call.
+The mux writer used to stage every chunk in its 64 KiB buffer before
+serialising it, and the demux to find a channel by scanning the ones it had
+seen. This round writes the chunks straight from the caller's buffer and looks
+a channel up in constant time (direct table below 64, a hash above), and the
+table is after both. At the commit before them the same benchmark (one run) put
+`bvnr_mux_send` at 110 ns, 4.4 µs and 63 µs; 2.0.2, which also allocated a
+chunk buffer per send and copied every demultiplexed message, recorded 262 ns,
+8.2 µs and 121 µs for the send and 183 ns, 7.2 µs and 116 µs for the demux.
+
+The callback-sink rows are the same writer against a sink that copies what it
+is pushed, as a socket's send does, minus the system call; the memory-sink row
+copies once. `bvnr_write_flush` hands each message over at once, so that row's
+difference from the batched one is the sink's push of a partly filled block.
 
 A message that fits one chunk and arrives in one feed is handed out without
 touching its bytes, which is why the 30 KB column falls by a factor of thirty.
 Fed in small pieces, a chunk is gathered before it is passed on, and a message
 split over chunks is reassembled: one copy each.
 
-Per framed document, a 43-byte one and a 30 KB one of numbers and strings:
+Per framed document, a 43-byte one and a 30 KB one of numbers and strings
+(measured together with the table above):
 
 | Path | 43 B | 30 KB |
 |------|-----:|------:|
 | `bvnr_doc_stream_read` (2.0.2: the reader's buffers and the payload allocated per document) | 5.6 µs | 757 µs |
-| `bvnr_doc_stream_read` (buffers kept across documents) | 2.4 µs | 758 µs |
-| parsing frame reader, one feed | 2.2 µs | 766 µs |
-| parsing frame reader, 1460 B feeds | 2.3 µs | 764 µs |
+| `bvnr_doc_stream_read` | 2.3 µs | 773 µs |
+| parsing frame reader, one feed | 2.2 µs | 767 µs |
+| parsing frame reader, 1460 B feeds | 2.2 µs | 772 µs |
 
 Re-opening a reader for the next document used to free its frame stack and
 scratch buffers and allocate them again, about 120 KB zeroed, and to copy the
@@ -738,7 +748,10 @@ small document costs to parse, and the frame reader paid it too (5.5 µs for the
 `bvnr_demux_next` and `bvnr_frame_reader_next` allocate nothing per message once
 warm, nor the parsing frame reader and a re-opened fed demux per document; a
 `bvnr_doc_stream_read` call allocates the same whatever the number of documents
-(`tests/bovnar_alloc_test.c`).
+(`tests/bovnar_alloc_test.c`). `bvnr_mux_send` also copies nothing beyond what
+the sink takes: its chunks are written straight from the caller's buffer. A
+writer with an observer is the exception — the observer is shown each chunk
+whole, so the chunk is staged in the writer's mux buffer only then.
 
 ### 8.5 Writing live: a flush per message
 
@@ -793,8 +806,9 @@ any writer error. The bindings wrap it: `Writer.flush()` and
 
 There is no "flush after every message" option on `bvnr_mux_send`: it would
 need a field in `bvnr_write_flags_t` or a second send function, and the call
-after the send costs what the table in §8.4 shows — about 8 ns on a 150-byte
-message, the push of the sink included — and allocates nothing.
+after the send costs the sink's push of the bytes written so far — a few
+nanoseconds to a few tens of them on a 150-byte message, depending on the
+sink (the row difference in §8.4) — and allocates nothing.
 
 ---
 

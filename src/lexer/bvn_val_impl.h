@@ -376,4 +376,17 @@ bool bvn_ser_finish_stream(bvnr_serializer_t* s);
 bool bvn_ser_emit_version(bvnr_serializer_t* s, uint16_t major, uint16_t minor);
 bool bvn_writer_set_error(bvnr_writer_t* w, error_code_t err);
 uint8_t* bvn_writer_mux_chunk(bvnr_writer_t* w);
+/*
+ * One octet chunk, written without first copying its payload into a staging
+ * buffer: the chunk header, then `hdr` (the channel and message-length
+ * varints, which the caller assembles), then `len` bytes at `data`. It is
+ * exactly what bvnr_write_event(w, ev_data, d) writes for
+ * d.type == token_is_octet_stream, d.data = hdr ++ data and
+ * d.length = hdr_len + len, with the same validation and errors; an
+ * installed observer is shown that contiguous chunk, staged in the writer's
+ * mux buffer, so what it sees is unchanged.
+ */
+bool bvn_writer_write_octet_chunk(bvnr_writer_t* w,
+	const uint8_t* hdr, uint32_t hdr_len,
+	const void* data, uint32_t len);
 #endif

@@ -299,10 +299,13 @@ BVN_API uint64_t bvnr_frame_reader_count(const bvnr_frame_reader_t* fr);
  * bvnr_mux_end. */
 BVN_API bool bvnr_mux_begin(bvnr_writer_t* w, const char* key);
 /* Send one message on `channel`, split across as many octet chunks as needed.
- * The chunk is staged in a buffer the writer allocates on the first send and
- * keeps, so a send allocates nothing. For an fd or callback sink the message
- * then waits in the writer's 64 KiB buffer; call bvnr_write_flush after the
- * send to hand it to a live consumer at once. */
+ * The chunks are written straight from `data`, which need not outlive the
+ * call: with no observer installed there is no staging copy, and a send
+ * allocates nothing. (An observer is shown every chunk whole, so a writer
+ * with one stages it in a 64 KiB buffer allocated on the first send and kept.)
+ * For an fd or callback sink the message then waits in the writer's 64 KiB
+ * buffer; call bvnr_write_flush after the send to hand it to a live consumer
+ * at once. */
 BVN_API bool bvnr_mux_send(bvnr_writer_t* w, uint64_t channel,
 	const void* data, uint64_t len);
 /* Close the multiplexed octet stream. */

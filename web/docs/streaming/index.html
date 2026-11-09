@@ -578,8 +578,8 @@ releases:</p>
 
 <p>The limits and error codes are those of the batch functions. A message costs
 microseconds in Python — the interpreter and ctypes, not the C path of §8.4:
-about 3 µs for a 150-byte message and 7 µs for a 30 KB one fed whole, against
-5 µs and 36 µs through <code>mux_load</code>'s callback, on the machine of §8.4. The
+about 3 µs for a 150-byte message and 6 µs for a 30 KB one fed whole, against
+2 µs and 8 µs through <code>mux_load</code>, on the machine of §8.4. The
 figures, and what feeding in small pieces costs, are in
 <a href="https://www.bovnar.io/docs/python/#47-live-streams-feeding-in-pieces">Python Bindings §4.7</a>
 (<code>python/bench/bench_stream.py</code>).</p>
@@ -702,10 +702,11 @@ the stream failed. Items point into the fed buffer where they lie whole in it,
 into the reader's own buffers otherwise, and are valid until the next call; the
 fed buffer must stay valid until the drain has returned <code>BVNR_NEXT_NONE</code>.</p>
 <h3 id="84-what-it-costs">8.4 What it costs</h3>
-<p>Measured with <code>bvnr_stream_bench</code> (<code>tests/bovnar_stream_bench.c</code>), release
-build, one core of an Intel i7-2700K (3.5 GHz, 2011); per message, the 400 KB
-message spanning seven chunks. Figures move with the machine; the ratios are the
-point.</p>
+<p>Measured with <code>bvnr_stream_bench</code> (<code>tests/bovnar_stream_bench.c</code>), an optimized
+build (<code>RelWithDebInfo</code>), one core of an Intel i7-2700K (3.5 GHz, 2011); per
+message, the 400 KB message spanning seven chunks. Figures move with the machine
+and with what else runs on it; the ratios are the point. The rows of the table
+were measured together, as the median of five runs, at the 2.1.0 tree.</p>
 <table>
 <thead>
 <tr>
@@ -717,81 +718,79 @@ point.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>bvnr_mux_send</code> (2.0.2: allocated a 64 KiB chunk per call)</td>
-<td style="text-align: right;">262 ns</td>
-<td style="text-align: right;">8.2 µs</td>
-<td style="text-align: right;">121 µs</td>
+<td><code>bvnr_mux_send</code></td>
+<td style="text-align: right;">84 ns</td>
+<td style="text-align: right;">3.2 µs</td>
+<td style="text-align: right;">45 µs</td>
 </tr>
 <tr>
-<td><code>bvnr_mux_send</code> (chunk buffer kept on the writer)</td>
-<td style="text-align: right;">202 ns</td>
-<td style="text-align: right;">8.6 µs</td>
-<td style="text-align: right;">120 µs</td>
-</tr>
-<tr>
-<td><code>bvnr_read</code> + <code>bvnr_demux_on_event</code> (2.0.2: copied every message)</td>
-<td style="text-align: right;">183 ns</td>
-<td style="text-align: right;">7.2 µs</td>
-<td style="text-align: right;">116 µs</td>
-</tr>
-<tr>
-<td><code>bvnr_read</code> + <code>bvnr_demux_on_event</code> (whole-chunk messages not copied)</td>
-<td style="text-align: right;">134 ns</td>
-<td style="text-align: right;">0.25 µs</td>
-<td style="text-align: right;">84 µs</td>
+<td><code>bvnr_read</code> + <code>bvnr_demux_on_event</code></td>
+<td style="text-align: right;">63 ns</td>
+<td style="text-align: right;">0.10 µs</td>
+<td style="text-align: right;">39 µs</td>
 </tr>
 <tr>
 <td>push-fed demux, callback, one feed</td>
-<td style="text-align: right;">139 ns</td>
-<td style="text-align: right;">0.25 µs</td>
-<td style="text-align: right;">83 µs</td>
+<td style="text-align: right;">65 ns</td>
+<td style="text-align: right;">0.10 µs</td>
+<td style="text-align: right;">39 µs</td>
 </tr>
 <tr>
 <td>push-fed demux, <code>bvnr_demux_next</code>, one feed</td>
-<td style="text-align: right;">159 ns</td>
-<td style="text-align: right;">0.27 µs</td>
-<td style="text-align: right;">86 µs</td>
+<td style="text-align: right;">74 ns</td>
+<td style="text-align: right;">0.11 µs</td>
+<td style="text-align: right;">39 µs</td>
 </tr>
 <tr>
 <td>push-fed demux, callback, 1460 B feeds</td>
-<td style="text-align: right;">152 ns</td>
-<td style="text-align: right;">7.9 µs</td>
-<td style="text-align: right;">158 µs</td>
+<td style="text-align: right;">69 ns</td>
+<td style="text-align: right;">3.6 µs</td>
+<td style="text-align: right;">69 µs</td>
 </tr>
 <tr>
 <td>push-fed demux, <code>bvnr_demux_next</code>, 1460 B feeds</td>
-<td style="text-align: right;">168 ns</td>
-<td style="text-align: right;">7.9 µs</td>
-<td style="text-align: right;">157 µs</td>
+<td style="text-align: right;">75 ns</td>
+<td style="text-align: right;">3.7 µs</td>
+<td style="text-align: right;">69 µs</td>
 </tr>
 <tr>
 <td>push-fed demux, <code>bvnr_demux_next</code>, 64 B feeds</td>
-<td style="text-align: right;">327 ns</td>
-<td style="text-align: right;">28 µs</td>
-<td style="text-align: right;">206 µs</td>
+<td style="text-align: right;">142 ns</td>
+<td style="text-align: right;">12.7 µs</td>
+<td style="text-align: right;">188 µs</td>
 </tr>
 <tr>
 <td><code>bvnr_mux_send</code> into a callback sink, batched</td>
-<td style="text-align: right;">105 ns</td>
-<td style="text-align: right;">6.1 µs</td>
-<td style="text-align: right;">86 µs</td>
+<td style="text-align: right;">92 ns</td>
+<td style="text-align: right;">4.4 µs</td>
+<td style="text-align: right;">61 µs</td>
 </tr>
 <tr>
 <td><code>bvnr_mux_send</code> + <code>bvnr_write_flush</code> into a callback sink</td>
-<td style="text-align: right;">113 ns</td>
-<td style="text-align: right;">6.1 µs</td>
-<td style="text-align: right;">86 µs</td>
+<td style="text-align: right;">104 ns</td>
+<td style="text-align: right;">4.2 µs</td>
+<td style="text-align: right;">61 µs</td>
 </tr>
 </tbody>
 </table>
-<p>The two callback-sink rows are from a later run (§8.5), where <code>bvnr_mux_send</code>
-into a memory sink measured 100 ns, 4.8 µs and 69 µs: the sink copies what it
-is pushed, as a socket's send does, minus the system call.</p>
+<p>The mux writer used to stage every chunk in its 64 KiB buffer before
+serialising it, and the demux to find a channel by scanning the ones it had
+seen. This round writes the chunks straight from the caller's buffer and looks
+a channel up in constant time (direct table below 64, a hash above), and the
+table is after both. At the commit before them the same benchmark (one run) put
+<code>bvnr_mux_send</code> at 110 ns, 4.4 µs and 63 µs; 2.0.2, which also allocated a
+chunk buffer per send and copied every demultiplexed message, recorded 262 ns,
+8.2 µs and 121 µs for the send and 183 ns, 7.2 µs and 116 µs for the demux.</p>
+<p>The callback-sink rows are the same writer against a sink that copies what it
+is pushed, as a socket's send does, minus the system call; the memory-sink row
+copies once. <code>bvnr_write_flush</code> hands each message over at once, so that row's
+difference from the batched one is the sink's push of a partly filled block.</p>
 <p>A message that fits one chunk and arrives in one feed is handed out without
 touching its bytes, which is why the 30 KB column falls by a factor of thirty.
 Fed in small pieces, a chunk is gathered before it is passed on, and a message
 split over chunks is reassembled: one copy each.</p>
-<p>Per framed document, a 43-byte one and a 30 KB one of numbers and strings:</p>
+<p>Per framed document, a 43-byte one and a 30 KB one of numbers and strings
+(measured together with the table above):</p>
 <table>
 <thead>
 <tr>
@@ -807,19 +806,19 @@ split over chunks is reassembled: one copy each.</p>
 <td style="text-align: right;">757 µs</td>
 </tr>
 <tr>
-<td><code>bvnr_doc_stream_read</code> (buffers kept across documents)</td>
-<td style="text-align: right;">2.4 µs</td>
-<td style="text-align: right;">758 µs</td>
+<td><code>bvnr_doc_stream_read</code></td>
+<td style="text-align: right;">2.3 µs</td>
+<td style="text-align: right;">773 µs</td>
 </tr>
 <tr>
 <td>parsing frame reader, one feed</td>
 <td style="text-align: right;">2.2 µs</td>
-<td style="text-align: right;">766 µs</td>
+<td style="text-align: right;">767 µs</td>
 </tr>
 <tr>
 <td>parsing frame reader, 1460 B feeds</td>
-<td style="text-align: right;">2.3 µs</td>
-<td style="text-align: right;">764 µs</td>
+<td style="text-align: right;">2.2 µs</td>
+<td style="text-align: right;">772 µs</td>
 </tr>
 </tbody>
 </table>
@@ -831,7 +830,10 @@ small document costs to parse, and the frame reader paid it too (5.5 µs for the
 <code>bvnr_demux_next</code> and <code>bvnr_frame_reader_next</code> allocate nothing per message once
 warm, nor the parsing frame reader and a re-opened fed demux per document; a
 <code>bvnr_doc_stream_read</code> call allocates the same whatever the number of documents
-(<code>tests/bovnar_alloc_test.c</code>).</p>
+(<code>tests/bovnar_alloc_test.c</code>). <code>bvnr_mux_send</code> also copies nothing beyond what
+the sink takes: its chunks are written straight from the caller's buffer. A
+writer with an observer is the exception — the observer is shown each chunk
+whole, so the chunk is staged in the writer's mux buffer only then.</p>
 <h3 id="85-writing-live-a-flush-per-message">8.5 Writing live: a flush per message</h3>
 <p>The writer gathers what it writes for an fd or callback sink in a 64 KiB buffer
 and pushes it when the buffer is full or at <code>bvnr_write_finish</code>, so a consumer
@@ -880,8 +882,9 @@ any writer error. The bindings wrap it: <code>Writer.flush()</code> and
 <code>stream.MuxWriter</code> in Python (§5), <code>Writer::flush</code> in Rust (§6).</p>
 <p>There is no "flush after every message" option on <code>bvnr_mux_send</code>: it would
 need a field in <code>bvnr_write_flags_t</code> or a second send function, and the call
-after the send costs what the table in §8.4 shows — about 8 ns on a 150-byte
-message, the push of the sink included — and allocates nothing.</p>
+after the send costs the sink's push of the bytes written so far — a few
+nanoseconds to a few tens of them on a 150-byte message, depending on the
+sink (the row difference in §8.4) — and allocates nothing.</p>
 <hr />
 <h2 id="9-shared-conformance-vectors">9. Shared conformance vectors</h2>
 <p><code>tests/stream_vectors/</code> holds one set of wire vectors that the C library, the

@@ -134,14 +134,6 @@ def _utf8(text: str, what: str) -> bytes:
             f"{text!r}") from None
 
 
-def _void_copy(data: bytes):
-    """Return (c_void_p, keepalive) for `data`, or (None, None) when empty."""
-    if not data:
-        return None, None
-    buf = (ctypes.c_char * len(data)).from_buffer_copy(data)
-    return ctypes.cast(buf, ctypes.c_void_p), buf
-
-
 # ===========================================================================
 # Multi-document record framing
 # ===========================================================================
@@ -156,9 +148,10 @@ def frame_documents(docs: Iterable[bytes], *, file=None) -> bytes | None:
     if file is not None:
         out = PushSink(file)
         for d in docs:
+            # bvnr_frame_write copies what it writes before it returns, so the
+            # bytes object is handed over as it is.
             b = _as_bytes(d)
-            dptr, _keep = _void_copy(b)
-            if not lib.bvnr_frame_write(ctypes.byref(out.handle), dptr, len(b)):
+            if not lib.bvnr_frame_write(ctypes.byref(out.handle), b, len(b)):
                 if out.exc is not None:
                     raise out.exc
                 raise BovnarWriteError(ErrorCode.WRITING_TO_SINK,
@@ -176,8 +169,7 @@ def frame_documents(docs: Iterable[bytes], *, file=None) -> bytes | None:
     lib.bvnr_sink_to_mem(ctypes.byref(sink), ctypes.cast(out, ctypes.c_void_p),
                          total)
     for b in blobs:
-        dptr, _keep = _void_copy(b)
-        if not lib.bvnr_frame_write(ctypes.byref(sink), dptr, len(b)):
+        if not lib.bvnr_frame_write(ctypes.byref(sink), b, len(b)):
             # The buffer is sized to fit every frame, so this is a memory
             # sink that ran out: the code says so, never NONE.
             raise BovnarWriteError(ErrorCode.SINK_BUFFER_EXHAUSTED,
@@ -278,9 +270,10 @@ def load_documents(data,
     if source is not None:
         src = source.handle
     else:
+        # The source borrows the bytes for the doc_stream_read call below,
+        # which is synchronous, so they are handed over as they are.
         src = BvnrSource()
-        dptr, _keep = _void_copy(data)
-        lib.bvnr_source_from_mem(ctypes.byref(src), dptr, len(data))
+        lib.bvnr_source_from_mem(ctypes.byref(src), data, len(data))
 
     out_count = ctypes.c_uint64(0)
     out_error = ctypes.c_int(0)
@@ -352,8 +345,9 @@ def mux_dump(messages: Iterable[tuple], *, key: str = 'mux',
     def write(w):
         _mux_open(w, kb, preamble)
         for ch, payload in msgs:
-            dptr, _keep = _void_copy(payload)
-            if not lib.bvnr_mux_send(w._ptr, ch, dptr, len(payload)):
+            # mux_send copies the message into the writer (or writes it
+            # straight from here) before it returns; the payload is not kept.
+            if not lib.bvnr_mux_send(w._ptr, ch, payload, len(payload)):
                 w._raise_error()
         if not lib.bvnr_mux_end(w._ptr):
             w._raise_error()
@@ -475,6 +469,55 @@ def mux_load(data, *, max_message: int = 0, key: str | None = None,
         data = _as_bytes(data)
 
     results: list = []
+    kfilter = _filter_key(key)      # before the demux: it may refuse the key
+
+    if source is None:
+        # In memory: drive the push-fed demux with plain calls. A Python
+        # callback per message was the cost of the pull-free path for a
+        # producer of many small messages; bvnr_demux_next hands each one
+        # over without re-entering Python from C, and the payload is
+        # borrowed until the next call, so only one copy is made here.
+        dm = lib.bvnr_demux_create(MUX_ON_MSG_FUNC(), None, max_message)
+        if not dm:
+            raise MemoryError("bvnr_demux_create() returned NULL")
+        try:
+            if kfilter is not None and not lib.bvnr_demux_set_key(dm, kfilter):
+                raise MemoryError("bvnr_demux_set_key() failed")
+            if not lib.bvnr_demux_open_feed(dm, ctypes.byref(flags), False):
+                raise MemoryError("bvnr_demux_open_feed() failed")
+            reader = lib.bvnr_demux_get_reader(dm)
+            nxt = lib.bvnr_demux_next
+            item = BvnrDemuxItem()
+            ref = ctypes.byref(item)
+
+            def drain():
+                while True:
+                    rc = nxt(dm, ref)
+                    if rc == _NEXT_ITEM:
+                        n = item.length
+                        results.append((int(item.channel),
+                                        ctypes.string_at(item.data, n) if n else b''))
+                    elif rc == _NEXT_NONE:
+                        return
+                    else:
+                        raise _demux_error(lib, lib.bvnr_demux_error(dm), reader)
+
+            if data and not lib.bvnr_demux_feed(dm, data, len(data)):
+                raise _demux_error(lib, lib.bvnr_demux_error(dm), reader)
+            drain()
+            done = lib.bvnr_demux_finish(dm)
+            drain()
+            if not done:
+                raise _demux_error(lib, lib.bvnr_demux_error(dm), reader)
+            # A message the stream's end cut short is the demux's error even
+            # though the document read to its end, as for the batch path.
+            derr = lib.bvnr_demux_error(dm)
+            if derr != int(ErrorCode.NONE):
+                raise _demux_error(lib, derr, reader)
+            return results
+        finally:
+            lib.bvnr_demux_destroy(dm)
+
     state = {'exc': None}
 
     def _on_msg(_ud, channel, data_ptr, length):
@@ -488,7 +531,6 @@ def mux_load(data, *, max_message: int = 0, key: str | None = None,
             return False
     cb_msg = MUX_ON_MSG_FUNC(_on_msg)
 
-    kfilter = _filter_key(key)      # before the demux: it may refuse the key
     dm = lib.bvnr_demux_create(cb_msg, None, max_message)
     if not dm:
         raise MemoryError("bvnr_demux_create() returned NULL")
@@ -507,16 +549,11 @@ def mux_load(data, *, max_message: int = 0, key: str | None = None,
         cb_ev = EVENT_CALLBACK_FUNC(_trampoline)
         flags.on_verified        = cb_ev
 
-        if source is not None:
-            ok = lib.bvnr_open_read_source(rptr, ctypes.byref(source.handle),
-                                           None, ctypes.byref(flags))
-        else:
-            dptr, _keep = _void_copy(data)
-            ok = lib.bvnr_open_read_mem(rptr, dptr, len(data), None, 0,
-                                        ctypes.byref(flags))
+        ok = lib.bvnr_open_read_source(rptr, ctypes.byref(source.handle),
+                                       None, ctypes.byref(flags))
         ok = ok and lib.bvnr_read(rptr)
 
-        if source is not None and source.exc is not None:
+        if source.exc is not None:
             raise source.exc
         if state['exc'] is not None:
             raise state['exc']
@@ -571,8 +608,7 @@ def embed_document(inner, *, key: str = 'payload', pretty: bool = True,
     if file is not None:
         w = Writer.to_stream(file, pretty=pretty)
         try:
-            dptr, _keep = _void_copy(inner)
-            if not lib.bvnr_embed_document(w._ptr, kb, dptr, len(inner)):
+            if not lib.bvnr_embed_document(w._ptr, kb, inner, len(inner)):
                 w._raise_error()
             w.finish()
         finally:
@@ -585,8 +621,7 @@ def embed_document(inner, *, key: str = 'payload', pretty: bool = True,
     while True:
         w = Writer.to_mem(cap=cap, pretty=pretty)
         try:
-            dptr, _keep = _void_copy(inner)
-            if not lib.bvnr_embed_document(w._ptr, kb, dptr, len(inner)):
+            if not lib.bvnr_embed_document(w._ptr, kb, inner, len(inner)):
                 w._raise_error()
             w.finish()
             return w.get_output()
@@ -629,8 +664,8 @@ def parse_embedded(inner, *, typed: bool = False, **options) -> dict:
     flags.on_verified        = cb
     flags.on_error           = cb_err
 
-    dptr, _keep = _void_copy(inner)
-    ok = lib.bvnr_parse_embedded(dptr, len(inner), ctypes.byref(flags))
+    # The parse is synchronous and bvnr_parse_embedded copies what it keeps.
+    ok = lib.bvnr_parse_embedded(inner, len(inner), ctypes.byref(flags))
 
     cb_state = getattr(cb, '_bvnr_state', None)
     if cb_state is not None and cb_state.get('exc') is not None:
@@ -769,6 +804,7 @@ class _Feed:
         self._view_mem = None
         self._fed      = None     # the bytes C reads from, until drained
         self._fed_at   = None     # their address, found on demand
+        self._fed_mv   = None     # a memoryview of them, for view=True items
         self._failure  = None     # an error kept for the iteration to raise
         self._finished = False
         self._closed   = False
@@ -780,7 +816,10 @@ class _Feed:
     def __next__(self):
         if self._closed:
             raise StopIteration
-        self._release()
+        # A view is the only thing a call has to release; the usual item is
+        # bytes, and this runs once per item of a live stream.
+        if self._view is not None or self._view_mem is not None:
+            self._release()
         if self._queue:
             return self._queue.popleft()
         if self._failure is not None:
@@ -802,6 +841,15 @@ class _Feed:
             at = self._fed_at = ctypes.cast(self._fed, ctypes.c_void_p).value
         return at
 
+    def _fed_view(self) -> memoryview:
+        """One memoryview of the fed bytes, reused: a view of a view costs
+        half what a fresh memoryview(fed) does, and this is per item."""
+        fed = self._fed
+        view = self._fed_mv
+        if view is None or view.obj is not fed:
+            view = self._fed_mv = memoryview(fed)
+        return view
+
     def _view_of(self, ptr: int, n: int) -> memoryview:
         """A read-only view of the n bytes at ptr. Where they lie whole in
         the fed bytes it is a slice of those, which keeps them alive by
@@ -811,7 +859,7 @@ class _Feed:
         if n and fed is not None:
             at = (ptr or 0) - self._fed_address()
             if 0 <= at <= len(fed) - n:
-                view = memoryview(fed)[at:at + n]
+                view = self._fed_view()[at:at + n]
                 self._view = view
                 return view
         return self._hand_out(ptr, n)
@@ -1297,7 +1345,15 @@ class FrameFeed(_Feed):
                 # A document whole in the fed bytes is a slice of them; one
                 # gathered across feeds lies in the frame reader's buffer.
                 return self._view_of(self._doc.value, n)
-            return ctypes.string_at(self._doc.value, n) if n else b''
+            if not n:
+                return b''
+            # As in DemuxFeed: a document that lies whole in the fed bytes is
+            # a slice of them, cheaper than a string_at call; one gathered
+            # across feeds is copied out of the reader's buffer.
+            at = self._doc.value - self._fed_address()
+            if 0 <= at <= len(self._fed) - n:
+                return self._fed[at:at + n]
+            return ctypes.string_at(self._doc.value, n)
         self._fed = None
         if rc == _NEXT_NONE:
             return None
@@ -1416,20 +1472,24 @@ class DemuxFeed(_Feed):
         self._item    = BvnrDemuxItem()
         self._item_ref = ctypes.byref(self._item)
         self._next    = lib.bvnr_demux_next
+        self._feed_c  = lib.bvnr_demux_feed
 
     def feed(self, data) -> 'DemuxFeed':
         """Hand over the next piece of the document and return the feed,
         iterating over what it completed. Drain it before feeding again."""
         if self._closed or self._finished:
             self._check_open()
-        self._release()
+        # Only a view handed out (view=True) has anything to release; the
+        # bytes path never does, and this is per feed of a live stream.
+        if self._view is not None or self._view_mem is not None:
+            self._release()
         if self._fed is not None or self._queue:
             raise BovnarArgumentError(
                 "the previous feed has not been drained; iterate the DemuxFeed "
                 "to its end before feeding it again")
         buf = data if type(data) is bytes else _held_bytes(data)
         if buf:
-            if not self._lib.bvnr_demux_feed(self._dm, buf, len(buf)):
+            if not self._feed_c(self._dm, buf, len(buf)):
                 self._raise_error()
             self._fed = buf
             # The address is wanted only when a message is handed out, and a
@@ -1462,6 +1522,11 @@ class DemuxFeed(_Feed):
                 return _tuple_new(Message, (item.channel, fed[at:at + n]))
             return _tuple_new(Message, (item.channel,
                                         ctypes.string_at(item.data, n)))
+        if rc == _NEXT_NONE:
+            # The fed bytes are used up; a for loop calls this once more
+            # after every feed, so it stays out of _resume's way.
+            self._fed = None
+            raise StopIteration
         item = self._resume(rc, self._as_view)
         if item is None:
             raise StopIteration
@@ -1633,13 +1698,14 @@ class MuxWriter:
         self._ptr = w._ptr
         self._send = lib.bvnr_mux_send
         self._flush = lib.bvnr_write_flush if flush_each else None
+        self._stream = w._stream
 
     def send(self, channel: int, payload) -> None:
         """Write one message on ``channel`` (an unsigned 64-bit int); a
         payload of any size is split over octet chunks as needed."""
         if self._closed:
             raise BovnarArgumentError("MuxWriter has been closed")
-        if self._w._stream.busy:
+        if self._stream.busy:
             self._w._check_not_in_sink()
         ch = _mux_channel(channel)
         data = payload if type(payload) is bytes else _as_bytes(payload)

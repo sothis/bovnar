@@ -330,6 +330,114 @@ static void test_octet_mux(void)
 	}
 }
 
+/* The writer with an observer: bvnr_mux_send now hands each chunk on straight
+ * from the caller's buffer, and stages it in the writer's mux buffer only for
+ * the observer. The output must be byte for byte what a writer without one
+ * produces, and each chunk the observer is shown must be the whole chunk, so
+ * that their concatenation is the octet stream's body. */
+typedef struct {
+	uint8_t  bytes[96 * 1024];
+	uint64_t len;
+	uint32_t chunks;
+	bool     overflow;
+} mux_obs_t;
+
+static bool mux_obs_on_event(void *ud, bvnr_event_t ev, bvnr_data_t *d)
+{
+	mux_obs_t *o = ud;
+	if (ev != ev_data || !d || d->type != token_is_octet_stream)
+		return true;
+	o->chunks++;
+	if (d->length > sizeof(o->bytes) - o->len) {
+		o->overflow = true;
+		return false;
+	}
+	memcpy(o->bytes + o->len, d->data, d->length);
+	o->len += d->length;
+	return true;
+}
+
+static uint64_t mux_write_with_observer(uint8_t *out, size_t cap,
+	bool observed, mux_obs_t *obs)
+{
+	bvnr_writer_t *w = bvnr_writer_create();
+	if (!w) return 0;
+	bvnr_write_flags_t fl = {0};
+	if (observed) {
+		fl.on_event = mux_obs_on_event;
+		fl.userdata = obs;
+	}
+	static uint8_t big[70000];   /* two chunks, payload arbitrary bytes */
+	for (size_t i = 0; i < sizeof big; i++)
+		big[i] = (uint8_t)(i * 31u + 7u);
+	bool ok = bvnr_open_write_mem(w, out, cap, false, &fl)
+		&& bvnr_mux_begin(w, "mux")
+		&& bvnr_mux_send(w, 1,  "hello", 5)
+		&& bvnr_mux_send(w, 42, "world!!", 7)
+		&& bvnr_mux_send(w, 70000, big, sizeof big)
+		&& bvnr_mux_send(w, 1,  "bye", 3)
+		&& bvnr_mux_end(w)
+		&& bvnr_write_finish(w);
+	uint64_t n = ok ? bvnr_writer_bytes_written(w) : 0;
+	bvnr_writer_destroy(w);
+	return n;
+}
+
+static void test_octet_mux_observer(void)
+{
+	printf("  test_octet_mux_observer...\n");
+	enum { CAP = 96 * 1024 };
+	uint8_t *plain = malloc(CAP), *seen = malloc(CAP);
+	ASSERT_TRUE(plain && seen, "alloc observer buffers");
+	if (!plain || !seen) { free(plain); free(seen); return; }
+
+	uint64_t n_plain = mux_write_with_observer(plain, CAP, false, NULL);
+	mux_obs_t obs = {0};
+	uint64_t n_seen = mux_write_with_observer(seen, CAP, true, &obs);
+	ASSERT_TRUE(n_plain > 0 && n_plain == n_seen, "observed write succeeds");
+	ASSERT_TRUE(n_plain > 0 && memcmp(plain, seen, (size_t)n_plain) == 0,
+		"an observer does not change the bytes");
+	ASSERT_TRUE(!obs.overflow, "observer captured every chunk");
+	ASSERT_EQ_UINT(obs.chunks, 5, "observer saw one piece per chunk");
+
+	/* The document is `.mux=` NUL <chunks> NUL ';'. Each chunk on the wire is
+	 * the tag 0x01, a 16-bit body length (0 means 65536) and the body — which
+	 * is exactly what the observer was handed, channel and message-length
+	 * varints included. Walk both. */
+	const uint8_t *open = memchr(plain, 0x00, (size_t)n_plain);
+	ASSERT_TRUE(open != NULL, "octet stream opens");
+	if (open && n_plain >= (uint64_t)(open - plain) + 3) {
+		const uint8_t *body = open + 1;
+		const uint8_t *end  = plain + n_plain - 2;   /* at the closing NUL */
+		ASSERT_EQ_UINT(plain[n_plain - 2], 0x00, "octet stream closes");
+		ASSERT_EQ_UINT(plain[n_plain - 1], ';', "assignment ends");
+		uint64_t seen_at = 0;
+		uint32_t chunks = 0;
+		const uint8_t *p = body;
+		while (p < end) {
+			ASSERT_TRUE((uint64_t)(end - p) >= 3, "chunk header fits");
+			if ((uint64_t)(end - p) < 3) break;
+			ASSERT_EQ_UINT(p[0], 0x01, "wire chunk tag");
+			uint32_t clen = (uint32_t)p[1] | ((uint32_t)p[2] << 8);
+			if (clen == 0) clen = 65536;
+			p += 3;
+			ASSERT_TRUE((uint64_t)(end - p) >= clen, "chunk body fits");
+			ASSERT_TRUE(seen_at + clen <= obs.len, "observer has the chunk");
+			if ((uint64_t)(end - p) < clen || seen_at + clen > obs.len)
+				break;
+			ASSERT_TRUE(memcmp(obs.bytes + seen_at, p, clen) == 0,
+				"observed chunk is the wire chunk body");
+			seen_at += clen;
+			p += clen;
+			chunks++;
+		}
+		ASSERT_EQ_UINT(chunks, obs.chunks, "one observation per wire chunk");
+		ASSERT_EQ_UINT(seen_at, obs.len, "observer saw every chunk body");
+		ASSERT_TRUE(p == end, "the chunk walk ends at the stream's close");
+	}
+	free(plain); free(seen);
+}
+
 /* Regression (deep-review pass 4): a message that is truncated when its octet
  * stream ends must NOT bleed into the next octet stream on a reused demux.
  * ev_octet_stream_end now resets every channel's reassembly progress. */
@@ -1404,6 +1512,7 @@ int main(void)
 	test_endless_knob();
 	test_multidoc();
 	test_octet_mux();
+	test_octet_mux_observer();
 	test_demux_truncated_stream_reset();
 	test_demux_overlong_varint_rejected();
 	test_demux_split_length_varint();

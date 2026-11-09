@@ -24,8 +24,8 @@
 
 /*
  * The hot paths of the streaming layer allocate nothing per message once
- * warm: bvnr_mux_send (whose 64 KiB chunk used to be malloc'd and freed on
- * every call), alone and followed by bvnr_write_flush into a callback sink,
+ * warm: bvnr_mux_send (which stages nothing and allocates nothing on its
+ * hot path), alone and followed by bvnr_write_flush into a callback sink,
  * the pull-style drains of a fed demux and frame reader for messages and
  * documents that lie whole in the fed buffer, and every path that
  * re-opens a reader for the next document -- the parsing frame reader,
@@ -132,7 +132,7 @@ int main(void)
 	bvnr_writer_t* w = bvnr_writer_create();
 	bvnr_open_write_mem(w, out, cap, false, NULL);
 	bvnr_mux_begin(w, "mux");
-	bvnr_mux_send(w, 1, payload, 150);       /* warm: the chunk buffer */
+	bvnr_mux_send(w, 1, payload, 150);       /* warm: outside the count */
 	static const uint64_t sizes[] = { 150, 30000, 400000 };
 	for (size_t s = 0; s < 3; s++) {
 		count_begin();
@@ -147,7 +147,7 @@ int main(void)
 	bvnr_write_finish(w);
 	uint64_t doc_len = bvnr_writer_bytes_written(w);
 
-	/* Re-opening keeps the chunk buffer. */
+	/* Re-opening a writer keeps everything it needs. */
 	bvnr_open_write_mem(w, out + doc_len, cap - doc_len, false, NULL);
 	bvnr_mux_begin(w, "mux");
 	count_begin();
@@ -161,7 +161,7 @@ int main(void)
 	bvnr_sink_to_callback(&live, take_push, take_flush, NULL);
 	bvnr_open_write_sink(w, &live, false, NULL);
 	bvnr_mux_begin(w, "mux");
-	bvnr_mux_send(w, 1, payload, 150);       /* warm: the chunk buffer */
+	bvnr_mux_send(w, 1, payload, 150);       /* warm: outside the count */
 	bvnr_write_flush(w);
 	for (size_t s = 0; s < 3; s++) {
 		count_begin();

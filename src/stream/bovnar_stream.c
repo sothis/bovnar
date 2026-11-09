@@ -83,6 +83,22 @@ static uint32_t bvn_varint_decode(const uint8_t* buf, uint32_t len, uint64_t* ou
 	return 0;
 }
 
+/* The frame length on the wire is little-endian. On a little-endian host the
+ * store/load *is* the wire form, so one unaligned copy replaces eight shifts;
+ * the byte loop below stays for the others. */
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+static void bvn_put_u64le(uint8_t out[8], uint64_t v)
+{
+	memcpy(out, &v, 8);
+}
+
+static uint64_t bvn_get_u64le(const uint8_t in[8])
+{
+	uint64_t v;
+	memcpy(&v, in, 8);
+	return v;
+}
+#else
 static void bvn_put_u64le(uint8_t out[8], uint64_t v)
 {
 	for (uint32_t i = 0; i < 8; i++)
@@ -96,6 +112,7 @@ static uint64_t bvn_get_u64le(const uint8_t in[8])
 		v |= (uint64_t)in[i] << (8u * i);
 	return v;
 }
+#endif
 
 /* ===========================================================================
  * 2. Multi-document record framing
@@ -331,9 +348,14 @@ bool bvnr_mux_begin(bvnr_writer_t* w, const char* key)
  * The logical stream for the message is varint(len) ++ data. Each chunk is
  * varint(channel) ++ fragment; the length varint always rides in the first
  * chunk (it is tiny and the fragment capacity is ~64 KiB, so it is never
- * split). The 64 KiB chunk buffer belongs to the writer and is reused by every
- * send: it used to be malloc'd and freed on each call, which for small messages
- * cost more than the message.
+ * split).
+ *
+ * The chunk's small header is assembled on the stack and the payload is
+ * handed to the writer where the caller keeps it: a message used to be
+ * copied into the writer's 64 KiB staging buffer first, a second copy of
+ * every byte before the sink's own. Nothing is allocated per send, and an
+ * installed observer still sees each chunk whole (the writer stages it only
+ * for that).
  */
 bool bvnr_mux_send(bvnr_writer_t* w, uint64_t channel,
 	const void* data, uint64_t len)
@@ -352,33 +374,27 @@ bool bvnr_mux_send(bvnr_writer_t* w, uint64_t channel,
 	uint32_t lvlen  = bvn_varint_encode(len, lenvar);
 	uint32_t fragcap = 65536u - chlen;   /* logical bytes per chunk after channel id */
 
-	uint8_t* chunk = bvn_writer_mux_chunk(w);
-	if (!chunk)
-		return bvn_writer_set_error(w, error_invalid_argument);
-
 	const uint8_t* dp = (const uint8_t*)data;
 	uint64_t dpos = 0;
 	bool first = true;
 	bool ok = true;
 	do {
+		uint8_t hdr[10 + 10];
 		uint32_t off = 0;
-		memcpy(chunk, chvar, chlen); off = chlen;
+		memcpy(hdr, chvar, chlen); off = chlen;
 		uint32_t room = fragcap;
 		if (first) {
-			memcpy(chunk + off, lenvar, lvlen);
+			memcpy(hdr + off, lenvar, lvlen);
 			off  += lvlen;
 			room -= lvlen;
 			first = false;
 		}
 		uint64_t dleft = len - dpos;
 		uint32_t take  = dleft < (uint64_t)room ? (uint32_t)dleft : room;
-		if (take) { memcpy(chunk + off, dp + dpos, take); off += take; dpos += take; }
-
-		bvnr_data_t d = {0};
-		d.type   = token_is_octet_stream;
-		d.data   = chunk;
-		d.length = off;
-		ok = bvnr_write_event(w, ev_data, &d);
+		/* take > 0 implies len > 0, so dp is not NULL there. */
+		ok = bvn_writer_write_octet_chunk(w, hdr, off,
+			take ? dp + dpos : NULL, take);
+		dpos += take;
 	} while (ok && dpos < len);
 	return ok;
 }
@@ -391,6 +407,10 @@ bool bvnr_mux_end(bvnr_writer_t* w)
 }
 
 /* ---- demultiplexer: per-channel reassembly --------------------------------*/
+
+#define BVNR_DEMUX_MAX_CHANNELS  4096u
+/* Channel ids below this get a slot in the demux's lookup table. */
+#define BVN_DEMUX_SMALL          64u
 
 typedef struct demux_channel_s {
 	uint64_t	channel;
@@ -424,6 +444,16 @@ struct bvnr_demux_s {
 	/* Slots whose buf/cap are set: the channels in use and, past nchans,
 	 * the buffers of a previous document's channels, kept as spares. */
 	uint32_t		chans_init;
+	/* A chunk names its channel on every fragment, so the lookup is on the
+	 * hot path, and a stream may use up to 4096 channels. Ids below
+	 * BVN_DEMUX_SMALL are found in a direct table (index + 1, 0 for none);
+	 * higher ones in an open-addressed hash table of the same shape, so
+	 * neither costs a scan. `last` answers a producer that sends chunk after
+	 * chunk on one channel even more cheaply. */
+	uint16_t		small[BVN_DEMUX_SMALL];
+	uint16_t*		hash;		/* index + 1, 0 empty; cap a power of two */
+	uint32_t		hash_cap;
+	uint32_t		last;		/* index + 1, 0 for none */
 	/* Optional key scope (bvnr_demux_set_key). When key is non-NULL the demux
 	 * only treats octet streams opened under a matching assignment key as
 	 * multiplexed; any other octet stream in the same document is ignored, so a
@@ -466,7 +496,6 @@ struct bvnr_demux_s {
 	bvnr_data_t		shown;
 };
 
-#define BVNR_DEMUX_MAX_CHANNELS  4096u
 /* Pull mode with deliver_events: the reader pauses once this many events, or
  * this many of their bytes, wait to be handed out. */
 #define BVNR_DEMUX_EVENT_BATCH   64u
@@ -490,6 +519,7 @@ void bvnr_demux_destroy(bvnr_demux_t* dm)
 	for (uint32_t i = 0; i < dm->chans_init; i++)
 		free(dm->chans[i].buf);
 	free(dm->chans);
+	free(dm->hash);
 	free(dm->key);
 	bvnr_reader_destroy(dm->reader);
 	free(dm->events);
@@ -535,11 +565,75 @@ error_code_t bvnr_demux_error(const bvnr_demux_t* dm)
 	return dm->error;
 }
 
+/*
+ * The open-addressed table for channel ids of BVN_DEMUX_SMALL and up. The
+ * capacity is a power of two with the channel count at half of it, so a
+ * lookup ends at an empty slot; entries are the index into `chans` plus one
+ * (0 empty) and the channel id is read back from `chans`, so a stale entry
+ * can never match a different id. The Fibonacci constant spreads sequential
+ * ids over the table.
+ */
+#define BVN_DEMUX_HASH_MIN 128u
+
+static uint32_t demux_hash_slot(const bvnr_demux_t* dm, uint64_t id)
+{
+	uint32_t mask = dm->hash_cap - 1u;
+	uint32_t s = (uint32_t)((id * 0x9E3779B97F4A7C15u) >> 32) & mask;
+	while (dm->hash[s]) {
+		if (dm->chans[(uint32_t)dm->hash[s] - 1u].channel == id)
+			break;
+		s = (s + 1u) & mask;
+	}
+	return s;
+}
+
+/* Index the channel at `chans[index]`, growing (and rehashing) first if the
+ * table is half full. False only when the table cannot be allocated. */
+static bool demux_hash_put(bvnr_demux_t* dm, uint32_t index)
+{
+	if (!dm->hash_cap ||
+	    (uint64_t)(dm->nchans + 1u) * 2u > (uint64_t)dm->hash_cap) {
+		uint32_t ncap = dm->hash_cap ? dm->hash_cap * 2u : BVN_DEMUX_HASH_MIN;
+		while ((uint64_t)(dm->nchans + 1u) * 2u > (uint64_t)ncap)
+			ncap *= 2u;
+		uint16_t* nh = (uint16_t*)calloc(ncap, sizeof(*nh));
+		if (!nh) return false;
+		uint16_t* old = dm->hash;
+		uint32_t oldcap = dm->hash_cap;
+		dm->hash     = nh;
+		dm->hash_cap = ncap;
+		for (uint32_t s = 0; s < oldcap; s++) {
+			if (!old[s]) continue;
+			uint32_t i = (uint32_t)old[s] - 1u;
+			dm->hash[demux_hash_slot(dm, dm->chans[i].channel)] =
+				(uint16_t)(i + 1u);
+		}
+		free(old);
+	}
+	dm->hash[demux_hash_slot(dm, dm->chans[index].channel)] =
+		(uint16_t)(index + 1u);
+	return true;
+}
+
 static demux_channel_t* demux_get_channel(bvnr_demux_t* dm, uint64_t channel)
 {
-	for (uint32_t i = 0; i < dm->nchans; i++)
-		if (dm->chans[i].channel == channel)
-			return &dm->chans[i];
+	/* The common cases first: a small id, or the channel of the chunk
+	 * before (the one a producer keeps sending on). Neither scans. */
+	if (channel < (uint64_t)BVN_DEMUX_SMALL) {
+		uint16_t slot = dm->small[channel];
+		if (slot) {
+			dm->last = slot;
+			return &dm->chans[(uint32_t)slot - 1u];
+		}
+	} else if (dm->hash_cap) {
+		uint16_t slot = dm->hash[demux_hash_slot(dm, channel)];
+		if (slot) {
+			dm->last = slot;
+			return &dm->chans[(uint32_t)slot - 1u];
+		}
+	}
+	if (dm->last && dm->chans[dm->last - 1u].channel == channel)
+		return &dm->chans[dm->last - 1u];
 	if (dm->nchans >= BVNR_DEMUX_MAX_CHANNELS) {
 		dm->error = error_octet_stream_out_of_sync;
 		return NULL;
@@ -552,7 +646,8 @@ static demux_channel_t* demux_get_channel(bvnr_demux_t* dm, uint64_t channel)
 		dm->chans     = nc;
 		dm->chans_cap = ncap;
 	}
-	demux_channel_t* c = &dm->chans[dm->nchans++];
+	uint32_t index = dm->nchans++;
+	demux_channel_t* c = &dm->chans[index];
 	/* A slot a previous document used keeps its buffer for the new id. */
 	uint8_t* buf = NULL;
 	uint64_t cap = 0;
@@ -566,6 +661,13 @@ static demux_channel_t* demux_get_channel(bvnr_demux_t* dm, uint64_t channel)
 	c->channel = channel;
 	c->buf     = buf;
 	c->cap     = cap;
+	dm->last = index + 1u;
+	if (channel < (uint64_t)BVN_DEMUX_SMALL) {
+		dm->small[channel] = (uint16_t)(index + 1u);
+	} else if (!demux_hash_put(dm, index)) {
+		dm->error = error_invalid_argument;
+		return NULL;
+	}
 	return c;
 }
 
@@ -587,6 +689,35 @@ static int demux_take(bvnr_demux_t* dm, demux_channel_t* c,
 {
 	while (*pos < fraglen) {
 		if (!c->active) {
+			/* The common case: no partial length varint from an earlier
+			 * fragment, and this one holds the whole varint and the whole
+			 * message. Decoding it where it lies skips the byte-by-byte
+			 * gathering below, which used to run even for a one-byte varint. */
+			if (!c->lvhave) {
+				uint64_t need = 0;
+				uint32_t used = bvn_varint_decode(frag + *pos,
+					fraglen - *pos, &need);
+				if (used) {
+					if (need > dm->max_message ||
+					    need > (uint64_t)SIZE_MAX) {
+						dm->error = error_value_out_of_range;
+						return -1;
+					}
+					if ((uint64_t)(fraglen - *pos - used) >= need) {
+						/* Whole in this chunk: no copy. A zero-length
+						 * message gets a pointer into the chunk too, so it
+						 * is never NULL. */
+						*pos     += used;
+						*msg      = frag + *pos;
+						*msg_len  = need;
+						*pos     += (uint32_t)need;
+						return 1;
+					}
+				}
+				/* A varint cut by the fragment's end, a malformed one, or
+				 * a message that does not fit: the gathering path below
+				 * tells these apart, exactly as it always has. */
+			}
 			/* Accumulate the message-length varint, which may itself span
 			 * chunk boundaries: pull continuation bytes into the per-channel
 			 * lvbuf until a terminator (high bit clear) arrives, then decode
@@ -946,8 +1077,13 @@ bool bvnr_demux_open_feed(bvnr_demux_t* dm, const bvnr_read_flags_t* flags,
 		return false;
 	/* A new document is a new mux stream: its channel ids are its own, so
 	 * the 4096-channel limit counts afresh, as it does for the Rust codec's
-	 * MuxReader::reset. The buffers stay, as spares for the new ids. */
+	 * MuxReader::reset. The buffers stay, as spares for the new ids; the
+	 * lookup table and the last-channel hint describe the old ids. */
 	dm->nchans = 0;
+	memset(dm->small, 0, sizeof(dm->small));
+	if (dm->hash)
+		memset(dm->hash, 0, (size_t)dm->hash_cap * sizeof(*dm->hash));
+	dm->last = 0;
 	dm->error          = error_none;
 	dm->in_octet       = false;
 	dm->key_match      = false;

@@ -64,8 +64,10 @@ API and implements spec 1.2.
   event, every event and each single event, and a writer whose sink feeds a
   fed demux has each message delivered before the next is sent. A memory sink
   has nothing to flush. Errors latch as for every writer call. Calling it after
-  each `bvnr_mux_send` adds about 8 ns to a 150-byte message and allocates
-  nothing (doc/08 §2.18, doc/10 §8.5). An export-only ABI addition.
+  each `bvnr_mux_send` adds the sink's push of the bytes written so far — a few
+  nanoseconds to a few tens of them on a 150-byte message, depending on the
+  sink — and allocates nothing (doc/08 §2.18, doc/10 §8.5). An export-only ABI
+  addition.
 - **Python: live streams.** `bovnar.stream.DocumentFeed`, `FrameFeed` and
   `DemuxFeed` wrap the push-fed reader, frame reader and demux: each is handed
   bytes in pieces of any size, and `feed()` returns the object, which iterates
@@ -383,6 +385,42 @@ API and implements spec 1.2.
   only one that spans chunks is reassembled. `on_message`'s `data` is now
   documented as valid for the call only. Demultiplexing 30 KB messages with
   `bvnr_read` and `bvnr_demux_on_event` went from about 7.2 µs to 0.25 µs each.
+
+- **`bvnr_mux_send` writes its chunks straight from the caller's buffer.**
+  The mux writer staged every chunk in the writer's 64 KiB buffer before the
+  event was serialised, so each message was copied twice on its way to the sink
+  (into the chunk buffer, then out through it). The chunk header is now
+  assembled on the stack and the payload handed on where the caller keeps it;
+  a writer with an observer still sees each chunk whole, and it is staged only
+  then. The output is byte for byte the same, and no send allocates per call.
+  A 150-byte send went from about 110 to 84 ns, a 30 KB message from
+  4.4 to 3.2 µs and a 400 KB one from 63 to 45 µs (doc/10 §8.4), which also
+  speeds up Rust's `mux_dump` through the shared C writer.
+- **The demultiplexer finds a channel in constant time.** The lookup walked
+  every channel the stream had used, so a producer that used the full 4096 ids
+  did quadratic work over its chunks. Ids below 64 now come from a direct
+  table and the rest from an open-addressed hash that is allocated only when a
+  high id first appears (32 KB at the limit); the channel of the previous chunk
+  is checked before either, which is what a producer usually sends. The wire
+  format, the 4096-channel limit and every error are unchanged.
+- **Python: the batch and framing helpers no longer copy what C does not
+  keep.** `mux_dump`, `mux_load`, `frame_documents`, `load_documents`,
+  `embed_document`, `parse_embedded` and `Writer.embed_document` copied each
+  payload or document into a ctypes buffer first, although the C call reads it
+  only for the duration of the call. `mux_load` on an in-memory document now
+  drains the push-fed demux with `bvnr_demux_next` instead of calling back into
+  Python once per message, as `DemuxFeed` does (a socket or file input still
+  uses the callback source); the errors, codes and positions are unchanged.
+  Per 150-byte / 400 KB message, `mux_dump` went from 6.0 µs / 474 µs to
+  1.7 / 287 µs and `mux_load` from 4.3 / 253 µs to 2.3 / 91 µs (doc/09 §4.7).
+  The feeds also keep a flat per-item path: the bytes path releases nothing,
+  and a document that lies whole in the fed bytes is sliced out of it instead
+  of copied with `string_at`.
+- **Rust: the memory writer's buffer becomes the result.** `grow_write` —
+  behind `mux_dump`, `embed_document`, `to_string` and the JSON conversion —
+  copied the whole output once more out of the writer with
+  `get_output().to_vec()`; the buffer is taken as the result instead.
+  `stream::mux_dump` for 150-byte messages went from about 255 to 108 ns each.
 
 ### Fixed
 

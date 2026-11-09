@@ -22,7 +22,7 @@
 
 """
 Per-message cost of reading a multiplexed stream from Python: the batch
-stream.mux_load (one ctypes callback per message) next to stream.DemuxFeed
+stream.mux_load (in memory: bvnr_demux_next, no callback) next to stream.DemuxFeed
 (bvnr_demux_next, no callback), fed the whole document at once and in 1460-byte
 pieces (a TCP segment's payload), with payloads as bytes and as memoryviews.
 And of writing one: the batch stream.mux_dump next to stream.MuxWriter into a
@@ -140,7 +140,7 @@ def main() -> int:
              lambda: run_live(msgs, False)),
             ("MuxWriter, flushed per message",
              lambda: run_live(msgs, True)),
-            ("mux_load (batch, callback per message)",
+            ("mux_load (batch, in memory)",
              lambda: run_batch(doc)),
             ("DemuxFeed, whole buffer, bytes",
              lambda: run_feed(doc, whole, False)),

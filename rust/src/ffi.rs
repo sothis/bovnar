@@ -1722,6 +1722,17 @@ impl WriterHandle {
         let n = usize::try_from(self.bytes_written()).unwrap_or(usize::MAX);
         &self.buf[..n.min(self.buf.len())]
     }
+
+    /// [`output`](Self::output) as an owned buffer: for a memory writer the
+    /// buffer *is* the output, so it is handed over rather than copied. The
+    /// writer is consumed; the document must already be finished.
+    pub fn into_output(mut self) -> Vec<u8> {
+        let n = usize::try_from(self.bytes_written()).unwrap_or(usize::MAX);
+        let n = n.min(self.buf.len());
+        let mut out = std::mem::take(&mut self.buf);
+        out.truncate(n);
+        out
+    }
 }
 
 // SAFETY: bovnar.h (THREADING): a writer holds its whole serialise state and

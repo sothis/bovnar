@@ -234,8 +234,11 @@ export async function loadBovnar(opts) {
     for (const k of Object.keys(options))
       if (!allowed.includes(k))
         throw new TypeError(`bovnar: ${label}: unknown option "${k}"`);
+    // null means "not set", like undefined, for every option. Mixing the two
+    // (null accepted by the limits, refused by the booleans) was a trap for
+    // options built from JSON.
     for (const k of allowed)
-      if (k !== 'policy' && options[k] !== undefined) return true;
+      if (k !== 'policy' && options[k] != null) return true;
     return options.policy != null;
   }
 
@@ -257,7 +260,7 @@ export async function loadBovnar(opts) {
       if (!policy)
         throw new Error(`bovnar: ${label}: the unit policy has been disposed`);
     }
-    const set = allowed.filter(k => k !== 'policy' && options[k] !== undefined);
+    const set = allowed.filter(k => k !== 'policy' && options[k] != null);
     if (!set.length) return { ptr: 0, policy };
     // Validate every value BEFORE allocating: a RangeError thrown after the
     // malloc would leak the block, and a caller retrying a bad option would
@@ -269,11 +272,11 @@ export async function loadBovnar(opts) {
     // type-checked; these are too.
     for (const k of ['strictVersion', 'textOnly']) {
       if (!allowed.includes(k)) continue;
-      if (options[k] !== undefined && typeof options[k] !== 'boolean')
+      if (options[k] != null && typeof options[k] !== 'boolean')
         throw new TypeError(`bovnar: ${label}: ${k} must be a boolean`);
     }
     const octets = options.octets;
-    if (octets !== undefined && octets !== 'hex')
+    if (octets != null && octets !== 'hex')
       throw new TypeError(
         `bovnar: ${label}: octets must be 'hex' (the only encoding offered)`);
     const fields = {
@@ -370,6 +373,11 @@ export async function loadBovnar(opts) {
   // (buf, len, unit, base, allow) where `unit` is a NUL-terminated C string we
   // allocate alongside the document; the _ex form appends options + policy.
   function callJsonConvert(input, unit, base, allowNonterminating, options) {
+    // A boolean like strictVersion: a truthy string from a config used to arm
+    // the relaxed (non-terminating) mode while reading as "off".
+    if (typeof allowNonterminating !== 'boolean')
+      throw new TypeError(
+        'bovnar: eventsConvert: allowNonterminating must be a boolean');
     const withOptions = optionWork(options, EVENT_OPTIONS, 'eventsConvert');
     const fnName = withOptions
       ? 'bvnr_wasm_events_convert_ex' : 'bvnr_wasm_events_convert';
@@ -506,8 +514,18 @@ export async function loadBovnar(opts) {
       /** A rule about one key path. `mode` is 'convert' (deliver converted) or
        *  'require' (assert but deliver as written). First match wins; a rule
        *  that matches nothing is satisfied. */
-      rule(path, unit, { base: ruleBase = 0, mode = 'convert' } = {}) {
+      rule(path, unit, opts = {}) {
         const h = live();
+        // The third argument is an options object like every other one: null
+        // means "not set", an unknown key is a typo and throws (a misspelled
+        // `mode` used to fall back to 'convert' in silence).
+        if (opts === null) opts = {};
+        if (typeof opts !== 'object' || Array.isArray(opts))
+          throw new TypeError('bovnar: rule: options must be an object');
+        for (const k of Object.keys(opts))
+          if (k !== 'base' && k !== 'mode')
+            throw new TypeError(`bovnar: rule: unknown option "${k}"`);
+        const { base: ruleBase = 0, mode = 'convert' } = opts;
         const modes = { convert: 0, require: 1 };
         if (!(mode in modes))
           throw new TypeError("bovnar: rule mode must be 'convert' or 'require'");

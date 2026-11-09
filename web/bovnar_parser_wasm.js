@@ -44,7 +44,7 @@
   };
 
   var wasm = null;
-  import('./bovnar_wasm.js?v=2c5924b7344c')
+  import('./bovnar_wasm.js?v=8859893773eb')
     .then(function (m) { return m.loadBovnar(); })
     .then(function (b) {
       wasm = b;
@@ -853,8 +853,14 @@
           var d;
           if (e.tok === 'type_width')      d = { kind: 'width', value: e.width, text: String(e.width) };
           else if (e.tok === 'type_base')  d = { kind: 'base',  value: e.base,  text: '_' + e.base };
-          else if (e.tok === 'unit')     { if (e.text === 'no_unit') break;   // synthesized "no unit" sentinel — not a real unit
-                                           d = { kind: 'unit', text: e.text }; }
+          /* `no_unit` IS a parameter the reader emitted, and the only sign
+             that an annotation spelled it: `<uint:8>` carries no unit
+             parameter, `<uint:8,no_unit>` carries this one, and a bare value's
+             synthesised annotation spells it out too. Dropping it (as a
+             "sentinel") made those three indistinguishable in the translated
+             stream and lost an event the C delivered. The display layer filters
+             it where it does not want it; the translator does not. */
+          else if (e.tok === 'unit')       d = { kind: 'unit', text: e.text };
           else if (e.tok === 'type_q')     d = { kind: 'q', value: e.q, text: 'q' + e.q };
           else                             d = { kind: 'param', text: e.text };
           E(EV.TYPE_ANN_PARAM, d);

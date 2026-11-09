@@ -121,8 +121,12 @@ bvnr.events(doc, { policy: bvnr.createPolicy().requireUnit() });
 policy and no read flags, so passing `strictVersion`, `textOnly` or a limit
 there **throws** rather than being silently ignored — the same reason
 `bovnar query` refuses `--text-only`. An unknown option always throws (a typo
-is not a setting). The three 64-bit limits (`maxFileSize`, `maxTextBytes`,
-`maxArrayItems`) are exact up to 2^53; pass a `BigInt` for one above that.
+is not a setting). `null` and `undefined` both mean **not set**, for every
+option and for `rule()`'s options object; `strictVersion`, `textOnly`,
+`eventsConvert`'s `allowNonterminating` and the policy toggles must be
+booleans (a `"false"` string is a `TypeError`, not an enabled assertion). The
+three 64-bit limits (`maxFileSize`, `maxTextBytes`, `maxArrayItems`) are exact
+up to 2^53; pass a `BigInt` for one above that.
 
 ### Results and throws
 
@@ -131,10 +135,12 @@ code and, where the tier has one, a position — never a throw. A throw means th
 **call** was wrong or the module could not proceed:
 
 - `TypeError` — a bad argument: input of an unsupported type, an unknown option
-  key (a typo is not a setting), options that are not an object, a read flag
-  passed to `toJSON`/`doc`, a policy from another `loadBovnar()` instance, a
-  string containing NUL, or a non-unit passed to `unitsEqual`/
-  `unitsConvertible`.
+  key (a typo is not a setting), options that are not an object, a non-boolean
+  for a boolean option or policy toggle, a read flag passed to
+  `toJSON`/`doc`, a policy from another `loadBovnar()` instance, a string
+  containing NUL, or a non-unit passed to `unitsEqual`/`unitsConvertible`.
+  An object with an unknown key is a typo even in the small options of
+  `rule()`.
 - `RangeError` — an option value out of range (a negative or fractional limit,
   nesting above 255, a base bvnr cannot write), or more than 8 policy entries
   of one kind.
@@ -170,6 +176,10 @@ const r = bvnr.events(doc, { policy });       // data events carry `converted`
 bvnr.toJSON(doc, { policy });                 // the DOM stores converted values
 policy.dispose();
 ```
+
+`rule()`'s third argument is an options object holding `base` and `mode`;
+an unknown key there throws (a misspelled `mode` used to fall back to
+`'convert'` in silence), and `null` means the defaults.
 
 A rule that matches nothing is **satisfied** (the C contract); a value at a
 rule's path that cannot be converted is `unit_mismatch`. `onInexact('leave')`

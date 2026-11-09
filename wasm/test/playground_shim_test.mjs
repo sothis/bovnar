@@ -223,6 +223,42 @@ function checkStream(P, text) {
   return bad;
 }
 
+/*
+ * The translated stream may CLOSE a container the C left open (drain does that
+ * so a consumer's nesting returns to the top), but it must not drop or invent
+ * any other event -- stream_end is never synthesised, and every start, data,
+ * type and annotation-parameter event the reader delivered must arrive. This
+ * caught `no_unit` being filtered out of the parameter events: an explicit
+ * `<uint:8,no_unit>` and a plain `<uint:8>` were indistinguishable, and a
+ * synthesised annotation lost a parameter the reader had emitted.
+ */
+const C_EV_TO_SHIM = {
+  stream_start: 'STREAM_START', stream_end: 'STREAM_END',
+  assign_start: 'ASSIGNMENT_START',
+  struct_open: 'STRUCT_START', struct_close: 'STRUCT_END',
+  array_row_start: 'ARRAY_ROW_START', array_row_end: 'ARRAY_ROW_END',
+  array_dim_start: 'ARRAY_DIM_START',
+  octet_start: 'OCTET_STREAM_START', octet_end: 'OCTET_STREAM_END',
+  type_start: 'TYPE_ANN_START', type_family: 'TYPE_ANN_FAMILY',
+  type_param: 'TYPE_ANN_PARAM', type_end: 'TYPE_ANN_END',
+  data: 'DATA',
+};
+function eventCountDiff(P, cEvents, text) {
+  const want = {}, got = {};
+  for (const e of cEvents) want[e.ev] = (want[e.ev] || 0) + 1;
+  P.parseBovnar(text, (ev) => {
+    for (const [ce, se] of Object.entries(C_EV_TO_SHIM))
+      if (ev.type === P.EV[se]) got[ce] = (got[ce] || 0) + 1;
+  });
+  const bad = [];
+  for (const ce of Object.keys(C_EV_TO_SHIM)) {
+    const w = want[ce] || 0, g = got[ce] || 0;
+    const closer = ce === 'struct_close' || ce === 'array_row_end' || ce === 'octet_end';
+    if (closer ? g < w : g !== w) bad.push(`${ce}: ${g} vs ${w}`);
+  }
+  return bad;
+}
+
 // --- corpus ----------------------------------------------------------------
 /*
  * The shim's input is what a browser textarea holds: a JS string, UTF-8 encoded
@@ -351,6 +387,68 @@ for (const { name, text } of [...examples, ...shapes]) {
   ok(d === null, `tree ${name}: ${d}`);
 }
 
+/* The corpus above is deliberate: every shape someone thought of. This adds
+   breadth — generated documents over the same constructs (typed scalars,
+   units, per-element annotations, empty and multi-row arrays, records, octets)
+   — and compares the shim's tree to the DOM projection for each one the DOM
+   accepts. The generator biases toward validity; the count assertion fails if
+   it drifts into generating nothing the DOM takes. */
+console.log('# the tree matches the DOM over generated documents');
+{
+  let seed = 1234;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const ri = (n) => Math.floor(rnd() * n);
+  const pickArr = (a) => a[ri(a.length)];
+  const scalars = [
+    '1', '-42', '-273.15', '9.81', '1e3', 'nan', 'inf', '-inf',
+    'true', 'false', 'null', 'sym', '&.ref', '"x"', '"a b"', '""',
+    '<uint:8> 7', '<sint:16> -2', '<float:64,m/s> 9.8',
+    '<float_fix:16,q8,°C> 21.5', '<float_dec:64,$USD> 12.34',
+    '<uint:16,_16> FF', '1 k~m', '100 deg', '\x00\x01\x02\x00ab\x00',
+  ];
+  const groups = [
+    ['1', '2', '3'],
+    ['<uint:8> 1', '<uint:8> 2'],
+    ['<float:64,m/s> 1.0', '<float:64,m/s> 2.0'],
+    ['1 m', '2 m', '3 m'],
+    ['true', 'false', 'true'],
+    ['"a"', '"b"'],
+    ['1', '<uint:8> 2'],               /* mixed encodings, one physical type */
+  ];
+  function gen(d) {
+    if (d > 2) return pickArr(scalars);
+    const k = ri(10);
+    if (k < 6) return pickArr(scalars);
+    if (k === 6) {
+      const g = pickArr(groups);
+      return '[' + Array.from({ length: ri(4) }, () => pickArr(g)).join(', ') + ']';
+    }
+    if (k === 7) {
+      const g = pickArr(groups);
+      return '[' + pickArr(g) + ', ' + pickArr(g) + '] / [' +
+             pickArr(g) + ', ' + pickArr(g) + ']';
+    }
+    if (k === 8)
+      return '{' + Array.from({ length: 1 + ri(3) },
+        (_, i) => '.f' + i + ' = ' + gen(d + 1) + ';').join(' ') + '}';
+    const shape = Array.from({ length: 1 + ri(3) }, (_, i) => '.g' + i);
+    return '[' + Array.from({ length: 1 + ri(3) }, () =>
+      '{' + shape.map((key) => key + ' = ' + pickArr(scalars) + ';').join(' ') + '}'
+    ).join(', ') + ']';
+  }
+  let valid = 0;
+  for (let n = 0; n < 300; n++) {
+    const text = Array.from({ length: 1 + ri(3) },
+      (_, i) => '.k' + i + ' = ' + gen(0) + ';').join('\n') + '\n';
+    const dom = bvnr.doc(text);
+    if (!dom.ok) continue;             /* not a document the DOM accepts */
+    valid++;
+    const d = diffTree(P.parseFaithful(text).tree, dom.tree);
+    ok(d === null, `generated ${n}: ${d} in ${JSON.stringify(text)}`);
+  }
+  ok(valid >= 50, `generated corpus: ${valid} valid document(s), expected 50+`);
+}
+
 console.log('# every assignment is closed exactly once, by its own value');
 for (const { name, text } of [...examples, ...shapes, ...resync]) {
   const bad = checkStream(P, text);
@@ -430,6 +528,9 @@ console.log('# a stream cut short inside a struct closes every level');
     const bad = checkStream(P, text);
     ok(bad.length === 0,
        `balance ${n}: ${bad.join('; ')} in ${JSON.stringify(text)}`);
+    const counts = eventCountDiff(P, bvnr.events(text).events, text);
+    ok(counts.length === 0,
+       `events ${n}: ${counts.join('; ')} in ${JSON.stringify(text)}`);
   }
 }
 
@@ -702,6 +803,30 @@ console.log('# a float_fix q parameter reaches the translated stream');
   const q = evs.find(x => x.kind === 'q');
   ok(q && q.text === 'q8' && q.value === 8,
      `shim q param: ${show(evs)}`);
+}
+
+/* The unit parameter is part of the annotation, and `no_unit` is a value of it:
+   `<uint:8>` carries none, `<uint:8,no_unit>` carries that one, and a bare
+   value's synthesised annotation spells it out. The translator used to drop it
+   as a "sentinel", losing the event and making the three indistinguishable. */
+console.log('# every type parameter the reader emitted reaches the callback');
+{
+  const paramsOf = (text) => {
+    const out = [];
+    P.parseBovnar(text, (ev) => {
+      if (ev.type === P.EV.TYPE_ANN_PARAM) out.push(ev.data);
+    });
+    return out;
+  };
+  const bare = paramsOf('.a = 1;');
+  ok(bare.some(p => p.kind === 'unit' && p.text === 'no_unit'),
+     `a synthesised annotation keeps its unit parameter ${show(bare)}`);
+  const omitted = paramsOf('.a = <uint:8> 1;');
+  ok(!omitted.some(p => p.kind === 'unit'),
+     `an omitted unit parameter is not invented ${show(omitted)}`);
+  const explicit = paramsOf('.a = <uint:8,no_unit> 1;');
+  ok(explicit.some(p => p.kind === 'unit' && p.text === 'no_unit'),
+     `an explicit no_unit reaches the callback ${show(explicit)}`);
 }
 
 /* An octet stream is raw binary, and a payload may contain '"', '#' or a

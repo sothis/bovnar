@@ -905,7 +905,11 @@ static char *to_json_impl(const char *buf, int len,
 
 	sb_putc(&b, '{');
 	emit_status(&b, err);
-	if (frac_key) {
+	/* The DOM could not be built at all: an allocation failure, not a finding
+	 * about the document. Say so, in the shape every internal failure uses. */
+	if (!doc) {
+		sb_puts(&b, ",\"detail\":\"out of memory\"");
+	} else if (frac_key) {
 		sb_puts(&b, ",\"detail\":\"a datetime with sub-second digits cannot "
 		            "be represented in JSON without dropping the fraction "
 		            "(under top-level key '");
@@ -1390,6 +1394,7 @@ static char *events_impl(const char *buf, int len,
 	sb_printf(&b, "\"error\":%d,", (int)err);
 	sb_puts(&b, "\"error_name\":");
 	sb_json_cstr(&b, bvn_error_to_string(err));
+	if (!r) sb_puts(&b, ",\"detail\":\"out of memory\"");
 	/* The first error's position: the errors array carries every position for
 	 * errors()/parse(), but events() has no such array, so without these a
 	 * caller that only reads the stream could not point at the failure at all
@@ -1613,6 +1618,8 @@ static char *errors_impl(const char *buf, int len,
 	sb_printf(&b, "\"error\":%d,", (int)err);
 	sb_puts(&b, "\"error_name\":");
 	sb_json_cstr(&b, bvn_error_to_string(err));
+	if (!r || internal_err != error_none)
+		sb_puts(&b, ",\"detail\":\"out of memory\"");
 	emit_position(&b, ctx.first_line, ctx.first_column,
 		      ctx.first_byte, ctx.first_offset);
 	emit_reader_stats(&b, r);
@@ -1743,6 +1750,7 @@ static char *parse_impl(const char *buf, int len,
 	sb_printf(&b, "\"error\":%d,", (int)err);
 	sb_puts(&b, "\"error_name\":");
 	sb_json_cstr(&b, bvn_error_to_string(err));
+	if (!r) sb_puts(&b, ",\"detail\":\"out of memory\"");
 	emit_position(&b, ud.er.first_line, ud.er.first_column,
 		      ud.er.first_byte, ud.er.first_offset);
 	emit_reader_stats(&b, r);
@@ -2023,6 +2031,7 @@ static char *doc_impl(const char *buf, int len, const wasm_policy_t *policy)
 	 * parsing the document again through another entry point. */
 	sb_putc(&b, '{');
 	emit_status(&b, err);
+	if (!doc) sb_puts(&b, ",\"detail\":\"out of memory\"");
 	emit_peeked_version(&b, buf, len);
 	sb_puts(&b, ",\"tree\":[");
 	if (doc) {

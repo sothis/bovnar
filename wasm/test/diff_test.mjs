@@ -442,9 +442,21 @@ console.log('# reader options');
      'options: a non-boolean strictVersion throws');
   ok(throws(() => b.events('.a=1;', { textOnly: 1 })),
      'options: a non-boolean textOnly throws');
+  // null is "not set" for every option, as undefined is -- limits, booleans,
+  // octets and policy alike.
+  ok(b.validate('.a = 1;', { maxFileSize: null, strictVersion: null }).ok &&
+     b.events('.a = 1;', { octets: null, textOnly: null }).ok &&
+     b.toJSON('.a = 1;', { policy: null }).ok,
+     'options: null means not set');
+  // eventsConvert's boolean is a boolean too.
+  ok(throws(() => b.eventsConvert('.v = <float:64,k~m/h> 100.0;', 'm/s', 10, 'no')),
+     'eventsConvert: a non-boolean allowNonterminating throws');
   const p = b.createPolicy();
   ok(throws(() => p.requireUnit('yes')) && throws(() => p.normaliseSI(1)),
      'policy: the on/off arguments are booleans');
+  ok(throws(() => p.rule('.a', 'm', { modes: 'require' })),
+     'policy: an unknown rule option throws');
+  ok(p.rule('.a', 'm', null) === p, 'policy: null rule options are the defaults');
   p.dispose();
   // A NUL in a C-string argument names the thing the caller passed.
   let nul = '';

@@ -549,14 +549,29 @@ API and implements spec 1.2.
     returned to the top: `drain()` popped each container without first closing
     the pending assignment on it (the live `struct_close` path does), and the
     octet pair had no drain at all. Both are closed now, and a randomized
-    balance check runs over generated, corrupted documents.
+    balance check runs over generated, corrupted documents. The translator
+    also dropped the reader's `no_unit` type-parameter event, so an explicit
+    `<uint:8,no_unit>` and a plain `<uint:8>` produced the same callback
+    stream and a synthesised annotation lost a parameter the reader emitted;
+    every parameter now crosses, and a randomized event-count check holds the
+    translated stream to the C event stream.
 
-- **WASM: the boolean options are type-checked.** `strictVersion` and
-  `textOnly` were read for truthiness, so a `"false"` arriving from a JSON
-  config ENABLED the assertion; `requireUnit()` and `normaliseSI()` were the
-  same. They now throw a `TypeError` for a non-boolean, as every other option
-  is type-checked. A NUL in `parseTypeAnnotation()`'s argument is also named
-  as a type annotation now, not as "a unit or key path".
+- **WASM: the boolean options are type-checked, and `null` means "not set"
+  everywhere.** `strictVersion`, `textOnly`, `eventsConvert`'s
+  `allowNonterminating`, `requireUnit()` and `normaliseSI()` were read for
+  truthiness, so a `"false"` arriving from a JSON config ENABLED the assertion
+  (or the relaxed conversion) it was meant to leave off; they now throw a
+  `TypeError` for a non-boolean. `null` was accepted as "not set" by the
+  limits and the policy but refused by the booleans and `octets`; it is now
+  "not set" for every option. `rule()`'s third argument is validated as an
+  options object too — an unknown key (a misspelled `mode`) throws instead of
+  silently defaulting, and `null` means the defaults. A NUL in
+  `parseTypeAnnotation()`'s argument is also named as a type annotation now,
+  not as "a unit or key path". The internal-failure paths of `doc()`,
+  `toJSON()`, `events()`, `errors()` and `parse()` carry
+  `detail: "out of memory"` when the DOM or the reader could not be allocated,
+  matching `validate()`'s shape instead of an unqualified
+  `invalid_argument`.
 
 - **WASM: the gaps a review of the bindings against the C API turned up.**
   - *`events()`/`parse()` reported an error with no position,* while

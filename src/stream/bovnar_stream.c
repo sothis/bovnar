@@ -138,7 +138,8 @@ bool bvnr_frame_write(bvnr_sink_t* sink, const void* doc, uint64_t doc_len)
  * <=1 GiB windows (the pull fn's length is uint32). Returns:
  *    1  filled all n bytes
  *    0  clean EOF before *any* byte was read  (legal frame boundary)
- *   -1  I/O error, or EOF mid-record (truncation)
+ *   -1  EOF mid-record (truncation)
+ *   -2  I/O error
  */
 static int bvn_src_read_exact(bvnr_source_t* src, uint8_t* buf, uint64_t n)
 {
@@ -148,7 +149,7 @@ static int bvn_src_read_exact(bvnr_source_t* src, uint8_t* buf, uint64_t n)
 		uint32_t want = rem > (1u << 30) ? (1u << 30) : (uint32_t)rem;
 		uint32_t got  = 0;
 		if (!bvn_source_pull(src, buf + total, want, &got))
-			return -1;
+			return -2;
 		if (!got)
 			return total == 0 ? 0 : -1;
 		total += got;
@@ -166,8 +167,9 @@ static int bvn_src_read_exact(bvnr_source_t* src, uint8_t* buf, uint64_t n)
  * that actually arrives bounds the allocation by real bytes received -- now by
  * the largest frame actually received so far, since a buffer that has grown is
  * kept. A fresh buffer grows exactly as the per-frame one it replaces did:
- * min(len, 4096), then doubling, clamped to len. Returns 1 on success and -1 on
- * short stream / I/O / OOM (the buffer is kept for the caller to free).
+ * min(len, 4096), then doubling, clamped to len. Returns 1 on success, -1 on a
+ * short stream, -2 on an I/O error and -3 when out of memory (the buffer is
+ * kept for the caller to free either way).
  */
 static int bvn_src_read_exact_grow(
 	bvnr_source_t* src, uint64_t len, uint8_t** buf, uint64_t* cap)
@@ -186,7 +188,7 @@ static int bvn_src_read_exact_grow(
 				if (ncap > len) ncap = len;
 			}
 			uint8_t* nb = (uint8_t*)realloc(*buf, (size_t)ncap);
-			if (!nb) return -1;
+			if (!nb) return -3;
 			*buf = nb;
 			*cap = ncap;
 		}
@@ -194,53 +196,68 @@ static int bvn_src_read_exact_grow(
 		uint64_t room = end - total;
 		uint32_t want = room > (1u << 30) ? (1u << 30) : (uint32_t)room;
 		uint32_t got  = 0;
-		if (!bvn_source_pull(src, *buf + total, want, &got)) return -1;
+		if (!bvn_source_pull(src, *buf + total, want, &got)) return -2;
 		if (!got) return -1;   /* EOF before len: truncation */
 		total += got;
 	}
 	return 1;
 }
 
-bool bvnr_doc_stream_read(
+/* What a short read of `rc` (bvn_src_read_exact, ..._grow) ends the stream
+ * with: the codes the push-fed frame reader gives for the same input. */
+static error_code_t doc_stream_read_error(int rc)
+{
+	return rc == -2 ? error_reading_from_source_fd
+	     : rc == -3 ? error_invalid_argument
+	     :            error_got_incomplete_bvnr_stream;
+}
+
+bool bvnr_doc_stream_read_ex(
 	bvnr_source_t* src, const bvnr_doc_stream_opts_t* opts,
-	uint64_t* out_count)
+	uint64_t* out_count, error_code_t* out_error)
 {
 	if (out_count) *out_count = 0;
-	if (!src || !bvn_source_impl(src)->pull)
+	if (out_error) *out_error = error_none;
+	error_code_t error = error_none;
+	if (!src || !bvn_source_impl(src)->pull) {
+		if (out_error) *out_error = error_invalid_argument;
 		return false;
+	}
 
 	uint64_t cap = (opts && opts->max_document_size)
 		? opts->max_document_size : BVNR_DOC_DEFAULT_MAX;
 	uint64_t index = 0;
 	bvnr_reader_t* r = bvnr_reader_create();
-	if (!r) return false;
+	if (!r) {
+		if (out_error) *out_error = error_invalid_argument;
+		return false;
+	}
 	/* One payload buffer for the whole sequence, as there is one reader: a
 	 * buffer per frame was an allocation per document. */
 	uint8_t* buf = NULL;
 	uint64_t buf_cap = 0;
 
-	bool result = true;
 	for (;;) {
 		uint8_t hdr[BVNR_FRAME_HEADER_SIZE];
 		int rc = bvn_src_read_exact(src, hdr, BVNR_FRAME_HEADER_SIZE);
 		if (rc == 0) break;            /* clean EOF on frame boundary */
-		if (rc < 0) { result = false; break; }
+		if (rc < 0) { error = doc_stream_read_error(rc); break; }
 		if (hdr[0] != BVNR_FRAME_MAGIC0 || hdr[1] != BVNR_FRAME_MAGIC1 ||
 		    hdr[2] != BVNR_FRAME_MAGIC2 || hdr[3] != BVNR_FRAME_MAGIC3) {
-			result = false; break;
+			error = error_unexpected_input_byte; break;
 		}
 		uint64_t len = bvn_get_u64le(hdr + 4);
 		/* cap is always nonzero here (explicit value or BVNR_DOC_DEFAULT_MAX).
 		 * To lift the per-frame guard, callers pass an explicit huge cap
-		 * (e.g. UINT64_MAX), which a 64-bit len can never exceed. */
-		if (len > cap) {
-			result = false; break;
+		 * (e.g. UINT64_MAX), which a 64-bit len can never exceed. The SIZE_MAX
+		 * guard is for 32-bit hosts, where a uint64 len can exceed size_t. */
+		if (len > cap || len > (uint64_t)SIZE_MAX) {
+			error = error_value_out_of_range; break;
 		}
-		/* SIZE_MAX guard for 32-bit hosts where uint64 len can exceed size_t. */
-		if (len > (uint64_t)SIZE_MAX) { result = false; break; }
 
-		if (len && bvn_src_read_exact_grow(src, len, &buf, &buf_cap) != 1) {
-			result = false; break;
+		if (len) {
+			rc = bvn_src_read_exact_grow(src, len, &buf, &buf_cap);
+			if (rc != 1) { error = doc_stream_read_error(rc); break; }
 		}
 
 		bool ok = bvnr_open_read_mem(r, len ? buf : (const void*)"", len,
@@ -258,23 +275,35 @@ bool bvnr_doc_stream_read(
 
 		if (opts && opts->on_document) {
 			if (!opts->on_document(opts->userdata, doc_index, ok, err)) {
-				result = false; break;
+				error = error_scanner_callback_failed; break;
 			}
 		}
 
 		/* A failed document aborts the sequence unless the caller opted into
 		 * inter-document resilience. This is orthogonal to the inner reader's
 		 * resync (flags->continue_on_error): each frame is independently
-		 * delimited, so we can always advance to the next one. */
+		 * delimited, so we can always advance to the next one. A document
+		 * that failed without a code of its own (it cannot, but the stream
+		 * must not end looking clean) is reported as incomplete. */
 		if (!ok && !(opts && opts->continue_past_failed)) {
-			result = false; break;
+			error = err != error_none ? err
+			                          : error_got_incomplete_bvnr_stream;
+			break;
 		}
 	}
 
 	free(buf);
 	bvnr_reader_destroy(r);
 	if (out_count) *out_count = index;
-	return result;
+	if (out_error) *out_error = error;
+	return error == error_none;
+}
+
+bool bvnr_doc_stream_read(
+	bvnr_source_t* src, const bvnr_doc_stream_opts_t* opts,
+	uint64_t* out_count)
+{
+	return bvnr_doc_stream_read_ex(src, opts, out_count, NULL);
 }
 
 /* ===========================================================================

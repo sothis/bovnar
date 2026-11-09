@@ -658,3 +658,21 @@ class TestFdParseFailures:
         finally:
             os.close(rfd)
         assert doc["a"].as_i64() == 1
+
+
+@needs_lib
+class TestDomKeysHoldingNul:
+    """A key crosses to C as a NUL-terminated string, so 'a\\x00zz' was cut
+    short at the NUL and found the entry under 'a'. No key holds a NUL."""
+
+    def test_lookups_do_not_find_the_key_before_the_nul(self):
+        doc = DomDoc.parse(b".a = {.b = 1;};\n.c = 2;\n")
+        with pytest.raises(KeyError):
+            doc["a\x00zz"]
+        with pytest.raises(KeyError):
+            doc["a"]["b\x00q"]
+        assert doc.lookup("c\x00zz") is None
+        assert "c\x00x" not in doc
+        assert "b\x00" not in doc["a"]
+        assert doc["a"]["b"].as_i64() == 1
+        assert doc.lookup("c").as_i64() == 2

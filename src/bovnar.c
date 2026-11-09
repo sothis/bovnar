@@ -3723,12 +3723,13 @@ static int cmd_frames_list(const char *path)
 	 * explicit huge cap (max_document_size==0 now selects BVNR_DOC_DEFAULT_MAX). */
 	opts.max_document_size    = UINT64_MAX;
 	uint64_t count = 0;
-	bool ok = bvnr_doc_stream_read(&src, &opts, &count);
+	error_code_t err = error_none;
+	bool ok = bvnr_doc_stream_read_ex(&src, &opts, &count, &err);
 	if (!is_stdin) close(fd);
 	printf("%" PRIu64 " document(s)\n", count);
 	if (!ok) {
-		fprintf(stderr, "frames list: framing/IO error after %" PRIu64
-				" document(s)\n", count);
+		fprintf(stderr, "frames list: %s after %" PRIu64 " document(s)\n",
+			bvn_error_to_string(err), count);
 		return 1;
 	}
 	/*

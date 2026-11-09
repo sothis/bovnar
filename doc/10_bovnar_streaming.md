@@ -129,6 +129,9 @@ typedef struct {
 bool bvnr_doc_stream_read(bvnr_source_t* src,
                           const bvnr_doc_stream_opts_t* opts,
                           uint64_t* out_count);
+bool bvnr_doc_stream_read_ex(bvnr_source_t* src,
+                             const bvnr_doc_stream_opts_t* opts,
+                             uint64_t* out_count, error_code_t* out_error);
 ```
 
 `bvnr_doc_stream_read` reads frames until EOF, parsing each payload with a fresh
@@ -140,6 +143,16 @@ crafted oversized length cannot force a large up-front allocation), bounded by
 `max_document_size`. Unlike `max_file_size`, this framing guard stays finite when
 `0` (it then selects `BVNR_DOC_DEFAULT_MAX`, 256 MiB); set an explicit huge cap
 (e.g. `UINT64_MAX`) to lift it.
+
+`bvnr_doc_stream_read_ex` is the same call, and says why it returned false in
+`*out_error` with the codes the push-fed frame reader gives (§2.4): a bad magic
+is `error_unexpected_input_byte`, a length over the cap
+`error_value_out_of_range`, input that ends inside a header or a payload
+`error_got_incomplete_bvnr_stream`, a failing pull
+`error_reading_from_source_fd`, an `on_document` veto
+`error_scanner_callback_failed`, and a failed document without
+`continue_past_failed` that document's own code. The bindings' `load_documents`
+reports these codes.
 
 Two **orthogonal** error controls — because each document occupies its own
 length-delimited frame, the two are independent:

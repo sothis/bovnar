@@ -148,6 +148,36 @@ fn test_wide_int_beside_a_null_is_annotated() {
 }
 
 #[test]
+fn test_negative_power_of_two_needs_no_extra_bit() {
+    // A sint:N holds -2^(N-1). The width was the magnitude's bits plus one,
+    // so an i64 array holding its minimum went out as <sint:65>.
+    let big = |s: &str| Value::BigInt(s.parse().unwrap());
+    let min256 = "-57896044618658097711785492504343953926634992332820282019728792003956564819968";
+    let cases = [
+        (vec![Value::Int(i128::from(i64::MIN)), Value::Int(1)], ""),
+        (vec![Value::Int(-(1 << 64))], "<sint:65>"),
+        (vec![Value::Int(-(1 << 64) - 1)], "<sint:66>"),
+        (vec![Value::Int(i128::MIN)], "<sint:128>"),
+        (vec![big(min256)], "<sint:256>"),
+    ];
+    for (items, annotation) in cases {
+        let body: Vec<String> = items
+            .iter()
+            .map(|v| match v {
+                Value::Int(i) => i.to_string(),
+                Value::BigInt(b) => b.to_string(),
+                _ => unreachable!(),
+            })
+            .collect();
+        let doc = obj(vec![("k", Value::Array(items))]);
+        let out = to_string(&doc, false).unwrap();
+        let want = format!(".k={annotation}[{}];", body.join(","));
+        assert_eq!(String::from_utf8_lossy(&out), want);
+        assert_eq!(parse(&out).unwrap(), doc);
+    }
+}
+
+#[test]
 fn test_wide_int_in_an_array_with_no_annotation_is_refused() {
     // An array has one annotation; beside a float, a bool or a string there is
     // none to give a wide int, so serialising must refuse.
@@ -251,5 +281,34 @@ fn test_typed_loads_does_not_pin_the_reader_snapshot() {
     assert_eq!(
         to_string(&d, false).unwrap(),
         b".a=<float:64,m>[1.5,2.5];.b=<float:64,m>3.5;.c=<uint:64,s>5;.d=sym;"
+    );
+}
+
+#[test]
+fn test_float_elements_are_written_in_the_canonical_form() {
+    // The bytes the Python binding writes for the same values: one document
+    // for one value in both bindings (Python used repr() for array floats).
+    let floats = [
+        1.0,
+        2.5,
+        -0.5,
+        0.0,
+        -0.0,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        f64::NAN,
+        5e-324,
+        1e300,
+    ];
+    let doc = obj(vec![
+        (
+            "a",
+            Value::Array(floats.iter().map(|&f| Value::Float(f)).collect()),
+        ),
+        ("b", Value::Float(2.5)),
+    ]);
+    assert_eq!(
+        String::from_utf8(to_string(&doc, false).unwrap()).unwrap(),
+        ".a=[1e+0,2.5e+0,-5e-1,0.0,-0.0,inf,ninf,nan,5e-324,1e+300];.b=<float:64>2.5e+0;"
     );
 }

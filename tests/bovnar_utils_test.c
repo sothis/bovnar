@@ -370,6 +370,47 @@ static void test_format_double_base_out_of_range(void)
 				"bvn_format_double with base=16 must succeed");
 }
 
+/*
+ * The canonical text of a double is its shortest decimal that reads back as
+ * it, and of several such the nearest. The digit choice saw only the value
+ * truncated to a 20-digit window, so a value just above a midpoint of the
+ * last digit looked like the midpoint and went to the even candidate: one
+ * that reads back too, but not the nearest -- not the digits Python's repr,
+ * Rust's {:?} or any shortest-digit printer gives, so the bindings could not
+ * produce the canonical form without asking C. And a subnormal was padded to
+ * 53 bits, printing digits it does not hold (5e-324 as 4.94...e-324).
+ */
+static void test_format_double_nearest_shortest(void)
+{
+	printf("  test_format_double_nearest_shortest...\n");
+	static const struct { double v; const char* want; } cases[] = {
+		{ -2.6546153960359173e+65, "-2.6546153960359173e+65" },
+		{ 388534.92884172197,      "3.8853492884172197e+5" },
+		{ -0.0045198390847938945,  "-4.5198390847938945e-3" },
+		{ 9.352393502903893e+163,  "9.352393502903893e+163" },
+		{ 5e-324,                  "5e-324" },
+		{ -1e-323,                 "-1e-323" },
+		{ 1e-320,                  "1e-320" },
+		{ 1.23456e-310,            "1.23456e-310" },
+		{ 2.2250738585072014e-308, "2.2250738585072014e-308" },
+		{ 1.7976931348623157e+308, "1.7976931348623157e+308" },
+		{ 0.1,                     "1e-1" },
+		{ 1.5,                     "1.5e+0" },
+	};
+	value_type_spec_t vt = BVN_TYPE_FLOAT(64);
+	char buf[64];
+	for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+		bool ok = bvn_format_double(buf, sizeof buf, cases[i].v, vt) > 0 &&
+			  strcmp(buf, cases[i].want) == 0;
+		if (!ok)
+			fprintf(stderr, "    got %s, want %s\n", buf, cases[i].want);
+		ASSERT_TRUE(ok, cases[i].want);
+		double back = 0.0;
+		ASSERT_TRUE(bvn_parse_double_in_base(buf, 10u, &back) &&
+			    back == cases[i].v, "the text reads back as the double");
+	}
+}
+
 static void test_validate_number_in_base_e_digit(void)
 {
 	printf("  test_validate_number_in_base_e_digit...\n");
@@ -578,6 +619,7 @@ int main(void)
 	test_unit_math_compound_units();
 	test_unit_edge_cases();
 	test_format_double_base_out_of_range();
+	test_format_double_nearest_shortest();
 	test_validate_number_in_base_e_digit();
 	test_unit_equal();
 	test_parse_helpers_respect_declared_width();

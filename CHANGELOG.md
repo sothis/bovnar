@@ -178,8 +178,33 @@ API and implements spec 1.2.
   flush after every writer call and after each single one — allocates nothing
   per message once warm, does nothing on a `to_mem` writer, and reports a
   failing `write` or `flush` as `Error::Io` with `writing_to_sink`.
+- **`bvnr_doc_stream_read_ex`** is `bvnr_doc_stream_read` saying why it
+  returned false, with the codes the push-fed frame reader gives for the same
+  input: `error_unexpected_input_byte` for a bad magic,
+  `error_value_out_of_range` for a frame over the cap,
+  `error_got_incomplete_bvnr_stream` for input that ends inside a frame,
+  `error_reading_from_source_fd`, `error_scanner_callback_failed` for an
+  `on_document` veto, or a failed document's own code. An export-only ABI
+  addition; `bovnar frames list` names the error with it.
 
 ### Changed
+
+- **The canonical text of a double is its nearest shortest decimal.**
+  `bvn_format_double`, which writes every float the writer formats, chose
+  between the two shortest candidates from the value truncated to a 20-digit
+  window, so a value just above a midpoint went to the even candidate: a
+  decimal that reads back as the double, but not the nearest one, and not the
+  one Python's `repr`, Rust's `{:?}` and other shortest-digit printers give
+  (`2.6546153960359172e+65` for `2.6546153960359173e+65`, about one value in
+  ten thousand). The choice now sees the whole value. A subnormal is written
+  at its own precision rather than padded to 53 bits: `5e-324`, not
+  `4.9406564584124654e-324`. Both read back as the same double as before.
+- **Python writes the floats of an array in the canonical form.** `dumps`,
+  `write_array` and the NumPy bridge wrote an array's floats with `repr()`
+  (`[1.5, -0.5]`) where a scalar float, and every float of the Rust binding,
+  is written in the C writer's form (`[1.5e+0, -5e-1]`), so the two bindings
+  wrote one value as two documents. The digits are those of `repr()` for a
+  normal double and of `bvn_format_double` otherwise, which are the same text.
 
 - **Re-opening a reader allocates nothing.** `bvnr_open_read_*` freed the
   reader's array-frame stack and scratch buffers and allocated them again, about
@@ -249,6 +274,41 @@ API and implements spec 1.2.
   message while `bvnr_write_flush` and `bvnr_write_finish` succeeded. It now
   sets `error_invalid_argument` like any writer error, the first error kept,
   and refuses at once after an earlier one.
+- **`load_documents` names the framing error.** In both bindings every
+  framing failure was `got_incomplete_bvnr_stream`, where `FrameFeed` and
+  `live::FrameParser` name it (`unexpected_input_byte` for a bad magic,
+  `value_out_of_range` for a frame over the cap); they now give the same codes,
+  through `bvnr_doc_stream_read_ex`. And with `continue_past_failed`, a framing
+  failure after a document that had failed to parse raised that document's
+  error — "document 1 failed to parse" — although the document was already a
+  `None` in the results and was not what ended the read.
+- **`nan`, `inf` and `ninf` under an integer type decode as numbers.** The
+  reader accepts them under every numeric family (spec §6.4), and the DOM
+  stores them as floats, but `bovnar.loads()` raised `ValueError` on
+  `<uint:8> nan`, and Rust's `parse()` returned the string `"nan"`, which
+  `to_string` then wrote as a string. Both now give the float, as the DOM
+  does, also inside an array and from `Quantity.value`; a quoted `"nan"` under
+  base 36 or 62 is still digits.
+- **A negative power of two is written at its own width.** A `sint:N` holds
+  -2^(N-1), but both bindings took a negative value's magnitude plus a sign
+  bit, so an integer array holding `i64::MIN` (`-2**63`) went out under a
+  needless `<sint:65>`, `[-2**64]` as `<sint:66>`, and in Python the scalar
+  `-2**255` as `<sint:257>`. The width is now the bits of `-v-1` plus the
+  sign; Rust's scalar widths were already right.
+- **Python: stream keys holding NUL are refused, not cut short.**
+  `mux_dump`, `MuxWriter` and `embed_document` passed the key to C as a
+  NUL-terminated string, so `key="mux\x00x"` wrote the stream under `mux`; they
+  now refuse any key `dumps()` refuses, with `BovnarArgumentError` (a key over
+  255 bytes, which every reader at its defaults refuses, was written; an
+  invalid one was a `BovnarWriteError`). `mux_load` and `DemuxFeed` refuse a
+  `key` filter holding NUL, which matched the stream under the key before it.
+  The same cut made a DOM lookup of `"a\x00b"` find the entry under `a`, and a
+  unit policy string `"m\x00junk"` mean `m`; the lookup now finds nothing and
+  the policy is refused. Rust already refused all of these.
+- **A re-opened writer frees the text of its last rescaled value.** Under
+  `BVN_UNIT_REDUCE` the writer keeps the rescaled digits of the last value for
+  its observer; `bvnr_open_write_*` on a used writer zeroed the pointer without
+  freeing it, leaking one allocation per re-open.
 
 ## [2.0.2] - 2026-11-04
 

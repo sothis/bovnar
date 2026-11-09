@@ -593,6 +593,10 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvnr_doc_stream_read.argtypes = [
         P(BvnrSource), P(BvnrDocStreamOpts), P(c_uint64),
     ]
+    lib.bvnr_doc_stream_read_ex.restype  = c_bool
+    lib.bvnr_doc_stream_read_ex.argtypes = [
+        P(BvnrSource), P(BvnrDocStreamOpts), P(c_uint64), P(c_int),
+    ]
 
     lib.bvnr_frame_reader_create.restype  = c_void_p
     lib.bvnr_frame_reader_create.argtypes = [P(BvnrDocStreamOpts)]

@@ -120,18 +120,14 @@ fn load_from(
 ) -> Result<Vec<Option<Value>>> {
     let parser = RefCell::new(DictParser::new(typed));
     let mut results = Vec::new();
-    let mut failed: Option<(u64, i32)> = None;
     let mut on_event = |d: &EventData<'_>| {
         parser.borrow_mut().on_event(d);
         true
     };
     let mut verified = wrap(&mut on_event);
-    let mut on_document = |index: u64, ok: bool, err: i32| {
+    let mut on_document = |_index: u64, ok: bool, _err: i32| {
         let done = parser.replace(DictParser::new(typed));
         results.push(ok.then(|| done.result()));
-        if !ok {
-            failed.get_or_insert((index, err));
-        }
         true
     };
     let mut h = ffi::Handlers {
@@ -139,7 +135,7 @@ fn load_from(
         on_document: Some(&mut on_document),
         ..ffi::Handlers::default()
     };
-    let (ok, _) = ffi::doc_stream_read(
+    let (ok, _, error) = ffi::doc_stream_read(
         src,
         read_flags(),
         continue_past_failed,
@@ -147,9 +143,10 @@ fn load_from(
         &mut h,
     );
     if !ok {
-        return Err(parse_error(
-            failed.map_or(ErrorCode::GotIncompleteBvnrStream as i32, |(_, e)| e),
-        ));
+        // Why the stream ended, with the codes live::FrameParser gives: a
+        // failed document's own code (without continue_past_failed), or the
+        // framing's.
+        return Err(parse_error(error));
     }
     Ok(results)
 }

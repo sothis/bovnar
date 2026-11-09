@@ -144,6 +144,16 @@ static void bvnf_bn_shr(bvnf_bn *b, uint32_t bits)
 	}
 	bvnf_bn_norm(b);
 }
+/* Whether the low `bits` bits of b are set anywhere: what a following
+ * bvnf_bn_shr(b, bits) throws away. */
+static bool bvnf_bn_low_bits_nonzero(const bvnf_bn *b, uint32_t bits)
+{
+	uint32_t whole = bits / 32u, rest = bits % 32u;
+	for (uint32_t i = 0; i < whole && i < b->nused; i++)
+		if (b->limbs[i]) return true;
+	return rest && whole < b->nused &&
+	       (b->limbs[whole] & ((1u << rest) - 1u)) != 0u;
+}
 static bool bvnf_bn_shl(bvnf_bn *b, uint32_t bits)
 {
 	if (bvnf_bn_is_zero(b) || !bits) return true;
@@ -1744,7 +1754,7 @@ static bool bvnf_rt_candidate(const bvn_float_t *f, uint32_t base,
  * failure the input is left unchanged — still correct, just not minimal.
  */
 static void bvnf_shorten_digits(const bvn_float_t *f, uint32_t base,
-								char *digs, long *pn, long *pE)
+								char *digs, long *pn, long *pE, bool inexact)
 {
 	long n = *pn;
 	if (n <= 1) return;
@@ -1770,7 +1780,13 @@ static void bvnf_shorten_digits(const bvn_float_t *f, uint32_t base,
 		bvnf_take_k(digs, n, base, k, false, df, &fn, &fe);
 		bvnf_take_k(digs, n, base, k, true,  dc, &cn, &ce);
 		uint32_t nd = (k < n) ? bvnf_digit((uint8_t)digs[k], base) : 0u;
-		bool sticky = false;
+		/* The digit string is the value TRUNCATED to its window: what lies
+		 * past it is non-zero exactly when `inexact`, and without it a value
+		 * just above a midpoint looked like the midpoint and went to the
+		 * even candidate -- a decimal that still round-trips, but not the
+		 * nearest one, so not the one every other shortest-digit printer
+		 * gives (2.6546153960359172e+65 for ...173). */
+		bool sticky = inexact;
 		for (long i = k + 1; i < n; i++)
 			if (bvnf_digit((uint8_t)digs[i], base) != 0u) { sticky = true; break; }
 		uint32_t last = bvnf_digit((uint8_t)digs[k - 1], base);
@@ -1820,16 +1836,28 @@ static int32_t bvnf_to_str_dec(const bvn_float_t *f, char *buf, size_t bufsize)
 	bvnf_bn M = {0}; if (!bvnf_bn_init(&M, f->_nlimbs * 2u)) return -1;
 	if (!bvnf_bn_from_float_mant(&M, f)) { bvnf_bn_free(&M); return -1; }
 	long net2 = e2 + k;
+	/* Whether the window drops anything of the value: bits shifted out, or
+	 * a remainder of the division by five. */
+	bool inexact = false;
 	if (k >= 0) {
 		bvnf_bn_mul_pow5(&M, (uint32_t)k);
-		if      (net2 > 0) bvnf_bn_shl(&M, (uint32_t)net2);
-		else if (net2 < 0) bvnf_bn_shr(&M, (uint32_t)(-net2));
+		if (net2 > 0) {
+			bvnf_bn_shl(&M, (uint32_t)net2);
+		} else if (net2 < 0) {
+			inexact = bvnf_bn_low_bits_nonzero(&M, (uint32_t)(-net2));
+			bvnf_bn_shr(&M, (uint32_t)(-net2));
+		}
 	} else {
 		long neg_k = -k;
-		if      (net2 > 0) bvnf_bn_shl(&M, (uint32_t)net2);
-		else if (net2 < 0) bvnf_bn_shr(&M, (uint32_t)(-net2));
+		if (net2 > 0) {
+			bvnf_bn_shl(&M, (uint32_t)net2);
+		} else if (net2 < 0) {
+			inexact = bvnf_bn_low_bits_nonzero(&M, (uint32_t)(-net2));
+			bvnf_bn_shr(&M, (uint32_t)(-net2));
+		}
 		for (long i = 0; i < neg_k; i++)
-			bvnf_bn_div_u32(&M, 5u);
+			if (bvnf_bn_div_u32(&M, 5u) != 0u)
+				inexact = true;
 	}
 	if (ndigits <= 0) { bvnf_bn_free(&M); return -1; }
 	char *digs = calloc((size_t)(ndigits + 4), 1u);
@@ -1862,7 +1890,7 @@ static int32_t bvnf_to_str_dec(const bvn_float_t *f, char *buf, size_t bufsize)
 	long last = ndigits - 1;
 	while (last > 0 && digs[last] == '0') last--;
 	ndigits = last + 1;
-	bvnf_shorten_digits(f, 10u, digs, &ndigits, &E10);
+	bvnf_shorten_digits(f, 10u, digs, &ndigits, &E10, inexact);
 	size_t pos = 0;
 	int32_t ret = -1;
 #define PUTC(c) do { if (pos + 1 >= bufsize) goto overflow; \

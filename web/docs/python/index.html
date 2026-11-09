@@ -248,6 +248,8 @@ failed (<code>not found</code>, or the loader's error).</p>
 <span class="k">assert</span> <span class="n">recovered</span><span class="p">[</span><span class="s2">&quot;sensor_id&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">42</span>
 </code></pre></div>
 
+<p><code>nan</code>, <code>inf</code> and <code>ninf</code> come back as <code>float</code>, under an integer type as well
+(<code>&lt;uint:8&gt; nan</code>, spec §6.4), as <code>dom_parse()</code> gives them.</p>
 <p><code>loads</code> accepts an optional <code>typed</code> flag that wraps typed values in <code>Quantity</code>
 objects instead of decoding them to native Python scalars.  This preserves the
 original text representation, exact type width, numeral base, and physical unit
@@ -492,7 +494,10 @@ treatment):</p>
 
 <p><code>parse_embedded</code> raises <code>BovnarParseError</code> carrying the inner document's own
 error code and position. <code>mux_dump</code> takes channels in the unsigned 64-bit
-range and raises <code>BovnarArgumentError</code> for anything outside it.</p>
+range and raises <code>BovnarArgumentError</code> for anything outside it. The <code>key</code> of
+<code>mux_dump</code>, <code>MuxWriter</code> and <code>embed_document</code> is held to the rule <code>dumps()</code>
+holds a key to (§4.1), with the same <code>BovnarArgumentError</code>; the <code>key</code> filter
+of <code>mux_load</code> and <code>DemuxFeed</code> may not hold a NUL.</p>
 <p><code>mux_dump(..., preamble={...})</code> writes a dict of ordinary values before the
 stream opens — what the stream is, read by a consumer before its first message
 (§4.7). <code>load_documents</code> and <code>mux_load</code> also take a socket or a binary file
@@ -544,10 +549,9 @@ a <code>bytes</code> value in the preamble, say — needs <code>key=</code> on t
 completed, and <code>finish()</code> says the input is over. Running out of input is never
 an error; <code>finish()</code> raises <code>BovnarParseError</code> for a document or frame cut off
 part-way. Every other error carries the code the batch function gives —
-<code>loads</code>, <code>mux_load</code>, a failed document's own code in <code>load_documents</code> — except
-that <code>FrameFeed</code> names a framing error the C frame reader's way (a bad magic is
-<code>UNEXPECTED_INPUT_BYTE</code>, a frame over <code>max_document_size</code> <code>VALUE_OUT_OF_RANGE</code>)
-where <code>load_documents</code> reports either as <code>GOT_INCOMPLETE_BVNR_STREAM</code>.
+<code>loads</code>, <code>mux_load</code>, <code>load_documents</code> (a failed document's own code, a bad
+magic <code>UNEXPECTED_INPUT_BYTE</code>, a frame over <code>max_document_size</code>
+<code>VALUE_OUT_OF_RANGE</code>, a stream cut inside a frame <code>GOT_INCOMPLETE_BVNR_STREAM</code>).
 <code>DocumentFeed</code> raises from the <code>feed()</code> whose bytes hit the error, with the
 reader's position, and drops what that feed had completed; <code>DemuxFeed</code> and
 <code>FrameFeed</code> raise from the iteration that reaches it, after the items before

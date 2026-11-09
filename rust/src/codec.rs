@@ -2097,9 +2097,9 @@ pub fn write_frame_to<W: Write + ?Sized>(out: &mut W, doc: &[u8]) -> Result<()> 
 /// | A length over `max_document_size` (default 256 MiB), or over `usize` | `ValueOutOfRange` |
 /// | The input ends inside a header or a document ([`FrameReader::finish`]) | `GotIncompleteBvnrStream` |
 ///
-/// `bvnr_doc_stream_read` reports all three as a failed read, which
-/// [`crate::stream::load_documents`] gives as `GotIncompleteBvnrStream`. An
-/// error is latched: every later call returns it again.
+/// These are the codes `bvnr_doc_stream_read_ex` and
+/// [`crate::stream::load_documents`] give for the same input. An error is
+/// latched: every later call returns it again.
 ///
 /// ```
 /// use bovnar::codec::FrameReader;

@@ -201,6 +201,9 @@ part-way through a header or payload is a truncation error.</p>
 <span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_doc_stream_read</span><span class="p">(</span><span class="n">bvnr_source_t</span><span class="o">*</span><span class="w"> </span><span class="n">src</span><span class="p">,</span>
 <span class="w">                          </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_doc_stream_opts_t</span><span class="o">*</span><span class="w"> </span><span class="n">opts</span><span class="p">,</span>
 <span class="w">                          </span><span class="kt">uint64_t</span><span class="o">*</span><span class="w"> </span><span class="n">out_count</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">bvnr_doc_stream_read_ex</span><span class="p">(</span><span class="n">bvnr_source_t</span><span class="o">*</span><span class="w"> </span><span class="n">src</span><span class="p">,</span>
+<span class="w">                             </span><span class="k">const</span><span class="w"> </span><span class="n">bvnr_doc_stream_opts_t</span><span class="o">*</span><span class="w"> </span><span class="n">opts</span><span class="p">,</span>
+<span class="w">                             </span><span class="kt">uint64_t</span><span class="o">*</span><span class="w"> </span><span class="n">out_count</span><span class="p">,</span><span class="w"> </span><span class="n">error_code_t</span><span class="o">*</span><span class="w"> </span><span class="n">out_error</span><span class="p">);</span>
 </code></pre></div>
 
 <p><code>bvnr_doc_stream_read</code> reads frames until EOF, parsing each payload with a fresh
@@ -212,6 +215,15 @@ crafted oversized length cannot force a large up-front allocation), bounded by
 <code>max_document_size</code>. Unlike <code>max_file_size</code>, this framing guard stays finite when
 <code>0</code> (it then selects <code>BVNR_DOC_DEFAULT_MAX</code>, 256 MiB); set an explicit huge cap
 (e.g. <code>UINT64_MAX</code>) to lift it.</p>
+<p><code>bvnr_doc_stream_read_ex</code> is the same call, and says why it returned false in
+<code>*out_error</code> with the codes the push-fed frame reader gives (§2.4): a bad magic
+is <code>error_unexpected_input_byte</code>, a length over the cap
+<code>error_value_out_of_range</code>, input that ends inside a header or a payload
+<code>error_got_incomplete_bvnr_stream</code>, a failing pull
+<code>error_reading_from_source_fd</code>, an <code>on_document</code> veto
+<code>error_scanner_callback_failed</code>, and a failed document without
+<code>continue_past_failed</code> that document's own code. The bindings' <code>load_documents</code>
+reports these codes.</p>
 <p>Two <strong>orthogonal</strong> error controls — because each document occupies its own
 length-delimited frame, the two are independent:</p>
 <table>

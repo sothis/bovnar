@@ -119,6 +119,31 @@ def test_wide_int_beside_a_null_is_annotated():
 
 
 @needs_lib
+@pytest.mark.parametrize('value,annotation', [
+    ([-2 ** 63, 1], b''),                       # an int64 array, as it is
+    ([-2 ** 64], b'<sint:65>'),
+    ([-2 ** 64 - 1], b'<sint:66>'),
+    ([-2 ** 255, 2 ** 254], b'<sint:256>'),
+])
+def test_negative_power_of_two_needs_no_extra_bit(value, annotation):
+    """A sint:N holds -2**(N-1). The width was the magnitude's bits plus one,
+    so an int64 array holding its minimum went out as <sint:65>."""
+    out = bovnar.dumps({'k': value}, pretty=False)
+    body = b','.join(str(v).encode() for v in value)
+    assert out == b'.k=' + annotation + b'[' + body + b'];'
+    assert bovnar.loads(out) == {'k': value}
+
+
+@needs_lib
+@pytest.mark.parametrize('value,width', [
+    (-2 ** 64, 65), (-2 ** 64 - 1, 66), (-2 ** 255, 256)])
+def test_negative_power_of_two_scalar_width(value, width):
+    out = bovnar.dumps({'k': value}, pretty=False)
+    assert out == b'.k=<sint:%d>%d;' % (width, value)
+    assert bovnar.loads(out) == {'k': value}
+
+
+@needs_lib
 @pytest.mark.parametrize('other', [1.5, True, 'x'])
 def test_wide_int_in_an_array_with_no_annotation_is_refused(other):
     """An array has one annotation; beside a float, a bool or a string there is
@@ -204,3 +229,41 @@ def test_typed_loads_does_not_pin_the_reader_snapshot():
         assert q.unit.raw._b_base_ is None
     assert bovnar.dumps(d, pretty=False) == \
         b'.a=<float:64,m>[1.5,2.5];.b=<float:64,m>3.5;.c=<uint:64,s>5;.d=sym;'
+
+
+@needs_lib
+def test_float_elements_are_written_in_the_canonical_form():
+    """An array's floats were written with repr() -- [1.5, -0.5] -- and a
+    scalar float, and every float the Rust binding writes, in the C writer's
+    canonical form: one value, two documents."""
+    import math
+    out = bovnar.dumps({'a': [1.0, 2.5, -0.5, 0.0, -0.0, math.inf, -math.inf,
+                              math.nan, 5e-324, 1e300],
+                        'b': 2.5}, pretty=False)
+    assert out == (b'.a=[1e+0,2.5e+0,-5e-1,0.0,-0.0,inf,ninf,nan,5e-324,'
+                   b'1e+300];.b=<float:64>2.5e+0;')
+
+
+@needs_lib
+def test_float_element_text_is_the_c_writers():
+    """The element text is built from repr() where that is exact (a normal
+    double, whose shortest nearest digits C picks too) and asked of C
+    otherwise; either way it is bvn_format_double's text."""
+    import ctypes
+    import math
+    import random
+    import struct
+    from bovnar._ffi import get_library
+    from bovnar import _canonical_float_text, _FLOAT64_VT
+    lib = get_library()
+    buf = ctypes.create_string_buffer(64)
+    rng = random.Random(20261109)
+    values = [0.0, -0.0, math.inf, -math.inf, math.nan, 5e-324,
+              2.2250738585072014e-308, 1.7976931348623157e308,
+              -2.6546153960359173e+65, 0.1, 1e22, 1e23]
+    values += [struct.unpack('<d', struct.pack('<Q', rng.getrandbits(64)))[0]
+               for _ in range(20000)]
+    values += [rng.uniform(-1e6, 1e6) for _ in range(5000)]
+    for x in values:
+        assert lib.bvn_format_double(buf, 64, x, _FLOAT64_VT) > 0
+        assert _canonical_float_text(x) == buf.value, repr(x)

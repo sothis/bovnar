@@ -543,23 +543,25 @@ fn int_annotation(rows: &[Value]) -> Option<ValueTypeSpec> {
     let (mut saw, mut other, mut neg) = (false, false, false);
     let (mut pos_bits, mut neg_bits) = (0, 0);
     leaves(rows, &mut |v| match v {
+        // A sint:N holds -2^(N-1): what a negative value needs is the bits
+        // of -v-1 (its complement), plus the sign added below.
         Value::Int(i) => {
             saw = true;
             if *i < 0 {
                 neg = true;
-                neg_bits = neg_bits.max(bit_length(*i));
+                neg_bits = neg_bits.max(bit_length(!*i));
             } else {
                 pos_bits = pos_bits.max(bit_length(*i));
             }
         }
         Value::BigInt(b) => {
             saw = true;
-            let bits = u32::try_from(b.bits()).unwrap_or(u32::MAX);
             if b.sign() == num_bigint::Sign::Minus {
                 neg = true;
-                neg_bits = neg_bits.max(bits);
+                let bits = (b.magnitude() - 1u32).bits();
+                neg_bits = neg_bits.max(u32::try_from(bits).unwrap_or(u32::MAX));
             } else {
-                pos_bits = pos_bits.max(bits);
+                pos_bits = pos_bits.max(u32::try_from(b.bits()).unwrap_or(u32::MAX));
             }
         }
         Value::Null => {}
@@ -934,25 +936,41 @@ pub(crate) fn decode_value(raw: &[u8], vt: ValueTypeSpec, token: Option<TokenTyp
     match ValueTypeFamily::from_raw(vt.family) {
         // Epoch seconds; `base` holds the epoch index, not a radix.
         Some(ValueTypeFamily::Datetime) => int_value_in_base(&text, 10),
-        Some(ValueTypeFamily::Uint | ValueTypeFamily::Sint) => int_value_in_base(&text, base),
+        // The reader accepts nan, inf and ninf under every numeric family
+        // (spec §6.4): unquoted, they are those numbers, not digits. Quoted,
+        // as a base-36 or base-62 literal is written, they stay digits.
+        Some(ValueTypeFamily::Uint | ValueTypeFamily::Sint) => {
+            let quoted = matches!(token, Some(TokenType::String | TokenType::ArrayString));
+            special_float(&text)
+                .filter(|_| !quoted)
+                .or_else(|| int_value_in_base(&text, base))
+        }
         Some(
             family @ (ValueTypeFamily::Float
             | ValueTypeFamily::FloatFix
             | ValueTypeFamily::FloatDec),
-        ) => match text.as_str() {
-            "nan" => Some(Value::Float(f64::NAN)),
-            "inf" => Some(Value::Float(f64::INFINITY)),
-            "ninf" => Some(Value::Float(f64::NEG_INFINITY)),
+        ) => special_float(&text).or_else(|| {
             // float_fix keeps Q and float_dec nothing in `base`: both are
             // always decimal.
-            _ if family == ValueTypeFamily::Float && base == 16 => {
+            if family == ValueTypeFamily::Float && base == 16 {
                 ffi::parse_float_base(&text, 16).map(Value::Float)
+            } else {
+                text.parse().ok().map(Value::Float)
             }
-            _ => text.parse().ok().map(Value::Float),
-        },
+        }),
         _ => None,
     }
     .unwrap_or(Value::String(text))
+}
+
+/// `nan`, `inf` or `ninf` as the float it stands for.
+fn special_float(text: &str) -> Option<Value> {
+    match text {
+        "nan" => Some(Value::Float(f64::NAN)),
+        "inf" => Some(Value::Float(f64::INFINITY)),
+        "ninf" => Some(Value::Float(f64::NEG_INFINITY)),
+        _ => None,
+    }
 }
 
 /// An integer literal in `base` as an [`Value::Int`], or a

@@ -278,6 +278,7 @@ bvnr_demux_on_event
 bvnr_demux_open_feed
 bvnr_demux_set_key
 bvnr_doc_stream_read
+bvnr_doc_stream_read_ex
 bvnr_embed_document
 bvnr_frame_reader_count
 bvnr_frame_reader_create

@@ -469,6 +469,12 @@ unsafe extern "C" {
         opts: *mut BvnrDocStreamOpts,
         out_count: *mut u64,
     ) -> bool;
+    pub fn bvnr_doc_stream_read_ex(
+        src: *mut BvnrSource,
+        opts: *mut BvnrDocStreamOpts,
+        out_count: *mut u64,
+        out_error: *mut c_int,
+    ) -> bool;
     pub fn bvnr_mux_begin(w: *mut c_void, key: *const c_char) -> bool;
     pub fn bvnr_mux_send(w: *mut c_void, channel: u64, data: *mut c_void, len: u64) -> bool;
     pub fn bvnr_mux_end(w: *mut c_void) -> bool;
@@ -2283,15 +2289,16 @@ pub fn frame_write_to(doc: &[u8], out: &mut dyn std::io::Write) -> std::io::Resu
     }
 }
 
-/// `bvnr_doc_stream_read` over `src`: `h.verified` sees each document's
-/// events and `h.on_document` each document's end. Returns (ok, count).
+/// `bvnr_doc_stream_read_ex` over `src`: `h.verified` sees each document's
+/// events and `h.on_document` each document's end. Returns (ok, count, the
+/// error that ended the stream).
 pub fn doc_stream_read(
     src: &mut BvnrSource,
     mut flags: BvnrReadFlags,
     continue_past_failed: bool,
     max_document_size: u64,
     h: &mut Handlers<'_>,
-) -> (bool, u64) {
+) -> (bool, u64, c_int) {
     h.install(&mut flags);
     let mut opts = BvnrDocStreamOpts {
         flags: &mut flags,
@@ -2300,12 +2307,12 @@ pub fn doc_stream_read(
         continue_past_failed,
         max_document_size,
     };
-    let mut count = 0;
+    let (mut count, mut error) = (0, 0);
     // SAFETY: `src`, `flags`, `opts` and `h` outlive the call, and nothing
     // else touches `h` meanwhile.
-    let ok = unsafe { bvnr_doc_stream_read(src, &mut opts, &mut count) };
+    let ok = unsafe { bvnr_doc_stream_read_ex(src, &mut opts, &mut count, &mut error) };
     h.resume();
-    (ok, count)
+    (ok, count, error)
 }
 
 extern "C" fn on_document_trampoline(ud: *mut c_void, index: u64, ok: bool, err: c_int) -> bool {

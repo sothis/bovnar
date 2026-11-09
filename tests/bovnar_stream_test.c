@@ -921,6 +921,82 @@ static void test_frames_oversized_declared(void)
 	ASSERT_EQ_UINT(count, 0, "no document completed");
 }
 
+/* bvnr_doc_stream_read_ex says why a frame stream ended, with the codes the
+ * push-fed frame reader gives; bvnr_doc_stream_read only said that it did, and
+ * the bindings reported every framing failure as an incomplete stream. */
+static bool fail_pull(bvnr_source_t* s, void* buf, uint32_t want,
+	uint32_t* got)
+{
+	(void)s; (void)buf; (void)want; (void)got;
+	return false;
+}
+static bool veto_document(void* ud, uint64_t index, bool ok, error_code_t err)
+{
+	(void)ud; (void)ok; (void)err;
+	return index == 0;
+}
+static error_code_t frames_error(const uint8_t* p, size_t n,
+	const bvnr_doc_stream_opts_t* opts, uint64_t* count)
+{
+	bvnr_source_t src;
+	bvnr_source_from_mem(&src, p, n);
+	error_code_t err = error_invalid_argument;
+	bool ok = bvnr_doc_stream_read_ex(&src, opts, count, &err);
+	if (ok != (err == error_none)) err = error_unknown_token_type;
+	return err;
+}
+static void test_frames_read_ex_codes(void)
+{
+	printf("  test_frames_read_ex_codes...\n");
+	uint8_t s[256];
+	bvnr_sink_t sink;
+	bvnr_sink_to_mem(&sink, s, sizeof s);
+	bvnr_frame_write(&sink, ".a = 1;", 7);
+	bvnr_frame_write(&sink, ".a = @;", 7);
+	bvnr_frame_write(&sink, ".a = 3;", 7);
+	size_t n = (size_t)bvnr_sink_bytes_written(&sink);
+	uint64_t count = 99;
+
+	ASSERT_EQ_UINT(frames_error(s, 19, NULL, &count), error_none,
+		       "one whole document: no error");
+	ASSERT_EQ_UINT(count, 1, "...and one document");
+	ASSERT_EQ_UINT(frames_error(s, n, NULL, &count),
+		       error_unexpected_input_byte,
+		       "a failed document ends the stream with its own code");
+	ASSERT_EQ_UINT(count, 2, "...counting it");
+	bvnr_doc_stream_opts_t go_on = { .continue_past_failed = true };
+	ASSERT_EQ_UINT(frames_error(s, n, &go_on, &count), error_none,
+		       "past a failed document the stream succeeds");
+	ASSERT_EQ_UINT(frames_error(s, n - 3, &go_on, &count),
+		       error_got_incomplete_bvnr_stream,
+		       "a cut payload is incomplete, not the earlier failure");
+	ASSERT_EQ_UINT(frames_error(s, 5, NULL, &count),
+		       error_got_incomplete_bvnr_stream, "a cut header");
+
+	uint8_t bad[sizeof s];
+	memcpy(bad, s, n);
+	bad[3] = '2';
+	ASSERT_EQ_UINT(frames_error(bad, n, NULL, &count),
+		       error_unexpected_input_byte, "a bad magic");
+	bvnr_doc_stream_opts_t small = { .max_document_size = 6 };
+	ASSERT_EQ_UINT(frames_error(s, n, &small, &count),
+		       error_value_out_of_range, "a frame over the cap");
+	bvnr_doc_stream_opts_t veto = { .on_document = veto_document,
+					.continue_past_failed = true };
+	ASSERT_EQ_UINT(frames_error(s, n, &veto, &count),
+		       error_scanner_callback_failed, "on_document said stop");
+	ASSERT_EQ_UINT(count, 2, "...after the document it stopped at");
+
+	bvnr_source_t src;
+	bvnr_source_from_callback(&src, fail_pull, NULL);
+	error_code_t err = error_none;
+	ASSERT_TRUE(!bvnr_doc_stream_read_ex(&src, NULL, NULL, &err) &&
+		    err == error_reading_from_source_fd, "a failing pull");
+	err = error_none;
+	ASSERT_TRUE(!bvnr_doc_stream_read_ex(NULL, NULL, NULL, &err) &&
+		    err == error_invalid_argument, "no source");
+}
+
 /* The per-frame guard `max_document_size` is independent of max_file_size:
  * unlike max_file_size (0 == unlimited), 0 here selects the finite
  * BVNR_DOC_DEFAULT_MAX, and the guard is lifted with an explicit huge cap
@@ -1340,6 +1416,7 @@ int main(void)
 	test_octet_mux_random_roundtrip();
 	test_frames_truncated();
 	test_frames_oversized_declared();
+	test_frames_read_ex_codes();
 	test_frames_max_document_size();
 	test_frames_abort_on_error();
 	test_frames_continue_on_error();

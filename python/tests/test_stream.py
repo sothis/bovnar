@@ -67,6 +67,40 @@ class TestMultiDocument:
         res = stream.load_documents(blob, continue_past_failed=True)
         assert res == [{"ok": 1}, None, {"ok": 1}]
 
+    @pytest.mark.parametrize("cont", [False, True])
+    def test_framing_errors_carry_the_frame_readers_codes(self, cont):
+        # load_documents reported every framing failure as
+        # GOT_INCOMPLETE_BVNR_STREAM, where FrameFeed names it.
+        from bovnar.enums import ErrorCode
+        good = stream.frame_documents([bovnar.dumps({"ok": 1})])
+        cases = [
+            (good + b"BVF2" + bytes(8), ErrorCode.UNEXPECTED_INPUT_BYTE),
+            (good + b"BVF1" + (1 << 40).to_bytes(8, "little"),
+             ErrorCode.VALUE_OUT_OF_RANGE),
+            (good[:-1], ErrorCode.GOT_INCOMPLETE_BVNR_STREAM),
+        ]
+        for blob, code in cases:
+            with pytest.raises(BovnarParseError) as ei:
+                stream.load_documents(blob, continue_past_failed=cont)
+            assert ei.value.code == code
+            feed = stream.FrameFeed(parse=True, continue_past_failed=cont)
+            with pytest.raises(BovnarParseError) as fe:
+                list(feed.feed(blob))
+                feed.finish()
+            assert fe.value.code == code
+
+    def test_continue_past_failed_names_the_framing_error(self):
+        # A document that failed earlier is a None in the results; it is not
+        # what ended the read. The truncated frame after it was reported as
+        # "document 1 failed to parse", with that document's code.
+        from bovnar.enums import ErrorCode
+        good = bovnar.dumps({"ok": 1})
+        blob = stream.frame_documents([good, b".broken = @@@;", good])
+        with pytest.raises(BovnarParseError) as ei:
+            stream.load_documents(blob[:-3], continue_past_failed=True)
+        assert ei.value.code == ErrorCode.GOT_INCOMPLETE_BVNR_STREAM
+        assert "document" not in str(ei.value)
+
     def test_truncated_frame_rejected(self):
         blob = stream.frame_documents([bovnar.dumps({"a": 1})])
         with pytest.raises(BovnarParseError):
@@ -190,6 +224,35 @@ def test_constants_present():
     assert stream.BVNR_FILESIZE_UNLIMITED == 0
     assert stream.BVNR_DOC_DEFAULT_MAX == 256 * 1024 * 1024
     assert stream.BVNR_MUX_DEFAULT_MAX == 64 * 1024 * 1024
+
+
+@needs_lib
+@pytest.mark.parametrize('key', ['mux\x00evil', 'a b', '', '1a', 'k' * 256])
+def test_stream_writers_refuse_a_key_no_reader_takes(key):
+    # The key crossed to C as a NUL-terminated string, so 'mux\x00evil' was
+    # written under 'mux'; a key over 255 bytes was written and then refused by
+    # every reader at its defaults; the rest raised a BovnarWriteError with an
+    # offset. dumps() refuses all of them with BovnarArgumentError.
+    import io
+    from bovnar.exceptions import BovnarArgumentError
+    with pytest.raises(BovnarArgumentError):
+        stream.mux_dump([(1, b'x')], key=key)
+    with pytest.raises(BovnarArgumentError):
+        stream.embed_document(b'.a=1;', key=key)
+    with pytest.raises(BovnarArgumentError):
+        stream.MuxWriter(io.BytesIO(), key=key)
+
+
+@needs_lib
+def test_stream_readers_refuse_a_key_holding_nul():
+    # A filter cut short at the NUL matched the stream under 'mux'.
+    from bovnar.exceptions import BovnarArgumentError
+    doc = stream.mux_dump([(1, b'x')], key='mux')
+    with pytest.raises(BovnarArgumentError):
+        stream.mux_load(doc, key='mux\x00zz')
+    with pytest.raises(BovnarArgumentError):
+        stream.DemuxFeed(key='mux\x00zz')
+    assert stream.mux_load(doc, key='mux') == [(1, b'x')]
 
 
 @needs_lib

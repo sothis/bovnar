@@ -14432,6 +14432,9 @@ recovered = bovnar.loads(bvnr_bytes)
 assert recovered["sensor_id"] == 42
 ```
 
+`nan`, `inf` and `ninf` come back as `float`, under an integer type as well
+(`<uint:8> nan`, spec §6.4), as `dom_parse()` gives them.
+
 `loads` accepts an optional `typed` flag that wraps typed values in `Quantity`
 objects instead of decoding them to native Python scalars.  This preserves the
 original text representation, exact type width, numeral base, and physical unit
@@ -14643,7 +14646,10 @@ inner = stream.parse_embedded(bovnar.loads(outer)["payload"])   # {"v": 1}
 
 `parse_embedded` raises `BovnarParseError` carrying the inner document's own
 error code and position. `mux_dump` takes channels in the unsigned 64-bit
-range and raises `BovnarArgumentError` for anything outside it.
+range and raises `BovnarArgumentError` for anything outside it. The `key` of
+`mux_dump`, `MuxWriter` and `embed_document` is held to the rule `dumps()`
+holds a key to (§4.1), with the same `BovnarArgumentError`; the `key` filter
+of `mux_load` and `DemuxFeed` may not hold a NUL.
 
 `mux_dump(..., preamble={...})` writes a dict of ordinary values before the
 stream opens — what the stream is, read by a consumer before its first message
@@ -14680,10 +14686,9 @@ a `bytes` value in the preamble, say — needs `key=` on the reader.
 completed, and `finish()` says the input is over. Running out of input is never
 an error; `finish()` raises `BovnarParseError` for a document or frame cut off
 part-way. Every other error carries the code the batch function gives —
-`loads`, `mux_load`, a failed document's own code in `load_documents` — except
-that `FrameFeed` names a framing error the C frame reader's way (a bad magic is
-`UNEXPECTED_INPUT_BYTE`, a frame over `max_document_size` `VALUE_OUT_OF_RANGE`)
-where `load_documents` reports either as `GOT_INCOMPLETE_BVNR_STREAM`.
+`loads`, `mux_load`, `load_documents` (a failed document's own code, a bad
+magic `UNEXPECTED_INPUT_BYTE`, a frame over `max_document_size`
+`VALUE_OUT_OF_RANGE`, a stream cut inside a frame `GOT_INCOMPLETE_BVNR_STREAM`).
 `DocumentFeed` raises from the `feed()` whose bytes hit the error, with the
 reader's position, and drops what that feed had completed; `DemuxFeed` and
 `FrameFeed` raise from the iteration that reaches it, after the items before
@@ -16694,6 +16699,9 @@ typedef struct {
 bool bvnr_doc_stream_read(bvnr_source_t* src,
                           const bvnr_doc_stream_opts_t* opts,
                           uint64_t* out_count);
+bool bvnr_doc_stream_read_ex(bvnr_source_t* src,
+                             const bvnr_doc_stream_opts_t* opts,
+                             uint64_t* out_count, error_code_t* out_error);
 ```
 
 `bvnr_doc_stream_read` reads frames until EOF, parsing each payload with a fresh
@@ -16705,6 +16713,16 @@ crafted oversized length cannot force a large up-front allocation), bounded by
 `max_document_size`. Unlike `max_file_size`, this framing guard stays finite when
 `0` (it then selects `BVNR_DOC_DEFAULT_MAX`, 256 MiB); set an explicit huge cap
 (e.g. `UINT64_MAX`) to lift it.
+
+`bvnr_doc_stream_read_ex` is the same call, and says why it returned false in
+`*out_error` with the codes the push-fed frame reader gives (§2.4): a bad magic
+is `error_unexpected_input_byte`, a length over the cap
+`error_value_out_of_range`, input that ends inside a header or a payload
+`error_got_incomplete_bvnr_stream`, a failing pull
+`error_reading_from_source_fd`, an `on_document` veto
+`error_scanner_callback_failed`, and a failed document without
+`continue_past_failed` that document's own code. The bindings' `load_documents`
+reports these codes.
 
 Two **orthogonal** error controls — because each document occupies its own
 length-delimited frame, the two are independent:
@@ -22964,7 +22982,7 @@ fn main() -> Result<(), bovnar::Error> {
 | `Bool(bool)` | |
 | `Int(i128)` | Any integer an `i128` holds, every `uint64` and `sint64` included |
 | `BigInt(num_bigint::BigInt)` | An integer outside the `i128` range (a `<uint:256>`, say); `to_string` writes it as `<uint:N>`/`<sint:N>`, `N` the smallest power of two from 128 that holds it |
-| `Float(f64)` | |
+| `Float(f64)` | `nan`, `inf` and `ninf` too, under an integer type as well (spec §6.4) |
 | `String(String)` | Symbols and references read back as strings too |
 | `Bytes(Vec<u8>)` | An octet stream |
 | `Array(Vec<Value>)` | A multi-row array is an array of row arrays |
@@ -23782,9 +23800,9 @@ stream, as `Error::Parse`: with a position when the document failed, the
 demultiplexer's code alone (`octet_stream_out_of_sync`, `value_out_of_range`,
 `octet_stream_truncated`) when the stream did, as `mux_load` reports them. A
 frame reader's errors carry no position, as `load_documents`' do not, and its
-framing errors are its own: a bad magic is `unexpected_input_byte` and a frame
-over the cap `value_out_of_range`, where `load_documents` reports both as
-`got_incomplete_bvnr_stream`. A panic in
+framing errors are `load_documents`' too: a bad magic is
+`unexpected_input_byte`, a frame over the cap `value_out_of_range` and a stream
+cut inside a frame `got_incomplete_bvnr_stream`. A panic in
 a handler reaches the caller, as for `Reader` ([§13](#13-error-handling)).
 
 **What it costs**, from `cargo bench --bench live`: a release build pinned to

@@ -900,6 +900,10 @@ def _int_from_base(text: str, base: int) -> int:
     return -val if neg else val
 
 
+_SPECIAL_FLOATS = {'nan': float('nan'), 'inf': float('inf'),
+                   'ninf': float('-inf')}
+
+
 def _decode_value(raw: bytes, fam: ValueTypeFamily, vt, tok_type: int = 0) -> object:
     if not raw:
         if tok_type in (1, 6):
@@ -927,6 +931,11 @@ def _decode_value(raw: bytes, fam: ValueTypeFamily, vt, tok_type: int = 0) -> ob
         return _int_from_text(text, 10)
 
     if fam in (ValueTypeFamily.UINT, ValueTypeFamily.SINT):
+        # The reader accepts nan, inf and ninf under every numeric family
+        # (spec §6.4): unquoted, they are those numbers, not digits. Quoted, as
+        # a base-36 or base-62 literal is written, they stay digits.
+        if text in _SPECIAL_FLOATS and tok_type not in (1, 6):
+            return _SPECIAL_FLOATS[text]
         base = vt.base if vt and vt.base > 1 else 10
         # int() only handles bases 2..36; high bases need the custom decoder.
         # int_from_text is int() without the digit-count limit -- an integer
@@ -937,10 +946,8 @@ def _decode_value(raw: bytes, fam: ValueTypeFamily, vt, tok_type: int = 0) -> ob
     if fam in (ValueTypeFamily.FLOAT,
                ValueTypeFamily.FLOAT_FIX,
                ValueTypeFamily.FLOAT_DEC):
-        if text in ('nan', 'inf', 'ninf'):
-            return {'nan': float('nan'),
-                    'inf': float('inf'),
-                    'ninf': float('-inf')}[text]
+        if text in _SPECIAL_FLOATS:
+            return _SPECIAL_FLOATS[text]
         # A <float:W,_16> carrier is a hex-float literal, not a decimal one.
         # float(text) read "1.8" as decimal 1.8 where the value is 1.5, and
         # returned the STRING "1.0p+0" for the binary-exponent form because it
@@ -1249,9 +1256,11 @@ def _array_int_annotation(rows):
             elif isinstance(e, int):
                 saw_int = True
                 if e < 0:
+                    # A sint:N holds -2**(N-1): what a negative value needs
+                    # is the bits of -e-1, plus the sign.
                     any_neg = True
-                    if (-e).bit_length() > max_neg_b:
-                        max_neg_b = (-e).bit_length()
+                    if (-e - 1).bit_length() > max_neg_b:
+                        max_neg_b = (-e - 1).bit_length()
                 elif e.bit_length() > max_pos_b:
                     max_pos_b = e.bit_length()
             else:
@@ -1533,8 +1542,10 @@ def _emit_value(w: Writer, key: str, value) -> None:
         elif -0x8000000000000000 <= value < 0:
             w.write_sint(key, value)
         else:
+            # A sint:N holds -2**(N-1), so a negative power of two needs
+            # no extra bit.
             width = (value.bit_length() if value >= 0
-                     else (-value).bit_length() + 1)
+                     else (-value - 1).bit_length() + 1)
             w.write_bvni(key, value, width=width)
     elif isinstance(value, float):
         w.write_float(key, value)
@@ -1868,7 +1879,7 @@ def _emit_array_element(w: Writer, elem, annotate: bool = False,
             width  = max(64, elem.bit_length())
         else:
             family = ValueTypeFamily.SINT
-            width  = max(64, (-elem).bit_length() + 1)
+            width  = max(64, (-elem - 1).bit_length() + 1)
         vt  = make_type_spec(family, width, 10)
         raw = _int_to_decimal(elem).encode('ascii')
         d = BvnrData()
@@ -1880,16 +1891,9 @@ def _emit_array_element(w: Writer, elem, annotate: bool = False,
         _write_event_data(w, d)
 
     elif isinstance(elem, float):
-        import math as _math
         elem = float(elem)                  # normalise numpy float scalars
-        vt  = make_type_spec(ValueTypeFamily.FLOAT, 64, 0)
-        if _math.isinf(elem):
-            _s = 'ninf' if elem < 0 else 'inf'
-        elif _math.isnan(elem):
-            _s = 'nan'
-        else:
-            _s = repr(elem)
-        raw = _s.encode('ascii')
+        vt  = _FLOAT64_VT
+        raw = _canonical_float_text(elem)
         d = BvnrData()
         d.type       = _TOKEN_IS_ARRAY_NUMBER
         d.value_type = vt
@@ -1935,6 +1939,50 @@ def _emit_array_element(w: Writer, elem, annotate: bool = False,
         # so what arrives here is something with no Bovnar form at all.
         raise BovnarArgumentError(
             f"Cannot serialise array element of type {type(elem).__name__!r}")
+
+
+_FLOAT64_VT = make_type_spec(ValueTypeFamily.FLOAT, 64, 0)
+_MIN_NORMAL = 2.2250738585072014e-308
+_float_text_buf = None
+
+
+def _canonical_float_text(value: float) -> bytes:
+    """A float array element in the C writer's canonical form
+    (bvn_format_double), the form a scalar float is written in and the Rust
+    binding writes array elements in: 1.5e+0, -5e-1, 0.0, inf, ninf, nan.
+    repr() gave 1.5 and -0.5, so the two bindings wrote one value as two
+    documents.
+
+    For a normal double both pick the shortest decimal that reads back as it,
+    the nearest one when there are several, so repr()'s digits are the C
+    digits and only the notation differs; a C call per element would cost
+    more than the rest of the element's write. A subnormal, a zero and the
+    specials go to C."""
+    if _MIN_NORMAL <= value <= 1.7976931348623157e308 or \
+            -1.7976931348623157e308 <= value <= -_MIN_NORMAL:
+        r = repr(value)
+        neg = r[0] == '-'
+        if neg:
+            r = r[1:]
+        mant, _, exp = r.partition('e')
+        ip, _, fp = mant.partition('.')
+        digits = (ip + fp).lstrip('0')
+        last = (int(exp) if exp else 0) - len(fp)   # exponent of the last digit
+        kept = digits.rstrip('0')
+        e10 = last + len(digits) - 1
+        head = kept[0] + ('.' + kept[1:] if len(kept) > 1 else '')
+        text = (('-' if neg else '') + head +
+                ('e+%d' % e10 if e10 >= 0 else 'e-%d' % -e10))
+        return text.encode('ascii')
+    global _float_text_buf
+    from ._ffi import get_library
+    buf = _float_text_buf
+    if buf is None:
+        import ctypes
+        buf = _float_text_buf = ctypes.create_string_buffer(64)
+    if get_library().bvn_format_double(buf, 64, value, _FLOAT64_VT) < 0:
+        raise BovnarArgumentError(f"cannot format the float {value!r}")
+    return buf.value
 
 
 def _write_event_data(w: Writer, d: BvnrData) -> None:

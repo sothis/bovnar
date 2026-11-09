@@ -188,6 +188,9 @@ recovered = bovnar.loads(bvnr_bytes)
 assert recovered["sensor_id"] == 42
 ```
 
+`nan`, `inf` and `ninf` come back as `float`, under an integer type as well
+(`<uint:8> nan`, spec §6.4), as `dom_parse()` gives them.
+
 `loads` accepts an optional `typed` flag that wraps typed values in `Quantity`
 objects instead of decoding them to native Python scalars.  This preserves the
 original text representation, exact type width, numeral base, and physical unit
@@ -399,7 +402,10 @@ inner = stream.parse_embedded(bovnar.loads(outer)["payload"])   # {"v": 1}
 
 `parse_embedded` raises `BovnarParseError` carrying the inner document's own
 error code and position. `mux_dump` takes channels in the unsigned 64-bit
-range and raises `BovnarArgumentError` for anything outside it.
+range and raises `BovnarArgumentError` for anything outside it. The `key` of
+`mux_dump`, `MuxWriter` and `embed_document` is held to the rule `dumps()`
+holds a key to (§4.1), with the same `BovnarArgumentError`; the `key` filter
+of `mux_load` and `DemuxFeed` may not hold a NUL.
 
 `mux_dump(..., preamble={...})` writes a dict of ordinary values before the
 stream opens — what the stream is, read by a consumer before its first message
@@ -436,10 +442,9 @@ a `bytes` value in the preamble, say — needs `key=` on the reader.
 completed, and `finish()` says the input is over. Running out of input is never
 an error; `finish()` raises `BovnarParseError` for a document or frame cut off
 part-way. Every other error carries the code the batch function gives —
-`loads`, `mux_load`, a failed document's own code in `load_documents` — except
-that `FrameFeed` names a framing error the C frame reader's way (a bad magic is
-`UNEXPECTED_INPUT_BYTE`, a frame over `max_document_size` `VALUE_OUT_OF_RANGE`)
-where `load_documents` reports either as `GOT_INCOMPLETE_BVNR_STREAM`.
+`loads`, `mux_load`, `load_documents` (a failed document's own code, a bad
+magic `UNEXPECTED_INPUT_BYTE`, a frame over `max_document_size`
+`VALUE_OUT_OF_RANGE`, a stream cut inside a frame `GOT_INCOMPLETE_BVNR_STREAM`).
 `DocumentFeed` raises from the `feed()` whose bytes hit the error, with the
 reader's position, and drops what that feed had completed; `DemuxFeed` and
 `FrameFeed` raise from the iteration that reaches it, after the items before

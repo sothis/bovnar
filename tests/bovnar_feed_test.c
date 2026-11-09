@@ -1105,6 +1105,7 @@ typedef struct {
 	frame_ref_t    ref;
 	bool           ref_ok;
 	uint64_t       ref_count;
+	error_code_t   ref_err;    /* what ended the stream, error_none if nothing */
 	uint64_t       mismatches;
 	const char*    name;
 } frame_case_t;
@@ -1128,15 +1129,18 @@ static void frame_try(void* ctx, const size_t* cuts, size_t ncuts,
 	}
 	bool ok = alive && bvnr_frame_reader_finish(fr);
 	uint64_t count = bvnr_frame_reader_count(fr);
+	error_code_t err = bvnr_frame_reader_error(fr);
 	bvnr_frame_reader_destroy(fr);
 	bool same = ok == fc->ref_ok && count == fc->ref_count &&
+		err == fc->ref_err &&
 		buf_eq(&got.docs, &fc->ref.docs) &&
 		buf_eq(&got.rec.log, &fc->ref.rec.log);
 	if (!same) {
 		if (fc->mismatches++ < 4)
 			fprintf(stderr, "  MISMATCH frames %s (%s): ok %d/%d "
-				"count %" PRIu64 "/%" PRIu64 "\n", fc->name, how, ok,
-				fc->ref_ok, count, fc->ref_count);
+				"count %" PRIu64 "/%" PRIu64 " error %d/%d\n",
+				fc->name, how, ok, fc->ref_ok, count,
+				fc->ref_count, (int)err, (int)fc->ref_err);
 	}
 	buf_free(&got.docs);
 	rec_free(&got.rec);
@@ -1198,7 +1202,8 @@ static void frame_reference(frame_case_t* fc)
 	frame_opts(&fc->ref, &fl, fc->resilient, fc->max_doc, fc->cfg, &o);
 	bvnr_source_t src;
 	bvnr_source_from_mem(&src, fc->stream, fc->n);
-	fc->ref_ok = bvnr_doc_stream_read(&src, &o, &fc->ref_count);
+	fc->ref_ok = bvnr_doc_stream_read_ex(&src, &o, &fc->ref_count,
+					     &fc->ref_err);
 }
 
 static void frame_add(buf_t* stream, buf_t* expect, const void* doc, size_t n)
@@ -1475,6 +1480,7 @@ static void frame_reference_fresh(frame_case_t* fc, const buf_t* docs)
 	frame_opts(&fc->ref, &fl, fc->resilient, fc->max_doc, fc->cfg, &o);
 	fc->ref_ok = true;
 	fc->ref_count = 0;
+	fc->ref_err = error_none;
 	for (size_t at = 0; at < docs->n; ) {
 		uint64_t len;
 		memcpy(&len, docs->p + at, sizeof(len));
@@ -1486,9 +1492,14 @@ static void frame_reference_fresh(frame_case_t* fc, const buf_t* docs)
 		error_code_t err = bvnr_reader_get_error(rd);
 		bvnr_reader_destroy(rd);
 		uint64_t index = fc->ref_count++;
-		if (!frame_on_document(&fc->ref, index, ok, err) ||
-		    (!ok && !fc->resilient)) {
+		if (!frame_on_document(&fc->ref, index, ok, err)) {
 			fc->ref_ok = false;
+			fc->ref_err = error_scanner_callback_failed;
+			break;
+		}
+		if (!ok && !fc->resilient) {
+			fc->ref_ok = false;
+			fc->ref_err = err;
 			break;
 		}
 	}
@@ -1552,8 +1563,10 @@ static void test_frame_isolation(void)
 			bvnr_source_t src;
 			bvnr_source_from_mem(&src, stream.p, stream.n);
 			uint64_t count = 0;
-			bool ok = bvnr_doc_stream_read(&src, &o, &count);
+			error_code_t err = error_none;
+			bool ok = bvnr_doc_stream_read_ex(&src, &o, &count, &err);
 			if (ok != fc.ref_ok || count != fc.ref_count ||
+			    err != fc.ref_err ||
 			    !buf_eq(&got.docs, &fc.ref.docs) ||
 			    !buf_eq(&got.rec.log, &fc.ref.rec.log)) {
 				ds_mism++;

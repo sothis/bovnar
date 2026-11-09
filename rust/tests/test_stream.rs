@@ -119,6 +119,51 @@ fn test_continue_past_failed() {
     assert_eq!(res, vec![ok.clone(), None, ok]);
 }
 
+/// The framing errors carry the codes `live::FrameParser` gives; every one
+/// used to be `got_incomplete_bvnr_stream`.
+#[test]
+fn test_framing_errors_carry_the_frame_readers_codes() {
+    let good = stream::frame_documents(&[dumps(&obj(&[("ok", Value::Int(1))]))]).unwrap();
+    let with = |tail: &[u8]| [&good[..], tail].concat();
+    let cases = [
+        (
+            with(b"BVF2\0\0\0\0\0\0\0\0"),
+            ErrorCode::UnexpectedInputByte,
+        ),
+        (
+            with(&[&b"BVF1"[..], &(1u64 << 40).to_le_bytes()].concat()),
+            ErrorCode::ValueOutOfRange,
+        ),
+        (
+            good[..good.len() - 1].to_vec(),
+            ErrorCode::GotIncompleteBvnrStream,
+        ),
+    ];
+    for cont in [false, true] {
+        for (blob, code) in &cases {
+            let err = stream::load_documents(blob, false, cont, 0).unwrap_err();
+            assert_eq!(err.code(), Some(*code), "{blob:?}");
+            let mut fp = bovnar::live::FrameParser::new(&Default::default(), cont, 0).unwrap();
+            let err = fp
+                .feed(blob, &mut |_| true, &mut |_, _| true)
+                .and_then(|()| fp.finish())
+                .unwrap_err();
+            assert_eq!(err.code(), Some(*code), "{blob:?}");
+        }
+    }
+}
+
+/// A document that failed earlier is a None in the results; it is not what
+/// ended the read. The truncated frame after it was reported with that
+/// document's code.
+#[test]
+fn test_continue_past_failed_names_the_framing_error() {
+    let good = dumps(&obj(&[("ok", Value::Int(1))]));
+    let blob = stream::frame_documents(&[&good[..], b".broken = @@@;", &good[..]]).unwrap();
+    let err = stream::load_documents(&blob[..blob.len() - 3], false, true, 0).unwrap_err();
+    assert_eq!(err.code(), Some(ErrorCode::GotIncompleteBvnrStream));
+}
+
 #[test]
 fn test_truncated_frame_rejected() {
     let blob = stream::frame_documents(&[dumps(&obj(&[("a", Value::Int(1))]))]).unwrap();

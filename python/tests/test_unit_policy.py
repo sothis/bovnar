@@ -493,6 +493,21 @@ class TestPolicyRefusalNamesTheEntry:
                 r.set_unit_policy(UnitPolicy(**kw))
         return str(e.value)
 
+    @pytest.mark.parametrize("kw", [
+        {"targets": ["m\x00junk"]},
+        {"targets": [("k~m\x00", 0)]},
+        {"require_dimension_of": ["m\x00/s"]},
+    ])
+    def test_a_string_holding_nul_is_refused(self, kw):
+        # It crossed to C as a NUL-terminated string: "m\x00junk" was the
+        # policy "m", installed without complaint.
+        assert "NUL" in self._msg(**kw)
+
+    def test_a_rule_holding_nul_is_refused(self):
+        from bovnar import UnitRule
+        assert "NUL" in self._msg(rules=[UnitRule(".a\x00.b", "m")])
+        assert "NUL" in self._msg(rules=[UnitRule(".a", "m\x00")])
+
     def test_targets_entry_is_named(self):
         m = self._msg(targets=[self.BAD_UNIT])
         assert "targets" in m and self.BAD_UNIT in m

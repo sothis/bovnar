@@ -83,6 +83,11 @@ fn test_the_two_tiers_agree_on_rich_documents() {
         ".a = <float_dec:128> 1.2345678901234567890123456789;\n",
         ".a = <uint:32,_16> \"deadbeef\";\n.b = <float:64,_16> \"1.8p3\";\n",
         ".a = nan;\n.b = inf;\n.c = ninf;\n",
+        // Special numbers under an integer family are those numbers (spec
+        // §6.4); parse() returned them as strings. Quoted in base 36 they are
+        // digits.
+        ".a = <uint:8> nan;\n.b = <sint:16> ninf;\n.c = <uint:8> [1, nan];\n\
+         .d = <uint:64,_36> \"nan\";\n",
         ".a = \"tab\\there\";\n.b = \"caf\\u{e9}\";\n.c = \"\\x41\";\n",
         ".a = {.b = [{.c = 1;}, {.c = 2;}];};\n",
         ".a = [1, , 3];\n.b = ;\n",

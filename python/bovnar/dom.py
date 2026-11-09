@@ -255,8 +255,11 @@ class DomNode:
         if dt == DomType.STRUCT:
             if not isinstance(key, str):
                 raise TypeError("Struct key must be a str")
-            raw = key.encode('utf-8')
-            ptr = lib.bvn_dom_struct_get(self._ptr, raw)
+            # The key crosses to C as a NUL-terminated string: one holding
+            # NUL would be cut short there and find another key. No key
+            # holds one.
+            ptr = (lib.bvn_dom_struct_get(self._ptr, key.encode('utf-8'))
+                   if '\x00' not in key else None)
             if not ptr:
                 raise KeyError(key)
             return DomNode(ptr, self._doc)
@@ -285,7 +288,8 @@ class DomNode:
     def __contains__(self, key: str) -> bool:
         # A key is a str; anything else is simply not one of them. (It was an
         # AttributeError from `.encode`, where `in` should just answer.)
-        if not isinstance(key, str) or self.dom_type != DomType.STRUCT:
+        if (not isinstance(key, str) or '\x00' in key
+                or self.dom_type != DomType.STRUCT):
             return False
         lib = get_library()
         return bool(lib.bvn_dom_struct_get(self._ptr, key.encode('utf-8')))
@@ -528,6 +532,10 @@ class DomDoc:
         Look up a node by dot-separated key path, e.g. 'sensor.temperature'.
         Returns None if the path does not exist.
         """
+        # A NUL would cut the path short as it crosses to C (see
+        # DomNode.__getitem__); no path holds one.
+        if '\x00' in path:
+            return None
         ptr = get_library().bvn_dom_lookup(self._ptr, path.encode('utf-8'))
         return DomNode(ptr, self) if ptr else None
 
@@ -539,14 +547,17 @@ class DomDoc:
         ``doc["server"]["tls"]`` and ``doc["matrix[1][0]"]`` an element. A key
         cannot itself contain '.' or '[', so the two readings never collide.
         ``in`` follows the same rule."""
-        ptr = get_library().bvn_dom_lookup(
-            self._ptr, ('.' + key).encode('utf-8'))
+        path = ('.' + key).encode('utf-8')
+        # A NUL would cut the path short as it crosses to C (see
+        # DomNode.__getitem__); no key holds one.
+        ptr = (get_library().bvn_dom_lookup(self._ptr, path)
+               if b'\x00' not in path else None)
         if not ptr:
             raise KeyError(key)
         return DomNode(ptr, self)
 
     def __contains__(self, key: str) -> bool:
-        if not isinstance(key, str):
+        if not isinstance(key, str) or '\x00' in key:
             return False
         return bool(get_library().bvn_dom_lookup(
             self._ptr, ('.' + key).encode('utf-8')))

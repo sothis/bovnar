@@ -2740,6 +2740,9 @@ static void bvn_writer_init(bvnr_writer_t* w, bvnr_write_flags_t* opts)
 	bvn_unit_policy_state_t saved_policy = w->val.policy;
 	bvnr_reader_t* saved_probe = w->usrc_probe;
 	uint8_t* saved_chunk = w->mux_chunk;
+	/* The text of the last rescaled value outlives its event (the observer
+	 * is shown it), so a writer re-armed after one still holds it. */
+	free(w->ser.ser_value_text);
 	memset(w, 0, sizeof(*w));
 	w->val.policy = saved_policy;
 	w->usrc_probe = saved_probe;

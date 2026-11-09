@@ -271,7 +271,7 @@ fn main() -> Result<(), bovnar::Error> {
 | `Bool(bool)` | |
 | `Int(i128)` | Any integer an `i128` holds, every `uint64` and `sint64` included |
 | `BigInt(num_bigint::BigInt)` | An integer outside the `i128` range (a `<uint:256>`, say); `to_string` writes it as `<uint:N>`/`<sint:N>`, `N` the smallest power of two from 128 that holds it |
-| `Float(f64)` | |
+| `Float(f64)` | `nan`, `inf` and `ninf` too, under an integer type as well (spec §6.4) |
 | `String(String)` | Symbols and references read back as strings too |
 | `Bytes(Vec<u8>)` | An octet stream |
 | `Array(Vec<Value>)` | A multi-row array is an array of row arrays |
@@ -1089,9 +1089,9 @@ stream, as `Error::Parse`: with a position when the document failed, the
 demultiplexer's code alone (`octet_stream_out_of_sync`, `value_out_of_range`,
 `octet_stream_truncated`) when the stream did, as `mux_load` reports them. A
 frame reader's errors carry no position, as `load_documents`' do not, and its
-framing errors are its own: a bad magic is `unexpected_input_byte` and a frame
-over the cap `value_out_of_range`, where `load_documents` reports both as
-`got_incomplete_bvnr_stream`. A panic in
+framing errors are `load_documents`' too: a bad magic is
+`unexpected_input_byte`, a frame over the cap `value_out_of_range` and a stream
+cut inside a frame `got_incomplete_bvnr_stream`. A panic in
 a handler reaches the caller, as for `Reader` ([§13](#13-error-handling)).
 
 **What it costs**, from `cargo bench --bench live`: a release build pinned to

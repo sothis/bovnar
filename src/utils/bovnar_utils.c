@@ -2685,6 +2685,19 @@ int32_t bvn_format_double(char* buf, size_t bufsize, double value,
 	 * still round-trips the double exactly, while a narrower declared width
 	 * (float:16/float:32) is preserved so its rounding intent is honoured. */
 	if (prec > 53u) prec = 53u;
+	/* A subnormal holds fewer than 53 bits, and padded to 53 it printed the
+	 * noise digits the cap above keeps out of a normal double: 5e-324 came
+	 * out as 4.9406564584124654e-324. Its own bits are its precision. */
+	{
+		uint64_t bits;
+		memcpy(&bits, &value, sizeof bits);
+		uint64_t man = bits & ((1ull << 52) - 1ull);
+		if (((bits >> 52) & 0x7ffu) == 0u && man) {
+			uint32_t sig = 0;
+			while (man) { sig++; man >>= 1; }
+			if (sig < prec) prec = sig;
+		}
+	}
 	/* For float_fix and float_dec the width is the FIELD (a Q-format integer,
 	 * a decimal interchange format), not a binary significand. Rounding the
 	 * double to `width` bits first and leaving the reader to round again to

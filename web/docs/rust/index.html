@@ -364,7 +364,7 @@ and <code>to_string</code> writes a <code>Value</code> out as BVNR bytes:</p>
 </tr>
 <tr>
 <td><code>Float(f64)</code></td>
-<td></td>
+<td><code>nan</code>, <code>inf</code> and <code>ninf</code> too, under an integer type as well (spec §6.4)</td>
 </tr>
 <tr>
 <td><code>String(String)</code></td>
@@ -1471,9 +1471,9 @@ stream, as <code>Error::Parse</code>: with a position when the document failed, 
 demultiplexer's code alone (<code>octet_stream_out_of_sync</code>, <code>value_out_of_range</code>,
 <code>octet_stream_truncated</code>) when the stream did, as <code>mux_load</code> reports them. A
 frame reader's errors carry no position, as <code>load_documents</code>' do not, and its
-framing errors are its own: a bad magic is <code>unexpected_input_byte</code> and a frame
-over the cap <code>value_out_of_range</code>, where <code>load_documents</code> reports both as
-<code>got_incomplete_bvnr_stream</code>. A panic in
+framing errors are <code>load_documents</code>' too: a bad magic is
+<code>unexpected_input_byte</code>, a frame over the cap <code>value_out_of_range</code> and a stream
+cut inside a frame <code>got_incomplete_bvnr_stream</code>. A panic in
 a handler reaches the caller, as for <code>Reader</code> (<a href="#13-error-handling">§13</a>).</p>
 <p><strong>What it costs</strong>, from <code>cargo bench --bench live</code>: a release build pinned to
 one core (<code>taskset -c 4</code>) of the same i7-2700K as §4.8, load average about 2;

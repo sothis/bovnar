@@ -182,13 +182,15 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 	bvnr_source_t src;
 	bvnr_source_from_mem(&src, p, len);
 	uint64_t count = 0;
-	bool ref_ok = bvnr_doc_stream_read(&src, &o, &count);
+	error_code_t ref_err = error_none;
+	bool ref_ok = bvnr_doc_stream_read_ex(&src, &o, &count, &ref_err);
 	bvnr_frame_reader_t *fr = bvnr_frame_reader_create(&o);
 	bool ok = fr != NULL;
 	for (size_t i = 0, from = 0; ok && i < ncuts; from = cuts[i++])
 		ok = bvnr_frame_reader_feed(fr, p + from, cuts[i] - from);
 	ok = ok && bvnr_frame_reader_finish(fr);
-	if (fr && (ok != ref_ok || bvnr_frame_reader_count(fr) != count))
+	if (fr && (ok != ref_ok || bvnr_frame_reader_count(fr) != count ||
+		   bvnr_frame_reader_error(fr) != ref_err))
 		__builtin_trap();
 	bvnr_frame_reader_destroy(fr);
 	fr = bvnr_frame_reader_create_pull(o.max_document_size);

@@ -666,6 +666,14 @@ def build_unit_policy(targets=(), base=0, normalise_si=False,
         raise ValueError(
             f"at most {MAX_UNIT_RULES} per-field rules, got {len(rules)}")
 
+    # Each string crosses to C NUL-terminated: 'm\x00junk' would be read as
+    # 'm', a policy other than the one asked for.
+    for text in ([r.path for r in rules] + [r.unit for r in rules] +
+                 [t if isinstance(t, str) else t[0] for t in targets] +
+                 list(require_dimension_of)):
+        if isinstance(text, str) and '\x00' in text:
+            raise ValueError(f"a unit policy string cannot hold NUL: {text!r}")
+
     keepalive = []
     c_rules = (BvnrUnitRule * max(len(rules), 1))()
     for i, r in enumerate(rules):

@@ -142,6 +142,24 @@ BVN_API bool bvnr_doc_stream_read(
 	uint64_t* out_count);
 
 /*
+ * bvnr_doc_stream_read, saying why it returned false: *out_error (optional)
+ * receives the code the push-fed frame reader (bvnr_frame_reader_error) gives
+ * for the same input, error_none on success:
+ *
+ *   error_unexpected_input_byte       a header without the "BVF1" magic
+ *   error_value_out_of_range          a declared length over the cap
+ *   error_got_incomplete_bvnr_stream  input ending inside a header or payload
+ *   error_reading_from_source_fd      the source's pull failed
+ *   error_scanner_callback_failed     on_document returned false
+ *   the document's own code           a failed document, without
+ *                                     continue_past_failed
+ *   error_invalid_argument            a NULL or pull-less source, or no memory
+ */
+BVN_API bool bvnr_doc_stream_read_ex(
+	bvnr_source_t* src, const bvnr_doc_stream_opts_t* opts,
+	uint64_t* out_count, error_code_t* out_error);
+
+/*
  * Pull-style calls (bvnr_frame_reader_next, bvnr_demux_next) return one of
  * these. They exist so that a caller who pays for every callback -- a binding
  * calling back through an FFI -- can drain everything one feed made available

@@ -1079,6 +1079,30 @@ static void test_reduce_float_edges(void)
 }
 
 /*
+ * A rescaled value's text outlives its event, for the observer, and re-opening
+ * the writer zeroed it without freeing it: one leak per re-armed writer whose
+ * last value was rescaled. Run under LeakSanitizer to see the leak.
+ */
+static void test_reduce_text_freed_on_reopen(void)
+{
+	printf("  test_reduce_text_freed_on_reopen...\n");
+	const value_unit_t km = BVN_UNIT_SI(bu_meter, si_kilo);
+	uint8_t out[256];
+	bvnr_writer_t *w = r4_open(out, sizeof out, BVN_UNIT_REDUCE, false);
+	ASSERT_NOT_NULL(w, "writer");
+	if (!w) return;
+	ASSERT_TRUE(bvnr_write_float_unit(w, "a", 64, 5.0, km), "5 k~m writes");
+	bvnr_write_flags_t wf;
+	memset(&wf, 0, sizeof wf);
+	wf.unit_flags = BVN_UNIT_REDUCE;
+	memset(out, 0, sizeof out);
+	ASSERT_TRUE(bvnr_open_write_mem(w, out, sizeof out - 1u, false, &wf),
+		    "the writer re-opens");
+	ASSERT_TRUE(bvnr_write_float_unit(w, "b", 64, 2.0, km), "2 k~m writes");
+	r4_expect(w, out, ".b=<float:64,m>2000;", "the re-opened writer rescales");
+}
+
+/*
  * A prefix is a prefix whatever it is attached to. BVN_UNIT_REDUCE asks for the
  * conversion `k~pc -> pc`, and that went through the parsec's SI factor -- which
  * is irrational, so the write failed as "value_out_of_range". The same for a
@@ -3687,6 +3711,7 @@ int main(void)
 	test_unstated_integer_width_is_64();
 	test_reduce_rescales_whatever_the_event_type();
 	test_reduce_float_edges();
+	test_reduce_text_freed_on_reopen();
 	test_reduce_prefix_on_any_base();
 	test_no_inline_unit_on_special_or_datetime();
 	test_writer_policy_checks_the_written_unit();

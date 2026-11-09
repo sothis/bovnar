@@ -240,8 +240,10 @@ def load_documents(data,
         lib.bvnr_source_from_mem(ctypes.byref(src), dptr, len(data))
 
     out_count = ctypes.c_uint64(0)
-    ok = lib.bvnr_doc_stream_read(ctypes.byref(src), ctypes.byref(opts),
-                                  ctypes.byref(out_count))
+    out_error = ctypes.c_int(0)
+    ok = lib.bvnr_doc_stream_read_ex(ctypes.byref(src), ctypes.byref(opts),
+                                     ctypes.byref(out_count),
+                                     ctypes.byref(out_error))
 
     if source is not None and source.exc is not None:
         raise source.exc
@@ -251,13 +253,18 @@ def load_documents(data,
     if state['exc'] is not None:
         raise state['exc']
     if not ok:
-        if fail['err'] is not None:
+        # Why the stream ended, with the codes FrameFeed gives. A failed
+        # document ends it only without continue_past_failed; with it, a
+        # document that failed earlier is a None in the results.
+        code = ErrorCode(out_error.value)
+        if (fail['err'] is not None and not continue_past_failed
+                and fail['err'] == int(code)):
             raise BovnarParseError(
-                ErrorCode(fail['err']),
-                message=f"document {fail['index']} failed to parse")
+                code, message=f"document {fail['index']} failed to parse")
+        msg_b = lib.bvn_error_to_string(int(code))
         raise BovnarParseError(
-            ErrorCode.GOT_INCOMPLETE_BVNR_STREAM,
-            message="frame stream truncated or malformed")
+            code, message="frame stream: " + (msg_b.decode('utf-8') if msg_b
+                                               else code.name.lower()))
     return results
 
 
@@ -284,7 +291,7 @@ def mux_dump(messages: Iterable[tuple], *, key: str = 'mux',
     msgs = [(_mux_channel(ch), _as_bytes(p)) for ch, p in messages]
     if preamble is not None and not isinstance(preamble, dict):
         raise BovnarArgumentError("mux_dump() preamble must be a dict")
-    kb = key.encode('utf-8')
+    kb = _writer_key(key)
 
     def write(w):
         _mux_open(w, kb, preamble)
@@ -323,6 +330,33 @@ def mux_dump(messages: Iterable[tuple], *, key: str = 'mux',
             raise
         finally:
             w.destroy()
+
+
+def _writer_key(key: str) -> bytes:
+    """The UTF-8 of the key a stream is written under. A key no reader takes
+    back is refused as dumps() refuses it, with BovnarArgumentError. (It
+    crosses to C as a NUL-terminated string, so a NUL in it used to cut it
+    short: the stream was written under another key.)"""
+    from . import _check_key  # deferred (import cycle)
+    if not isinstance(key, str):
+        raise BovnarArgumentError(
+            f"a stream key is a str, not {type(key).__name__}")
+    _check_key(key)
+    return key.encode('utf-8')
+
+
+def _filter_key(key: str | None) -> bytes | None:
+    """The UTF-8 of the key a reader is scoped to (None: every stream). A NUL
+    would cut it short as it crosses to C, so the filter would match another
+    key; no key holds one, so it is refused."""
+    if key is None:
+        return None
+    if not isinstance(key, str):
+        raise BovnarArgumentError(
+            f"a stream key is a str, not {type(key).__name__}")
+    if '\x00' in key:
+        raise BovnarArgumentError(f"a stream key cannot hold NUL: {key!r}")
+    return key.encode('utf-8')
 
 
 def _mux_channel(channel) -> int:
@@ -385,7 +419,8 @@ def mux_load(data, *, max_message: int = 0, key: str | None = None) -> list:
     dm = lib.bvnr_demux_create(cb_msg, None, max_message)
     if not dm:
         raise MemoryError("bvnr_demux_create() returned NULL")
-    if key is not None and not lib.bvnr_demux_set_key(dm, key.encode('utf-8')):
+    kfilter = _filter_key(key)
+    if kfilter is not None and not lib.bvnr_demux_set_key(dm, kfilter):
         lib.bvnr_demux_destroy(dm)
         raise MemoryError("bvnr_demux_set_key() failed")
     rptr = lib.bvnr_reader_create()
@@ -465,7 +500,7 @@ def embed_document(inner, *, key: str = 'payload', pretty: bool = True,
     file object), write it there and return nothing."""
     lib   = get_library()
     inner = _as_bytes(inner)
-    kb    = key.encode('utf-8')
+    kb    = _writer_key(key)
     if file is not None:
         w = Writer.to_stream(file, pretty=pretty)
         try:
@@ -926,11 +961,10 @@ class FrameFeed(_Feed):
     ``max_document_size`` is that of :func:`load_documents` (``0`` selects
     ``BVNR_DOC_DEFAULT_MAX``). A failed document (without
     ``continue_past_failed``) raises ``BovnarParseError`` with its own code, as
-    there; a bad magic and a declared length over the cap raise it with the
-    frame reader's codes, ``UNEXPECTED_INPUT_BYTE`` and ``VALUE_OUT_OF_RANGE``,
-    which :func:`load_documents` reports alike as
-    ``GOT_INCOMPLETE_BVNR_STREAM``. Running out of input is never an error, and
-    ``finish()`` raises for a stream cut inside a frame.
+    there; a bad magic and a declared length over the cap raise it with
+    ``UNEXPECTED_INPUT_BYTE`` and ``VALUE_OUT_OF_RANGE``, as there too.
+    Running out of input is never an error, and ``finish()`` raises
+    ``GOT_INCOMPLETE_BVNR_STREAM`` for a stream cut inside a frame.
 
     Unparsed, the fed bytes stay referenced until the documents are drained,
     and feeding again before then raises ``BovnarArgumentError``.
@@ -1160,7 +1194,7 @@ class DemuxFeed(_Feed):
         if not dm:
             raise MemoryError("bvnr_demux_create() returned NULL")
         self._dm = dm
-        self._key = key.encode('utf-8') if key is not None else None
+        self._key = _filter_key(key)
         if self._key is not None and not lib.bvnr_demux_set_key(dm, self._key):
             raise MemoryError("bvnr_demux_set_key() failed")
         if not lib.bvnr_demux_open_feed(dm, ctypes.byref(_flags_255(max_file_size)),
@@ -1359,7 +1393,7 @@ class MuxWriter:
         self._closed = True
         if preamble is not None and not isinstance(preamble, dict):
             raise BovnarArgumentError("MuxWriter() preamble must be a dict")
-        kb = key.encode('utf-8')
+        kb = _writer_key(key)
         w = Writer.to_stream(file, pretty=False)
         self._w = w
         lib = w._lib

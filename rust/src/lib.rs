@@ -25,6 +25,7 @@ pub mod error;
 mod ffi;
 mod io;
 pub mod json;
+pub mod literals;
 pub mod live;
 pub mod quantity;
 pub mod reader;
@@ -35,7 +36,7 @@ pub mod writer;
 
 pub use bvnfloat::{BvnFloat, FRACTION_EXPONENT_CAP};
 pub use decimal::Decimal;
-pub use dom::{DomDoc, DomNode, DomType};
+pub use dom::{DomDoc, DomNode, DomType, NewArray, NewNode, NewStruct};
 pub use enums::{
     BaseUnit, ErrorCode, Event, Exponent, IECPrefix, Prefix, PrefixSystem, SIPrefix, TokenType,
     UnknownValue, ValueTypeFamily,

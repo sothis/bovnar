@@ -3531,3 +3531,391 @@ mod abi_tests {
         );
     }
 }
+
+// ---------------------------------------------------------------------------
+// Literals, type annotations, DOM builder.
+
+/// The validators and literal helpers of `bovnar.h` and its type-annotation
+/// parser: each reads a string or plain values and returns plain values.
+pub mod literal_fns {
+    use super::*;
+
+    unsafe extern "C" {
+        pub fn bvn_parse_type_annotation(
+            text: *const u8,
+            len: u32,
+            type_ok: *mut bool,
+            unit_ok: *mut bool,
+            unit_too_long: *mut bool,
+            out_unit: *mut ValueUnit,
+            unit_buf: *mut u8,
+            unit_buf_len: *mut u8,
+        ) -> ValueTypeSpec;
+        pub fn bvn_validate_number(s: *const c_char) -> bool;
+        pub fn bvn_validate_digits_for_base(s: *const c_char, base: u32) -> bool;
+        pub fn bvn_validate_number_in_base(s: *const c_char, base: u32) -> bool;
+        pub fn bvn_validate_string(data: *const u8, len: usize) -> bool;
+        pub fn bvn_char_to_digit(c: u32, base: u32) -> u32;
+        pub fn bvn_min_digits_for_type(vt: ValueTypeSpec) -> u32;
+        pub fn bvn_parse_double_in_base(s: *const c_char, base: u32, out: *mut f64) -> bool;
+        pub fn bvn_get_escape_repl_table() -> *const u8;
+    }
+
+    /// What `bvn_parse_type_annotation` reports: the spec, the unit, the
+    /// unit parameter's text, and the three flags.
+    pub struct Annotation {
+        pub spec: ValueTypeSpec,
+        pub unit: ValueUnit,
+        pub unit_text: Vec<u8>,
+        pub type_ok: bool,
+        pub unit_ok: bool,
+        pub unit_too_long: bool,
+    }
+
+    /// `bvn_parse_type_annotation` of `text`; `None` for text over 4 GiB.
+    pub fn parse_type_annotation(text: &[u8]) -> Option<Annotation> {
+        let len = u32::try_from(text.len()).ok()?;
+        let (mut type_ok, mut unit_ok, mut unit_too_long) = (false, false, false);
+        let mut unit = ValueUnit::zeroed();
+        // The header's minimum: a unit parameter is up to 255 bytes plus NUL.
+        let mut buf = [0u8; 256];
+        let mut buf_len = 0u8;
+        // SAFETY: `text` has `len` readable bytes; every output is writable,
+        // and `buf` has the 256 bytes the function may write.
+        let spec = unsafe {
+            bvn_parse_type_annotation(
+                text.as_ptr(),
+                len,
+                &mut type_ok,
+                &mut unit_ok,
+                &mut unit_too_long,
+                &mut unit,
+                buf.as_mut_ptr(),
+                &mut buf_len,
+            )
+        };
+        Some(Annotation {
+            spec,
+            unit,
+            unit_text: buf[..usize::from(buf_len)].to_vec(),
+            type_ok,
+            unit_ok,
+            unit_too_long,
+        })
+    }
+
+    /// Runs a `bool (*)(const char*)` check on `s`; text holding NUL is
+    /// none of the things these check, so it is `false` without a call.
+    fn on_c_str(s: &str, f: impl FnOnce(*const c_char) -> bool) -> bool {
+        CString::new(s).is_ok_and(|c| f(c.as_ptr()))
+    }
+
+    macro_rules! str_check {
+        ($($name:ident => $c:ident($($a:ident: $t:ty),*);)*) => {$(
+            #[doc = concat!("`", stringify!($c), "`; `false` for text holding NUL.")]
+            pub fn $name(s: &str $(, $a: $t)*) -> bool {
+                // SAFETY: a NUL-terminated string, only read during the call.
+                on_c_str(s, |p| unsafe { $c(p $(, $a)*) })
+            }
+        )*};
+    }
+
+    str_check! {
+        validate_identifier => bvn_validate_identifier();
+        validate_symbol => bvn_validate_symbol();
+        validate_reference => bvn_validate_reference();
+        validate_number => bvn_validate_number();
+        is_special_number_string => bvn_is_special_number_string();
+        validate_digits_for_base => bvn_validate_digits_for_base(base: u32);
+        validate_number_in_base => bvn_validate_number_in_base(base: u32);
+        validate_uint_range => bvn_validate_uint_range(width: u32, base: u32);
+        validate_sint_range => bvn_validate_sint_range(width: u32, base: u32);
+    }
+
+    /// `bvn_validate_string`.
+    pub fn validate_string(data: &[u8]) -> bool {
+        // SAFETY: `data` has `data.len()` readable bytes for the call.
+        unsafe { bvn_validate_string(data.as_ptr(), data.len()) }
+    }
+
+    /// `bvn_char_to_digit`: `base` itself means "not a digit".
+    pub fn char_to_digit(c: u32, base: u32) -> u32 {
+        // SAFETY: plain values in and out.
+        unsafe { bvn_char_to_digit(c, base) }
+    }
+
+    /// `bvn_min_digits_for_type`.
+    pub fn min_digits_for_type(vt: ValueTypeSpec) -> u32 {
+        // SAFETY: plain values in and out.
+        unsafe { bvn_min_digits_for_type(vt) }
+    }
+
+    /// Runs a `bvn_format_*` function on a buffer of 256 bytes, more than
+    /// any of them writes (64 digits, a sign and the NUL for the integers;
+    /// a 53-bit significand and its exponent for a double).
+    fn format256(f: impl FnOnce(*mut c_char, usize) -> i32) -> Option<String> {
+        let mut buf = [0u8; 256];
+        let n = usize::try_from(f(buf.as_mut_ptr().cast(), buf.len())).ok()?;
+        String::from_utf8(buf.get(..n)?.to_vec()).ok()
+    }
+
+    /// `bvn_format_uint64`; `None` where it returns -1.
+    pub fn format_uint64(value: u64, base: u32, min_digits: u32) -> Option<String> {
+        // SAFETY: `buf` has `len` writable bytes for the call.
+        format256(|buf, len| unsafe { bvn_format_uint64(buf, len, value, base, min_digits) })
+    }
+
+    /// `bvn_format_int64`; `None` where it returns -1.
+    pub fn format_int64(value: i64, base: u32, min_digits: u32) -> Option<String> {
+        // SAFETY: as above.
+        format256(|buf, len| unsafe { bvn_format_int64(buf, len, value, base, min_digits) })
+    }
+
+    /// `bvn_format_double`; `None` where it returns -1.
+    pub fn format_double(value: f64, vt: ValueTypeSpec) -> Option<String> {
+        // SAFETY: as above.
+        format256(|buf, len| unsafe { bvn_format_double(buf, len, value, vt) })
+    }
+
+    /// `bvn_parse_int64`.
+    pub fn parse_int64(s: &str, vt: ValueTypeSpec) -> Option<i64> {
+        let s = CString::new(s).ok()?;
+        let mut out = 0;
+        // SAFETY: NUL-terminated input; `out` is writable.
+        unsafe { bvn_parse_int64(s.as_ptr(), vt, &mut out) }.then_some(out)
+    }
+
+    /// `bvn_parse_uint64`.
+    pub fn parse_uint64(s: &str, vt: ValueTypeSpec) -> Option<u64> {
+        let s = CString::new(s).ok()?;
+        let mut out = 0;
+        // SAFETY: as above.
+        unsafe { bvn_parse_uint64(s.as_ptr(), vt, &mut out) }.then_some(out)
+    }
+
+    /// `bvn_parse_double`.
+    pub fn parse_double(s: &str, vt: ValueTypeSpec) -> Option<f64> {
+        let s = CString::new(s).ok()?;
+        let mut out = 0.0;
+        // SAFETY: as above.
+        unsafe { bvn_parse_double(s.as_ptr(), vt, &mut out) }.then_some(out)
+    }
+
+    /// `bvn_parse_double_in_base`.
+    pub fn parse_double_in_base(s: &str, base: u32) -> Option<f64> {
+        let s = CString::new(s).ok()?;
+        let mut out = 0.0;
+        // SAFETY: as above.
+        unsafe { bvn_parse_double_in_base(s.as_ptr(), base, &mut out) }.then_some(out)
+    }
+
+    /// `bvn_get_escape_repl_table`: escape letter -> the byte it stands for,
+    /// 0 for a letter that is no escape.
+    pub fn escape_repl_table() -> &'static [u8; 256] {
+        // SAFETY: the function returns a pointer to a `static const uint8_t
+        // [256]` in the library, alive and unchanging for the whole program.
+        unsafe { &*bvn_get_escape_repl_table().cast::<[u8; 256]>() }
+    }
+}
+
+/// The C DOM's tree-building calls (`bovnar_dom.h`, doc/08 §4.5) behind an
+/// owned node handle, so that the transfer of ownership on attach is a move.
+pub mod dom_build {
+    use super::*;
+    use std::ptr::NonNull;
+
+    /// `BVN_DOM_NULL`, `BVN_DOM_STRUCT`, `BVN_DOM_ARRAY`: the kinds
+    /// `bvn_dom_node_alloc` makes a complete value of.
+    pub const DOM_NULL: c_int = 0;
+    pub const DOM_STRUCT: c_int = 6;
+    pub const DOM_ARRAY: c_int = 7;
+
+    unsafe extern "C" {
+        pub fn bvn_dom_node_alloc(t: c_int) -> *mut c_void;
+        pub fn bvn_dom_node_destroy(n: *mut c_void);
+        pub fn bvn_dom_struct_add(
+            s: *mut c_void,
+            key: *const c_char,
+            klen: u32,
+            val: *mut c_void,
+        ) -> bool;
+        pub fn bvn_dom_doc_add(
+            d: *mut c_void,
+            key: *const c_char,
+            klen: u32,
+            val: *mut c_void,
+        ) -> bool;
+        pub fn bvn_dom_array_append(a: *mut c_void, elem: *mut c_void) -> bool;
+        pub fn bvn_dom_node_from_i64(v: i64) -> *mut c_void;
+        pub fn bvn_dom_node_from_u64(v: u64) -> *mut c_void;
+        pub fn bvn_dom_node_from_i32(v: i32) -> *mut c_void;
+        pub fn bvn_dom_node_from_u32(v: u32) -> *mut c_void;
+        pub fn bvn_dom_node_from_i16(v: i16) -> *mut c_void;
+        pub fn bvn_dom_node_from_u16(v: u16) -> *mut c_void;
+        pub fn bvn_dom_node_from_i8(v: i8) -> *mut c_void;
+        pub fn bvn_dom_node_from_u8(v: u8) -> *mut c_void;
+        pub fn bvn_dom_node_from_bigint(
+            bigint: *mut c_void,
+            vt: ValueTypeSpec,
+            vu: ValueUnit,
+        ) -> *mut c_void;
+    }
+
+    /// An owned `bvn_dom_node_t` in no tree yet. Attaching it moves it into
+    /// its container; dropping it unattached destroys it.
+    pub struct BuildNode(NonNull<c_void>);
+
+    // SAFETY: an unattached node is a tree the C DOM allocated and nothing
+    // else points into; like DocHandle, it may move to another thread.
+    unsafe impl Send for BuildNode {}
+
+    impl Drop for BuildNode {
+        fn drop(&mut self) {
+            // SAFETY: the node is live and in no tree (attaching consumes
+            // the handle), so this is its only release.
+            unsafe { bvn_dom_node_destroy(self.0.as_ptr()) }
+        }
+    }
+
+    macro_rules! from_narrow {
+        ($($name:ident => $c:ident($t:ty);)*) => {$(
+            #[doc = concat!("`", stringify!($c), "`; `None` when it cannot allocate.")]
+            pub fn $name(v: $t) -> Option<Self> {
+                // SAFETY: a plain value in, a fresh node (or NULL) out.
+                NonNull::new(unsafe { $c(v) }).map(Self)
+            }
+        )*};
+    }
+
+    impl BuildNode {
+        /// `bvn_dom_node_alloc` of a null, struct or array node (the kinds
+        /// it makes a complete value of); `None` for any other kind or when
+        /// it cannot allocate.
+        pub fn alloc(kind: c_int) -> Option<Self> {
+            if ![DOM_NULL, DOM_STRUCT, DOM_ARRAY].contains(&kind) {
+                return None;
+            }
+            // SAFETY: a valid kind in, a fresh node (or NULL) out.
+            NonNull::new(unsafe { bvn_dom_node_alloc(kind) }).map(Self)
+        }
+
+        from_narrow! {
+            from_i64 => bvn_dom_node_from_i64(i64);
+            from_u64 => bvn_dom_node_from_u64(u64);
+            from_i32 => bvn_dom_node_from_i32(i32);
+            from_u32 => bvn_dom_node_from_u32(u32);
+            from_i16 => bvn_dom_node_from_i16(i16);
+            from_u16 => bvn_dom_node_from_u16(u16);
+            from_i8 => bvn_dom_node_from_i8(i8);
+            from_u8 => bvn_dom_node_from_u8(u8);
+        }
+
+        /// `bvn_dom_node_from_bigint` of the integer whose base-16 digits
+        /// (after a `-` when negative) are `hex`, under `vt` and `vu`.
+        /// `None` when the value does not fit `vt`, `vt` is not a `uint` or
+        /// `sint` wider than 64 bits, or allocation fails.
+        pub fn from_bigint(hex: &str, vt: ValueTypeSpec, vu: ValueUnit) -> Option<Self> {
+            let digits = CString::new(hex).ok()?;
+            // SAFETY: no arguments; the result is NULL or a bignum we own.
+            let n = unsafe { bvn_int_alloc() };
+            if n.is_null() {
+                return None;
+            }
+            // SAFETY: `n` is live and `digits` NUL-terminated. On success the
+            // node owns `n`; on failure (NULL) it does not, and it is freed
+            // here, once: the asymmetric ownership bovnar_dom.h describes.
+            unsafe {
+                let node = if bvn_int_from_str(n, digits.as_ptr(), 16) {
+                    bvn_dom_node_from_bigint(n, vt, vu)
+                } else {
+                    std::ptr::null_mut()
+                };
+                if node.is_null() {
+                    bvn_int_free(n);
+                }
+                NonNull::new(node).map(Self)
+            }
+        }
+
+        fn ptr(&self) -> *mut c_void {
+            self.0.as_ptr()
+        }
+
+        /// Gives up the handle, for a C function that takes ownership of the
+        /// node.
+        fn into_raw(self) -> *mut c_void {
+            let p = self.ptr();
+            std::mem::forget(self);
+            p
+        }
+
+        /// `bvn_dom_node_type`.
+        pub fn node_type(&self) -> c_int {
+            // SAFETY: the node is live.
+            unsafe { bvn_dom_node_type(self.ptr()) }
+        }
+
+        /// `bvn_dom_struct_count` or `bvn_dom_array_count`, whichever the
+        /// node is (each is 0 for any other kind).
+        pub fn count(&self) -> usize {
+            // SAFETY: the node is live.
+            let (s, a) = unsafe {
+                (
+                    bvn_dom_struct_count(self.ptr()),
+                    bvn_dom_array_count(self.ptr()),
+                )
+            };
+            (s as usize) + (a as usize)
+        }
+
+        /// Whether this struct node has a member `key` (`bvn_dom_struct_get`).
+        pub fn has_key(&self, key: &str) -> bool {
+            let Ok(key) = CString::new(key) else {
+                return false;
+            };
+            // SAFETY: the node is live; `key` is NUL-terminated.
+            !unsafe { bvn_dom_struct_get(self.ptr(), key.as_ptr()) }.is_null()
+        }
+
+        /// `bvn_dom_struct_add`. Afterwards the node is the container's, or
+        /// destroyed by the C function when it refuses: either way `node` is
+        /// consumed.
+        pub fn struct_add(&mut self, key: &str, node: BuildNode) -> bool {
+            let Ok(klen) = u32::try_from(key.len()) else {
+                return false;
+            };
+            // SAFETY: both nodes are live and distinct (`node` is owned,
+            // `self` borrowed); `key` has `klen` readable bytes and is
+            // copied. The call takes `node` on every path.
+            unsafe { bvn_dom_struct_add(self.ptr(), key.as_ptr().cast(), klen, node.into_raw()) }
+        }
+
+        /// `bvn_dom_array_append`; consumes `node` as [`Self::struct_add`]
+        /// does.
+        pub fn array_append(&mut self, node: BuildNode) -> bool {
+            // SAFETY: both nodes are live and distinct; the call takes
+            // `node` on every path.
+            unsafe { bvn_dom_array_append(self.ptr(), node.into_raw()) }
+        }
+    }
+
+    impl DocHandle {
+        /// `bvn_dom_doc_create`: an empty document.
+        pub fn create() -> Option<Self> {
+            // SAFETY: no arguments; the result is NULL or a document we own.
+            NonNull::new(unsafe { bvn_dom_doc_create() }).map(Self)
+        }
+
+        /// `bvn_dom_doc_add`; consumes `node` as [`BuildNode::struct_add`]
+        /// does.
+        pub fn add(&mut self, key: &str, node: BuildNode) -> bool {
+            let Ok(klen) = u32::try_from(key.len()) else {
+                return false;
+            };
+            // SAFETY: the document and the node are live; `key` has `klen`
+            // readable bytes and is copied. The call takes `node` on every
+            // path, and no Node borrows the document (`&mut self`).
+            unsafe { bvn_dom_doc_add(self.0.as_ptr(), key.as_ptr().cast(), klen, node.into_raw()) }
+        }
+    }
+}

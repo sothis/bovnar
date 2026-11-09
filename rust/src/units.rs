@@ -39,6 +39,23 @@ pub struct UnitConversion {
     pub requires_affine: bool,
 }
 
+impl UnitConversion {
+    /// The `ok` flag of `bvn_unit_convert_factor`: whether multiplying by
+    /// `factor` performs the conversion. It is `false` for an affine
+    /// conversion whose offsets do not cancel (°C to K), where the C
+    /// function reports `factor` 0.0 with `requires_affine`; use
+    /// [`convert_value`] there. An affine pair that shares its offset
+    /// (°C to m~°C) is `true` with `requires_affine` too.
+    ///
+    /// A method, not a field: a field would break code that builds or
+    /// destructures the struct. It is exact all the same, since the C
+    /// function never succeeds with a factor of 0.0 (a factor a double
+    /// cannot hold is a refusal there).
+    pub fn ok(&self) -> bool {
+        !(self.requires_affine && self.factor == 0.0)
+    }
+}
+
 /// A simplified unit and the scale accumulated while simplifying it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ReducedUnit {

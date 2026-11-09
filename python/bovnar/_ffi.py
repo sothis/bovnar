@@ -777,3 +777,53 @@ def _declare_functions(lib: ctypes.CDLL) -> None:
     lib.bvn_float_fix_in_range.argtypes = [c_void_p, c_uint32, c_uint32]
     lib.bvn_float_str_fits_fix.restype  = c_bool
     lib.bvn_float_str_fits_fix.argtypes = [c_char_p, c_uint32, c_uint32, c_uint32]
+
+    # --- literals, type annotations, DOM builder ---
+    # bovnar.literals and bovnar.dom.NewNode. The validators, parsers and
+    # formatters declared further up (bvn_validate_identifier ... _number,
+    # bvn_is_special_number_string, bvn_parse_*64, bvn_parse_double,
+    # bvn_format_*) serve these too; only what they lacked is here.
+    # unit_buf is a caller buffer of at least 256 bytes (bovnar.h); the text
+    # is length-counted, so c_char_p carries it with any NUL it holds.
+    lib.bvn_parse_type_annotation.restype  = ValueTypeSpec
+    lib.bvn_parse_type_annotation.argtypes = [
+        c_char_p, c_uint32, P(c_bool), P(c_bool), P(c_bool), P(ValueUnit),
+        c_void_p, P(c_uint8),
+    ]
+    lib.bvn_validate_digits_for_base.restype  = c_bool
+    lib.bvn_validate_digits_for_base.argtypes = [c_char_p, c_uint32]
+    lib.bvn_validate_number_in_base.restype  = c_bool
+    lib.bvn_validate_number_in_base.argtypes = [c_char_p, c_uint32]
+    lib.bvn_validate_string.restype  = c_bool
+    lib.bvn_validate_string.argtypes = [c_char_p, c_size_t]
+    lib.bvn_char_to_digit.restype  = c_uint32
+    lib.bvn_char_to_digit.argtypes = [c_uint32, c_uint32]
+    lib.bvn_min_digits_for_type.restype  = c_uint32
+    lib.bvn_min_digits_for_type.argtypes = [ValueTypeSpec]
+    lib.bvn_parse_double_in_base.restype  = c_bool
+    lib.bvn_parse_double_in_base.argtypes = [c_char_p, c_uint32, P(c_double)]
+    # A pointer to the library's static table of 256 bytes.
+    lib.bvn_get_escape_repl_table.restype  = P(c_uint8)
+    lib.bvn_get_escape_repl_table.argtypes = []
+    # The DOM builder (bovnar_dom.h). Every attach takes ownership of the
+    # node on success AND on failure; bovnar.dom.NewNode hands it over once.
+    lib.bvn_dom_node_alloc.restype  = c_void_p
+    lib.bvn_dom_node_alloc.argtypes = [c_int]
+    lib.bvn_dom_node_destroy.restype  = None
+    lib.bvn_dom_node_destroy.argtypes = [c_void_p]
+    lib.bvn_dom_struct_add.restype  = c_bool
+    lib.bvn_dom_struct_add.argtypes = [c_void_p, c_char_p, c_uint32, c_void_p]
+    lib.bvn_dom_doc_add.restype  = c_bool
+    lib.bvn_dom_doc_add.argtypes = [c_void_p, c_char_p, c_uint32, c_void_p]
+    lib.bvn_dom_array_append.restype  = c_bool
+    lib.bvn_dom_array_append.argtypes = [c_void_p, c_void_p]
+    for _name, _ct in (('i8', c_int8), ('u8', c_uint8), ('i16', c_int16),
+                       ('u16', c_uint16), ('i32', c_int32), ('u32', c_uint32),
+                       ('i64', c_int64), ('u64', c_uint64)):
+        fn = getattr(lib, 'bvn_dom_node_from_' + _name)
+        fn.restype = c_void_p
+        fn.argtypes = [_ct]
+    # Asymmetric: the node owns the bignum on success; on NULL the caller
+    # still does.
+    lib.bvn_dom_node_from_bigint.restype  = c_void_p
+    lib.bvn_dom_node_from_bigint.argtypes = [c_void_p, ValueTypeSpec, ValueUnit]

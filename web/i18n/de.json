@@ -403,6 +403,7 @@
     "cfg.ind": "# ── Reaktor R-204 — Konfiguration der SPS-Telemetrie ───\n# Festkomma-Register tragen Skalierung (q) und Einheit inline.\n.control = {\n    .setpoint = <float_fix:16,q8,°C> 78.50;\n    .kp       = <float_fix:16,q8>    3.0;\n    .ki       = <float_fix:16,q8>    0.04;\n    .kd       = <float_fix:16,q8>    6.0;\n};\n\n.limits = {\n    .temp_max  = <float_fix:16,q8,°C>  86.0;\n    .press_max = <float_fix:16,q8,bar> 3.0;\n    .level_min = <float_fix:16,q8,%>   38.0;\n};\n\n.bus = {\n    .resync = true;\n};",
     "cfg.parseErrors": "$N Parse-Fehler, Zeile $L",
     "cfg.parseError": "Parse-Fehler, Zeile $L",
+    "cfg.docRule": "Dokumentregel $C (keine einzelne Zeile)",
     "cfg.noAltitude": ".orbit.altitude nicht gefunden",
     "cfg.orbitUpdated": "Orbit aktualisiert — ",
     "cfg.noStartPrice": ".instrument.start_price fehlt",

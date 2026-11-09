@@ -85,6 +85,7 @@ in a browser or worker, through `fetch`; the inlined build needs neither.
 | `peekVersion(in)` | `{ major, minor }` or `null` — a document's leading `#!bovnar` directive, without parsing it |
 | `errorName(code)` | the `error_name` a numeric result code maps to (`"none"` for 0) |
 | `parseUnit(text)` | `{ ok, unit, error, error_name, profile_only }` — a unit's canonical spelling and why a string was refused |
+| `parseTypeAnnotation(text)` | `{ ok, type_ok, unit_ok, unit_too_long, family, width, base, epoch, unit, unit_source, profile_only }` — a type annotation parsed as the reader parses one (`bvn_parse_type_annotation`), without a document. Angle brackets are optional |
 | `unitToProfile(text, ns = 'ucum')` | `{ ok, unit, error, error_name }` — the unit as a code in that vocabulary (no `ns:` prefix), or `null` for a valid unit the vocabulary has no code for |
 | `unitsEqual(a, b)` | whether two unit strings denote the same unit; throws `TypeError` if either is not a unit |
 | `unitsConvertible(a, b)` | `bvn_units_convertible`, the screen for a conversion target; a screen, not a guarantee |
@@ -141,10 +142,11 @@ code and, where the tier has one, a position — never a throw. A throw means th
   the library cannot parse (the message names what was added), or a core
   export this wrapper needs is missing (a stale core paired with a current
   wrapper).
-- `parseUnit`, `unitToProfile` and `convertUnit` treat a bad unit as **data**:
-  they return `{ ok: false, error_name: "unit_illegal" }` (or
-  `unit_profile_*`) and never throw for it, so a unit arriving from a user can
-  be checked without try/catch.
+- `parseUnit`, `unitToProfile`, `parseTypeAnnotation` and `convertUnit` treat
+  a bad unit or annotation as **data**: they return a result with
+  `ok: false` (and, for the unit surfaces, `error_name: "unit_illegal"` or
+  `unit_profile_*`) and never throw for it, so a unit or an annotation
+  arriving from a user can be checked without try/catch.
 
 ### Unit policy
 
@@ -231,7 +233,11 @@ callback can tell you: the skipped bytes were never parsed.
 An event that carries a unit reports it twice: `unit` is the canonical form
 (`m~L`), and `unit_source` is the unit exactly as the document spelled it
 (`ucum:mL{total}`) — the only place a UCUM annotation or a profile's own
-spelling survives. `unit_source` is absent where the value has no unit.
+spelling survives. `unit_source` is present on every event whose value has a
+unit, even when that spelling is already canonical (`3 m` carries
+`unit_source: "m"`); it is absent only where there is no unit. `doc()`'s
+`unitSource` follows the DOM's rule instead and is `null` when the spelling is
+canonical, so the two surfaces are not interchangeable field for field.
 
 ### Position and value caveats
 
@@ -289,6 +295,41 @@ read. Bases 64 and 85 have no sign character, so a negative result in one is
 `invalid_argument` too — the exactness contract will not write `-` as a digit
 that means something else.
 
+### `parseTypeAnnotation`: an annotation on its own
+
+`bvn_parse_type_annotation` parses the body of a type annotation — the text
+between the angle brackets, `uint:32,_16,k~g` — as the reader parses one,
+without a document around it:
+
+```js
+bvnr.parseTypeAnnotation('<float:64,ucum:mL{total}>');
+// { ok: true, type_ok: true, unit_ok: true, unit_too_long: false,
+//   family: 'float', width: 64, base: 0, epoch: null,
+//   unit: 'm~L', unit_source: 'ucum:mL{total}', profile_only: false }
+```
+
+`ok` is `type_ok && unit_ok && !unit_too_long`; the flags keep the C API's
+three failure kinds apart (an annotation that does not parse — an unknown
+family, or a base that family cannot carry, as in `<float:64,_8>` or
+`<uint:64,_0>`; a unit parameter that is not a unit; and a unit parameter over
+255 bytes). This is the reader's acceptance test for the **annotation**, not
+for a value: `<uint:8>` against a string still passes here.
+
+`width` and `base` are the parsed spec's fields, not the reader's resolved
+view: `0` means "not written" (the reader resolves those to 64 and 10), a
+`float_fix` keeps its `q` in `base` and a datetime its epoch index there, with
+the epoch's name in `epoch` (`null` off a datetime). `family`, `width`, `base`
+and `epoch` are `null` when `type_ok` is false; `unit` is the canonical
+spelling (and `"no_unit"` for an annotation with no unit), `unit_source` the
+parameter exactly as written (`null` when none was written or it was over the
+length bound), and `profile_only` says the unit has no native spelling.
+
+There is no document here, so there is no declared spec version and no value:
+a profile spelling such as `ucum:mm[Hg]` parses as a unit (`ok: true`), yet a
+**document** carrying it still needs `#!bovnar 1.2` and would report
+`unit_illegal` without one. Use `validate()` when the document's rules are
+what you need.
+
 ### `toJSON` projection notes
 
 `toJSON` projects the validated DOM onto plain JSON *values*; it intentionally
@@ -314,17 +355,19 @@ drops unit/type metadata (use `events()` to recover that). Specifically:
 
 ### `doc`: the tree shape
 
-`doc()` returns the DOM's own view, not a projection: every value node carries
-`familyName`, `width`, `base`, `unit`, `unitSource` and `epoch` (null where the
-field does not apply), a scalar's number `text` beside its JSON `value`, a
-datetime's sub-second digits as `frac`, a struct's `children`, an array's
-`dims` and `rows`; an octet stream is `{ type: "octet", total, chunks }` —
-the DOM joins the chunks into one payload, so `chunks` carries a single entry
-of `total` bytes, and the original boundaries are in the event stream
-(`events()`, with `octets: 'hex'` for the bytes themselves). An
-integer wider than 64 bits is a string in `value`, as in `toJSON`; unit/type
-metadata is kept. This is what the web playground's parser shim uses to
-cross-check its event-stream reconstruction.
+`doc()` returns the DOM's own view, not a projection: every scalar, struct and
+array node carries `familyName`, `width`, `base`, `unit`, `unitSource` and
+`epoch` (null where the field does not apply), a scalar's number `text` beside
+its JSON `value`, a datetime's sub-second digits as `frac`, a struct's
+`children`, and an array's `dims` and `rows`. An octet stream is the one node
+without those type fields: `{ type: "octet", total, chunks }` — the DOM joins
+the chunks into one payload, so `chunks` carries a single entry of `total`
+bytes, and the original boundaries are in the event stream (`events()`, with
+`octets: 'hex'` for the bytes themselves). An integer wider than 64 bits is a
+string in `value`, as in `toJSON`; a 64-bit one is a JSON number token, so
+`JSON.parse` of `value` rounds it above 2⁵³ exactly as it does for `toJSON`.
+Unit/type metadata is kept. This is what the web playground's parser shim uses
+to cross-check its event-stream reconstruction.
 
 Two notes on the fields. `base` is the TYPE's base (or the conversion's), not
 the base `text` is written in: the DOM stores a numeric value, and `text` and

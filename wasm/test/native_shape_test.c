@@ -131,6 +131,13 @@ static char *call_unit_to_profile(const char *buf, int len)
 	(void)buf; (void)len;
 	return bvnr_wasm_unit_to_profile("k~m/s", "ucum");
 }
+/* The annotation serialiser: a profile spelling with an annotation exercises
+ * the unit_source path, and the 255-byte parameter bound. */
+static char *call_type_annotation(const char *buf, int len)
+{
+	(void)buf; (void)len;
+	return bvnr_wasm_parse_type_annotation("float:64,ucum:mL{total}");
+}
 /* The exact-rational serialiser: allow_nonterminating makes the value arrive
  * as converted_num/converted_den, so sb_json_bigint's scratch buffer is part
  * of the exhaustion sweep too. */
@@ -174,6 +181,7 @@ static void test_out_of_memory_shapes(void)
 		{ "unit", call_unit },              { "unit_profiles", call_profiles },
 		{ "convert_unit", call_convert_unit },
 		{ "unit_to_profile", call_unit_to_profile },
+		{ "type_annotation", call_type_annotation },
 		{ "events_octet_hex", call_events_hex },
 		{ "convert_rational", call_convert_rational },
 	};
@@ -617,6 +625,90 @@ static void policy_oom_one(const char *label, policy_add_fn add)
 	count_malloc = 0;
 }
 
+/* bvn_parse_type_annotation as data: the three failure flags, the parsed spec
+ * (raw width/base, q and epoch in base), the canonical unit and its spelling. */
+static void test_parse_type_annotation(void)
+{
+	char *j = bvnr_wasm_parse_type_annotation("uint:32,_16,k~g");
+	CHECK(has(j, "\"ok\":true") && has(j, "\"type_ok\":true") &&
+	      has(j, "\"unit_ok\":true") && has(j, "\"unit_too_long\":false") &&
+	      has(j, "\"family\":\"uint\"") && has(j, "\"width\":32") &&
+	      has(j, "\"base\":16") && has(j, "\"unit\":\"k~g\"") &&
+	      has(j, "\"unit_source\":\"k~g\"") &&
+	      has(j, "\"profile_only\":false"),
+	      "a full annotation parses: %s", j);
+	free(j);
+
+	j = bvnr_wasm_parse_type_annotation("float:64,ucum:mL{total}");
+	CHECK(has(j, "\"family\":\"float\"") && has(j, "\"unit\":\"m~L\"") &&
+	      has(j, "\"unit_source\":\"ucum:mL{total}\""),
+	      "the unit's spelling survives: %s", j);
+	free(j);
+
+	j = bvnr_wasm_parse_type_annotation("float_fix:16,q8,°C");
+	CHECK(has(j, "\"family\":\"float_fix\"") && has(j, "\"width\":16") &&
+	      has(j, "\"base\":8") && has(j, "\"unit\":\"°C\"") &&
+	      has(j, "\"epoch\":null"), "float_fix keeps q in base: %s", j);
+	free(j);
+
+	j = bvnr_wasm_parse_type_annotation("datetime:64,tai");
+	CHECK(has(j, "\"family\":\"datetime\"") && has(j, "\"base\":1") &&
+	      has(j, "\"epoch\":\"tai\""),
+	      "a datetime reports its epoch index and name: %s", j);
+	free(j);
+
+	j = bvnr_wasm_parse_type_annotation("uint");
+	CHECK(has(j, "\"ok\":true") && has(j, "\"width\":0") &&
+	      has(j, "\"base\":0") && has(j, "\"unit\":\"no_unit\"") &&
+	      has(j, "\"unit_source\":null"),
+	      "an unwritten width/base/unit stay unwritten: %s", j);
+	free(j);
+
+	j = bvnr_wasm_parse_type_annotation("uint:8,zz");
+	CHECK(has(j, "\"ok\":false") && has(j, "\"type_ok\":true") &&
+	      has(j, "\"unit_ok\":false") && has(j, "\"family\":\"uint\"") &&
+	      has(j, "\"unit\":null") && has(j, "\"unit_source\":\"zz\""),
+	      "a bad unit is a unit failure, not a type one: %s", j);
+	free(j);
+
+	j = bvnr_wasm_parse_type_annotation("float:64,_8");
+	CHECK(has(j, "\"ok\":false") && has(j, "\"type_ok\":false") &&
+	      has(j, "\"unit_ok\":true") && has(j, "\"family\":null") &&
+	      has(j, "\"width\":null") && has(j, "\"base\":null"),
+	      "a base the family cannot carry is a type failure: %s", j);
+	free(j);
+	j = bvnr_wasm_parse_type_annotation("uint:64,_0");
+	CHECK(has(j, "\"ok\":false") && has(j, "\"type_ok\":false"),
+	      "_0 is not a writable base: %s", j);
+	free(j);
+
+	/* A unit parameter over BVNR_UNIT_SOURCE_MAX/255 bytes: unit_too_long is
+	 * its own flag, and the fragment that fit the buffer is not echoed as a
+	 * spelling (it is not one). */
+	char longunit[300];
+	memcpy(longunit, "uint:8,", 7);
+	for (size_t i = 0; i < 260; i++) longunit[7 + i] = 'm';
+	longunit[267] = '\0';
+	j = bvnr_wasm_parse_type_annotation(longunit);
+	CHECK(has(j, "\"ok\":false") && has(j, "\"type_ok\":true") &&
+	      has(j, "\"unit_ok\":false") && has(j, "\"unit_too_long\":true") &&
+	      has(j, "\"unit\":null") && has(j, "\"unit_source\":null"),
+	      "an over-long unit says so and is not echoed: %s", j);
+	free(j);
+
+	j = bvnr_wasm_parse_type_annotation("float:64,ucum:[IU]");
+	CHECK(has(j, "\"ok\":true") && has(j, "\"unit\":\"ucum:[IU]\"") &&
+	      has(j, "\"unit_source\":\"ucum:[IU]\"") &&
+	      has(j, "\"profile_only\":true"),
+	      "an opaque profile unit keeps its spelling: %s", j);
+	free(j);
+
+	j = bvnr_wasm_parse_type_annotation("");
+	CHECK(has(j, "\"ok\":false") && has(j, "\"type_ok\":false"),
+	      "an empty annotation is not one: %s", j);
+	free(j);
+}
+
 static void test_policy_oom(void)
 {
 	policy_oom_one("target", add_target);
@@ -630,6 +722,7 @@ int main(void)
 	test_result_shapes();
 	test_read_options_and_policy();
 	test_policy_oom();
+	test_parse_type_annotation();
 	test_new_event_and_doc_fields();
 	test_helpers();
 	test_out_of_memory_shapes();

@@ -44,7 +44,7 @@
   };
 
   var wasm = null;
-  import('./bovnar_wasm.js?v=55cbe9ce49f3')
+  import('./bovnar_wasm.js?v=2c5924b7344c')
     .then(function (m) { return m.loadBovnar(); })
     .then(function (b) {
       wasm = b;
@@ -360,6 +360,17 @@
           settle();
           var s = scan(e.text); key = e.text; line = s.line; col = s.col;
           annUnit = null;
+          /* A resynced assignment leaves its type annotation PENDING: the
+             reader emits type_start..type_end and then, the value being bad,
+             no data event ever claims it. Left set, the next assignment's
+             array consumed it at array_row_start and the tree showed an
+             EXPLICIT annotation there that the document never wrote (and the
+             reader never emitted for it) -- `.a = <uint:8> 999; .b = [1,2];`
+             put a uint annotation on `.b`. A pending annotation belongs to
+             the value that follows it in the SAME assignment, so a new
+             assignment starts with none. */
+          annPending = false;
+          annSynth = false;
           break;
         }
         case 'type_start': annUnit = null; annSynth = false; break;
@@ -799,7 +810,16 @@
        never returns to the top. ev_stream_end itself is NOT synthesised: its
        absence is how the C says the document was cut short. */
     function drain() {
+      if (octetOpen) { E(EV.OCTET_STREAM_END); octetOpen = false; }
       while (stack.length > 1) {
+        /* The frame being popped may hold the assignment whose value never
+           arrived (a fatal error inside a struct field, a stream cut short).
+           Close it FIRST, exactly as the live struct_close path does: popping
+           the struct and then emitting an assignment_end closed the wrong
+           level -- the field stayed open and the enclosing assignment was
+           closed by the struct's own end, so a consumer's nesting never
+           returned to the top. */
+        flushPending();
         var f = stack.pop();
         if (f.kind === 'array') { if (f.row) E(EV.ARRAY_ROW_END); }
         else E(EV.STRUCT_END);
@@ -810,6 +830,12 @@
     var sawStreamEnd = false;
     /* struct_close events already accounted for by a resynced array_row_end */
     var swallowStructClose = 0;
+    /* An octet stream has no container on `stack`, but it is a bracketing pair
+       like the others. A read that dies inside one (a chunk cut short, a
+       framing byte out of sync) delivers ev_octet_stream_start and no end, and
+       a consumer's nesting then never closes — so the stream below closes it,
+       exactly as drain() closes a struct or a row. */
+    var octetOpen = false;
     for (var i = 0; i < events.length; i++) {
       var e = events[i];
       switch (e.ev) {
@@ -884,8 +910,18 @@
           if (top().kind === 'array') top().pendingDim = true;
           E(EV.ARRAY_DIM_START);
           break;
-        case 'octet_start': settle(); E(EV.OCTET_STREAM_START); break;
-        case 'octet_end': E(EV.OCTET_STREAM_END); endValue(); break;
+        case 'octet_start':
+          settle();
+          /* a resync can open another stream over one that never closed */
+          if (octetOpen) { E(EV.OCTET_STREAM_END); octetOpen = false; }
+          E(EV.OCTET_STREAM_START);
+          octetOpen = true;
+          break;
+        case 'octet_end':
+          /* an end without a start would unbalance the consumer, not fix it */
+          if (octetOpen) { E(EV.OCTET_STREAM_END); octetOpen = false; }
+          endValue();
+          break;
         case 'data':
           if (e.tok === 'octet_stream') {
             E(EV.DATA, { kind: 'octet', value: null, text: '', length: e.bytes });

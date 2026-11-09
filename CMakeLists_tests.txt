@@ -1514,7 +1514,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 199)   # 134 base + rust_build_sync + canonical_keeps_meaning + interval_array + bench_iterations_zero + sitemap + convert_wide_int + unit_source + 3 for examples/unit_profiles.bvnr + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier) + cli_regressions + wasm_native_shape + abi_baseline + crate_provenance
+set(BVNR_EXPECTED_TEST_COUNT 200)   # 134 base + rust_build_sync + canonical_keeps_meaning + interval_array + bench_iterations_zero + sitemap + convert_wide_int + unit_source + 3 for examples/unit_profiles.bvnr + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier) + cli_regressions + wasm_native_shape + web_browser + abi_baseline + crate_provenance
                                     #             + citation
                                     #         + profiles_off_build
                                     # + om_test + cf_test
@@ -1662,6 +1662,29 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/dist/wasm/index.mjs
     endif()
     set_tests_properties(bvnr_playground_shim PROPERTIES
         LABELS "wasm;web" TIMEOUT 120)
+endif()
+
+# ── The page, in a real browser, running the real WASM ──────────────────────
+# The static wiring in playground_shim_test.mjs proves the scripts name each
+# other; it cannot prove the chain boots, that the module instantiates, or that
+# the demos and the playground render values that came out of the reference
+# parser. This loads the real page in headless Chrome and checks exactly that.
+# Chrome is optional: with none found the test exits 77 ("SKIP: no Chrome"),
+# which SKIP_RETURN_CODE reports as skipped rather than failed.
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/dist/wasm/index.mjs
+   AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/wasm/test/browser_smoke.mjs)
+    if(NODE_EXECUTABLE)
+        add_test(
+            NAME    bvnr_web_browser
+            COMMAND ${NODE_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/wasm/test/browser_smoke.mjs)
+    else()
+        add_test(NAME bvnr_web_browser COMMAND ${CMAKE_COMMAND} -E echo
+                 "no node found -- install node or source emsdk to run this gate")
+        set_tests_properties(bvnr_web_browser PROPERTIES DISABLED TRUE)
+    endif()
+    set_tests_properties(bvnr_web_browser PROPERTIES
+        LABELS "wasm;web" TIMEOUT 180 SKIP_RETURN_CODE 77)
 endif()
 
 # ── The WASM build answers like the native CLI ──────────────────────────────

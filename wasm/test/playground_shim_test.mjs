@@ -33,6 +33,7 @@
 
 import { loadBovnar } from '../../dist/wasm/index.mjs';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -356,6 +357,82 @@ for (const { name, text } of [...examples, ...shapes, ...resync]) {
   ok(bad.length === 0, `events ${name}: ${bad.join('; ')}`);
 }
 
+/* A read that dies inside an octet stream delivers ev_octet_stream_start and
+   no end: a chunk cut short (read_complete_chunk_failed) or a framing byte out
+   of sync. drain() closed structs, rows and assignments but not this pair, so
+   the translated stream left an octet open and a consumer's nesting never
+   returned to the top. It is closed like the others now. */
+console.log('# a truncated octet stream still opens and closes once');
+{
+  const cases = [
+    { name: 'chunk cut short', text: '.bin = \x00\x01\x05\x00ab;\n.after = 1;\n' },
+    { name: 'framing out of sync', text: '.bin = \x00\x01\x05\x00ab' },
+    { name: 'inside an array row', text: '.a = [\x00\x01\x05\x00ab;\n.b = 2;\n' },
+  ];
+  for (const { name, text } of cases) {
+    const bad = checkStream(P, text);
+    ok(bad.length === 0, `octet ${name}: ${bad.join('; ')}`);
+    const types = [];
+    P.parseBovnar(text, (ev) => types.push(ev.type));
+    const starts = types.filter(t => t === P.EV.OCTET_STREAM_START).length;
+    const ends = types.filter(t => t === P.EV.OCTET_STREAM_END).length;
+    ok(starts === 1 && ends === 1,
+       `octet ${name}: ${starts} start(s) and ${ends} end(s)`);
+  }
+}
+
+/* A read that stops while a struct field's VALUE has not arrived (a fatal
+   error in the field, a stream cut at that point) leaves the field's
+   assignment pending when drain() closes the document. drain() popped the
+   struct without closing it first, so struct_end closed the field's
+   assignment and the enclosing assignment_end closed the struct: every level
+   below was off by one. The live struct_close path already flushes first. */
+console.log('# a stream cut short inside a struct closes every level');
+{
+  const cases = [
+    '.a = {.x = <uint:8> 999;\n',
+    '.a = {.x = <uint:8> 999;',
+    '.a = {.x = @;\n',
+    '.a = {.x = 1;\n',
+    '.a = {.x = <uint:8> 999;\n.b = 2;\n',
+  ];
+  for (const text of cases) {
+    const bad = checkStream(P, text);
+    ok(bad.length === 0, `truncated ${JSON.stringify(text)}: ${bad.join('; ')}`);
+  }
+  /* The same invariant over generated documents corrupted at random — the
+     shape that found the drain() bug above. */
+  let seed = 9;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const ri = (n) => Math.floor(rnd() * n);
+  const atoms = ['1', '-2', '3.5', '"x"', 'true', 'null', 'sym', '&.r',
+    '1 m', '<uint:8> 7', '<float_fix:16,q8,°C> 1.5', '@',
+    '\x00\x01\x02\x00ab;\x00'];
+  function gen(d) {
+    if (d > 3) return '1';
+    const k = ri(8);
+    if (k < 5) return atoms[ri(atoms.length)];
+    if (k === 5)
+      return '[' + Array.from({ length: ri(3) }, () => gen(d + 1)).join(', ') + ']';
+    if (k === 6)
+      return '{' + Array.from({ length: ri(3) },
+        (_, i) => '.f' + i + ' = ' + gen(d + 1) + ';').join(' ') + '}';
+    return '[' + gen(d + 1) + '] / [' + gen(d + 1) + ']';
+  }
+  for (let n = 0; n < 200; n++) {
+    let text = '';
+    for (let i = 0, k = 1 + ri(3); i < k; i++)
+      text += '.k' + i + ' = ' + gen(0) + ';\n';
+    if (rnd() < 0.4) {
+      const at = ri(text.length);
+      text = text.slice(0, at) + text.slice(at + 1);   /* drop one byte */
+    }
+    const bad = checkStream(P, text);
+    ok(bad.length === 0,
+       `balance ${n}: ${bad.join('; ')} in ${JSON.stringify(text)}`);
+  }
+}
+
 console.log('# no assignment is rendered without its key');
 for (const { name, text } of [...examples, ...shapes]) {
   /* `·null` in the tree is the signature of a value that was attached to the
@@ -570,6 +647,44 @@ console.log('# every annotation sits on the element the C emitted it for');
   }
 }
 
+/* A resynced assignment never delivers its value, so nothing claims the
+   annotation the reader emitted for it. That pending annotation used to survive
+   into the NEXT assignment and wrap itself around an array the document never
+   annotated — `.a = <uint:8> 999; .b = [1,2];` showed `.b` as explicitly
+   `<uint>`, an event the reader never emitted for it. The tree must show the
+   annotations the reader delivered and no others. */
+console.log('# a skipped assignment does not leak its annotation');
+{
+  const cases = [
+    { name: 'top-level array', text: '.a = <uint:8> 999; .b = [1,2];\n', path: ['b'] },
+    { name: 'array in a struct', text: '.a = <uint:8> 999; .s = {.x = [1,2];};\n',
+      path: ['s', 'x'] },
+  ];
+  for (const { name, text, path } of cases) {
+    const r = P.parseFaithful(text);
+    ok(r.errors.length > 0, `leak ${name}: premise — the value is refused`);
+    let assign = r.tree.children.find(a => a.key === path[0]);
+    for (const key of path.slice(1))
+      assign = assign && assign.value.type === 'struct'
+        ? assign.value.children.find(a => a.key === key) : null;
+    const arr = assign && assign.value;
+    ok(arr && arr.type === 'array', `leak ${name}: the array is in the tree`);
+    ok(arr && !arr.ann && !(assign && assign.ann),
+       `leak ${name}: no phantom annotation (assignment ${show(assign && assign.ann)}, `
+       + `array ${show(arr && arr.ann)})`);
+    /* ...and the element annotation the C DID emit for this array still lands */
+    ok(arr && arr.rows[0].elements[0].ann &&
+       arr.rows[0].elements[0].ann.synthesized === true,
+       `leak ${name}: the element keeps its own synthesised annotation`);
+  }
+  /* An annotation the document really wrote after the skipped one still lands,
+     explicit, from its own event group. */
+  const good = P.parseFaithful('.a = <uint:8> 999; .b = <sint:16> [1,2];\n');
+  const b = good.tree.children.find(a => a.key === 'b');
+  ok(b && b.ann && b.ann.synthesized === false && b.ann.familyName === 'sint',
+     `leak: a written annotation still lands ${show(b && b.ann)}`);
+}
+
 /* A float_fix annotation's q is a parameter of its own, not a radix. The C
    event carries "q": 8; the shim used to read a `text` the event never had, so
    parseBovnar rendered {kind:'q', text:undefined}. Pinned against the C so a
@@ -718,6 +833,66 @@ console.log('# the regression itself');
      `the row holds ${els ? show(els.map(e => e.type)) : 'nothing'}, expected two structs`);
   ok(arr && arr.rows.length === 1 && arr.dims === 1,
      `array reports ${arr && arr.rows.length} row(s) / dims ${arr && arr.dims}, expected 1 / 1`);
+}
+
+/*
+ * The page promises that every frame of the three demos and everything the
+ * playground shows is parsed by the C reference implementation, not a
+ * JavaScript re-implementation. That holds only while every link of the chain
+ * is the current one: each demo's decoder (and the playground) calls
+ * BovnarParser.parseFaithful; the shim imports the cache-stamped wrapper that
+ * is on disk; the wrapper imports the current core; and the page loads and
+ * preloads those same stamped files. This is the wiring the shim tests above
+ * cannot see — they replace the import and run the shim standalone.
+ */
+console.log('# the website demos and playground run on this shim');
+{
+  const page = readFileSync(join(ROOT, 'web', 'index.html'), 'utf8');
+  const shimPath = join(ROOT, 'web', 'bovnar_parser_wasm.js');
+  const shimSrc = readFileSync(shimPath, 'utf8');
+  const hash = (p) => createHash('sha256').update(readFileSync(p)).digest('hex').slice(0, 12);
+
+  /* (a) every decoder in the page goes through the shim. The three demo decode
+     helpers are identical: parse, then project the tree. */
+  const decoders = [...page.matchAll(/function decode\(text[^)]*\)\s*\{([\s\S]{0,4000}?)\n  \}/g)];
+  ok(decoders.length === 3, `page: ${decoders.length} demo decoder(s), expected 3`);
+  decoders.forEach((m, i) => {
+    ok(/const res = parseFaithful\(text, opts\);/.test(m[1]),
+       `page: demo decoder ${i} does not parse through parseFaithful`);
+  });
+  ok(/const parseF = BovnarParser\.parseFaithful;/.test(page),
+     'page: the playground does not bind BovnarParser.parseFaithful');
+  /* the event tree draws the stream end only when the reader delivered one */
+  ok(/res\.events\.some\(\(e\) => e\.ev === 'stream_end'\)/.test(page),
+     'page: the playground appends a stream_end the reader did not deliver');
+
+  /* The config editors are the one place a demo validates user-typed text, so
+     they ask for the document tier (duplicate keys, array shapes); the frames
+     keep the single-pass streaming decode for speed. */
+  const cfgDecode = {
+    cfg: /decode\(txt, \{ documentTier: true \}\)/,
+    fcfg: /decode\(\$\('fcfg'\)\.value, \{ documentTier: true \}\)/,
+    icfg: /decode\(\$\('icfg'\)\.value, \{ documentTier: true \}\)/,
+  };
+  for (const [id, re] of Object.entries(cfgDecode))
+    ok(re.test(page), `page: #${id} does not get the two-tier verdict`);
+
+  /* (b) the shim imports the wrapper on disk, and the wrapper the core, each
+     under the cache stamp build_wasm.sh computes from the file's bytes. */
+  const wrapHash = hash(join(ROOT, 'web', 'bovnar_wasm.js'));
+  const coreHash = hash(join(ROOT, 'web', 'bovnar_wasm_core.js'));
+  ok(shimSrc.includes(`./bovnar_wasm.js?v=${wrapHash}`),
+     `shim: imports a wrapper other than bovnar_wasm.js?v=${wrapHash}`);
+  const wrapSrc = readFileSync(join(ROOT, 'web', 'bovnar_wasm.js'), 'utf8');
+  ok(wrapSrc.includes(`./bovnar_wasm_core.js?v=${coreHash}`),
+     `wrapper: imports a core other than bovnar_wasm_core.js?v=${coreHash}`);
+
+  /* (c) the page loads that shim and preloads the same chain. */
+  ok(page.includes(`bovnar_parser_wasm.js?v=${hash(shimPath)}`),
+     'page: does not load the current bovnar_parser_wasm.js stamp');
+  ok(page.includes(`bovnar_wasm.js?v=${wrapHash}`) &&
+     page.includes(`bovnar_wasm_core.js?v=${coreHash}`),
+     'page: modulepreload does not name the current wrapper/core stamps');
 }
 
 // --- report ----------------------------------------------------------------

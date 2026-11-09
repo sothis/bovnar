@@ -437,6 +437,19 @@ console.log('# reader options');
      'options: toJSON refuses a read flag it cannot honour');
   ok(throws(() => b.doc('.a=1;', { maxFileSize: 10 })),
      'options: doc refuses a read flag it cannot honour');
+  // The assertions are booleans: a string used to enable one via truthiness.
+  ok(throws(() => b.validate('.a=1;', { strictVersion: 'false' })),
+     'options: a non-boolean strictVersion throws');
+  ok(throws(() => b.events('.a=1;', { textOnly: 1 })),
+     'options: a non-boolean textOnly throws');
+  const p = b.createPolicy();
+  ok(throws(() => p.requireUnit('yes')) && throws(() => p.normaliseSI(1)),
+     'policy: the on/off arguments are booleans');
+  p.dispose();
+  // A NUL in a C-string argument names the thing the caller passed.
+  let nul = '';
+  try { b.parseTypeAnnotation('uint:8,m\0x'); } catch (e) { nul = e.message; }
+  ok(/a type annotation cannot contain NUL/.test(nul), `annotation NUL: ${nul}`);
 }
 
 // --- first-error position and what resync cost -------------------------------
@@ -835,6 +848,73 @@ console.log('# doc(): unitSource and a datetime fraction');
 }
 
 
+// --- a type annotation parsed on its own -------------------------------------
+// bvn_parse_type_annotation against the reader it mirrors: the same document
+// parsed as a whole delivers the resolved annotation fields on type_start, so
+// the standalone parse must agree with it field for field (the name, width,
+// base, unit and its spelling, and a datetime's epoch).
+console.log('# parseTypeAnnotation (vs the reader it mirrors)');
+{
+  const cases = [
+    ['uint:32,_16,k~g', '.v = <uint:32,_16,k~g> 7;',
+     { family: 'uint', width: 32, base: 16, unit: 'k~g' }],
+    ['float:64,ucum:mL{total}', '.v = <float:64,ucum:mL{total}> 1.0;',
+     { family: 'float', width: 64, base: 0, unit: 'm~L' }],
+    ['float_fix:16,q8,°C', '.v = <float_fix:16,q8,°C> 1.5;',
+     { family: 'float_fix', width: 16, base: 8, unit: '°C' }],
+    ['datetime:64,tai',
+     '#!bovnar 1.1\n.v = <datetime:64,tai> 2026-01-01T00:00:00Z;',
+     { family: 'datetime', width: 64, base: 1, epoch: 'tai' }],
+  ];
+  for (const [ann, text, want] of cases) {
+    const a = b.parseTypeAnnotation('<' + ann + '>');   // brackets are accepted
+    const ts = b.events(text).events.find(e => e.ev === 'type_start');
+    ok(a.ok && ts, `annotation ${ann}: both parse`);
+    for (const k of ['family', 'width', 'base'])
+      ok(a[k] === want[k] && ts[k] === want[k],
+         `annotation ${ann}: ${k} ${a[k]}/${ts[k]} vs ${want[k]}`);
+    if (want.unit)
+      ok(a.unit === want.unit && a.unit_source === ts.unit_source &&
+         ts.unit === want.unit,
+         `annotation ${ann}: unit ${a.unit} vs events ${ts.unit}`);
+    if (want.epoch)
+      ok(a.epoch === want.epoch && ts.epoch === want.epoch,
+         `annotation ${ann}: epoch ${a.epoch}/${ts.epoch}`);
+  }
+  ok(b.parseTypeAnnotation('uint:32,_16,k~g').unit_source === 'k~g',
+     'annotation: the body without brackets parses too');
+
+  // A width/base/unit the document did not write stays 0/null; the reader's
+  // type_start reports the same raw fields (a value event resolves the width).
+  const u = b.parseTypeAnnotation('uint');
+  ok(u.ok && u.width === 0 && u.base === 0 && u.unit === 'no_unit' &&
+     u.unit_source === null, `annotation: unwritten fields ${JSON.stringify(u)}`);
+
+  // The three failure flags mirror the reader's own refusal, and the flags are
+  // data: these never throw.
+  const bad = [
+    ['float:64,_8', '.v = <float:64,_8> 1.0;', 'illegal_value_type'],
+    ['uint:64,_0', '.v = <uint:64,_0> 1;', 'illegal_value_type'],
+    ['uint:8,zz', '.v = <uint:8,zz> 1;', 'unit_illegal'],
+  ];
+  for (const [ann, text, code] of bad) {
+    const a = b.parseTypeAnnotation(ann);
+    ok(!a.ok && !throws(() => b.parseTypeAnnotation(ann)),
+       `annotation ${ann}: refused as data`);
+    ok((a.type_ok && !a.unit_ok) || (!a.type_ok && a.unit_ok),
+       `annotation ${ann}: exactly one half failed ${JSON.stringify(a)}`);
+    ok(b.validate(text).error_name === code,
+       `annotation ${ann}: the reader says ${code}`);
+  }
+  const tooLong = b.parseTypeAnnotation('uint:8,' + 'm'.repeat(260));
+  ok(!tooLong.ok && tooLong.type_ok && !tooLong.unit_ok &&
+     tooLong.unit_too_long && tooLong.unit_source === null,
+     `annotation: over the unit bound ${JSON.stringify(tooLong)}`);
+  const opaque = b.parseTypeAnnotation('float:64,ucum:[IU]');
+  ok(opaque.ok && opaque.unit === 'ucum:[IU]' && opaque.profile_only,
+     `annotation: an opaque profile unit ${JSON.stringify(opaque)}`);
+}
+
 // --- the single-file build answers the same ----------------------------------
 // index.single.mjs (inlined wasm, no second fetch) is what the web playground
 // ships as web/bovnar_wasm_core.js, and what works in an environment with
@@ -886,6 +966,9 @@ console.log('# the single-file build (the playground ships this one)');
        single.unitToProfile('k~m/s').unit === 'km.s-1' &&
        single.unitProfiles().profiles.includes('ucum'),
        'single: the unit helpers work');
+    ok(single.parseTypeAnnotation('uint:8,m').ok &&
+       single.parseTypeAnnotation('uint:8,m').unit === 'm',
+       'single: parseTypeAnnotation is in the inlined build');
     const sh = single.events('.bin = \x00\x01\x02\x00hi\x00;', { octets: 'hex' })
       .events.find(e => e.tok === 'octet_stream');
     ok(sh && sh.hex === '6869', `single: octets hex (${JSON.stringify(sh)})`);
@@ -917,6 +1000,8 @@ console.log('# the web page chain');
     const h = web.events('.bin = \x00\x01\x02\x00hi\x00;', { octets: 'hex' })
       .events.find(e => e.tok === 'octet_stream');
     ok(h && h.hex === '6869', `web chain: octets hex (${JSON.stringify(h)})`);
+    ok(web.parseTypeAnnotation('<float:64,m>').family === 'float',
+       'web chain: parseTypeAnnotation');
   }
 }
 

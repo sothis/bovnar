@@ -137,8 +137,10 @@ export async function loadBovnar(opts) {
   }
 
   // Call a `char* fn(const char* text)` export with a NUL-terminated C string.
-  function callJsonCString(fnName, text) {
-    const p = stringPtr(text, 'a unit or key path');
+  // `what` names the argument in the NUL refusal ("a unit", "a type
+  // annotation"), so a rejected string names the thing the caller passed.
+  function callJsonCString(fnName, text, what) {
+    const p = stringPtr(text, what || 'a unit');
     let outPtr = 0;
     try {
       outPtr = Module.ccall(fnName, 'number', ['number'], [p]);
@@ -260,6 +262,16 @@ export async function loadBovnar(opts) {
     // Validate every value BEFORE allocating: a RangeError thrown after the
     // malloc would leak the block, and a caller retrying a bad option would
     // leak one per attempt.
+    //
+    // The two assertions are booleans, and used to be read for truthiness: a
+    // `strictVersion: "false"` from a JSON config ENABLED strict mode, an
+    // assertion the caller believed was off. Every other option is
+    // type-checked; these are too.
+    for (const k of ['strictVersion', 'textOnly']) {
+      if (!allowed.includes(k)) continue;
+      if (options[k] !== undefined && typeof options[k] !== 'boolean')
+        throw new TypeError(`bovnar: ${label}: ${k} must be a boolean`);
+    }
     const octets = options.octets;
     if (octets !== undefined && octets !== 'hex')
       throw new TypeError(
@@ -454,6 +466,8 @@ export async function loadBovnar(opts) {
     const api = {
       /** Every numeric value must carry a unit. */
       requireUnit(on = true) {
+        if (typeof on !== 'boolean')
+          throw new TypeError('bovnar: requireUnit takes a boolean');
         need(Module.ccall('bvnr_wasm_policy_require_unit', 'number',
                           ['number', 'number'], [live(), on ? 1 : 0]),
              'requireUnit');
@@ -512,6 +526,8 @@ export async function loadBovnar(opts) {
       /** Deliver everything the targets did not match in coherent SI base
        *  units (prefixes folded out). Values with no SI form are left alone. */
       normaliseSI(on = true) {
+        if (typeof on !== 'boolean')
+          throw new TypeError('bovnar: normaliseSI takes a boolean');
         setMode(on ? 1 : 0, base, onInexact);
         return api;
       },
@@ -625,8 +641,12 @@ export async function loadBovnar(opts) {
      *  reader's recovery statistics beside it.
      *
      *  A unit crosses twice: `unit` is the canonical form ("m~L") and
-     *  `unit_source` the spelling the document used ("ucum:mL{total}"), when
-     *  they differ. `base` 0 on a value means "no explicit base", i.e. decimal
+     *  `unit_source` the spelling the document used ("ucum:mL{total}"). The
+     *  reader sets `unit_source` on every event whose value HAS a unit, even
+     *  when the spelling is already canonical ("3 m" carries unit_source "m");
+     *  it is absent only where there is no unit. (`doc()`'s `unitSource` is
+     *  the DOM's and follows its own rule: null when the spelling is
+     *  canonical.) `base` 0 on a value means "no explicit base", i.e. decimal
      *  10; on a datetime it is the EPOCH INDEX, whose name is in `epoch`.
      *
      *  An octet chunk's data event reports `bytes`; pass `{ octets: 'hex' }`
@@ -768,7 +788,44 @@ export async function loadBovnar(opts) {
      *  profile_unsupported. */
     parseUnit: (text) => {
       needExport('bvnr_wasm_unit', 'parseUnit');
-      return callJsonCString('bvnr_wasm_unit', text);
+      return callJsonCString('bvnr_wasm_unit', text, 'a unit');
+    },
+
+    /** Parse the body of a type annotation — "uint:32,_16,k~g" — as the reader
+     *  parses one, without a document: bvn_parse_type_annotation. The angle
+     *  brackets are optional here (a "<...>" wrapper is stripped); the body
+     *  alone is what crosses.
+     *
+     *  Returns { ok, type_ok, unit_ok, unit_too_long, family, width, base,
+     *  epoch, unit, unit_source, profile_only }. `ok` is type_ok && unit_ok &&
+     *  !unit_too_long. The flags keep the C API's failure kinds apart: an
+     *  annotation that does not parse (an unknown family, or a base that
+     *  family cannot carry — <float:64,_8>, <uint:64,_0>), a unit parameter
+     *  that is not a unit, and a unit parameter over 255 bytes.
+     *
+     *  This is the reader's own acceptance test for the ANNOTATION; it does
+     *  not see a value, so a well-formed <uint:8> against a string still
+     *  passes here. `width` and `base` are the parsed spec's fields, not the
+     *  reader's resolved view: 0 means "not written" (the reader resolves
+     *  those to 64 and 10), a float_fix keeps its q in `base` and a datetime
+     *  its epoch index there, with the epoch's name beside it in `epoch`.
+     *  `family`/`width`/`base` are null when type_ok is false; `unit` is the
+     *  canonical spelling (null for a unit with no text), and `unit_source`
+     *  the parameter as written. A bad annotation is data, as with parseUnit:
+     *  it never throws.
+     *
+     *  There is no document here, so there is no declared spec version: a
+     *  profile spelling ("ucum:mm[Hg]") parses as a unit, while a DOCUMENT
+     *  carrying it still needs "#!bovnar 1.2" and reports unit_illegal
+     *  without one. Use validate() when the document's rules are what you
+     *  need. */
+    parseTypeAnnotation: (text) => {
+      needExport('bvnr_wasm_parse_type_annotation', 'type annotations');
+      let s = String(text);
+      if (s.length >= 2 && s[0] === '<' && s[s.length - 1] === '>')
+        s = s.slice(1, -1);
+      return callJsonCString('bvnr_wasm_parse_type_annotation', s,
+                             'a type annotation');
     },
 
     /** A unit written as a code in a profile's vocabulary: bvn_unit_to_profile,

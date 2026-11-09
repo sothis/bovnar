@@ -320,6 +320,14 @@ API and implements spec 1.2.
   (it still prints the projection), so the units and binary documents in it
   are no longer skipped. The README also states which build needs Node's
   globals or `window` and which needs neither.
+- **WASM: `parseTypeAnnotation()`** (`bvn_parse_type_annotation`) parses the
+  body of a type annotation — `uint:32,_16,k~g` — as the reader parses one,
+  without a document, and reports the C API's three failure kinds separately
+  (`type_ok`, `unit_ok`, `unit_too_long`) with the parsed family, width, base,
+  epoch, canonical unit and the unit's written spelling. The angle brackets are
+  optional in the JS surface. This is the reader's acceptance test for the
+  annotation itself (`<float:64,_8>` and `<uint:64,_0>` are refused as in a
+  document); it is data, never a throw.
 
 ### Changed
 
@@ -510,6 +518,45 @@ API and implements spec 1.2.
   take the last value.
 
 ### Fixed
+
+- **Web: the demos and the playground show only what the reader delivered,
+  and the demos validate a config as `bovnar validate` does.**
+  - *The playground tree appended an `ev_stream_end` the reader never sent.* A
+    document cut short by an error has no `ev_stream_end` (its absence is how
+    the C says the document was truncated), but the tree added one
+    unconditionally, in the panel whose promise is the same events in the same
+    order.
+  - *A skipped assignment leaked its type annotation onto the next one.* In
+    resync mode a refused value never claims the annotation the reader emitted
+    for it; the shim kept it pending, and the next array consumed it, so
+    `.a = <uint:8> 999; .b = [1,2];` showed `.b` as explicitly `<uint>` — an
+    annotation the document never wrote and the reader never emitted for it.
+    The pending annotation is now cleared at each assignment start.
+  - *The three demos' config editors used the streaming tier only,* so a config
+    with a duplicate key or a heterogeneous array was accepted where the
+    playground and `bovnar validate` refuse it. Config parsing now asks for the
+    document tier (once per Apply); the per-frame decoders stay single-pass.
+  - A page-wiring test now fails if any demo decoder (or the playground) stops
+    going through `BovnarParser.parseFaithful`, or if the page, shim, wrapper
+    and core cache stamps stop naming each other — the claims the landing page
+    makes about running the C implementation. A headless-Chrome smoke test
+    (`bvnr_web_browser`) loads the real page, offline, and checks that the
+    playground reports `ok` with a non-zero event count and that all three
+    demos apply their configs and render decoded values; it skips when no
+    Chrome is installed.
+  - *`parseBovnar()` left a truncated octet stream, and a struct field whose
+    value never arrived, unclosed.* The translated stream's nesting never
+    returned to the top: `drain()` popped each container without first closing
+    the pending assignment on it (the live `struct_close` path does), and the
+    octet pair had no drain at all. Both are closed now, and a randomized
+    balance check runs over generated, corrupted documents.
+
+- **WASM: the boolean options are type-checked.** `strictVersion` and
+  `textOnly` were read for truthiness, so a `"false"` arriving from a JSON
+  config ENABLED the assertion; `requireUnit()` and `normaliseSI()` were the
+  same. They now throw a `TypeError` for a non-boolean, as every other option
+  is type-checked. A NUL in `parseTypeAnnotation()`'s argument is also named
+  as a type annotation now, not as "a unit or key path".
 
 - **WASM: the gaps a review of the bindings against the C API turned up.**
   - *`events()`/`parse()` reported an error with no position,* while

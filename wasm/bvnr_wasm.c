@@ -2097,7 +2097,7 @@ uint32_t bvnr_wasm_peek_version(const char *buf, int len, int *found)
 }
 
 /* bvn_error_to_string, so a caller holding the NUMERIC code in a result can
- * name it. The table is the library's; an unknown code answers "unknown",
+ * name it. The table is the library's; an unknown code answers "unknown_error",
  * exactly as the C function does. */
 WASM_EXPORT
 const char *bvnr_wasm_error_name(int code)
@@ -2249,6 +2249,86 @@ char *bvnr_wasm_unit_profiles(void)
 		sb_json_cstr(&b, bvn_unit_profile_name(i));
 	}
 	sb_puts(&b, "]}");
+	return sb_finish(&b);
+}
+
+/* bvn_parse_type_annotation: the body of a type annotation ("uint:32,_16,k~g")
+ * parsed as the reader parses one, without a document around it. The three
+ * flags keep the failure kinds apart exactly as the C API does: type_ok false
+ * is an annotation that does not parse (an unknown family, an unwritable base
+ * for that family), unit_ok false a unit parameter that is not a unit, and
+ * unit_too_long the one unit failure that is about length (over 255 bytes).
+ *
+ * This is the reader's own acceptance test: <float:64,_8> and <uint:64,_0> are
+ * type_ok false here, as they are error_illegal_value_type in a document. It
+ * does not check a VALUE (that is what parsing one does), so <uint:8> against
+ * a string still passes here.
+ *
+ * The type fields are the parsed spec's own, not the reader's resolved view:
+ * width 0 and base 0 mean "not written" (the reader resolves them to 64 and
+ * 10), float_fix keeps its q in base as the event stream does, and a datetime
+ * keeps its epoch index there beside the epoch's name. `unit` is the canonical
+ * spelling (null when the unit parses but has no text, as bvnr_wasm_unit says);
+ * `unit_source` is the parameter exactly as written. */
+WASM_EXPORT
+char *bvnr_wasm_parse_type_annotation(const char *text)
+{
+	sb_t b; sb_init(&b);
+	bool type_ok = false, unit_ok = false, unit_too_long = false;
+	value_unit_t unit;
+	uint8_t unit_text[UINT8_MAX + 1u];
+	uint8_t unit_len = 0;
+	size_t len = text ? strlen(text) : 0;
+
+	memset(unit_text, 0, sizeof unit_text);
+	memset(&unit, 0, sizeof unit);
+	value_type_spec_t vt = bvn_parse_type_annotation(
+		(const uint8_t *)(text ? text : ""), (uint32_t)len,
+		&type_ok, &unit_ok, &unit_too_long, &unit, unit_text, &unit_len);
+
+	sb_putc(&b, '{');
+	sb_printf(&b, "\"ok\":%s",
+		  (type_ok && unit_ok && !unit_too_long) ? "true" : "false");
+	sb_printf(&b, ",\"type_ok\":%s,\"unit_ok\":%s,\"unit_too_long\":%s",
+		  type_ok ? "true" : "false", unit_ok ? "true" : "false",
+		  unit_too_long ? "true" : "false");
+	sb_puts(&b, ",\"family\":");
+	if (type_ok) sb_json_cstr(&b, evt_family(vt.family));
+	else         sb_puts(&b, "null");
+	if (type_ok) {
+		sb_printf(&b, ",\"width\":%u,\"base\":%u", vt.width, vt.base);
+		if (vt.family == vt_datetime) {
+			const char *ep = bvnr_datetime_epoch_name(vt);
+			sb_puts(&b, ",\"epoch\":");
+			if (ep) sb_json_cstr(&b, ep);
+			else    sb_puts(&b, "null");
+		} else {
+			sb_puts(&b, ",\"epoch\":null");
+		}
+	} else {
+		sb_puts(&b, ",\"width\":null,\"base\":null,\"epoch\":null");
+	}
+	sb_puts(&b, ",\"unit\":");
+	bool have_unit = false;
+	if (unit_ok) {
+		char ub[BVNR_UNIT_STRING_MAX];
+		if (bvn_unit_to_string(unit, ub, sizeof ub) >= 0) {
+			sb_json_cstr(&b, ub);
+			have_unit = true;
+		}
+	}
+	if (!have_unit) sb_puts(&b, "null");
+	sb_puts(&b, ",\"unit_source\":");
+	if (!unit_too_long && unit_len > 0u) {
+		sb_putc(&b, '"');
+		sb_json_str_body(&b, (const char *)unit_text, unit_len);
+		sb_putc(&b, '"');
+	} else {
+		sb_puts(&b, "null");
+	}
+	sb_printf(&b, ",\"profile_only\":%s",
+		  (unit_ok && bvn_unit_is_profile_only(unit)) ? "true" : "false");
+	sb_putc(&b, '}');
 	return sb_finish(&b);
 }
 

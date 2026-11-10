@@ -41,6 +41,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "bovnar.h"
+#include "bvn_double_impl.h"
 #include "bovnar_si_units.h"
 #include "bvn_internal_dims.h"
 
@@ -95,7 +96,7 @@ static void chk_factor(const char* src, double want)
 	bool aff = false, fok = true;
 	double off = 0.0;
 	double f = bvn_unit_to_si_factor(u, &aff, &off, &fok);
-	if (!fok || fabs(f - want) > fabs(want) * 1e-9) {
+	if (!fok || bvni_fabs(f - want) > bvni_fabs(want) * 1e-9) {
 		fprintf(stderr, "FAIL: %s factor %.17g, expected %.17g\n",
 		        src, f, want);
 		failures++;
@@ -360,7 +361,7 @@ static void test_arbitrary(void)
 	 * silently wrong. */
 	bool cok = true, aff2 = false;
 	double f = bvn_unit_convert_factor(iu, iu, &cok, &aff2);
-	ASSERT_TRUE(cok && fabs(f - 1.0) < 1e-15, "[IU] -> [IU] is identity");
+	ASSERT_TRUE(cok && bvni_fabs(f - 1.0) < 1e-15, "[IU] -> [IU] is identity");
 	cok = true;
 	(void)bvn_unit_convert_factor(iu, pfu, &cok, &aff2);
 	ASSERT_FALSE(cok, "[IU] does not convert to [PFU]");
@@ -376,7 +377,7 @@ static void test_arbitrary(void)
 	cok = true;
 	f = bvn_unit_convert_factor(U("ucum:[IU]/L"), U("ucum:[IU]/mL"),
 	                            &cok, &aff2);
-	ASSERT_TRUE(cok && fabs(f - 0.001) < 1e-15,
+	ASSERT_TRUE(cok && bvni_fabs(f - 0.001) < 1e-15,
 	            "[IU]/L -> [IU]/mL is exactly 1/1000");
 
 	/* UCUM's metric flag is enforced: [IU] takes prefixes, [arb'U] does not. */
@@ -393,11 +394,11 @@ static void test_arbitrary(void)
 	ASSERT_FALSE(bvn_unit_equal(iu_i, pfu), "[iU] is NOT [PFU]");
 	cok = true;
 	f = bvn_unit_convert_factor(iu_i, iu, &cok, &aff2);
-	ASSERT_TRUE(cok && fabs(f - 1.0) < 1e-15, "[iU] -> [IU] is identity");
+	ASSERT_TRUE(cok && bvni_fabs(f - 1.0) < 1e-15, "[iU] -> [IU] is identity");
 	cok = true;
 	f = bvn_unit_convert_factor(U("ucum:[iU]/L"), U("ucum:[IU]/mL"),
 	                            &cok, &aff2);
-	ASSERT_TRUE(cok && fabs(f - 0.001) < 1e-15,
+	ASSERT_TRUE(cok && bvni_fabs(f - 0.001) < 1e-15,
 	            "[iU]/L -> [IU]/mL is exactly 1/1000");
 	cok = true;
 	(void)bvn_unit_convert_factor(iu_i, pfu, &cok, &aff2);

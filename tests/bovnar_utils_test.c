@@ -28,6 +28,7 @@
 #include <string.h>
 #include <math.h>
 #include "bovnar.h"
+#include "bvn_double_impl.h"
 #include "bovnar_si_units.h"
 
 static int failures = 0;
@@ -66,7 +67,7 @@ static int tests = 0;
 #define ASSERT_EQ_DBL(a, b, tol, msg) do {                            \
 	tests++;                                                         \
 	double _a = (a), _b = (b);                                       \
-	if (fabs(_a - _b) > (tol)) {                                     \
+	if (bvni_fabs(_a - _b) > (tol)) {                                     \
 		fprintf(stderr, "FAIL line %d: %s\n  got %.15g, expected %.15g\n", \
 				__LINE__, (msg), _a, _b);                           \
 		failures++;                                                  \

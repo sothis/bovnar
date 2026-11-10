@@ -94,7 +94,7 @@ COMMON=(
 	# "bovnar_si_units.h"` (the exact-rational formatter and the base check).
 	# The amalgamated bovnar.h is found first, so its merged copy of the same
 	# header satisfies the include guard and nothing is defined twice.
-	-I "$AMALG" -I "$ROOT/wasm" -I "$ROOT/include"
+	-I "$AMALG" -I "$ROOT/wasm" -I "$ROOT/include" -I "$ROOT/src/utils"
 	-std=c11
 	"$AMALG/bovnar.c" "$ROOT/wasm/bvnr_wasm.c"
 	-sEXPORTED_FUNCTIONS="$EXPORTS"

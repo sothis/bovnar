@@ -77,6 +77,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "bovnar.h"
+#include "bvn_double_impl.h"
 #include "bovnar_si_units.h"
 #include "bvn_internal_dims.h"
 
@@ -374,7 +375,7 @@ static void test_agreement(void)
 					        "have an SI factor at all\n",
 					        con->concept, con->spelling[i], con->spelling[j]);
 					failures++;
-				} else if (ha && fabs(fa - fb) > fabs(fa) * 1e-12) {
+				} else if (ha && bvni_fabs(fa - fb) > bvni_fabs(fa) * 1e-12) {
 					fprintf(stderr,
 					        "FAIL [%s]: %s factor %.17g, %s factor %.17g\n",
 					        con->concept, con->spelling[i], fa,

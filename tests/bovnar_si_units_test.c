@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "bovnar.h"
+#include "bvn_double_impl.h"
 #include "bvn_internal_dims.h"
 #include "bovnar_si_units.h"
 #include "bvn_int.h"
@@ -38,7 +39,7 @@ static int tests    = 0;
 #define ASSERT_EQ_DBL(a, b, tol, msg) do {                          \
 	tests++;                                                     \
 	double _a = (a), _b = (b);                                   \
-	if (fabs(_a - _b) > (tol)) {                                 \
+	if (bvni_fabs(_a - _b) > (tol)) {                                 \
 		fprintf(stderr, "FAIL line %d: %s\n  got %.15g, expected %.15g\n", \
 		        __LINE__, (msg), _a, _b);                     \
 		failures++;                                           \
@@ -2189,9 +2190,9 @@ static void test_rational_matches_double_path(void)
 				mismatches++;
 			} else if (rok && exact) {
 				double r = rat_to_double(on, od);
-				double scale = fabs(dref) > 1e-300 ? fabs(dref) : 1.0;
+				double scale = bvni_fabs(dref) > 1e-300 ? bvni_fabs(dref) : 1.0;
 				compared++;
-				if (!(fabs(r - dref) / scale < 1e-9))
+				if (!(bvni_fabs(r - dref) / scale < 1e-9))
 					mismatches++;
 			}
 			bvn_int_free(vn); bvn_int_free(vd);
@@ -2590,7 +2591,7 @@ static void test_affine_unit_in_a_product_has_no_si_value(void)
 	ASSERT_TRUE(bvn_unit_convert_value(20.0, BVN_UNIT_NO_PREFIX(bu_celsius),
 					   BVN_UNIT_NO_PREFIX(bu_kelvin), &out),
 		    "a lone affine unit still converts");
-	ASSERT_TRUE(fabs(out - 293.15) < 1e-9, "20 °C is 293.15 K");
+	ASSERT_TRUE(bvni_fabs(out - 293.15) < 1e-9, "20 °C is 293.15 K");
 }
 
 static void test_temperature_difference_is_its_own_quantity_kind(void)
@@ -2636,10 +2637,10 @@ static void test_temperature_difference_is_its_own_quantity_kind(void)
 	 * no offset anywhere. Δ°De is negative because Delisle runs backwards. */
 	ASSERT_TRUE(bvn_unit_convert_value(9.0, dF, dK, &out),
 		    "Δ°F -> ΔK converts");
-	ASSERT_TRUE(fabs(out - 5.0) < 1e-12, "9 Δ°F is 5 ΔK (5/9, no offset)");
+	ASSERT_TRUE(bvni_fabs(out - 5.0) < 1e-12, "9 Δ°F is 5 ΔK (5/9, no offset)");
 	ASSERT_TRUE(bvn_unit_convert_value(3.0, dDe, dK, &out),
 		    "Δ°De -> ΔK converts");
-	ASSERT_TRUE(fabs(out + 2.0) < 1e-12, "3 Δ°De is -2 ΔK (Delisle inverts)");
+	ASSERT_TRUE(bvni_fabs(out + 2.0) < 1e-12, "3 Δ°De is -2 ΔK (Delisle inverts)");
 
 	/* The SI normal form must reduce an interval to ΔK and never to K. Getting
 	 * this wrong is not cosmetic: the form is screened against the unit it came
@@ -2673,7 +2674,7 @@ static void test_temperature_difference_is_its_own_quantity_kind(void)
 		out = 0.0;
 		ASSERT_TRUE(bvn_unit_convert_value(6.5, with_delta, with_kelvin, &out),
 			    "and the conversion is the identity");
-		ASSERT_TRUE(fabs(out - 6.5) < 1e-12, "factor 1, no rescale");
+		ASSERT_TRUE(bvni_fabs(out - 6.5) < 1e-12, "factor 1, no rescale");
 		/*
 		 * "The same unit" means bvn_unit_equal, not merely compatible, and
 		 * this line is the one that was missing. Compatibility was already
@@ -2870,7 +2871,7 @@ static void test_reduced_serialisation_preserves_the_quantity(void)
 			continue;
 		}
 		checked++;
-		if (isfinite(back) && fabs(back - 1.0) > 1e-9) {
+		if (bvni_isfinite(back) && bvni_fabs(back - 1.0) > 1e-9) {
 			printf("    %s -> %s : 1 came back as %.17g\n", plain, red, back);
 			ASSERT_TRUE(false, "the round trip is the identity");
 		}
@@ -2913,11 +2914,11 @@ static void test_extreme_compounds_keep_full_precision(void)
 			    "the conversion is performed, not refused");
 		/* Within a few ulp of the exact rational. The old code was 5e-5 out,
 		 * so the bound does not need to be tight to be decisive. */
-		ASSERT_TRUE(fabs(conv - cases[i].si_factor) <=
-			    1e-13 * fabs(cases[i].si_factor),
+		ASSERT_TRUE(bvni_fabs(conv - cases[i].si_factor) <=
+			    1e-13 * bvni_fabs(cases[i].si_factor),
 			    "and it agrees with the exact rational conversion");
-		ASSERT_TRUE(fabs(scale - cases[i].si_factor) <=
-			    1e-13 * fabs(cases[i].si_factor),
+		ASSERT_TRUE(bvni_fabs(scale - cases[i].si_factor) <=
+			    1e-13 * bvni_fabs(cases[i].si_factor),
 			    "as does the scale bvn_unit_reduce reports");
 	}
 }
@@ -3089,7 +3090,7 @@ static void test_named_si_collapse_never_substitutes_a_named_unit(void)
 				    "and it is the documented one");
 			double rs = 0.0; bool ovf = false;
 			(void)bvn_unit_reduce(in, &rs, &ovf);
-			ASSERT_TRUE(!ovf && fabs(rs - cases[i].reduce_scale) <
+			ASSERT_TRUE(!ovf && bvni_fabs(rs - cases[i].reduce_scale) <
 				    1e-9 * cases[i].reduce_scale,
 				    "bvn_unit_reduce reports the fully-reduced scale");
 			value_unit_t emitted = bvn_parse_unit((const uint8_t *)em, &pok);
@@ -3097,7 +3098,7 @@ static void test_named_si_collapse_never_substitutes_a_named_unit(void)
 			double es = 0.0;
 			ASSERT_TRUE(bvn_unit_convert_value(1.0, in, emitted, &es),
 				    "and the value converts into it");
-			ASSERT_TRUE(fabs(es - cases[i].emitted_scale) <
+			ASSERT_TRUE(bvni_fabs(es - cases[i].emitted_scale) <
 				    1e-9 * cases[i].emitted_scale,
 				    "which is the scale a caller must actually apply");
 		}
@@ -3234,8 +3235,8 @@ static void compare_engines(value_unit_t ua, value_unit_t ub,
 		int32_t len = bvn_rational_to_str(on, od, 10u, buf, sizeof buf, &rex);
 		if (len > 0 && rex) {
 			double rv = strtod(buf, NULL);
-			double tol = fabs(dv) * 1e-9 + 1e-300;
-			if (fabs(rv - dv) <= tol) {
+			double tol = bvni_fabs(dv) * 1e-9 + 1e-300;
+			if (bvni_fabs(rv - dv) <= tol) {
 				(*compared)++;
 			} else {
 				(*disagreed)++;

@@ -398,11 +398,12 @@ Every build also regenerates the single-file amalgamation into `build/amalgamate
 
 Disable with `-DBVNR_PACKAGE=OFF`.
 
-The Linux, macOS and Windows archives — built and smoke-tested by CI, plus a
-`-source.tar.xz` snapshot of the tag and a `SHA256SUMS` file — are attached to
-each [GitHub release](https://github.com/sothis/bovnar/releases) from 1.1.0
-onward, so a build from source is optional. The FreeBSD archive is packed by a
-native FreeBSD build and is not part of the release assets yet. Earlier tags
+The amalgamation and the Linux, macOS and Windows archives — built and
+smoke-tested by CI, plus a `-source.tar.xz` snapshot of the tag and a
+`SHA256SUMS` file — are attached to each
+[GitHub release](https://github.com/sothis/bovnar/releases) from 1.1.0 onward,
+so a build from source is optional. The FreeBSD archive is packed by a native
+FreeBSD build and is not part of the release assets yet. Earlier tags
 predate the packaging: 1.0.0 was POSIX-only and had no packer at all, and
 carries no assets.
 

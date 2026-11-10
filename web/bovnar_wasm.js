@@ -29,7 +29,7 @@
 // reader-side C API: the bvnr_read_flags_t assertions and limits, and a unit
 // policy. See "Reader options" below.
 
-import createBovnar from './bovnar_wasm_core.js?v=375ae72f3560';
+import createBovnar from './bovnar_wasm_core.js?v=254ac42b8fb9';
 
 const enc = new TextEncoder();
 

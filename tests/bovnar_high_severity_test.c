@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "bovnar.h"
+#include "bvn_double_impl.h"
 #include "bovnar_si_units.h"
 #include "bvn_float.h"
 
@@ -71,7 +72,7 @@ static int g_failures = 0;
 #define ASSERT_NEAR(a, b, eps, msg) do { \
 	g_tests++; \
 	double _a = (double)(a), _b = (double)(b), _e = (double)(eps); \
-	if (fabs(_a - _b) > _e) \
+	if (bvni_fabs(_a - _b) > _e) \
 		FAIL("%s: %.15g vs %.15g (eps %.2g)", (msg), _a, _b, _e); \
 } while (0)
 

@@ -45,6 +45,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "bovnar.h"
+#include "bvn_double_impl.h"
 #include "bovnar_si_units.h"
 #include "bvn_internal_dims.h"
 
@@ -102,7 +103,7 @@ static void chk_factor(const char* src, double want)
 	bool aff = false, fok = true;
 	double off = 0.0;
 	double f = bvn_unit_to_si_factor(u, &aff, &off, &fok);
-	if (!fok || fabs(f - want) > fabs(want) * 1e-9) {
+	if (!fok || bvni_fabs(f - want) > bvni_fabs(want) * 1e-9) {
 		fprintf(stderr, "FAIL: %s factor %.17g, expected %.17g\n",
 		        src, f, want);
 		failures++;
@@ -311,7 +312,7 @@ static void test_opaque_counts(void)
 	 * package has one. */
 	bool cok = true, aff = false;
 	double f = bvn_unit_convert_factor(box, box, &cok, &aff);
-	ASSERT_TRUE(cok && fabs(f - 1.0) < 1e-12,
+	ASSERT_TRUE(cok && bvni_fabs(f - 1.0) < 1e-12,
 	            "a box converts to a box with factor 1");
 	cok = true;
 	(void)bvn_unit_convert_factor(box, pallet, &cok, &aff);

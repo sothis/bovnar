@@ -1,18 +1,11 @@
 include(CTest)
 
-# Test code uses isnan()/isinf()/signbit()/fabs()/frexp()/ldexp() directly (the
-# last three as the differential oracle in bvnr_float_test). Those are libm
-# entry points wherever libm is a separate library -- FreeBSD, and glibc before
-# 2.34 -- so the test executables link it on every non-Windows host. The SHIPPED
-# library does not and must not: its own classification and scaling helpers are
-# in src/utils/bvn_double_impl.h. link_libraries() applies to linkable targets
-# created after it in this directory -- include() does not open a scope -- so
-# every test target is created below and no linkable target is added after this
-# include; the CLI and the libraries, created in CMakeLists.txt before it, stay
-# libm-free.
-if(NOT WIN32)
-    link_libraries(m)
-endif()
+# Tests use the local bvni_* helpers in src/utils/bvn_double_impl.h rather than
+# the <math.h> classification and scaling functions, so no executable in this
+# suite links libm -- the same rule the shipped library follows
+# (CONTRIBUTING.md). The tests that include the header get src/utils on their
+# include path below; nothing added after this include opens a directory scope
+# that could leak a library dependency into the CLI or the libraries.
 
 # ── Which unit profiles this build carries ──────────────────────────────────
 # The per-vocabulary switches (BVNR_WITH_*_PROFILE, see CMakeLists.txt) are
@@ -173,6 +166,8 @@ target_link_libraries(bvnr_extended_reader_test PRIVATE bvnr_static)
 
 target_compile_options(bvnr_utils_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_utils_test PRIVATE bvnr_static)
+target_include_directories(bvnr_utils_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
 
 if(NOT WIN32)
 target_compile_options(bvnr_socketpair_roundtrip_test PRIVATE ${BVNR_C_FLAGS})
@@ -199,6 +194,8 @@ target_link_libraries(bvnr_stream_bench PRIVATE bvnr_static)
 
 target_compile_options(bvnr_high_severity_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_high_severity_test PRIVATE bvnr_static)
+target_include_directories(bvnr_high_severity_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
 
 target_compile_options(bvnr_currency_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_currency_test PRIVATE bvnr_static)
@@ -220,6 +217,8 @@ target_link_libraries(bvnr_datetime_test PRIVATE bvnr_static)
 add_executable(bvnr_float_fix_dec_test tests/bvn_float_fix_dec_test.c)
 target_compile_options(bvnr_float_fix_dec_test PRIVATE ${BVNR_C_FLAGS})
 target_link_libraries(bvnr_float_fix_dec_test PRIVATE bvnr_static)
+target_include_directories(bvnr_float_fix_dec_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
 
 # NOTE on gating: no test in this file carries a PASS_REGULAR_EXPRESSION. Every
 # test binary returns non-zero when a case fails, so the exit code is the
@@ -246,6 +245,8 @@ set_tests_properties(bvnr_float_fix_dec_test PROPERTIES
 # so the JSON contract of the npm package is checked on every build and not only
 # where dist/wasm has been rebuilt. See wasm/test/native_shape_test.c.
 add_executable(bvnr_wasm_native_shape_test wasm/test/native_shape_test.c)
+target_include_directories(bvnr_wasm_native_shape_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/utils)
 target_link_libraries(bvnr_wasm_native_shape_test PRIVATE bvnr_static)
 add_test(NAME bvnr_wasm_native_shape COMMAND bvnr_wasm_native_shape_test)
 set_tests_properties(bvnr_wasm_native_shape PROPERTIES

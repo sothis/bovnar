@@ -89,6 +89,7 @@
  * include/ directly, which is how the native shape test builds it. */
 #include "bovnar_dom.h"
 #include "bovnar_si_units.h"
+#include "bvn_double_impl.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -629,7 +630,7 @@ static void json_emit_node(sb_t *b, const bvn_dom_node_t *node)
 		bvn_dom_get_float(node, &v);
 		/* JSON has no infinity/NaN; emit null for non-finite, as `bovnar
 		 * convert` does. */
-		if (isnan(v) || isinf(v)) sb_puts(b, "null");
+		if (bvni_isnan(v) || bvni_isinf(v)) sb_puts(b, "null");
 		else                      sb_printf(b, "%.17g", v);
 		break;
 	}
@@ -1916,13 +1917,13 @@ static void wdoc_emit_value(sb_t *b, const bvn_dom_node_t *node)
 	case BVN_DOM_FLOAT: {
 		double v = 0.0; bvn_dom_get_float(node, &v);
 		value_type_spec_t vt = bvn_dom_get_value_type(node);
-		bool fin = !(isnan(v) || isinf(v));
+		bool fin = !(bvni_isnan(v) || bvni_isinf(v));
 		sb_puts(b, "{\"type\":\"scalar\",\"kind\":");
 		sb_json_cstr(b, vt.family == vt_datetime ? "datetime"
 		                : (fin ? "number" : "special"));
 		sb_puts(b, ",\"text\":\"");
-		if (isnan(v))      sb_puts(b, "nan");
-		else if (isinf(v)) sb_puts(b, v < 0 ? "-inf" : "inf");
+		if (bvni_isnan(v))      sb_puts(b, "nan");
+		else if (bvni_isinf(v)) sb_puts(b, v < 0 ? "-inf" : "inf");
 		else               wdoc_float_text(b, v);
 		sb_puts(b, "\",\"value\":");
 		if (fin) wdoc_float_number(b, v);
@@ -2201,7 +2202,7 @@ char *bvnr_wasm_convert_unit(double value, const char *from, const char *to)
 		err = error_unit_mismatch;
 	/* JSON has no infinity/NaN, and a conversion that produced one is not the
 	 * value to hand back as null with ok:true. */
-	if (err == error_none && !isfinite(out)) err = error_value_out_of_range;
+	if (err == error_none && !bvni_isfinite(out)) err = error_value_out_of_range;
 	sb_putc(&b, '{');
 	emit_status(&b, err);
 	sb_puts(&b, ",\"value\":");

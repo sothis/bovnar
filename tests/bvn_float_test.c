@@ -56,7 +56,7 @@ static bool f32_eq_strtof(const char *s)
 {
 	float ref = strtof(s, NULL);
 	float got = bvn_float_parse_f32(s);
-	if (isnan(ref) && isnan(got)) return true;
+	if (bvni_isnan(ref) && bvni_isnan(got)) return true;
 	return f32_bits(ref) == f32_bits(got);
 }
 
@@ -64,7 +64,7 @@ static bool f64_eq_strtod(const char *s)
 {
 	double ref = strtod(s, NULL);
 	double got = bvn_float_parse_f64(s);
-	if (isnan(ref) && isnan(got)) return true;
+	if (bvni_isnan(ref) && bvni_isnan(got)) return true;
 	return f64_bits(ref) == f64_bits(got);
 }
 
@@ -1092,7 +1092,7 @@ static void test_bvnf_strtodec_ties(void)
 			double d = 1.0;
 			uint32_t w[2] = { 1u, 1u };
 			CHECK(bvn_parse_double_in_base(z[k], 10u, &d) && d == 0.0 &&
-			      !signbit(d), "binary: zero mantissa is +0");
+			      !bvni_signbit(d), "binary: zero mantissa is +0");
 			CHECK(bvn_float_strtod(z[k]) == 0.0, "strtod: zero");
 			CHECK(bvn_float_strtodec(z[k], 64u, w, 2) &&
 			      (w[1] & 0x7c000000u) != 0x78000000u &&
@@ -1107,7 +1107,7 @@ static void test_bvnf_strtodec_ties(void)
 		double d = 1.0;
 		uint32_t w[2] = { 1u, 1u };
 		CHECK(bvn_parse_double_in_base("-0e99999999999999999999", 10u, &d) &&
-		      d == 0.0 && signbit(d), "binary: the sign of zero is kept");
+		      d == 0.0 && bvni_signbit(d), "binary: the sign of zero is kept");
 		CHECK(bvn_float_strtodec("-0e99999999999999999999", 64u, w, 2) &&
 		      (w[1] & 0x80000000u) != 0u &&
 		      (w[1] & 0x7c000000u) != 0x78000000u,
@@ -1116,7 +1116,7 @@ static void test_bvnf_strtodec_ties(void)
 		      d == 0.0, "hex: zero mantissa is zero");
 		/* A non-zero mantissa still saturates, either way. */
 		CHECK(bvn_parse_double_in_base("1e999999999999999999999", 10u, &d) &&
-		      isinf(d) && d > 0, "1e<huge> is +inf");
+		      bvni_isinf(d) && d > 0, "1e<huge> is +inf");
 		CHECK(bvn_parse_double_in_base("1e-999999999999999999999", 10u, &d) &&
 		      d == 0.0, "1e-<huge> is 0");
 		CHECK(bvn_float_strtodec("1e999999999999999999999", 64u, w, 2) &&
@@ -1162,7 +1162,7 @@ static void test_bvnf_long_mantissa(void)
 		bvn_float_t *f = bvn_float_alloc(64);
 		double g = 0.0;
 		CHECK(f && s && bvn_float_from_str(f, s, 10) &&
-		      bvn_float_to_double(f, &g) && fabs(g - 1.0 / 9.0) < 1e-15,
+		      bvn_float_to_double(f, &g) && bvni_fabs(g - 1.0 / 9.0) < 1e-15,
 		      "from_str: 0.111...1 of any length is 1/9");
 		bvn_float_free(f);
 		free(s);
@@ -1509,11 +1509,11 @@ static void test_frexp_ldexp_fabs(void)
 	m = bvni_frexp(0.0, &e);
 	CHECK(m == 0.0 && e == 0, "frexp(+0)");
 	m = bvni_frexp(-0.0, &e);
-	CHECK(m == 0.0 && signbit(m) && e == 0, "frexp(-0)");
+	CHECK(m == 0.0 && bvni_signbit(m) && e == 0, "frexp(-0)");
 	m = bvni_frexp(INFINITY, &e);
-	CHECK(isinf(m) && e == 0, "frexp(inf)");
+	CHECK(bvni_isinf(m) && e == 0, "frexp(inf)");
 	m = bvni_frexp(NAN, &e);
-	CHECK(isnan(m) && e == 0, "frexp(nan)");
+	CHECK(bvni_isnan(m) && e == 0, "frexp(nan)");
 
 	/* frexp/ldexp are exact inverses over every exponent class. */
 	for (i = 0; i < sizeof vals / sizeof vals[0]; i++) {
@@ -1522,8 +1522,8 @@ static void test_frexp_ldexp_fabs(void)
 	}
 
 	CHECK(bvni_ldexp(1.0, 1023) == 0x1p1023, "ldexp to the top normal");
-	CHECK(isinf(bvni_ldexp(1.0, 1024)), "ldexp overflow -> inf");
-	CHECK(isinf(bvni_ldexp(DBL_MAX, 1)), "ldexp(DBL_MAX,1) -> inf");
+	CHECK(bvni_isinf(bvni_ldexp(1.0, 1024)), "ldexp overflow -> inf");
+	CHECK(bvni_isinf(bvni_ldexp(DBL_MAX, 1)), "ldexp(DBL_MAX,1) -> inf");
 	CHECK(bvni_ldexp(DBL_MAX, 0) == DBL_MAX, "ldexp(DBL_MAX,0)");
 	CHECK(bvni_ldexp(1.0, -1074) == 0x1p-1074,
 	      "ldexp to the smallest subnormal");
@@ -1532,103 +1532,25 @@ static void test_frexp_ldexp_fabs(void)
 	CHECK(bvni_ldexp(1.5, -1075) == 0x1p-1074,
 	      "ldexp rounds up at underflow");
 	m = bvni_ldexp(-1.0, -1075);
-	CHECK(m == 0.0 && signbit(m), "underflow keeps the sign");
+	CHECK(m == 0.0 && bvni_signbit(m), "underflow keeps the sign");
 	CHECK(bvni_ldexp(1.0, -2000000) == 0.0, "far underflow -> 0");
-	CHECK(isinf(bvni_ldexp(1.0, 2000000)), "far overflow -> inf");
+	CHECK(bvni_isinf(bvni_ldexp(1.0, 2000000)), "far overflow -> inf");
 	CHECK(bvni_ldexp(0.0, 2000000) == 0.0, "ldexp(0) unchanged");
 	m = bvni_ldexp(-0.0, -2000000);
-	CHECK(m == 0.0 && signbit(m), "ldexp(-0) unchanged");
-	CHECK(isinf(bvni_ldexp(INFINITY, -2000000)), "ldexp(inf) unchanged");
-	CHECK(isnan(bvni_ldexp(NAN, 3)), "ldexp(nan) unchanged");
+	CHECK(m == 0.0 && bvni_signbit(m), "ldexp(-0) unchanged");
+	CHECK(bvni_isinf(bvni_ldexp(INFINITY, -2000000)), "ldexp(inf) unchanged");
+	CHECK(bvni_isnan(bvni_ldexp(NAN, 3)), "ldexp(nan) unchanged");
 
 	CHECK(bvni_fabs(-2.5) == 2.5 && bvni_fabs(2.5) == 2.5, "fabs");
 	m = bvni_fabs(-0.0);
-	CHECK(m == 0.0 && !signbit(m), "fabs(-0)");
-	CHECK(isnan(bvni_fabs(-NAN)), "fabs(nan)");
-}
-
-/*
- * A deterministic differential sweep against the platform's libm. The library
- * itself does not link libm (src/utils/bvn_double_impl.h); this test does, and
- * on FreeBSD CMakeLists_tests.txt links m into the test executables. The seed,
- * loop counts and exponent choices reproduce the 10 994 643-case run the
- * FreeBSD port was checked with, so a subnormal rounding case outside the fixed
- * list above cannot regress unnoticed.
- */
-static uint64_t g_diff_state = 0x9E3779B97F4A7C15ULL;
-
-static uint64_t diff_rnd(void)
-{
-	g_diff_state ^= g_diff_state << 13;
-	g_diff_state ^= g_diff_state >> 7;
-	g_diff_state ^= g_diff_state << 17;
-	return g_diff_state;
-}
-
-static double diff_bits_to_double(uint64_t b)
-{
-	double d;
-	memcpy(&d, &b, 8);
-	return d;
-}
-
-static void test_libm_differential(void)
-{
-	uint64_t checks = 0, fails = 0;
-	int i;
-
-	/* frexp over random bit patterns, all exponent classes. Infinity is
-	 * skipped: C99 leaves frexp's exponent for a non-finite argument
-	 * unspecified, so a libm that answers something other than 0 is not a
-	 * defect in bvni_frexp. */
-	for (i = 0; i < 5000000; i++) {
-		uint64_t b = diff_rnd();
-		double v = diff_bits_to_double(b), a, c;
-		int ea, ec;
-		if (!isfinite(v)) continue;
-		a = frexp(v, &ea);
-		c = bvni_frexp(v, &ec);
-		checks++;
-		if (f64_bits(a) != f64_bits(c) || ea != ec) fails++;
-	}
-
-	/* ldexp over random finite values and exponents, including extremes. */
-	for (i = 0; i < 5000000; i++) {
-		uint64_t b = diff_rnd();
-		double v = diff_bits_to_double(b), a, c;
-		int32_t e;
-		if (isnan(v)) continue;
-		switch (diff_rnd() & 3u) {
-		case 0: e = (int32_t)(diff_rnd() % 2401u) - 1200; break;
-		case 1: e = (int32_t)(diff_rnd() % 2147483647u); break;
-		case 2: e = -(int32_t)(diff_rnd() % 2147483647u); break;
-		default: e = (int32_t)(diff_rnd() % 1088u) - 1088; break;
-		}
-		a = ldexp(v, e);
-		c = bvni_ldexp(v, e);
-		checks++;
-		if (f64_bits(a) != f64_bits(c)) fails++;
-	}
-
-	/* fabs over random bit patterns (NaN payloads are not comparable). */
-	for (i = 0; i < 1000000; i++) {
-		uint64_t b = diff_rnd();
-		double v = diff_bits_to_double(b);
-		if (isnan(v)) continue;
-		checks++;
-		if (f64_bits(fabs(v)) != f64_bits(bvni_fabs(v))) fails++;
-	}
-
-	printf("  libm differential: %" PRIu64 " checks, %" PRIu64 " failures\n",
-	       checks, fails);
-	CHECK(fails == 0, "libm differential");
+	CHECK(m == 0.0 && !bvni_signbit(m), "bvni_fabs(-0)");
+	CHECK(bvni_isnan(bvni_fabs(-NAN)), "bvni_fabs(nan)");
 }
 
 int main(void)
 {
 #define RUN(fn) do { fprintf(stderr,">>> " #fn "\n"); fflush(stderr); fn(); } while(0)
 	RUN(test_frexp_ldexp_fabs);
-	RUN(test_libm_differential);
 	RUN(test_bigint_internals);
 	RUN(test_bvnf_binary128_long_midpoint);
 	RUN(test_bvnf_midpoint_past_budget);

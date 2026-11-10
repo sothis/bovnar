@@ -346,9 +346,10 @@ API and implements spec 1.2.
   release build reported no failure across all 200 CTest cases — 198 passed and
   two skipped (the glibc-only `bvnr_alloc_test` and `bvnr_web_browser`, which
   needs a browser), including the wasm freshness, playground-shim and CLI-diff
-  gates — the ASan+UBSan build passed 170/170, Rust `cargo test` passed 1 584
-  tests, the Python wheel built with a `freebsd_15_1_release_amd64` tag, and
-  `libbvnr.a` holds no math symbol.
+  gates — the ASan+UBSan build reported no failure across 173 cases (171
+  passed, the same two skipped), Rust `cargo test` passed 1 584 tests, the
+  Python wheel built with a `freebsd_15_1_release_amd64` tag, and `libbvnr.a`
+  holds no math symbol.
 
 ### Changed
 
@@ -922,10 +923,11 @@ API and implements spec 1.2.
   `__signbit`, and libm is a separate library there, so `libbvnr.a` still held
   `frexp`/`ldexp` undefined and every executable needed `-lm`. All seven
   primitives are now implemented from the IEEE-754 binary64 bit pattern in
-  `src/utils/bvn_double_impl.h`; `libbvnr.a`, `libbvnr.so` and the CLI link
-  against libc alone on FreeBSD, and the differential sweep in
-  `tests/bvn_float_test.c` (10 994 643 random values and exponents) matches
-  FreeBSD's own libm bit for bit.
+  `src/utils/bvn_double_impl.h`; `libbvnr.a`, `libbvnr.so` the CLI and the test
+  executables link against libc alone on FreeBSD, and a development-time
+  differential harness over 10 994 643 random values and exponents matched
+  FreeBSD's own libm bit for bit. The committed cases in
+  `tests/bvn_float_test.c` cover every exponent class without linking libm.
 
 ## [2.0.2] - 2026-11-04
 

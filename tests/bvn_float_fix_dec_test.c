@@ -37,6 +37,7 @@
 #include <stdint.h>
 
 #include "bovnar.h"
+#include "bvn_double_impl.h"
 #include "bvn_float.h"
 
 /* ── Minimal test harness ──────────────────────────────────────────── */
@@ -469,7 +470,7 @@ static void test_bvn_float_dec_api(void)
 	CHECK(ok, "from_dec64 succeeded");
 	double out = 0.0;
 	bvn_float_to_double(&f, &out);
-	CHECK(fabs(out - 1.0) < 1e-9, "dec64 round-trip: 1.0");
+	CHECK(bvni_fabs(out - 1.0) < 1e-9, "dec64 round-trip: 1.0");
 
 	/* -3.14 → dec32 → back (reduced precision). */
 	bvn_float_from_double(&f, -3.14);
@@ -482,7 +483,7 @@ static void test_bvn_float_dec_api(void)
 	CHECK(ok, "from_dec32 succeeded");
 	out = 0.0;
 	bvn_float_to_double(&f, &out);
-	CHECK(fabs(out - (-3.14)) < 0.01, "dec32 round-trip: -3.14 approx");
+	CHECK(bvni_fabs(out - (-3.14)) < 0.01, "dec32 round-trip: -3.14 approx");
 
 	/* NaN and Inf round-trip. */
 	bvn_float_set_nan(&f);
@@ -518,7 +519,7 @@ static void test_bvn_float_dec_api(void)
 	ok = bvn_float_from_dec128(&f, dec128);
 	CHECK(ok, "from_dec128 succeeded");
 	bvn_float_to_double(&f, &out);
-	CHECK(fabs(out - 2.71828) < 1e-4, "dec128 round-trip: e approx");
+	CHECK(bvni_fabs(out - 2.71828) < 1e-4, "dec128 round-trip: e approx");
 
 	/* dec16 — a 16-bit decimal extrapolating the IEEE decimal family:
 	 * 1 sign + 6-bit biased exponent + 9-bit coefficient, p = 2 digits,
@@ -531,14 +532,14 @@ static void test_bvn_float_dec_api(void)
 	bvn_float_set_zero(&f, false);
 	bvn_float_from_dec16(&f, dec16_bits);
 	bvn_float_to_double(&f, &out);
-	CHECK(fabs(out - 1.5) < 1.5 * 0.01, "dec16 round-trip: 1.5");
+	CHECK(bvni_fabs(out - 1.5) < 1.5 * 0.01, "dec16 round-trip: 1.5");
 
 	bvn_float_from_double(&f, 6.0e-23);
 	bvn_float_to_dec16(&f, &dec16_bits);
 	bvn_float_set_zero(&f, false);
 	bvn_float_from_dec16(&f, dec16_bits);
 	bvn_float_to_double(&f, &out);
-	CHECK(fabs(out - 6.0e-23) < 6.0e-23 * 0.1, "dec16 round-trip: 6e-23");
+	CHECK(bvni_fabs(out - 6.0e-23) < 6.0e-23 * 0.1, "dec16 round-trip: 6e-23");
 
 	bvn_float_set_inf(&f, false);
 	bvn_float_to_dec16(&f, &dec16_bits);
@@ -597,7 +598,7 @@ static void test_bvn_float_fix_api(void)
 	CHECK(ok, "from_fix16 ok");
 	double out = 0.0;
 	bvn_float_to_double(&f, &out);
-	CHECK(fabs(out - 1.5) < 1e-6, "from_fix16: 384 Q8 == 1.5");
+	CHECK(bvni_fabs(out - 1.5) < 1e-6, "from_fix16: 384 Q8 == 1.5");
 
 	/* to_fix32 / from_fix32: value = -2.25, Q=16 → -147456 (-2.25 × 65536). */
 	bvn_float_from_double(&f, -2.25);
@@ -608,7 +609,7 @@ static void test_bvn_float_fix_api(void)
 	ok = bvn_float_from_fix32(&f, -147456, 16);
 	CHECK(ok, "from_fix32 ok");
 	bvn_float_to_double(&f, &out);
-	CHECK(fabs(out - (-2.25)) < 1e-6, "from_fix32: -147456 Q16 == -2.25");
+	CHECK(bvni_fabs(out - (-2.25)) < 1e-6, "from_fix32: -147456 Q16 == -2.25");
 
 	/* to_fix64 / from_fix64: 0.5, Q=32. */
 	bvn_float_from_double(&f, 0.5);
@@ -619,7 +620,7 @@ static void test_bvn_float_fix_api(void)
 	ok = bvn_float_from_fix64(&f, (int64_t)1 << 31, 32);
 	CHECK(ok, "from_fix64 ok");
 	bvn_float_to_double(&f, &out);
-	CHECK(fabs(out - 0.5) < 1e-9, "from_fix64: 2^31 Q32 == 0.5");
+	CHECK(bvni_fabs(out - 0.5) < 1e-9, "from_fix64: 2^31 Q32 == 0.5");
 
 	/* Zero. */
 	bvn_float_from_double(&f, 0.0);
@@ -633,7 +634,7 @@ static void test_bvn_float_fix_api(void)
 	ok = bvn_float_from_fix16(&f, INT16_MIN, 0);
 	CHECK(ok, "from_fix16 INT16_MIN ok");
 	bvn_float_to_double(&f, &out);
-	CHECK(fabs(out - (-32768.0)) < 1.0, "from_fix16 INT16_MIN value");
+	CHECK(bvni_fabs(out - (-32768.0)) < 1.0, "from_fix16 INT16_MIN value");
 
 	/* Integer fixed-point (Q=0). */
 	bvn_float_from_double(&f, 7.0);
@@ -652,7 +653,7 @@ static void test_bvn_float_fix_api(void)
 	ok = bvn_float_from_fix128(&f, fix128b, 16);
 	CHECK(ok, "from_fix128 ok");
 	bvn_float_to_double(&f, &out);
-	CHECK(fabs(out - 1.0) < 1e-9, "from_fix128 round-trip: 1.0 Q16");
+	CHECK(bvni_fabs(out - 1.0) < 1e-9, "from_fix128 round-trip: 1.0 Q16");
 
 	/* Overflow must SATURATE to the representable extreme, never wrap. */
 	bvn_float_from_double(&f, 1000000.0);            /* >> [-128, 127.996] */

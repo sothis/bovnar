@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "bovnar.h"
+#include "bvn_double_impl.h"
 #include "bvn_internal_dims.h"
 #include "bovnar_si_units.h"
 
@@ -54,7 +55,7 @@ static int tests    = 0;
 #define ASSERT_EQ_DBL(a, b, tol, msg) do { \
 	tests++; \
 	double _a = (a), _b = (b); \
-	if (fabs(_a - _b) > (tol)) { \
+	if (bvni_fabs(_a - _b) > (tol)) { \
 		fprintf(stderr, "FAIL line %d: %s\n  got %.15g, expected %.15g\n", \
 				__LINE__, (msg), _a, _b); \
 		failures++; \
@@ -1106,11 +1107,11 @@ static void test_water_quality_scales(void)
 		ASSERT_TRUE(ok, "CF and the EC compounds parse");
 		ASSERT_TRUE(bvn_units_compatible(cf, mS_cm), "CF is a conductivity");
 		ASSERT_TRUE(bvn_unit_convert_value(1.0, cf, mS_cm, &out) &&
-			    fabs(out - 0.1) < 1e-12, "1 CF = 0.1 mS/cm");
+			    bvni_fabs(out - 0.1) < 1e-12, "1 CF = 0.1 mS/cm");
 		ASSERT_TRUE(bvn_unit_convert_value(1.0, cf, uS_cm, &out) &&
-			    fabs(out - 100.0) < 1e-9, "1 CF = 100 µS/cm");
+			    bvni_fabs(out - 100.0) < 1e-9, "1 CF = 100 µS/cm");
 		ASSERT_TRUE(bvn_unit_convert_value(1.0, mS_cm, cf, &out) &&
-			    fabs(out - 10.0) < 1e-12, "1 mS/cm = 10 CF");
+			    bvni_fabs(out - 10.0) < 1e-12, "1 mS/cm = 10 CF");
 		/* "cF" is the centifarad and must stay that way. */
 		value_unit_t cfarad = bvn_parse_unit((const uint8_t *)"cF", &ok);
 		ASSERT_TRUE(ok, "cF parses");

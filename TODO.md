@@ -43,8 +43,10 @@ web request. `orcid_prefer.py --tag vX.Y.Z` makes the release's two works
 preferred using a signed-in orcid.org session cookie in
 `~/.config/bovnar-orcid.cookie`; `--check` reports without one. Future
 deposits do it in the same command with `zenodo_deposit.py --publish
---orcid-prefer` (or run `orcid_prefer.py` after DataCite catches up). The
-2.1.0 source work still needs that run.
+--orcid-prefer` (or run `orcid_prefer.py` after DataCite catches up). ORCID's
+session cookie is named `SESSION` (with `XSRF-TOKEN`/`AUTH-XSRF-TOKEN` beside
+it), not `JSESSIONID`. Both 2.1.0 works are preferred now: source
+display-index 9, documentation 8 (set 2026-11-10).
 
 Verified on this tree: `./run_tests.sh` 200/200 with the fuzz sweep, the
 ASan+UBSan build 174/174 (`-LE python`), `cargo test --locked` 1584/1584 and

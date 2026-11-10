@@ -307,6 +307,17 @@ def main() -> int:
             "(DevTools -> Network -> any orcid.org request -> Headers) into",
             f"{cookie_path}, one line; chmod 600 it. A Netscape cookies.txt",
             "export for orcid.org works too.")
+    if "SESSION=" not in cookie and "JSESSIONID=" not in cookie:
+        hint = ""
+        if "Path=" in cookie or "Expires=" in cookie:
+            hint = (" The file looks like a Set-Cookie response line (it has "
+                    "Expires/Path attributes), not a request Cookie header.")
+        return fail(
+            f"orcid_prefer.py: {cookie_path} has no ORCID session cookie."
+            f"{hint}",
+            "DevTools -> Network -> a request to orcid.org -> Request Headers:",
+            "copy the whole `cookie:` value, not Response Headers / Set-Cookie.",
+            "It should contain SESSION=... (or JSESSIONID=...).")
     try:
         if cookie_path.stat().st_mode & 0o077:
             print(f"warning: {cookie_path} is readable by group/others; "

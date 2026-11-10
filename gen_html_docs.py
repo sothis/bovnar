@@ -225,9 +225,8 @@ DOCS = [
      "over out-of-band channels, and documents embedded in documents, with examples."),
     ("11_bovnar_unit_profiles.md", "profiles", "bovnar-unit-profiles",
      "Bovnar Unit Profiles",
-     "Writing UCUM, UN/ECE, QUDT, UDUNITS, OM 2 and CF codes in a Bovnar unit slot: the "
-     "transliteration tables, the collisions between the namespaces, what has "
-     "no representation, and the cross-vocabulary conformance suite."),
+     "Writing UCUM, UN/ECE, QUDT, UDUNITS, OM 2 and CF codes in a Bovnar unit slot: "
+     "the transliteration tables, the namespace collisions, and the conformance suite."),
     ("12_bovnar.ebnf", "grammar", "bovnar-grammar",
      "Bovnar EBNF Grammar",
      "The formal EBNF grammar (ISO/IEC 14977) of the Bovnar (BVNR) format, version "

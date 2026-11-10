@@ -3,7 +3,7 @@
     "lang": "de"
   },
   "units": {
-    "Bovnar — Unit-safe serialization for science and industry": "Bovnar — Einheitensichere Serialisierung für Wissenschaft und Industrie",
+    "Bovnar — Unit-safe serialization for science and industry": "Bovnar — Einheitensichere Serialisierung (BVNR)",
     "Skip to content": "Zum Inhalt springen",
     "A Markdown version of this page, optimized for AI and LLM tools, is available at https://www.bovnar.io/index.md": "Eine für KI- und LLM-Tools optimierte Markdown-Version dieser Seite ist unter https://www.bovnar.io/de/index.md verfügbar.",
     "<svg width=\"20\" height=\"20\" viewBox=\"0 0 64 64\" aria-hidden=\"true\" style=\"flex:none;vertical-align:-4px;margin-right:.55rem\"><use href=\"#bvnr-fav\"/></svg>BOVNAR<span class=\"ext\">.bvnr</span>": "<svg width=\"20\" height=\"20\" viewBox=\"0 0 64 64\" aria-hidden=\"true\" style=\"flex:none;vertical-align:-4px;margin-right:.55rem\"><use href=\"#bvnr-fav\"/></svg>BOVNAR<span class=\"ext\">.bvnr</span>",
@@ -333,8 +333,8 @@
     "Allow analytics": "Analyse erlauben"
   },
   "attrs": {
-    "Bovnar (BVNR) — unit-safe serialization for science and industry. Every measurement carries a validated physical unit, bit-width, and numeric base inline, with no external schema. C99 reference implementation, MIT-licensed.": "Bovnar (BVNR) — einheitensichere Serialisierung für Wissenschaft und Industrie. Jede Messung trägt validierte physikalische Einheit, Bitbreite und Zahlenbasis direkt in sich, ganz ohne externes Schema. C99-Referenzimplementierung, MIT-lizenziert.",
-    "Bovnar — Unit-safe serialization for science and industry": "Bovnar — Einheitensichere Serialisierung für Wissenschaft und Industrie",
+    "Bovnar (BVNR) — unit-safe serialization for science and industry: every value carries its unit, bit width, base and type inline, with no schema. C99, MIT.": "Bovnar (BVNR) ist einheitensichere Serialisierung für Wissenschaft und Industrie: Jede Messung trägt Einheit, Bitbreite, Basis und Typ in sich, ohne Schema.",
+    "Bovnar — Unit-safe serialization for science and industry": "Bovnar — Einheitensichere Serialisierung (BVNR)",
     "Every measurement carries a validated physical unit, inline in the byte stream. A bare 9.81 is never ambiguous, and a mismatched unit is a parse error. Built for instrumentation, telemetry, and control systems.": "Jede Messung trägt eine validierte physikalische Einheit direkt im Byte-Strom. Ein bloßes 9.81 ist nie mehrdeutig, und eine unpassende Einheit ist ein Parse-Fehler. Gebaut für Messtechnik, Telemetrie und Steuerungssysteme.",
     "Bovnar — unit-safe serialization for science and industry": "Bovnar — einheitensichere Serialisierung für Wissenschaft und Industrie",
     "Every measurement carries a validated physical unit, inline in the byte stream. A bare 9.81 is never ambiguous, and a mismatched unit is a parse error.": "Jede Messung trägt eine validierte physikalische Einheit direkt im Byte-Strom. Ein bloßes 9.81 ist nie mehrdeutig, und eine unpassende Einheit ist ein Parse-Fehler.",

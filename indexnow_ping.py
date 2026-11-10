@@ -6,8 +6,10 @@ site's pages changed, right after publish_web.sh has uploaded them.
 
 Bing Webmaster Tools ranked the missing IndexNow setup as the site's one
 high-severity issue, and Bing's Site Explorer showed most pages last crawled
-weeks before the content it was serving had changed. One POST to
-api.indexnow.org reaches every participating engine.
+weeks before the content it was serving had changed. The shared endpoint at
+api.indexnow.org relays to every participating engine; Bing's own endpoint is
+posted to as well, because Webmaster Tools kept reporting IndexNow as not set
+up while the shared endpoint returned 200 on every publish.
 
 The protocol proves ownership with a key file at the site root whose name and
 content are the key: web/<32 hex>.txt. It is public by design -- anyone can read
@@ -30,7 +32,10 @@ import urllib.request
 ROOT = pathlib.Path(__file__).resolve().parent
 WEB = ROOT / "web"
 HOST = "www.bovnar.io"
-ENDPOINT = "https://api.indexnow.org/indexnow"
+ENDPOINTS = (
+    "https://api.indexnow.org/indexnow",
+    "https://www.bing.com/indexnow",
+)
 
 
 def key():
@@ -51,6 +56,22 @@ def urls():
     return locs
 
 
+def submit(endpoint, body):
+    """POST one IndexNow body; return its HTTP status, or None on a socket error."""
+    req = urllib.request.Request(
+        endpoint, data=json.dumps(body).encode(), method="POST",
+        headers={"Content-Type": "application/json; charset=utf-8",
+                 "User-Agent": "bovnar-publish (indexnow_ping.py)"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return r.status
+    except urllib.error.HTTPError as e:
+        return e.code
+    except OSError as e:
+        print(f"indexnow_ping: {endpoint}: request failed: {e}", file=sys.stderr)
+        return None
+
+
 def main():
     k = key()
     body = {"host": HOST, "key": k,
@@ -58,25 +79,19 @@ def main():
     if "--dry-run" in sys.argv[1:]:
         print(json.dumps(body, indent=2))
         return 0
-    req = urllib.request.Request(
-        ENDPOINT, data=json.dumps(body).encode(), method="POST",
-        headers={"Content-Type": "application/json; charset=utf-8",
-                 "User-Agent": "bovnar-publish (indexnow_ping.py)"})
-    try:
-        with urllib.request.urlopen(req, timeout=30) as r:
-            status = r.status
-    except urllib.error.HTTPError as e:
-        status = e.code
-    except OSError as e:
-        print(f"indexnow_ping: request failed: {e}", file=sys.stderr)
-        return 1
-    # 200 = accepted, 202 = accepted, key validation pending. 403 means the key
-    # file was not found at keyLocation (not uploaded yet?), 422 that a URL is
-    # not on HOST, 429 too many requests.
-    ok = status in (200, 202)
-    print(f"indexnow_ping: {len(body['urlList'])} URL(s) submitted, HTTP {status}"
-          + ("" if ok else " (not accepted)"),
-          file=sys.stdout if ok else sys.stderr)
+    ok = False
+    for endpoint in ENDPOINTS:
+        status = submit(endpoint, body)
+        # 200 = accepted, 202 = accepted, key validation pending. 403 means the
+        # key file was not found at keyLocation (not uploaded yet?), 422 that a
+        # URL is not on HOST, 429 too many requests.
+        accepted = status in (200, 202)
+        ok = ok or accepted
+        print(f"indexnow_ping: {len(body['urlList'])} URL(s) submitted to "
+              f"{endpoint}, HTTP {status}"
+              + ("" if accepted else " (not accepted)"),
+              file=sys.stdout if accepted else sys.stderr)
+    # One accepted endpoint is enough: the shared one relays to Bing too.
     return 0 if ok else 1
 
 

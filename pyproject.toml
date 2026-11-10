@@ -53,6 +53,7 @@ dev = [
 ]
 
 [project.urls]
+Homepage      = "https://www.bovnar.io/"
 Source        = "https://github.com/sothis/bovnar"
 Documentation = "https://github.com/sothis/bovnar/tree/main/doc"
 Issues        = "https://github.com/sothis/bovnar/issues"

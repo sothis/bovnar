@@ -186,43 +186,43 @@ DOCS = [
     ("01_bovnar_tutorial.md", "tutorial", "bovnar-tutorial",
      "Bovnar Tutorial",
      "A guided, example-driven introduction to reading and writing Bovnar (BVNR) "
-     "documents — types, units, arrays, references, and the streaming API."),
+     "documents — types, units, arrays, references, and the streaming API, step by step."),
     ("02_bovnar_faq.md", "faq", "bovnar-faq",
      "Bovnar FAQ",
      "Frequently asked questions about Bovnar (BVNR): syntax, type annotations, "
-     "units, numbers, strings, arrays, errors, limits, and the C and Python APIs."),
+     "units, numbers, strings, arrays, errors, limits, and the C, Python and Rust APIs."),
     ("03_bovnar_spec.md", "spec", "bovnar-specification",
      "Bovnar Specification (v1.2)",
      "The complete Bovnar (BVNR) format specification, version 1.2: grammar, type "
-     "system, physical units, numeric bases, limits, and error semantics."),
+     "system, physical units, numeric bases, limits, and error semantics in full."),
     ("04_bovnar_unit_cheatsheet.md", "cheatsheet", "bovnar-cheatsheet",
      "Bovnar Unit & Currency Cheat Sheet",
      "A one-page reference of every Bovnar unit symbol, SI and IEC binary prefix "
      "and ISO 4217 and cryptocurrency code, with prefix rules and disambiguation."),
     ("05_bovnar_unit_system.md", "units", "bovnar-unit-system",
-     "Bovnar Unit & Currency System",
-     "Every Bovnar physical unit, SI and IEC prefix, and currency — 264 units and "
-     "216 currencies with dimensions and exact conversion factors."),
+     "Bovnar Unit & Currency System — Complete Reference",
+     "Every Bovnar physical unit, SI and IEC binary prefix, and currency — 264 units and "
+     "216 currencies with dimensions, symbols, and exact conversion factors."),
     ("06_bovnar_unit_policy.md", "policy", "bovnar-unit-policy",
-     "Bovnar Unit Policy Reference",
+     "Bovnar Unit Policy Reference — Reader & Writer",
      "The Bovnar unit policy: what it validates, what it converts, the order it "
-     "resolves in, and the errors it raises, on both the reader and the writer."),
+     "resolves in, and the errors it raises, on both the reader and the writer side."),
     ("07_bovnar_unit_ambiguities.md", "ambiguities", "bovnar-unit-ambiguities",
      "Bovnar Unit Ambiguities",
      "Every Bovnar token that could plausibly mean two things — what the parser "
-     "reads it as, and how to write the other meaning."),
+     "reads it as, how to write the other meaning, and the grammar behind each case."),
     ("08_bovnar_readwrite_api.md", "api", "bovnar-readwrite-api",
      "Bovnar C Read & Write API",
      "The Bovnar C reader, writer, and DOM API reference (bovnar.h, bovnar_dom.h), "
-     "including read-time lossless unit and base conversion."),
+     "including read-time lossless unit and base conversion, with error handling."),
     ("09_bovnar_python_bindings.md", "python", "bovnar-python-bindings",
      "Bovnar Python Bindings",
      "The pure-ctypes Bovnar Python package: loads/dumps, the streaming reader, the "
-     "DOM, Quantity, and the NumPy and Pint bridges."),
+     "DOM, Quantity, and the NumPy and Pint bridges, with type hints and examples."),
     ("10_bovnar_streaming.md", "streaming", "bovnar-streaming",
      "Bovnar Streaming, Framing & Multiplexing",
      "Bovnar endless streaming, multi-document record framing, octet multiplexing "
-     "over out-of-band channels, and documents embedded in documents."),
+     "over out-of-band channels, and documents embedded in documents, with examples."),
     ("11_bovnar_unit_profiles.md", "profiles", "bovnar-unit-profiles",
      "Bovnar Unit Profiles",
      "Writing UCUM, UN/ECE, QUDT, UDUNITS, OM 2 and CF codes in a Bovnar unit slot: the "
@@ -237,11 +237,11 @@ DOCS = [
      "Bovnar Conformance Testing",
      "The Bovnar 470-case conformance test suite: the IUT protocol, writing an "
      "adapter for a third-party implementation, TAP output, and CMake "
-     "integration."),
+     "integration in CI."),
     ("14_bovnar_rust_bindings.md", "rust", "bovnar-rust-bindings",
      "Bovnar Rust Bindings",
      "The Bovnar Rust crate: parse/to_string, the streaming reader and writer, the DOM, "
-     "Quantity and the exact numbers, and JSON conversion."),
+     "Quantity and the exact numbers, and JSON conversion, with a worked example."),
 ]
 
 # filename (and .ebnf) -> clean slug, for inter-doc link rewriting.
@@ -779,7 +779,7 @@ def build_index_page():
     return page(
         "Bovnar Documentation",
         "Bovnar (BVNR) documentation: tutorial, specification, unit system, the C, "
-        "Python and Rust APIs, grammar, FAQ, conformance, and streaming.",
+        "Python and Rust APIs, grammar, conformance, and streaming — all in one place.",
         f"{SITE}/docs/", body, alt + schema)
 
 

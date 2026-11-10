@@ -44,7 +44,6 @@
  * om-2.0.rdf itself and compares.
  */
 
-#include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include "bovnar.h"

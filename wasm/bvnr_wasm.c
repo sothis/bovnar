@@ -95,7 +95,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include <math.h>
 
 #ifdef __EMSCRIPTEN__
 #  include <emscripten.h>

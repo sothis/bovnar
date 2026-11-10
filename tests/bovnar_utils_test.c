@@ -26,7 +26,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <math.h>
 #include "bovnar.h"
 #include "bvn_double_impl.h"
 #include "bovnar_si_units.h"

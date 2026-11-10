@@ -39,7 +39,6 @@
  * hectopascal. See the provenance note at the top of src/gendata/udunits.bvnr.
  */
 
-#include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include "bovnar.h"

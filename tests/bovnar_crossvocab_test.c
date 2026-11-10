@@ -73,7 +73,6 @@
  *   top of each .bvnr data file under src/gendata.
  */
 
-#include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include "bovnar.h"

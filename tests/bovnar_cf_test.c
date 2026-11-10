@@ -40,7 +40,6 @@
  * kg m-2 s-1 because the table says so.
  */
 
-#include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include "bovnar.h"

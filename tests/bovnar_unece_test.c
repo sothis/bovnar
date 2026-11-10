@@ -41,7 +41,6 @@
  * see the provenance note at the top of src/gendata/unece.bvnr.
  */
 
-#include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include "bovnar.h"

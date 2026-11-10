@@ -45,10 +45,10 @@ publishes a stand-in 1.1.0 pair there to make a new version of.
 
 ORCID: the creators carry the ORCID iD, so with DataCite's ORCID auto-update
 enabled (DataCite Commons, signed in with ORCID) each published version reaches
-the author's ORCID record by itself. The preferred source does not move with
-it -- ORCID keeps the version the researcher selected -- and its API cannot
-raise another client's work, so --orcid-prefer runs orcid_prefer.py with the
-record owner's session cookie after publishing. --resave publishes an edit of
+the author's ORCID record by itself. The preferred source and featured works
+do not move with it -- ORCID keeps the version and list the researcher
+selected -- and its API cannot raise another client's work, so --orcid-prefer
+runs orcid_prefer.py with the record owner's session cookie after publishing. --resave publishes an edit of
 records deposited before auto-update was enabled, which pushes them too; it
 adds the ORCID iD to a creator that has none, and changes nothing else.
 
@@ -462,7 +462,8 @@ def main():
                          "ORCID), so their DOIs reach ORCID through DataCite's auto-update")
     ap.add_argument("--orcid-prefer", action="store_true",
                     help="after --publish, make the two new works the ORCID preferred "
-                         "source (needs the session cookie file; see orcid_prefer.py)")
+                         "source and featured works (needs the session cookie file; "
+                         "see orcid_prefer.py)")
     ap.add_argument("--orcid-wait", type=float, default=600.0, metavar="SECONDS",
                     help="with --orcid-prefer, wait this long for DataCite's "
                          "auto-update to reach ORCID (default: 600)")

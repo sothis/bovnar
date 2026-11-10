@@ -259,7 +259,7 @@ The surrounding file is the authority. In summary:
   `src/utils/bvn_double_impl.h`. Call `bvni_frexp()`, `bvni_ldexp()`,
   `bvni_fabs()`, `bvni_isfinite()`, `bvni_isinf()`, `bvni_isnan()` and
   `bvni_signbit()` from library and test code rather than importing libm back
-  in; the test executables follow the same rule and link no libm either.
+  in; no build product links it.
 - **Tabs for indentation**, K&R bracing with a function's opening brace on its
   own line, roughly 80 columns.
 - Every source file carries the SPDX header (`SPDX-License-Identifier: MIT`)

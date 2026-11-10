@@ -819,6 +819,7 @@ endif()
 #   bovnar-<version>-<count>-amalgamate.tar.xz   (the amalgamation)
 #   bovnar-linux-<version>-<count>.tar.xz        (Linux artifacts)
 #   bovnar-freebsd-<version>-<count>.tar.xz      (native FreeBSD artifacts)
+#   bovnar-macos-<version>-<count>.tar.xz        (native macOS artifacts)
 #   bovnar-windows-msvc-<version>-<count>.zip    (native MSVC artifacts)
 #   bovnar-windows-mingw-<version>-<count>.zip   (native or cross MinGW artifacts)
 # The platform archives also bundle doc/, examples/ and highlighter/.

@@ -4,8 +4,7 @@ include(CTest)
 # the <math.h> classification and scaling functions, so no executable in this
 # suite links libm -- the same rule the shipped library follows
 # (CONTRIBUTING.md). The tests that include the header get src/utils on their
-# include path below; nothing added after this include opens a directory scope
-# that could leak a library dependency into the CLI or the libraries.
+# include path below.
 
 # ── Which unit profiles this build carries ──────────────────────────────────
 # The per-vocabulary switches (BVNR_WITH_*_PROFILE, see CMakeLists.txt) are

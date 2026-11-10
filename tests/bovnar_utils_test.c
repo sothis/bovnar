@@ -67,7 +67,7 @@ static int tests = 0;
 #define ASSERT_EQ_DBL(a, b, tol, msg) do {                            \
 	tests++;                                                         \
 	double _a = (a), _b = (b);                                       \
-	if (bvni_fabs(_a - _b) > (tol)) {                                     \
+	if (bvni_fabs(_a - _b) > (tol)) {                                \
 		fprintf(stderr, "FAIL line %d: %s\n  got %.15g, expected %.15g\n", \
 				__LINE__, (msg), _a, _b);                           \
 		failures++;                                                  \

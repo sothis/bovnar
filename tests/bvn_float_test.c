@@ -1543,8 +1543,8 @@ static void test_frexp_ldexp_fabs(void)
 
 	CHECK(bvni_fabs(-2.5) == 2.5 && bvni_fabs(2.5) == 2.5, "fabs");
 	m = bvni_fabs(-0.0);
-	CHECK(m == 0.0 && !bvni_signbit(m), "bvni_fabs(-0)");
-	CHECK(bvni_isnan(bvni_fabs(-NAN)), "bvni_fabs(nan)");
+	CHECK(m == 0.0 && !bvni_signbit(m), "fabs(-0)");
+	CHECK(bvni_isnan(bvni_fabs(-NAN)), "fabs(nan)");
 }
 
 int main(void)

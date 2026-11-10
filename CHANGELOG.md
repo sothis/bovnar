@@ -923,7 +923,7 @@ API and implements spec 1.2.
   `__signbit`, and libm is a separate library there, so `libbvnr.a` still held
   `frexp`/`ldexp` undefined and every executable needed `-lm`. All seven
   primitives are now implemented from the IEEE-754 binary64 bit pattern in
-  `src/utils/bvn_double_impl.h`; `libbvnr.a`, `libbvnr.so` the CLI and the test
+  `src/utils/bvn_double_impl.h`; `libbvnr.a`, `libbvnr.so`, the CLI and the test
   executables link against libc alone on FreeBSD, and a development-time
   differential harness over 10 994 643 random values and exponents matched
   FreeBSD's own libm bit for bit. The committed cases in

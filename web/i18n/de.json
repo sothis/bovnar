@@ -306,7 +306,7 @@
     "<a href=\"#docs\">Documentation</a>": "<a href=\"#docs\">Dokumentation</a>",
     "Repository": "Repository",
     "<a href=\"https://github.com/sothis/bovnar\" target=\"_blank\" rel=\"noopener\">GitHub ↗</a>": "<a href=\"https://github.com/sothis/bovnar\" target=\"_blank\" rel=\"noopener\">GitHub ↗</a>",
-    "<a href=\"https://github.com/sothis/bovnar/releases\" target=\"_blank\" rel=\"noopener\">Releases</a>": "<a href=\"https://github.com/sothis/bovnar/releases\" target=\"_blank\" rel=\"noopener\">Releases</a>",
+    "<a href=\"/download/\">Releases</a>": "<a href=\"/download/\">Releases</a>",
     "<a href=\"https://github.com/sothis/bovnar/tree/main/include\" target=\"_blank\" rel=\"noopener\">C Headers</a>": "<a href=\"https://github.com/sothis/bovnar/tree/main/include\" target=\"_blank\" rel=\"noopener\">C-Header</a>",
     "<a href=\"https://github.com/sothis/bovnar/tree/main/python/bovnar\" target=\"_blank\" rel=\"noopener\">Python Package</a>": "<a href=\"https://github.com/sothis/bovnar/tree/main/python/bovnar\" target=\"_blank\" rel=\"noopener\">Python-Paket</a>",
     "<a href=\"https://github.com/sothis/bovnar/tree/main/rust\" target=\"_blank\" rel=\"noopener\">Rust Crate</a>": "<a href=\"https://github.com/sothis/bovnar/tree/main/rust\" target=\"_blank\" rel=\"noopener\">Rust-Crate</a>",

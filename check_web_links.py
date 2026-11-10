@@ -303,6 +303,12 @@ def overlay_lookup(sitepath):
     for prefix, localdir in STAGE_OVERLAY.items():
         if not sitepath.startswith(prefix):
             continue
+        # A real page under web/ wins over the overlay: /download/ is
+        # web/download/index.html, while /download/<version>/<asset> comes from
+        # build/releases/.
+        if (os.path.isfile(os.path.join(WEB, sitepath))
+                or os.path.isfile(os.path.join(WEB, sitepath, "index.html"))):
+            return None, None
         name = sitepath[len(prefix):]
         if not os.path.isdir(localdir):
             return "unbuilt", localdir

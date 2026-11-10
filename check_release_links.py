@@ -21,7 +21,9 @@ So this recomputes what the release job would have produced and compares:
     project() in CMakeLists.txt AT THE TAG and `git rev-list --count <tag>`,
     not from the tag string, so a tag cut without bumping project() is caught
     too (that mismatch would name every archive after the old version);
-  * the version the panel prints in its heading is that same tag.
+  * the version the panel prints in its heading is that same tag;
+  * the menu's "All releases" link is the local /download/ page, and that page
+    links the same release's files.
 
 What it deliberately does not check: the human-readable sizes beside each link.
 They are not derivable without asking github.com, and a test here must not
@@ -47,8 +49,8 @@ PAGE = os.path.join(ROOT, "web", "index.html")
 REPO = "sothis/bovnar"
 SITE = "https://www.bovnar.io"
 DOWNLOAD_PREFIX = "/download/"      # <version>/<asset>, served from this host
+DOWNLOAD_PAGE = DOWNLOAD_PREFIX     # the all-releases page the menu links
 GITHUB_DOWNLOAD_PREFIX = f"https://github.com/{REPO}/releases/download/"
-RELEASES_URL = f"https://github.com/{REPO}/releases"
 
 # The nav's downloads menu, from <li class="nav-dl"> to its closing </li>. Only
 # this block is examined: the page links to github.com in a dozen other places
@@ -151,9 +153,8 @@ def main():
 
     hrefs = HREF_RE.findall(block)
     assets = [h[len(DOWNLOAD_PREFIX):] for h in hrefs
-              if h.startswith(DOWNLOAD_PREFIX)]
+              if h.startswith(DOWNLOAD_PREFIX) and h != DOWNLOAD_PAGE]
     github_assets = [h for h in hrefs if h.startswith(GITHUB_DOWNLOAD_PREFIX)]
-    others = [h for h in hrefs if not h.startswith(DOWNLOAD_PREFIX)]
 
     if github_assets:
         return fail(
@@ -165,10 +166,9 @@ def main():
     if not assets:
         return fail("web/index.html: the downloads menu links to no release "
                     "asset at all.")
-    if RELEASES_URL not in others:
-        return fail(f"web/index.html: the downloads menu has no {RELEASES_URL} "
-                    "link. That one is the only entry that survives a release "
-                    "untouched; keep it.")
+    if hrefs.count(DOWNLOAD_PAGE) != 1:
+        return fail(f"web/index.html: the downloads menu must carry exactly one "
+                    f"{DOWNLOAD_PAGE} link (the local all-releases page).")
 
     # --- the page agrees with itself ------------------------------------------
     # The JSON-LD block further down states a softwareVersion of its own. It is
@@ -263,6 +263,22 @@ def main():
                      "check cannot see), then re-run ./gen_i18n.py --extract de "
                      "and translate the new keys.")
         return fail(*lines)
+
+    # The menu's "All releases" link points at this generated page; it has to
+    # list the same release, or it sends readers to files that do not exist.
+    page_path = os.path.join(ROOT, "web", "download", "index.html")
+    if not os.path.isfile(page_path):
+        return fail("web/download/index.html: the all-releases downloads page "
+                    "is missing; run python3 gen_downloads.py.")
+    page_html = open(page_path, encoding="utf-8").read()
+    missing = [a for a in want_prefixed
+               if f"{DOWNLOAD_PREFIX}{a}" not in page_html]
+    if missing:
+        return fail("web/download/index.html: it does not link the current "
+                    "release's files:",
+                    *[f"  {SITE}{DOWNLOAD_PREFIX}{a}" for a in missing],
+                    "Run python3 gen_downloads.py (and fetch the archives first "
+                    "if they are absent).")
 
     head = HEAD_RE.search(block)
     if not head:

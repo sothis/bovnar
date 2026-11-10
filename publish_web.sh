@@ -250,7 +250,17 @@ else
     python3 "$ROOT/gen_html_docs.py"
 fi
 
-# ── 1a4. Regenerate sitemap.xml with git-derived lastmod dates ───────────────
+# ── 1a4. Render the all-releases downloads page ─────────────────────────────
+# It lists what fetch_release_artifacts.py fetched into build/releases/; with
+# no archives there it leaves the committed page alone.
+echo "==> Generating the downloads page (gen_downloads.py)"
+if [ "$DRY_RUN" -eq 1 ]; then
+    python3 "$ROOT/gen_downloads.py" --check
+else
+    python3 "$ROOT/gen_downloads.py"
+fi
+
+# ── 1a5. Regenerate sitemap.xml with git-derived lastmod dates ───────────────
 # Runs after the doc/LLM generators so every referenced file exists.
 echo "==> Generating sitemap (gen_sitemap.py)"
 if [ "$DRY_RUN" -eq 1 ]; then

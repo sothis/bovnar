@@ -36,7 +36,7 @@
 ## Links
 
 - **Website:** https://www.bovnar.io
-- **Prebuilt downloads:** https://github.com/sothis/bovnar/releases
+- **Prebuilt downloads:** https://www.bovnar.io/download/
 - **IANA media type (`text/vnd.bovnar`):** https://www.iana.org/assignments/media-types/text/vnd.bovnar
 - **DOI — Documentation and Specification (latest):** https://doi.org/10.5281/zenodo.21443295
 - **DOI — Source (latest):** https://doi.org/10.5281/zenodo.21443008

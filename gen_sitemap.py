@@ -7,7 +7,8 @@ The sitemap was hand-maintained, so its <lastmod> dates drifted from the actual
 content (PDFs stamped 2026-06-01 long after the docs changed). This builds it
 from the real last-commit date of each source file, falling back to the file
 mtime and then today. It lists only the canonical, indexable pages: the two
-home pages, /docs/ and the HTML doc pages (/docs/<slug>/).
+home pages, /docs/, the HTML doc pages (/docs/<slug>/) and the all-releases
+/download/ page.
 
 publish_web.sh runs this after the doc/LLM generators. Run: python3 gen_sitemap.py
 
@@ -75,6 +76,10 @@ def build():
     entries.append(url(f"{SITE}/docs/", newest_doc, "0.8"))
     for src, slug, _pdf, _title, _desc in DOCS:
         entries.append(url(f"{SITE}/docs/{slug}/", lastmod(f"doc/{src}"), "0.7"))
+    # The all-releases downloads page; the archives it links are files, not
+    # indexable pages of their own.
+    entries.append(url(f"{SITE}/download/",
+                       lastmod("web/download/index.html"), "0.6"))
     # Nothing else. A sitemap is the list of URLs we want indexed, and every
     # other rendering of these documents names one of the pages above as its
     # canonical (the PDFs and the doc .md by a Link header, /index.md and

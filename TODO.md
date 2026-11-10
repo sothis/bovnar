@@ -35,6 +35,17 @@ are published. The wiki article text is in doc/wiki; publish it to the GitHub
 wiki, then restore `-dev` and an [Unreleased] CHANGELOG section for the next
 cycle.
 
+ORCID: DataCite auto-update put both 2.1.0 works on the record, but the
+source-code work is not the preferred source yet -- 2.0.2 still is
+(display-index 6 against 1). ORCID's API cannot fix that: only the client that
+created a work (DataCite) may update it, and the record owner's selection is a
+web request. `orcid_prefer.py --tag vX.Y.Z` makes the release's two works
+preferred using a signed-in orcid.org session cookie in
+`~/.config/bovnar-orcid.cookie`; `--check` reports without one. Future
+deposits do it in the same command with `zenodo_deposit.py --publish
+--orcid-prefer` (or run `orcid_prefer.py` after DataCite catches up). The
+2.1.0 source work still needs that run.
+
 Verified on this tree: `./run_tests.sh` 200/200 with the fuzz sweep, the
 ASan+UBSan build 174/174 (`-LE python`), `cargo test --locked` 1584/1584 and
 the same under 1.88, `cargo clippy --locked --all-targets -- -D warnings`,

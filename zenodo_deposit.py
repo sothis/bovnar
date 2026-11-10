@@ -45,9 +45,12 @@ publishes a stand-in 1.1.0 pair there to make a new version of.
 
 ORCID: the creators carry the ORCID iD, so with DataCite's ORCID auto-update
 enabled (DataCite Commons, signed in with ORCID) each published version reaches
-the author's ORCID record by itself. --resave publishes an edit of records
-deposited before auto-update was enabled, which pushes them too; it adds the
-ORCID iD to a creator that has none, and changes nothing else.
+the author's ORCID record by itself. The preferred source does not move with
+it -- ORCID keeps the version the researcher selected -- and its API cannot
+raise another client's work, so --orcid-prefer runs orcid_prefer.py with the
+record owner's session cookie after publishing. --resave publishes an edit of
+records deposited before auto-update was enabled, which pushes them too; it
+adds the ORCID iD to a creator that has none, and changes nothing else.
 
 The token is read from ZENODO_TOKEN (scopes deposit:write and deposit:actions);
 sandbox and production tokens are separate.
@@ -57,6 +60,7 @@ Usage:
     ZENODO_TOKEN=... python3 zenodo_deposit.py --host sandbox \\
         --source-record <id> --docs-record <id> [--publish]
     ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo [--tag v2.0.2] [--publish]
+    ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo --tag v2.1.0 --publish --orcid-prefer
     ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo --resave 23934686 23934688
     ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo --resave 21443009 21443296
 """
@@ -456,7 +460,18 @@ def main():
     ap.add_argument("--resave", type=int, nargs="+", metavar="RECORD",
                     help="publish an edit of these records (adding a missing creator "
                          "ORCID), so their DOIs reach ORCID through DataCite's auto-update")
+    ap.add_argument("--orcid-prefer", action="store_true",
+                    help="after --publish, make the two new works the ORCID preferred "
+                         "source (needs the session cookie file; see orcid_prefer.py)")
+    ap.add_argument("--orcid-wait", type=float, default=600.0, metavar="SECONDS",
+                    help="with --orcid-prefer, wait this long for DataCite's "
+                         "auto-update to reach ORCID (default: 600)")
     args = ap.parse_args()
+
+    if args.orcid_prefer and not args.publish:
+        raise SystemExit("zenodo_deposit.py: --orcid-prefer needs --publish")
+    if args.orcid_prefer and args.host != "zenodo":
+        raise SystemExit("zenodo_deposit.py: --orcid-prefer is for the production host")
 
     token = os.environ.get("ZENODO_TOKEN")
     if not token:
@@ -513,10 +528,12 @@ def main():
             z.call("PUT", draft["links"]["self"], body={"metadata": meta})
             drafts[kind] = z.call("GET", draft["links"]["self"])
 
+    published = {}
     for kind in ("source", "docs"):
         d = drafts[kind]
         if args.publish:
             p = z.call("POST", d["links"]["publish"])
+            published[kind] = p.get("doi") or dois[kind]
             print(f"==> {kind}: published {p.get('doi')}  "
                   f"{p['links'].get('html') or p['links'].get('record_html', '')}")
             # The cross-links were written with the reserved DOI. If the record
@@ -531,6 +548,18 @@ def main():
                   f"{d['links'].get('html', '')}")
     if not args.publish:
         print("Review the drafts, then run again with --publish.")
+        return 0
+    if args.orcid_prefer:
+        print("==> ORCID: making the new works the preferred source")
+        cmd = [sys.executable, os.path.join(ROOT, "orcid_prefer.py"),
+               "--tag", tag,
+               "--source-doi", published.get("source", dois["source"]),
+               "--docs-doi", published.get("docs", dois["docs"]),
+               "--wait", str(args.orcid_wait)]
+        if subprocess.run(cmd).returncode:
+            print("    ORCID preference not set; fix the cookie (or run "
+                  "orcid_prefer.py later) and rerun that step.", file=sys.stderr)
+            return 1
     return 0
 
 

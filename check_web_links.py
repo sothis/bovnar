@@ -49,16 +49,20 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 WEB = os.path.join(ROOT, "web")
 SITE_HOSTS = ("www.bovnar.io", "bovnar.io")
 
-# Paths publish_web.sh CREATES at stage time instead of taking from web/: the
-# PDFs are generated into build/doc/pdf/ (git-ignored) and copied into the
-# staging tree. They are live URLs, so the links to them are not dead — but they
+# Paths publish_web.sh publishes from a build directory instead of taking from
+# web/: the PDFs are generated into build/doc/pdf/ and copied into the staging
+# tree; the release archives are fetched into build/releases/ and uploaded to
+# /download/. They are live URLs, so the links to them are not dead — but they
 # are also not in a checkout, so they have to be resolved against the build
-# directory rather than the web root. When it has not been built the links are
-# reported as unverifiable rather than passed silently: publish_web.sh already
-# refuses to ship without them ("the download links will 404"), so the existence
-# question is gated there, and the question HERE is whether a page names a file
-# the generator actually produces.
-STAGE_OVERLAY = {"doc/pdf/": os.path.join(ROOT, "build", "doc", "pdf")}
+# directory rather than the web root. When they have not been built the links
+# are reported as unverifiable rather than passed silently: publish_web.sh
+# warns when the files are missing, so the existence question is gated there,
+# and the question HERE is whether a page names a file the generator or fetcher
+# actually produces.
+STAGE_OVERLAY = {
+    "doc/pdf/": os.path.join(ROOT, "build", "doc", "pdf"),
+    "download/": os.path.join(ROOT, "build", "releases"),
+}
 
 # The question this check has to answer is "will the server have this file?", and
 # the answer must not depend on whose machine is asking. The site is committed
@@ -434,11 +438,11 @@ def main():
         print("  %d source file(s) skipped — publish_web.sh does not upload them"
               % offsite)
     if staged:
-        print("  %d resolved against a publish-time staging directory" % staged)
+        print("  %d resolved against a publish-time build directory" % staged)
     if unbuilt:
-        print("  %d NOT VERIFIED — their staging directory has not been built "
-              "(run gen_doc_pdfs.py); publish_web.sh gates their existence"
-              % unbuilt)
+        print("  %d NOT VERIFIED — their build directory is missing (run "
+              "gen_doc_pdfs.py for the PDFs, fetch_release_artifacts.py for the "
+              "archives); publish_web.sh warns when they are absent" % unbuilt)
     if gen:
         print("  %d into a generated language edition (%s) — produced by "
               "gen_i18n.py, which publish_web.sh runs before staging"

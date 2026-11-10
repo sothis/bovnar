@@ -20,6 +20,11 @@
 # to (re)build them with gen_doc_pdfs.py before uploading. Without --pdf the
 # script ships whatever already exists in build/doc/pdf/ (and warns if empty).
 #
+# The release archives are also not kept in the repository: fetch them once per
+# tag with fetch_release_artifacts.py into build/releases/<version>/, and this
+# script uploads that directory to <webroot>/download/<version>/ (and includes
+# it in a --serve preview). Use --no-artifacts to skip that upload.
+#
 # With --serve the same generators run and the same tree is staged, but instead
 # of uploading it the script serves the staging directory locally. That makes a
 # preview include everything a publish would: the generated /docs/ pages, the
@@ -41,6 +46,7 @@
 #   --bind <addr>    Address for --serve (default 127.0.0.1). Use 0.0.0.0 to
 #                    preview from another device on the network.
 #   --pdf            Regenerate the doc PDFs + zip bundle before publishing.
+#   --no-artifacts   Do not upload build/releases/<version>/ to /download/.
 #   --delete         Pass --delete to rsync (prune files removed locally).
 #   -n, --dry-run    Show what rsync would transfer; do not build or upload.
 #                    With --serve, stage and print the server command only.
@@ -66,6 +72,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WEB_DIR="$ROOT/web"
 GEN_PDF="$ROOT/gen_doc_pdfs.py"
 PDF_BUILD_DIR="$ROOT/build/doc/pdf"   # where gen_doc_pdfs.py writes its output
+RELEASES_DIR="$ROOT/build/releases"   # fetch_release_artifacts.py writes <version>/
 
 # ── What gets published out of doc/ ─────────────────────────────────────────
 #
@@ -121,6 +128,7 @@ SERVE=0
 PORT="${BOVNAR_PREVIEW_PORT:-8000}"
 BIND=127.0.0.1
 INDEXNOW=auto
+ARTIFACTS=1
 DEST="${BOVNAR_PUBLISH_DEST:-}"
 
 # The header block: line 2 through the last comment line before the first line
@@ -133,6 +141,7 @@ usage() { sed -n '2,/^[^#]/p' "${BASH_SOURCE[0]}" | sed -n 's/^# \{0,1\}//p'; }
 while [ $# -gt 0 ]; do
     case "$1" in
         --pdf|--build-pdf) BUILD_PDF=1 ;;
+        --no-artifacts)    ARTIFACTS=0 ;;
         --delete)          RSYNC_DELETE=1 ;;
         -n|--dry-run)      DRY_RUN=1 ;;
         --serve)           SERVE=1 ;;
@@ -323,6 +332,53 @@ for rel in "${EXCLUDES[@]}"; do
     rm -rf "$STAGE/$rel"
 done
 
+# ── 2c. Release archives for /download/ ─────────────────────────────────────
+# The Downloads menu serves the newest release's archives from this host, not
+# from GitHub. They are fetched once per tag into build/releases/<version>/ by
+# fetch_release_artifacts.py and uploaded beside the site. They are not under
+# web/, so the staging tree does not contain them and the --delete rsync in
+# step 3 carries an exclude for /download/.
+ARTIFACT_DIRS=()
+if [ "$ARTIFACTS" -eq 1 ] && [ -d "$RELEASES_DIR" ]; then
+    while IFS= read -r -d '' _dir; do
+        ARTIFACT_DIRS+=("$_dir")
+    done < <(find "$RELEASES_DIR" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z)
+fi
+if [ "$ARTIFACTS" -eq 0 ]; then
+    echo "==> Not publishing release archives (--no-artifacts)"
+elif [ ${#ARTIFACT_DIRS[@]} -eq 0 ]; then
+    echo "WARNING: no release archives under build/releases/ — the Downloads" >&2
+    echo "         menu's /download/ links will 404. Run:" >&2
+    echo "           python3 fetch_release_artifacts.py" >&2
+else
+    # Every /download/ link in the menu must name a file we are about to upload.
+    python3 - "$ROOT" "$RELEASES_DIR" <<'PYEOF' || true
+import os, re, sys
+root, releases = sys.argv[1], sys.argv[2]
+html = open(os.path.join(root, "web", "index.html"), encoding="utf-8").read()
+m = re.search(r'<li class="nav-dl">(.*?)\n\s*</li>\s*\n\s*<li>', html, re.S)
+hrefs = re.findall(r'href="(/download/[^"]+)"', m.group(1)) if m else []
+missing = [h for h in hrefs
+           if not os.path.isfile(os.path.join(releases, h[len("/download/"):]))]
+if missing:
+    sys.stderr.write("WARNING: the Downloads menu links to files that are not "
+                     "in build/releases/:\n")
+    for h in missing:
+        sys.stderr.write("  %s\n" % h)
+    sys.stderr.write("Run: python3 fetch_release_artifacts.py\n")
+    raise SystemExit(1)
+PYEOF
+fi
+
+# The preview must resolve the menu's /download/ links too.
+if [ "$SERVE" -eq 1 ]; then
+    for _dir in "${ARTIFACT_DIRS[@]}"; do
+        _v="$(basename "$_dir")"
+        mkdir -p "$STAGE/download/$_v"
+        cp -r "$_dir"/. "$STAGE/download/$_v/"
+    done
+fi
+
 # ── 2b. Serve the staged tree locally instead of uploading it ───────────────
 # The staging tree is the same one a publish would rsync, so this previews the
 # real site -- generated /docs/ pages and translations included -- not a raw
@@ -356,8 +412,23 @@ RSYNC_OPTS=(-az --human-readable --chmod=D755,F644)
 # where certbot writes ACME challenges: deleting it breaks TLS renewal. Use
 # --delete-after so a transfer that fails partway does not leave the live site
 # with files already removed.
-[ "$RSYNC_DELETE" -eq 1 ] && RSYNC_OPTS+=(--delete-after --exclude='/.well-known/')
+[ "$RSYNC_DELETE" -eq 1 ] && RSYNC_OPTS+=(--delete-after --exclude='/.well-known/' --exclude='/download/')
 [ "$DRY_RUN" -eq 1 ] && RSYNC_OPTS+=(--dry-run --itemize-changes)
+
+# Release archives are build outputs, not web/ files, so they are not in the
+# staging tree; upload each cached version to /download/<version>/ before the
+# menu that links it goes live.
+if [ ${#ARTIFACT_DIRS[@]} -gt 0 ]; then
+    echo "==> Publishing release archives to /download/"
+    for _dir in "${ARTIFACT_DIRS[@]}"; do
+        _v="$(basename "$_dir")"
+        echo "    /download/$_v/"
+        # --mkpath creates the missing /download/<version>/ parents on the
+        # destination; without it rsync creates only the last component and
+        # fails on the first publish, when /download/ itself does not exist yet.
+        rsync --mkpath "${RSYNC_OPTS[@]}" "$_dir"/ "$DEST/download/$_v/"
+    done
+fi
 
 echo "==> Publishing to: $DEST"
 [ "$DRY_RUN" -eq 1 ] && echo "    [dry-run] rsync ${RSYNC_OPTS[*]} <staged web/> $DEST/"

@@ -4,14 +4,14 @@
 """
 check_release_links.py — the site's Downloads menu points at the newest release.
 
-The landing page's nav carries a Downloads menu whose links go straight to the
-GitHub release assets. Those assets cannot be named generically: CI packs
-them as `bovnar-<version>-<count>-…`, where <count> is the tagged commit's total
-commit count, so there is no name-agnostic URL GitHub would redirect. The menu
-is therefore pinned to a tag by hand — and a hand-written URL set that has to be
-retyped at every release is precisely the thing that gets forgotten. Forgotten
-here it is silent: the links keep resolving, keep downloading, and keep handing
-out the PREVIOUS version to everyone who takes the site at its word.
+The landing page's nav carries a Downloads menu whose links are the newest
+release's archives, served from this host at /download/<version>/. The archive
+names cannot be generic: CI packs them as `bovnar-<version>-<count>-…`, where
+<count> is the tagged commit's total commit count, so the menu is pinned to a
+release by hand — and a hand-written URL set that has to be retyped at every
+release is precisely the thing that gets forgotten. Forgotten here it is
+silent: the links keep resolving, keep downloading, and keep handing out the
+PREVIOUS version to everyone who takes the site at its word.
 
 So this recomputes what the release job would have produced and compares:
 
@@ -45,7 +45,9 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 PAGE = os.path.join(ROOT, "web", "index.html")
 
 REPO = "sothis/bovnar"
-DOWNLOAD_PREFIX = f"https://github.com/{REPO}/releases/download/"
+SITE = "https://www.bovnar.io"
+DOWNLOAD_PREFIX = "/download/"      # <version>/<asset>, served from this host
+GITHUB_DOWNLOAD_PREFIX = f"https://github.com/{REPO}/releases/download/"
 RELEASES_URL = f"https://github.com/{REPO}/releases"
 
 # The nav's downloads menu, from <li class="nav-dl"> to its closing </li>. Only
@@ -150,7 +152,15 @@ def main():
     hrefs = HREF_RE.findall(block)
     assets = [h[len(DOWNLOAD_PREFIX):] for h in hrefs
               if h.startswith(DOWNLOAD_PREFIX)]
+    github_assets = [h for h in hrefs if h.startswith(GITHUB_DOWNLOAD_PREFIX)]
     others = [h for h in hrefs if not h.startswith(DOWNLOAD_PREFIX)]
+
+    if github_assets:
+        return fail(
+            "web/index.html: the downloads menu still sends archives to GitHub:",
+            *[f"  {h}" for h in github_assets],
+            f"The archives are served from this host; link them as "
+            f"{DOWNLOAD_PREFIX}<version>/<asset>.")
 
     if not assets:
         return fail("web/index.html: the downloads menu links to no release "
@@ -237,19 +247,19 @@ def main():
 
     # --- compare -------------------------------------------------------------
     want = expected_assets(version, count)
-    want_prefixed = [f"{tag}/{a}" for a in want]
+    want_prefixed = [f"{version}/{a}" for a in want]
 
     if assets != want_prefixed:
-        wrong_tag = sorted({a.split("/", 1)[0] for a in assets} - {tag})
+        wrong_version = sorted({a.split("/", 1)[0] for a in assets} - {version})
         lines = [f"web/index.html: the downloads menu does not match {tag} "
                  f"(version {version}, build count {count})."]
-        if wrong_tag:
-            lines.append(f"  it links to tag(s): {', '.join(wrong_tag)}")
+        if wrong_version:
+            lines.append(f"  it links to version(s): {', '.join(wrong_version)}")
         lines.append("  expected, in order:")
-        lines += [f"    {DOWNLOAD_PREFIX}{a}" for a in want_prefixed]
+        lines += [f"    {SITE}{DOWNLOAD_PREFIX}{a}" for a in want_prefixed]
         lines.append("  found:")
-        lines += [f"    {DOWNLOAD_PREFIX}{a}" for a in assets]
-        lines.append("Retag the hrefs (and the sizes beside them, which this "
+        lines += [f"    {SITE}{DOWNLOAD_PREFIX}{a}" for a in assets]
+        lines.append("Repoint the hrefs (and the sizes beside them, which this "
                      "check cannot see), then re-run ./gen_i18n.py --extract de "
                      "and translate the new keys.")
         return fail(*lines)
@@ -266,7 +276,7 @@ def main():
           f"({len(want)} assets, build count {count})")
     if verbose:
         for a in want_prefixed:
-            print(f"  {DOWNLOAD_PREFIX}{a}")
+            print(f"  {SITE}{DOWNLOAD_PREFIX}{a}")
     return 0
 
 

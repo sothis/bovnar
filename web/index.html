@@ -2836,34 +2836,37 @@ a[data-doc] { cursor: pointer; }
     <li class="nav-section"><a href="#quickstart">Quick Start</a></li>
     <li class="nav-section"><a href="#docs">Inline Documentation</a></li>
     <li class="nav-section"><a href="/docs/">Documentation</a></li>
-    <!-- Downloads — the GitHub release assets for the newest tag. CI builds and
-         smoke-tests these archives and attaches them on a v* tag (see the
-         `release` job in .github/workflows/build-and-package.yml); the names
-         carry the version AND the tag's commit count, so there is no
-         name-agnostic "latest" URL GitHub would redirect for. This block is
-         therefore pinned to a tag and is part of cutting a release: tag first,
-         let CI attach the archives, then retag the hrefs -- seven through
-         2.0.2, eight from 2.1.0, whose FreeBSD archive the `freebsd` job builds
-         in a VM -- the version in .nav-dl-head and the sizes, and re-run
-         ./gen_i18n.py --extract de to translate the new keys.
-         check_release_links.py (bvnr_release_links) recomputes every name from
-         the newest v* tag and fails the suite if this block still names the
-         previous one -- it cannot see the sizes, so those are on you. The
-         "All releases" link never goes stale. -->
+    <!-- Downloads — the newest release's archives, served from this host at
+         /download/<version>/. CI builds and smoke-tests the archives and
+         attaches them on a v* tag (see the `release` job in
+         .github/workflows/build-and-package.yml); the names carry the version
+         AND the tag's commit count, so there is no name-agnostic "latest"
+         name. fetch_release_artifacts.py copies them into
+         build/releases/<version>/ and publish_web.sh uploads that directory.
+         This block is therefore pinned to a version and is part of cutting a
+         release: tag first, let CI attach the archives, fetch them, then
+         update the hrefs -- seven through 2.0.2, eight from 2.1.0, whose
+         FreeBSD archive the `freebsd` job builds in a VM -- the version in
+         .nav-dl-head and the sizes, and re-run ./gen_i18n.py --extract de to
+         translate the new keys (the href is part of each key).
+         check_release_links.py (bvnr_release_links) recomputes every path from
+         the newest v* tag, refuses a GitHub artifact link, and fails the suite
+         if this block still names the previous release -- it cannot see the
+         sizes, so those are on you. The "All releases" link never goes stale. -->
     <li class="nav-dl">
       <details class="nav-dl-menu" id="nav-downloads">
         <summary>Downloads<span class="nav-dl-caret" aria-hidden="true">▾</span></summary>
         <div class="nav-dl-panel">
           <div class="nav-dl-head">Latest release <b>v2.1.0</b></div>
           <ul class="nav-dl-list">
-            <li><a href="https://github.com/sothis/bovnar/releases/download/v2.1.0/bovnar-linux-2.1.0-944.tar.xz"><span class="nav-dl-name">Linux x64</span><span class="nav-dl-meta">tar.xz · 3.6 MB</span></a></li>
-            <li><a href="https://github.com/sothis/bovnar/releases/download/v2.1.0/bovnar-freebsd-2.1.0-944.tar.xz"><span class="nav-dl-name">FreeBSD x64</span><span class="nav-dl-meta">tar.xz · 1.4 MB</span></a></li>
-            <li><a href="https://github.com/sothis/bovnar/releases/download/v2.1.0/bovnar-macos-2.1.0-944.tar.xz"><span class="nav-dl-name">macOS · arm64 + x86_64</span><span class="nav-dl-meta">tar.xz · 1.6 MB</span></a></li>
-            <li><a href="https://github.com/sothis/bovnar/releases/download/v2.1.0/bovnar-windows-msvc-2.1.0-944.zip"><span class="nav-dl-name">Windows x64 · MSVC</span><span class="nav-dl-meta">zip · 3.3 MB</span></a></li>
-            <li><a href="https://github.com/sothis/bovnar/releases/download/v2.1.0/bovnar-windows-mingw-2.1.0-944.zip"><span class="nav-dl-name">Windows x64 · MinGW</span><span class="nav-dl-meta">zip · 2.5 MB</span></a></li>
-            <li><a href="https://github.com/sothis/bovnar/releases/download/v2.1.0/bovnar-2.1.0-944-amalgamate.tar.xz"><span class="nav-dl-name">Single-file amalgamation</span><span class="nav-dl-meta">tar.xz · 1.1 MB</span></a></li>
-            <li><a href="https://github.com/sothis/bovnar/releases/download/v2.1.0/bovnar-2.1.0-944-source.tar.xz"><span class="nav-dl-name">Source tarball</span><span class="nav-dl-meta">tar.xz · 3.6 MB</span></a></li>
-            <li><a href="https://github.com/sothis/bovnar/releases/download/v2.1.0/SHA256SUMS"><span class="nav-dl-name">Checksums</span><span class="nav-dl-meta">SHA256SUMS</span></a></li>
+            <li><a href="/download/2.1.0/bovnar-linux-2.1.0-944.tar.xz"><span class="nav-dl-name">Linux x64</span><span class="nav-dl-meta">tar.xz · 3.6 MB</span></a></li>
+            <li><a href="/download/2.1.0/bovnar-freebsd-2.1.0-944.tar.xz"><span class="nav-dl-name">FreeBSD x64</span><span class="nav-dl-meta">tar.xz · 1.4 MB</span></a></li>
+            <li><a href="/download/2.1.0/bovnar-macos-2.1.0-944.tar.xz"><span class="nav-dl-name">macOS · arm64 + x86_64</span><span class="nav-dl-meta">tar.xz · 1.6 MB</span></a></li>
+            <li><a href="/download/2.1.0/bovnar-windows-msvc-2.1.0-944.zip"><span class="nav-dl-name">Windows x64 · MSVC</span><span class="nav-dl-meta">zip · 3.3 MB</span></a></li>
+            <li><a href="/download/2.1.0/bovnar-windows-mingw-2.1.0-944.zip"><span class="nav-dl-name">Windows x64 · MinGW</span><span class="nav-dl-meta">zip · 2.5 MB</span></a></li>
+            <li><a href="/download/2.1.0/bovnar-2.1.0-944-amalgamate.tar.xz"><span class="nav-dl-name">Single-file amalgamation</span><span class="nav-dl-meta">tar.xz · 1.1 MB</span></a></li>
+            <li><a href="/download/2.1.0/bovnar-2.1.0-944-source.tar.xz"><span class="nav-dl-name">Source tarball</span><span class="nav-dl-meta">tar.xz · 3.6 MB</span></a></li>
+            <li><a href="/download/2.1.0/SHA256SUMS"><span class="nav-dl-name">Checksums</span><span class="nav-dl-meta">SHA256SUMS</span></a></li>
           </ul>
           <a class="nav-dl-all" href="https://github.com/sothis/bovnar/releases">All releases ↗</a>
         </div>

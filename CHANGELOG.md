@@ -331,6 +331,23 @@ API and implements spec 1.2.
   visible as `unit_source: "no_unit"` where an omitted one is null — the one
   surface that distinguishes them (the event stream omits `unit_source` for a
   value with no unit).
+- **FreeBSD.** The C library, CLI and test suite build and pass on FreeBSD 15.1
+  with the base clang. The build gives the platform its own archive name
+  (`bovnar-freebsd-<version>-<count>.tar.xz`), links the test executables with
+  `Threads::Threads` rather than a bare `pthread`, and probes
+  `-fsanitize=address,undefined` on both the compile and the link line — a
+  toolchain without the runtime now gets no sanitizer flags, and
+  `BVNR_SANITIZE=ON` fails with a message instead of one link error per target.
+  The wasm module builds there too with the ports `emscripten` 6.0.3 (its
+  package omits the `acorn` and `acorn-import-phases` modules the optimiser
+  imports, now recorded in `wasm/README.md`), and `build_wasm.sh` rewrites its
+  cache-bust hashes with a temp file rather than `sed -i -E`, which FreeBSD's
+  sed reads as a backup suffix and a BRE. Verified on a VirtualBox guest: the
+  release build reported no failure across 197 runnable CTest cases — 196
+  passed, the glibc-only `bvnr_alloc_test` skipped, three Node tests disabled —
+  the ASan+UBSan build passed 170/170, Rust `cargo test` passed 1 584 tests,
+  the Python wheel built with a `freebsd_15_1_release_amd64` tag, and
+  `libbvnr.a` holds no math symbol.
 
 ### Changed
 
@@ -896,6 +913,17 @@ API and implements spec 1.2.
 - **`parse_embedded` reports the error that ended the parse.** In both
   bindings, under `continue_on_error`, it reported the first error it had
   recovered from, not the one that ended the parse.
+- **The `libm`-free guarantee now holds on FreeBSD.** The 1.1.0 note said the
+  remaining `<math.h>` uses (`fabs`, `isfinite`, `isinf`, `isnan`, `signbit`)
+  were compiler builtins that need no runtime library — true of glibc, musl,
+  libSystem and the Windows CRT, but FreeBSD's `<math.h>` spells the four
+  classification macros as calls to `__isfinite`/`__isinf`/`__isnan`/
+  `__signbit`, and libm is a separate library there, so `libbvnr.a` still held
+  `frexp`/`ldexp` undefined and every executable needed `-lm`. All seven
+  primitives are now implemented from the IEEE-754 binary64 bit pattern in
+  `src/utils/bvn_double_impl.h`; `libbvnr.a`, `libbvnr.so` and the CLI link
+  against libc alone on FreeBSD, and a differential test over 10 994 643 random
+  values and exponents matches FreeBSD's own libm bit for bit.
 
 ## [2.0.2] - 2026-11-04
 

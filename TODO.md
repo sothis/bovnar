@@ -1,6 +1,6 @@
 # TODO
 
-## State 2026-11-10 — 2.1.0 release prepared
+## State 2026-11-10 — 2.1.0 released
 
 The release commit moves every version field to 2.1.0: CMakeLists.txt,
 `bovnar.h` (with `BVNR_VERSION_SUFFIX` back to `""`), pyproject.toml and its
@@ -25,11 +25,15 @@ callbacks are documented as not re-entrant, as the fed reader's already were.
 The Rust codec and live modules and the C feed/frame/demux paths were read
 again and no defect survived verification.
 
-The tag is not created yet. After it: the Downloads menu (eight links, the
-FreeBSD archive among them), Zenodo and the version DOIs, and the wiki article
-text for the release. The FreeBSD archive is built by the new CI `freebsd` job
-(vmactions/freebsd-vm, 15.1) and attached with the others, so the menu update
-is all that is left to make the site's FreeBSD download resolve.
+2.1.0 is tagged on 4895049 and published: the GitHub release carries the
+eight archives including `bovnar-freebsd-2.1.0-944.tar.xz`, PyPI and crates.io
+have 2.1.0, and Zenodo has the source as 10.5281/zenodo.24111262 and the
+documentation and specification as 10.5281/zenodo.24111263 (CITATION.cff and
+README name them). The Downloads menu points at the release (eight links,
+build count 944), `check_release_links.py` passes, and the site and its PDFs
+are published. The wiki article text is in doc/wiki; publish it to the GitHub
+wiki, then restore `-dev` and an [Unreleased] CHANGELOG section for the next
+cycle.
 
 Verified on this tree: `./run_tests.sh` 200/200 with the fuzz sweep, the
 ASan+UBSan build 174/174 (`-LE python`), `cargo test --locked` 1584/1584 and

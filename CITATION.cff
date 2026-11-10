@@ -36,15 +36,14 @@ identifiers:
     description: >-
       Concept DOI, resolving to the latest archived documentation and
       specification
-  # The version DOIs of the previous release, 2.0.2; those of this one are
-  # deposited by zenodo_deposit.py after the tag and replace them then.
-  # Those of earlier releases (2.0.1, 2.0.0, 1.1.0) are in README.md.
+  # The version DOIs of this release, 2.1.0; those of earlier releases
+  # (2.0.2, 2.0.1, 2.0.0, 1.1.0) are in README.md.
   - type: doi
-    value: 10.5281/zenodo.23963398
-    description: Version DOI of the 2.0.2 source release
+    value: 10.5281/zenodo.24111262
+    description: Version DOI of the 2.1.0 source release
   - type: doi
-    value: 10.5281/zenodo.23963399
-    description: Version DOI of the 2.0.2 documentation and specification
+    value: 10.5281/zenodo.24111263
+    description: Version DOI of the 2.1.0 documentation and specification
 keywords:
   - serialization
   - units of measure

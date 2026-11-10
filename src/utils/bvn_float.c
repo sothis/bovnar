@@ -24,6 +24,7 @@
 
 #include <bvn_float.h>
 #include <bvn_int.h>
+#include "bvn_double_impl.h"
 #include <inttypes.h>
 #include <math.h>
 #include <stdlib.h>
@@ -1978,10 +1979,10 @@ int32_t bvn_float_to_str(const bvn_float_t *f, char *buf, size_t bufsize,
 bool bvn_float_from_double(bvn_float_t *f, double v)
 {
 	if (!f) return false;
-	if (isnan(v))  { bvn_float_set_nan(f);  return true; }
-	if (isinf(v))  { bvn_float_set_inf(f, v < 0.0); return true; }
+	if (bvni_isnan(v))  { bvn_float_set_nan(f);  return true; }
+	if (bvni_isinf(v))  { bvn_float_set_inf(f, v < 0.0); return true; }
 	if (v == 0.0) {
-		bvn_float_set_zero(f, signbit(v) != 0);
+		bvn_float_set_zero(f, bvni_signbit(v));
 		return true;
 	}
 	uint64_t bits;

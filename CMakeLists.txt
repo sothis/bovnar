@@ -166,6 +166,22 @@ if(BVNR_WERROR)
     endif()
 endif()
 
+# The ASan/UBSan runtimes are not universal even where clang is. OpenBSD's base
+# clang ships only ubsan_minimal, and a FreeBSD install without compiler-rt has
+# the compiler flag without the runtime; either way -fsanitize=address,undefined
+# then fails at LINK time, one target at a time. Probe once with the flag on BOTH
+# the compile and the link line -- check_c_compiler_flag compiles only, which is
+# not enough: GCC links libasan from the link flag, so a compile-only probe says
+# "yes" and the build then fails. Gate every sanitizer flag on this result.
+# Where CI builds (glibc, macOS, Windows) it is TRUE, so the option and the
+# Debug fuzz instrumentation behave exactly as before.
+include(CheckCSourceCompiles)
+set(CMAKE_REQUIRED_FLAGS "-fsanitize=address,undefined")
+set(CMAKE_REQUIRED_LINK_OPTIONS "-fsanitize=address,undefined")
+check_c_source_compiles("int main(void) { return 0; }" BVNR_HAVE_ASAN_UBSAN)
+unset(CMAKE_REQUIRED_FLAGS)
+unset(CMAKE_REQUIRED_LINK_OPTIONS)
+
 # Sanitizer build. Kept as a first-class option rather than a remembered shell
 # incantation, because these runs are only useful if they are repeatable.
 #
@@ -189,6 +205,12 @@ endif()
 if(BVNR_SANITIZE)
     if(MSVC)
         message(FATAL_ERROR "BVNR_SANITIZE is GCC/Clang only")
+    endif()
+    if(NOT BVNR_HAVE_ASAN_UBSAN)
+        message(FATAL_ERROR
+            "BVNR_SANITIZE is ON but this compiler cannot link "
+            "-fsanitize=address,undefined (the sanitizer runtime is missing; "
+            "on FreeBSD install compiler-rt, or use a toolchain that ships it)")
     endif()
     set(BVNR_SAN_FLAGS -fsanitize=address,undefined -fno-sanitize-recover=all
                        -fno-omit-frame-pointer -g)
@@ -796,6 +818,7 @@ endif()
 # <build>/amalgamate and pack release archives into <build>:
 #   bovnar-<version>-<count>-amalgamate.tar.xz   (the amalgamation)
 #   bovnar-linux-<version>-<count>.tar.xz        (Linux artifacts)
+#   bovnar-freebsd-<version>-<count>.tar.xz      (native FreeBSD artifacts)
 #   bovnar-windows-msvc-<version>-<count>.zip    (native MSVC artifacts)
 #   bovnar-windows-mingw-<version>-<count>.zip   (native or cross MinGW artifacts)
 # The platform archives also bundle doc/, examples/ and highlighter/.
@@ -818,6 +841,10 @@ if(BVNR_PACKAGE AND NOT SKBUILD)
         # Named macos, not linux: the generic branch below used to label a
         # Mac build's archive bovnar-linux.
         set(_bvnr_pkg_kind macos)
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+        # Same reason as macos: the generic branch would label a FreeBSD build's
+        # archive bovnar-linux.
+        set(_bvnr_pkg_kind freebsd)
     else()
         set(_bvnr_pkg_kind linux)
     endif()

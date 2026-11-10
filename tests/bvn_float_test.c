@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "bvn_double_impl.h"
 #include "bvn_float.h"
 #include "bvn_float_impl.h"
 /* The value layer's entry to the binary parser (bovnar.h). Declared rather than
@@ -1470,9 +1471,86 @@ static void test_bvnf_str_fits_fix_q_bound(void)
 	CHECK(bvn_float_str_fits_fix("0.5", 10u, 16u, 15u), "q15 of 16 bits holds 0.5");
 }
 
+/*
+ * The local libm replacements (bvn_double_impl.h). The unit engine's scaled
+ * representation (bvn_unit_impl.h) and the DOM's decimal exponent both depend on
+ * them, and they are what lets the library link without libm on FreeBSD, where
+ * frexp/ldexp live in a separate library. Every exponent class is exercised
+ * because the bit-constructed answer, not a libm call, is now the reference.
+ */
+static void test_frexp_ldexp_fabs(void)
+{
+	static const double vals[] = {
+		1.0, -1.0, 0.1, 1e300, 1e-300, DBL_MAX, DBL_MIN,
+		0x1p-1074, -0x1p-1074, 0x1.8p-1070, 3.141592653589793
+	};
+	int e;
+	double m;
+	size_t i;
+
+	m = bvni_frexp(1.0, &e);
+	CHECK(m == 0.5 && e == 1, "frexp(1.0)");
+	m = bvni_frexp(0.75, &e);
+	CHECK(m == 0.75 && e == 0, "frexp(0.75)");
+	m = bvni_frexp(-6.0, &e);
+	CHECK(m == -0.75 && e == 3, "frexp(-6.0)");
+
+	m = bvni_frexp(DBL_MAX, &e);
+	/* DBL_MAX is (2^53 - 1) * 2^971, so frexp leaves (1 - 2^-53) * 2^1024;
+	 * the subtraction is exact (the predecessor of 1). */
+	CHECK(m == 1.0 - 0x1p-53 && e == 1024, "frexp(DBL_MAX)");
+	m = bvni_frexp(DBL_MIN, &e);
+	CHECK(m == 0.5 && e == -1021, "frexp(DBL_MIN)");
+	m = bvni_frexp(0x1p-1074, &e);          /* smallest subnormal */
+	CHECK(m == 0.5 && e == -1073, "frexp(DBL_TRUE_MIN)");
+	m = bvni_frexp(0x1.8p-1070, &e);        /* 0.75 * 2^-1069 */
+	CHECK(m == 0.75 && e == -1069, "frexp(subnormal, full fraction)");
+
+	m = bvni_frexp(0.0, &e);
+	CHECK(m == 0.0 && e == 0, "frexp(+0)");
+	m = bvni_frexp(-0.0, &e);
+	CHECK(m == 0.0 && signbit(m) && e == 0, "frexp(-0)");
+	m = bvni_frexp(INFINITY, &e);
+	CHECK(isinf(m) && e == 0, "frexp(inf)");
+	m = bvni_frexp(NAN, &e);
+	CHECK(isnan(m) && e == 0, "frexp(nan)");
+
+	/* frexp/ldexp are exact inverses over every exponent class. */
+	for (i = 0; i < sizeof vals / sizeof vals[0]; i++) {
+		m = bvni_frexp(vals[i], &e);
+		CHECK(bvni_ldexp(m, e) == vals[i], "frexp/ldexp round trip");
+	}
+
+	CHECK(bvni_ldexp(1.0, 1023) == 0x1p1023, "ldexp to the top normal");
+	CHECK(isinf(bvni_ldexp(1.0, 1024)), "ldexp overflow -> inf");
+	CHECK(isinf(bvni_ldexp(DBL_MAX, 1)), "ldexp(DBL_MAX,1) -> inf");
+	CHECK(bvni_ldexp(DBL_MAX, 0) == DBL_MAX, "ldexp(DBL_MAX,0)");
+	CHECK(bvni_ldexp(1.0, -1074) == 0x1p-1074,
+	      "ldexp to the smallest subnormal");
+	CHECK(bvni_ldexp(1.0, -1075) == 0.0,
+	      "ldexp ties to even at underflow");
+	CHECK(bvni_ldexp(1.5, -1075) == 0x1p-1074,
+	      "ldexp rounds up at underflow");
+	m = bvni_ldexp(-1.0, -1075);
+	CHECK(m == 0.0 && signbit(m), "underflow keeps the sign");
+	CHECK(bvni_ldexp(1.0, -2000000) == 0.0, "far underflow -> 0");
+	CHECK(isinf(bvni_ldexp(1.0, 2000000)), "far overflow -> inf");
+	CHECK(bvni_ldexp(0.0, 2000000) == 0.0, "ldexp(0) unchanged");
+	m = bvni_ldexp(-0.0, -2000000);
+	CHECK(m == 0.0 && signbit(m), "ldexp(-0) unchanged");
+	CHECK(isinf(bvni_ldexp(INFINITY, -2000000)), "ldexp(inf) unchanged");
+	CHECK(isnan(bvni_ldexp(NAN, 3)), "ldexp(nan) unchanged");
+
+	CHECK(bvni_fabs(-2.5) == 2.5 && bvni_fabs(2.5) == 2.5, "fabs");
+	m = bvni_fabs(-0.0);
+	CHECK(m == 0.0 && !signbit(m), "fabs(-0)");
+	CHECK(isnan(bvni_fabs(-NAN)), "fabs(nan)");
+}
+
 int main(void)
 {
 #define RUN(fn) do { fprintf(stderr,">>> " #fn "\n"); fflush(stderr); fn(); } while(0)
+	RUN(test_frexp_ldexp_fabs);
 	RUN(test_bigint_internals);
 	RUN(test_bvnf_binary128_long_midpoint);
 	RUN(test_bvnf_midpoint_past_budget);

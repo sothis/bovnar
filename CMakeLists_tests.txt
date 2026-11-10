@@ -1,5 +1,15 @@
 include(CTest)
 
+# Test code uses isnan()/isinf()/signbit()/fabs() directly in its assertions.
+# On FreeBSD those are libm entry points and libm is a separate library there,
+# so the test executables link it. The SHIPPED library does not and must not:
+# its own classification and scaling helpers are in src/utils/bvn_double_impl.h.
+# link_libraries() applies only to targets created below in this file; the CLI
+# was created in CMakeLists.txt before this include and stays libm-free.
+if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+    link_libraries(m)
+endif()
+
 # ── Which unit profiles this build carries ──────────────────────────────────
 # The per-vocabulary switches (BVNR_WITH_*_PROFILE, see CMakeLists.txt) are
 # compile-time, so a suite that asserts "ucum:m is the metre" cannot pass in a
@@ -58,6 +68,10 @@ add_executable(bvnr_currency_test        tests/bovnar_currency_test.c)
 # excluded from the Windows/MinGW build. Guarded in three places: the target,
 # its link line, and the CTest registration.
 if(NOT WIN32)
+# Threads::Threads, not the bare library name: it supplies the compiler's own
+# -pthread spelling (needed on FreeBSD/OpenBSD for the POSIX thread declarations
+# as well as the link) and resolves to libthr/libpthread per platform.
+find_package(Threads REQUIRED)
 add_executable(bvnr_socketpair_roundtrip_test tests/bovnar_socketpair_roundtrip_test.c)
 # Distinct objects on distinct threads must not interfere. The library keeps no
 # mutable shared state -- bovnar_lexer.c builds its run LUTs from a pre-main
@@ -67,7 +81,7 @@ add_executable(bvnr_socketpair_roundtrip_test tests/bovnar_socketpair_roundtrip_
 # crash. POSIX-only, like the socketpair test above.
 add_executable(bvnr_concurrency_test tests/bovnar_concurrency_test.c)
 target_compile_options(bvnr_concurrency_test PRIVATE ${BVNR_C_FLAGS})
-target_link_libraries(bvnr_concurrency_test PRIVATE bvnr_static pthread)
+target_link_libraries(bvnr_concurrency_test PRIVATE bvnr_static Threads::Threads)
 add_test(NAME bvnr_concurrency COMMAND bvnr_concurrency_test)
 set_tests_properties(bvnr_concurrency PROPERTIES
     LABELS "unit;threads"
@@ -158,7 +172,7 @@ target_link_libraries(bvnr_utils_test PRIVATE bvnr_static)
 
 if(NOT WIN32)
 target_compile_options(bvnr_socketpair_roundtrip_test PRIVATE ${BVNR_C_FLAGS})
-target_link_libraries(bvnr_socketpair_roundtrip_test PRIVATE bvnr_static pthread)
+target_link_libraries(bvnr_socketpair_roundtrip_test PRIVATE bvnr_static Threads::Threads)
 endif()
 
 target_compile_options(bvnr_stream_test PRIVATE ${BVNR_C_FLAGS})
@@ -500,11 +514,11 @@ if (BVNR_FUZZ_TEST)
 
     target_compile_options(bvnr_fuzz_test PRIVATE
         -Wall -Wextra -g
-        $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>>:
+        $<$<AND:$<BOOL:${BVNR_HAVE_ASAN_UBSAN}>,$<NOT:$<BOOL:${WIN32}>>,$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>>:
             -fsanitize=address,undefined
             -fno-omit-frame-pointer>)
 
-    if (CMAKE_C_COMPILER_ID MATCHES "GNU|Clang" AND NOT WIN32)
+    if (BVNR_HAVE_ASAN_UBSAN AND CMAKE_C_COMPILER_ID MATCHES "GNU|Clang" AND NOT WIN32)
         target_link_options(bvnr_fuzz_test PRIVATE
             $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:
                 -fsanitize=address,undefined>)
@@ -546,11 +560,11 @@ if (BVNR_FUZZ_TEST)
 
     target_compile_options(bvnr_fuzz_writer_test PRIVATE
         -Wall -Wextra -g
-        $<$<AND:$<NOT:$<BOOL:${WIN32}>>,$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>>:
+        $<$<AND:$<BOOL:${BVNR_HAVE_ASAN_UBSAN}>,$<NOT:$<BOOL:${WIN32}>>,$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>>:
             -fsanitize=address,undefined
             -fno-omit-frame-pointer>)
 
-    if (CMAKE_C_COMPILER_ID MATCHES "GNU|Clang" AND NOT WIN32)
+    if (BVNR_HAVE_ASAN_UBSAN AND CMAKE_C_COMPILER_ID MATCHES "GNU|Clang" AND NOT WIN32)
         target_link_options(bvnr_fuzz_writer_test PRIVATE
             $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:
                 -fsanitize=address,undefined>)

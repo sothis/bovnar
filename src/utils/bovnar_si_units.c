@@ -885,7 +885,7 @@ double bvn_unit_convert_factor(value_unit_t a, value_unit_t b,
 			 * back inf (or 0 the other way) as a "factor" would turn every
 			 * value into it. bvn_unit_convert_rational carries it exactly. */
 			double f = bvni_pow10(sid) * bvni_ipow(2.0, iecd);
-			if (!isfinite(f) || f == 0.0) {
+			if (!bvni_isfinite(f) || f == 0.0) {
 				*ok = false;
 				return 0.0;
 			}
@@ -930,8 +930,8 @@ double bvn_unit_convert_factor(value_unit_t a, value_unit_t b,
 	if (aff_a || aff_b) {
 		*requires_affine = true;
 		if (aff_a && aff_b &&
-		    fabs(off_a - off_b) <=
-		        DBL_EPSILON * fabs(off_a + off_b) + DBL_EPSILON)
+		    bvni_fabs(off_a - off_b) <=
+		        DBL_EPSILON * bvni_fabs(off_a + off_b) + DBL_EPSILON)
 			return ratio;
 		*ok = false;
 		return 0.0;

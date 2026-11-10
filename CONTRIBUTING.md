@@ -252,7 +252,13 @@ The surrounding file is the authority. In summary:
 - **C99**, with **no dependency beyond the C standard library**, not even
   `libm`. This is a hard constraint: it is what allows the single-file
   amalgamation and the WebAssembly build. A patch introducing a library
-  dependency will be asked to remove it.
+  dependency will be asked to remove it. `frexp()`, `ldexp()` and `fabs()` are
+  in libm on FreeBSD and OpenBSD, and FreeBSD's `<math.h>` also spells
+  `isfinite()`/`isinf()`/`isnan()`/`signbit()` as libm calls, so all of these
+  are implemented locally on the IEEE-754 bit pattern in
+  `src/utils/bvn_double_impl.h`. Call `bvni_frexp()`, `bvni_ldexp()`,
+  `bvni_fabs()`, `bvni_isfinite()`, `bvni_isinf()`, `bvni_isnan()` and
+  `bvni_signbit()` from library code rather than importing libm back in.
 - **Tabs for indentation**, K&R bracing with a function's opening brace on its
   own line, roughly 80 columns.
 - Every source file carries the SPDX header (`SPDX-License-Identifier: MIT`)

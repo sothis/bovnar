@@ -25,10 +25,11 @@
 #ifndef BVN_UNIT_IMPL_H_
 #define BVN_UNIT_IMPL_H_
 #include <assert.h>
-#include <math.h>       /* frexp/ldexp/isfinite for bvni_scaled_t */
+#include <math.h>       /* isfinite for bvni_scaled_t */
 #include <stdbool.h>
 #include <stdint.h>
 #include "bovnar.h"
+#include "bvn_double_impl.h"
 #include "bvn_internal_dims.h"
 #include "bovnar_si_units.h"
 typedef struct {
@@ -107,7 +108,7 @@ typedef struct {
 static inline bvni_scaled_t bvni_scaled_norm(double v, int32_t e2)
 {
 	bvni_scaled_t s;
-	if (v == 0.0 || !isfinite(v)) {
+	if (v == 0.0 || !bvni_isfinite(v)) {
 		/* 0 stays 0; a non-finite has escaped the representation and is
 		 * reported as such by the caller's final isfinite() check. */
 		s.m = v;
@@ -115,7 +116,7 @@ static inline bvni_scaled_t bvni_scaled_norm(double v, int32_t e2)
 		return s;
 	}
 	int exp = 0;
-	s.m = frexp(v, &exp);
+	s.m = bvni_frexp(v, &exp);
 	/* Saturate rather than wrap: an exponent this large is already a failure,
 	 * and a wrapped one would turn it into a plausible small number. */
 	int64_t sum = (int64_t)e2 + exp;
@@ -178,10 +179,10 @@ static inline bvni_scaled_t bvni_scaled_ipow(double base, int32_t exp)
  * can only be underflow. */
 static inline bool bvni_scaled_to_double(bvni_scaled_t s, double *out)
 {
-	if (s.m == 0.0 || !isfinite(s.m))
+	if (s.m == 0.0 || !bvni_isfinite(s.m))
 		return false;
-	double v = ldexp(s.m, s.e2);
-	if (!isfinite(v) || v == 0.0)
+	double v = bvni_ldexp(s.m, s.e2);
+	if (!bvni_isfinite(v) || v == 0.0)
 		return false;
 	*out = v;
 	return true;

@@ -69,6 +69,14 @@ static int g_tests    = 0;
 
 typedef struct { uint8_t* p; size_t n, cap; } buf_t;
 
+/* A vector with no bytes has a NULL base; NULL + 0 is still undefined
+ * behaviour (UBSan's pointer-overflow check flags it on FreeBSD's clang), so
+ * an offset is applied only to a real pointer. */
+static const uint8_t* at_offset(const uint8_t* p, size_t off)
+{
+	return p ? p + off : NULL;
+}
+
 static void* xrealloc(void* p, size_t n)
 {
 	void* q = realloc(p, n ? n : 1);
@@ -347,7 +355,8 @@ static bool mux_fed(const vector_t* v, const uint8_t* data, size_t n,
 	size_t at = 0;
 	for (size_t i = 0; alive && i <= ncuts; i++) {
 		if (i < ncuts) {
-			alive = bvnr_demux_feed(dm, data + at, cuts[i] - at);
+			alive = bvnr_demux_feed(dm, at_offset(data, at),
+			                        cuts[i] - at);
 			at = cuts[i];
 		} else {
 			alive = bvnr_demux_finish(dm);
@@ -396,11 +405,16 @@ static bool mux_write(const vector_t* v, const got_t* g, bool flush, buf_t* out)
 	if (ok && v->preamble_len)
 		ok = write_preamble(w);
 	ok = ok && bvnr_mux_begin(w, "mux");
-	const uint8_t* p = g->payloads.p;
+	/* Advance by offset, not by adding to the base pointer: for a vector whose
+	 * payloads are all empty the buffer is NULL, and NULL + 0 is still
+	 * undefined behaviour (UBSan flags it on FreeBSD's clang). */
+	const uint8_t* base = g->payloads.p;
+	size_t off = 0;
 	for (uint32_t i = 0; ok && i < g->n; i++) {
+		const uint8_t* p = base ? base + off : NULL;
 		ok = bvnr_mux_send(w, g->items[i].channel, p, g->items[i].length) &&
 		     (!flush || bvnr_write_flush(w));
-		p += g->items[i].length;
+		off += g->items[i].length;
 	}
 	ok = ok && bvnr_mux_end(w) && bvnr_write_finish(w);
 	bvnr_writer_destroy(w);
@@ -449,7 +463,8 @@ static bool frames_pull(const vector_t* v, const uint8_t* data, size_t n,
 	bool alive = true;
 	size_t at = 0;
 	for (size_t i = 0; alive && i < ncuts; i++) {
-		alive = bvnr_frame_reader_feed(fr, data + at, cuts[i] - at);
+		alive = bvnr_frame_reader_feed(fr, at_offset(data, at),
+		                               cuts[i] - at);
 		at = cuts[i];
 		const uint8_t* doc;
 		uint64_t len;
@@ -542,7 +557,8 @@ static bool frames_parse(const vector_t* v, bool go_on, const uint8_t* data,
 	bool alive = true;
 	size_t at = 0;
 	for (size_t i = 0; alive && i < ncuts; i++) {
-		alive = bvnr_frame_reader_feed(fr, data + at, cuts[i] - at);
+		alive = bvnr_frame_reader_feed(fr, at_offset(data, at),
+		                               cuts[i] - at);
 		at = cuts[i];
 	}
 	if (alive) bvnr_frame_reader_finish(fr);
@@ -602,7 +618,8 @@ static void test_frames(const vector_t* v, const buf_t* data)
 	for (uint32_t i = 0; ok && i < v->nitems; i++) {
 		at += BVNR_FRAME_HEADER_SIZE;
 		ok = at + v->items[i].length <= data->n &&
-		     bvnr_frame_write(&sink, data->p + at, v->items[i].length);
+		     bvnr_frame_write(&sink, at_offset(data->p, at),
+		                      v->items[i].length);
 		at += (size_t)v->items[i].length;
 	}
 	/* An empty vector (frames_none) leaves out.p NULL: memcmp may not

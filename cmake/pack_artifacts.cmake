@@ -10,6 +10,7 @@
 #   amalgamate/{bovnar.h,bovnar.c}              (the regenerated amalgamation)
 #   bovnar-<version>-<count>-amalgamate.tar.xz  (the amalgamation, packed)
 #   bovnar-linux-<version>-<count>.tar.xz       (native Linux artifacts)
+#   bovnar-freebsd-<version>-<count>.tar.xz     (native FreeBSD artifacts)
 #   bovnar-macos-<version>-<count>.tar.xz       (native macOS artifacts)
 #   bovnar-windows-msvc-<version>-<count>.zip   (native MSVC artifacts)
 #   bovnar-windows-mingw-<version>-<count>.zip  (native or cross MinGW artifacts)
@@ -19,7 +20,7 @@
 # with the MinGW cross-build present (CROSS_DIR), the Windows .zip is packed too.
 #
 # Required: SRC_DIR BIN_DIR VERSION
-# Optional: PYTHON  NATIVE_KIND(linux|macos|msvc|mingw)  CROSS_DIR
+# Optional: PYTHON  NATIVE_KIND(linux|freebsd|macos|msvc|mingw)  CROSS_DIR
 #           ARTIFACT_DIR (where the native libraries and CLI were built;
 #                         defaults to BIN_DIR, which is right only for a
 #                         single-config generator)
@@ -116,7 +117,8 @@ endfunction()
 function(_stage_bin top kind dir)
     _stage_common("${top}")
     file(MAKE_DIRECTORY "${STAGE}/${top}/lib" "${STAGE}/${top}/bin")
-    if(kind STREQUAL "linux")
+    if(kind STREQUAL "linux" OR kind STREQUAL "freebsd")
+        # Both are ELF: libbvnr.so.2.0.0 and its symlinks beside the .a.
         file(GLOB _libs "${dir}/libbvnr.a" "${dir}/libbvnr.so*")
         set(_exe "${dir}/bovnar")
     elseif(kind STREQUAL "macos")
@@ -190,6 +192,9 @@ endif()
 if(NATIVE_KIND STREQUAL "linux")
     _stage_bin("bovnar-linux-${TAG}" linux "${ARTIFACT_DIR}")
     _pack("bovnar-linux-${TAG}" xz)
+elseif(NATIVE_KIND STREQUAL "freebsd")
+    _stage_bin("bovnar-freebsd-${TAG}" freebsd "${ARTIFACT_DIR}")
+    _pack("bovnar-freebsd-${TAG}" xz)
 elseif(NATIVE_KIND STREQUAL "macos")
     _stage_bin("bovnar-macos-${TAG}" macos "${ARTIFACT_DIR}")
     _pack("bovnar-macos-${TAG}" xz)

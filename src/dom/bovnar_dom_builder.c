@@ -35,6 +35,7 @@
 #include "bovnar_dom.h"
 #include "bovnar_si_units.h"
 #include "bvn_dom_impl.h"
+#include "bvn_double_impl.h"
 #include "bvn_float.h"
 #ifndef BVN_DOM_FD_MAX_BYTES
 #define BVN_DOM_FD_MAX_BYTES   (256u * 1024u * 1024u)
@@ -566,7 +567,7 @@ static bool builder_rational_to_double(const bvn_int_t *num,
 	uint64_t m = 0;
 	if (!bvn_int_to_uint64(q, &m)) goto done;
 	if (sticky) m |= 1u;
-	double v = ldexp((double)m, drop - shift);
+	double v = bvni_ldexp((double)m, drop - shift);
 	*out = neg ? -v : v;
 	ok = true;
 done:

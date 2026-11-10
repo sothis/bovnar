@@ -1537,7 +1537,7 @@ static int32_t bvni_p10_si_prefix_id(double v)
 {
 	for (int32_t e = -30; e <= 30; e++) {
 		double p = bvni_pow10(e);
-		if (fabs(v - p) <= 1e-6 * p)
+		if (bvni_fabs(v - p) <= 1e-6 * p)
 			return bvni_pexp_to_si_prefix_id(e);
 	}
 	return -1;
@@ -1565,7 +1565,7 @@ static value_unit_t bvni_reduce_to_named_si(value_unit_t u, double scale,
 	 * altogether: q~kg¹¹·m/kg¹⁰·s² reduces to kg·m/s², and the next pass, with
 	 * nothing left to fold, would write N. */
 	double net_si = scale_known ? scale * base_si : 0.0;
-	if (scale_known && (net_si <= 0.0 || !isfinite(net_si)))
+	if (scale_known && (net_si <= 0.0 || !bvni_isfinite(net_si)))
 		return u;
 	int32_t dim_r[bvn_si_dim_count];
 	if (!bvn_unit_dimension_vector(u, dim_r))

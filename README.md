@@ -359,7 +359,7 @@ bovnar/
 ### Requirements
 
 - CMake ≥ 3.21
-- A C99-conforming compiler (GCC or Clang on Linux/macOS; **64-bit** MinGW64 or MSVC on Windows)
+- A C99-conforming compiler (GCC or Clang on Linux/FreeBSD/macOS; **64-bit** MinGW64 or MSVC on Windows)
 - No external library dependencies, at build time or runtime, beyond the C standard library (not even `libm`)
 
 ### Build the library and CLI tool

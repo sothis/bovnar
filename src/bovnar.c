@@ -33,6 +33,7 @@
 #include <stdlib.h>
 #include <string.h>
 #define BVN_PORT_TIMING   /* pull in bvn_monotonic_sec / bvn_cpu_sec for cmd_bench */
+#include "bvn_double_impl.h"
 #include "bvn_port.h"
 #include "bovnar.h"
 #include "bovnar_dom.h"
@@ -1917,7 +1918,7 @@ static JsonNode *json_parse_value_depth(const char **p, int depth)
 			 * Only overflow: a literal too small to tell from zero, and one
 			 * with more digits than a binary64 holds, are rounding -- what
 			 * reading a decimal into a double always is. */
-			if (isinf(n->u.f)) {
+			if (bvni_isinf(n->u.f)) {
 				fprintf(stderr, "convert: the JSON number under key '%s' "
 					"is too large for a 64-bit float (it would become "
 					"infinity)\n", json_key_for_msg());
@@ -2413,7 +2414,7 @@ static void print_json_string_escaped(const char *s, uint32_t len)
  */
 static void print_json_double(double v)
 {
-	if (!isfinite(v)) { fputs("null", stdout); return; }
+	if (!bvni_isfinite(v)) { fputs("null", stdout); return; }
 	char buf[64];
 	bvn_cli_format_double(buf, sizeof buf, v);
 	fputs(buf, stdout);
@@ -2639,11 +2640,11 @@ static void json_loss_scan(const bvn_dom_node_t *node, const char *path,
 		value_type_spec_t vt = bvn_dom_get_value_type(node);
 		double v = 0.0;
 		bvn_dom_get_float(node, &v);
-		if (!isfinite(v)) {
+		if (!bvni_isfinite(v)) {
 			L->n_nonfinite++;
 			json_loss_note(L->ex_nonfinite, sizeof L->ex_nonfinite, path,
-				       isnan(v) ? "nan" : v > 0 ? "inf" : "ninf");
-		} else if (v == 0.0 && signbit(v)) {
+				       bvni_isnan(v) ? "nan" : v > 0 ? "inf" : "ninf");
+		} else if (v == 0.0 && bvni_signbit(v)) {
 			L->n_negzero++;
 			json_loss_note(L->ex_negzero, sizeof L->ex_negzero, path, NULL);
 		} else if ((vt.family == vt_float && vt.width > 64u) ||

@@ -474,6 +474,8 @@ class DomDoc:
         ``bvn_dom_parse_fd_ex`` does; ``0``, or anything above 256 MiB, keeps
         it. There is no unlimited mode.
         """
+        if type(fd) is not int or fd < 0 or fd > 0x7FFFFFFF:
+            raise BovnarArgumentError(f"Invalid file descriptor: {fd!r}")
         if type(max_bytes) is not int or not 0 <= max_bytes < (1 << 64):
             raise BovnarArgumentError(
                 f"max_bytes must be an int from 0 to 2**64 - 1, not {max_bytes!r}")

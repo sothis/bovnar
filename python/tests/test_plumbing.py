@@ -123,6 +123,7 @@ def test_observer_may_not_use_its_writer():
     def reenter(ev, d):
         for call in (lambda: holder['w'].write_uint('x', 1),
                      holder['w'].finish, holder['w'].flush,
+                     lambda: holder['w'].set_unit_policy(None),
                      holder['w'].destroy):
             try:
                 call()
@@ -131,7 +132,7 @@ def test_observer_may_not_use_its_writer():
     w = holder['w'] = Writer.to_mem(on_event=reenter)
     w.write_null('a')
     w.finish()
-    assert len(errors) == 4 * 2      # two events, four refused calls each
+    assert len(errors) == 5 * 2      # two events, five refused calls each
     assert bovnar.loads(w.get_output()) == {'a': None}
 
 

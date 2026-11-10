@@ -71,7 +71,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Error recovery** — Optional resync mode skips broken assignments and continues parsing — suitable for log streams and unreliable transports.
 - **Python bindings** — Pure-`ctypes`, no compiled extension required. Exposes both a high-level `loads`/`dumps` dict-like API and a low-level event-driven streaming API.
 - **Rust bindings** — the `bovnar` crate compiles the C library in, so there is no system library to install. It offers `parse`/`to_string` over a dynamic `Value`, the streaming `Reader`/`Writer`, the DOM, exact numbers and JSON conversion ([doc/14](doc/14_bovnar_rust_bindings.md)).
-- **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
+- **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing and streaming throughput.
 - **Browser playground** — the real C reference parser, compiled to WebAssembly (`bovnar_parser_wasm.js` over `bovnar_wasm_core.js`), runs the reference verified event stream (with full type/unit/value validation) in the browser and powers an interactive web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
 - **Extensively tested** — Unit tests, socket-pair round-trip tests, a 470-case conformance suite, fuzz harnesses (reader, push-fed reader, writer, DOM, utils), Python and Rust test suites with cargo-fuzz targets for the crate, and a built-in benchmark mode (`bovnar bench`).
@@ -1326,7 +1326,7 @@ Spec 1.0 remains the frozen, stable baseline: a document that declares no
 number from the spec version and has been since library 2.0.0: that release
 broke the C ABI and the Python API, which is what a library major is for, while
 the format it reads grew only additively. `bovnar version` prints both —
-`bovnar 2.0.2 (spec 1.2)`.
+`bovnar 2.1.0 (spec 1.2)`.
 
 ---
 
@@ -2659,7 +2659,11 @@ arrays, units) and hardware. The CLI's benchmark subcommand (`bovnar bench`) can
 measure MB/s, assignments/s, and events/s across configurable profiles and
 payload sizes. Run `bovnar bench --profile all --size 1024,65536 --iterations 200`
 for a representative baseline. Use `--min-overhead` to drop the `on_unverified`
-(lexer) callback and keep only `on_verified`.
+(lexer) callback and keep only `on_verified`. Add `--stream` to measure the
+streaming paths as well -- raw octet-stream read and write, mux send and demux,
+the push-fed demux, and framed documents, with per-chunk, per-message and
+per-document costs; `--stream-only` runs just those, and `--stream-seconds <S>`
+sets the wall-clock budget per streaming cell (default 0.2 s).
 
 ---
 
@@ -5868,7 +5872,7 @@ major counts breaks in what a *document* means, and has not moved. The C header
 defines `BVNR_VERSION_MAJOR`, `BVNR_VERSION_MINOR`, `BVNR_VERSION_PATCH`, the
 comparable integer `BVNR_VERSION` (`major*10000 + minor*100 + patch`, so
 `#if BVNR_VERSION >= 20000` tests "≥ 2.0.0"), and `BVNR_VERSION_STRING`
-(`"2.0.2"`). The Python package mirrors this as `bovnar.__version__`, the Rust crate as
+(`"2.1.0"`). The Python package mirrors this as `bovnar.__version__`, the Rust crate as
 `bovnar::version()`.
 Separately, `BVNR_SPEC_VERSION_MAJOR` / `BVNR_SPEC_VERSION_MINOR` name the
 highest **spec** version the build understands (`1.2`); `bvnr_version()`, `bvnr_version_string()` and
@@ -11922,6 +11926,8 @@ bool bvnr_read(bvnr_reader_t *r);
 
 Drive the parser until EOF or a fatal error. Fires the registered callbacks for every event. Returns `true` on clean completion, `false` on any error.
 
+The read is single-threaded and not re-entrant: a callback must not call `bvnr_read`, any other reader entry point, or `bvnr_reader_destroy` on the same reader. The push-fed reader (§1.15) detects such a call and refuses it with `error_invalid_argument`; the pull path does not, so there it is simply unsupported.
+
 This is the only call needed after `bvnr_open_read_*`. The reader does not allocate during this call; all buffering is internal to the reader struct.
 
 ```c
@@ -14283,7 +14289,7 @@ int main(void)
 > **Scope:** Installation, the high-level and streaming APIs, the DOM, `Quantity`, and the NumPy and pint bridges.
 
 Pure-`ctypes` Python bindings for the **Bovnar (BVNR)** typed serialisation
-library (library 2.0.2, format spec 1.2).
+library (library 2.1.0, format spec 1.2).
 
 No compiled extension module is needed — the bindings load `libbvnr.so`
 through the standard `ctypes.CDLL` machinery the first time something needs
@@ -16679,8 +16685,9 @@ writer, with `SCANNER_CALLBACK_FAILED`: a veto, say of a key that must not
 leave the process. An exception the observer raises fails it the same way and
 is re-raised from the write call that ran it, unchanged; a later call raises
 the latched `BovnarWriteError`, chained to that exception. The observer runs
-inside the C call, so it may not write to, flush, finish or destroy its own
-writer (`BovnarArgumentError`). It costs a Python call per event.
+inside the C call, so it may not write to, flush, finish, reconfigure
+(`set_unit_policy`) or destroy its own writer (`BovnarArgumentError`). It costs
+a Python call per event.
 
 ### 12.11 Plain values, datetimes and type annotations
 
@@ -17243,7 +17250,7 @@ only invite the bounds check it can no longer support. Use `UNIT_NATIVE_FIRST`
 ## 19. Spec 1.1 additions
 
 These bindings target the **Bovnar spec 1.2**; spec 1.0 remains the frozen
-baseline, and the package's own version (2.0.2) is a separate number
+baseline, and the package's own version (2.1.0) is a separate number
 (`bovnar.version()` against `bovnar.spec_version()`). Spec 1.2's one addition,
 the unit-profile notation, is covered in [§5.1](#51-the-unit-profile-notations-spec-12):
 it is gated on a `#!bovnar 1.2` directive, which `dumps()` prepends when a
@@ -18003,7 +18010,16 @@ Measured with `bvnr_stream_bench` (`tests/bovnar_stream_bench.c`), an optimized
 build (`RelWithDebInfo`), one core of an Intel i7-2700K (3.5 GHz, 2011); per
 message, the 400 KB message spanning seven chunks. Figures move with the machine
 and with what else runs on it; the ratios are the point. The rows of the table
-were measured together, as the median of five runs, at the 2.1.0 tree.
+were measured together, as the median of five runs, at the 2.1.0 tree. The same
+cells are in the CLI: `bovnar bench --stream` runs them after the parse table,
+`--stream-only` runs them alone, and `--stream-seconds <S>` sets the wall-clock
+budget per cell (0.2 s by default). The CLI also measures a raw octet stream on
+its own -- writing a document that holds one and reading it back -- at 1 KiB,
+64 KiB, 1 MiB and 8 MiB, where an item is a chunk of up to 64 KiB. Its MB/s is
+memory-to-memory: payloads are copied and stay cache-resident, so a row can
+exceed disk or network throughput; it is the cost of the API and its copies,
+not of I/O. `bvnr_stream_bench` remains the standalone harness for before/after
+figures against an older library.
 
 | Path | 150 B | 30 KB | 400 KB |
 |------|------:|------:|-------:|
@@ -19907,7 +19923,7 @@ The existing `from_pint_unit` / `to_pint_unit` bridge is untouched.
 when a code that should parse does not:
 
 ```
-bovnar 2.0.2 (spec 1.2)
+bovnar 2.1.0 (spec 1.2)
 unit profiles: ucum unece qudt qudt-qk udunits om cf
 ```
 
@@ -23525,7 +23541,7 @@ ctest --output-on-failure
 > **Scope:** Installation, the high-level and streaming APIs, the DOM, `Quantity` and the exact numbers, JSON conversion, and the thread rules.
 
 Rust bindings for the **Bovnar (BVNR)** typed serialisation library (library
-2.0.2, format spec 1.2).
+2.1.0, format spec 1.2).
 
 The crate is a thin wrapper around the C library: `build.rs` compiles the C
 sources into the crate, so there is no system library to install and nothing is
@@ -23632,14 +23648,14 @@ integration with third-party unit or array libraries; see [§16](#16-crate-layou
 
 ## 2. Installation
 
-The crate carries the version of the C library it wraps (**2.0.2**: `version` in
+The crate carries the version of the C library it wraps (**2.1.0**: `version` in
 `Cargo.toml` is the `project(bovnar VERSION x.y.z)` of the top-level
 `CMakeLists.txt`, and CI fails when the two differ). It is published to
 crates.io with each release:
 
 ```toml
 [dependencies]
-bovnar = "2.0.2"
+bovnar = "2.1.0"
 ```
 
 A repository checkout works too, as a path dependency or straight from Git,
@@ -23723,7 +23739,7 @@ leave out `ucum` or `cf`:
 
 ```toml
 [dependencies]
-bovnar = { version = "2.0.2", default-features = false, features = ["unece", "qudt", "qudt-qk", "udunits", "om"] }
+bovnar = { version = "2.1.0", default-features = false, features = ["unece", "qudt", "qudt-qk", "udunits", "om"] }
 ```
 
 ### 3.3 How the published crate is made
@@ -27287,7 +27303,7 @@ or ask `currency::is_currency`.
 ## 18. Spec 1.1 additions
 
 These bindings target the **Bovnar spec 1.2**; spec 1.0 remains the frozen
-baseline, and the crate's own version (2.0.2) is a separate number
+baseline, and the crate's own version (2.1.0) is a separate number
 (`bovnar::version()` against `bovnar::spec_version()`). Spec 1.2's one addition,
 the unit-profile notation, is covered in [§5.1](#51-the-unit-profile-notations-spec-12):
 it is gated on a `#!bovnar 1.2` directive, which `to_string()` prepends when a

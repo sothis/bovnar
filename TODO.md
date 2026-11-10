@@ -1,14 +1,54 @@
 # TODO
 
-## State 2026-11-09 — main is ahead of 2.0.2
+## State 2026-11-10 — 2.1.0 release prepared
 
-main carries the unreleased 2.1.0 work (CHANGELOG, Unreleased): the streaming
+The release commit moves every version field to 2.1.0: CMakeLists.txt,
+`bovnar.h` (with `BVNR_VERSION_SUFFIX` back to `""`), pyproject.toml and its
+cibuildwheel test command, `python/bovnar/__init__.py` and its version test,
+the Rust crate and both lockfiles, CITATION.cff (`version` 2.1.0,
+`date-released` 2026-11-10), SECURITY.md's table, rust/README.md, the version
+lines in doc/02, doc/03, doc/09, doc/11 and doc/14, the IETF draft's date
+(with its three renderings), the wiki infoboxes and the highlighter. The
+WASM module, `web/docs`, the LLM views and `web/de` are regenerated, and
+RELEASE_NOTES_v2.1.0.md is the summary the release job attaches.
+
+The fifth review pass (2026-11-10) found and fixed: a demux channel committed
+before its hash insertion could fail; a DOM policy conversion of a rational
+far below binary64's range failing instead of storing signed zero; a NULL
+event replacing the writer's latched first error; Python's `float_fix`
+`stored_value` rounding to the decimal context instead of being exact; fd
+arguments accepting bools and out-of-`int` values (reader, writer and DOM);
+`write_bool` truth-coercing a non-bool; `Writer.set_unit_policy` escaping the
+callback re-entrancy guard; and a refused `memoryview` call not retrying the
+release once the buffer made from the view was gone. The pull reader's
+callbacks are documented as not re-entrant, as the fed reader's already were.
+The Rust codec and live modules and the C feed/frame/demux paths were read
+again and no defect survived verification.
+
+The tag is not created yet. After it: the Downloads menu (eight links, the
+FreeBSD archive among them), Zenodo and the version DOIs, and the wiki article
+text for the release. The FreeBSD archive is built by the new CI `freebsd` job
+(vmactions/freebsd-vm, 15.1) and attached with the others, so the menu update
+is all that is left to make the site's FreeBSD download resolve.
+
+Verified on this tree: `./run_tests.sh` 200/200 with the fuzz sweep, the
+ASan+UBSan build 174/174 (`-LE python`), `cargo test --locked` 1584/1584 and
+the same under 1.88, `cargo clippy --locked --all-targets -- -D warnings`,
+`cargo fmt --check`, `cargo check` on the fuzz targets,
+`test_writers_agree -- --ignored`, the wheel (built and smoke-tested), and
+the CLI and WASM module both report 2.1.0 / 20100. The wasm32-wasip2 tests
+run in CI's `rust_wasm` job; wasmtime is not installed here.
+
+## State 2026-11-09 — main was ahead of 2.0.2
+
+main carried the unreleased 2.1.0 work (CHANGELOG, Unreleased): the streaming
 layer for both bindings and the binding plumbing, with three review passes
-fixed (the last on 2026-11-09, CHANGELOG Fixed, "second pass"). The tree
-still says 2.0.2 (`-dev` in the CLI), and the web pages on main already
-describe the 2.1.0 API: publish the site after the tag, not before.
+fixed (the last on 2026-11-09, CHANGELOG Fixed, "second pass"). The tree then
+still said 2.0.2 (`-dev` in the CLI), and the web pages on main already
+described the 2.1.0 API: the site is published after the tag, not before.
 
-What the 2.1.0 release commit has to move (nothing gates the doc lines):
+What the 2.1.0 release commit had to move (all done on 2026-11-10; nothing
+gated the doc lines):
 CMakeLists.txt `project(VERSION)`; `bovnar.h` version macros, with
 `BVNR_VERSION_SUFFIX` back to `""`; pyproject.toml (version and the
 cibuildwheel test command); `python/bovnar/__init__.py` `__version__`;
@@ -56,8 +96,8 @@ or harmless, and changing it means picking a side. None blocks 2.1.0.
    Python's `FrameFeed` and `DemuxFeed` take only the `READ_OPTIONS`, as do
    `load_documents`, `mux_load`, `parse_embedded`, `loads`/`load` and
    `canonicalize`; only `Reader.read_*` and `DocumentFeed` take the callbacks.
-   Either add `on_error`/`want_unit`/`on_unverified` to the Python feeds, or
-   say in doc/09 that they are for `DocumentFeed` and `Reader` only. The other
+   doc/09 §4.7 now states this (the option taken on 2026-11-10), so the
+   remaining choice is whether to add them to the Python feeds later. The other
    way round, Python's `FrameFeed(return_errors=True)` has a Rust equivalent
    only in batch form (`stream::load_documents_results`).
 2. **Writer limits are not bound.** `WriteOptions` (Rust) and the `Writer.to_*`

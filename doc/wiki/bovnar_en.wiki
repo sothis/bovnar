@@ -5,8 +5,8 @@
 | mime                   = <code>text/vnd.bovnar</code>
 | developer              = Janos Sonntag
 | released               = {{Start date and age|2026|06|15|df=yes}}
-| latest_release_version = 2.0.2
-| latest_release_date    = {{Start date and age|2026|11|04|df=yes}}
+| latest_release_version = 2.1.0
+| latest_release_date    = {{Start date and age|2026|11|10|df=yes}}
 | type                   = [[Serialization]] format
 | standard               = Bovnar Specification 1.2
 | open                   = Yes

@@ -406,8 +406,9 @@ class TestInvalidArguments:
 
     def test_invalid_fd(self):
         with Reader() as r:
-            with pytest.raises(BovnarArgumentError):
-                r.read_fd(-1)
+            for fd in (-1, True, 0x80000000):
+                with pytest.raises(BovnarArgumentError):
+                    r.read_fd(fd)
 
 
 

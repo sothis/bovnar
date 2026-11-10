@@ -1,6 +1,6 @@
 [package]
 name = "bovnar"
-version = "2.0.2"
+version = "2.1.0"
 edition = "2024"
 # Let-chains (`if let .. && let ..`) need 1.88; edition 2024 alone would be 1.85.
 rust-version = "1.88"

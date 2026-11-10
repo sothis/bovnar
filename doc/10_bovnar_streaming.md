@@ -697,7 +697,16 @@ Measured with `bvnr_stream_bench` (`tests/bovnar_stream_bench.c`), an optimized
 build (`RelWithDebInfo`), one core of an Intel i7-2700K (3.5 GHz, 2011); per
 message, the 400 KB message spanning seven chunks. Figures move with the machine
 and with what else runs on it; the ratios are the point. The rows of the table
-were measured together, as the median of five runs, at the 2.1.0 tree.
+were measured together, as the median of five runs, at the 2.1.0 tree. The same
+cells are in the CLI: `bovnar bench --stream` runs them after the parse table,
+`--stream-only` runs them alone, and `--stream-seconds <S>` sets the wall-clock
+budget per cell (0.2 s by default). The CLI also measures a raw octet stream on
+its own -- writing a document that holds one and reading it back -- at 1 KiB,
+64 KiB, 1 MiB and 8 MiB, where an item is a chunk of up to 64 KiB. Its MB/s is
+memory-to-memory: payloads are copied and stay cache-resident, so a row can
+exceed disk or network throughput; it is the cost of the API and its copies,
+not of I/O. `bvnr_stream_bench` remains the standalone harness for before/after
+figures against an older library.
 
 | Path | 150 B | 30 KB | 400 KB |
 |------|------:|------:|-------:|

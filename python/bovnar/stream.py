@@ -899,18 +899,17 @@ class _Feed:
         is refused again until that buffer is gone."""
         view = self._view
         if view is not None:
-            # Whether or not it can be released, the feed holds it no longer:
-            # a view still exported is kept alive by its exports, and its
-            # memory then by it.
-            self._view = None
             try:
                 view.release()
             except BufferError:
                 # A view of the fed bytes (a bytes object) points at nothing
                 # C reuses, and its exports keep those bytes alive: not in
-                # use. One of the C object's memory is.
+                # use. One of the C object's memory is: keep the view, so a
+                # later call can release it once the buffer made from it is
+                # gone, and report it in use now.
                 if not isinstance(view.obj, bytes):
                     return True
+            self._view = None
         mem = self._view_mem
         if mem is not None:
             if mem() is not None:
@@ -958,6 +957,11 @@ class _Feed:
         # Nothing more is handed out; a view still alive keeps what it needs.
         self._fed = None
         if self._view_in_use():
+            # The feed no longer holds the view: an export (or a buffer made
+            # from it) keeps the memory alive, and _view_gone frees the C
+            # object once that goes. Dropping the reference here also keeps
+            # the feed from keeping the view, and its memory, alive itself.
+            self._view = None
             return
         self._destroy()
 

@@ -4,8 +4,8 @@
 """
 check_release_links.py — the site's Downloads menu points at the newest release.
 
-The landing page's nav carries a Downloads menu whose seven links go straight to
-the GitHub release assets. Those assets cannot be named generically: CI packs
+The landing page's nav carries a Downloads menu whose links go straight to the
+GitHub release assets. Those assets cannot be named generically: CI packs
 them as `bovnar-<version>-<count>-…`, where <count> is the tagged commit's total
 commit count, so there is no name-agnostic URL GitHub would redirect. The menu
 is therefore pinned to a tag by hand — and a hand-written URL set that has to be
@@ -95,16 +95,28 @@ def version_at(tag):
     return m.group(1) if m else None
 
 
+def has_freebsd_asset(version):
+    """Whether this release carries a FreeBSD archive.
+
+    The FreeBSD port and its archive landed in 2.1.0. Earlier tags have no such
+    asset, so their menus must not be expected to link one -- the expectation
+    moves with the version rather than with the calendar.
+    """
+    return tuple(int(p) for p in version.split(".")) >= (2, 1, 0)
+
+
 def expected_assets(version, count):
     """Filenames the release job attaches, in the order the menu lists them.
 
     Mirrors cmake/pack_artifacts.cmake (the amalgamation and one archive per
-    platform and toolchain), the source-tarball job, and the SHA256SUMS the
-    release job writes beside them.
+    platform and toolchain, FreeBSD from 2.1.0), the source-tarball job, and
+    the SHA256SUMS the release job writes beside them.
     """
     tag = f"{version}-{count}"
-    return [
-        f"bovnar-linux-{tag}.tar.xz",
+    assets = [f"bovnar-linux-{tag}.tar.xz"]
+    if has_freebsd_asset(version):
+        assets.append(f"bovnar-freebsd-{tag}.tar.xz")
+    assets += [
         f"bovnar-macos-{tag}.tar.xz",
         f"bovnar-windows-msvc-{tag}.zip",
         f"bovnar-windows-mingw-{tag}.zip",
@@ -112,6 +124,7 @@ def expected_assets(version, count):
         f"bovnar-{tag}-source.tar.xz",
         "SHA256SUMS",
     ]
+    return assets
 
 
 def fail(*lines):

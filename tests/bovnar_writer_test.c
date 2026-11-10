@@ -307,6 +307,31 @@ static void test_write_bool_and_null(void)
 	bvnr_writer_destroy(w);
 }
 
+static void test_first_error_survives_a_null_event(void)
+{
+	printf("  test_first_error_survives_a_null_event...\n");
+
+	uint8_t output[256];
+	bvnr_sink_t sink;
+	bvnr_writer_t *w = make_writer(output, sizeof(output), &sink);
+	ASSERT_NOT_NULL(w, "make_writer must succeed");
+	if (!w) return;
+
+	bvnr_data_t empty = {0};
+	/* An unbalanced struct end latches the validation error... */
+	ASSERT_FALSE(bvnr_write_event(w, ev_struct_end, &empty),
+				 "an unbalanced struct end must fail");
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_unknown_token_type,
+				  "the validation error must be latched");
+	/* ...and a NULL event afterwards must not replace it. */
+	ASSERT_FALSE(bvnr_write_event(w, ev_data, NULL),
+				 "a NULL event must fail");
+	ASSERT_EQ_INT(bvnr_writer_get_error(w), error_unknown_token_type,
+				  "the first error must survive the NULL event");
+
+	bvnr_writer_destroy(w);
+}
+
 static void test_write_with_units(void)
 {
 	printf("  test_write_with_units...\n");
@@ -3721,6 +3746,7 @@ int main(void)
 	test_write_float_fix_q_edges();
 	test_write_float_dec_roundtrip();
 	test_write_bool_and_null();
+	test_first_error_survives_a_null_event();
 	test_write_with_units();
 	test_write_struct();
 	test_write_nested_struct();

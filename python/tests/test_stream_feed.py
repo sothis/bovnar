@@ -661,6 +661,21 @@ class TestReviewFixes:
         assert next(it).channel == 2              # the call can be repeated
         dm.close()
 
+    def test_dropping_the_buffer_lets_the_call_go_ahead(self):
+        # The refused call keeps the view, so the release is retried: the
+        # original view may still be held once the buffer made from it goes.
+        dm = DemuxFeed(view=True)
+        it = dm.feed(stream.mux_dump([(1, b'x' * 70000), (2, b'y')]))
+        first = next(it)
+        held = memoryview(first.payload)
+        with pytest.raises(BovnarArgumentError):
+            next(it)
+        del held
+        assert next(it).channel == 2
+        with pytest.raises(ValueError):
+            first.payload[0]                      # released by that call
+        dm.close()
+
     def test_close_with_a_buffer_alive_defers_the_free(self):
         fr = FrameFeed(view=True)
         wire = stream.frame_documents([b'.a = 1;'])

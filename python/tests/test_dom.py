@@ -634,6 +634,11 @@ class TestFdParseFailures:
         assert ei.value.errno == errno.EBADF
         assert not isinstance(ei.value, MemoryError)
 
+    def test_a_bool_or_an_out_of_range_fd_is_an_argument_error(self):
+        for fd in (True, 0x80000000):
+            with pytest.raises(bovnar.BovnarArgumentError):
+                DomDoc.parse_fd(fd)
+
     def test_a_bad_fd_with_a_policy_is_an_oserror(self):
         from bovnar.reader import UnitPolicy
         with pytest.raises(OSError):

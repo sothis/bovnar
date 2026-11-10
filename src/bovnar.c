@@ -2932,6 +2932,10 @@ typedef struct {
 	bool     verbose;
 	bool     json;
 	bool     min_overhead;
+	bool     stream;
+	bool     stream_only;
+	bool     stream_seconds_set;
+	double   stream_seconds;
 } bmark_cfg_t;
 static bmark_cfg_t bmark_cfg = {
 	.profiles   = {true, true, true, true, true, true},
@@ -2942,6 +2946,10 @@ static bmark_cfg_t bmark_cfg = {
 	.verbose    = false,
 	.json       = false,
 	.min_overhead = false,
+	.stream     = false,
+	.stream_only = false,
+	.stream_seconds_set = false,
+	.stream_seconds = 0.2,
 };
 /* Monotonic wall clock as a double (seconds); the platform source is in
  * bvn_port.h (clock_gettime on POSIX, QueryPerformanceCounter on Windows). */
@@ -3367,6 +3375,725 @@ static void bmark_print_result(const bmark_result_t *r, uint32_t iterations)
 		       mb_per_sec, assign_per_sec, events_per_sec);
 	}
 }
+/*
+ * Streaming throughput: the paths of tests/bovnar_stream_bench.c, exposed as
+ * `bovnar bench --stream` so they can be measured without a source build. A
+ * streaming cell runs whole documents -- a mux stream of messages, a frame
+ * stream of documents -- in rounds until a wall-clock budget is spent, at
+ * least twice, because a fixed iteration count cannot suit both a 150-byte
+ * message and a 30 KB document. `--stream-seconds` sets the budget.
+ *
+ * Raw octet streams come first, at 1 KiB, 64 KiB, 1 MiB and 8 MiB: writing a
+ * document that holds one through the writer's event API, and reading it back,
+ * with one table item per 64 KiB chunk (the last may be shorter). Then the
+ * matrix is the one doc/10 §8.4 uses: messages of 150 B, 30 KB and 400 KB
+ * (the last spanning seven chunks), and framed documents of about 43 B and
+ * 30 KB. Per message size: mux send into a memory sink; the batch demux; a
+ * live send into a callback sink, batched and flushed per message; and the
+ * push-fed demux by callback and by bvnr_demux_next, fed whole and in 1460-
+ * and 64-byte pieces. Per document size: bvnr_doc_stream_read and the parsing
+ * frame reader, fed whole and in 1460-byte pieces. The demux and pull
+ * consumers copy every message into one stream-sized buffer: the zero-copy
+ * handoff the API offers when a message lies whole in a chunk measures pointer
+ * passing, not reading, and reported hundreds of thousands of MB/s. Costs are
+ * per item, so the table is separate from the parse one: MB/s is the stream's
+ * bytes per second, ns/item the cost of one message or document.
+ */
+typedef struct {
+	const char *path;
+	size_t      item_bytes;
+	size_t      items;
+	size_t      round_bytes;
+	uint64_t    rounds;
+	double      elapsed_sec;
+	double      cpu_sec;
+} bmark_stream_result_t;
+
+static uint8_t  *bmark_stream_payload;
+static uint64_t bmark_stream_sink;
+
+static bool bmark_stream_measure(bmark_stream_result_t *r,
+                                 bool (*once)(void *), void *ud)
+{
+	bmark_wall_clock_t start = bmark_timer_now();
+	double             cpu_start = bmark_cpu_sec();
+	bmark_wall_clock_t end   = start;
+	uint64_t           rounds = 0;
+	bool               ok     = true;
+	do {
+		if (!once(ud)) { ok = false; break; }
+		rounds++;
+		end = bmark_timer_now();
+	} while (bmark_timer_sec(&start, &end) < bmark_cfg.stream_seconds ||
+	         rounds < 2);
+	r->rounds      = rounds;
+	r->elapsed_sec = bmark_timer_sec(&start, &end);
+	r->cpu_sec     = bmark_cpu_sec() - cpu_start;
+	return ok;
+}
+
+static void bmark_stream_print_header(void)
+{
+	if (bmark_cfg.json) return;
+	cwf("═════════════════════════════════════════════════════════════\n");
+	printf("  Bovnar Streaming Throughput Benchmark\n");
+	printf("  Time per cell: %.3g s   (at least 2 rounds)\n",
+	       bmark_cfg.stream_seconds);
+	printf("  Payloads are copied in memory (often cache-resident): MB/s is\n");
+	printf("  memory throughput, not disk or network throughput\n");
+	cwf("═════════════════════════════════════════════════════════════\n");
+	printf("%-34s %8s %10s %12s %12s %10s %12s\n",
+	       "Path", "Item (B)", "Items", "Wall (ms)", "CPU (ms)",
+	       "MB/s", "ns/item");
+	cwf("────────────────────────────────── ──────── ────────── "
+	       "──────────── ──────────── ────────── ────────────\n");
+}
+
+static void bmark_stream_print_result(const bmark_stream_result_t *r,
+                                      bool *first_json)
+{
+	double wall_ms     = r->elapsed_sec * 1000.0;
+	double cpu_ms      = r->cpu_sec * 1000.0;
+	double mb_per_sec  = (double)r->round_bytes * (double)r->rounds
+	                   / (1024.0 * 1024.0) / r->elapsed_sec;
+	double ns_per_item = r->elapsed_sec * 1e9
+	                   / ((double)r->rounds * (double)r->items);
+	if (bmark_cfg.json) {
+		if (!*first_json) printf(",\n");
+		*first_json = false;
+		printf("{\"path\":\"%s\",\"item_bytes\":%zu,\"items\":%zu,"
+		       "\"round_bytes\":%zu,\"rounds\":%" PRIu64 ","
+		       "\"wall_ms\":%.3f,\"cpu_ms\":%.3f,\"mb_per_sec\":%.3f,"
+		       "\"ns_per_item\":%.1f}",
+		       r->path, r->item_bytes, r->items, r->round_bytes,
+		       r->rounds, wall_ms, cpu_ms, mb_per_sec, ns_per_item);
+	} else {
+		printf("%-34s %8zu %10zu %12.3f %12.3f %10.2f %12.1f\n",
+		       r->path, r->item_bytes, r->items,
+		       wall_ms, cpu_ms, mb_per_sec, ns_per_item);
+	}
+}
+
+static uint32_t bmark_stream_cell(const char *path, size_t item_bytes,
+                                  size_t items, size_t round_bytes,
+                                  bool (*once)(void *), void *ud,
+                                  bool *first_json)
+{
+	bmark_stream_result_t r;
+	memset(&r, 0, sizeof(r));
+	r.path        = path;
+	r.item_bytes  = item_bytes;
+	r.items       = items;
+	r.round_bytes = round_bytes;
+	if (!bmark_stream_measure(&r, once, ud)) {
+		fprintf(stderr, "  FAILED: stream %s, %zu item(s) of %zu byte(s) "
+		        "per round\n", path, items, item_bytes);
+		return 1;
+	}
+	bmark_stream_print_result(&r, first_json);
+	if (bmark_cfg.verbose && !bmark_cfg.json) {
+		cwf("  ── detail: %s, %" PRIu64 " rounds, %zu item(s) and "
+		       "%zu byte(s) per round\n",
+		       path, r.rounds, items, round_bytes);
+	}
+	return 0;
+}
+
+static bool bmark_stream_count_value(void *ud, bvnr_event_t ev,
+                                     bvnr_data_t *d)
+{
+	(void)ud;
+	bmark_stream_sink += (uint64_t)ev + (d ? d->length : 0);
+	return true;
+}
+
+typedef struct {
+	bvnr_writer_t *writer;
+	bvnr_reader_t *reader;
+	bvnr_demux_t  *demux;
+	uint8_t       *doc;
+	size_t         doc_cap;
+	size_t         doc_len;
+	uint8_t       *out;
+	size_t         out_cap;
+	size_t         out_at;
+	uint8_t       *msg_out;
+	size_t         msg_cap;
+	size_t         msg_at;
+	bvnr_sink_t    sink;
+	uint32_t       msgs;
+	uint32_t       size;
+	bool           flush;
+	bool           pull;
+	uint64_t       piece;
+} bmark_stream_ctx_t;
+
+/*
+ * The demux hands a message out without copying it, and the pull loop's item
+ * is valid only until the next call. A consumer that keeps or processes the
+ * bytes pays a copy, so the read and feed cells make one; without it a
+ * 30 KB message in one chunk measured the pointer handoff and reported
+ * hundreds of thousands of MB/s.
+ */
+static bool bmark_stream_count_msg(void *ud, uint64_t channel,
+                                   const uint8_t *data, uint64_t len)
+{
+	bmark_stream_ctx_t *c = ud;
+	if (c->msg_at > c->msg_cap || len > c->msg_cap - c->msg_at)
+		return false;
+	if (len)
+		memcpy(c->msg_out + c->msg_at, data, (size_t)len);
+	c->msg_at += len;
+	bmark_stream_sink += channel + len
+	    + (len ? c->msg_out[c->msg_at - 1] : 0);
+	return true;
+}
+
+/* Write the mux document the cells share: `msgs` messages on four channels. */
+static bool bmark_stream_write_mux(bmark_stream_ctx_t *c)
+{
+	if (!bvnr_open_write_mem(c->writer, c->doc, (uint64_t)c->doc_cap,
+	                         false, NULL))
+		return false;
+	if (!bvnr_mux_begin(c->writer, "mux"))
+		return false;
+	for (uint32_t i = 0; i < c->msgs; i++) {
+		if (!bvnr_mux_send(c->writer, i % 4u,
+		                   bmark_stream_payload + (i % 64u), c->size))
+			return false;
+	}
+	if (!bvnr_mux_end(c->writer))
+		return false;
+	return bvnr_write_finish(c->writer);
+}
+
+static bool bmark_stream_send_once(void *ud)
+{
+	bmark_stream_ctx_t *c = ud;
+	return bmark_stream_write_mux(c);
+}
+
+static bool bmark_stream_copy_push(bvnr_sink_t *s, const void *p, uint32_t n)
+{
+	bmark_stream_ctx_t *c = bvnr_sink_get_userdata(s);
+	if (!c || c->out_at > c->out_cap || n > c->out_cap - c->out_at)
+		return false;
+	memcpy(c->out + c->out_at, p, n);
+	c->out_at += n;
+	return true;
+}
+
+static bool bmark_stream_live_once(void *ud)
+{
+	bmark_stream_ctx_t *c = ud;
+	c->out_at = 0;
+	if (!bvnr_open_write_sink(c->writer, &c->sink, false, NULL))
+		return false;
+	if (!bvnr_mux_begin(c->writer, "mux"))
+		return false;
+	for (uint32_t i = 0; i < c->msgs; i++) {
+		if (!bvnr_mux_send(c->writer, i % 4u,
+		                   bmark_stream_payload + (i % 64u), c->size))
+			return false;
+		if (c->flush && !bvnr_write_flush(c->writer))
+			return false;
+	}
+	if (!bvnr_mux_end(c->writer))
+		return false;
+	if (!bvnr_write_finish(c->writer))
+		return false;
+	bmark_stream_sink += c->out_at;
+	return true;
+}
+
+static bool bmark_stream_read_once(void *ud)
+{
+	bmark_stream_ctx_t *c = ud;
+	bvnr_read_flags_t flags;
+	memset(&flags, 0, sizeof(flags));
+	flags.userdata   = c->demux;
+	flags.on_verified = bvnr_demux_on_event;
+	c->msg_at = 0;
+	return bvnr_open_read_mem(c->reader, c->doc, (uint64_t)c->doc_len,
+	                          NULL, 0, &flags)
+	    && bvnr_read(c->reader);
+}
+
+static bool bmark_stream_feed_once(void *ud)
+{
+	bmark_stream_ctx_t *c = ud;
+	uint64_t piece = c->piece ? c->piece : (uint64_t)c->doc_len;
+	if (!piece || !bvnr_demux_open_feed(c->demux, NULL, false))
+		return false;
+	c->msg_at = 0;
+	for (uint64_t at = 0; at < (uint64_t)c->doc_len; at += piece) {
+		uint64_t left = (uint64_t)c->doc_len - at;
+		uint64_t n   = left < piece ? left : piece;
+		if (!bvnr_demux_feed(c->demux, c->doc + at, n))
+			return false;
+		if (c->pull) {
+			bvnr_demux_item_t item;
+			int rc;
+			while ((rc = bvnr_demux_next(c->demux, &item))
+			       == BVNR_NEXT_MESSAGE) {
+				if (c->msg_at > c->msg_cap ||
+				    item.length > c->msg_cap - c->msg_at)
+					return false;
+				if (item.length)
+					memcpy(c->msg_out + c->msg_at, item.data,
+					       (size_t)item.length);
+				c->msg_at += item.length;
+				bmark_stream_sink += item.channel + item.length
+				    + (item.length
+				       ? c->msg_out[c->msg_at - 1] : 0);
+			}
+			if (rc == BVNR_NEXT_ERROR)
+				return false;
+		}
+	}
+	return bvnr_demux_finish(c->demux)
+	    && bvnr_demux_error(c->demux) == error_none;
+}
+
+/*
+ * Raw octet streams: the binary substrate the mux and embedded-document
+ * layers sit on. One cell writes a document holding one octet stream through
+ * the writer's event API, the next reads it back, so the table's item is a
+ * chunk of up to 64 KiB rather than a message. The read cell copies every
+ * chunk into a consumer buffer: the reader hands a chunk out without a copy,
+ * and a consumer that wants the bytes pays that copy -- leaving it out would
+ * report a framing scan, not a read.
+ */
+typedef struct {
+	bvnr_writer_t *writer;
+	bvnr_reader_t *reader;
+	const uint8_t *payload;
+	uint8_t       *doc;
+	size_t         doc_cap;
+	size_t         doc_len;
+	uint8_t       *out;
+	size_t         out_at;
+	size_t         size;
+	size_t         chunks;
+	size_t         seen_chunks;
+	size_t         seen_bytes;
+} bmark_stream_octet_ctx_t;
+
+static bool bmark_stream_octet_write_once(void *ud)
+{
+	bmark_stream_octet_ctx_t *c = ud;
+	bvnr_data_t d;
+	if (!bvnr_open_write_mem(c->writer, c->doc, (uint64_t)c->doc_cap,
+	                         false, NULL))
+		return false;
+	memset(&d, 0, sizeof(d));
+	d.type   = token_is_identifier;
+	d.data   = "data";
+	d.length = 4;
+	if (!bvnr_write_event(c->writer, ev_assignment_start, &d))
+		return false;
+	memset(&d, 0, sizeof(d));
+	if (!bvnr_write_event(c->writer, ev_octet_stream_start, &d))
+		return false;
+	for (size_t off = 0; off < c->size; off += 65536u) {
+		size_t n = c->size - off < 65536u ? c->size - off : 65536u;
+		d.type   = token_is_octet_stream;
+		d.data   = c->payload + off;
+		d.length = (uint32_t)n;
+		if (!bvnr_write_event(c->writer, ev_data, &d))
+			return false;
+	}
+	memset(&d, 0, sizeof(d));
+	if (!bvnr_write_event(c->writer, ev_octet_stream_end, &d))
+		return false;
+	return bvnr_write_finish(c->writer);
+}
+
+static bool bmark_stream_count_octet(void *ud, bvnr_event_t ev,
+                                     bvnr_data_t *d)
+{
+	bmark_stream_octet_ctx_t *c = ud;
+	if (ev == ev_data && d && d->type == token_is_octet_stream) {
+		if (!d->data || c->out_at > c->size ||
+		    d->length > c->size - c->out_at)
+			return false;
+		/* The reader hands out a chunk without copying it; a consumer that
+		 * wants the bytes pays this copy, so the row measures one. */
+		memcpy(c->out + c->out_at, d->data, d->length);
+		c->out_at += d->length;
+		if (d->length)
+			bmark_stream_sink += c->out[c->out_at - 1];
+		c->seen_chunks++;
+		c->seen_bytes += d->length;
+	}
+	return true;
+}
+
+static bool bmark_stream_octet_read_once(void *ud)
+{
+	bmark_stream_octet_ctx_t *c = ud;
+	bvnr_read_flags_t flags;
+	memset(&flags, 0, sizeof(flags));
+	flags.userdata    = c;
+	flags.on_verified = bmark_stream_count_octet;
+	c->seen_chunks = 0;
+	c->seen_bytes  = 0;
+	c->out_at      = 0;
+	if (!bvnr_open_read_mem(c->reader, c->doc, (uint64_t)c->doc_len,
+	                        NULL, 0, &flags))
+		return false;
+	if (!bvnr_read(c->reader))
+		return false;
+	return c->seen_chunks == c->chunks && c->seen_bytes == c->size
+	    && c->out_at == c->size;
+}
+
+/* Octet-stream cells; returns the number of failed cells. */
+static uint32_t bmark_stream_octets(bool *first_json)
+{
+	static const size_t sizes[] = {
+		1024u, 65536u, 1048576u, 8388608u
+	};
+	static const size_t payload_cap = 8388608u;
+	uint8_t *payload = malloc(payload_cap);
+	uint32_t failed = 0;
+	if (!payload) {
+		fprintf(stderr, "  FAILED: streaming bench out of memory "
+		        "(%zu-byte octet payload)\n", payload_cap);
+		return 1;
+	}
+	for (size_t i = 0; i < payload_cap; i++)
+		payload[i] = (uint8_t)((i * 2654435761u) >> 11);
+	for (size_t s = 0; s < sizeof(sizes) / sizeof(sizes[0]); s++) {
+		size_t size   = sizes[s];
+		size_t chunks = (size + 65535u) / 65536u;
+		size_t item   = size < 65536u ? size : 65536u;
+		size_t cap    = size + chunks * 8u + 64u;
+		bmark_stream_octet_ctx_t c;
+		memset(&c, 0, sizeof(c));
+		c.payload = payload;
+		c.size    = size;
+		c.chunks  = chunks;
+		c.doc_cap = cap;
+		c.doc     = malloc(cap);
+		c.out     = malloc(size);
+		c.writer  = bvnr_writer_create();
+		c.reader  = bvnr_reader_create();
+		if (!c.doc || !c.out || !c.writer || !c.reader) {
+			fprintf(stderr, "  FAILED: streaming bench out of memory "
+			        "(octet stream, %zu bytes)\n", size);
+			free(c.doc);
+			free(c.out);
+			bvnr_writer_destroy(c.writer);
+			bvnr_reader_destroy(c.reader);
+			failed++;
+			continue;
+		}
+		if (!bmark_stream_octet_write_once(&c)) {
+			fprintf(stderr, "  FAILED: streaming bench could not write "
+			        "a %zu-byte octet stream\n", size);
+			failed++;
+			goto next;
+		}
+		c.doc_len = (size_t)bvnr_writer_bytes_written(c.writer);
+		if (!bmark_cfg.json)
+			printf("%zu-byte octet stream, %zu chunk%s\n",
+			       size, chunks, chunks == 1 ? "" : "s");
+		failed += bmark_stream_cell("octet stream write", item, chunks,
+		                            c.doc_len,
+		                            bmark_stream_octet_write_once, &c,
+		                            first_json);
+		failed += bmark_stream_cell("octet stream read", item, chunks,
+		                            c.doc_len,
+		                            bmark_stream_octet_read_once, &c,
+		                            first_json);
+next:
+		bvnr_writer_destroy(c.writer);
+		bvnr_reader_destroy(c.reader);
+		free(c.doc);
+		free(c.out);
+	}
+	free(payload);
+	return failed;
+}
+
+/* Mux cells for one message size; returns the number of failed cells. */
+static uint32_t bmark_stream_messages(uint32_t msgs, uint32_t size,
+                                      bool *first_json)
+{
+	static const uint64_t feed_pieces[] = { 0, 1460, 64 };
+	uint32_t failed = 0;
+	size_t   cap    = (size_t)msgs * ((size_t)size + 64u) + 65536u;
+	bmark_stream_ctx_t c;
+	memset(&c, 0, sizeof(c));
+	c.msgs    = msgs;
+	c.size    = size;
+	c.doc_cap = cap;
+	c.out_cap = cap;
+	c.msg_cap = cap;
+	c.doc     = malloc(cap);
+	c.out     = malloc(cap);
+	c.msg_out = malloc(cap);
+	c.writer  = bvnr_writer_create();
+	c.reader  = bvnr_reader_create();
+	if (!c.doc || !c.out || !c.msg_out || !c.writer || !c.reader) {
+		fprintf(stderr, "  FAILED: streaming bench out of memory "
+		        "(mux, %u x %u bytes)\n", msgs, size);
+		free(c.doc);
+		free(c.out);
+		free(c.msg_out);
+		bvnr_writer_destroy(c.writer);
+		bvnr_reader_destroy(c.reader);
+		return 1;
+	}
+	if (!bmark_stream_write_mux(&c)) {
+		fprintf(stderr, "  FAILED: streaming bench could not write the "
+		        "mux document (%u x %u bytes)\n", msgs, size);
+		failed = 1;
+		goto done;
+	}
+	c.doc_len = (size_t)bvnr_writer_bytes_written(c.writer);
+	if (!bmark_cfg.json)
+		printf("%u messages of %u bytes, %zu-byte document\n",
+		       msgs, size, c.doc_len);
+
+	failed += bmark_stream_cell("mux send", size, msgs, c.doc_len,
+	                            bmark_stream_send_once, &c, first_json);
+
+	c.demux = bvnr_demux_create(bmark_stream_count_msg, &c, 0);
+	if (!c.demux) {
+		fprintf(stderr, "  FAILED: streaming bench out of memory "
+		        "(demux)\n");
+		failed++;
+	} else {
+		failed += bmark_stream_cell("demux read", size, msgs, c.doc_len,
+		                            bmark_stream_read_once, &c, first_json);
+		bvnr_demux_destroy(c.demux);
+		c.demux = NULL;
+	}
+
+	bvnr_sink_to_callback(&c.sink, bmark_stream_copy_push, NULL, &c);
+	c.flush = false;
+	c.out_at = 0;
+	failed += bmark_stream_cell("live send, batched", size, msgs, c.doc_len,
+	                            bmark_stream_live_once, &c, first_json);
+	c.flush = true;
+	failed += bmark_stream_cell("live send, flushed", size, msgs, c.doc_len,
+	                            bmark_stream_live_once, &c, first_json);
+	c.flush = false;
+
+	for (size_t p = 0; p < sizeof(feed_pieces) / sizeof(feed_pieces[0]);
+	     p++) {
+		char label[64];
+		for (int pull = 0; pull < 2; pull++) {
+			c.piece = feed_pieces[p];
+			c.pull  = pull != 0;
+			if (feed_pieces[p])
+				snprintf(label, sizeof(label),
+				         "feed %s, %llu B pieces",
+				         c.pull ? "pull" : "callback",
+				         (unsigned long long)feed_pieces[p]);
+			else
+				snprintf(label, sizeof(label),
+				         "feed %s, whole buffer",
+				         c.pull ? "pull" : "callback");
+			c.demux = bvnr_demux_create(
+				c.pull ? NULL : bmark_stream_count_msg,
+				c.pull ? NULL : &c, 0);
+			if (!c.demux) {
+				fprintf(stderr, "  FAILED: streaming bench out of "
+				        "memory (fed demux)\n");
+				failed++;
+				continue;
+			}
+			failed += bmark_stream_cell(label, size, msgs, c.doc_len,
+			                            bmark_stream_feed_once, &c,
+			                            first_json);
+			bvnr_demux_destroy(c.demux);
+			c.demux = NULL;
+		}
+	}
+done:
+	bvnr_writer_destroy(c.writer);
+	bvnr_reader_destroy(c.reader);
+	bvnr_demux_destroy(c.demux);
+	free(c.doc);
+	free(c.out);
+	free(c.msg_out);
+	return failed;
+}
+
+typedef struct {
+	uint8_t *stream;
+	size_t   stream_len;
+	uint32_t docs;
+	size_t   doc_len;
+} bmark_stream_frames_t;
+
+static bool bmark_stream_frames_build(bmark_stream_frames_t *f,
+                                      const void *doc, size_t doc_len,
+                                      uint32_t docs)
+{
+	uint64_t cap = (uint64_t)docs * ((uint64_t)doc_len
+	                                 + BVNR_FRAME_HEADER_SIZE);
+	f->stream = malloc((size_t)cap);
+	if (!f->stream)
+		return false;
+	bvnr_sink_t sink;
+	bvnr_sink_to_mem(&sink, f->stream, cap);
+	for (uint32_t i = 0; i < docs; i++) {
+		if (!bvnr_frame_write(&sink, doc, doc_len)) {
+			free(f->stream);
+			f->stream = NULL;
+			return false;
+		}
+	}
+	f->stream_len = (size_t)bvnr_sink_bytes_written(&sink);
+	f->docs       = docs;
+	f->doc_len    = doc_len;
+	return true;
+}
+
+typedef struct {
+	const bmark_stream_frames_t *frames;
+	bvnr_read_flags_t            flags;
+	bvnr_doc_stream_opts_t       opts;
+	uint64_t                     piece;
+} bmark_stream_frames_ctx_t;
+
+static bool bmark_stream_docstream_once(void *ud)
+{
+	bmark_stream_frames_ctx_t *c = ud;
+	bvnr_source_t src;
+	bvnr_source_from_mem(&src, c->frames->stream,
+	                     (uint64_t)c->frames->stream_len);
+	return bvnr_doc_stream_read(&src, &c->opts, NULL);
+}
+
+static bool bmark_stream_frame_once(void *ud)
+{
+	bmark_stream_frames_ctx_t *c = ud;
+	uint64_t piece = c->piece ? c->piece
+	                          : (uint64_t)c->frames->stream_len;
+	if (!piece)
+		return false;
+	bvnr_frame_reader_t *fr = bvnr_frame_reader_create(&c->opts);
+	if (!fr)
+		return false;
+	bool ok = true;
+	for (uint64_t at = 0; at < (uint64_t)c->frames->stream_len;
+	     at += piece) {
+		uint64_t left = (uint64_t)c->frames->stream_len - at;
+		uint64_t n   = left < piece ? left : piece;
+		if (!bvnr_frame_reader_feed(fr, c->frames->stream + at, n)) {
+			ok = false;
+			break;
+		}
+	}
+	if (ok)
+		ok = bvnr_frame_reader_finish(fr)
+		    && bvnr_frame_reader_error(fr) == error_none
+		    && bvnr_frame_reader_count(fr) == c->frames->docs;
+	if (ok)
+		bmark_stream_sink += bvnr_frame_reader_count(fr);
+	bvnr_frame_reader_destroy(fr);
+	return ok;
+}
+
+/* About 30 KB of assignments, numbers and strings alternating. */
+static size_t bmark_stream_large_doc(char *out, size_t cap)
+{
+	size_t n = 0;
+	for (uint32_t i = 0; n + 64 < cap && n < 30000; i++) {
+		int w = snprintf(out + n, cap - n,
+		                 i & 1 ? ".k%u = \"value %u\";\n"
+		                       : ".k%u = %u;\n",
+		                 i, i * 7919u);
+		if (w < 0 || (size_t)w >= cap - n)
+			break;
+		n += (size_t)w;
+	}
+	return n;
+}
+
+/* Framed-document cells; returns the number of failed cells. */
+static uint32_t bmark_stream_frames(bool *first_json)
+{
+	static const char small[] =
+		".id = 12345; .name = \"sensor-7\"; .t = 21.5;";
+	static char large[32768];
+	static const uint32_t counts[2] = { 20000, 200 };
+	const char *docs[2] = { small, large };
+	size_t lens[2];
+	lens[0] = sizeof(small) - 1;
+	lens[1] = bmark_stream_large_doc(large, sizeof(large));
+	uint32_t failed = 0;
+	for (int s = 0; s < 2; s++) {
+		bmark_stream_frames_t frames;
+		memset(&frames, 0, sizeof(frames));
+		if (!bmark_stream_frames_build(&frames, docs[s], lens[s],
+		                               counts[s])) {
+			fprintf(stderr, "  FAILED: streaming bench out of memory "
+			        "(frames, %u x %zu bytes)\n",
+			        counts[s], lens[s]);
+			failed++;
+			continue;
+		}
+		if (!bmark_cfg.json)
+			printf("%u framed documents of %zu bytes\n",
+			       frames.docs, frames.doc_len);
+		bmark_stream_frames_ctx_t c;
+		memset(&c, 0, sizeof(c));
+		c.frames = &frames;
+		memset(&c.flags, 0, sizeof(c.flags));
+		c.flags.on_verified = bmark_stream_count_value;
+		memset(&c.opts, 0, sizeof(c.opts));
+		c.opts.flags = &c.flags;
+		failed += bmark_stream_cell("doc stream read", frames.doc_len,
+		                            frames.docs, frames.stream_len,
+		                            bmark_stream_docstream_once, &c,
+		                            first_json);
+		c.piece = 0;
+		failed += bmark_stream_cell("frame reader, whole buffer",
+		                            frames.doc_len, frames.docs,
+		                            frames.stream_len,
+		                            bmark_stream_frame_once, &c,
+		                            first_json);
+		c.piece = 1460;
+		failed += bmark_stream_cell("frame reader, 1460 B pieces",
+		                            frames.doc_len, frames.docs,
+		                            frames.stream_len,
+		                            bmark_stream_frame_once, &c,
+		                            first_json);
+		free(frames.stream);
+	}
+	return failed;
+}
+
+static uint32_t bmark_stream_run(bool *first_json)
+{
+	static const uint32_t sizes[]  = { 150, 30000, 400000 };
+	static const uint32_t counts[] = { 20000, 400, 30 };
+	static const size_t   payload_cap = 400000u + 64u;
+	uint32_t failed = 0;
+	bmark_stream_payload = malloc(payload_cap);
+	if (!bmark_stream_payload) {
+		fprintf(stderr, "  FAILED: streaming bench out of memory "
+		        "(%zu-byte payload)\n", payload_cap);
+		return 1;
+	}
+	for (size_t i = 0; i < payload_cap; i++)
+		bmark_stream_payload[i] =
+			(uint8_t)((i * 2654435761u) >> 11);
+	failed += bmark_stream_octets(first_json);
+	for (int s = 0; s < 3; s++)
+		failed += bmark_stream_messages(counts[s], sizes[s], first_json);
+	failed += bmark_stream_frames(first_json);
+	free(bmark_stream_payload);
+	bmark_stream_payload = NULL;
+	return failed;
+}
+
 static bool bmark_any_profile(void)
 {
 	for (int i = 0; i < BMARK_PROFILE_COUNT; i++)
@@ -3474,6 +4201,38 @@ static bool bench_parse_count(const char *opt, const char *arg,
 	*out = (uint32_t)v;
 	return true;
 }
+/* Parse the wall-clock budget for one streaming cell. strtod alone would also
+ * accept "0x1p3" and "inf"; a budget is a plain decimal count of seconds, so
+ * accept digits and at most one '.', and reject 0 (a typo, not a time) and
+ * anything over an hour. */
+static bool bench_parse_seconds(const char *opt, const char *arg, double *out)
+{
+	bool dot   = false;
+	bool digit = false;
+	bool valid = arg && *arg;
+	if (valid) {
+		for (const char *p = arg; *p; p++) {
+			if (*p == '.') {
+				if (dot) { valid = false; break; }
+				dot = true;
+			} else if (*p >= '0' && *p <= '9') {
+				digit = true;
+			} else {
+				valid = false;
+				break;
+			}
+		}
+	}
+	errno = 0;
+	double v = (valid && digit) ? strtod(arg, NULL) : 0.0;
+	if (!valid || !digit || errno != 0 || !(v > 0.0) || v > 3600.0) {
+		fprintf(stderr, "bench: %s wants a positive number of seconds "
+		        "up to 3600, got '%s'\n", opt, arg ? arg : "");
+		return false;
+	}
+	*out = v;
+	return true;
+}
 static void bench_usage(FILE *f)
 {
 	fprintf(f,
@@ -3492,12 +4251,24 @@ static void bench_usage(FILE *f)
 	    "  --json             Machine-readable JSON output\n"
 	    "  --min-overhead     Drop the on_unverified (lexer) callback and keep\n"
 	    "                     only on_verified, halving the callback work\n"
+	    "  --stream           Also benchmark the streaming paths: raw octet\n"
+	    "                     streams (1 KiB, 64 KiB, 1 MiB, 8 MiB), mux send\n"
+	    "                     and demux, the push-fed demux, and framed\n"
+	    "                     documents (150 B, 30 KB and 400 KB messages;\n"
+	    "                     43 B and 30 KB documents). Each streaming cell\n"
+	    "                     runs for --stream-seconds, not --iterations\n"
+	    "  --stream-only      Benchmark only the streaming paths\n"
+	    "  --stream-seconds <S>\n"
+	    "                     Time budget per streaming cell in seconds,\n"
+	    "                     above 0 and at most 3600 (default: 0.2)\n"
 	    "  -h, --help         Show this help and exit\n"
 	    "\n"
 	    "Examples:\n"
 	    "  bovnar bench --profile scalars --size 4096\n"
 	    "  bovnar bench --profile all --size 1024,65536 --iterations 200 --json\n"
-	    "  bovnar bench --min-overhead --profile scalars,units --size 4096\n");
+	    "  bovnar bench --min-overhead --profile scalars,units --size 4096\n"
+	    "  bovnar bench --stream\n"
+	    "  bovnar bench --stream-only --stream-seconds 0.5 --json\n");
 }
 static int cmd_bench(int argc, char **argv)
 {
@@ -3509,7 +4280,8 @@ static int cmd_bench(int argc, char **argv)
 		if ((strcmp(argv[i], "--profile") == 0 ||
 		     strcmp(argv[i], "--size") == 0 ||
 		     strcmp(argv[i], "--iterations") == 0 ||
-		     strcmp(argv[i], "--warmup") == 0) && i + 1 >= argc) {
+		     strcmp(argv[i], "--warmup") == 0 ||
+		     strcmp(argv[i], "--stream-seconds") == 0) && i + 1 >= argc) {
 			fprintf(stderr, "bench: %s needs a value\n", argv[i]);
 			return 2;
 		}
@@ -3552,6 +4324,16 @@ static int cmd_bench(int argc, char **argv)
 			bmark_cfg.json = true;
 		} else if (strcmp(argv[i], "--min-overhead") == 0) {
 			bmark_cfg.min_overhead = true;
+		} else if (strcmp(argv[i], "--stream") == 0) {
+			bmark_cfg.stream = true;
+		} else if (strcmp(argv[i], "--stream-only") == 0) {
+			bmark_cfg.stream      = true;
+			bmark_cfg.stream_only = true;
+		} else if (strcmp(argv[i], "--stream-seconds") == 0) {
+			if (!bench_parse_seconds("--stream-seconds", argv[++i],
+			                         &bmark_cfg.stream_seconds))
+				return 2;
+			bmark_cfg.stream_seconds_set = true;
 		} else if (strcmp(argv[i], "-h") == 0 ||
 		           strcmp(argv[i], "--help") == 0) {
 			/* Asked-for help is output, not a diagnostic: stdout, so that
@@ -3563,12 +4345,21 @@ static int cmd_bench(int argc, char **argv)
 			return 2;
 		}
 	}
+	if (bmark_cfg.stream_seconds_set && !bmark_cfg.stream) {
+		fprintf(stderr, "bench: --stream-seconds needs --stream or "
+		        "--stream-only\n");
+		return 2;
+	}
 	if (bmark_cfg.json) {
 		printf("{\n\"config\":{\"iterations\":%u,\"warmup\":%u,"
-		       "\"min_overhead\":%s},\n\"results\":[\n",
+		       "\"min_overhead\":%s,\"stream\":%s,\"stream_only\":%s,"
+		       "\"stream_seconds\":%.6g},\n\"results\":[\n",
 		       bmark_cfg.iterations, bmark_cfg.warmup,
-		       bmark_cfg.min_overhead ? "true" : "false");
-	} else {
+		       bmark_cfg.min_overhead ? "true" : "false",
+		       bmark_cfg.stream ? "true" : "false",
+		       bmark_cfg.stream_only ? "true" : "false",
+		       bmark_cfg.stream_seconds);
+	} else if (!bmark_cfg.stream_only) {
 		cwf("═════════════════════════════════════════════════════════════\n");
 		printf("  Bovnar Parsing Throughput Benchmark\n");
 		printf("  Iterations: %u   Warmup: %u   Min-overhead: %s\n",
@@ -3582,38 +4373,60 @@ static int cmd_bench(int argc, char **argv)
 	 * stderr and exit status 0, so `bench --size 99999999999999999` -- every
 	 * cell a malloc failure -- printed an empty table and reported success. */
 	uint32_t failed = 0;
-	for (int p = 0; p < BMARK_PROFILE_COUNT; p++) {
-		if (!bmark_cfg.profiles[p]) continue;
-		for (uint32_t s = 0; s < bmark_cfg.num_sizes; s++) {
-			bmark_result_t r = bmark_run((bmark_profile_t)p,
-			                             bmark_cfg.sizes[s],
-			                             bmark_cfg.iterations);
-			if (r.payload_size == 0) {
-				fprintf(stderr, "  FAILED: %s/%zu (the size holds no whole "
-					"assignment of this profile, or generation or "
-					"the parse failed)\n",
-				        bmark_profile_names[p], bmark_cfg.sizes[s]);
-				failed++;
-				continue;
-			}
-			if (bmark_cfg.json && !first)
-				printf(",\n");
-			first = false;
-			bmark_print_result(&r, bmark_cfg.iterations);
-			if (bmark_cfg.verbose && !bmark_cfg.json) {
-				cwf("  ── detail: profile=%s, size=%zu bytes, "
-				       "assignments=%zu, events=%zu, "
-				       "avg_cost=%.3f us/assign\n",
-				       bmark_profile_names[p], r.payload_size,
-				       r.num_assignments, r.num_events,
-				       (r.elapsed_sec * 1e6) /
-				           (double)(r.num_assignments * bmark_cfg.iterations));
+	if (!bmark_cfg.stream_only) {
+		for (int p = 0; p < BMARK_PROFILE_COUNT; p++) {
+			if (!bmark_cfg.profiles[p]) continue;
+			for (uint32_t s = 0; s < bmark_cfg.num_sizes; s++) {
+				bmark_result_t r = bmark_run((bmark_profile_t)p,
+				                             bmark_cfg.sizes[s],
+				                             bmark_cfg.iterations);
+				if (r.payload_size == 0) {
+					fprintf(stderr, "  FAILED: %s/%zu (the size holds no whole "
+						"assignment of this profile, or generation or "
+						"the parse failed)\n",
+					        bmark_profile_names[p], bmark_cfg.sizes[s]);
+					failed++;
+					continue;
+				}
+				if (bmark_cfg.json && !first)
+					printf(",\n");
+				first = false;
+				bmark_print_result(&r, bmark_cfg.iterations);
+				if (bmark_cfg.verbose && !bmark_cfg.json) {
+					cwf("  ── detail: profile=%s, size=%zu bytes, "
+					       "assignments=%zu, events=%zu, "
+					       "avg_cost=%.3f us/assign\n",
+					       bmark_profile_names[p], r.payload_size,
+					       r.num_assignments, r.num_events,
+					       (r.elapsed_sec * 1e6) /
+					           (double)(r.num_assignments * bmark_cfg.iterations));
+				}
 			}
 		}
 	}
-	if (bmark_cfg.json)
-		printf("\n]}\n");
-	printf("\n");
+	if (bmark_cfg.json) {
+		if (bmark_cfg.stream)
+			printf("],\n\"stream_results\":[\n");
+		else
+			printf("]\n}\n");
+	} else if (!bmark_cfg.stream) {
+		printf("\n");
+	}
+	if (bmark_cfg.stream) {
+		if (!bmark_cfg.json) {
+			if (!bmark_cfg.stream_only)
+				printf("\n");
+			bmark_stream_print_header();
+		}
+		bool first_stream = true;
+		failed += bmark_stream_run(&first_stream);
+		if (bmark_cfg.json)
+			printf("]\n}\n");
+		else
+			printf("\n");
+	}
+	/* Keeps the checksums the streaming callbacks accumulate observable. */
+	(void)bmark_stream_sink;
 	if (failed) {
 		fprintf(stderr, "bench: %u cell(s) could not be measured\n", failed);
 		return 1;
@@ -4037,7 +4850,8 @@ static void usage(FILE *out, const char *prog)
 		"                  List the channel/message sizes in a multiplexed stream.\n"
 		"  version       Print library and supported spec version\n"
 		"  bench [opts]\n"
-		"                  Run parsing throughput benchmark.\n"
+		"                  Benchmark parsing throughput, and with --stream the\n"
+		"                  streaming paths as well.\n"
 		"                  Options:\n"
 		"                    --profile <list>   all,scalars,typed,structs,arrays,units,mixed\n"
 		"                    --size <list>      payload sizes in bytes\n"
@@ -4046,6 +4860,10 @@ static void usage(FILE *out, const char *prog)
 		"                    --verbose          per-run detail\n"
 		"                    --json             machine-readable JSON output\n"
 		"                    --min-overhead     drop the on_unverified callback\n"
+		"                    --stream           add the streaming paths benchmark\n"
+		"                    --stream-only      run only the streaming benchmark\n"
+		"                    --stream-seconds <S>  seconds per streaming cell\n"
+		"                                       (default: 0.2)\n"
 		"\n"
 		"Exit status: 0 success; 1 the document, the input or the output failed;\n"
 		"2 the command line was wrong.\n"
@@ -4064,9 +4882,10 @@ static void usage(FILE *out, const char *prog)
 		"  %s frames list docs.bvf\n"
 		"  %s mux pack 1:a.bvnr 2:b.bvnr | %s mux list -\n"
 		"  %s bench --profile scalars --size 4096\n"
-		"  %s bench --profile all --size 1024,65536 --iterations 200 --json\n",
+		"  %s bench --profile all --size 1024,65536 --iterations 200 --json\n"
+		"  %s bench --stream\n",
 		prog, prog, prog, prog, prog, prog, prog, prog,
-		prog, prog, prog, prog, prog, prog, prog);
+		prog, prog, prog, prog, prog, prog, prog, prog);
 }
 /*
  * The dispatcher. Its exit status is one of three, and which one is decided by

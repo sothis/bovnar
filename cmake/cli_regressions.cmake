@@ -214,6 +214,26 @@ _case(bench_unknown_profile 2 "" "bench: --profile 'bogus' is not a known profil
       bench --profile scalars,bogus --size 1024 --iterations 1 --json)
 _case(bench_unknown_option 2 "" "bench: unknown option: --nope" "" bench --nope)
 _case(bench_help_stdout 0 "--min-overhead +Drop the on_unverified" "^$" "" bench --help)
+# The streaming suite is selected explicitly, and --stream-only must not run
+# (or print) the parse cells. Streaming cells use a time budget, so the run
+# takes its two-round minimum per cell even with a tiny --stream-seconds.
+_case(bench_stream_json 0 "\"path\":\"octet stream write\"" "" "\"profile\":\"scalars\""
+      bench --stream-only --stream-seconds 0.005 --json)
+_case(bench_stream_only_human 0 "Bovnar Streaming Throughput Benchmark" ""
+      "Bovnar Parsing Throughput Benchmark"
+      bench --stream-only --stream-seconds 0.005)
+_case(bench_stream_combined 0
+      "\"profile\":\"scalars\"[^\n]*\n\\],\n\"stream_results\":\\[\n\\{\"path\":\"octet stream write\""
+      "" "" bench --profile scalars --size 1024 --iterations 1 --warmup 0
+      --stream --stream-seconds 0.005 --json)
+_case(bench_stream_seconds_zero 2 "" "wants a positive number of seconds.*got '0'" ""
+      bench --stream-seconds 0)
+_case(bench_stream_seconds_garbage 2 "" "wants a positive number of seconds" ""
+      bench --stream-seconds 1x)
+_case(bench_stream_seconds_without_stream 2 "" "needs --stream or --stream-only" ""
+      bench --stream-seconds 0.5)
+_case(bench_stream_seconds_missing 2 "" "bench: --stream-seconds needs a value" ""
+      bench --stream-seconds)
 
 # ── 12. one rule for arguments, one meaning per exit status ──────────────────
 _case(help_stdout          0 "Usage: .* <command>" "^$" "" --help)

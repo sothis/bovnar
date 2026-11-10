@@ -1698,7 +1698,7 @@ The existing `from_pint_unit` / `to_pint_unit` bridge is untouched.
 when a code that should parse does not:
 
 ```
-bovnar 2.0.2 (spec 1.2)
+bovnar 2.1.0 (spec 1.2)
 unit profiles: ucum unece qudt qudt-qk udunits om cf
 ```
 

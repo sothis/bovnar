@@ -29,8 +29,9 @@ with the reporter credited in `CHANGELOG.md` unless they ask otherwise.
 
 | Version | Supported |
 |---|---|
-| 2.0.x | Yes |
-| 1.1.x | No — upgrade to 2.0.x, which reads 1.0 and 1.1 documents (see below for what it now refuses); the C ABI and the Python API changed, so this one is a rebuild and not a drop-in |
+| 2.1.x | Yes |
+| 2.0.x | No — upgrade to 2.1.x; the C ABI is unchanged (the exports were only added), so C consumers are a drop-in replacement; the Rust crate has one source-incompatible `ReadOptions` change |
+| 1.1.x | No — upgrade to 2.1.x, which reads 1.0 and 1.1 documents (see below for what it now refuses); the C ABI and the Python API changed at 2.0.0, so this one is a rebuild and not a drop-in |
 | 1.0.x | No |
 
 The **format** and the reference implementation are versioned separately, both

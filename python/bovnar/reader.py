@@ -610,7 +610,7 @@ class Reader:
         are those of :meth:`read_mem`."""
         self._check_open()
         self._check_not_busy()
-        if not isinstance(fd, int) or fd < 0:
+        if type(fd) is not int or fd < 0 or fd > 0x7FFFFFFF:
             raise BovnarArgumentError(f"Invalid file descriptor: {fd!r}")
 
         flags, cb_refs = self._build_flags(

@@ -23,7 +23,7 @@ fn read_error(doc: &[u8], options: &ReadOptions) -> ErrorCode {
 
 #[test]
 fn test_runtime_versions() {
-    assert_eq!(version(), "2.0.2");
+    assert_eq!(version(), "2.1.0");
     assert_eq!(spec_version(), (1, 2));
 }
 

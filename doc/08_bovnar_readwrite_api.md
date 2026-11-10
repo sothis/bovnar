@@ -237,6 +237,8 @@ bool bvnr_read(bvnr_reader_t *r);
 
 Drive the parser until EOF or a fatal error. Fires the registered callbacks for every event. Returns `true` on clean completion, `false` on any error.
 
+The read is single-threaded and not re-entrant: a callback must not call `bvnr_read`, any other reader entry point, or `bvnr_reader_destroy` on the same reader. The push-fed reader (§1.15) detects such a call and refuses it with `error_invalid_argument`; the pull path does not, so there it is simply unsupported.
+
 This is the only call needed after `bvnr_open_read_*`. The reader does not allocate during this call; all buffering is internal to the reader struct.
 
 ```c

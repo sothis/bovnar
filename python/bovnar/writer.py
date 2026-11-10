@@ -245,7 +245,7 @@ class Writer:
         """A writer into file descriptor ``fd``; the keywords are those of
         :meth:`to_mem`."""
 
-        if not isinstance(fd, int) or fd < 0:
+        if type(fd) is not int or fd < 0 or fd > 0x7FFFFFFF:
             raise BovnarArgumentError(f"Invalid file descriptor: {fd!r}")
 
         w, flags = cls._opened(unit_flags, emit_version, on_event,
@@ -355,8 +355,8 @@ class Writer:
         if stream is not None and stream.busy:
             raise BovnarArgumentError(
                 "the writer is in use by its own sink: it cannot be written "
-                "to, finished, flushed or destroyed from the object's write() "
-                "or flush()")
+                "to, flushed, finished, reconfigured or destroyed from the "
+                "object's write() or flush()")
         self._check_not_observing()
 
     def _check_not_observing(self) -> None:
@@ -366,7 +366,8 @@ class Writer:
         if state is not None and state['busy']:
             raise BovnarArgumentError(
                 "the writer is in use by its own on_event observer: it cannot "
-                "be written to, finished, flushed or destroyed from there")
+                "be written to, flushed, finished, reconfigured or destroyed "
+                "from there")
 
     def finish(self) -> None:
 
@@ -436,6 +437,7 @@ class Writer:
         """
         if self._ptr is None:
             raise BovnarArgumentError("Writer has been destroyed")
+        self._check_not_in_sink()
         if policy is None:
             if not self._lib.bvnr_writer_set_unit_policy(self._ptr, None):
                 raise BovnarArgumentError("bvnr_writer_set_unit_policy failed")
@@ -912,6 +914,9 @@ class Writer:
 
     def write_bool(self, key: str, value: bool) -> None:
 
+        if not isinstance(value, bool):
+            raise BovnarArgumentError(
+                f"write_bool takes a bool, not {type(value).__name__}")
         self.emit(Event.ASSIGNMENT_START, key=key)
         sym = b'true' if value else b'false'
         d = BvnrData()

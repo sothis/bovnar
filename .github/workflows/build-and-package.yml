@@ -21,6 +21,8 @@ concurrency:
 #   * Windows MSVC  -> bovnar-windows-msvc
 #   * Windows MinGW -> bovnar-windows-mingw
 #   * Linux x64     -> bovnar-linux (+ the cross-platform bovnar-amalgamate)
+#   * FreeBSD x64   -> bovnar-freebsd (native build in a VM: GitHub hosts no
+#                                     FreeBSD runner)
 #   * macOS         -> bovnar-macos (universal: arm64 and x86_64)
 # Each platform archive (packed by cmake/pack_artifacts.cmake) bundles the
 # documentation (doc/), runnable examples (examples/) and editor syntax
@@ -414,6 +416,64 @@ jobs:
           out=$(arch -x86_64 ./build/bovnar pretty-print smoke.bvnr)
           grep -q '<uint:8>' <<< "$out"
 
+  freebsd:
+    name: FreeBSD (x64)
+    # GitHub hosts no FreeBSD runner, so this boots the FreeBSD project's 15.1
+    # VM image under QEMU on an Ubuntu runner (vmactions/freebsd-vm) and syncs
+    # the checkout in and the build back out. 15.1 is the release the port was
+    # verified on (RELEASE_NOTES_v2.1.0.md, CHANGELOG.md): the base clang, and
+    # no libm. The image is not guaranteed to carry cmake or git, hence the
+    # prepare step; git is what gives the archive its build count, and the
+    # checkout arrives with the runner's uid as owner, so without the
+    # safe.directory line git refuses the repository and pack_artifacts.cmake
+    # silently falls back to count 0 -- the mislabelling the release job's -0
+    # guard exists to catch.
+    # The tests stay off here as in the other packaging jobs; the full C suite
+    # runs in `tests`, and the FreeBSD C suite was run on a 15.1 base-clang
+    # build for the release.
+    runs-on: ubuntu-latest
+    # The VM action needs the checkout and an artifact upload, no repository
+    # write; keep the job's token read-only rather than leaving a guest OS with
+    # whatever the repository's default token permissions hand it.
+    permissions:
+      contents: read
+    # The VM image download and boot dominate; the build itself is under a
+    # minute. The default 6-hour job timeout would let a hung QEMU pass for a
+    # slow release.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Full history so the packed artifact's build count is meaningful.
+          fetch-depth: 0
+
+      - name: Build and smoke-test in FreeBSD
+        uses: vmactions/freebsd-vm@v1.6.0
+        with:
+          release: "15.1"
+          arch: x86_64
+          prepare: |
+            pkg install -y cmake git
+          run: |
+            set -e
+            git config --global --add safe.directory "$PWD"
+            echo "build count: $(git rev-list --count HEAD)"
+            cmake -B build -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=OFF .
+            cmake --build build -j"$(sysctl -n hw.ncpu)"
+            printf '.a = <uint:8> 7;\n.b = <float:64> 3.5;\n' > smoke.bvnr
+            ./build/bovnar validate smoke.bvnr
+            out=$(./build/bovnar pretty-print smoke.bvnr)
+            printf '%s\n' "$out" | grep -q '<uint:8>'
+            printf '.x = "hi";\n' | ./build/bovnar events -
+            ls -l build/bovnar-freebsd-*.tar.xz
+
+      - name: Upload FreeBSD artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: bovnar-freebsd
+          path: build/bovnar-freebsd-*.tar.xz
+          if-no-files-found: error
+
   # The Rust binding in rust/: a thin wrapper that compiles the C sources above
   # through build.rs (no system library). Tested on the toolchains the C
   # library ships for -- MSVC and MinGW64 on Windows, Linux x64 and aarch64,
@@ -804,7 +864,7 @@ jobs:
   # ── GitHub Release assets ────────────────────────────────────────────────
   release:
     name: Attach archives to the release
-    # `tests` is in here alongside the four packaging jobs on purpose: a release
+    # `tests` is in here alongside the five packaging jobs on purpose: a release
     # asset is permanent and public, so it must not be able to ship from a tag
     # whose C/Python/conformance suite went red.
     #
@@ -815,13 +875,14 @@ jobs:
     # They are skipped on a release-* push, which must not skip the rehearsal,
     # hence the explicit `if:`: every need succeeded, or was one of the two
     # that may be skipped.
-    needs: [msvc, mingw, linux, macos, source, tests, rust_version, rust, rust_wasm, rust_package, build_wheels, build_sdist]
+    needs: [msvc, mingw, linux, macos, freebsd, source, tests, rust_version, rust, rust_wasm, rust_package, build_wheels, build_sdist]
     if: >-
       !cancelled() &&
       needs.msvc.result == 'success' &&
       needs.mingw.result == 'success' &&
       needs.linux.result == 'success' &&
       needs.macos.result == 'success' &&
+      needs.freebsd.result == 'success' &&
       needs.source.result == 'success' &&
       needs.tests.result == 'success' &&
       needs.rust_version.result == 'success' &&
@@ -869,6 +930,7 @@ jobs:
             mv "$src" assets/
           done
           mv staging/bovnar-linux/*.tar.xz \
+             staging/bovnar-freebsd/*.tar.xz \
              staging/bovnar-macos/*.tar.xz \
              staging/bovnar-amalgamate/*.tar.xz \
              staging/bovnar-source/*.tar.xz assets/
@@ -976,9 +1038,9 @@ jobs:
     # job's `if` then skips it GitHub still creates the run and lists it as
     # skipped: a shortage the first re-run cured left a second, skipped
     # "Runner shortage retry" entry behind.
-    needs: [msvc, mingw, tests, linux, macos, rust_version, rust, rust_wasm,
-            rust_package, source, build_wheels, build_sdist, publish,
-            publish_crate, release]
+    needs: [msvc, mingw, tests, linux, macos, freebsd, rust_version, rust,
+            rust_wasm, rust_package, source, build_wheels, build_sdist,
+            publish, publish_crate, release]
     # A real failure is handed over too; the retry workflow tells it apart and
     # leaves the run alone. A cancelled job is the shortage's own signature;
     # `!cancelled()` keeps out a run superseded by a newer push (re-running it

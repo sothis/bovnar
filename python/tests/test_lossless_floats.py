@@ -156,6 +156,17 @@ class TestScalarLosslessRead:
         assert q.fixed_point == (837, 8)
         assert q.stored_value == Decimal('3.26953125')
 
+    def test_float_fix_stored_value_is_exact_beyond_context_precision(self):
+        # m / 2**40 has a 40-digit decimal expansion; the stored value is the
+        # exact Decimal, not one rounded to the active context's 28 digits.
+        import decimal
+        q = loads(b'.x=<float_fix:64,q40>0.1;', typed=True)['x']
+        m, qb = q.fixed_point
+        with decimal.localcontext() as ctx:
+            ctx.prec = 200
+            assert q.stored_value == Decimal(m) / Decimal(1 << qb)
+        assert len(q.stored_value.as_tuple().digits) > 28
+
     def test_stored_value_rounds_to_format(self):
         # a 34-digit literal in decimal64 (16 digits) -> stored value is rounded
         q = loads(('.p=<float_dec:64>%s;' % PI34).encode(), typed=True)['p']

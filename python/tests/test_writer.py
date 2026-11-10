@@ -71,6 +71,17 @@ class TestWriterLifecycle:
         finally:
             os.unlink(name)
 
+    def test_to_fd_refuses_a_bool_or_an_out_of_range_int(self):
+        for fd in (True, 0x80000000):
+            with pytest.raises(BovnarArgumentError):
+                Writer.to_fd(fd)
+
+    def test_write_bool_refuses_a_non_bool(self):
+        with Writer.to_mem() as w:
+            for value in ('false', 1, None):
+                with pytest.raises(BovnarArgumentError):
+                    w.write_bool("flag", value)
+
 @needs_lib
 class TestWriteUint:
     def _write_and_read(self, fn) -> bytes:

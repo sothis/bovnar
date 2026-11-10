@@ -89,7 +89,7 @@ Bovnar closes that gap. Every value in a `.bvnr` document carries its own type f
 - **Error recovery** — Optional resync mode skips broken assignments and continues parsing — suitable for log streams and unreliable transports.
 - **Python bindings** — Pure-`ctypes`, no compiled extension required. Exposes both a high-level `loads`/`dumps` dict-like API and a low-level event-driven streaming API.
 - **Rust bindings** — the `bovnar` crate compiles the C library in, so there is no system library to install. It offers `parse`/`to_string` over a dynamic `Value`, the streaming `Reader`/`Writer`, the DOM, exact numbers and JSON conversion ([doc/14](doc/14_bovnar_rust_bindings.md)).
-- **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing throughput.
+- **Command-line tool** — `bovnar` validates, queries values by path, pretty-prints, converts to and from JSON, dumps the lexer/validator event stream, and benchmarks parsing and streaming throughput.
 - **Browser playground** — the real C reference parser, compiled to WebAssembly (`bovnar_parser_wasm.js` over `bovnar_wasm_core.js`), runs the reference verified event stream (with full type/unit/value validation) in the browser and powers an interactive web playground.
 - **Syntax highlighting** — Ready-made grammars for VS Code, Sublime Text, Geany, Vim, and CLion (JetBrains), all sharing one "cyberpunk" colour scheme with depth-cycling brackets.
 - **Extensively tested** — Unit tests, socket-pair round-trip tests, a 470-case conformance suite, fuzz harnesses (reader, push-fed reader, writer, DOM, utils), Python and Rust test suites with cargo-fuzz targets for the crate, and a built-in benchmark mode (`bovnar bench`).
@@ -402,10 +402,10 @@ The amalgamation and the Linux, macOS and Windows archives — built and
 smoke-tested by CI, plus a `-source.tar.xz` snapshot of the tag and a
 `SHA256SUMS` file — are attached to each
 [GitHub release](https://github.com/sothis/bovnar/releases) from 1.1.0 onward,
-so a build from source is optional. The FreeBSD archive is packed by a native
-FreeBSD build and is not part of the release assets yet. Earlier tags
-predate the packaging: 1.0.0 was POSIX-only and had no packer at all, and
-carries no assets.
+so a build from source is optional. The FreeBSD archive is built and
+smoke-tested in a FreeBSD 15.1 virtual machine in CI, and is attached from
+2.1.0. Earlier tags predate the packaging: 1.0.0 was POSIX-only and had no
+packer at all, and carries no assets.
 
 The macOS archive's binaries are ad-hoc signed, not signed with a Developer ID
 or notarized. macOS marks what a browser downloads as quarantined, and
@@ -547,7 +547,7 @@ The `bovnar` binary built above wraps the library for everyday use:
 | `bovnar frames pack\|list <file…\|->` | Wrap each document in a length-prefixed frame, or list the documents in a frame stream. |
 | `bovnar mux pack\|list <chan:file…\|->` | Multiplex files onto channels in one octet stream, or list the channel/message sizes in a multiplexed stream. |
 | `bovnar version` | Print the library version and supported spec version. |
-| `bovnar bench [options]` | Benchmark parsing throughput. `--profile <list>` picks the payload shape (`scalars,typed,structs,arrays,units,mixed`, or `all`), `--size <list>` the payload sizes in bytes (each payload is whole assignments up to that size). `--iterations <N>` parse rounds per cell (default 100) and `--warmup <N>` warm-up rounds (default 10); `--min-overhead` drops the `on_unverified` (lexer) callback and keeps only `on_verified`. `--verbose` for per-run detail, `--json` for machine-readable output. |
+| `bovnar bench [options]` | Benchmark parsing throughput. `--profile <list>` picks the payload shape (`scalars,typed,structs,arrays,units,mixed`, or `all`), `--size <list>` the payload sizes in bytes (each payload is whole assignments up to that size). `--iterations <N>` parse rounds per cell (default 100) and `--warmup <N>` warm-up rounds (default 10); `--min-overhead` drops the `on_unverified` (lexer) callback and keeps only `on_verified`. `--verbose` for per-run detail, `--json` for machine-readable output. `--stream` adds the streaming paths benchmark (raw octet-stream read and write, mux send and demux, the push-fed demux, framed documents); each streaming cell runs for `--stream-seconds <S>` (default 0.2) instead of `--iterations`, and `--stream-only` runs just those. |
 
 Exit status: `0` success; `1` the document, the input or the output failed; `2` the command line was wrong. Asked-for help (`--help`) goes to stdout.
 

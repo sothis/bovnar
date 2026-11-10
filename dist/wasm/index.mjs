@@ -18,7 +18,7 @@
 //   bvnr.toJSON('.v = 9.81 m/s;');                // -> { ok, value, ... }
 //   bvnr.events('.v = 9.81 m/s;');                // -> { ok, events:[...] }
 //   bvnr.eventsConvert('.v = 9.81 k~m/s;', 'm/s'); // -> events with `converted`
-//   bvnr.version();                                // -> "2.0.2"
+//   bvnr.version();                                // -> "2.1.0"
 //
 // `input` may be a string (UTF-8 encoded for you), a Uint8Array or an
 // ArrayBuffer (passed through verbatim — required if the document embeds octet
@@ -745,11 +745,11 @@ export async function loadBovnar(opts) {
       callJsonOpts('bvnr_wasm_doc', 'bvnr_wasm_doc_ex',
                    input, options, DOM_OPTIONS, 'doc', true),
 
-    /** Library version string, e.g. "2.0.2" (BVNR_VERSION_STRING). */
+    /** Library version string, e.g. "2.1.0" (BVNR_VERSION_STRING). */
     version: () => Module.ccall('bvnr_wasm_version', 'string', [], []),
 
     /** The same version as the monotonic integer BVNR_VERSION, for comparison
-     *  (#if-style: 2.0.2 is 20002). */
+     *  (#if-style: 2.1.0 is 20100). */
     versionNumber: () => {
       needExport('bvnr_wasm_version_number', 'versionNumber');
       return Module.ccall('bvnr_wasm_version_number', 'number', [], []);

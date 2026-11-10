@@ -3,9 +3,9 @@
 
 
 Independent Submission                                        J. Sonntag
-Internet-Draft                                           4 November 2026
+Internet-Draft                                          10 November 2026
 Intended status: Informational                                          
-Expires: 8 May 2027
+Expires: 14 May 2027
 
 
             The Bovnar (BVNR) Unit-Safe Serialization Format
@@ -53,7 +53,7 @@ Status of This Memo
 
 
 
-Sonntag                    Expires 8 May 2027                   [Page 1]
+Sonntag                    Expires 14 May 2027                  [Page 1]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -63,7 +63,7 @@ Internet-Draft              The Bovnar Format              November 2026
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 8 May 2027.
+   This Internet-Draft will expire on 14 May 2027.
 
 Copyright Notice
 
@@ -109,7 +109,7 @@ Table of Contents
 
 
 
-Sonntag                    Expires 8 May 2027                   [Page 2]
+Sonntag                    Expires 14 May 2027                  [Page 2]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -165,7 +165,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                   [Page 3]
+Sonntag                    Expires 14 May 2027                  [Page 3]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -221,7 +221,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                   [Page 4]
+Sonntag                    Expires 14 May 2027                  [Page 4]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -277,7 +277,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                   [Page 5]
+Sonntag                    Expires 14 May 2027                  [Page 5]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -333,7 +333,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                   [Page 6]
+Sonntag                    Expires 14 May 2027                  [Page 6]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -389,7 +389,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                   [Page 7]
+Sonntag                    Expires 14 May 2027                  [Page 7]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -445,7 +445,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                   [Page 8]
+Sonntag                    Expires 14 May 2027                  [Page 8]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -501,7 +501,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                   [Page 9]
+Sonntag                    Expires 14 May 2027                  [Page 9]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -557,7 +557,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 10]
+Sonntag                    Expires 14 May 2027                 [Page 10]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -613,7 +613,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 11]
+Sonntag                    Expires 14 May 2027                 [Page 11]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -669,7 +669,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 12]
+Sonntag                    Expires 14 May 2027                 [Page 12]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -725,7 +725,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 13]
+Sonntag                    Expires 14 May 2027                 [Page 13]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -781,7 +781,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 14]
+Sonntag                    Expires 14 May 2027                 [Page 14]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -837,7 +837,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 15]
+Sonntag                    Expires 14 May 2027                 [Page 15]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -893,7 +893,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 16]
+Sonntag                    Expires 14 May 2027                 [Page 16]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -949,7 +949,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 17]
+Sonntag                    Expires 14 May 2027                 [Page 17]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -1005,7 +1005,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 18]
+Sonntag                    Expires 14 May 2027                 [Page 18]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -1061,7 +1061,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 19]
+Sonntag                    Expires 14 May 2027                 [Page 19]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -1117,7 +1117,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 20]
+Sonntag                    Expires 14 May 2027                 [Page 20]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -1173,7 +1173,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 21]
+Sonntag                    Expires 14 May 2027                 [Page 21]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -1229,7 +1229,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 22]
+Sonntag                    Expires 14 May 2027                 [Page 22]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -1285,7 +1285,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 23]
+Sonntag                    Expires 14 May 2027                 [Page 23]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -1341,7 +1341,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 24]
+Sonntag                    Expires 14 May 2027                 [Page 24]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -1397,7 +1397,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 25]
+Sonntag                    Expires 14 May 2027                 [Page 25]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -1453,7 +1453,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 26]
+Sonntag                    Expires 14 May 2027                 [Page 26]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -1509,7 +1509,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 27]
+Sonntag                    Expires 14 May 2027                 [Page 27]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -1565,7 +1565,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 28]
+Sonntag                    Expires 14 May 2027                 [Page 28]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -1621,7 +1621,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 29]
+Sonntag                    Expires 14 May 2027                 [Page 29]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -1677,7 +1677,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 30]
+Sonntag                    Expires 14 May 2027                 [Page 30]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -1733,7 +1733,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 31]
+Sonntag                    Expires 14 May 2027                 [Page 31]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -1789,7 +1789,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 32]
+Sonntag                    Expires 14 May 2027                 [Page 32]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -1845,7 +1845,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 33]
+Sonntag                    Expires 14 May 2027                 [Page 33]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -1901,7 +1901,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 34]
+Sonntag                    Expires 14 May 2027                 [Page 34]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -1957,7 +1957,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 35]
+Sonntag                    Expires 14 May 2027                 [Page 35]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -2013,7 +2013,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 36]
+Sonntag                    Expires 14 May 2027                 [Page 36]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -2069,7 +2069,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 37]
+Sonntag                    Expires 14 May 2027                 [Page 37]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -2125,7 +2125,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 38]
+Sonntag                    Expires 14 May 2027                 [Page 38]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -2181,7 +2181,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 39]
+Sonntag                    Expires 14 May 2027                 [Page 39]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -2237,7 +2237,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 40]
+Sonntag                    Expires 14 May 2027                 [Page 40]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -2293,7 +2293,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 41]
+Sonntag                    Expires 14 May 2027                 [Page 41]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -2349,7 +2349,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 42]
+Sonntag                    Expires 14 May 2027                 [Page 42]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -2405,7 +2405,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 43]
+Sonntag                    Expires 14 May 2027                 [Page 43]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -2461,7 +2461,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 44]
+Sonntag                    Expires 14 May 2027                 [Page 44]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -2517,7 +2517,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 45]
+Sonntag                    Expires 14 May 2027                 [Page 45]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -2573,7 +2573,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 46]
+Sonntag                    Expires 14 May 2027                 [Page 46]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -2629,7 +2629,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 47]
+Sonntag                    Expires 14 May 2027                 [Page 47]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -2685,7 +2685,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 48]
+Sonntag                    Expires 14 May 2027                 [Page 48]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -2741,7 +2741,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 49]
+Sonntag                    Expires 14 May 2027                 [Page 49]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -2797,7 +2797,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 50]
+Sonntag                    Expires 14 May 2027                 [Page 50]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -2853,7 +2853,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 51]
+Sonntag                    Expires 14 May 2027                 [Page 51]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -2909,7 +2909,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 52]
+Sonntag                    Expires 14 May 2027                 [Page 52]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -2965,7 +2965,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 53]
+Sonntag                    Expires 14 May 2027                 [Page 53]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -3021,7 +3021,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 54]
+Sonntag                    Expires 14 May 2027                 [Page 54]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -3077,7 +3077,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 55]
+Sonntag                    Expires 14 May 2027                 [Page 55]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -3133,7 +3133,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 56]
+Sonntag                    Expires 14 May 2027                 [Page 56]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -3189,7 +3189,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 57]
+Sonntag                    Expires 14 May 2027                 [Page 57]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -3245,7 +3245,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 58]
+Sonntag                    Expires 14 May 2027                 [Page 58]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -3301,7 +3301,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 59]
+Sonntag                    Expires 14 May 2027                 [Page 59]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -3357,7 +3357,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 60]
+Sonntag                    Expires 14 May 2027                 [Page 60]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -3413,7 +3413,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 61]
+Sonntag                    Expires 14 May 2027                 [Page 61]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -3469,7 +3469,7 @@ Appendix A.  Collected ABNF
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 62]
+Sonntag                    Expires 14 May 2027                 [Page 62]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -3525,7 +3525,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 63]
+Sonntag                    Expires 14 May 2027                 [Page 63]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -3581,7 +3581,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 64]
+Sonntag                    Expires 14 May 2027                 [Page 64]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -3637,7 +3637,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 65]
+Sonntag                    Expires 14 May 2027                 [Page 65]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -3693,7 +3693,7 @@ Appendix B.  Error Codes
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 66]
+Sonntag                    Expires 14 May 2027                 [Page 66]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -3749,7 +3749,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 67]
+Sonntag                    Expires 14 May 2027                 [Page 67]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -3805,7 +3805,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 68]
+Sonntag                    Expires 14 May 2027                 [Page 68]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -3861,7 +3861,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 69]
+Sonntag                    Expires 14 May 2027                 [Page 69]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -3917,7 +3917,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 70]
+Sonntag                    Expires 14 May 2027                 [Page 70]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -3973,7 +3973,7 @@ C.2.  Instrument Record
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 71]
+Sonntag                    Expires 14 May 2027                 [Page 71]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -4029,7 +4029,7 @@ C.5.  Arrays
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 72]
+Sonntag                    Expires 14 May 2027                 [Page 72]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -4085,7 +4085,7 @@ Appendix D.  Design Rationale
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 73]
+Sonntag                    Expires 14 May 2027                 [Page 73]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -4141,7 +4141,7 @@ Internet-Draft              The Bovnar Format              November 2026
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 74]
+Sonntag                    Expires 14 May 2027                 [Page 74]
 
 Internet-Draft              The Bovnar Format              November 2026
 
@@ -4197,4 +4197,4 @@ Author's Address
 
 
 
-Sonntag                    Expires 8 May 2027                  [Page 75]
+Sonntag                    Expires 14 May 2027                 [Page 75]

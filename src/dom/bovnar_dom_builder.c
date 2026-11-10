@@ -556,6 +556,15 @@ static bool builder_rational_to_double(const bvn_int_t *num,
 	dd->negative = false;
 	int shift = 66 + bvn_int_bitlen(dd) - bvn_int_bitlen(n);
 	if (shift < 0) shift = 0;
+	/* n/dd < 2^(67 - shift). Past 2^-1075 -- half the smallest binary64
+	 * subnormal -- the correctly rounded result is a signed zero, and
+	 * building the scaling integer would only fail on a shift beyond
+	 * BVN_INT_MAX_BITS. */
+	if (shift > 1200) {
+		*out = neg ? -0.0 : 0.0;
+		ok = true;
+		goto done;
+	}
 	if (shift && !bvn_int_shl(n, shift)) goto done;
 	if (!bvn_int_divrem(q, r, n, dd)) goto done;
 	bool sticky = !bvn_int_is_zero(r);

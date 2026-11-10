@@ -12,7 +12,7 @@ implements; the highest spec a build understands is reported by
 numbers were the same. They part at 2.0.0, which breaks the ABI and the Python
 API and implements spec 1.2.
 
-## [Unreleased]
+## [2.1.0] - 2026-11-10
 
 ### Added
 
@@ -111,6 +111,17 @@ API and implements spec 1.2.
   parsing frame reader (`tests/bovnar_stream_bench.c`, built but not a test;
   figures in doc/10 §8.4), and `bvnr_alloc_test`, which counts allocations on
   glibc: none per message or document on those paths once warm.
+- **`bovnar bench --stream`.** The streaming suite of `bvnr_stream_bench` is
+  in the CLI: raw octet-stream write and read at 1 KiB, 64 KiB, 1 MiB and
+  8 MiB; mux send into a memory sink; the batch demux and the push-fed demux
+  by callback and by `bvnr_demux_next`; live sends batched and flushed per
+  message; and framed documents through `bvnr_doc_stream_read` and the parsing
+  frame reader. Each streaming cell runs against a wall-clock budget
+  (`--stream-seconds`, default 0.2 s) rather than `--iterations`;
+  `--stream-only` runs just those cells, and `--json` carries them in a
+  `stream_results` array after the parse results. Every cell that consumes
+  the stream copies each chunk or message into one buffer, so its MB/s is
+  memory-to-memory and not I/O.
 - **A framing codec for live streams in the Rust crate: `bovnar::codec`.**
   `bovnar::stream` builds its output in memory and reads its input to the
   end, so it cannot serve a stream that never ends. The new module writes and
@@ -333,7 +344,9 @@ API and implements spec 1.2.
   value with no unit).
 - **FreeBSD.** The C library, CLI and test suite build and pass on FreeBSD 15.1
   with the base clang. The build gives the platform its own archive name
-  (`bovnar-freebsd-<version>-<count>.tar.xz`), links the test executables with
+  (`bovnar-freebsd-<version>-<count>.tar.xz`), which the CI `freebsd` job
+  builds in a FreeBSD 15.1 VM on an Ubuntu runner and attaches to the release.
+  It links the test executables with
   `Threads::Threads` rather than a bare `pthread`, and probes
   `-fsanitize=address,undefined` on both the compile and the link line — a
   toolchain without the runtime now gets no sanitizer flags, and
@@ -353,7 +366,7 @@ API and implements spec 1.2.
 
 ### Changed
 
-- **Every read option reaches every reading entry point, in Rust and Python.**
+- **Every read flag reaches every reading entry point, in Rust and Python.**
   (The DOM is the exception: its C parse functions take no read flags.)
   An endless text document read with a live feed stopped at the library's
   default of 2 147 483 647 bytes of text (`text_data_too_long`), and an array
@@ -363,10 +376,11 @@ API and implements spec 1.2.
   `max_string_length`, `max_number_length`, `max_symbol_length`,
   `max_reference_length`) and the two nesting caps (fixed at 255) could not be
   set at all, `on_error` — the only report of an error `continue_on_error`
-  recovers from — was not reachable, and most stream readers built flags of
-  their own that took no options. All of it now passes to C as given, 0 keeping
-  the library default; for the two nesting caps the bindings pass 255, the
-  format's limit, as before (the C reader's own default is 64):
+  recovers from — was missing from the stream entry points, and most stream
+  readers built flags of their own that took no options. Every flag now passes
+  to C as given, 0 keeping the library default; for the two nesting caps the
+  bindings pass 255, the format's limit, as before (the C reader's own default
+  is 64):
   - *Rust:* `ReadOptions` gains `max_text_bytes`, `max_array_items`
     (`u64::MAX` lifts either cap), the five length caps and
     `max_struct_nesting` / `max_array_nesting`, honoured by every reader that
@@ -383,7 +397,7 @@ API and implements spec 1.2.
     **Source-incompatible** for code that builds `ReadOptions` with a struct
     literal naming every field: add `..ReadOptions::default()`. Code using
     `ReadOptions::default()` or `..Default::default()` is unaffected, as is
-    every default behaviour. Released in a minor version (2.1.0) on the
+    every default behaviour. Released in this minor version (2.1.0) on the
     maintainer's word; no known user names every field.
   - *Python:* the read options are one table, `bovnar.READ_OPTIONS`, from
     which every reading entry point takes its keywords — `Reader.read_mem`,
@@ -546,6 +560,50 @@ API and implements spec 1.2.
   take the last value.
 
 ### Fixed
+
+- **A MinGW test build links again.** `bvnr_stream_bench` used
+  `clock_gettime` wherever `CLOCK_MONOTONIC` is defined; MinGW defines it, but
+  implements the call in winpthread, which the benchmark target does not link,
+  so a MinGW build with tests enabled failed at link time. Windows uses
+  `QueryPerformanceCounter` now, the clock `bvn_port.h` already uses. The
+  Windows release archives build tests off, so no shipped binary changes.
+- **A fifth review of the release tree (2026-11-10).** Each finding was
+  checked against the code before the fix, and reproduced where it is
+  reachable; the Rust codec and live modules and the C feed, frame and demux
+  paths were read again and no defect survived verification.
+  - *A demux channel was committed before its hash insertion could fail.* The
+    slot was counted in `nchans` first, so a failed allocation left a channel
+    counted but unreachable until the next re-open. The slot is filled and
+    indexed first and committed only when the insert succeeds.
+  - *A policy conversion far below binary64's range failed the DOM instead of
+    storing zero.* A rational whose scaling shift passed `BVN_INT_MAX_BITS`
+    made the DOM parse return NULL; below half the smallest subnormal the
+    correctly rounded result is a signed zero, and it is stored as one now.
+  - *A NULL event after a writer error replaced the latched error.*
+    `bvnr_write_event` checked its `data` argument before the error latch, so
+    `bvnr_write_event(w, ev, NULL)` after a failed write reported
+    `error_invalid_argument` in place of the error that ended the write. The
+    latch is checked first (`test_first_error_survives_a_null_event` in
+    `bvnr_writer_test`).
+  - *Python: `Quantity.stored_value` rounded a `float_fix` value to the active
+    decimal context.* It is the exact `Decimal` at any `q` now; the default
+    context's 28 digits truncated a 40-digit expansion.
+  - *Python: fd arguments accepted bools and out-of-`int` values.*
+    `Reader.read_fd`, `Writer.to_fd` and `DomDoc.parse_fd` require a real
+    non-negative `int` in C `int` range now, so `True` is no longer fd 1 and
+    `2**32 + 1` no longer wraps to 1.
+  - *Python: `Writer.write_bool` truth-coerced its argument.* `"false"` wrote
+    `true`; a non-bool is a `BovnarArgumentError` now.
+  - *Python: `Writer.set_unit_policy` escaped the callback re-entrancy guard.*
+    It could change the policy of a writer running its own sink or observer;
+    it refuses like the other writer operations now.
+  - *Python: a refused `memoryview` call did not retry the release.* After the
+    buffer made from a view was dropped, a feed could keep refusing while the
+    caller still held the original view, because the refused call had
+    forgotten it. The view is kept and the release retried, as doc/09 §4.7
+    promises.
+  - *Docs:* the pull reader is documented as non-re-entrant like the fed one
+    (include/bovnar.h, doc/08 §1.6).
 
 - **A fourth review of the unreleased tree (2026-11-10).** Each defect was
   checked against the tree before the fix — by running it where it is reachable
@@ -6707,7 +6765,7 @@ arrays (including the homogeneity rules), structs, octet streams, references,
 and the error-code values. See [`RELEASE_NOTES_v1.0.0.md`](RELEASE_NOTES_v1.0.0.md)
 for the full notes.
 
-[Unreleased]: https://github.com/sothis/bovnar/compare/v2.0.2...HEAD
+[2.1.0]: https://github.com/sothis/bovnar/releases/tag/v2.1.0
 [2.0.2]: https://github.com/sothis/bovnar/releases/tag/v2.0.2
 [2.0.1]: https://github.com/sothis/bovnar/releases/tag/v2.0.1
 [2.0.0]: https://github.com/sothis/bovnar/releases/tag/v2.0.0

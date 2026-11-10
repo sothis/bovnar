@@ -109,7 +109,7 @@ Spec 1.0 remains the frozen, stable baseline: a document that declares no
 number from the spec version and has been since library 2.0.0: that release
 broke the C ABI and the Python API, which is what a library major is for, while
 the format it reads grew only additively. `bovnar version` prints both —
-`bovnar 2.0.2 (spec 1.2)`.
+`bovnar 2.1.0 (spec 1.2)`.
 
 ---
 
@@ -1442,7 +1442,11 @@ arrays, units) and hardware. The CLI's benchmark subcommand (`bovnar bench`) can
 measure MB/s, assignments/s, and events/s across configurable profiles and
 payload sizes. Run `bovnar bench --profile all --size 1024,65536 --iterations 200`
 for a representative baseline. Use `--min-overhead` to drop the `on_unverified`
-(lexer) callback and keep only `on_verified`.
+(lexer) callback and keep only `on_verified`. Add `--stream` to measure the
+streaming paths as well -- raw octet-stream read and write, mux send and demux,
+the push-fed demux, and framed documents, with per-chunk, per-message and
+per-document costs; `--stream-only` runs just those, and `--stream-seconds <S>`
+sets the wall-clock budget per streaming cell (default 0.2 s).
 
 ---
 

@@ -23,7 +23,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Bovnar (BVNR) — unit-safe serialization">
 <meta property="article:published_time" content="2026-11-03">
-<meta property="article:modified_time" content="2026-11-09">
+<meta property="article:modified_time" content="2026-11-10">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Bovnar Rust Bindings">
@@ -33,7 +33,7 @@
 <link rel="stylesheet" href="/fonts/fonts.css?v=47fe6a616ffc">
 <link rel="stylesheet" href="/docs/docs.css?v=535fc13f09d4">
 <link rel="alternate" type="text/markdown" href="/doc/14_bovnar_rust_bindings.md">
-<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Rust Bindings", "description": "The Bovnar Rust crate: parse/to_string, the streaming reader and writer, the DOM, Quantity and the exact numbers, and JSON conversion.", "url": "https://www.bovnar.io/docs/rust/", "mainEntityOfPage": "https://www.bovnar.io/docs/rust/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-11-03", "dateModified": "2026-11-09", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}, "isAccessibleForFree": true, "license": "https://creativecommons.org/licenses/by/4.0/", "copyrightHolder": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Rust Bindings", "item": "https://www.bovnar.io/docs/rust/"}]}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TechArticle", "headline": "Bovnar Rust Bindings", "description": "The Bovnar Rust crate: parse/to_string, the streaming reader and writer, the DOM, Quantity and the exact numbers, and JSON conversion.", "url": "https://www.bovnar.io/docs/rust/", "mainEntityOfPage": "https://www.bovnar.io/docs/rust/", "inLanguage": "en", "image": ["https://www.bovnar.io/bovnar-og.png"], "datePublished": "2026-11-03", "dateModified": "2026-11-10", "author": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}, "publisher": {"@type": "Organization", "@id": "https://www.bovnar.io/#organization", "name": "Bovnar", "url": "https://www.bovnar.io/", "logo": {"@type": "ImageObject", "url": "https://www.bovnar.io/apple-touch-icon.png", "width": 180, "height": 180}}, "isPartOf": {"@type": "WebSite", "@id": "https://www.bovnar.io/#website", "name": "Bovnar", "url": "https://www.bovnar.io/"}, "isAccessibleForFree": true, "license": "https://creativecommons.org/licenses/by/4.0/", "copyrightHolder": {"@type": "Person", "@id": "https://www.bovnar.io/#author", "name": "Janos Sonntag"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://www.bovnar.io/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://www.bovnar.io/docs/"}, {"@type": "ListItem", "position": 3, "name": "Bovnar Rust Bindings", "item": "https://www.bovnar.io/docs/rust/"}]}]}</script>
 </head>
 <body>
 <header class="site"><a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cb0ea"/><stop offset="1" stop-color="#0a85d6"/></linearGradient></defs><path d="M28 13 L12.5 32 L28 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 13 L51.5 32 L36 51" fill="none" stroke="url(#g)" stroke-width="6.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 20 L44 32 L32 44 L20 32 Z" fill="#33a78f"/><path d="M32 20 L20 32 L32 32 Z" fill="#9cdcfe"/><path d="M32 20 L44 32 L32 32 Z" fill="#4ec9b0"/><path d="M20 32 L32 44 L32 32 Z" fill="#3fb89e"/><path d="M44 32 L32 44 L32 32 Z" fill="#2c9281"/></svg>BOVNAR<span class="ext">.bvnr</span></a><nav><a href="/#playground">Playground</a><a href="/#quickstart">Quick&nbsp;Start</a><a href="/docs/">Documentation</a><a class="cta" href="https://github.com/sothis/bovnar">GitHub&nbsp;↗</a><button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch to light theme" title="Toggle light / dark theme"><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button></nav></header>
@@ -46,7 +46,7 @@
 <strong>Scope:</strong> Installation, the high-level and streaming APIs, the DOM, <code>Quantity</code> and the exact numbers, JSON conversion, and the thread rules.</p>
 </blockquote>
 <p>Rust bindings for the <strong>Bovnar (BVNR)</strong> typed serialisation library (library
-2.0.2, format spec 1.2).</p>
+2.1.0, format spec 1.2).</p>
 <p>The crate is a thin wrapper around the C library: <code>build.rs</code> compiles the C
 sources into the crate, so there is no system library to install and nothing is
 looked up at run time. One module is not a wrapper: <code>bovnar::codec</code>, the
@@ -182,12 +182,12 @@ library's error kind.</p>
 integration with third-party unit or array libraries; see <a href="#16-crate-layout">§16</a>.</p>
 <hr />
 <h2 id="2-installation">2. Installation</h2>
-<p>The crate carries the version of the C library it wraps (<strong>2.0.2</strong>: <code>version</code> in
+<p>The crate carries the version of the C library it wraps (<strong>2.1.0</strong>: <code>version</code> in
 <code>Cargo.toml</code> is the <code>project(bovnar VERSION x.y.z)</code> of the top-level
 <code>CMakeLists.txt</code>, and CI fails when the two differ). It is published to
 crates.io with each release:</p>
 <div class="codehilite"><pre><span></span><code><span class="k">[dependencies]</span>
-<span class="n">bovnar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;2.0.2&quot;</span>
+<span class="n">bovnar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;2.1.0&quot;</span>
 </code></pre></div>
 
 <p>A repository checkout works too, as a path dependency or straight from Git,
@@ -288,7 +288,7 @@ feature, and all seven are on by default:</p>
 refuses its codes. <code>THIRD_PARTY_NOTICES.md</code> says why a distributor may want to
 leave out <code>ucum</code> or <code>cf</code>:</p>
 <div class="codehilite"><pre><span></span><code><span class="k">[dependencies]</span>
-<span class="n">bovnar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;2.0.2&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">default-features</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="n">features</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;unece&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;qudt&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;qudt-qk&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;udunits&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;om&quot;</span><span class="p">]</span><span class="w"> </span><span class="p">}</span>
+<span class="n">bovnar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;2.1.0&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">default-features</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="n">features</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;unece&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;qudt&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;qudt-qk&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;udunits&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;om&quot;</span><span class="p">]</span><span class="w"> </span><span class="p">}</span>
 </code></pre></div>
 
 <h3 id="33-how-the-published-crate-is-made">3.3 How the published crate is made</h3>
@@ -4962,7 +4962,7 @@ and case stays load-bearing (<code>cup</code> = volume, <code>CUP</code> = curre
 <hr />
 <h2 id="18-spec-11-additions">18. Spec 1.1 additions</h2>
 <p>These bindings target the <strong>Bovnar spec 1.2</strong>; spec 1.0 remains the frozen
-baseline, and the crate's own version (2.0.2) is a separate number
+baseline, and the crate's own version (2.1.0) is a separate number
 (<code>bovnar::version()</code> against <code>bovnar::spec_version()</code>). Spec 1.2's one addition,
 the unit-profile notation, is covered in <a href="#51-the-unit-profile-notations-spec-12">§5.1</a>:
 it is gated on a <code>#!bovnar 1.2</code> directive, which <code>to_string()</code> prepends when a

@@ -547,7 +547,14 @@ class Quantity:
             return nf
         if fam == int(_F.FLOAT_FIX):
             m, q = self.fixed_point
-            return Decimal(m) / Decimal(1 << q)
+            if q == 0:
+                return Decimal(m)
+            # m / 2**q = (m * 5**q) / 10**q, and the 5**q is exact integer
+            # arithmetic; the tuple constructor is exact whatever the active
+            # decimal context's precision is (a division would round to it).
+            mag = abs(m) * 5 ** q
+            return Decimal((1 if m < 0 else 0,
+                            tuple(map(int, str(mag))), -q))
         if fam == int(_F.FLOAT) and width not in _IEEE_WIDTHS:
             raise BovnarArgumentError(
                 f"stored_value() materialises IEEE 16/32/64/128/256-bit floats; "

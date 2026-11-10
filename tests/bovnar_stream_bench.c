@@ -57,12 +57,29 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#if defined(_WIN32)
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+#  include <windows.h>
+#endif
 #include "bovnar.h"
 #include "bovnar_stream.h"
 
 static double now_sec(void)
 {
-#if defined(CLOCK_MONOTONIC)
+#if defined(_WIN32)
+	/* MinGW defines CLOCK_MONOTONIC, but its clock_gettime is winpthread's
+	 * clock_gettime64 and this benchmark does not link winpthread. Use the
+	 * same platform clock as the library (bvn_port.h) instead. */
+	LARGE_INTEGER freq, cnt;
+	QueryPerformanceFrequency(&freq);
+	QueryPerformanceCounter(&cnt);
+	return (double)cnt.QuadPart / (double)freq.QuadPart;
+#elif defined(CLOCK_MONOTONIC)
 	struct timespec ts;
 	clock_gettime(CLOCK_MONOTONIC, &ts);
 	return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;

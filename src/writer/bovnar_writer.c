@@ -2847,9 +2847,11 @@ bool bvnr_write_event(
 	bvnr_writer_t* w, bvnr_event_t ev, bvnr_data_t* data)
 {
 	if (!w) return false;
-	if (!data) return bvn_writer_set_error(w, error_invalid_argument);
+	/* The latch comes first: a NULL event after an earlier error must not
+	 * replace the error that ended the write. */
 	if (w->val.last_error != error_none)
 		return false;
+	if (!data) return bvn_writer_set_error(w, error_invalid_argument);
 	if (w->ser.finished)
 		return bvn_writer_set_error(w, error_invalid_argument);
 	/* No bvnr_open_write_* has attached a sink (or it failed). The event

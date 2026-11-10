@@ -87,7 +87,7 @@ pub enum Value {
     Fraction(num_rational::BigRational),
 }
 
-/// The library version, e.g. `"2.0.2"`.
+/// The library version, e.g. `"2.1.0"`.
 pub fn version() -> String {
     ffi::version_string()
 }

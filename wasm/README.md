@@ -58,7 +58,7 @@ bvnr.toJSON('.speed = 9.81 m/s;\n.name = "probe";');
 bvnr.events('.x = <uint:16> 7;');
 // { ok: true, events: [ { seq: 0, ev: 'stream_start', ... }, ... ] }
 
-bvnr.version();  // "2.0.2"
+bvnr.version();  // "2.1.0"
 ```
 
 `input` is a string (UTF-8 encoded for you), a `Uint8Array` or an
@@ -93,8 +93,8 @@ in a browser or worker, through `fetch`; the inlined build needs neither.
 | `parse(in, options?)` | `{ ok, error, error_name, line, column, byte, offset, recovery_count, skipped_bytes, declared_version, events: [...], errors: [...] }` — `events` and `errors` in one pass (streaming tier only) |
 | `eventsConvert(in, unit = '', base = 0, allowNonterminating = false, options?)` | as `events`; each numeric `data` event that can be delivered in `unit` also carries `converted`, `converted_base` and `converted_unit` |
 | `doc(in, options?)` | `{ ok, error, error_name, declared_version, tree: [{ key, value }, ...] }` — the document as a tree of keyed nodes |
-| `version()` | library version string, e.g. `"2.0.2"` (`BVNR_VERSION_STRING`) |
-| `versionNumber()` | the same as the monotonic integer `BVNR_VERSION` (2.0.2 → 20002) |
+| `version()` | library version string, e.g. `"2.1.0"` (`BVNR_VERSION_STRING`) |
+| `versionNumber()` | the same as the monotonic integer `BVNR_VERSION` (2.1.0 → 20100) |
 | `specVersion()` | `{ major, minor }` — the highest bovnar *spec* version this build understands (1.2) |
 | `peekVersion(in)` | `{ major, minor }` or `null` — a document's leading `#!bovnar` directive, without parsing it |
 | `errorName(code)` | the `error_name` a numeric result code maps to (`"none"` for 0) |

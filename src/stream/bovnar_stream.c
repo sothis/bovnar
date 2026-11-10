@@ -646,28 +646,32 @@ static demux_channel_t* demux_get_channel(bvnr_demux_t* dm, uint64_t channel)
 		dm->chans     = nc;
 		dm->chans_cap = ncap;
 	}
-	uint32_t index = dm->nchans++;
+	/* Fill and index the slot first; the channel is committed (nchans,
+	 * chans_init, last) only once the hash insert cannot fail, so an
+	 * allocation failure leaves no channel counted but unreachable. */
+	uint32_t index = dm->nchans;
 	demux_channel_t* c = &dm->chans[index];
 	/* A slot a previous document used keeps its buffer for the new id. */
 	uint8_t* buf = NULL;
 	uint64_t cap = 0;
-	if (dm->nchans <= dm->chans_init) {
+	if (index < dm->chans_init) {
 		buf = c->buf;
 		cap = c->cap;
-	} else {
-		dm->chans_init = dm->nchans;
 	}
 	memset(c, 0, sizeof(*c));
 	c->channel = channel;
 	c->buf     = buf;
 	c->cap     = cap;
-	dm->last = index + 1u;
 	if (channel < (uint64_t)BVN_DEMUX_SMALL) {
 		dm->small[channel] = (uint16_t)(index + 1u);
 	} else if (!demux_hash_put(dm, index)) {
 		dm->error = error_invalid_argument;
 		return NULL;
 	}
+	dm->nchans = index + 1u;
+	if (dm->chans_init < dm->nchans)
+		dm->chans_init = dm->nchans;
+	dm->last = index + 1u;
 	return c;
 }
 

@@ -54,12 +54,12 @@ extern "C" {
  * versioned by its "#!bovnar" directive and never by this.
  */
 #define BVNR_VERSION_MAJOR		2
-#define BVNR_VERSION_MINOR		0
-#define BVNR_VERSION_PATCH		2
+#define BVNR_VERSION_MINOR		1
+#define BVNR_VERSION_PATCH		0
 #define BVNR_VERSION			((BVNR_VERSION_MAJOR) * 10000 + \
 					 (BVNR_VERSION_MINOR) * 100 + \
 					 (BVNR_VERSION_PATCH))
-#define BVNR_VERSION_STRING		"2.0.2"
+#define BVNR_VERSION_STRING		"2.1.0"
 /*
  * Pre-release marker for a build made from a tree that is AHEAD of the released
  * version above. "-dev" while CHANGELOG.md still has an [Unreleased] section;
@@ -79,7 +79,7 @@ extern "C" {
  * bovnar.version() equals it. The suffix is applied where the mistake actually
  * happens: the `bovnar version` banner a human reads.
  */
-#define BVNR_VERSION_SUFFIX		"-dev"
+#define BVNR_VERSION_SUFFIX		""
 #define BVNR_VERSION_STRING_FULL	BVNR_VERSION_STRING BVNR_VERSION_SUFFIX
 /*
  * Highest bovnar *spec* version this build understands. A document may declare
@@ -1019,7 +1019,11 @@ BVN_API bool bvnr_open_read_mem(
 /* Run the parse. Requires a reader that one of the bvnr_open_read_* calls above
  * has attached a source to; a NULL handle, or one that was created but never
  * opened, returns false (the latter setting error_invalid_argument) rather than
- * faulting. Returns false on the first error unless continue_on_error is set. */
+ * faulting. Returns false on the first error unless continue_on_error is set.
+ * The reader is single-threaded and not re-entrant: a callback must not call
+ * bvnr_read, another reader entry point, or bvnr_reader_destroy on the same
+ * reader. (The push-fed API detects and refuses such a call; the pull path
+ * does not.) */
 BVN_API bool bvnr_read(bvnr_reader_t* r);
 /*
  * Push-fed reading, for input that arrives when it arrives: a non-blocking

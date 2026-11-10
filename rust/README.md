@@ -8,7 +8,7 @@ compiled by `build.rs`; there is no system library to install.
 
 ```toml
 [dependencies]
-bovnar = "2.0.2"
+bovnar = "2.1.0"
 ```
 
 The full reference is [doc/14](https://www.bovnar.io/docs/rust/) on bovnar.io,
@@ -22,7 +22,7 @@ carry the library's error kind.
 
 ## Versioning
 
-The crate carries the version of the C library it wraps, currently **2.0.2**:
+The crate carries the version of the C library it wraps, currently **2.1.0**:
 `version` in `Cargo.toml` is the `project(bovnar VERSION x.y.z)` of the
 top-level `CMakeLists.txt`, and CI fails when the two differ. A release tag
 `vX.Y.Z` names that same version. The minimum supported Rust version is

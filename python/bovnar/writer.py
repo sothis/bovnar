@@ -44,6 +44,9 @@ from .structs import (
 
 DEFAULT_MEM_CAP = 4 * 1024 * 1024
 
+# The reserved float spellings: written as a bare number token, never quoted.
+_SPECIAL_FLOAT_TEXTS = frozenset(('nan', 'inf', 'ninf'))
+
 # The families whose base field is not a radix (bvn_effective_base reports 10
 # for them): Q for float_fix, unused for float_dec, the epoch index for
 # datetime. Their literal is never quoted for it. Module constants: these were
@@ -376,10 +379,13 @@ class Writer:
                 f"finish() called with {self._struct_depth} unclosed struct(s)"
             )
         ok = self._lib.bvnr_write_finish(self._ptr)
-        self._finished = True
         self._close_owned_fd()
         if not ok:
+            # Leave _finished clear: the C writer has latched the error, and a
+            # second finish() must report that same error rather than return
+            # silently. (The Rust writer documents the same contract.)
             self._raise_error()
+        self._finished = True
 
     def flush(self) -> None:
         """Hand everything written so far to the sink now, then call its
@@ -1028,13 +1034,10 @@ class Writer:
         self.emit(Event.ASSIGNMENT_START, key=key)
         self._emit_annotation(family_name, vt, vu, unit_source)
 
-        _SPECIAL = frozenset(('nan', 'inf', 'ninf'))
-        _decimal_float_families = frozenset((
-            int(ValueTypeFamily.FLOAT_FIX),
-            int(ValueTypeFamily.FLOAT_DEC),
-        ))
-        if (vt.base not in (0, 10) and val not in _SPECIAL
-                and int(vt.family) not in _decimal_float_families):
+        # Both sets are module constants: rebuilding them here put two
+        # frozenset allocations on every scalar written.
+        if (vt.base not in (0, 10) and val not in _SPECIAL_FLOAT_TEXTS
+                and int(vt.family) not in _DECIMAL_FLOAT_FAMILIES):
             data_token_type = self._TOKEN_IS_STRING
         else:
             data_token_type = self._TOKEN_IS_NUMBER

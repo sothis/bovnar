@@ -550,6 +550,22 @@ static void test_parse_helpers_respect_declared_width(void)
 			ASSERT_TRUE(bvn_parse_int64("101", s2, &iv) && iv == 5, "101 in base 2");
 			ASSERT_TRUE(bvn_parse_uint64("0", u2, &uv) && uv == 0, "0 in base 2");
 		}
+		/* Base 64/85 have no sign: '+' and '-' are digits (or invalid in
+		 * base 64), and bvn_parse_int64 used to read a leading '-' as a sign
+		 * and invent a negative value. */
+		{
+			int64_t iv = 7;
+			value_type_spec_t s85 = { .family = vt_sint, .width = 64, .base = 85 };
+			value_type_spec_t s64 = { .family = vt_sint, .width = 64, .base = 64 };
+			ASSERT_TRUE(bvn_parse_int64("-A", s85, &iv) && iv == 1052,
+				"-A in base 85 is 12*85+32, not -32");
+			ASSERT_TRUE(bvn_parse_int64("+A", s85, &iv) && iv == 882,
+				"+A in base 85 is 10*85+32");
+			ASSERT_FALSE(bvn_parse_int64("-A", s64, &iv),
+				"'-' is not a digit in base 64");
+			ASSERT_TRUE(bvn_parse_int64("A", s64, &iv) && iv == 0,
+				"A is digit 0 in base 64");
+		}
 		ASSERT_TRUE(bvn_parse_double("1", f64, &d) && d == 1.0, "1");
 		/* A leading '+' is NOT bad text: the reader accepts it on a quoted
 		 * float literal in every base (`<float:64> "+5"`, `<float:64,_16>

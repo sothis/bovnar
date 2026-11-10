@@ -446,6 +446,11 @@ def unit_to_profile(namespace: str, unit: ValueUnit) -> str:
     """
     import ctypes as _ct
     from ._ffi import get_library
+    # The namespace crosses as a NUL-terminated C string: 'ucum\0junk' would be
+    # read as 'ucum', a profile the caller did not name.
+    if not isinstance(namespace, str) or '\x00' in namespace:
+        raise BovnarArgumentError(
+            f"unit_to_profile: a namespace is a str without NUL, not {namespace!r}")
     lib = get_library()
     buf = _ct.create_string_buffer(UNIT_STRING_MAX)
     n   = lib.bvn_unit_to_profile(namespace.encode('utf-8'), _as_vu(unit), buf,

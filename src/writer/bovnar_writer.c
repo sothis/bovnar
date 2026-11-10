@@ -102,6 +102,8 @@ uint8_t* bvn_writer_mux_chunk(bvnr_writer_t* w)
  */
 bool bvn_writer_set_error(bvnr_writer_t* w, error_code_t err)
 {
+	if (!w)
+		return false;
 	w->val.last_error   = err;
 	w->val.error_offset = bvnr_sink_bytes_written(&w->ser.sink)
 	                    + (uint64_t)w->ser.wbuf_pos;

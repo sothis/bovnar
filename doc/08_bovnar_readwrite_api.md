@@ -2282,6 +2282,14 @@ char *bvn_dom_strdup(const char *s, uint32_t len);
 on **every** failure path the node is destroyed internally — so never destroy it
 yourself after the call (doing so double-frees).
 
+A node belongs to one tree, and the tree must stay acyclic: pass a freshly built
+node that no container owns yet, and never attach a container (or any node
+already in the tree) into one of its own descendants. The direct
+`val == container` case is refused, but ancestry is not tracked, so an indirect
+cycle or a node owned by two trees makes `bvn_dom_node_destroy` free a node
+twice (use-after-free). This is a precondition, not a check the library
+performs.
+
 **What they refuse.** Each returns `false` — having destroyed the value — when
 the container is NULL or of the wrong kind (`bvn_dom_array_append` on anything
 but a `BVN_DOM_ARRAY`, `bvn_dom_struct_add` on anything but a `BVN_DOM_STRUCT`),

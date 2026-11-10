@@ -2543,8 +2543,15 @@ static bool bvn_parse_hex_prefix(const char* s, uint32_t base)
 bool bvn_parse_int64(const char* s, value_type_spec_t vt, int64_t* out)
 {
 	if (!s || !out) return false;
-	if (!bvn_parse_prefix_ok(s, true)) return false;
 	uint32_t base = bvn_effective_base(vt);
+	/* Above base 36 there is no sign character to screen: '+' and '-' are
+	 * digits in base 64/85 (and neither is one below 64), exactly as in
+	 * bvn_parse_uint64. */
+	if (base <= 36u) {
+		if (!bvn_parse_prefix_ok(s, true)) return false;
+	} else if (!*s) {
+		return false;
+	}
 	if (bvn_parse_hex_prefix(s, base)) return false;
 	if (base >= 2u && base <= 36u) {
 		char* end;
@@ -2556,7 +2563,13 @@ bool bvn_parse_int64(const char* s, value_type_spec_t vt, int64_t* out)
 		*out = (int64_t)v;
 		return true;
 	}
-	bool neg = (s[0] == '-');
+	/* Base64 and Ascii85 spend '+'/'-' on digits, so those two have no sign
+	 * (the format has no signed integer in either). Treating a leading '-' as
+	 * a sign there made "-A" in base 85 -32 instead of 12·85+32 = 1052, and
+	 * accepted "-A" in base 64 (where '-' is not a digit at all) as 0.
+	 * bvn_parse_uint64 and the annotation parser already read them signless. */
+	bool signless = (base == 64u || base == 85u);
+	bool neg = !signless && (s[0] == '-');
 	const char* p = s + (neg ? 1u : 0u);
 	if (!*p) return false;
 	uint64_t acc = 0;

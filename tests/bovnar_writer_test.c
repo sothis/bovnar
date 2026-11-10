@@ -3665,8 +3665,35 @@ static void test_canonical_keeps_interval_and_affine_apart(void)
 	bvnr_writer_destroy(w);
 }
 
+/* The convenience helpers and bvnr_write_event all refuse a NULL writer. The
+ * helpers used to dereference it before reaching bvnr_write_event. */
+static void test_null_writer_is_refused(void)
+{
+	value_type_spec_t vt = BVN_TYPE_UINT(8);
+	value_unit_t none = BVN_UNIT_NONE;
+	ASSERT_FALSE(bvnr_write_string(NULL, "k", "v"), "write_string(NULL)");
+	ASSERT_FALSE(bvnr_write_plain(NULL, "k", "v"), "write_plain(NULL)");
+	ASSERT_FALSE(bvnr_write_null(NULL, "k"), "write_null(NULL)");
+	ASSERT_FALSE(bvnr_write_bool(NULL, "k", true), "write_bool(NULL)");
+	ASSERT_FALSE(bvnr_write_uint(NULL, "k", 8u, 1u), "write_uint(NULL)");
+	ASSERT_FALSE(bvnr_write_sint(NULL, "k", 8u, -1), "write_sint(NULL)");
+	ASSERT_FALSE(bvnr_write_float(NULL, "k", 64u, 1.0), "write_float(NULL)");
+	ASSERT_FALSE(bvnr_write_struct_start(NULL, "k"), "write_struct_start(NULL)");
+	ASSERT_FALSE(bvnr_write_struct_end(NULL), "write_struct_end(NULL)");
+	ASSERT_FALSE(bvnr_write_type_annotation(NULL, vt, none),
+	             "write_type_annotation(NULL)");
+	ASSERT_FALSE(bvnr_write_bvnf(NULL, "k", NULL, 64u), "write_bvnf(NULL)");
+	ASSERT_FALSE(bvnr_write_bvni(NULL, "k", NULL, 64u, 10u), "write_bvni(NULL)");
+	ASSERT_FALSE(bvnr_writer_set_unit_source(NULL, "m", 1u),
+	             "writer_set_unit_source(NULL)");
+	ASSERT_FALSE(bvnr_write_event(NULL, ev_data, NULL), "write_event(NULL)");
+	ASSERT_FALSE(bvnr_write_finish(NULL), "write_finish(NULL)");
+	ASSERT_FALSE(bvnr_write_flush(NULL), "write_flush(NULL)");
+}
+
 int main(void)
 {
+	test_null_writer_is_refused();
 	test_unit_reduce_rescales_the_value();
 	test_unit_reduce_rescales_a_quoted_literal();
 	test_unit_reduce_annotation_matches_the_value();

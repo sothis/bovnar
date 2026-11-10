@@ -3,7 +3,8 @@
 # Copyright (c) 2026 Janos Sonntag
 #
 # publish_web.sh — deploy the Bovnar website (everything under ./web) to the
-# live server's web root with rsync.
+# live server's web root with rsync, or stage it and serve it locally as a
+# preview.
 #
 # The web/doc directory is a symlink to ../doc (the canonical Markdown sources).
 # This script stages the site into a temp directory, *resolving that symlink* so
@@ -19,16 +20,30 @@
 # to (re)build them with gen_doc_pdfs.py before uploading. Without --pdf the
 # script ships whatever already exists in build/doc/pdf/ (and warns if empty).
 #
+# With --serve the same generators run and the same tree is staged, but instead
+# of uploading it the script serves the staging directory locally. That makes a
+# preview include everything a publish would: the generated /docs/ pages, the
+# translated editions, the sitemap and any PDFs that exist.
+#
 # Usage:
 #   ./publish_web.sh [options] [user@host:/var/www/html]
+#   ./publish_web.sh --serve [--port N]
 #
 # The destination may be given as the last argument, or via the
 # BOVNAR_PUBLISH_DEST environment variable. The argument wins if both are set.
+# --serve needs no destination and never uploads.
 #
 # Options:
+#   --serve          Stage the site exactly as a publish would, then serve it at
+#                    http://127.0.0.1:8000/ instead of uploading. Nothing is
+#                    sent to the live server and IndexNow is not pinged.
+#   --port <n>       Port for --serve (default 8000, or BOVNAR_PREVIEW_PORT).
+#   --bind <addr>    Address for --serve (default 127.0.0.1). Use 0.0.0.0 to
+#                    preview from another device on the network.
 #   --pdf            Regenerate the doc PDFs + zip bundle before publishing.
 #   --delete         Pass --delete to rsync (prune files removed locally).
 #   -n, --dry-run    Show what rsync would transfer; do not build or upload.
+#                    With --serve, stage and print the server command only.
 #   --no-indexnow    Do not submit the sitemap URLs to IndexNow after upload.
 #   --indexnow       Submit them even though DEST is not one of the live
 #                    server's names (an IP, an ssh alias). By default the ping
@@ -42,6 +57,8 @@
 #   ./publish_web.sh --pdf me@bovnar.org:/var/www/html
 #   ./publish_web.sh --pdf --delete me@bovnar.org:/var/www/html
 #   BOVNAR_PUBLISH_DEST=me@bovnar.org:/var/www/html ./publish_web.sh --pdf
+#   ./publish_web.sh --serve
+#   ./publish_web.sh --serve --port 8080 --bind 0.0.0.0
 #
 set -euo pipefail
 
@@ -100,6 +117,9 @@ EXCLUDES=(
 BUILD_PDF=0
 DRY_RUN=0
 RSYNC_DELETE=0
+SERVE=0
+PORT="${BOVNAR_PREVIEW_PORT:-8000}"
+BIND=127.0.0.1
 INDEXNOW=auto
 DEST="${BOVNAR_PUBLISH_DEST:-}"
 
@@ -115,6 +135,18 @@ while [ $# -gt 0 ]; do
         --pdf|--build-pdf) BUILD_PDF=1 ;;
         --delete)          RSYNC_DELETE=1 ;;
         -n|--dry-run)      DRY_RUN=1 ;;
+        --serve)           SERVE=1 ;;
+        --port|--bind)
+            [ $# -ge 2 ] || {
+                echo "publish_web.sh: $1 needs a value." >&2
+                exit 2
+            }
+            case "$1" in
+                --port) PORT="$2" ;;
+                --bind) BIND="$2" ;;
+            esac
+            shift
+            ;;
         --no-indexnow)     INDEXNOW=0 ;;
         --indexnow)        INDEXNOW=1 ;;
         -h|--help)         usage; exit 0 ;;
@@ -124,10 +156,27 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-if [ -z "$DEST" ]; then
+if [ "$SERVE" -eq 1 ]; then
+    case "$PORT" in
+        ''|*[!0-9]*)
+            echo "publish_web.sh: --port must be a number, got '$PORT'." >&2
+            exit 2
+            ;;
+    esac
+    if [ "$PORT" -lt 1 ] || [ "$PORT" -gt 65535 ]; then
+        echo "publish_web.sh: --port must be between 1 and 65535." >&2
+        exit 2
+    fi
+fi
+
+if [ "$SERVE" -eq 1 ]; then
+    [ -n "$DEST" ] &&
+        echo "publish_web.sh: --serve never uploads; ignoring destination '$DEST'." >&2
+elif [ -z "$DEST" ]; then
     echo "publish_web.sh: no destination given." >&2
     echo "Pass it as an argument or set BOVNAR_PUBLISH_DEST, e.g.:" >&2
     echo "  ./publish_web.sh me@host:/var/www/html" >&2
+    echo "Or preview locally with:  ./publish_web.sh --serve" >&2
     exit 2
 fi
 
@@ -143,8 +192,13 @@ fi
 
 # Warn if we are about to ship a site with no PDFs at all.
 if ! ls "$PDF_BUILD_DIR"/*.pdf >/dev/null 2>&1; then
-    echo "WARNING: no PDFs in build/doc/pdf/ — the download links will 404." >&2
-    echo "         Re-run with --pdf to generate them." >&2
+    if [ "$SERVE" -eq 1 ]; then
+        echo "WARNING: no PDFs in build/doc/pdf/ — the preview's download links" >&2
+        echo "         will 404. Re-run with --pdf to generate them." >&2
+    else
+        echo "WARNING: no PDFs in build/doc/pdf/ — the download links will 404." >&2
+        echo "         Re-run with --pdf to generate them." >&2
+    fi
 fi
 
 # ── 1a0. Content-stamp the fonts and the stylesheet that reaches them ───────
@@ -268,6 +322,26 @@ fi
 for rel in "${EXCLUDES[@]}"; do
     rm -rf "$STAGE/$rel"
 done
+
+# ── 2b. Serve the staged tree locally instead of uploading it ───────────────
+# The staging tree is the same one a publish would rsync, so this previews the
+# real site -- generated /docs/ pages and translations included -- not a raw
+# checkout of web/. Ctrl-C stops the server and the EXIT trap removes $STAGE.
+if [ "$SERVE" -eq 1 ]; then
+    case "$BIND" in
+        0.0.0.0|::) URL="http://localhost:$PORT/ (all interfaces)" ;;
+        *)          URL="http://$BIND:$PORT/" ;;
+    esac
+    echo "==> Serving the staged site at $URL"
+    echo "    Same tree a publish would upload; nothing is sent to the server."
+    echo "    Press Ctrl-C to stop."
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "    [dry-run] would run: python3 -m http.server $PORT --bind $BIND --directory $STAGE"
+        exit 0
+    fi
+    python3 -m http.server "$PORT" --bind "$BIND" --directory "$STAGE"
+    exit $?
+fi
 
 # ── 3. Upload with rsync ────────────────────────────────────────────────────
 # --chmod normalises permissions on the destination: directories 755, files 644.

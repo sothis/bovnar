@@ -109,6 +109,16 @@ BVN_API bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base);
  * must be caller-allocated. Underpins lossless read-time unit conversion. */
 BVN_API bool bvn_float_parse_rational(const char *s, uint32_t base,
                                       bvn_int_t *num, bvn_int_t *den);
+/* Render f in base 10 or base 16. Returns the text length, or -1 when the
+ * buffer is too small, the base is not 10/16, or a base-10 render would need a
+ * binary exponent beyond +-300000 (about +-90309 decimal digits).
+ *
+ * THAT LIMIT IS DELIBERATE. Base 10's work grows with the exponent rather than
+ * with its (scientific-notation) output: a hex value such as 0x1p+999999999 is
+ * exact and legal in base 16, but rendering it in base 10 would allocate an
+ * ~87 MB integer and run ~1e15 limb operations. 300000 is past every value the
+ * library itself produces or materialises (binary256's whole range is about
+ * 2^262378), and base 16 still writes the whole documented +-1e9 range. */
 BVN_API int32_t bvn_float_to_str(const bvn_float_t *f, char *buf, size_t bufsize,
 						  uint32_t base);
 BVN_API size_t bvn_float_str_bufsize(uint32_t prec, uint32_t base);

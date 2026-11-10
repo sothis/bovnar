@@ -1537,8 +1537,18 @@ bool bvn_float_from_str(bvn_float_t *f, const char *s, uint32_t base)
  */
 static bool bvnf_ieee_geom_ok(uint32_t exp_bits, uint32_t man_bits, int bits32)
 {
-	return exp_bits < 32u && bits32 > 0 &&
-		   1L + (long)exp_bits + (long)man_bits <= (long)bits32 * 32L;
+	if (exp_bits >= 32u || bits32 <= 0)
+		return false;
+	/* The conversions hold the field bit count in an int and use man_bits in
+	 * uint32 shifts and indexes. Without this bound a caller-defined geometry
+	 * with man_bits near UINT32_MAX passed the total-bits test (bits32 may be
+	 * large), then cast to a negative int and indexed memory before the
+	 * buffer. Keep 1 + exp_bits + man_bits a positive int, and the 64-bit
+	 * arithmetic keeps the total-bits comparison itself from overflowing on
+	 * LLP64, where long is 32 bits. */
+	if (man_bits > (uint32_t)INT_MAX - exp_bits - 1u)
+		return false;
+	return (int64_t)1 + exp_bits + man_bits <= (int64_t)bits32 * 32;
 }
 void bvn_float_strtoieee_bin(const char *s, uint32_t base,
 		uint32_t exp_bits, uint32_t man_bits, int32_t bias,
@@ -1801,14 +1811,34 @@ static void bvnf_shorten_digits(const bvn_float_t *f, uint32_t base,
 	}
 	free(cnd); free(df); free(dc); bvn_float_free(t);
 }
+/*
+ * Largest binary exponent bvn_float_to_str will render in base 10.
+ *
+ * The decimal renderer's WORK grows with the exponent, not with the length of
+ * its output: the text is scientific notation with at most `prec` digits and an
+ * exponent, but normalising the value shifts an arbitrary-precision integer and
+ * divides it by five once per decimal place. A 14-byte hex literal such as
+ * "0x1p+999999999" -- which base 16 parses exactly, up to the documented
+ * +-1e9 -- made it allocate ~87 MB and run ~1e15 limb operations; at the old
+ * guard of +-1e9 this was a hang reachable from a single small value.
+ *
+ * 300000 covers every value the library itself produces or materialises: a
+ * decimal parse is capped at ~1e9865 (about 2^32770) by BVN_INT_MAX_BITS,
+ * every conversion result is bounded by the same rational budget, and
+ * binary256's whole range -- which the Python binding materialises outside the
+ * C parser -- runs to a binary exponent of about 2^262378. That keeps the worst
+ * case below a second; base 16 remains exact over the whole +-1e9 range, so a
+ * caller with a wider value formats it in base 16.
+ */
+#define BVNF_DEC_EXP_LIMIT 300000L
 static int32_t bvnf_to_str_dec(const bvn_float_t *f, char *buf, size_t bufsize)
 {
 	if (f->_prec > BVN_FLOAT_MAX_PREC) return -1;
-	if (f->_exp  >  1000000000L || f->_exp < -1000000000L) return -1;
+	if (f->_exp  >  BVNF_DEC_EXP_LIMIT || f->_exp < -BVNF_DEC_EXP_LIMIT) return -1;
 	/* Explicit casts: long is 64-bit on LP64 (Linux) but 32-bit on Windows
-	 * (LLP64). _prec (<= BVN_FLOAT_MAX_PREC) and _exp (guarded to +-1e9 above)
-	 * both fit a 32-bit long, so the value is identical on every target; the
-	 * casts only document the intended (bounded) narrowing for -Wconversion. */
+	 * (LLP64). _prec (<= BVN_FLOAT_MAX_PREC) and _exp (guarded above) both fit
+	 * a 32-bit long, so the value is identical on every target; the casts only
+	 * document the intended (bounded) narrowing for -Wconversion. */
 	long prec = (long)f->_prec;
 	long exp2 = (long)f->_exp;
 	long e2   = exp2 - prec;
@@ -1839,10 +1869,19 @@ static int32_t bvnf_to_str_dec(const bvn_float_t *f, char *buf, size_t bufsize)
 	/* Whether the window drops anything of the value: bits shifted out, or
 	 * a remainder of the division by five. */
 	bool inexact = false;
+	/* Each of these can fail only on allocation, and a failure left the
+	 * mantissa unshifted or partly multiplied: the digits below would then come
+	 * from the wrong value and be returned as a successful conversion. */
 	if (k >= 0) {
-		bvnf_bn_mul_pow5(&M, (uint32_t)k);
+		if (!bvnf_bn_mul_pow5(&M, (uint32_t)k)) {
+			bvnf_bn_free(&M);
+			return -1;
+		}
 		if (net2 > 0) {
-			bvnf_bn_shl(&M, (uint32_t)net2);
+			if (!bvnf_bn_shl(&M, (uint32_t)net2)) {
+				bvnf_bn_free(&M);
+				return -1;
+			}
 		} else if (net2 < 0) {
 			inexact = bvnf_bn_low_bits_nonzero(&M, (uint32_t)(-net2));
 			bvnf_bn_shr(&M, (uint32_t)(-net2));
@@ -1850,7 +1889,10 @@ static int32_t bvnf_to_str_dec(const bvn_float_t *f, char *buf, size_t bufsize)
 	} else {
 		long neg_k = -k;
 		if (net2 > 0) {
-			bvnf_bn_shl(&M, (uint32_t)net2);
+			if (!bvnf_bn_shl(&M, (uint32_t)net2)) {
+				bvnf_bn_free(&M);
+				return -1;
+			}
 		} else if (net2 < 0) {
 			inexact = bvnf_bn_low_bits_nonzero(&M, (uint32_t)(-net2));
 			bvnf_bn_shr(&M, (uint32_t)(-net2));
@@ -2801,8 +2843,13 @@ bool bvn_float_str_fits_fix(const char *s, uint32_t base,
 		int m = bvnf_dec_magnitude(s, &D);
 		if (m == 0) return true;
 		if (m == 1) {
-			if (D < 0 && -(D * 3) > (long)frac_bits + 4L) return true;
-			if (D > 1 && (D - 1) * 3 > (long)total_bits + 4L) return false;
+			/* D is a decimal exponent that saturates near +-1e9. On
+			 * LLP64 (64-bit Windows) long is 32 bits, where D * 3
+			 * overflows int32 and the comparison below is UB. Do the
+			 * arithmetic in int64_t, which holds every D. */
+			int64_t D64 = (int64_t)D;
+			if (D < 0 && -D64 * 3 > (int64_t)frac_bits + 4) return true;
+			if (D > 1 && (D64 - 1) * 3 > (int64_t)total_bits + 4) return false;
 		}
 	}
 	/* The rest decides it exactly, with ONE rounding, as doc/03 §6.2 says:

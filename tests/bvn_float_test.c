@@ -1443,6 +1443,18 @@ static void test_bvnf_hex_any_exponent(void)
 	      "past 1e9 it saturates to inf");
 	CHECK(f && bvn_float_from_str(f, "-0x1p-1000000002", 16u) && bvn_float_is_zero(f) &&
 	      bvn_float_is_neg(f), "and to -0 below");
+	/* Base 16 keeps the whole +-1e9 exponent range, but base 10 must refuse a
+	 * value it cannot render without materialising 10^3e8 digits: this used to
+	 * allocate ~87 MB and run ~1e15 limb operations. 300000 still covers
+	 * binary256's whole range (about 2^262378), which the bindings materialise. */
+	if (f && bvn_float_from_str(f, "0x1p999999999", 16u)) {
+		char dbuf[128], hbuf[128];
+		CHECK(bvn_float_to_str(f, dbuf, sizeof dbuf, 10u) < 0,
+		      "decimal rendering refuses an unreachable binary exponent");
+		CHECK(bvn_float_to_str(f, hbuf, sizeof hbuf, 16u) > 0 &&
+		      strcmp(hbuf, "1p+999999999") == 0,
+		      "base 16 still writes that exponent exactly");
+	}
 	/* 24 bits: 1.000001p0 + half an ulp is a tie, to even; a further 1 breaks it. */
 	CHECK(hex_roundtrips("0x1.000001p0", 24u, "1p+0"), "a tie rounds to even");
 	CHECK(hex_roundtrips("0x1.0000010000000000000001p0", 24u, "1.000002p+0"),

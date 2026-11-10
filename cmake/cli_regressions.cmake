@@ -283,6 +283,14 @@ _case(json_control_char_in_array 1 "^$" "under key 'list' contains the control c
       "unexpected_input_byte" convert ctrl2.json)
 file(WRITE "${_dir}/tab.json" "{\"t\":\"a\\tb\\nc\\fd\"}")
 _case(json_escapable_controls_ok 0 "\\.t = \"a\\\\tb\\\\nc\\\\fd\";" "" "" convert tab.json)
+# A truncated object used to be accepted when the end of input fell where a
+# value or the closer could follow: "{" converted to an empty document and
+# "{\"a\":1," to {a: 1}, both exit 0. A missing close is not a document.
+file(WRITE "${_dir}/trunc_open.json" "{")
+_case(json_truncated_open_brace 1 "^$" "Failed to parse JSON" "" convert trunc_open.json)
+file(WRITE "${_dir}/trunc_comma.json" "{\"a\":1,")
+_case(json_truncated_trailing_comma 1 "^$" "Failed to parse JSON" ""
+      convert trunc_comma.json)
 # A NUL after the closing brace hid everything behind it.
 # CMake cannot put a NUL into a file from a string (file(WRITE) stops at it), so
 # the fixture is written by printf where there is one, and the case is skipped

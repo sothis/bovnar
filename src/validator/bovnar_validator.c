@@ -868,12 +868,28 @@ static bool bvn_apply_want_unit(bvnr_reader_t* r, token_type_t tt, bvnr_data_t* 
 	 * happens — and checking here is what stops the cost, because building the
 	 * 10^9800 denominator is itself a tenth of a second. Rejecting only at render
 	 * time left the whole attack intact under continue_on_error, where each value
-	 * paid the parse and then got skipped. The bound never rejects a value that
-	 * would have been accepted. */
-	{
+	 * paid the parse and then got skipped.
+	 *
+	 * ONLY A FLOAT LITERAL HAS AN EXPONENT. For an integer family in base 15 or
+	 * above, 'e' and 'E' are DIGITS: `<uint:64,_36> "1e1025"` is 84027533, and
+	 * scanning it for a decimal exponent refused a valid document with
+	 * error_value_out_of_range (or passed it through unconverted under
+	 * leave-inexact). float_fix and float_dec are decimal whatever their base
+	 * field holds (q, or nothing), so their marker is e/E. */
+	if (d->value_type.family == vt_float ||
+	    d->value_type.family == vt_float_fix ||
+	    d->value_type.family == vt_float_dec) {
 		uint32_t cap = v->max_conversion_length
 			     ? v->max_conversion_length
 			     : BVNR_DEFAULT_MAX_CONVERSION_LENGTH;
+		/* A conversion factor moves the decimal point too, and the factor is a
+		 * rational bounded by BVN_INT_MAX_BITS: |log10 factor| <= 32768·log10(2)
+		 * < 9865. Allow for that when the units differ, or a value the
+		 * conversion brings inside the cap is refused on its own exponent --
+		 * 1e-5000 Q~m¹⁰⁰ is 1e1000 in q~m¹⁰⁰, 1001 digits within a 1024 cap.
+		 * With the same unit (a pure base conversion) the factor is 1 and the
+		 * tight bound stands. */
+		uint64_t allowance = bvn_unit_equal(d->value_unit, want) ? 0u : 9865u;
 		const char* e = NULL;
 		for (const char* p = nb; *p; p++) {
 			char c = *p;
@@ -882,12 +898,13 @@ static bool bvn_apply_want_unit(bvnr_reader_t* r, token_type_t tt, bvnr_data_t* 
 		}
 		if (e) {
 			if (*e == '+' || *e == '-') e++;
+			uint64_t limit = (uint64_t)cap + allowance;
 			uint64_t mag = 0;
 			for (; *e >= '0' && *e <= '9'; e++) {
 				mag = mag * 10u + (uint64_t)(*e - '0');
-				if (mag > (uint64_t)cap) break;
+				if (mag > limit) break;
 			}
-			if (mag > (uint64_t)cap) {
+			if (mag > limit) {
 				if (nb != small) free(nb);
 				if (leave_on_refusal) return true;
 				v->last_error = error_value_out_of_range;

@@ -840,10 +840,15 @@ impl FrameParser {
         if self.finished {
             return Err(Error::argument("the frame stream is finished"));
         }
-        self.finished = true;
         if self.handle.finish() {
+            self.finished = true;
             Ok(())
         } else {
+            /* The C reader has ended the stream and latched the error. Leave
+             * `finished` clear so a later feed or finish reaches it and gets
+             * that same error back, as feed() promises ("this and every later
+             * call return it") -- latching here turned it into an Argument
+             * that said the stream was finished, not why. */
             Err(frame_error(self.handle.error()))
         }
     }
@@ -929,10 +934,12 @@ impl FramePull {
         if self.handle.is_attached() {
             return Err(undrained());
         }
-        self.finished = true;
         if self.handle.finish() {
+            self.finished = true;
             Ok(())
         } else {
+            /* See FrameParser::finish: the C reader latched the error, and a
+             * later next()/finish() must report that, not "finished". */
             Err(frame_error(self.handle.error()))
         }
     }

@@ -82,6 +82,7 @@ typedef struct {
 	bool         saw_value;
 	bool         converted;
 	bool         had_text;   /* conv.text non-NULL (false = rational only) */
+	uint32_t     text_len;   /* full conv.length, even past the copy below */
 	bool         unv_seen;       /* on_unverified observed an ev_data value */
 	bool         unv_converted;  /* ...and what it saw in data->converted */
 	char         unv_text[512];  /* ...and the conversion text it could read */
@@ -131,8 +132,10 @@ static bool want_on_verified(void *userdata, bvnr_event_t ev, bvnr_data_t *data)
 		c->saw_value = true;
 		c->converted = data->converted;
 		c->had_text  = data->converted && data->conv.text != NULL;
-		if (data->converted)
-			c->base = data->conv.base;
+		if (data->converted) {
+			c->base     = data->conv.base;
+			c->text_len = data->conv.length;
+		}
 		if (data->converted && data->conv.text) {
 			size_t n = data->conv.length < sizeof c->text - 1
 				 ? data->conv.length : sizeof c->text - 1;
@@ -254,6 +257,43 @@ static void test_want_unit_string_carried_base(void)
 	run_want(".x = <uint:32,_16> \"FF\" k~m;", &ctx, true, error_none);
 	ASSERT_TRUE(ctx.converted, "want: hex string-carried value converted");
 	ASSERT_TRUE(strcmp(ctx.text, "255000") == 0, "want: 0xFF k~m → 255000 m");
+}
+
+static void test_want_unit_high_base_e_is_a_digit(void)
+{
+	/* 'e' is a DIGIT in base 36, not an exponent: "1e1025" is 84027533. The
+	 * pre-parse exponent scan picked its marker from the wire base and read
+	 * the trailing digits as an exponent, refusing this valid document as
+	 * value_out_of_range (or passing it through unconverted under
+	 * leave-inexact). */
+	want_ctx_t ctx = {0};
+	ctx.want_base = 10;
+	ctx.identity  = true;
+	ctx.request   = true;
+	run_want(".x = <uint:64,_36> \"1e1025\";", &ctx, true, error_none);
+	ASSERT_TRUE(ctx.converted, "want: base-36 string-carried value converted");
+	ASSERT_TRUE(strcmp(ctx.text, "84027533") == 0,
+				"want: base-36 1e1025 → 84027533");
+}
+
+static void test_want_unit_extreme_prefix_ratio(void)
+{
+	/* The literal's own exponent is past max_conversion_length, but the
+	 * conversion factor brings it inside: 1e-5000 Q~m¹⁰⁰ is 1e1000 in
+	 * q~m¹⁰⁰. The early bound used to look at the exponent alone and refuse
+	 * a conversion that fits. */
+	bool ok = false;
+	uint8_t unit[] = "q~m^100";
+	want_ctx_t ctx = {0};
+	ctx.want      = bvn_parse_unit_n(unit, sizeof unit - 1u, &ok);
+	ctx.request   = true;
+	ASSERT_TRUE(ok, "want: q~m^100 parses");
+	run_want(".x = 1e-5000 Q~m^100;", &ctx, true, error_none);
+	ASSERT_TRUE(ctx.converted, "want: extreme prefix ratio converted");
+	ASSERT_EQ_UINT(ctx.text_len, 1001u,
+				   "want: 1e-5000 Q~m^100 → 1e1000 (1001 digits)");
+	ASSERT_TRUE(ctx.text_len == 1001u && ctx.text[0] == '1',
+				"want: the converted value starts with its leading 1");
 }
 
 static void test_want_unit_real_string_skipped(void)
@@ -648,6 +688,8 @@ int main(void)
 	test_want_unit_decline_passthrough();
 	test_want_unit_pure_base_conversion();
 	test_want_unit_string_carried_base();
+	test_want_unit_high_base_e_is_a_digit();
+	test_want_unit_extreme_prefix_ratio();
 	test_want_unit_real_string_skipped();
 	test_want_unit_multiprecision_integer();
 	test_want_unit_wide_float();

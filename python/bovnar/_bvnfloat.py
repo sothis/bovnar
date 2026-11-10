@@ -353,7 +353,14 @@ class BvnFloat:
         buf = ctypes.create_string_buffer(int(n))
         wrote = self._lib.bvn_float_to_str(self._ptr, buf, n, int(base))
         if wrote < 0:
-            raise BovnarArgumentError("bvn_float_to_str: buffer too small")
+            # The buffer is sized by bvn_float_str_bufsize, so after the
+            # decimal-render exponent limit (-1 beyond +-300000 binary) this is
+            # the usual cause; name both rather than sending the caller after a
+            # buffer that was never the problem.
+            raise BovnarArgumentError(
+                "bvn_float_to_str refused the value: the buffer is too small, "
+                "or a base-10 exponent is beyond the renderer's limit "
+                "(use base 16)")
         return buf.raw[:wrote].decode('ascii')
 
     def to_double(self) -> float:

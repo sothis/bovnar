@@ -84,6 +84,10 @@ static void bvn_w_data_begin(bvnr_writer_t *w, bvnr_data_t *d)
  */
 static bool emit_key(bvnr_writer_t *w, const char *key)
 {
+	/* Every convenience helper starts here, and bvnr_write_event refuses a
+	 * NULL writer, so these do too rather than dereferencing it. */
+	if (!w)
+		return false;
 	if (!key)
 		return bvn_writer_set_error(w, error_invalid_argument);
 	bvnr_data_t d;
@@ -242,6 +246,8 @@ bool bvnr_write_type_annotation(bvnr_writer_t *w,
 				value_type_spec_t vt,
 				value_unit_t vu)
 {
+	if (!w)
+		return false;
 	return bvn_w_type_annotation(w, vt, &vu);
 }
 /*
@@ -535,6 +541,7 @@ bool bvnr_write_bvnf_base_unit(bvnr_writer_t *w, const char *key,
 				uint32_t width, uint32_t base,
 				value_unit_t unit)
 {
+	if (!w) return false;
 	if (!f) return bvn_writer_set_error(w, error_invalid_argument);
 	uint32_t effective_base = base ? base : 10u;
 	if (effective_base != 10u && effective_base != 16u)
@@ -588,6 +595,7 @@ bool bvnr_write_bvni_unit(bvnr_writer_t *w, const char *key,
 			   uint32_t width, uint32_t base,
 			   value_unit_t unit)
 {
+	if (!w) return false;
 	if (!n) return bvn_writer_set_error(w, error_invalid_argument);
 	uint32_t effective_base = base ? base : 10u;
 	/* Bases 64 and 85 are unsigned-only (they use '+'/'-' as digit characters,

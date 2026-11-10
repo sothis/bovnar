@@ -528,6 +528,12 @@ API and implements spec 1.2.
   75.5 to 23.6 µs per value. `dumps` also stopped building a `frozenset` per
   call and casts byte strings to pointers directly instead of through a
   `c_char_p` temporary: 35.1 to 33.7 µs per value.
+- **Python: `dumps` stops rebuilding two more frozensets per scalar.**
+  `Writer._write_scalar` re-created the reserved-float set and the
+  decimal-family set on every value written. Both are module constants now,
+  and the family test uses the existing `_DECIMAL_FLOAT_FAMILIES`, which also
+  includes datetime — so a datetime can never be quoted for its epoch index,
+  even if it reaches that path.
 - **Rust: a document's keys are indexed instead of scanned.** `DictParser` —
   behind `parse`, `parse_typed`, `ValueFeed` and `EmbeddedFeed` — found a
   repeated key by comparing the new key with every key already in the scope, so
@@ -540,6 +546,72 @@ API and implements spec 1.2.
   take the last value.
 
 ### Fixed
+
+- **A fourth review of the unreleased tree (2026-11-10).** Each defect was
+  checked against the tree before the fix — by running it where it is reachable
+  — and every suite was re-run afterwards:
+  - *A hexadecimal float with an exponent near the base-16 ±1e9 limit hung
+    decimal formatting.* `0x1p+999999999` is exact in base 16 (the header
+    promises ±1e9), but rendering it in base 10 shifted an 87 MB integer and
+    divided it by five ~3e8 times — a hang from a 14-byte value. Base-10
+    rendering now refuses a binary exponent beyond ±300000 (past binary256's
+    whole range, about 2^262378, and under a second in the worst case); base 16
+    is unchanged. The same function now checks its big-integer shifts and
+    multiplications, so an allocation failure is a refusal instead of a
+    successful string built from the wrong mantissa.
+  - *`bvn_float_str_fits_fix` computed `D * 3` in a 32-bit `long`* on LLP64
+    (64-bit Windows), where the saturated decimal exponent overflows `int32` —
+    signed-overflow UB in a range decision. It is computed in `int64_t` now.
+  - *The read-time conversion's pre-parse exponent scan ran for every numeric
+    family.* For an integer in base 15 or above, `e`/`E` is a digit:
+    `<uint:64,_36> "1e1025"` is 84027533, but the scan read "1025" as an
+    exponent and refused a valid document with `error_value_out_of_range` (or
+    passed it through unconverted under leave-inexact). Only float families
+    have an exponent marker now. The bound also allows for the conversion
+    factor when the units differ — the factor is a rational bounded by
+    `BVN_INT_MAX_BITS`, so it moves the decimal point by fewer than 9865 places
+    — and `1e-5000 Q~m¹⁰⁰ → q~m¹⁰⁰` (1e1000, 1001 digits) converts instead of
+    being refused on the literal's own exponent.
+  - *`bovnar convert` accepted a truncated JSON object.* `{` converted to an
+    empty document and `{"a":1,` to `{a: 1}`, both exit 0; the array parser had
+    the same hole. A missing closing brace or bracket is now a parse error, as
+    it already was when a value was cut short.
+  - *The writer's convenience helpers dereferenced a NULL writer.*
+    `bvnr_write_string(NULL, …)`, `bvnr_write_uint(NULL, …)` and the rest
+    crashed where `bvnr_write_event(NULL, …)` returns false; they now refuse
+    the same way.
+  - *`bvn_parse_int64` read a leading `-` as a sign in base 64/85,* where
+    `+`/`-` are digits (`-A` in base 85 is 1052) or no digit at all — while
+    `bvn_parse_uint64` and the annotation parser read those bases signless.
+    It now uses the same rule. (`bvn_parse_int64` also rejected a leading `+`
+    in those bases, which is a digit.)
+  - *The arbitrary-geometry IEEE encoders accepted a caller-supplied
+    `man_bits` that overflowed the field bit count.* The count is held in an
+    `int` and used as an index bound, so a geometry with `man_bits` near
+    `UINT32_MAX` passed its total-bits test and then indexed memory before the
+    caller's buffer. `bvnf_ieee_geom_ok` now requires the count to fit a
+    positive `int`, with the comparison in 64-bit arithmetic (LLP64-safe).
+  - *`bvn_int_divrem`'s no-aliasing requirement was undocumented,* unlike the
+    arithmetic functions beside it, which explicitly allow aliasing. The
+    header now says `q` and `r` must not alias the inputs (both outputs are
+    cleared before the inputs are read).
+  - *`bovnar.unit_to_profile` cut a namespace at a NUL.* The namespace crosses
+    as a C string, so `'ucum\0junk'` named `ucum`; it is now refused like every
+    other NUL-bearing key.
+  - *The DOM builder's ownership contract omitted the single-tree, acyclic
+    precondition.* Attaching a node another tree owns, or an ancestor of the
+    container, makes `bvn_dom_node_destroy` free it twice; the direct
+    `val == container` case was refused but ancestry was never tracked. The
+    precondition is now stated in `bovnar_dom.h` and doc/08 §4.5.
+  - *doc/05 said `Q~m¹⁰⁰ → q~m¹⁰⁰` (10⁶⁰⁰⁰) declines for capacity.* It is
+    19 932 bits and succeeds; the example is the two-factor
+    `Q~m¹⁰⁰·Q~g¹⁰⁰ → q~m¹⁰⁰·q~g¹⁰⁰` (10¹²⁰⁰⁰, past 32 768 bits).
+  - *A failed `finish()` changed what later calls report.* Python's
+    `Writer.finish()` set `_finished` before the C finish, so a second call
+    returned silently; Rust's `FrameParser::finish`/`FramePull::finish` set
+    `finished` before the C finish, so later calls reported "finished" instead
+    of the stream error the feed contract promises. Both now keep failing with
+    the latched error, as the Rust writer already documented.
 
 - **Web: the demos and the playground show only what the reader delivered,
   and the demos validate a config as `bovnar validate` does.**

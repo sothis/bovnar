@@ -124,6 +124,10 @@ BVN_API int  bvn_int_cmp(const bvn_int_t *a, const bvn_int_t *b);
  * returns false and a is garbage. For signed subtraction negate b and use
  * bvn_int_add. */
 BVN_API bool bvn_int_sub_inplace(bvn_int_t *a, const bvn_int_t *b);
+/* q = a / b and r = a % b (truncating, as C's / and % do). Unlike the
+ * arithmetic below, q and r must NOT alias a or b: the function clears both
+ * outputs before it reads the inputs, so an aliased dividend or divisor is
+ * zeroed first (a silent 0 quotient, or a false return). Use temporaries. */
 BVN_API bool bvn_int_divrem(bvn_int_t *q, bvn_int_t *r,
 					const bvn_int_t *a, const bvn_int_t *b);
 /* dst = a * b, signed, arbitrary precision. dst may alias a and/or b. */

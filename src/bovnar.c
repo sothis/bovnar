@@ -1747,6 +1747,7 @@ static JsonNode *json_parse_array(const char **p, int depth)
 	uint32_t cap = 8;
 	node->u.arr.items = malloc(cap * sizeof(*node->u.arr.items));
 	if (!node->u.arr.items) { free(node); return NULL; }
+	bool closed = false;
 	while (**p) {
 		JsonNode *elem = json_parse_value_depth(p, depth);
 		if (!elem) { json_free_node(node); return NULL; }
@@ -1760,9 +1761,14 @@ static JsonNode *json_parse_array(const char **p, int depth)
 		node->u.arr.items[node->u.arr.count++] = elem;
 		skip_ws(p);
 		if (**p == ',') { (*p)++; skip_ws(p); continue; }
-		if (**p == ']') { (*p)++; break; }
+		if (**p == ']') { (*p)++; closed = true; break; }
 		json_free_node(node); return NULL;
 	}
+	/* The loop also ends at end of input, after a trailing comma as well as
+	 * before the first element: "[1," and "[", which used to be accepted as
+	 * the complete array "[1]" and "[]". A missing closer is not a document
+	 * to guess at. */
+	if (!closed) { json_free_node(node); return NULL; }
 	return node;
 }
 static JsonNode *json_parse_object(const char **p, int depth)
@@ -1777,6 +1783,7 @@ static JsonNode *json_parse_object(const char **p, int depth)
 	node->u.obj.keys   = malloc(cap * sizeof(*node->u.obj.keys));
 	node->u.obj.values = malloc(cap * sizeof(*node->u.obj.values));
 	if (!node->u.obj.keys || !node->u.obj.values) { json_free_node(node); return NULL; }
+	bool closed = false;
 	while (**p) {
 		char *key = parse_json_string(p);
 		if (!key) { json_free_node(node); return NULL; }
@@ -1810,9 +1817,12 @@ static JsonNode *json_parse_object(const char **p, int depth)
 		node->u.obj.count++;
 		skip_ws(p);
 		if (**p == ',') { (*p)++; skip_ws(p); continue; }
-		if (**p == '}') { (*p)++; break; }
+		if (**p == '}') { (*p)++; closed = true; break; }
 		json_free_node(node); return NULL;
 	}
+	/* As in json_parse_array: "{", "{"a":1," and the like end at EOF and
+	 * used to be accepted as a complete object. */
+	if (!closed) { json_free_node(node); return NULL; }
 	return node;
 }
 /*

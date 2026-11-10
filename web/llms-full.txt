@@ -10006,7 +10006,7 @@ unit_exponent_t bvn_int_to_exponent(int32_t n);
 It is a *screen*, not a guarantee, and the gap is exactly **two** shapes wide. Code that screens with this must still handle a conversion that declines, and the two reasons it can decline are worth telling apart:
 
 - **An affine scale outside "alone, at exponent 1".** `s/°C` is dimensionally compatible with `s/K` and passes here; the conversion entry points refuse it, because an affine scale means nothing at an exponent other than 1 (stated under "An affine unit has an SI value only alone" below, and for the interval units in §3.4; see also [Unit Ambiguities §10](07_bovnar_unit_ambiguities.md)). This one is reachable from ordinary units and is the one a policy has to fence.
-- **Capacity.** The exact factor needs more than `BVN_INT_MAX_BITS`, as the paragraph above describes: `Q~m¹⁰⁰ → q~m¹⁰⁰` is 10⁶⁰⁰⁰ and declines, while remaining a perfectly well-defined conversion between compatible units. This is *why* the screen answers `true` there — separating "too large to compute" from "these units disagree" is the question it exists to answer, and it is reachable only from deliberately extreme prefixes and exponents.
+- **Capacity.** The exact factor needs more than `BVN_INT_MAX_BITS`, as the paragraph above describes: `Q~m¹⁰⁰·Q~g¹⁰⁰ → q~m¹⁰⁰·q~g¹⁰⁰` is 10¹²⁰⁰⁰ and declines, while remaining a perfectly well-defined conversion between compatible units. (`Q~m¹⁰⁰ → q~m¹⁰⁰` alone is 10⁶⁰⁰⁰, about 19 932 bits, and does *not* decline; only the double-factor case is past the bound.) This is *why* the screen answers `true` there — separating "too large to compute" from "these units disagree" is the question it exists to answer, and it is reachable only from deliberately extreme prefixes and exponents.
 
 Nothing else is in the gap. `python/tests/test_convertible_implies_convertible.py` sweeps the catalogue and its quotients and squares — a domain that cannot reach the capacity bound — and requires every pair that passes the screen and is then refused to be the affine shape; a companion case pins the capacity shape directly.
 
@@ -13966,6 +13966,14 @@ char *bvn_dom_strdup(const char *s, uint32_t len);
 **always** take ownership of the value node: on success the container owns it, and
 on **every** failure path the node is destroyed internally — so never destroy it
 yourself after the call (doing so double-frees).
+
+A node belongs to one tree, and the tree must stay acyclic: pass a freshly built
+node that no container owns yet, and never attach a container (or any node
+already in the tree) into one of its own descendants. The direct
+`val == container` case is refused, but ancestry is not tracked, so an indirect
+cycle or a node owned by two trees makes `bvn_dom_node_destroy` free a node
+twice (use-after-free). This is a precondition, not a check the library
+performs.
 
 **What they refuse.** Each returns `false` — having destroyed the value — when
 the container is NULL or of the wrong kind (`bvn_dom_array_append` on anything

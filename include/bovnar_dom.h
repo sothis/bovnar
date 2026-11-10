@@ -142,7 +142,13 @@ BVN_API void            bvn_dom_node_destroy(bvn_dom_node_t *n);
  * after the call; in particular do NOT write
  *     if (!bvn_dom_struct_add(s, k, n, v)) bvn_dom_node_destroy(v); // DOUBLE FREE
  * The container pointer (s/d/a) must be non-NULL. The key is copied; a NULL or
- * empty key is refused (a key is an identifier). */
+ * empty key is refused (a key is an identifier).
+ *
+ * A node belongs to one tree, and the tree must stay acyclic. Pass a FRESHLY
+ * built node: a node another container already owns, or an ancestor of the
+ * container, must not be attached. The direct val == container case is refused,
+ * but ancestry is not tracked, so an indirect cycle or a shared node makes
+ * bvn_dom_node_destroy free it twice (use-after-free). */
 BVN_API bool bvn_dom_struct_add(bvn_dom_node_t *s,
 						const char *key, uint32_t klen,
 						bvn_dom_node_t *val);

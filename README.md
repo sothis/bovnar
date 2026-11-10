@@ -839,6 +839,17 @@ cd web && ./httpd.sh          # python3 -m http.server
 # then open http://localhost:8000/
 ```
 
+For a full-site preview — the generated `/docs/` pages, the German edition, and
+the exact file tree a publish would upload — use the staging preview instead:
+
+```bash
+./publish_web.sh --serve      # http://127.0.0.1:8000/
+```
+
+It runs the same generators and stages the same tree as a deploy, then serves
+it; nothing is uploaded. `--port N` changes the port, and `--bind 0.0.0.0`
+exposes the preview to other devices on the network.
+
 ---
 
 ## Use Cases

@@ -22,6 +22,23 @@ AMALG="$ROOT/build/amalgamate"
 OUT="$ROOT/dist/wasm"
 mkdir -p "$OUT"
 
+# In-place ERE substitution that means the same thing on GNU and BSD sed.
+# Plain "sed -i -E" is not portable: GNU sed takes -E as an option, while
+# FreeBSD's sed takes it as the -i backup SUFFIX and then evaluates the
+# expression as a BRE -- the groups/alternations silently match nothing, and a
+# stray "<file>-E" is left behind. A temp file plus cat preserves the target's
+# mode on both and leaves no backup.
+sed_in_place() {
+	local expr="$1" file="$2" tmp
+	tmp="$(mktemp "${file}.XXXXXX")" || return 1
+	if ! sed -E "$expr" "$file" > "$tmp"; then
+		rm -f "$tmp"
+		return 1
+	fi
+	cat "$tmp" > "$file"
+	rm -f "$tmp"
+}
+
 if ! command -v emcc >/dev/null 2>&1; then
 	echo "error: emcc not found. Run:  source ~/emsdk/emsdk_env.sh" >&2
 	exit 1
@@ -142,7 +159,7 @@ sed "s#'./bovnar.mjs'#'./bovnar_wasm_core.js?v=${CORE_HASH}'#" \
 # bytes, computed after the core import above is substituted in, so it also
 # rolls whenever the core it loads changes.
 WRAP_HASH="$(sha256sum "$ROOT/web/bovnar_wasm.js" | cut -c1-12)"
-sed -i -E "s#(import\('\./bovnar_wasm\.js)(\?v=[0-9a-f]+)?('\))#\1?v=${WRAP_HASH}\3#" \
+sed_in_place "s#(import\('\./bovnar_wasm\.js)(\?v=[0-9a-f]+)?('\))#\1?v=${WRAP_HASH}\3#" \
 	"$ROOT/web/bovnar_parser_wasm.js"
 # The shim is hand-maintained FFI logic, versioned independently of the compiled
 # core — so key ITS cache-bust on its own content hash (computed after the import
@@ -150,19 +167,19 @@ sed -i -E "s#(import\('\./bovnar_wasm\.js)(\?v=[0-9a-f]+)?('\))#\1?v=${WRAP_HASH
 # CORE_HASH would leave the ?v= unchanged after a shim-only edit and serve a stale
 # shim from browser/CDN cache.
 SHIM_HASH="$(sha256sum "$ROOT/web/bovnar_parser_wasm.js" | cut -c1-12)"
-sed -i -E "s#(bovnar_parser_wasm\.js\?v=)[0-9a-zA-Z]+#\1${SHIM_HASH}#" \
+sed_in_place "s#(bovnar_parser_wasm\.js\?v=)[0-9a-zA-Z]+#\1${SHIM_HASH}#" \
 	"$ROOT/web/index.html"
 # ...and the two <link rel="modulepreload"> hrefs, which must match the dynamic-import
 # URLs above or the browser would fetch the modules twice. The wrapper preload
 # therefore carries WRAP_HASH (what bovnar_parser_wasm.js imports) and the core
 # preload CORE_HASH (what the wrapper itself imports).
-sed -i -E "s#(bovnar_wasm\.js\?v=)[0-9a-f]+#\1${WRAP_HASH}#g" "$ROOT/web/index.html"
-sed -i -E "s#(bovnar_wasm_core\.js\?v=)[0-9a-f]+#\1${CORE_HASH}#g" "$ROOT/web/index.html"
+sed_in_place "s#(bovnar_wasm\.js\?v=)[0-9a-f]+#\1${WRAP_HASH}#g" "$ROOT/web/index.html"
+sed_in_place "s#(bovnar_wasm_core\.js\?v=)[0-9a-f]+#\1${CORE_HASH}#g" "$ROOT/web/index.html"
 # bovnar_highlight.js carried a HAND-WRITTEN date stamp (?v=20260720) that nobody
 # remembered to bump, so every edit to the highlighter shipped stale to returning
 # visitors from cache. Key it on its own content, like the other two.
 HL_HASH="$(sha256sum "$ROOT/web/bovnar_highlight.js" | cut -c1-12)"
-sed -i -E "s#(bovnar_highlight\.js\?v=)[0-9a-zA-Z]+#\1${HL_HASH}#" "$ROOT/web/index.html"
+sed_in_place "s#(bovnar_highlight\.js\?v=)[0-9a-zA-Z]+#\1${HL_HASH}#" "$ROOT/web/index.html"
 # fonts/fonts.css was the last hand-written stamp on the page -- a date, ?v=20260724,
 # carried over from the same batch as the highlighter's. It survived on luck: the
 # one commit that changed the file (pruning 30 webfont faces to 14) happened to
@@ -171,7 +188,7 @@ sed -i -E "s#(bovnar_highlight\.js\?v=)[0-9a-zA-Z]+#\1${HL_HASH}#" "$ROOT/web/in
 # stylesheet in returning visitors' caches for a year instead of revalidating.
 # Key it on its own bytes like the other four; cache_stamps.cmake covers it now.
 FONTS_HASH="$(sha256sum "$ROOT/web/fonts/fonts.css" | cut -c1-12)"
-sed -i -E "s#(fonts/fonts\.css\?v=)[0-9a-zA-Z]+#\1${FONTS_HASH}#" "$ROOT/web/index.html"
+sed_in_place "s#(fonts/fonts\.css\?v=)[0-9a-zA-Z]+#\1${FONTS_HASH}#" "$ROOT/web/index.html"
 echo ">> stamped web/ module chain: core v=${CORE_HASH}, wrapper v=${WRAP_HASH}, shim v=${SHIM_HASH}, highlighter v=${HL_HASH}, fonts v=${FONTS_HASH}"
 
 echo ">> done:"

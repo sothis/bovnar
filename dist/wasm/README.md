@@ -25,6 +25,20 @@ source ~/emsdk/emsdk_env.sh
 ./wasm/build_wasm.sh        # writes dist/wasm/
 ```
 
+On FreeBSD the port supplies the toolchain, but its package omits the two npm
+modules that emscripten's JS optimiser imports, so install them alongside it:
+
+```sh
+pkg install emscripten bash node npm
+npm install -g acorn acorn-import-phases
+./wasm/build_wasm.sh
+```
+
+The port currently pairs emscripten with a newer `clang-devel` than it expects;
+emcc prints a version-check warning and compiles correctly. The script's
+in-place rewrites use a temp file rather than `sed -i -E`, whose meaning differs
+between GNU and BSD sed.
+
 ## Usage
 
 ```js

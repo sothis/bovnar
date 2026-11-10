@@ -392,16 +392,19 @@ Every build also regenerates the single-file amalgamation into `build/amalgamate
 |---|---|
 | `bovnar-<version>-<count>-amalgamate.tar.xz` | the amalgamation (`bovnar.h`, `bovnar.c`), plus `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`, `doc/` and `examples/` |
 | `bovnar-linux-<version>-<count>.tar.xz` | Linux libraries, CLI and headers, plus `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`, `doc/`, `examples/` and the editor `highlighter/` grammars |
+| `bovnar-freebsd-<version>-<count>.tar.xz` | FreeBSD libraries, CLI and headers, with the same extras |
 | `bovnar-macos-<version>-<count>.tar.xz` | macOS libraries (`libbvnr.a`, `libbvnr.dylib`), CLI and headers as universal binaries (arm64 and x86_64, macOS 11 or later), with the same extras |
 | `bovnar-windows-msvc-<version>-<count>.zip`, `bovnar-windows-mingw-<version>-<count>.zip` | Windows libraries, CLI and headers, one archive per toolchain; both link the Universal CRT (`ucrtbase.dll`, part of Windows 10 and later), the MinGW one being built in MSYS2's UCRT64 environment. The `BVNR_CROSS_MINGW` cross-build on a Linux host makes the MinGW one too, linking whatever CRT the host's mingw-w64 targets (msvcrt on Debian and Ubuntu); each unpacks to a directory of its own name, plus `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`, `doc/`, `examples/` and the editor `highlighter/` grammars |
 
 Disable with `-DBVNR_PACKAGE=OFF`.
 
-These same archives — built and smoke-tested by CI, plus a `-source.tar.xz`
-snapshot of the tag and a `SHA256SUMS` file — are attached to each
-[GitHub release](https://github.com/sothis/bovnar/releases) from 1.1.0 onward,
-so a build from source is optional. Earlier tags predate the packaging: 1.0.0
-was POSIX-only and had no packer at all, and carries no assets.
+The Linux, macOS and Windows archives — built and smoke-tested by CI, plus a
+`-source.tar.xz` snapshot of the tag and a `SHA256SUMS` file — are attached to
+each [GitHub release](https://github.com/sothis/bovnar/releases) from 1.1.0
+onward, so a build from source is optional. The FreeBSD archive is packed by a
+native FreeBSD build and is not part of the release assets yet. Earlier tags
+predate the packaging: 1.0.0 was POSIX-only and had no packer at all, and
+carries no assets.
 
 The macOS archive's binaries are ad-hoc signed, not signed with a Developer ID
 or notarized. macOS marks what a browser downloads as quarantined, and

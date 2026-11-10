@@ -39,6 +39,30 @@ sed_in_place() {
 	rm -f "$tmp"
 }
 
+# SHA-256 of stdin as bare lowercase hex. sha256sum is GNU coreutils (Linux and
+# FreeBSD 15 base), sha256 is the FreeBSD base tool, and shasum is macOS's; the
+# fallback keeps the cache-bust stamps working on a host without coreutils.
+_sha256() {
+	if command -v sha256sum >/dev/null 2>&1; then
+		sha256sum | cut -d' ' -f1
+	elif command -v sha256 >/dev/null 2>&1; then
+		sha256 -q
+	elif command -v shasum >/dev/null 2>&1; then
+		shasum -a 256 | cut -d' ' -f1
+	else
+		echo "error: no SHA-256 tool (sha256sum, sha256 or shasum)" >&2
+		return 1
+	fi
+}
+
+sha256_file() {
+	if [ ! -f "$1" ]; then
+		echo "error: missing file for SHA-256: $1" >&2
+		return 1
+	fi
+	_sha256 < "$1"
+}
+
 if ! command -v emcc >/dev/null 2>&1; then
 	echo "error: emcc not found. Run:  source ~/emsdk/emsdk_env.sh" >&2
 	exit 1
@@ -129,10 +153,11 @@ sed "s#'./bovnar.mjs'#'./bovnar.single.mjs'#" \
 {
 	# build_wasm.sh itself is an input: its emcc flags and EXPORTS shape the
 	# module as much as the sources do.
-	sha256sum "$AMALG/bovnar.c" "$AMALG/bovnar.h" "$ROOT/wasm/bvnr_wasm.c" \
-		"$ROOT/wasm/build_wasm.sh" \
-		| cut -d' ' -f1 | tr -d '\n'
-} | sha256sum | cut -d' ' -f1 > "$ROOT/wasm/built_from.sha256"
+	sha256_file "$AMALG/bovnar.c"
+	sha256_file "$AMALG/bovnar.h"
+	sha256_file "$ROOT/wasm/bvnr_wasm.c"
+	sha256_file "$ROOT/wasm/build_wasm.sh"
+} | tr -d '\n' | _sha256 > "$ROOT/wasm/built_from.sha256"
 echo ">> recorded source stamp $(cat "$ROOT/wasm/built_from.sha256" | cut -c1-12)"
 
 echo ">> installing web/ playground module"
@@ -147,7 +172,7 @@ cp "$OUT/bovnar.single.mjs" "$ROOT/web/bovnar_wasm_core.js"
 # changes only when its file's bytes change, so unchanged rebuilds stay byte-stable
 # (no spurious diffs) and there's no version number to bump by hand. All seds are
 # idempotent (they rewrite any existing ?v=).
-CORE_HASH="$(sha256sum "$ROOT/web/bovnar_wasm_core.js" | cut -c1-12)"
+CORE_HASH="$(sha256_file "$ROOT/web/bovnar_wasm_core.js" | cut -c1-12)"
 sed "s#'./bovnar.mjs'#'./bovnar_wasm_core.js?v=${CORE_HASH}'#" \
 	"$ROOT/wasm/index.mjs" > "$ROOT/web/bovnar_wasm.js"
 # The wrapper is generated from wasm/index.mjs, which is hand-maintained and
@@ -158,7 +183,7 @@ sed "s#'./bovnar.mjs'#'./bovnar_wasm_core.js?v=${CORE_HASH}'#" \
 # shim and the highlighter were already pulled out of below. Key it on its own
 # bytes, computed after the core import above is substituted in, so it also
 # rolls whenever the core it loads changes.
-WRAP_HASH="$(sha256sum "$ROOT/web/bovnar_wasm.js" | cut -c1-12)"
+WRAP_HASH="$(sha256_file "$ROOT/web/bovnar_wasm.js" | cut -c1-12)"
 sed_in_place "s#(import\('\./bovnar_wasm\.js)(\?v=[0-9a-f]+)?('\))#\1?v=${WRAP_HASH}\3#" \
 	"$ROOT/web/bovnar_parser_wasm.js"
 # The shim is hand-maintained FFI logic, versioned independently of the compiled
@@ -166,7 +191,7 @@ sed_in_place "s#(import\('\./bovnar_wasm\.js)(\?v=[0-9a-f]+)?('\))#\1?v=${WRAP_H
 # rewrite above, so it also rolls when the core it loads changes). Keying it on
 # CORE_HASH would leave the ?v= unchanged after a shim-only edit and serve a stale
 # shim from browser/CDN cache.
-SHIM_HASH="$(sha256sum "$ROOT/web/bovnar_parser_wasm.js" | cut -c1-12)"
+SHIM_HASH="$(sha256_file "$ROOT/web/bovnar_parser_wasm.js" | cut -c1-12)"
 sed_in_place "s#(bovnar_parser_wasm\.js\?v=)[0-9a-zA-Z]+#\1${SHIM_HASH}#" \
 	"$ROOT/web/index.html"
 # ...and the two <link rel="modulepreload"> hrefs, which must match the dynamic-import
@@ -178,7 +203,7 @@ sed_in_place "s#(bovnar_wasm_core\.js\?v=)[0-9a-f]+#\1${CORE_HASH}#g" "$ROOT/web
 # bovnar_highlight.js carried a HAND-WRITTEN date stamp (?v=20260720) that nobody
 # remembered to bump, so every edit to the highlighter shipped stale to returning
 # visitors from cache. Key it on its own content, like the other two.
-HL_HASH="$(sha256sum "$ROOT/web/bovnar_highlight.js" | cut -c1-12)"
+HL_HASH="$(sha256_file "$ROOT/web/bovnar_highlight.js" | cut -c1-12)"
 sed_in_place "s#(bovnar_highlight\.js\?v=)[0-9a-zA-Z]+#\1${HL_HASH}#" "$ROOT/web/index.html"
 # fonts/fonts.css was the last hand-written stamp on the page -- a date, ?v=20260724,
 # carried over from the same batch as the highlighter's. It survived on luck: the
@@ -187,7 +212,7 @@ sed_in_place "s#(bovnar_highlight\.js\?v=)[0-9a-zA-Z]+#\1${HL_HASH}#" "$ROOT/web
 # "max-age=31536000, immutable", so a single forgotten bump would pin the old
 # stylesheet in returning visitors' caches for a year instead of revalidating.
 # Key it on its own bytes like the other four; cache_stamps.cmake covers it now.
-FONTS_HASH="$(sha256sum "$ROOT/web/fonts/fonts.css" | cut -c1-12)"
+FONTS_HASH="$(sha256_file "$ROOT/web/fonts/fonts.css" | cut -c1-12)"
 sed_in_place "s#(fonts/fonts\.css\?v=)[0-9a-zA-Z]+#\1${FONTS_HASH}#" "$ROOT/web/index.html"
 echo ">> stamped web/ module chain: core v=${CORE_HASH}, wrapper v=${WRAP_HASH}, shim v=${SHIM_HASH}, highlighter v=${HL_HASH}, fonts v=${FONTS_HASH}"
 

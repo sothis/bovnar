@@ -1,12 +1,16 @@
 include(CTest)
 
-# Test code uses isnan()/isinf()/signbit()/fabs() directly in its assertions.
-# On FreeBSD those are libm entry points and libm is a separate library there,
-# so the test executables link it. The SHIPPED library does not and must not:
-# its own classification and scaling helpers are in src/utils/bvn_double_impl.h.
-# link_libraries() applies only to targets created below in this file; the CLI
-# was created in CMakeLists.txt before this include and stays libm-free.
-if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+# Test code uses isnan()/isinf()/signbit()/fabs()/frexp()/ldexp() directly (the
+# last three as the differential oracle in bvnr_float_test). Those are libm
+# entry points wherever libm is a separate library -- FreeBSD, and glibc before
+# 2.34 -- so the test executables link it on every non-Windows host. The SHIPPED
+# library does not and must not: its own classification and scaling helpers are
+# in src/utils/bvn_double_impl.h. link_libraries() applies to linkable targets
+# created after it in this directory -- include() does not open a scope -- so
+# every test target is created below and no linkable target is added after this
+# include; the CLI and the libraries, created in CMakeLists.txt before it, stay
+# libm-free.
+if(NOT WIN32)
     link_libraries(m)
 endif()
 

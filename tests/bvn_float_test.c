@@ -1547,10 +1547,88 @@ static void test_frexp_ldexp_fabs(void)
 	CHECK(isnan(bvni_fabs(-NAN)), "fabs(nan)");
 }
 
+/*
+ * A deterministic differential sweep against the platform's libm. The library
+ * itself does not link libm (src/utils/bvn_double_impl.h); this test does, and
+ * on FreeBSD CMakeLists_tests.txt links m into the test executables. The seed,
+ * loop counts and exponent choices reproduce the 10 994 643-case run the
+ * FreeBSD port was checked with, so a subnormal rounding case outside the fixed
+ * list above cannot regress unnoticed.
+ */
+static uint64_t g_diff_state = 0x9E3779B97F4A7C15ULL;
+
+static uint64_t diff_rnd(void)
+{
+	g_diff_state ^= g_diff_state << 13;
+	g_diff_state ^= g_diff_state >> 7;
+	g_diff_state ^= g_diff_state << 17;
+	return g_diff_state;
+}
+
+static double diff_bits_to_double(uint64_t b)
+{
+	double d;
+	memcpy(&d, &b, 8);
+	return d;
+}
+
+static void test_libm_differential(void)
+{
+	uint64_t checks = 0, fails = 0;
+	int i;
+
+	/* frexp over random bit patterns, all exponent classes. Infinity is
+	 * skipped: C99 leaves frexp's exponent for a non-finite argument
+	 * unspecified, so a libm that answers something other than 0 is not a
+	 * defect in bvni_frexp. */
+	for (i = 0; i < 5000000; i++) {
+		uint64_t b = diff_rnd();
+		double v = diff_bits_to_double(b), a, c;
+		int ea, ec;
+		if (!isfinite(v)) continue;
+		a = frexp(v, &ea);
+		c = bvni_frexp(v, &ec);
+		checks++;
+		if (f64_bits(a) != f64_bits(c) || ea != ec) fails++;
+	}
+
+	/* ldexp over random finite values and exponents, including extremes. */
+	for (i = 0; i < 5000000; i++) {
+		uint64_t b = diff_rnd();
+		double v = diff_bits_to_double(b), a, c;
+		int32_t e;
+		if (isnan(v)) continue;
+		switch (diff_rnd() & 3u) {
+		case 0: e = (int32_t)(diff_rnd() % 2401u) - 1200; break;
+		case 1: e = (int32_t)(diff_rnd() % 2147483647u); break;
+		case 2: e = -(int32_t)(diff_rnd() % 2147483647u); break;
+		default: e = (int32_t)(diff_rnd() % 1088u) - 1088; break;
+		}
+		a = ldexp(v, e);
+		c = bvni_ldexp(v, e);
+		checks++;
+		if (f64_bits(a) != f64_bits(c)) fails++;
+	}
+
+	/* fabs over random bit patterns (NaN payloads are not comparable). */
+	for (i = 0; i < 1000000; i++) {
+		uint64_t b = diff_rnd();
+		double v = diff_bits_to_double(b);
+		if (isnan(v)) continue;
+		checks++;
+		if (f64_bits(fabs(v)) != f64_bits(bvni_fabs(v))) fails++;
+	}
+
+	printf("  libm differential: %" PRIu64 " checks, %" PRIu64 " failures\n",
+	       checks, fails);
+	CHECK(fails == 0, "libm differential");
+}
+
 int main(void)
 {
 #define RUN(fn) do { fprintf(stderr,">>> " #fn "\n"); fflush(stderr); fn(); } while(0)
 	RUN(test_frexp_ldexp_fabs);
+	RUN(test_libm_differential);
 	RUN(test_bigint_internals);
 	RUN(test_bvnf_binary128_long_midpoint);
 	RUN(test_bvnf_midpoint_past_budget);

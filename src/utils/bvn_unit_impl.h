@@ -25,7 +25,6 @@
 #ifndef BVN_UNIT_IMPL_H_
 #define BVN_UNIT_IMPL_H_
 #include <assert.h>
-#include <math.h>       /* isfinite for bvni_scaled_t */
 #include <stdbool.h>
 #include <stdint.h>
 #include "bovnar.h"
@@ -110,7 +109,7 @@ static inline bvni_scaled_t bvni_scaled_norm(double v, int32_t e2)
 	bvni_scaled_t s;
 	if (v == 0.0 || !bvni_isfinite(v)) {
 		/* 0 stays 0; a non-finite has escaped the representation and is
-		 * reported as such by the caller's final isfinite() check. */
+		 * reported as such by the caller's final bvni_isfinite() check. */
 		s.m = v;
 		s.e2 = 0;
 		return s;

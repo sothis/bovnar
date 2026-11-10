@@ -29,7 +29,7 @@ On FreeBSD the port supplies the toolchain, but its package omits the two npm
 modules that emscripten's JS optimiser imports, so install them alongside it:
 
 ```sh
-pkg install emscripten bash node npm
+pkg install emscripten bash npm-node24   # npm-node24 matches emscripten's node24
 npm install -g acorn acorn-import-phases
 ./wasm/build_wasm.sh
 ```

@@ -343,10 +343,11 @@ API and implements spec 1.2.
   imports, now recorded in `wasm/README.md`), and `build_wasm.sh` rewrites its
   cache-bust hashes with a temp file rather than `sed -i -E`, which FreeBSD's
   sed reads as a backup suffix and a BRE. Verified on a VirtualBox guest: the
-  release build reported no failure across 197 runnable CTest cases — 196
-  passed, the glibc-only `bvnr_alloc_test` skipped, three Node tests disabled —
-  the ASan+UBSan build passed 170/170, Rust `cargo test` passed 1 584 tests,
-  the Python wheel built with a `freebsd_15_1_release_amd64` tag, and
+  release build reported no failure across all 200 CTest cases — 198 passed and
+  two skipped (the glibc-only `bvnr_alloc_test` and `bvnr_web_browser`, which
+  needs a browser), including the wasm freshness, playground-shim and CLI-diff
+  gates — the ASan+UBSan build passed 170/170, Rust `cargo test` passed 1 584
+  tests, the Python wheel built with a `freebsd_15_1_release_amd64` tag, and
   `libbvnr.a` holds no math symbol.
 
 ### Changed
@@ -922,8 +923,9 @@ API and implements spec 1.2.
   `frexp`/`ldexp` undefined and every executable needed `-lm`. All seven
   primitives are now implemented from the IEEE-754 binary64 bit pattern in
   `src/utils/bvn_double_impl.h`; `libbvnr.a`, `libbvnr.so` and the CLI link
-  against libc alone on FreeBSD, and a differential test over 10 994 643 random
-  values and exponents matches FreeBSD's own libm bit for bit.
+  against libc alone on FreeBSD, and the differential sweep in
+  `tests/bvn_float_test.c` (10 994 643 random values and exponents) matches
+  FreeBSD's own libm bit for bit.
 
 ## [2.0.2] - 2026-11-04
 

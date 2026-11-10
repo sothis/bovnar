@@ -32,7 +32,6 @@
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
-#include <math.h>
 #include "bovnar.h"
 #include "bvn_internal_dims.h"
 #include "bvn_float.h"

@@ -26,7 +26,6 @@
 #include <bvn_int.h>
 #include "bvn_double_impl.h"
 #include <inttypes.h>
-#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

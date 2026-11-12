@@ -10,7 +10,8 @@ on:
   workflow_dispatch:
 
 # Never cancel a run on a TAG. That run publishes, and a second run on the same
-# ref -- "Run workflow" with the tag selected, or the tag re-pushed -- would stop
+# ref -- "Run workflow" with the tag selected, or the tag re-pushed -- would
+# stop
 # it midway: half a PyPI upload cannot be taken back.
 concurrency:
   group: build-package-${{ github.ref }}
@@ -28,14 +29,16 @@ concurrency:
 # documentation (doc/), runnable examples (examples/) and editor syntax
 # highlighters (highlighter/) alongside the headers, libs and CLI.
 # Those uploads are Actions artifacts, which GitHub deletes after 90 days. On a
-# v* tag the `release` job at the bottom re-publishes the same archives as GitHub
+# v* tag the `release` job at the bottom re-publishes the same archives as
+# GitHub
 # Release assets, which are permanent and downloadable without an Actions login.
 # Each job smoke-tests the CLI end to end (split one step per command so a
 # failure pinpoints the offending command from the step status alone). The full
 # C/Python suite runs in the `tests` job below: it used to be left to whoever
 # remembered to run run_tests.sh locally, which meant nothing gated a push — the
 # shipped WebAssembly artifact drifted 35 commits behind the library, an eol
-# filter corrupted a tracked example so that a fresh clone failed to validate it,
+# filter corrupted a tracked example so that a fresh clone failed to validate
+# it,
 # and four CTest gates could not fail at all, none of which anything noticed.
 #
 # The Rust binding (rust/) is linted, tested and built for wasm32-wasip2 in
@@ -68,7 +71,8 @@ jobs:
         run: echo "::add-matcher::.github/problem-matchers/msvc.json"
 
       - name: Configure (Ninja)
-        run: cmake -B build\msvc -G Ninja -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=OFF .
+        run: cmake -B build\msvc -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DBVNR_BUILD_TESTS=OFF .
 
       - name: Build
         run: cmake --build build\msvc
@@ -88,7 +92,8 @@ jobs:
           if not exist build\msvc\bvnr.lib exit /b 1
           if not exist build\msvc\bvnr_static.lib exit /b 1
           if not exist build\msvc\bovnar.exe exit /b 1
-          dumpbin /exports build\msvc\bvnr.dll | findstr /i "bvnr_version bvnr_read"
+          dumpbin /exports build\msvc\bvnr.dll | findstr /i "bvnr_version \
+          bvnr_read"
 
       # The static library the Rust crate links instead of compiling the C
       # sources (rust/build.rs PREBUILT, staged by rust/package.py). Copied to
@@ -110,7 +115,8 @@ jobs:
 
       - name: Prepare sample document
         shell: pwsh
-        run: Set-Content -NoNewline -Encoding ascii smoke.bvnr ".a = <uint:8> 7;`n.b = <float:64> 3.5;`n"
+        run: Set-Content -NoNewline -Encoding ascii smoke.bvnr ".a = <uint:8>
+          7;`n.b = <float:64> 3.5;`n"
 
       - name: smoke - validate (file)
         shell: pwsh
@@ -128,7 +134,8 @@ jobs:
         shell: pwsh
         run: |
           Get-Content pp.txt
-          if (-not (Select-String -Path pp.txt -Pattern '<uint:8>' -Quiet)) { Write-Error 'missing <uint:8>'; exit 1 }
+          if (-not (Select-String -Path pp.txt -Pattern '<uint:8>' -Quiet)) { \
+          Write-Error 'missing <uint:8>'; exit 1 }
 
       - name: smoke - events (binary-mode stdin)
         shell: pwsh
@@ -149,10 +156,12 @@ jobs:
           fetch-depth: 0
 
       # `git` is in this list because pack_artifacts.cmake shells out to it for
-      # the build count and falls back to 0 when it cannot — a fallback meant for
+      # the build count and falls back to 0 when it cannot — a fallback meant
+      # for
       # builds from the source tarball, which has no .git. The MSYS2 shell had
       # no git at all, so this job alone stamped every Windows archive
-      # bovnar-windows-mingw-<version>-0, in the zip name AND in its internal directory
+      # bovnar-windows-mingw-<version>-0, in the zip name AND in its internal
+      # directory
       # prefix, while MSVC and Linux got the real count. It shipped that way in
       # the v1.1.0 assets before anyone noticed.
       #
@@ -169,7 +178,8 @@ jobs:
             mingw-w64-ucrt-x86_64-ninja
 
       - name: Configure (Ninja)
-        run: cmake -B build/mingw -G Ninja -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=OFF .
+        run: cmake -B build/mingw -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DBVNR_BUILD_TESTS=OFF .
 
       - name: Build
         run: cmake --build build/mingw
@@ -189,7 +199,8 @@ jobs:
           test -f build/mingw/libbvnr.dll.a
           test -f build/mingw/bovnar.exe
           # No GCC runtime sidecar dependency (we link -static-libgcc -static).
-          if objdump -p build/mingw/libbvnr.dll | grep -iE 'libgcc_s|libwinpthread|libstdc\+\+'; then
+          if objdump -p build/mingw/libbvnr.dll | grep -iE \
+          'libgcc_s|libwinpthread|libstdc\+\+'; then
             echo "DLL has an unexpected GCC runtime dependency" && exit 1
           fi
           # The CRT is the Universal one, not msvcrt.dll: a toolchain that
@@ -231,16 +242,20 @@ jobs:
         with:
           # Full history, as the packaging jobs already take: bvnr_html_docs
           # regenerates pages whose meta tags and schema.org dates come from
-          # `git log -- doc/<file>`. The default depth-1 checkout has no per-file
+          # `git log -- doc/<file>`. The default depth-1 checkout has no
+          # per-file
           # history -- its one grafted commit answers for every path -- so every
           # doc dated as written today and all ten pages read as stale.
           fetch-depth: 0
 
       # Ahead of Configure, not somewhere after CTest: CMakeLists_tests.txt
       # probes for pytest at CONFIGURE time and skips the 19 bvnr_py_* gates
-      # without it. Installing later therefore bought nothing -- the first run of
-      # this job registered those gates against a runner whose interpreter had no
-      # pytest and every one of them failed. A setup-python toolchain rather than
+      # without it. Installing later therefore bought nothing -- the first run
+      # of
+      # this job registered those gates against a runner whose interpreter had
+      # no
+      # pytest and every one of them failed. A setup-python toolchain rather
+      # than
       # the runner's /usr/bin/python3, because the latter is an
       # externally-managed distro interpreter that refuses `pip install`; this
       # one lands first on PATH, which is what find_package(Python3) then picks.
@@ -249,8 +264,10 @@ jobs:
           python-version: '3.12'
 
       # numpy is not optional here even though test_numpy_bridge.py
-      # importorskip()s it: skipping is how bvnr_py_numpy silently tested nothing
-      # (and, worse, failed -- a collection-time skip exits 5). The runner has no
+      # importorskip()s it: skipping is how bvnr_py_numpy silently tested
+      # nothing
+      # (and, worse, failed -- a collection-time skip exits 5). The runner has
+      # no
       # numpy, so without this the bridge ships unexercised by CI.
       #
       # markdown is what gen_html_docs.py imports; without it bvnr_html_docs
@@ -259,7 +276,8 @@ jobs:
       # generated web/docs pages are committed, so this is the only gate that
       # catches a doc/*.md edit that never went through the generator.
       #
-      # pygments is PINNED, and it has to be. pytest pulls in whatever is newest,
+      # pygments is PINNED, and it has to be. pytest pulls in whatever is
+      # newest,
       # codehilite renders the docs' code blocks through it, and 2.21 stopped
       # escaping quotes in its HTML -- so bvnr_html_docs compared the committed
       # pages against a regeneration that differed in every code block and
@@ -267,10 +285,12 @@ jobs:
       # web/docs pages are generated with this version; bump the pin and
       # regenerate them in the same commit.
       - name: Install Python test dependencies
-        run: python3 -m pip install --quiet pytest numpy 'markdown==3.10.2' 'pygments==2.19.2'
+        run: python3 -m pip install --quiet pytest numpy 'markdown==3.10.2'
+          'pygments==2.19.2'
 
       # -DPython3_EXECUTABLE pins the resolution to the interpreter just
-      # provisioned instead of leaving FindPython3 to choose among the several on
+      # provisioned instead of leaving FindPython3 to choose among the several
+      # on
       # the runner -- only this one has pytest. BVNR_WERROR makes a new warning
       # (or -fanalyzer finding) fail the run, as CONTRIBUTING says CI does; the
       # option existed "for CI" but no job passed it.
@@ -291,7 +311,8 @@ jobs:
           set -euo pipefail
           for t in bvnr_html_docs bvnr_py_numpy bvnr_py_all; do
             ctest --test-dir build -N -R "^$t$" | grep -q "$t" \
-              || { echo "::error::$t was not registered -- a Python dependency is missing"; exit 1; }
+              || { echo "::error::$t was not registered -- a Python dependency \
+          is missing"; exit 1; }
           done
 
       - name: CTest
@@ -321,7 +342,8 @@ jobs:
       # exactly that kind of test under a name the prefix does not match, so it
       # ran, hit the ctypes-into-unsanitized-interpreter wall and failed.
       - name: CTest (ASan + UBSan)
-        run: ctest --test-dir build-asan -j"$(nproc)" -LE python --output-on-failure
+        run: ctest --test-dir build-asan -j"$(nproc)" -LE python
+          --output-on-failure
 
   linux:
     name: Linux (x64)
@@ -405,7 +427,8 @@ jobs:
             for a in arm64 x86_64; do
               otool -arch "$a" -l "$f" | grep -A4 LC_BUILD_VERSION \
                 | grep -q "minos $MACOSX_DEPLOYMENT_TARGET" \
-                || { echo "::error::$f ($a) is not for macOS $MACOSX_DEPLOYMENT_TARGET" && exit 1; }
+                || { echo "::error::$f ($a) is not for macOS \
+          $MACOSX_DEPLOYMENT_TARGET" && exit 1; }
             done
           done
 
@@ -446,7 +469,8 @@ jobs:
       - name: smoke - the x86_64 slice, under Rosetta
         run: |
           if ! arch -x86_64 /usr/bin/true 2>/dev/null; then
-            echo "::notice::no Rosetta on this image; the x86_64 slice is built and checked, not run"
+            echo "::notice::no Rosetta on this image; the x86_64 slice is \
+          built and checked, not run"
             exit 0
           fi
           arch -x86_64 ./build/bovnar validate smoke.bvnr
@@ -527,10 +551,12 @@ jobs:
         # the crate published from that tag must carry the same version.
         run: |
           set -euo pipefail
-          want=$(grep -oP 'project\(bovnar VERSION \K[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt)
+          want=$(grep -oP 'project\(bovnar VERSION \K[0-9]+\.[0-9]+\.[0-9]+' \
+          CMakeLists.txt)
           have=$(grep -oP '^version = "\K[^"]+' rust/Cargo.toml)
           if [ "$have" != "$want" ]; then
-            echo "::error file=rust/Cargo.toml::crate version ${have} is not the project version ${want} of CMakeLists.txt"
+            echo "::error file=rust/Cargo.toml::crate version ${have} is not \
+          the project version ${want} of CMakeLists.txt"
             exit 1
           fi
           echo "OK: crate and project are both ${want}"
@@ -542,13 +568,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: Linux x64, os: ubuntu-latest, toolchain: stable, cli: true }
-          # rust-version in Cargo.toml: the oldest toolchain that must build and pass.
-          - { name: Linux x64 MSRV, os: ubuntu-latest, toolchain: "1.88", msrv: true }
-          - { name: Linux aarch64, os: ubuntu-24.04-arm, toolchain: stable }
-          - { name: macOS, os: macos-15, toolchain: stable }
-          - { name: MSVC x64, os: windows-latest, toolchain: stable-x86_64-pc-windows-msvc }
-          - { name: MinGW64, os: windows-latest, toolchain: stable-x86_64-pc-windows-gnu, mingw: true }
+          - {name: Linux x64, os: ubuntu-latest, toolchain: stable, cli: true}
+          # rust-version in Cargo.toml: the oldest toolchain that must build and
+          # pass.
+          - name: Linux x64 MSRV
+            os: ubuntu-latest
+            toolchain: "1.88"
+            msrv: true
+          - {name: Linux aarch64, os: ubuntu-24.04-arm, toolchain: stable}
+          - {name: macOS, os: macos-15, toolchain: stable}
+          - name: MSVC x64
+            os: windows-latest
+            toolchain: stable-x86_64-pc-windows-msvc
+          - name: MinGW64
+            os: windows-latest
+            toolchain: stable-x86_64-pc-windows-gnu
+            mingw: true
     defaults:
       run:
         working-directory: rust
@@ -573,14 +608,16 @@ jobs:
       - name: Put MINGW64 gcc on PATH
         if: matrix.mingw
         shell: pwsh
-        run: Add-Content $env:GITHUB_PATH "${{ steps.msys2.outputs.msys2-location }}\mingw64\bin"
+        run: Add-Content $env:GITHUB_PATH "${{
+          steps.msys2.outputs.msys2-location }}\mingw64\bin"
 
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.toolchain }}
           components: rustfmt, clippy
 
-      # Lints are checked on current toolchains; the MSRV leg only builds and tests.
+      # Lints are checked on current toolchains; the MSRV leg only builds and
+      # tests.
       - run: cargo fmt --check
         if: ${{ !matrix.msrv }}
       # --locked: a Cargo.lock that no longer matches Cargo.toml fails here
@@ -630,17 +667,26 @@ jobs:
       # than a pipe so a download failure is reported as one.
       - name: Install wasi-sdk
         run: |
-          curl -sSLf --retry 5 --retry-all-errors --retry-delay 5 -o "$RUNNER_TEMP/wasi-sdk.tar.gz" \
-            "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_SDK_VERSION}/wasi-sdk-${WASI_SDK_VERSION}.0-x86_64-linux.tar.gz"
+          curl -sSLf --retry 5 --retry-all-errors --retry-delay 5 -o \
+          "$RUNNER_TEMP/wasi-sdk.tar.gz" \
+          "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-\
+          ${WASI_SDK_VERSION}/wasi-sdk-${WASI_SDK_VERSION}.0-x86_64-linux.tar.\
+          gz"
           tar xzf "$RUNNER_TEMP/wasi-sdk.tar.gz" -C "$RUNNER_TEMP"
-          echo "WASI_SDK_PATH=$RUNNER_TEMP/wasi-sdk-${WASI_SDK_VERSION}.0-x86_64-linux" >> "$GITHUB_ENV"
+          echo \
+          "WASI_SDK_PATH=$RUNNER_TEMP/wasi-sdk-${WASI_SDK_VERSION}.0-x86_64-\
+          linux" >> "$GITHUB_ENV"
 
       - name: Install wasmtime
         run: |
-          curl -sSLf --retry 5 --retry-all-errors --retry-delay 5 -o "$RUNNER_TEMP/wasmtime.tar.xz" \
-            "https://github.com/bytecodealliance/wasmtime/releases/download/v${WASMTIME_VERSION}/wasmtime-v${WASMTIME_VERSION}-x86_64-linux.tar.xz"
+          curl -sSLf --retry 5 --retry-all-errors --retry-delay 5 -o \
+          "$RUNNER_TEMP/wasmtime.tar.xz" \
+          "https://github.com/bytecodealliance/wasmtime/releases/download/\
+          v${WASMTIME_VERSION}/wasmtime-v${WASMTIME_VERSION}-x86_64-linux.tar.\
+          xz"
           tar xJf "$RUNNER_TEMP/wasmtime.tar.xz" -C "$RUNNER_TEMP"
-          echo "$RUNNER_TEMP/wasmtime-v${WASMTIME_VERSION}-x86_64-linux" >> "$GITHUB_PATH"
+          echo "$RUNNER_TEMP/wasmtime-v${WASMTIME_VERSION}-x86_64-linux" >> \
+          "$GITHUB_PATH"
 
       - run: cargo build --locked --target wasm32-wasip2
 
@@ -653,7 +699,8 @@ jobs:
       # temp_dir(), which WASI does not have.
       - name: cargo test (wasm32-wasip2, wasmtime)
         env:
-          CARGO_TARGET_WASM32_WASIP2_RUNNER: wasmtime run --dir ${{ github.workspace }}
+          CARGO_TARGET_WASM32_WASIP2_RUNNER: wasmtime run --dir ${{
+            github.workspace }}
         run: cargo test --locked --target wasm32-wasip2 --lib --tests
 
   # crates.io gets the crate from rust/package.py, not from rust/ itself:
@@ -694,10 +741,13 @@ jobs:
         run: |
           set -euo pipefail
           tag=()
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then tag=(--tag "$GITHUB_REF_NAME"); fi
-          # `cargo publish --dry-run` leaves the .crate in target/package/tmp-crate/,
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then tag=(--tag \
+          "$GITHUB_REF_NAME"); fi
+          # `cargo publish --dry-run` leaves the .crate in
+          # target/package/tmp-crate/,
           # `cargo package` in target/package/: take the one there is, wherever.
-          crate=$(find "$RUNNER_TEMP/crate/bovnar/target/package" -name 'bovnar-*.crate')
+          crate=$(find "$RUNNER_TEMP/crate/bovnar/target/package" -name \
+          'bovnar-*.crate')
           if [ "$(printf '%s\n' "$crate" | grep -c .)" != 1 ]; then
             echo "::error::expected one packed .crate, found: ${crate:-none}"
             exit 1
@@ -787,7 +837,8 @@ jobs:
       - uses: actions/checkout@v5
         with:
           # Full history so `git rev-list --count HEAD` yields the true build
-          # count (a shallow clone would report 1) — matches pack_artifacts.cmake.
+          # count (a shallow clone would report 1) — matches
+          # pack_artifacts.cmake.
           fetch-depth: 0
 
       - name: Pack source tarball
@@ -795,10 +846,12 @@ jobs:
           set -euo pipefail
           # Version from the single source of truth (project() in CMakeLists),
           # count = total commits, exactly as pack_artifacts.cmake derives them.
-          version=$(grep -oP 'project\(bovnar VERSION \K[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt)
+          version=$(grep -oP \
+          'project\(bovnar VERSION \K[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt)
           count=$(git rev-list --count HEAD)
           name="bovnar-${version}-${count}-source"
-          git archive --format=tar --prefix="${name}/" HEAD | xz -9 > "${name}.tar.xz"
+          git archive --format=tar --prefix="${name}/" HEAD | xz -9 > \
+          "${name}.tar.xz"
           ls -l "${name}.tar.xz"
           echo "SRC_TARBALL=${name}.tar.xz" >> "$GITHUB_ENV"
 
@@ -806,14 +859,18 @@ jobs:
         run: |
           set -euo pipefail
           prefix="${SRC_TARBALL%.tar.xz}/"
-          # Files in the archive (drop directory entries and the prefix), sorted.
-          tar -tJf "$SRC_TARBALL" | grep -v '/$' | sed "s#^${prefix}##" | LC_ALL=C sort > archived.txt
+          # Files in the archive (drop directory entries and the prefix),
+          # sorted.
+          tar -tJf "$SRC_TARBALL" | grep -v '/$' | sed "s#^${prefix}##" | \
+          LC_ALL=C sort > archived.txt
           git ls-files | LC_ALL=C sort > tracked.txt
           if ! diff -u tracked.txt archived.txt; then
-            echo "::error::source tarball contents differ from the tracked file set" >&2
+            echo "::error::source tarball contents differ from the tracked \
+          file set" >&2
             exit 1
           fi
-          echo "OK: $(wc -l < tracked.txt) tracked files archived, nothing ignored included"
+          echo "OK: $(wc -l < tracked.txt) tracked files archived, nothing \
+          ignored included"
 
       - name: Upload source artifact
         uses: actions/upload-artifact@v7
@@ -824,7 +881,8 @@ jobs:
 
   # ── Python distribution ──────────────────────────────────────────────────
   # The wheel/sdist jobs are heavy (cibuildwheel across Linux x86_64 + arm64 and
-  # macOS), so — unlike the C build/package jobs above — they do NOT run on every
+  # macOS), so — unlike the C build/package jobs above — they do NOT run on
+  # every
   # release-* push. The `if:` keeps them to their prior triggers: pull requests,
   # workflow_dispatch, pushes to main, and v* tags. Publishing to PyPI stays
   # gated to v* tags only (the `publish` job's own `if:`).
@@ -861,7 +919,8 @@ jobs:
         with:
           name: pypi-wheels-${{ matrix.os }}
           path: ./wheelhouse/*.whl
-          # Fail loudly rather than publish an incomplete (immutable) PyPI release
+          # Fail loudly rather than publish an incomplete (immutable) PyPI
+          # release
           # if a matrix leg ever produces an empty wheelhouse.
           if-no-files-found: error
 
@@ -951,16 +1010,23 @@ jobs:
           set -euo pipefail
           version=$(grep -oP '^version = "\K[^"]+' rust/Cargo.toml)
           ua='bovnar-release-ci (https://github.com/sothis/bovnar)'
-          crate=$(curl -sS -o /dev/null -w '%{http_code}' -A "$ua" https://crates.io/api/v1/crates/bovnar)
+          crate=$(curl -sS -o /dev/null -w '%{http_code}' -A "$ua" \
+          https://crates.io/api/v1/crates/bovnar)
           if [ "$crate" = 404 ]; then
-            echo "::notice::bovnar is not on crates.io yet. Trusted Publishing cannot create a crate: publish ${version} by hand from this tag (python3 rust/package.py -- publish), then add this workflow as the crate's trusted publisher."
+            echo "::notice::bovnar is not on crates.io yet. Trusted Publishing \
+          cannot create a crate: publish ${version} by hand from this tag \
+          (python3 rust/package.py -- publish), then add this workflow as the \
+          crate's trusted publisher."
             echo "publish=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          [ "$crate" = 200 ] || { echo "::error::crates.io answered HTTP ${crate}"; exit 1; }
-          have=$(curl -sS -o /dev/null -w '%{http_code}' -A "$ua" "https://crates.io/api/v1/crates/bovnar/${version}")
+          [ "$crate" = 200 ] || { echo "::error::crates.io answered HTTP \
+          ${crate}"; exit 1; }
+          have=$(curl -sS -o /dev/null -w '%{http_code}' -A "$ua" \
+          "https://crates.io/api/v1/crates/bovnar/${version}")
           case "$have" in
-            200) echo "::notice::bovnar ${version} is already on crates.io; nothing to publish."
+            200) echo "::notice::bovnar ${version} is already on crates.io; \
+          nothing to publish."
                  echo "publish=false" >> "$GITHUB_OUTPUT" ;;
             404) echo "publish=true" >> "$GITHUB_OUTPUT" ;;
             *)   echo "::error::crates.io answered HTTP ${have}"; exit 1 ;;
@@ -974,7 +1040,8 @@ jobs:
         if: steps.state.outputs.publish == 'true'
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
-        run: python3 rust/package.py --out "$RUNNER_TEMP/crate" -- publish --locked
+        run: python3 rust/package.py --out "$RUNNER_TEMP/crate" -- publish
+          --locked
 
   # ── GitHub Release assets ────────────────────────────────────────────────
   release:
@@ -990,7 +1057,15 @@ jobs:
     # They are skipped on a release-* push, which must not skip the rehearsal,
     # hence the explicit `if:`: every need succeeded, or was one of the two
     # that may be skipped.
-    needs: [msvc, mingw, linux, macos, freebsd, source, tests, rust_version, rust, rust_wasm, rust_package, rust_prebuilt, build_wheels, build_sdist]
+    needs: [msvc,
+      mingw,
+      linux,
+      macos,
+      freebsd,
+      source,
+      tests,
+      rust_version,
+      rust, rust_wasm, rust_package, rust_prebuilt, build_wheels, build_sdist]
     if: >-
       !cancelled() &&
       needs.msvc.result == 'success' &&
@@ -1005,8 +1080,10 @@ jobs:
       needs.rust_wasm.result == 'success' &&
       needs.rust_package.result == 'success' &&
       needs.rust_prebuilt.result == 'success' &&
-      (needs.build_wheels.result == 'success' || needs.build_wheels.result == 'skipped') &&
-      (needs.build_sdist.result == 'success' || needs.build_sdist.result == 'skipped')
+      (needs.build_wheels.result == 'success' || needs.build_wheels.result ==
+      'skipped') &&
+      (needs.build_sdist.result == 'success' || needs.build_sdist.result ==
+      'skipped')
     runs-on: ubuntu-latest
     # The JOB runs on every push; only its last step is gated on a tag. This job
     # is irreversible the one time it matters, and gated as a whole it had never
@@ -1016,10 +1093,12 @@ jobs:
     permissions:
       contents: write   # create the release and upload its assets
     steps:
-      # Shallow is enough: this job only needs RELEASE_NOTES_<tag>.md, not history.
+      # Shallow is enough: this job only needs RELEASE_NOTES_<tag>.md, not
+      # history.
       - uses: actions/checkout@v5
 
-      # No merge-multiple: each artifact lands in staging/<artifact-name>/, which
+      # No merge-multiple: each artifact lands in staging/<artifact-name>/,
+      # which
       # is what lets the step below check every archive against the job that
       # built it. The bovnar-prebuilt-<triple> artifacts come along and are left
       # in staging on purpose: those archives ship inside the crates.io crate,
@@ -1035,14 +1114,16 @@ jobs:
           mkdir -p assets
           # pack_artifacts.cmake names each Windows zip, and the directory it
           # unpacks to, after its toolchain. This step used to do the renaming
-          # itself and only got as far as the file: the two assets of one release
+          # itself and only got as far as the file: the two assets of one
+          # release
           # unpacked onto each other. Assert the two agree rather than trust it.
           for tc in msvc mingw; do
             src=$(ls staging/bovnar-windows-"$tc"/bovnar-windows-"$tc"-*.zip)
             base=$(basename "$src" .zip)
             tops=$(unzip -Z1 "$src" | cut -d/ -f1 | sort -u)
             if [ "$tops" != "$base" ]; then
-              echo "::error::$base.zip unpacks to '$tops', not to its own name" >&2
+              echo "::error::$base.zip unpacks to '$tops', not to its own \
+          name" >&2
               exit 1
             fi
             mv "$src" assets/
@@ -1054,13 +1135,16 @@ jobs:
              staging/bovnar-source/*.tar.xz assets/
           ls -l assets
 
-          # A build count of 0 means pack_artifacts.cmake could not reach git and
-          # took its source-tarball fallback, which stamps the archive -- and the
+          # A build count of 0 means pack_artifacts.cmake could not reach git
+          # and
+          # took its source-tarball fallback, which stamps the archive -- and
+          # the
           # directory inside it -- <version>-0. That is how the v1.1.0 MinGW zip
           # shipped mislabelled. Catch any future cause (missing git, a shallow
           # clone, dubious-ownership) here rather than on a permanent asset.
           if ls assets | grep -E -- '-0(\.tar\.xz|\.zip)$|-0-'; then
-            echo "::error::an archive is stamped with build count 0 -- git was not reachable in its build job" >&2
+            echo "::error::an archive is stamped with build count 0 -- git was \
+          not reachable in its build job" >&2
             exit 1
           fi
 
@@ -1072,7 +1156,8 @@ jobs:
           cd assets && sha256sum -- * > SHA256SUMS && cat SHA256SUMS
 
       - name: Publish to the GitHub release
-        # Only on a version tag (e.g. v2.0.0) -- the same gate the PyPI publish uses.
+        # Only on a version tag (e.g. v2.0.0) -- the same gate the PyPI publish
+        # uses.
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
@@ -1088,14 +1173,17 @@ jobs:
           # no assets). So nothing is published until every asset is attached
           # -- create a draft, upload, publish last -- and everything that can
           # be checked is checked before the first call that changes anything.
-          version=$(grep -oP 'project\(bovnar VERSION \K[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt)
+          version=$(grep -oP \
+          'project\(bovnar VERSION \K[0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt)
           if [ "$tag" != "v$version" ]; then
-            echo "::error::tag ${tag} does not name project version ${version} (expected v${version})"
+            echo "::error::tag ${tag} does not name project version ${version} \
+          (expected v${version})"
             exit 1
           fi
           notes="RELEASE_NOTES_${tag}.md"
           if [ ! -f "$notes" ]; then
-            echo "::error::${notes} is missing -- refusing to publish a permanent release with generated notes"
+            echo "::error::${notes} is missing -- refusing to publish a \
+          permanent release with generated notes"
             exit 1
           fi
           want=$(cd assets && ls | LC_ALL=C sort | paste -sd,)
@@ -1104,33 +1192,41 @@ jobs:
           # failing is "there is none" only when it failed with a 404: a 403, a
           # rate limit or a network error must not be read as permission to
           # create one.
-          if state=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" --jq '"\(.immutable) \([.assets[].name] | sort | join(","))"' 2>"$err"); then
+          if state=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" \
+          --jq '"\(.immutable) \([.assets[].name] | sort | join(","))"' \
+          2>"$err"); then
             immutable="${state%% *}"
             have="${state#* }"
             if [ "$have" = "$want" ]; then
               # A re-run after a completed release.
-              echo "::notice::release ${tag} is already published with exactly the expected assets -- nothing to do"
+              echo "::notice::release ${tag} is already published with exactly \
+          the expected assets -- nothing to do"
             elif [ "$immutable" != "false" ]; then
               # Published by hand, or from a half-filled draft. Nothing can be
               # attached any more, and saying "fine" here would let PyPI
               # publish a version whose GitHub release is incomplete.
-              echo "::error::release ${tag} is published and immutable but its assets [${have}] are not [${want}] -- it cannot be completed. Delete it and cut the next version."
+              echo "::error::release ${tag} is published and immutable but its \
+          assets [${have}] are not [${want}] -- it cannot be completed. Delete \
+          it and cut the next version."
               exit 1
             else
               gh release upload "$tag" assets/* --clobber
             fi
           elif ! grep -q 'HTTP 404' "$err"; then
             cat "$err" >&2
-            echo "::error::could not ask GitHub whether release ${tag} exists -- re-run this job"
+            echo "::error::could not ask GitHub whether release ${tag} exists \
+          -- re-run this job"
             exit 1
           else
             if gh release view "$tag" >/dev/null 2>"$err"; then
               :   # a draft left by an earlier attempt of this job
             elif grep -q 'release not found' "$err"; then
-              gh release create "$tag" --draft --verify-tag --title "$tag" --notes-file "$notes"
+              gh release create "$tag" --draft --verify-tag --title "$tag" \
+          --notes-file "$notes"
             else
               cat "$err" >&2
-              echo "::error::could not ask GitHub whether a draft of ${tag} exists -- re-run this job"
+              echo "::error::could not ask GitHub whether a draft of ${tag} \
+          exists -- re-run this job"
               exit 1
             fi
             gh release upload "$tag" assets/* --clobber
@@ -1185,7 +1281,8 @@ jobs:
           # shortage unretried. Ask up to three times.
           for i in 1 2 3; do
             if gh workflow run runner-shortage.yml -R "$GITHUB_REPOSITORY" \
-                 -f run_id="$GITHUB_RUN_ID" -f attempt="$GITHUB_RUN_ATTEMPT"; then
+                 -f run_id="$GITHUB_RUN_ID" -f attempt="$GITHUB_RUN_ATTEMPT"; \
+          then
               exit 0
             fi
             if [ "$i" -lt 3 ]; then sleep 10; fi

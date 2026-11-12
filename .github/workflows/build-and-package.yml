@@ -834,9 +834,12 @@ jobs:
           set -euo pipefail
           for t in "${{ matrix.build }}" "${{ matrix.test }}"; do
             out=$(find "target/$t" -path '*/build/bovnar-*/output' | head -1)
-            grep -q "native=.*c/prebuilt/$t" "$out" \
-              || { echo "::error::$t compiled c/ instead of linking"; exit 1; }
-            echo "$t: $(grep -o 'link-search=native=.*' "$out")"
+            # \ on Windows, / elsewhere, so match the pieces, not a path.
+            search=$(grep -o 'link-search=native=.*' "$out" || true)
+            case "$search" in
+              *prebuilt*"$t"*) echo "$t links: $search" ;;
+              *) echo "::error::$t compiled c/ instead of linking"; exit 1 ;;
+            esac
           done
 
   source:

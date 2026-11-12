@@ -12,6 +12,23 @@ implements; the highest spec a build understands is reported by
 numbers were the same. They part at 2.0.0, which breaks the ABI and the Python
 API and implements spec 1.2.
 
+## [Unreleased]
+
+### Added
+
+- **The Rust crate ships prebuilt C libraries on Windows MSVC and macOS.**
+  `bovnar` on crates.io carried the C sources and compiled them in `build.rs`,
+  so it needed a C compiler on every target. It now also carries the static
+  library the CI job for that platform already builds, in
+  `c/prebuilt/<target>/`, and links it: `x86_64-pc-windows-msvc`,
+  `x86_64-apple-darwin` and `aarch64-apple-darwin` build with no C compiler at
+  all. Everything else — Linux, Windows GNU, FreeBSD, `wasm32-wasip2`, and any
+  build with a unit-profile feature off, the archives having all of them —
+  compiles `c/` as before; `BOVNAR_BUILD_FROM_SOURCE=1` forces that path
+  everywhere. `PROVENANCE.json` names each archive's SHA-256 and the artifact it
+  came from, and a new `rust_prebuilt` CI job links and tests the packaged crate
+  on those targets.
+
 ## [2.1.0] - 2026-11-10
 
 ### Added

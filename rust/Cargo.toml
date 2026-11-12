@@ -16,6 +16,9 @@ categories = ["encoding", "parser-implementations", "science"]
 # generated tables bundled in c/ and lifts this there.
 publish = false
 build = "build.rs"
+# One crate provides libbvnr: build.rs links the prebuilt archive or compiles
+# c/, and cargo must not let a second crate link the same library.
+links = "bvnr"
 
 [dependencies]
 # Arbitrary-precision integers, fractions and decimals: the exact numbers behind `BvnFloat` and

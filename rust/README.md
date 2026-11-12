@@ -30,10 +30,24 @@ top-level `CMakeLists.txt`, and CI fails when the two differ. A release tag
 
 ## Building
 
-Requirements: Rust 1.88 or later and a C compiler. The crate from crates.io
-carries the C sources and the generated unit tables. Built from a repository
-checkout (a path or Git dependency), it also needs Python 3 at build time: the
-build then runs the upstream table generators, exactly as CMake does.
+Requirements: Rust 1.88 or later, and on most targets a C compiler. The crate
+from crates.io carries the C sources and the generated unit tables. Built from
+a repository checkout (a path or Git dependency), it also needs Python 3 at
+build time: the build then runs the upstream table generators, exactly as CMake
+does.
+
+On `x86_64-pc-windows-msvc` and both macOS targets the crate from crates.io
+also carries a prebuilt `libbvnr` static library (`c/prebuilt/<target>/`), built
+by the same CI job that builds that platform's release archive, from the same
+commit. There it links that archive and needs no C compiler at all; everywhere
+else (Linux, Windows GNU, FreeBSD, `wasm32-wasip2`, a path or Git dependency)
+it compiles `c/` as before. The archives are Release builds with every unit
+profile compiled in, so a build with any profile feature off compiles from
+source; `BOVNAR_BUILD_FROM_SOURCE=1` forces that everywhere:
+
+```sh
+BOVNAR_BUILD_FROM_SOURCE=1 cargo build
+```
 
 The crate depends on `num-bigint`, `num-rational`, `num-integer` and
 `num-traits` for exact numbers: wide integers, exact fractions and the
@@ -54,9 +68,10 @@ tables from the library, and the reader refuses its codes;
 
 ### Building for WebAssembly (wasm32-wasip2)
 
-The crate compiles its C sources itself, so a WebAssembly build needs a C
-compiler for WASI: [wasi-sdk](https://github.com/WebAssembly/wasi-sdk). Point
-`WASI_SDK_PATH` at it and build for `wasm32-wasip2`:
+The crate compiles its C sources itself (there is no wasm prebuilt archive), so
+a WebAssembly build needs a C compiler for WASI:
+[wasi-sdk](https://github.com/WebAssembly/wasi-sdk). Point `WASI_SDK_PATH` at
+it and build for `wasm32-wasip2`:
 
 ```sh
 rustup target add wasm32-wasip2
@@ -381,34 +396,51 @@ C library's: a version check (crate version = `CMakeLists.txt` version),
 fmt, clippy `-D warnings` and the tests on Linux x64 (with the CLI for
 `test_writers_agree`), Linux aarch64, macOS, Windows MSVC x64 and Windows
 MinGW64, a build and test on Rust 1.88, a `wasm32-wasip2` build with wasi-sdk
-and its tests under wasmtime, and the packaging rehearsal below. The release job waits for all of them.
+and its tests under wasmtime, the prebuilt legs below, and the packaging
+rehearsal. The release job waits for all of them.
 
 `rust/Cargo.toml` keeps `publish = false`, because a package made from `rust/`
 would not contain the `../src` that `build.rs` compiles. The crate is published
 from a staged copy that `rust/package.py` builds: the crate without `tests/`
 and `fuzz/`, plus `LICENSE`, `THIRD_PARTY_NOTICES.md` and, in `c/`, the C
-sources, the headers and the generated tables. `build.rs` builds from `c/`
-when it is there, without running the generators.
+sources, the headers, the generated tables and the prebuilt archives.
+`build.rs` builds from `c/` when it is there, without running the generators,
+and links `c/prebuilt/<target>/` when there is one for the target.
+
+The prebuilt archives are not built by a job of their own: the `msvc` and
+`macos` jobs, which build that platform's release archive anyway, also stage the
+static library they produced as a `bovnar-prebuilt-<target>` artifact, and
+`rust_package` and `rust_prebuilt` download them. `rust_prebuilt` is the gate:
+it stages the same crate and runs the unit tests against the prebuilt library on
+macOS and Windows, with no C compiler involved, so a broken or mislabelled
+archive fails CI rather than a user's build. `rust/build.rs`'s `PREBUILT` list
+is the one place that says which targets have one, and `package.py` refuses to
+stage a crate with any of them missing.
 
 ```bash
 python3 rust/package.py                          # cargo package: pack and verify
 python3 rust/package.py -- publish --dry-run     # what CI runs on every push
 ```
 
-On every push the `rust_package` job runs that dry run and builds the package
-with no unit profiles. On a `vX.Y.Z` tag, `publish_crate` publishes it through
-crates.io Trusted Publishing once every Rust job, the C suite and the GitHub
-release have passed. It skips a version that is already on crates.io. The very
-first version is published by hand (Trusted Publishing cannot create a crate),
-with `python3 rust/package.py -- publish` and a crates.io token.
+On every push the `rust_package` job runs that dry run, with the prebuilt
+archives downloaded, and then builds the package with no unit profiles (which
+cannot use an archive and so compiles `c/`). On a `vX.Y.Z` tag, `publish_crate`
+publishes it through crates.io Trusted Publishing once every Rust job, the C
+suite and the GitHub release have passed. It skips a version that is already on
+crates.io. The very first version is published by hand (Trusted Publishing
+cannot create a crate), with `python3 rust/package.py -- publish` and a
+crates.io token.
 
 The crate carries `PROVENANCE.json`: the repository, commit and release tag it
 was staged from, and every file's SHA-256 and repository origin, so a program
 that vendors the C library from `c/` can tie its copy, and the notices it
-ships, to that revision. `package.py` checks the staged copy against the commit
+ships, to that revision. A prebuilt archive has no repository origin — it is
+build output of that commit — so its entry says so, and names the Actions
+artifact it came from. `package.py` checks the staged copy against the commit
 before cargo runs (`check_crate_provenance.py` stages the commit again and
-requires the same files), CI checks the packed `.crate`, and a publish refuses
-uncommitted changes and an untagged commit.
+requires the same files, and checks each prebuilt archive's hash and that
+`build.rs` names that target and file), CI checks the packed `.crate`, and a
+publish refuses uncommitted changes and an untagged commit.
 
 ## License
 
@@ -420,3 +452,6 @@ OM 2, UDUNITS-2, the CF standard name table and UN/ECE Recommendations 20 and
 21. Those identifiers belong to their publishers and the MIT grant does not
 extend to them; the notices are at
 [`THIRD_PARTY_NOTICES.md`](https://github.com/sothis/bovnar/blob/main/THIRD_PARTY_NOTICES.md).
+The prebuilt archives contain the same tables: a distributor that must not ship
+the UCUM or CF identifiers builds from source with that profile feature off
+(see above) instead of linking the archive.

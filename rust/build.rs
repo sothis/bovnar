@@ -54,6 +54,17 @@ const PROFILES: [(&str, &str); 7] = [
     ("BVNR_WITH_CF_PROFILE", "cf"),
 ];
 
+/// The prebuilt archives the published crate may carry: (target triple, archive
+/// in `c/prebuilt/<triple>`). Each is the static library the CI job that builds
+/// that platform already produces, shipped from the same commit, so a crate on
+/// that target needs no C compiler. rust/package.py requires every one of them;
+/// add a triple only together with the job that uploads it.
+const PREBUILT: [(&str, &str); 3] = [
+    ("x86_64-pc-windows-msvc", "bvnr.lib"),
+    ("x86_64-apple-darwin", "libbvnr.a"),
+    ("aarch64-apple-darwin", "libbvnr.a"),
+];
+
 fn main() {
     let manifest = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"));
     // The crate as published on crates.io carries the C sources and the
@@ -256,7 +267,43 @@ fn generate_tables(repo: &Path, gen_dir: &Path) {
     }
 }
 
+/// Links `c/prebuilt/<triple>` instead of compiling, when there is one for
+/// TARGET. The archives are Release builds with every unit profile compiled in,
+/// so one is used only with all the profile features on and without
+/// BOVNAR_BUILD_FROM_SOURCE: a distributor dropping a profile, or a target with
+/// no archive, builds `c/` here as before.
+fn link_prebuilt(repo: &Path) -> bool {
+    let target = env::var("TARGET").expect("TARGET");
+    let Some(archive) = PREBUILT
+        .iter()
+        .find(|(triple, _)| *triple == target)
+        .map(|(_, archive)| archive)
+    else {
+        return false;
+    };
+    let all_profiles = PROFILES.iter().all(|(_, feature)| {
+        let var = format!("CARGO_FEATURE_{}", feature.to_uppercase().replace('-', "_"));
+        env::var_os(var).is_some()
+    });
+    let file = repo.join("prebuilt").join(&target).join(archive);
+    if !all_profiles || env::var_os("BOVNAR_BUILD_FROM_SOURCE").is_some() || !file.is_file() {
+        return false;
+    }
+    println!("cargo:rerun-if-changed={}", file.display());
+    println!(
+        "cargo:rustc-link-search=native={}",
+        file.parent()
+            .expect("the archive has a directory")
+            .display()
+    );
+    println!("cargo:rustc-link-lib=static=bvnr");
+    true
+}
+
 fn compile_library(repo: &Path, gen_dir: &Path) {
+    if link_prebuilt(repo) {
+        return;
+    }
     let target = env::var("TARGET").expect("TARGET");
     let mut build = cc::Build::new();
 

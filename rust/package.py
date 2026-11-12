@@ -17,11 +17,18 @@ staged copy instead:
         c/include/        include/*.h
         c/src/            the C sources build.rs compiles, and every src/ header
         c/generated/      the generators' output (*.gen.inc)
+        c/prebuilt/       one static library per target, from the platform jobs
 
 build.rs sees c/generated/ and builds from c/ without running anything, so the
 published crate needs a C compiler but no Python. tests/ and fuzz/ stay out:
 they read ../examples and ../src/gendata, which only the repository has, and
 the repository's CI runs them.
+
+c/prebuilt/<triple>/ is the static library the job that builds that platform
+already produces (x86_64 MSVC, both macOS architectures), so a crate on that
+target links it and needs no C compiler at all. `--prebuilt DIR` takes a
+directory of the `bovnar-prebuilt-<triple>` Actions artifacts; build.rs's
+PREBUILT list says which. A publish refuses to run without them.
 
 PROVENANCE.json is what a consumer that vendors the C library from the crate
 ties it to: the repository, the commit and (on a release) the tag, and the
@@ -36,13 +43,13 @@ that repository's .gitignore to the package), so the default is a fresh
 temporary directory.
 
 Usage:
-    python3 rust/package.py [--out DIR] [--no-cargo] [-- CARGO-ARGS...]
+    python3 rust/package.py [--out DIR] [--prebuilt DIR] [--no-cargo] [-- CARGO-ARGS...]
 
 CARGO-ARGS default to `package`, which builds the .crate and verifies it by
 compiling it on its own. --no-cargo stages and checks only, and removes a
 staging directory it created. Other examples:
     python3 rust/package.py -- publish --dry-run
-    python3 rust/package.py -- publish            # needs a crates.io token
+    python3 rust/package.py --prebuilt prebuilt -- publish   # needs a crates.io token
 """
 import argparse
 import hashlib
@@ -57,6 +64,7 @@ import tempfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GENERATORS_RE = re.compile(r"const GENERATORS: \[[^\]]+\] = \[(.*?)\];", re.S)
 SOURCES_RE = re.compile(r"const SOURCES: \[[^\]]+\] = \[(.*?)\];", re.S)
+PREBUILT_RE = re.compile(r"const PREBUILT: \[[^\]]+\] = \[(.*?)\];", re.S)
 PUBLISH_RE = re.compile(r"^# Not from here:.*?^publish = false\n", re.S | re.M)
 VERSION_RE = re.compile(r'^version = "([^"]+)"', re.M)
 
@@ -83,8 +91,20 @@ def build_rs_list(root, regex):
     return re.findall(r'"([^"]+)"', m.group(1))
 
 
-def stage(crate, root=ROOT):
+def prebuilt_list(root):
+    """build.rs's PREBUILT, as [(target triple, archive name)]."""
+    flat = build_rs_list(root, PREBUILT_RE)
+    return list(zip(flat[::2], flat[1::2], strict=True))
+
+
+def stage(crate, root=ROOT, prebuilt=None):
     """Stage the crate from the work tree at `root` into `crate`.
+
+    `prebuilt` is a directory holding `bovnar-prebuilt-<triple>/<archive>` for
+    every triple rust/build.rs lists: the CI artifacts that let the crate build
+    without a C compiler on those targets. They are copied into `c/prebuilt/`
+    and get no `from` in the manifest -- they are build output of the commit,
+    not a file of it.
 
     Returns {crate path: where it came from}: the repository path a file was
     copied from, or "generated" for the generators' output.
@@ -148,6 +168,20 @@ def stage(crate, root=ROOT):
     missing = [s for s in sources if not os.path.exists(os.path.join(crate, "c", s))]
     if missing:
         sys.exit("package.py: build.rs names sources git does not track: %s" % missing)
+
+    # The prebuilt archives, one per triple build.rs names, from the artifacts
+    # the platform jobs upload. All of them or none: a crate that silently lost
+    # one would start needing a C compiler on a target it promised not to.
+    if prebuilt:
+        for triple, archive in prebuilt_list(root):
+            src = os.path.join(prebuilt, "bovnar-prebuilt-" + triple, archive)
+            if not os.path.isfile(src):
+                sys.exit(f"package.py: {src} is missing (build.rs PREBUILT names "
+                         f"{archive} for {triple})")
+            dest = f"c/prebuilt/{triple}/{archive}"
+            os.makedirs(os.path.dirname(os.path.join(crate, dest)), exist_ok=True)
+            shutil.copy2(src, os.path.join(crate, dest))
+            origin[dest] = None
     return origin
 
 
@@ -173,15 +207,17 @@ def crate_files(crate):
 def provenance(crate, origin, root=ROOT):
     """The manifest for a crate staged from `root`, as a dict."""
     with open(os.path.join(crate, "Cargo.toml"), encoding="utf-8") as f:
-        version = VERSION_RE.search(f.read()).group(1)
+        version = VERSION_RE.search(f.read())
+    if version is None:
+        sys.exit("package.py: the staged Cargo.toml has no version")
+    version = version.group(1)
     commit = git(root, "rev-parse", "HEAD").strip()
     tag = "v" + version
     tagged = tag in git(root, "tag", "--points-at", "HEAD").split()
     dirty = bool(git(root, "status", "--porcelain", "--untracked-files=no").strip())
     files = crate_files(crate)
     return {
-        "schema": 1,
-        "crate": "bovnar",
+        "schema": 1,        "crate": "bovnar",
         "version": version,
         "repository": REPOSITORY,
         "commit": commit,
@@ -190,6 +226,10 @@ def provenance(crate, origin, root=ROOT):
         # not the commit's, and a publish refuses the crate.
         "dirty": dirty,
         "generators": build_rs_list(root, GENERATORS_RE),
+        # The GitHub Actions artifact each c/prebuilt/<triple> came from: the job
+        # that builds the library for that platform, in the run of this commit.
+        "prebuilt": {rel.split("/")[2]: "bovnar-prebuilt-" + rel.split("/")[2]
+                     for rel in files if rel.startswith("c/prebuilt/")},
         "files": {rel: {"sha256": sha256(os.path.join(crate, rel)),
                         "from": origin.get(rel)} for rel in files},
     }
@@ -207,14 +247,25 @@ def main():
     if "--" in argv:
         i = argv.index("--")
         argv, cargo_args = argv[:i], argv[i + 1:] or cargo_args
-    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
     ap.add_argument("--out", help="staging directory (default: a new temporary one)")
+    ap.add_argument("--prebuilt",
+                    help="directory of bovnar-prebuilt-<triple> artifacts from "
+                         "the platform jobs (required to publish)")
     ap.add_argument("--no-cargo", action="store_true",
                     help="stage and check only; do not run cargo")
     args = ap.parse_args(argv)
 
     out = os.path.abspath(args.out) if args.out else tempfile.mkdtemp(prefix="bovnar-crate-")
     crate = os.path.join(out, "bovnar")
+    publishing = not args.no_cargo and cargo_args[0] == "publish" \
+        and "--dry-run" not in cargo_args
+    # A published crate is immutable and every target it promised a prebuilt
+    # archive for keeps that promise until the next release. The dry run is the
+    # rehearsal of exactly that file, so it needs them too.
+    if not args.no_cargo and cargo_args[0] == "publish" and not args.prebuilt:
+        sys.exit("package.py: a publish needs --prebuilt DIR (the "
+                 "bovnar-prebuilt-<triple> artifacts); see rust/build.rs PREBUILT")
     if os.path.exists(crate):
         shutil.rmtree(crate)
     inside = subprocess.run(["git", "-C", out, "rev-parse", "--is-inside-work-tree"],
@@ -223,15 +274,17 @@ def main():
         sys.exit("package.py: %s is inside a git work tree; pick a directory "
                  "outside it" % out)
 
-    origin = stage(crate)
+    origin = stage(crate, prebuilt=args.prebuilt)
     data = provenance(crate, origin)
     write_manifest(crate, data)
-    print("package.py: staged %s from %s%s%s" % (
-        crate, data["commit"], " (%s)" % data["tag"] if data["tag"] else "",
-        ", with uncommitted changes" if data["dirty"] else ""), flush=True)
+    print(
+        f"package.py: staged {crate} from {data['commit']}"
+        f"{' (' + data['tag'] + ')' if data['tag'] else ''}"
+        f"{', with uncommitted changes' if data['dirty'] else ''}",
+        f"with {len(data['prebuilt'])} prebuilt "
+        f"{'archive' if len(data['prebuilt']) == 1 else 'archives'}",
+        flush=True)
 
-    publishing = not args.no_cargo and cargo_args[0] == "publish" \
-        and "--dry-run" not in cargo_args
     sys.path.insert(0, ROOT)
     import check_crate_provenance
     problems = check_crate_provenance.check(

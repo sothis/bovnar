@@ -18,6 +18,9 @@ the manifest worth trusting:
   * every file in the crate is listed, with the hash it has, and nothing listed
     is missing (in a .crate, cargo's own normalized Cargo.toml is not ours:
     the manifest's Cargo.toml is cargo's Cargo.toml.orig);
+  * a c/prebuilt/<triple>/ static library is build output, not a file of the
+    commit: its hash is checked, and that its triple and archive are the ones
+    rust/build.rs links; it is left out of the restage, which cannot produce it;
   * staged again from the named commit, the crate comes out the same, so the
     manifest, and with it every hash, is what that commit produces: the copied
     sources byte for byte, and the generated tables as its generators make them;
@@ -43,7 +46,7 @@ import tempfile
 ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(ROOT, "rust"))
 
-import package  # noqa: E402  rust/package.py: staging and the manifest
+import package  # type: ignore  # noqa: E402  rust/package.py: staging and the manifest
 
 # Files cargo writes into a .crate that no source has.
 CARGO_MADE = {"Cargo.toml", ".cargo_vcs_info.json"}
@@ -126,6 +129,30 @@ def check(path, allow_dirty=False, tag=None):
             if package.sha256(have[rel]) != listed[rel]["sha256"]:
                 problems.append("%s does not have the manifest's SHA-256" % rel)
 
+        # The prebuilt static libraries are build output of the commit, not a
+        # file of it, so staging the commit again cannot produce them: their
+        # hash is checked above and they are left out of the restage below. What
+        # can be checked is that each sits where build.rs looks for it, under
+        # the artifact the job that builds that platform uploads.
+        triples = set()
+        for rel in sorted(r for r in have if r.startswith("c/prebuilt/")):
+            parts = rel.split("/")
+            if len(parts) != 4:
+                problems.append(f"{rel} is not c/prebuilt/<triple>/<archive>")
+                continue
+            triple, archive = parts[2], parts[3]
+            triples.add(triple)
+            if (triple, archive) not in package.prebuilt_list(ROOT):
+                problems.append(
+                    f"{rel}: build.rs PREBUILT wants no {archive} for {triple}")
+            if manifest.get("prebuilt", {}).get(triple) != "bovnar-prebuilt-" + triple:
+                problems.append(
+                    f"{rel}: the manifest names no bovnar-prebuilt-{triple} artifact")
+        for triple in sorted(set(manifest.get("prebuilt", {})) - triples):
+            problems.append(
+                f"the manifest names a bovnar-prebuilt-{triple} artifact the "
+                "crate does not carry")
+
         commit, named = manifest["commit"], manifest["tag"]
         if manifest["dirty"] and not allow_dirty:
             problems.append("the crate was staged from uncommitted changes on %s"
@@ -147,13 +174,15 @@ def check(path, allow_dirty=False, tag=None):
             problems.append(why)
         else:
             for key in sorted(set(manifest) | set(again)):
-                if key == "files":
+                if key in ("files", "prebuilt"):
                     continue
                 if manifest.get(key) != again.get(key):
                     problems.append("%s: the manifest says %r, the commit gives %r"
                                     % (key, manifest.get(key), again.get(key)))
             mine, theirs = listed, again["files"]
             for rel in sorted(set(mine) | set(theirs)):
+                if rel.startswith("c/prebuilt/"):
+                    continue
                 if mine.get(rel) != theirs.get(rel):
                     problems.append("%s: not what commit %s stages (%s)" % (
                         rel, commit[:12],
@@ -165,7 +194,7 @@ def check(path, allow_dirty=False, tag=None):
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
     ap.add_argument("crate", help="a staged crate directory or a .crate file")
     ap.add_argument("--tag", help="require the manifest to name this tag")
     ap.add_argument("--allow-dirty", action="store_true",

@@ -92,8 +92,9 @@ jobs:
           if not exist build\msvc\bvnr.lib exit /b 1
           if not exist build\msvc\bvnr_static.lib exit /b 1
           if not exist build\msvc\bovnar.exe exit /b 1
-          dumpbin /exports build\msvc\bvnr.dll | findstr /i "bvnr_version \
-          bvnr_read"
+          dumpbin /exports build\msvc\bvnr.dll > exports.txt
+          findstr /i bvnr_version exports.txt
+          findstr /i bvnr_read exports.txt
 
       # The static library the Rust crate links instead of compiling the C
       # sources (rust/build.rs PREBUILT, staged by rust/package.py). Copied to
@@ -134,8 +135,8 @@ jobs:
         shell: pwsh
         run: |
           Get-Content pp.txt
-          if (-not (Select-String -Path pp.txt -Pattern '<uint:8>' -Quiet)) { \
-          Write-Error 'missing <uint:8>'; exit 1 }
+          $ok = Select-String -Path pp.txt -Pattern '<uint:8>' -Quiet
+          if (-not $ok) { Write-Error 'missing <uint:8>'; exit 1 }
 
       - name: smoke - events (binary-mode stdin)
         shell: pwsh

@@ -1058,15 +1058,9 @@ jobs:
     # They are skipped on a release-* push, which must not skip the rehearsal,
     # hence the explicit `if:`: every need succeeded, or was one of the two
     # that may be skipped.
-    needs: [msvc,
-      mingw,
-      linux,
-      macos,
-      freebsd,
-      source,
-      tests,
-      rust_version,
-      rust, rust_wasm, rust_package, rust_prebuilt, build_wheels, build_sdist]
+    needs: [msvc, mingw, linux, macos, freebsd, source, tests, rust_version,
+            rust, rust_wasm, rust_package, rust_prebuilt, build_wheels,
+            build_sdist]
     if: >-
       !cancelled() &&
       needs.msvc.result == 'success' &&
@@ -1254,8 +1248,8 @@ jobs:
     # skipped: a shortage the first re-run cured left a second, skipped
     # "Runner shortage retry" entry behind.
     needs: [msvc, mingw, tests, linux, macos, freebsd, rust_version, rust,
-            rust_wasm, rust_package, source, build_wheels, build_sdist,
-            publish, publish_crate, release]
+            rust_wasm, rust_package, source, build_wheels, build_sdist, publish,
+            publish_crate, release]
     # A real failure is handed over too; the retry workflow tells it apart and
     # leaves the run alone. A cancelled job is the shortage's own signature;
     # `!cancelled()` keeps out a run superseded by a newer push (re-running it

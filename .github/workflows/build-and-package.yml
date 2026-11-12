@@ -90,6 +90,24 @@ jobs:
           if not exist build\msvc\bovnar.exe exit /b 1
           dumpbin /exports build\msvc\bvnr.dll | findstr /i "bvnr_version bvnr_read"
 
+      # The static library the Rust crate links instead of compiling the C
+      # sources (rust/build.rs PREBUILT, staged by rust/package.py). Copied to
+      # the name build.rs asks the linker for, under the artifact the other
+      # jobs' convention gives the triple.
+      - name: Stage the prebuilt static library for the crate
+        run: |
+          $dest = 'prebuilt\bovnar-prebuilt-x86_64-pc-windows-msvc'
+          New-Item -ItemType Directory -Force $dest | Out-Null
+          Copy-Item build\msvc\bvnr_static.lib "$dest\bvnr.lib"
+          Get-ChildItem -Recurse prebuilt
+
+      - name: Upload the Rust prebuilt artifact (MSVC)
+        uses: actions/upload-artifact@v7
+        with:
+          name: bovnar-prebuilt-x86_64-pc-windows-msvc
+          path: prebuilt/bovnar-prebuilt-*
+          if-no-files-found: error
+
       - name: Prepare sample document
         shell: pwsh
         run: Set-Content -NoNewline -Encoding ascii smoke.bvnr ".a = <uint:8> 7;`n.b = <float:64> 3.5;`n"
@@ -398,6 +416,25 @@ jobs:
           path: build/bovnar-macos-*.tar.xz
           if-no-files-found: error
 
+      # One fat archive serves both slices: the linker takes the one for its
+      # architecture, and the check above proved both are in it. This is the
+      # library rust/build.rs links on macOS instead of compiling the C sources.
+      - name: Stage the prebuilt static libraries for the crate
+        run: |
+          set -euo pipefail
+          for t in x86_64-apple-darwin aarch64-apple-darwin; do
+            mkdir -p "prebuilt/bovnar-prebuilt-$t"
+            cp build/libbvnr.a "prebuilt/bovnar-prebuilt-$t/libbvnr.a"
+          done
+          ls -lR prebuilt
+
+      - name: Upload the Rust prebuilt artifact (macOS)
+        uses: actions/upload-artifact@v7
+        with:
+          name: bovnar-prebuilt-macos
+          path: prebuilt/bovnar-prebuilt-*
+          if-no-files-found: error
+
       - name: smoke - validate + pretty-print + events (arm64)
         run: |
           printf '.a = <uint:8> 7;\n.b = <float:64> 3.5;\n' > smoke.bvnr
@@ -625,16 +662,30 @@ jobs:
   # c/ and the crate builds from those, without Python. This is the rehearsal
   # of `publish_crate`: on every push the same staging and `cargo publish
   # --dry-run`, which packs the crate and compiles it from the package alone.
+  #
+  # The prebuilt archives come from the jobs above, which build that platform's
+  # library already: the crate carries them in c/prebuilt/ and links one instead
+  # of compiling c/. This leg builds from c/ (there is no Linux archive), which
+  # is what keeps that path honest.
   rust_package:
     name: Rust crate package
+    needs: [msvc, macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: bovnar-prebuilt-*
+          path: ${{ runner.temp }}/prebuilt
+          merge-multiple: true
+
       - name: Stage, package and verify the crate
-        run: python3 rust/package.py --out "$RUNNER_TEMP/crate" -- publish --dry-run --locked
+        run: >-
+          python3 rust/package.py --out "$RUNNER_TEMP/crate"
+          --prebuilt "$RUNNER_TEMP/prebuilt" -- publish --dry-run --locked
 
       # package.py checked the staged copy before cargo ran; this checks what
       # cargo packed from it, the file crates.io would get. On a release tag
@@ -655,9 +706,72 @@ jobs:
 
       # The unit profiles are Cargo features; a build with all of them off
       # must still compile (THIRD_PARTY_NOTICES tells distributors they can).
+      # It cannot use a prebuilt archive -- those have every profile in -- so
+      # this is also the leg that compiles c/ on the packaged crate here.
       - name: Build the packaged crate with no unit profiles
         working-directory: ${{ runner.temp }}/crate/bovnar
         run: cargo build --locked --no-default-features
+
+  # crates.io gets a crate that, on the targets the jobs above assign a prebuilt
+  # archive, links c/prebuilt/<triple> instead of compiling the fifteen C
+  # sources. An archive is only worth shipping if it links and runs, so this
+  # stages the same crate package.py stages and runs its unit tests against it,
+  # on the runner of each target, with no C compilation in the job at all.
+  rust_prebuilt:
+    name: Rust crate, prebuilt C (${{ matrix.name }})
+    needs: [msvc, macos]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The x86_64 slice is built, not run: Rosetta is not on every image,
+          # and linking is what the prebuilt archive must prove there.
+          - name: macOS
+            os: macos-26
+            python: python3
+            build: x86_64-apple-darwin
+            test: aarch64-apple-darwin
+          - name: MSVC x64
+            os: windows-latest
+            python: python
+            build: x86_64-pc-windows-msvc
+            test: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.build }} ${{ matrix.test }}
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: bovnar-prebuilt-*
+          path: ${{ runner.temp }}/prebuilt
+          merge-multiple: true
+
+      - name: Stage the crate the way a publish stages it
+        shell: bash
+        run: |
+          set -euo pipefail
+          ${{ matrix.python }} rust/package.py --out "$RUNNER_TEMP/crate" \
+            --prebuilt "$RUNNER_TEMP/prebuilt" --no-cargo
+          # The lib's unit tests include ../tests/json, which ships with the
+          # repository and not with the crate: give the staged copy what they
+          # expect, so they run against the prebuilt archive.
+          mkdir -p "$RUNNER_TEMP/crate/tests"
+          cp -R tests/json "$RUNNER_TEMP/crate/tests/"
+
+      - name: Link the prebuilt archive and run the unit tests
+        working-directory: ${{ runner.temp }}/crate/bovnar
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --locked --lib --target "${{ matrix.build }}"
+          # abi_tests compile tests/bvnr_abi_dump.c, which the crate does not
+          # ship; they run in the from-source legs for every target.
+          cargo test --locked --lib --target "${{ matrix.test }}" \
+            -- --skip abi_tests
 
   source:
     name: Source tarball
@@ -812,7 +926,8 @@ jobs:
     name: Publish to crates.io
     # Gated like `publish`: a crates.io version is immutable (yanking only hides
     # it), so it waits for every Rust job, the C suite and the GitHub release.
-    needs: [rust_version, rust, rust_wasm, rust_package, tests, release]
+    needs: [rust_version, rust, rust_wasm, rust_package, rust_prebuilt, tests,
+            release]
     runs-on: ubuntu-latest
     # Only publish on a version tag (e.g. v2.0.1).
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
@@ -875,7 +990,7 @@ jobs:
     # They are skipped on a release-* push, which must not skip the rehearsal,
     # hence the explicit `if:`: every need succeeded, or was one of the two
     # that may be skipped.
-    needs: [msvc, mingw, linux, macos, freebsd, source, tests, rust_version, rust, rust_wasm, rust_package, build_wheels, build_sdist]
+    needs: [msvc, mingw, linux, macos, freebsd, source, tests, rust_version, rust, rust_wasm, rust_package, rust_prebuilt, build_wheels, build_sdist]
     if: >-
       !cancelled() &&
       needs.msvc.result == 'success' &&
@@ -889,6 +1004,7 @@ jobs:
       needs.rust.result == 'success' &&
       needs.rust_wasm.result == 'success' &&
       needs.rust_package.result == 'success' &&
+      needs.rust_prebuilt.result == 'success' &&
       (needs.build_wheels.result == 'success' || needs.build_wheels.result == 'skipped') &&
       (needs.build_sdist.result == 'success' || needs.build_sdist.result == 'skipped')
     runs-on: ubuntu-latest
@@ -905,7 +1021,9 @@ jobs:
 
       # No merge-multiple: each artifact lands in staging/<artifact-name>/, which
       # is what lets the step below check every archive against the job that
-      # built it.
+      # built it. The bovnar-prebuilt-<triple> artifacts come along and are left
+      # in staging on purpose: those archives ship inside the crates.io crate,
+      # not as release assets.
       - uses: actions/download-artifact@v8
         with:
           pattern: bovnar-*

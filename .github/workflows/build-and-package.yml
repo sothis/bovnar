@@ -824,6 +824,21 @@ jobs:
           cargo test --locked --lib --target "${{ matrix.test }}" \
             -- --skip abi_tests
 
+      # A silent fallback to compiling c/ would build and test fine here and
+      # still ship the crate this job exists to check. build.rs says which way
+      # it went, so read it back for each target.
+      - name: It linked the archive, it did not compile the C sources
+        working-directory: ${{ runner.temp }}/crate/bovnar
+        shell: bash
+        run: |
+          set -euo pipefail
+          for t in "${{ matrix.build }}" "${{ matrix.test }}"; do
+            out=$(find "target/$t" -path '*/build/bovnar-*/output' | head -1)
+            grep -q "native=.*c/prebuilt/$t" "$out" \
+              || { echo "::error::$t compiled c/ instead of linking"; exit 1; }
+            echo "$t: $(grep -o 'link-search=native=.*' "$out")"
+          done
+
   source:
     name: Source tarball
     runs-on: ubuntu-latest

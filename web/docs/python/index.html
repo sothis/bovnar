@@ -1517,7 +1517,7 @@ Each raises <code>BovnarArgumentError</code> where the C one returns <code>false
 </tr>
 <tr>
 <td><code>format_double(value, vt)</code></td>
-<td>The literal the writer emits under <code>vt</code>: the shortest digits that read back to the same double, in base 10 or 16 (any other base raises). A <code>float:16</code> or <code>float:32</code> value is first rounded to IEEE binary16 or binary32 (<code>2049.0</code> is <code>2.048e+3</code> under <code>float:16</code>) and printed with the digits of a 16- or 32-bit significand, so it reads back as that value without rounding to the format (<code>65504.0</code> is <code>6.5504e+4</code>); a finite value the format cannot hold raises</td>
+<td>The literal the writer emits under <code>vt</code>: the shortest digits that read back to the same double, in base 10 or 16 (any other base raises). A <code>float:16</code> or <code>float:32</code> value is first rounded to IEEE binary16 or binary32 (<code>2049.0</code> is <code>2.048e+3</code> under <code>float:16</code>) and printed with the digits of a 16- or 32-bit significand, so it reads back as that value without rounding to the format (<code>65504.0</code> is <code>6.5504e+4</code>); a subnormal has no full significand, so it gets the shortest decimal that reads back as the declared format (<code>2**-149</code> under <code>float:32</code> is <code>1.4e-45</code>, which the reader rounds to the format); a finite value the format cannot hold raises</td>
 </tr>
 <tr>
 <td><code>escape_repl_table()</code></td>
@@ -2612,7 +2612,11 @@ were recovered, and <code>recovery_count</code> is how to tell that any were (sp
 </tbody>
 </table>
 <p>To see the errors a <code>continue_on_error</code> read recovered from, pass <code>on_error</code>
-(§11.2): it is called with each one.</p>
+(§11.2): it is called with each one. The count itself belongs to the reader
+object, so it is reachable from <code>Reader</code> and from the feeds that keep one;
+<code>loads()</code> and <code>load()</code> build a reader inside the call and drop it, so neither
+reports a count — a caller who needs it reads through <code>Reader.read_mem</code> or
+<code>Reader.read_stream</code>.</p>
 <h3 id="117-max_filesize_bytes">11.7 <code>MAX_FILESIZE_BYTES</code></h3>
 <div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">bovnar</span><span class="w"> </span><span class="kn">import</span> <span class="n">MAX_FILESIZE_BYTES</span>   <span class="c1"># 16 * 1024 * 1024  (16 MiB)</span>
 </code></pre></div>

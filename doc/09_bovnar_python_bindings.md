@@ -1379,7 +1379,7 @@ Each raises `BovnarArgumentError` where the C one returns `false` or -1:
 | `parse_int64(s, vt)` / `parse_uint64(s, vt)` | The integer literal in the type's base; refused when it does not fit the type's width (64 when it declares none), and for a `+` or a space before it |
 | `parse_double(s, vt)` / `parse_double_in_base(s, base)` | The float literal (base 10 or 16; `inf`, `ninf` and `nan`, not `-inf`) as the nearest double, rounded once from its exact value |
 | `format_uint64(value, base=10, min_digits=0)` / `format_int64(...)` | The digits in base 2 to 62, 64 or 85, padded with zero digits to `min_digits` (which the C function caps at 64). A negative value has no form in bases 64 and 85 |
-| `format_double(value, vt)` | The literal the writer emits under `vt`: the shortest digits that read back to the same double, in base 10 or 16 (any other base raises). A `float:16` or `float:32` value is first rounded to IEEE binary16 or binary32 (`2049.0` is `2.048e+3` under `float:16`) and printed with the digits of a 16- or 32-bit significand, so it reads back as that value without rounding to the format (`65504.0` is `6.5504e+4`); a finite value the format cannot hold raises |
+| `format_double(value, vt)` | The literal the writer emits under `vt`: the shortest digits that read back to the same double, in base 10 or 16 (any other base raises). A `float:16` or `float:32` value is first rounded to IEEE binary16 or binary32 (`2049.0` is `2.048e+3` under `float:16`) and printed with the digits of a 16- or 32-bit significand, so it reads back as that value without rounding to the format (`65504.0` is `6.5504e+4`); a subnormal has no full significand, so it gets the shortest decimal that reads back as the declared format (`2**-149` under `float:32` is `1.4e-45`, which the reader rounds to the format); a finite value the format cannot hold raises |
 | `escape_repl_table()` | A `dict` of each escape letter to the character it stands for: `t`, `n`, `v`, `f`, `r`, `"` and `\`. The `\x` and `\u` escapes of spec 1.1 take digits and are not in it |
 
 ```python
@@ -2163,7 +2163,11 @@ were recovered, and `recovery_count` is how to tell that any were (spec §13.4).
 | `declared_version` | `tuple[int, int] \| None` | The `(major, minor)` of a leading `#!bovnar M.N` directive, `None` when the document declared none; valid after a read |
 
 To see the errors a `continue_on_error` read recovered from, pass `on_error`
-(§11.2): it is called with each one.
+(§11.2): it is called with each one. The count itself belongs to the reader
+object, so it is reachable from `Reader` and from the feeds that keep one;
+`loads()` and `load()` build a reader inside the call and drop it, so neither
+reports a count — a caller who needs it reads through `Reader.read_mem` or
+`Reader.read_stream`.
 
 ### 11.7 `MAX_FILESIZE_BYTES`
 

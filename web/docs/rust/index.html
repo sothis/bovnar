@@ -2485,7 +2485,7 @@ Each returns <code>Err(Error::Argument)</code> where the C one returns <code>fal
 </tr>
 <tr>
 <td><code>format_double(value, vt)</code></td>
-<td>The literal the writer emits under <code>vt</code>: the shortest digits that read back to the same <code>f64</code>, in base 10 or 16 (any other base fails). A <code>float:16</code> or <code>float:32</code> value is first rounded to IEEE binary16 or binary32 (<code>2049.0</code> is <code>2.048e+3</code> under <code>float:16</code>) and printed with the digits of a 16- or 32-bit significand, so it reads back as that value without rounding to the format (<code>65504.0</code> is <code>6.5504e+4</code>); a finite value the format cannot hold fails</td>
+<td>The literal the writer emits under <code>vt</code>: the shortest digits that read back to the same <code>f64</code>, in base 10 or 16 (any other base fails). A <code>float:16</code> or <code>float:32</code> value is first rounded to IEEE binary16 or binary32 (<code>2049.0</code> is <code>2.048e+3</code> under <code>float:16</code>) and printed with the digits of a 16- or 32-bit significand, so it reads back as that value without rounding to the format (<code>65504.0</code> is <code>6.5504e+4</code>); a subnormal has no full significand, so it gets the shortest decimal that reads back as the declared format (<code>2f64.powi(-149)</code> under <code>float:32</code> is <code>1.4e-45</code>, which the reader rounds to the format); a finite value the format cannot hold fails</td>
 </tr>
 <tr>
 <td><code>escape_repl_table()</code></td>

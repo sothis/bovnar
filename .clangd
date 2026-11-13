@@ -1,11 +1,14 @@
 # The wasm translation unit is compiled by wasm/build_wasm.sh with include/,
 # src/utils and wasm on the path (and the amalgamated bovnar.h ahead of them in
 # the real build). Without them the editor's clang cannot find bovnar.h at all,
-# so every symbol in the file reads as undeclared. One flag per entry: a
+# so every symbol in the file reads as undeclared. build/generated carries the
+# .gen.inc tables the build writes (bvn_unit_impl.h includes them), and without
+# it that translation unit cannot be parsed at all. One flag per entry: a
 # "-I include" with a space is a single argument whose path starts with a space.
 CompileFlags:
   Add:
     - -Iinclude
     - -Isrc/utils
     - -Iwasm
+    - -Ibuild/generated
     - -std=c11

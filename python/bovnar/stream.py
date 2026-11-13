@@ -188,7 +188,7 @@ def dump_documents(objs: Iterable[dict], *, pretty: bool = True,
 @overload
 def dump_documents(objs: Iterable[dict], *, pretty: bool = True,
                    file: Any) -> None: ...
-def dump_documents(objs, *, pretty: bool = True, file=None):
+def dump_documents(objs, *, pretty: bool = True, file=None):  # pyright: ignore[reportInconsistentOverload]
     """Serialise each dict (via :func:`bovnar.dumps`) and frame the results;
     with ``file``, write each frame there as it is made (see
     :func:`frame_documents`)."""
@@ -1198,6 +1198,37 @@ class DocumentFeed(_Feed):
 # FrameFeed
 # ---------------------------------------------------------------------------
 
+def _frame_document_callbacks(lib, state, queue, new_parser,
+                             continue_past_failed, return_errors):
+    """The callbacks a parsing FrameFeed installs, built here rather than inside
+    the constructor: they close over the feed's state and queue by argument, so
+    nothing of the feed is a local of its own __init__."""
+
+    def on_event(ev, d):
+        return state['parser'].on_event(ev, d)
+
+    def on_document(_ud, index, ok, err):
+        try:
+            # Without continue_past_failed a failed document is the stream's
+            # error, not an item.
+            if ok:
+                queue.append(state['parser'].result())
+            elif continue_past_failed:
+                queue.append(
+                    _failed_document(lib, int(index), int(err))
+                    if return_errors else None)
+            if not ok and state['index'] is None:
+                state['index'], state['err'] = int(index), int(err)
+            state['parser'] = new_parser()
+            return True
+        except BaseException as exc:           # noqa: BLE001 (re-raised by feed)
+            if state['exc'] is None:
+                state['exc'] = exc
+            return False
+
+    return on_event, on_document
+
+
 class FrameFeed(_Feed):
     """A ``BVF1`` frame stream (:func:`frame_documents`), fed in pieces of any
     size; one C frame reader for the whole stream, however long.
@@ -1283,27 +1314,8 @@ class FrameFeed(_Feed):
                             'index': None, 'err': None}
         queue = self._queue
 
-        def on_event(ev, d):
-            return st['parser'].on_event(ev, d)
-
-        def on_document(_ud, index, ok, err):
-            try:
-                # Without continue_past_failed a failed document is the
-                # stream's error, not an item.
-                if ok:
-                    queue.append(st['parser'].result())
-                elif continue_past_failed:
-                    queue.append(
-                        _failed_document(lib, int(index), int(err))
-                        if return_errors else None)
-                if not ok and st['index'] is None:
-                    st['index'], st['err'] = int(index), int(err)
-                st['parser'] = new_parser()
-                return True
-            except BaseException as exc:           # noqa: BLE001 (re-raised by feed)
-                if st['exc'] is None:
-                    st['exc'] = exc
-                return False
+        on_event, on_document = _frame_document_callbacks(
+            lib, st, queue, new_parser, continue_past_failed, return_errors)
 
         self._cb_event = Reader._wrap_callback(on_event)
         self._cb_doc   = ON_DOCUMENT_FUNC(on_document)

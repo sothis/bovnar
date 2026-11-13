@@ -69,7 +69,7 @@ from .structs import (
     BvnrDemuxItem,
     EVENT_CALLBACK_FUNC, ON_DOCUMENT_FUNC, MUX_ON_MSG_FUNC, ON_ERROR_FUNC,
 )
-from .reader import Reader, _read_limit, read_flags
+from .reader import Reader, UnitPolicy, _read_limit, read_flags
 from .writer import Writer
 
 # Mirrors of the C constants (bovnar.h / bovnar_stream.h).
@@ -1147,6 +1147,18 @@ class DocumentFeed(_Feed):
     def declared_version(self):
         """The ``#!bovnar M.N`` the document declared, or ``None``."""
         return self._reader.declared_version
+
+    def set_unit_policy(self, policy: UnitPolicy | None) -> None:
+        """Install (or, with ``None``, clear) the unit policy of the reader
+        behind this feed, as :meth:`Reader.set_unit_policy` does -- the one
+        live object that lacked it, Rust's ``live::DocumentFeed`` having had
+        it all along.
+
+        Set it before the first ``feed()``: a policy decides what a unit
+        string means, and the document has already been half-read by the time
+        a later call could change its mind.
+        """
+        self._reader.set_unit_policy(policy)
 
     def _destroy(self) -> None:
         self._reader.close()

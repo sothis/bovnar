@@ -958,3 +958,32 @@ class TestThirdReviewFixes:
         got = list(f.feed(mm)) + list(f.finish())
         assert got == [Value('a', 1), Value('b', 2)]
         mm.close()
+
+
+def test_document_feed_takes_a_unit_policy():
+    """Item 11 of the binding-review list: ``DocumentFeed`` was the one live
+    object with no unit policy of its own -- ``Reader`` and ``Writer`` have
+    ``set_unit_policy`` and Rust's ``live::DocumentFeed`` always had it -- so a
+    fed stream was the only read with no policy to set. Held to the ``Reader``
+    it stands in for, as everything else in this file is."""
+    policy = bovnar.UnitPolicy(targets=["m"], require_unit=True)
+
+    f = DocumentFeed(events=False, values=True)
+    f.set_unit_policy(policy)
+    assert list(f.feed(b".a = 1 m;")) + list(f.finish()) == [Value("a", 1)]
+
+    g = DocumentFeed(events=False, values=True)
+    g.set_unit_policy(policy)
+    with pytest.raises(BovnarParseError) as fed:
+        list(g.feed(b".c = 3;")) + list(g.finish())
+
+    r = Reader()
+    r.set_unit_policy(policy)
+    with pytest.raises(BovnarParseError) as read:
+        r.read_mem(b".c = 3;")
+    assert fed.value.code == read.value.code      # a unitless value is refused
+
+    h = DocumentFeed(events=False, values=True)
+    h.set_unit_policy(policy)
+    h.set_unit_policy(None)                       # back to no policy at all
+    assert list(h.feed(b".c = 3;")) + list(h.finish()) == [Value("c", 3)]

@@ -13,6 +13,9 @@ state, so callers guessed and got a TypeError either way.
 """
 from fractions import Fraction
 
+# The negative tests below pass a wrong type on purpose, to prove the refusal;
+# those lines carry a `# pyright: ignore` for the argument-type rule they
+# break, rather than switching the rule off for the whole file.
 import pytest
 
 import bovnar
@@ -93,7 +96,7 @@ class TestUnitObject:
 
     def test_constructor_rejects_nonsense(self):
         with pytest.raises(BovnarArgumentError):
-            Unit(42)
+            Unit(42)  # pyright: ignore[reportArgumentType]
 
 
 class TestAccessorsAreProperties:
@@ -112,7 +115,7 @@ class TestAccessorsAreProperties:
 
     def test_fixed_point(self):
         q = _q(b".x = <float_fix:32,q8> 3.26953125;")
-        mantissa, bits = q.fixed_point
+        mantissa, bits = q.fixed_point  # pyright: ignore[reportGeneralTypeIssues]
         assert bits == 8
         assert mantissa / (1 << bits) == 3.26953125
 
@@ -121,23 +124,23 @@ class TestAccessorsAreProperties:
         other one fails loudly rather than silently returning a bound method."""
         q = _q(b".x = <float:64> 1.0;")
         with pytest.raises(TypeError):
-            q.decimal()
+            q.decimal()  # pyright: ignore[reportCallIssue, reportOptionalCall]
 
 
 class TestQuantityValidation:
     def test_rejects_bad_vtype(self):
         with pytest.raises(BovnarArgumentError, match="ValueTypeSpec"):
-            Quantity("1", "nope")
+            Quantity("1", "nope")  # pyright: ignore[reportArgumentType]
 
     def test_rejects_bad_raw(self):
         vt = bovnar.make_type_spec(bovnar.ValueTypeFamily.UINT, 64, 0)
         with pytest.raises(BovnarArgumentError, match="raw"):
-            Quantity(123, vt)
+            Quantity(123, vt)  # pyright: ignore[reportArgumentType]
 
     def test_rejects_bad_frac(self):
         vt = bovnar.make_type_spec(bovnar.ValueTypeFamily.UINT, 64, 0)
         with pytest.raises(BovnarArgumentError, match="frac"):
-            Quantity("1", vt, frac=5)
+            Quantity("1", vt, frac=5)  # pyright: ignore[reportArgumentType]
 
     def test_accepts_a_unit_string_for_convenience(self):
         vt = bovnar.make_type_spec(bovnar.ValueTypeFamily.FLOAT, 64, 0)
@@ -195,8 +198,8 @@ class TestRawValueUnitEqualityMatchesUnit:
         vu, u = bovnar.parse_unit("m"), Unit.parse("m")
         assert u == vu and vu == u
         assert hash(u) == hash(vu)
-        assert {u: 1}[vu] == 1
-        assert {vu: 2}[u] == 2
+        assert {u: 1}[vu] == 1  # pyright: ignore[reportArgumentType]
+        assert {vu: 2}[u] == 2  # pyright: ignore[reportArgumentType]
         assert len({u, vu}) == 1
 
     def test_hash_separates_units_that_differ(self):
@@ -258,7 +261,7 @@ def test_unit_and_valueunit_hash_alike_across_the_catalogue():
         u = Unit.parse(spelling)
         assert u == vu and vu == u
         assert hash(u) == hash(vu), spelling
-        assert {u: 1}[vu] == 1
+        assert {u: 1}[vu] == 1  # pyright: ignore[reportArgumentType]
 
 
 class TestAffineIsNotAFactor:
@@ -320,7 +323,9 @@ class TestUnitIsAcceptedWhereAValueUnitIs:
         assert bovnar.unit_prefix_exponent(q.unit) == 3
         assert bovnar.unit_dimension_vector(q.unit)[0] == 1
         assert bovnar.unit_reduce(q.unit).scale == 1000.0
-        assert bovnar.unit_to_str(bovnar.unit_si_normal_form(q.unit)) == "m"
+        normal = bovnar.unit_si_normal_form(q.unit)
+        assert normal is not None
+        assert bovnar.unit_to_str(normal) == "m"
         assert bovnar.unit_to_profile("ucum", q.unit) == "km"
         assert bovnar.unit_to_ucum(q.unit) == "km"
         assert not bovnar.unit_is_profile_only(q.unit)
@@ -355,19 +360,19 @@ class TestAUnitShapedArgumentIsATypeMatter:
 
     def test_a_str_unit_is_a_type_error_not_a_ctypes_one(self):
         m = Unit.parse("m")
-        for call in (lambda: bovnar.convert_value(1.0, "m", m),
-                     lambda: bovnar.convert_value(1.0, m, "m"),
-                     lambda: bovnar.convert_rational(1, "m", m),
-                     lambda: bovnar.convert_rational(1, m, "m")):
+        for call in (lambda: bovnar.convert_value(1.0, "m", m),  # pyright: ignore[reportArgumentType]
+                     lambda: bovnar.convert_value(1.0, m, "m"),  # pyright: ignore[reportArgumentType]
+                     lambda: bovnar.convert_rational(1, "m", m),  # pyright: ignore[reportArgumentType]
+                     lambda: bovnar.convert_rational(1, m, "m")):  # pyright: ignore[reportArgumentType]
             with pytest.raises(TypeError, match="Unit or a ValueUnit"):
                 call()
 
     def test_a_unit_shaped_argument_elsewhere_too(self):
         m = Unit.parse("m")
-        for call in (lambda: bovnar.unit_to_str("m"),
-                     lambda: bovnar.unit_valid(5),
-                     lambda: bovnar.units_compatible(m, 5),
-                     lambda: bovnar.unit_convert_factor(m, None)):
+        for call in (lambda: bovnar.unit_to_str("m"),  # pyright: ignore[reportArgumentType]
+                     lambda: bovnar.unit_valid(5),  # pyright: ignore[reportArgumentType]
+                     lambda: bovnar.units_compatible(m, 5),  # pyright: ignore[reportArgumentType]
+                     lambda: bovnar.unit_convert_factor(m, None)):  # pyright: ignore[reportArgumentType]
             with pytest.raises(TypeError, match="Unit or a ValueUnit"):
                 call()
 

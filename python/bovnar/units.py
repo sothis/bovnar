@@ -28,7 +28,7 @@ from ._ffi import get_library
 from .enums import BaseUnit, SIPrefix, IECPrefix, Exponent
 from .structs import ValueUnit, ValueUnitPrefix, make_unit_compound, UNIT_STRING_MAX
 from .exceptions import BovnarArgumentError
-from .unit import _as_vu
+from .unit import UnitLike, _as_vu
 
 _SI_DIM_COUNT = 7
 SI_DIM_NAMES  = ('m', 'kg', 's', 'A', 'K', 'mol', 'cd')
@@ -89,7 +89,7 @@ class ReducedUnit:
     scale: float
 
 
-def unit_valid(unit: ValueUnit) -> bool:
+def unit_valid(unit: UnitLike) -> bool:
     """
     Return True when *unit* is structurally valid.
 
@@ -99,7 +99,7 @@ def unit_valid(unit: ValueUnit) -> bool:
     return bool(get_library().bvn_unit_valid(_as_vu(unit)))
 
 
-def unit_prefix_factor(unit: ValueUnit) -> float:
+def unit_prefix_factor(unit: UnitLike) -> float:
     """
     Return the combined SI/IEC prefix scale factor for *unit*.
 
@@ -117,7 +117,7 @@ def unit_prefix_factor(unit: ValueUnit) -> float:
     return float(get_library().bvn_unit_prefix_factor(_as_vu(unit)))
 
 
-def unit_prefix_exponent(unit: ValueUnit) -> int:
+def unit_prefix_exponent(unit: UnitLike) -> int:
     """
     Return the effective prefix exponent for *unit*.
 
@@ -145,7 +145,7 @@ def prefix_unit_valid(prefix: ValueUnitPrefix, base: BaseUnit | int) -> bool:
     return bool(get_library().bvn_prefix_unit_valid(prefix, int(base)))
 
 
-def unit_to_si_factor(unit: ValueUnit) -> SIConversion:
+def unit_to_si_factor(unit: UnitLike) -> SIConversion:
     """
     Return the full SI conversion for *unit*, including affine terms.
 
@@ -169,7 +169,7 @@ def unit_to_si_factor(unit: ValueUnit) -> SIConversion:
                         float(affine_off.value))
 
 
-def units_compatible(a: ValueUnit, b: ValueUnit) -> bool:
+def units_compatible(a: UnitLike, b: UnitLike) -> bool:
     """Return True when *a* and *b* may be inter-converted.
 
     That is the same SI dimension vector AND the same amount of every
@@ -185,7 +185,7 @@ def units_compatible(a: ValueUnit, b: ValueUnit) -> bool:
     return bool(get_library().bvn_units_compatible(_as_vu(a), _as_vu(b)))
 
 
-def units_equal(a: ValueUnit, b: ValueUnit) -> bool:
+def units_equal(a: UnitLike, b: UnitLike) -> bool:
     """Return True when *a* and *b* are the SAME unit, not merely commensurate.
 
     The strictest of the three questions. `units_compatible` asks whether the
@@ -208,7 +208,7 @@ def units_equal(a: ValueUnit, b: ValueUnit) -> bool:
     return bool(get_library().bvn_unit_equal(_as_vu(a), _as_vu(b)))
 
 
-def units_convertible(a: ValueUnit, b: ValueUnit) -> bool:
+def units_convertible(a: UnitLike, b: UnitLike) -> bool:
     """Return True when the library can actually convert *a* to *b*.
 
     This, not units_compatible, is the question to ask before choosing a
@@ -228,7 +228,7 @@ def units_convertible(a: ValueUnit, b: ValueUnit) -> bool:
     return bool(get_library().bvn_units_convertible(_as_vu(a), _as_vu(b)))
 
 
-def unit_si_normal_form(u: ValueUnit) -> ValueUnit | None:
+def unit_si_normal_form(u: UnitLike) -> ValueUnit | None:
     """The coherent SI form of *u*, or None when there is none to name.
 
     Prefixes are folded out, and mass comes back as ``k~g`` — the SI base unit
@@ -247,8 +247,8 @@ def unit_si_normal_form(u: ValueUnit) -> ValueUnit | None:
     return out
 
 
-def unit_convert_factor(from_unit: ValueUnit,
-                        to_unit: ValueUnit) -> UnitConversion:
+def unit_convert_factor(from_unit: UnitLike,
+                        to_unit: UnitLike) -> UnitConversion:
     """
     Return the conversion factor to go from *from_unit* to *to_unit*.
 
@@ -287,7 +287,7 @@ def unit_convert_factor(from_unit: ValueUnit,
                           bool(ok.value))
 
 
-def unit_dimension_vector(unit: ValueUnit) -> list[int]:
+def unit_dimension_vector(unit: UnitLike) -> list[int]:
     """
     Return the 7-element SI dimensional exponent vector [m, kg, s, A, K, mol, cd].
 
@@ -302,7 +302,7 @@ def unit_dimension_vector(unit: ValueUnit) -> list[int]:
     return list(dims)
 
 
-def unit_reduce(unit: ValueUnit) -> ReducedUnit:
+def unit_reduce(unit: UnitLike) -> ReducedUnit:
     """
     Simplify *unit* to its canonical named SI unit where possible.
 
@@ -332,7 +332,7 @@ def unit_reduce(unit: ValueUnit) -> ReducedUnit:
     return ReducedUnit(reduced, float(scale.value))
 
 
-def unit_to_str_ex(unit: ValueUnit,
+def unit_to_str_ex(unit: UnitLike,
                    flags: UnitFlags | int = UnitFlags.NONE) -> str:
     """
     Serialise *unit* to its string representation with formatting options.
@@ -452,8 +452,8 @@ def int_to_exponent(n: int) -> Exponent:
 
 
 def convert_value(value: float,
-                  from_unit: ValueUnit,
-                  to_unit: ValueUnit) -> float:
+                  from_unit: UnitLike,
+                  to_unit: UnitLike) -> float:
     """
     Convert *value* (expressed in *from_unit*) to *to_unit*.
 
@@ -473,7 +473,7 @@ def convert_value(value: float,
     return out.value
 
 
-def convert_rational(value, from_unit: ValueUnit, to_unit: ValueUnit):
+def convert_rational(value, from_unit: UnitLike, to_unit: UnitLike):
     """Convert *value* (an int, a :class:`fractions.Fraction` or anything
     ``Fraction()`` takes exactly, such as a ``Decimal``) from *from_unit* to
     *to_unit* EXACTLY, with the arbitrary-precision engine behind the reader's

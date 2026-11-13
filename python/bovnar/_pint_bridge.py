@@ -39,6 +39,7 @@ one registry across calls; otherwise a module-level default is built on first us
 from __future__ import annotations
 
 import weakref
+from typing import cast
 
 from .enums import (BaseUnit, SIPrefix, IECPrefix, Exponent, PrefixSystem,
                     EXPONENT_MIN, EXPONENT_MAX)
@@ -244,10 +245,13 @@ def from_pint_unit(unit, *, ureg=None, validate: bool = True) -> ValueUnit:
     revmap = _reverse_map(reg)
     comps = []
     for name, exp in items:
-        if exp != int(exp):
+        # pint's Scalar is int | float | Fraction at runtime; the cast is only
+        # for the checker, which types it as possibly complex.
+        whole = int(cast("int | float", exp))
+        if exp != whole:
             raise BovnarArgumentError(
                 f"non-integer exponent {exp} on {name!r} is not representable in bovnar")
-        exp = int(exp)
+        exp = whole
         if exp == 0 or not (EXPONENT_MIN <= exp <= EXPONENT_MAX):
             raise BovnarArgumentError(
                 f"exponent {exp} on {name!r} is outside bovnar's range "

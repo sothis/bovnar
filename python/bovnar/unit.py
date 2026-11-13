@@ -34,8 +34,15 @@ multiset of (base, exponent, prefix) triples, so ``Unit`` gets a ``==`` that mea
 ``ucum:mm[Hg]`` and from ``mmHg`` now compare equal on their units, which is what
 the format promises and what the ctypes default denied.
 """
+from typing import TypeAlias
+
 from .exceptions import BovnarArgumentError
 from .structs import ValueUnit, make_unit_none
+
+# What every entry point that takes "a unit" accepts: the parsed struct the C
+# library hands out, or the Unit object wrapping it (unit.py's _as_vu is the
+# one door both go through).
+UnitLike: TypeAlias = "Unit | ValueUnit"
 
 
 def _as_vu(unit):

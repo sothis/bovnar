@@ -20,6 +20,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from typing import cast
+
 from .structs import ValueTypeSpec, ValueUnit, make_type_spec, make_unit_none
 from .unit    import Unit
 from .enums   import ValueTypeFamily
@@ -371,7 +373,7 @@ class Quantity:
             v = self.value
             if v is None:
                 return None
-            return Decimal(v)
+            return Decimal(int(cast(int, v)))
         if fam in _FLOATISH:
             nf = self._nonfinite_decimal()
             if nf is not None:
@@ -414,7 +416,7 @@ class Quantity:
                 f"fraction() is not defined for the non-finite value {self.raw!r}")
         if d:
             cap = self._fraction_exponent_cap()
-            e = max(abs(d.adjusted()), abs(d.as_tuple().exponent))
+            e = max(abs(d.adjusted()), abs(int(d.as_tuple().exponent)))
             if e > cap:
                 raise BovnarArgumentError(
                     f"fraction() refuses a literal with a decimal exponent of "
@@ -434,7 +436,7 @@ class Quantity:
         return FRACTION_EXPONENT_CAP
 
     @property
-    def fixed_point(self) -> tuple:
+    def fixed_point(self) -> tuple | None:
         """``(mantissa, frac_bits)`` for a ``float_fix`` value; the exact value
         is ``mantissa / 2**frac_bits``. Raises for any other family."""
         if int(self.vtype.family) != int(_F.FLOAT_FIX):
@@ -481,26 +483,28 @@ class Quantity:
             return BvnFloat.strtodec_bits(
                 'nan' if nf.is_nan() else ('ninf' if nf.is_signed() else 'inf'),
                 width)
-        f = BvnFloat.from_str(self.raw, 10)
+        raw = cast(str, self.raw)      # a typed null answers None first
+        f = BvnFloat.from_str(raw, 10)
         lit = self.decimal
         if self._parser_saturated(f, lit):
             return decimal_to_interchange_bits(lit, width)
         # Straight from the literal: encoding the parsed bvn_float would round
         # the decimal tie through a binary intermediate and land on the wrong
         # side 26 % of the time. See BvnFloat.strtodec_bits.
-        return BvnFloat.strtodec_bits(self.raw, width)
+        return BvnFloat.strtodec_bits(raw, width)
 
     def _decimal_stored(self):
         """The materialised float_dec value as an exact Decimal, full range
         (C encoder normally; pure-Python encoder past the parser's cap)."""
         from ._bvnfloat import BvnFloat, decimal_stored_value
         width = int(self.vtype.width) or 64
-        f = BvnFloat.from_str(self.raw, 10)
+        raw = cast(str, self.raw)      # a typed null answers None first
+        f = BvnFloat.from_str(raw, 10)
         lit = self.decimal
         if self._parser_saturated(f, lit):
             return decimal_stored_value(lit, width)
         return BvnFloat.from_decimal_bits(
-            width, BvnFloat.strtodec_bits(self.raw, width)).to_decimal()
+            width, BvnFloat.strtodec_bits(raw, width)).to_decimal()
 
     def _binary_bits(self) -> bytes:
         """IEEE binary interchange bytes for this (binary float) value, over the
@@ -510,7 +514,7 @@ class Quantity:
         from ._bvnfloat import BvnFloat, decimal_to_binary_bits
         width = int(self.vtype.width) or 64
         base = self._numeric_base()
-        f = BvnFloat.from_str(self.raw, base)
+        f = BvnFloat.from_str(cast(str, self.raw), base)
         lit = self.decimal
         if base in (0, 10) and self._parser_saturated(f, lit):
             # Not Fraction(lit) first: for 1e-99999999 that is 10**99999999.
@@ -546,7 +550,10 @@ class Quantity:
         if nf is not None:
             return nf
         if fam == int(_F.FLOAT_FIX):
-            m, q = self.fixed_point
+            fp = self.fixed_point
+            if fp is None:                 # a typed null, handled above
+                return None
+            m, q = fp
             if q == 0:
                 return Decimal(m)
             # m / 2**q = (m * 5**q) / 10**q, and the 5**q is exact integer

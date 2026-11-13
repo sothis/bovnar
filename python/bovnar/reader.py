@@ -23,8 +23,9 @@
 
 
 import ctypes
+from collections.abc import Callable, Generator, Sequence
 from dataclasses import dataclass, field
-from typing import Callable, Generator, IO, Sequence
+from typing import Any, cast
 
 from ._ffi import get_library
 from ._fileio import PullSource, push_sink, is_stream
@@ -40,6 +41,17 @@ from .structs import (
 from .unit import _as_vu
 
 MAX_FILESIZE_BYTES = 16 * 1024 * 1024
+
+
+def _keep_state(cb, state) -> None:
+    """Park the Python-side state on the ctypes callback object.
+
+    C holds the callback for as long as the reader lives, so the state has to
+    live on it; a ctypes function object has no such member to type-check
+    against, hence the Any.
+    """
+    holder: Any = cb
+    holder._bvnr_state = state
 
 
 @dataclass
@@ -278,7 +290,7 @@ class Reader:
     def __enter__(self):
         return self
 
-    def __exit__(self, *_):
+    def __exit__(self, exc_type, exc, tb) -> None:
         self.close()
 
     def __del__(self):
@@ -434,7 +446,7 @@ class Reader:
                 return False
 
         cb = EVENT_CALLBACK_FUNC(_c_cb)
-        cb._bvnr_state = state
+        _keep_state(cb, state)
         return cb
 
     @staticmethod
@@ -452,7 +464,7 @@ class Reader:
                 state['exc'] = exc
 
         cb = ON_ERROR_FUNC(_c_cb)
-        cb._bvnr_state = state
+        _keep_state(cb, state)
         return cb
 
     @staticmethod
@@ -506,7 +518,7 @@ class Reader:
                 return False
 
         cb = WANT_UNIT_FUNC(_c_cb)
-        cb._bvnr_state = state
+        _keep_state(cb, state)
         return cb
 
     def _raise_error(self) -> None:
@@ -851,7 +863,7 @@ def _canon_callback(lib):
     global _canon_on_event
     if _canon_on_event is None:
         addr = ctypes.cast(lib.bvnr_canon_observer_on_event, ctypes.c_void_p)
-        _canon_on_event = EVENT_CALLBACK_FUNC(addr.value)
+        _canon_on_event = EVENT_CALLBACK_FUNC(cast(Any, int(addr.value or 0)))
     return _canon_on_event
 
 

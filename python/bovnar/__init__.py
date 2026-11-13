@@ -47,7 +47,7 @@ from .writer   import Writer
 from .dom      import DomDoc, DomNode, DomType, NewNode
 from .         import literals
 from .quantity import Quantity
-from .unit     import Unit, _as_vu
+from .unit     import Unit, UnitLike, _as_vu
 from .units   import (
     UnitFlags,
     SIConversion, UnitConversion, ReducedUnit, SI_DIM_NAMES,
@@ -413,7 +413,7 @@ def unit_factor(unit_str: str) -> float:
     return lib.bvn_unit_prefix_factor(vu)
 
 
-def unit_to_str(unit: ValueUnit) -> str:
+def unit_to_str(unit: UnitLike) -> str:
     import ctypes as _ct
     from ._ffi import get_library
     lib = get_library()
@@ -425,7 +425,7 @@ def unit_to_str(unit: ValueUnit) -> str:
     return buf.raw[:n].decode('utf-8')
 
 
-def unit_to_profile(namespace: str, unit: ValueUnit) -> str:
+def unit_to_profile(namespace: str, unit: UnitLike) -> str:
     """
     The code for *unit* in the named vocabulary, without the ``<ns>:`` prefix.
 
@@ -466,7 +466,7 @@ def unit_to_profile(namespace: str, unit: ValueUnit) -> str:
     return buf.raw[:n].decode('utf-8')
 
 
-def unit_to_ucum(unit: ValueUnit) -> str:
+def unit_to_ucum(unit: UnitLike) -> str:
     """
     The UCUM code for *unit*, without the ``ucum:`` prefix.
 
@@ -483,7 +483,7 @@ def unit_to_ucum(unit: ValueUnit) -> str:
     return buf.raw[:n].decode('utf-8')
 
 
-def unit_is_profile_only(unit: ValueUnit) -> bool:
+def unit_is_profile_only(unit: UnitLike) -> bool:
     """
     True when *unit* has no native spelling and serialises in profile notation.
 

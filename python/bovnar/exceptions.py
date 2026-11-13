@@ -37,6 +37,10 @@ class BovnarLibraryNotFound(BovnarError):
         )
 
 class BovnarParseError(BovnarError):
+    # Set by the frame readers on a failed document, to its index in the
+    # stream (stream.py's _failed_document); 0 where there is no such index.
+    index: int = 0
+
     def __init__(self,
                  code: ErrorCode,
                  line: int = 0,

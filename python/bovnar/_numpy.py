@@ -381,11 +381,12 @@ def _extract(src, dtype):
     # are taken from the node's annotation instead.
     def _no_leaf(v):
         return isinstance(v, list) and all(_no_leaf(x) for x in v)
-    empty_annotated = (isinstance(src, DomNode) and src.dom_type == DomType.ARRAY
+    node = src if isinstance(src, DomNode) else None
+    empty_annotated = (node is not None and node.dom_type == DomType.ARRAY
                        and _no_leaf(values)
-                       and int(src.value_type.family) != int(F.PLAIN))
-    if empty_annotated and src.unit_str:
-        _record_unit(acc, src.unit, src.unit_str)
+                       and int(node.value_type.family) != int(F.PLAIN))
+    if empty_annotated and node is not None and node.unit_str:
+        _record_unit(acc, node.unit, node.unit_str)
 
     if dtype is None:
         if acc['unmappable']:
@@ -397,12 +398,12 @@ def _extract(src, dtype):
                 "array has an element with no native numpy dtype; "
                 "pass dtype=object"))
         dts = acc['dtypes']
-        if empty_annotated:
+        if node is not None and empty_annotated:
             # No element to take a dtype from, but the annotation is still on
             # the node: `<sint:32> []` came back as float64 -- what numpy
             # infers from nothing.
-            dt = _gather_dtype(acc, src.value_type.family, src.value_type.width,
-                               src.value_type.base)
+            dt = _gather_dtype(acc, node.value_type.family, node.value_type.width,
+                               node.value_type.base)
             if acc['unmappable']:
                 raise BovnarArgumentError(acc['unmappable_reason'])
             dts = {dt} if dt else set()

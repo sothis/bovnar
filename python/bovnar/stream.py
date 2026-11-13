@@ -57,8 +57,9 @@ import ctypes
 import operator
 import weakref
 from collections import deque
+from collections.abc import Iterable
 from functools import lru_cache
-from typing import Iterable, NamedTuple
+from typing import Any, NamedTuple, overload
 
 from ._ffi import get_library
 from ._fileio import PullSource, PushSink, is_stream, push_sink
@@ -138,7 +139,11 @@ def _utf8(text: str, what: str) -> bytes:
 # Multi-document record framing
 # ===========================================================================
 
-def frame_documents(docs: Iterable[bytes], *, file=None) -> bytes | None:
+@overload
+def frame_documents(docs: Iterable[bytes], *, file: None = None) -> bytes: ...
+@overload
+def frame_documents(docs: Iterable[bytes], *, file: Any) -> None: ...
+def frame_documents(docs, *, file=None):
     """Wrap each already-serialised document in a length-prefixed frame and
     return the concatenated frame stream (``"BVF1" + u64 len + payload`` each).
 
@@ -177,8 +182,13 @@ def frame_documents(docs: Iterable[bytes], *, file=None) -> bytes | None:
     return bytes(out[:total])
 
 
+@overload
 def dump_documents(objs: Iterable[dict], *, pretty: bool = True,
-                   file=None) -> bytes | None:
+                   file: None = None) -> bytes: ...
+@overload
+def dump_documents(objs: Iterable[dict], *, pretty: bool = True,
+                   file: Any) -> None: ...
+def dump_documents(objs, *, pretty: bool = True, file=None):
     """Serialise each dict (via :func:`bovnar.dumps`) and frame the results;
     with ``file``, write each frame there as it is made (see
     :func:`frame_documents`)."""
@@ -232,7 +242,7 @@ def load_documents(data,
     results: list = []
     holder = {'parser': _new_parser()}
     fail   = {'index': None, 'err': None}
-    state  = {'exc': None}
+    state: dict[str, Any] = {'exc': None}
 
     def on_event(ev, d):
         return holder['parser'].on_event(ev, d)
@@ -321,8 +331,13 @@ def _failed_document(lib, index: int, err: int) -> BovnarParseError:
 # Octet multiplexing
 # ===========================================================================
 
+@overload
 def mux_dump(messages: Iterable[tuple], *, key: str = 'mux',
-             preamble: dict | None = None, file=None) -> bytes | None:
+             preamble: dict | None = None, file: None = None) -> bytes: ...
+@overload
+def mux_dump(messages: Iterable[tuple], *, key: str = 'mux',
+             preamble: dict | None = None, file: Any) -> None: ...
+def mux_dump(messages, *, key: str = 'mux', preamble=None, file=None):
     """Serialise ``(channel:int, payload:bytes)`` messages as one multiplexed
     octet-stream document under ``key``. Channels may repeat and interleave;
     messages of any size are split across octet chunks and reassembled by
@@ -518,7 +533,7 @@ def mux_load(data, *, max_message: int = 0, key: str | None = None,
         finally:
             lib.bvnr_demux_destroy(dm)
 
-    state = {'exc': None}
+    state: dict[str, Any] = {'exc': None}
 
     def _on_msg(_ud, channel, data_ptr, length):
         try:
@@ -597,8 +612,14 @@ def _demux_error(lib, err: int, reader=None) -> BovnarParseError:
 # Document-in-document
 # ===========================================================================
 
+@overload
 def embed_document(inner, *, key: str = 'payload', pretty: bool = True,
-                   file=None) -> bytes | None:
+                   file: None = None) -> bytes: ...
+@overload
+def embed_document(inner, *, key: str = 'payload', pretty: bool = True,
+                   file: Any) -> None: ...
+def embed_document(inner, *, key: str = 'payload', pretty: bool = True,
+                   file=None):
     """Return a complete document that embeds ``inner`` (raw document bytes) as
     the octet-stream payload of ``key``; with ``file`` (a socket or a binary
     file object), write it there and return nothing."""
@@ -802,9 +823,9 @@ class _Feed:
         self._queue    = deque()
         self._view     = None
         self._view_mem = None
-        self._fed      = None     # the bytes C reads from, until drained
-        self._fed_at   = None     # their address, found on demand
-        self._fed_mv   = None     # a memoryview of them, for view=True items
+        self._fed: bytes | None = None   # the bytes C reads from, until drained
+        self._fed_at: int | None = None  # their address, found on demand
+        self._fed_mv: memoryview | None = None  # a view of them, for view=True
         self._failure  = None     # an error kept for the iteration to raise
         self._finished = False
         self._closed   = False
@@ -813,7 +834,10 @@ class _Feed:
     def __iter__(self):
         return self
 
-    def __next__(self):
+    def __next__(self) -> Any:
+        # The item type is the feed's: DocumentEvent (and Value), Message, or
+        # a document's bytes. Each class's docstring says which; one annotation
+        # cannot say three, so the base leaves it to them.
         if self._closed:
             raise StopIteration
         # A view is the only thing a call has to release; the usual item is
@@ -830,21 +854,23 @@ class _Feed:
             raise StopIteration
         return item
 
-    def _pull(self):
+    def _pull(self) -> "memoryview | bytes | None":
         """The next item C has for the fed bytes, or None."""
         return None
 
     # -- memoryview lifetime -----------------------------------------------
-    def _fed_address(self) -> int:
+    def _fed_address(self, fed: bytes) -> int:
         at = self._fed_at
         if at is None:
-            at = self._fed_at = ctypes.cast(self._fed, ctypes.c_void_p).value
+            # c_char_p keeps the bytes object alive (no copy), and c_void_p
+            # gives the address as an int.
+            at = self._fed_at = int(
+                ctypes.cast(ctypes.c_char_p(fed), ctypes.c_void_p).value or 0)
         return at
 
-    def _fed_view(self) -> memoryview:
+    def _fed_view(self, fed: bytes) -> memoryview:
         """One memoryview of the fed bytes, reused: a view of a view costs
         half what a fresh memoryview(fed) does, and this is per item."""
-        fed = self._fed
         view = self._fed_mv
         if view is None or view.obj is not fed:
             view = self._fed_mv = memoryview(fed)
@@ -857,9 +883,9 @@ class _Feed:
         is a view of the C object's memory (_hand_out)."""
         fed = self._fed
         if n and fed is not None:
-            at = (ptr or 0) - self._fed_address()
+            at = (ptr or 0) - self._fed_address(fed)
             if 0 <= at <= len(fed) - n:
-                view = self._fed_view()[at:at + n]
+                view = self._fed_view(fed)[at:at + n]
                 self._view = view
                 return view
         return self._hand_out(ptr, n)
@@ -876,7 +902,11 @@ class _Feed:
             # feed, so the memory is not freed under it; the weak reference
             # tells whether anything still points there, and frees the C
             # object of a feed closed meanwhile once nothing does.
-            mem._bvnr_owner = self
+            # Assigning the attribute is the point (it keeps `mem` alive from
+            # the view, which the weak reference below watches); through Any,
+            # as ctypes' Array has no such member to type-check against.
+            owner_mem: Any = mem
+            owner_mem._bvnr_owner = self
             self._view_mem = weakref.ref(mem, self._view_gone)
             view = memoryview(mem).toreadonly()
         self._view = view
@@ -971,7 +1001,7 @@ class _Feed:
     def __enter__(self):
         return self
 
-    def __exit__(self, *_):
+    def __exit__(self, exc_type, exc, tb) -> None:
         self.close()
 
     def __del__(self):
@@ -1350,26 +1380,28 @@ class FrameFeed(_Feed):
             code, message="frame stream: " + (msg_b.decode('utf-8') if msg_b
                                                else code.name.lower()))
 
-    def _pull(self):
-        if self._fed is None:
+    def _pull(self) -> "memoryview | bytes | None":
+        fed = self._fed
+        if fed is None:
             return None
         rc = self._lib.bvnr_frame_reader_next(self._fr, self._doc_ref,
                                               self._len_ref)
+        doc_at = int(self._doc.value or 0)
         if rc == _NEXT_ITEM:
             n = self._len.value
             if self._as_view:
                 # A document whole in the fed bytes is a slice of them; one
                 # gathered across feeds lies in the frame reader's buffer.
-                return self._view_of(self._doc.value, n)
+                return self._view_of(doc_at, n)
             if not n:
                 return b''
             # As in DemuxFeed: a document that lies whole in the fed bytes is
             # a slice of them, cheaper than a string_at call; one gathered
             # across feeds is copied out of the reader's buffer.
-            at = self._doc.value - self._fed_address()
-            if 0 <= at <= len(self._fed) - n:
-                return self._fed[at:at + n]
-            return ctypes.string_at(self._doc.value, n)
+            at = doc_at - self._fed_address(fed)
+            if 0 <= at <= len(fed) - n:
+                return fed[at:at + n]
+            return ctypes.string_at(doc_at, n)
         self._fed = None
         if rc == _NEXT_NONE:
             return None
@@ -1533,7 +1565,7 @@ class DemuxFeed(_Feed):
             # A message that lay whole in the fed bytes is a slice of them, far
             # cheaper than a string_at call; one reassembled in the channel's
             # buffer is copied from there.
-            at = item.data - self._fed_address()
+            at = item.data - self._fed_address(fed)
             if 0 <= at <= len(fed) - n:
                 return _tuple_new(Message, (item.channel, fed[at:at + n]))
             return _tuple_new(Message, (item.channel,
@@ -1716,27 +1748,37 @@ class MuxWriter:
         self._flush = lib.bvnr_write_flush if flush_each else None
         self._stream = w._stream
 
+    @property
+    def _writer(self) -> Writer:
+        """The open writer; ``_closed`` is what says whether there is one."""
+        w = self._w
+        if w is None:
+            raise BovnarArgumentError("MuxWriter has been closed")
+        return w
+
     def send(self, channel: int, payload) -> None:
         """Write one message on ``channel`` (an unsigned 64-bit int); a
         payload of any size is split over octet chunks as needed."""
         if self._closed:
             raise BovnarArgumentError("MuxWriter has been closed")
-        if self._stream.busy:
-            self._w._check_not_in_sink()
+        w = self._writer
+        sink = w._stream
+        if sink is not None and sink.busy:
+            w._check_not_in_sink()
         ch = _mux_channel(channel)
         data = payload if type(payload) is bytes else _as_bytes(payload)
         if not self._send(self._ptr, ch, data, len(data)):
-            self._w._raise_error()
+            w._raise_error()
         flush = self._flush
         if flush is not None and not flush(self._ptr):
-            self._w._raise_error()
+            w._raise_error()
 
     def flush(self) -> None:
         """Hand everything written so far to the object now, then call its
         ``flush`` when it has one."""
         if self._closed:
             raise BovnarArgumentError("MuxWriter has been closed")
-        self._w.flush()
+        self._writer.flush()
 
     @property
     def bytes_written(self) -> int:
@@ -1751,9 +1793,9 @@ class MuxWriter:
         inside the object's own ``write`` or ``flush``."""
         if self._closed:
             return
-        self._w._check_not_in_sink()
+        w = self._writer
+        w._check_not_in_sink()
         self._closed = True
-        w = self._w
         try:
             if self._lib.bvnr_writer_get_error(self._ptr) == 0:
                 if not self._lib.bvnr_mux_end(self._ptr):
@@ -1858,9 +1900,12 @@ class FrameWriter:
                 "flush()")
 
     def _call_flush(self) -> None:
+        flush_obj = self._flush_obj
+        if flush_obj is None:                 # _call_flush is only reached with one
+            return
         self._busy = True
         try:
-            self._flush_obj()
+            flush_obj()
         finally:
             self._busy = False
 

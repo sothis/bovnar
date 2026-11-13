@@ -22,6 +22,7 @@
 
 import re as _re
 from decimal import Decimal
+from typing import NoReturn
 from fractions import Fraction
 
 from .enums import (
@@ -599,7 +600,7 @@ def write_array(w: Writer,
     # [2, 3].
     if not isinstance(rows, (list, tuple)):
         rows = list(rows)
-    vu = _as_vu(vu)
+    vu = None if vu is None else _as_vu(vu)
     # Refuse before the first byte: an exception half-way through left the
     # writer inside an open array, and every later write failed with it.
     _check_rows(rows, vt)
@@ -1113,21 +1114,21 @@ def _emit_quantity(w: Writer, key: str, q: 'Quantity') -> None:
     d.type       = q._tok_type
     d.value_type = q.vtype
     d.value_unit = q.unit.raw
-    d.data       = _ct.cast(_ct.c_char_p(raw_bytes), _ct.c_void_p)
+    d.data       = _ct.cast(_ct.c_char_p(raw_bytes), _ct.c_void_p).value
     d.length     = len(raw_bytes)
     # spec 1.1 — pass a datetime's verbatim sub-second digits so the C writer
     # re-emits the ISO literal (else the whole-second carrier alone would
     # silently drop the fraction). frac_bytes must outlive the write call.
     frac_bytes = q._frac.encode('ascii') if q._frac else None
     if frac_bytes:
-        d.frac_data   = _ct.cast(_ct.c_char_p(frac_bytes), _ct.c_void_p)
+        d.frac_data   = _ct.cast(_ct.c_char_p(frac_bytes), _ct.c_void_p).value
         d.frac_length = len(frac_bytes)
     # library 2.0 — the unit's spelling rides on the value as well: where the
     # annotation carries no unit parameter (a string's unit is written inline)
     # this event is the only place the writer can take it from.
     src_bytes = q.unit_source.encode('utf-8') if q.unit_source else None
     if src_bytes:
-        d.unit_source        = _ct.cast(_ct.c_char_p(src_bytes), _ct.c_void_p)
+        d.unit_source        = _ct.cast(_ct.c_char_p(src_bytes), _ct.c_void_p).value
         d.unit_source_length = len(src_bytes)
     _write_event_data(w, d)
 
@@ -1477,7 +1478,7 @@ def _emit_octets(w: Writer, payload: bytes) -> None:
         part = payload[off:off + chunk]
         d = BvnrData()
         d.type   = TokenType.OCTET_STREAM
-        d.data   = _ct.cast(_ct.c_char_p(part), _ct.c_void_p)
+        d.data   = _ct.cast(_ct.c_char_p(part), _ct.c_void_p).value
         d.length = len(part)
         if not lib.bvnr_write_event(w._ptr, int(Event.DATA), _ct.byref(d)):
             w._raise_error()
@@ -1666,7 +1667,7 @@ def _emit_value(w: Writer, key: str, value) -> None:
             f"for key {key!r}")
 
 
-def _refuse_under(elem, vt, why: str):
+def _refuse_under(elem, vt, why: str) -> NoReturn:
     fam = ValueTypeFamily(int(vt.family)).name.lower()
     spec = fam if not vt.width else f"{fam}:{int(vt.width)}"
     # repr() of an int past 4300 digits raises ValueError (int_max_str_digits)
@@ -1694,7 +1695,7 @@ def _emit_held_element(w: Writer, elem, vt) -> bool:
     d.type       = tok
     d.value_type = vt
     d.value_unit = make_unit_dimensionless()
-    d.data       = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p)
+    d.data       = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p).value
     d.length     = len(raw)
     _write_event_data(w, d)
     return True
@@ -1829,9 +1830,9 @@ def _emit_array_element(w: Writer, elem, annotate: bool = False,
             d.type        = _TOKEN_IS_ARRAY_NUMBER
             d.value_type  = elem.vtype
             d.value_unit  = make_unit_none()
-            d.data        = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p)
+            d.data        = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p).value
             d.length      = len(raw)
-            d.frac_data   = _ct.cast(_ct.c_char_p(frac), _ct.c_void_p)
+            d.frac_data   = _ct.cast(_ct.c_char_p(frac), _ct.c_void_p).value
             d.frac_length = len(frac)
             _write_event_data(w, d)
             return
@@ -1869,7 +1870,7 @@ def _emit_array_element(w: Writer, elem, annotate: bool = False,
                             else _TOKEN_IS_ARRAY_NUMBER)
             d.value_type = elem.vtype
             d.value_unit = make_unit_none()
-            d.data       = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p)
+            d.data       = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p).value
             d.length     = len(raw)
             _write_event_data(w, d)
             return
@@ -1879,7 +1880,7 @@ def _emit_array_element(w: Writer, elem, annotate: bool = False,
             raw = elem.raw.encode('utf-8')
             d = BvnrData()
             d.type   = elem._tok_type
-            d.data   = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p)
+            d.data   = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p).value
             d.length = len(raw)
             _write_event_data(w, d)
             return
@@ -1909,7 +1910,7 @@ def _emit_array_element(w: Writer, elem, annotate: bool = False,
         sym = b'true' if elem else b'false'
         d = BvnrData()
         d.type = _TOKEN_IS_BOOL
-        d.data   = _ct.cast(_ct.c_char_p(sym), _ct.c_void_p)
+        d.data   = _ct.cast(_ct.c_char_p(sym), _ct.c_void_p).value
         d.length = len(sym)
         _write_event_data(w, d)
 
@@ -1931,7 +1932,7 @@ def _emit_array_element(w: Writer, elem, annotate: bool = False,
         d.type       = _TOKEN_IS_ARRAY_NUMBER
         d.value_type = vt
         d.value_unit = make_unit_dimensionless()
-        d.data       = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p)
+        d.data       = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p).value
         d.length     = len(raw)
         _write_event_data(w, d)
 
@@ -1943,7 +1944,7 @@ def _emit_array_element(w: Writer, elem, annotate: bool = False,
         d.type       = _TOKEN_IS_ARRAY_NUMBER
         d.value_type = vt
         d.value_unit = make_unit_dimensionless()
-        d.data       = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p)
+        d.data       = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p).value
         d.length     = len(raw)
         _write_event_data(w, d)
 
@@ -1958,7 +1959,7 @@ def _emit_array_element(w: Writer, elem, annotate: bool = False,
         d.type       = _TOKEN_IS_ARRAY_NUMBER
         d.value_type = make_type_spec(ValueTypeFamily.FLOAT_DEC, 64, 0)
         d.value_unit = make_unit_dimensionless()
-        d.data       = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p)
+        d.data       = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p).value
         d.length     = len(raw)
         _write_event_data(w, d)
 
@@ -1966,7 +1967,7 @@ def _emit_array_element(w: Writer, elem, annotate: bool = False,
         raw = elem.encode('utf-8')
         d = BvnrData()
         d.type   = _TOKEN_IS_ARRAY_STRING
-        d.data   = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p)
+        d.data   = _ct.cast(_ct.c_char_p(raw), _ct.c_void_p).value
         d.length = len(raw)
         _write_event_data(w, d)
 

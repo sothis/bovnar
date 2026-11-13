@@ -503,7 +503,7 @@ class Writer:
         if key is not None:
             raw = key.encode('utf-8')
             _keep.append(raw)
-            d.data   = ctypes.cast(raw, ctypes.c_void_p)
+            d.data   = ctypes.cast(ctypes.c_char_p(raw), ctypes.c_void_p).value
             d.length = len(raw)
 
         if vt is not None:
@@ -515,7 +515,7 @@ class Writer:
         if value is not None:
             raw = value.encode('utf-8')
             _keep.append(raw)
-            d.data   = ctypes.cast(raw, ctypes.c_void_p)
+            d.data   = ctypes.cast(ctypes.c_char_p(raw), ctypes.c_void_p).value
             d.length = len(raw)
 
             if vt is not None:
@@ -623,7 +623,7 @@ class Writer:
                 d_ep = BvnrData()
                 d_ep.type = self._TOKEN_IS_UNIT
                 d_ep.value_type = vt
-                d_ep.data = ctypes.cast(epoch, ctypes.c_void_p)
+                d_ep.data = ctypes.cast(ctypes.c_char_p(epoch), ctypes.c_void_p).value
                 d_ep.length = len(epoch)
                 ok = self._lib.bvnr_write_event(
                     self._ptr, int(Event.TYPE_ANNOTATION_TYPE_FAMILY_PARAM),
@@ -671,14 +671,14 @@ class Writer:
                 d_unit.type = self._TOKEN_IS_UNIT
                 d_unit.value_type = vt
                 d_unit.value_unit = vu
-                d_unit.data = ctypes.cast(raw_unit, ctypes.c_void_p)
+                d_unit.data = ctypes.cast(ctypes.c_char_p(raw_unit), ctypes.c_void_p).value
                 d_unit.length = ulen
                 # library 2.0 — the producer's own spelling, when one was kept. The
                 # C writer checks it against `vu` and ignores it under a unit
                 # flag; `_keep_src` must outlive the call.
                 if unit_source:
                     _keep_src = unit_source.encode('utf-8')
-                    d_unit.unit_source = ctypes.cast(_keep_src, ctypes.c_void_p)
+                    d_unit.unit_source = ctypes.cast(ctypes.c_char_p(_keep_src), ctypes.c_void_p).value
                     d_unit.unit_source_length = len(_keep_src)
                 ok = self._lib.bvnr_write_event(
                     self._ptr, int(Event.TYPE_ANNOTATION_TYPE_FAMILY_PARAM),
@@ -888,11 +888,9 @@ class Writer:
                                     Exponent.LINEAR, None, IECPrefix.NONE)
         else:
             from .unit import _as_vu        # deferred, as the package root does
+            # Raises TypeError for anything that is not a Unit or a
+            # ValueUnit, the one rule for unit-shaped arguments (unit.py).
             vu = _as_vu(unit)
-            if not isinstance(vu, ValueUnit):
-                raise BovnarArgumentError(
-                    f"unit must be a Unit, a ValueUnit or a str, not "
-                    f"{type(unit).__name__}")
         if unit_source is not None and vu.num_components == 0:
             raise BovnarArgumentError(
                 f"unit_source {unit_source!r} given without a unit")
@@ -906,7 +904,7 @@ class Writer:
         _keep = raw
         d = BvnrData()
         d.type = self._TOKEN_IS_STRING
-        d.data = ctypes.cast(ctypes.c_char_p(raw), ctypes.c_void_p)
+        d.data = ctypes.cast(ctypes.c_char_p(raw), ctypes.c_void_p).value
         d.length = len(raw)
         ok = self._lib.bvnr_write_event(self._ptr, int(Event.DATA), ctypes.byref(d))
         if not ok:
@@ -921,7 +919,7 @@ class Writer:
         sym = b'true' if value else b'false'
         d = BvnrData()
         d.type = self._TOKEN_IS_BOOL
-        d.data = ctypes.cast(ctypes.c_char_p(sym), ctypes.c_void_p)
+        d.data = ctypes.cast(ctypes.c_char_p(sym), ctypes.c_void_p).value
         d.length = len(sym)
         ok = self._lib.bvnr_write_event(self._ptr, int(Event.DATA), ctypes.byref(d))
         if not ok:
@@ -1052,7 +1050,7 @@ class Writer:
         d.value_unit = vu
         raw = val.encode('utf-8')
         _keep = raw
-        d.data = ctypes.cast(ctypes.c_char_p(raw), ctypes.c_void_p)
+        d.data = ctypes.cast(ctypes.c_char_p(raw), ctypes.c_void_p).value
         d.length = len(raw)
         ok = self._lib.bvnr_write_event(
             self._ptr, int(Event.DATA), ctypes.byref(d))

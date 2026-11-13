@@ -488,10 +488,10 @@ def convert_rational(value, from_unit: ValueUnit, to_unit: ValueUnit):
     needs more than the library's 32768 bits.
     """
     import fractions
-    if isinstance(value, float):
+    if isinstance(value, (float, bool)):
         raise BovnarArgumentError(
             "convert_rational takes an exact value; pass Fraction(x) to "
-            "convert the float's own binary value")
+            "convert the float's own binary value, and an int for a bool")
     try:
         value = fractions.Fraction(value)
     except (TypeError, ValueError) as e:

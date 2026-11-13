@@ -204,7 +204,9 @@ class DomNode:
         if not raw_ptr:
             raise ValueError("bvn_dom_int_to_str returned NULL")
         try:
-            s = ctypes.cast(raw_ptr, ctypes.c_char_p).value.decode('ascii')
+            # string_at reads to the NUL and returns bytes; c_char_p().value
+            # is str | None, and None is not decodable.
+            s = ctypes.string_at(raw_ptr).decode('ascii')
         finally:
             lib.bvn_dom_free_string(ctypes.c_void_p(raw_ptr))
         return s
@@ -834,9 +836,6 @@ def _new_unit(unit) -> ValueUnit:
         from . import parse_unit
         unit = parse_unit(unit)
     vu = _as_vu(unit)
-    if not isinstance(vu, ValueUnit):
-        raise TypeError(f"a unit is a str, Unit or ValueUnit, not "
-                        f"{type(unit).__name__}")
     if not get_library().bvn_unit_valid(vu):
         raise BovnarArgumentError("NewNode.integer: the unit is not structurally valid")
     return vu

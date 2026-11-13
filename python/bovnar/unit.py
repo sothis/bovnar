@@ -49,10 +49,19 @@ def _as_vu(unit):
     bridge) that named neither type. One helper at each of those doors, so the
     two spellings of "a unit" are interchangeable as arguments.
 
-    Deliberately not a validator: whatever is not a ``Unit`` goes on to the
-    callee, whose own complaint about a wrong type is the right one.
+    What is neither is a wrong TYPE, and refused here: left to the callee it
+    reached ctypes, which raised ``ctypes.ArgumentError: argument 1:
+    <class 'TypeError'>: wrong type`` -- naming neither the argument nor the
+    type it wanted (``convert_rational(1, "m", u)``, item 5 of the
+    binding-review list). ``TypeError`` is the rule the rest of the package
+    follows for a wrong type: ``BovnarArgumentError`` is for a value it cannot
+    use.
     """
-    return unit._vu if isinstance(unit, Unit) else unit
+    if isinstance(unit, Unit):
+        return unit._vu
+    if isinstance(unit, ValueUnit):
+        return unit
+    raise TypeError(f"expected a Unit or a ValueUnit, not {type(unit).__name__}")
 
 
 class Unit:

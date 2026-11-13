@@ -11,6 +11,8 @@ equal. And the value accessors were split between properties (value, epoch_name)
 and methods (decimal(), fraction(), fixed_point()) with no rule anyone could
 state, so callers guessed and got a TypeError either way.
 """
+from fractions import Fraction
+
 import pytest
 
 import bovnar
@@ -341,3 +343,44 @@ def test_repr_of_a_profile_only_unit_does_not_raise():
     assert "UCUM_IU" in repr(vu)
     assert "LITER" in repr(vu)
     assert "UCUM_IU" in repr(vu.active_components()[0])
+
+
+class TestAUnitShapedArgumentIsATypeMatter:
+    """Item 5 of the 2026-11-09 binding review: a wrong TYPE was answered with
+    whatever ctypes said. ``convert_rational(1, "m", u)`` reached the C call and
+    raised ``ctypes.ArgumentError: argument 2: <class 'TypeError'>: wrong type``
+    -- naming neither the argument nor the type it wanted. One rule now: a
+    ``TypeError`` for a wrong type (unit.py's ``_as_vu`` is the door), a
+    ``BovnarArgumentError`` for a value the library cannot use."""
+
+    def test_a_str_unit_is_a_type_error_not_a_ctypes_one(self):
+        m = Unit.parse("m")
+        for call in (lambda: bovnar.convert_value(1.0, "m", m),
+                     lambda: bovnar.convert_value(1.0, m, "m"),
+                     lambda: bovnar.convert_rational(1, "m", m),
+                     lambda: bovnar.convert_rational(1, m, "m")):
+            with pytest.raises(TypeError, match="Unit or a ValueUnit"):
+                call()
+
+    def test_a_unit_shaped_argument_elsewhere_too(self):
+        m = Unit.parse("m")
+        for call in (lambda: bovnar.unit_to_str("m"),
+                     lambda: bovnar.unit_valid(5),
+                     lambda: bovnar.units_compatible(m, 5),
+                     lambda: bovnar.unit_convert_factor(m, None)):
+            with pytest.raises(TypeError, match="Unit or a ValueUnit"):
+                call()
+
+    def test_a_bool_is_not_an_exact_value(self):
+        """``Fraction(True)`` is 1, so ``convert_rational(True, ...)`` answered
+        as if the caller had passed an int. It is refused, as timekeeping's
+        ``_int`` refuses a bool."""
+        m = Unit.parse("m")
+        with pytest.raises(BovnarArgumentError, match="bool"):
+            bovnar.convert_rational(True, m, m)
+
+    def test_the_real_spellings_still_work(self):
+        m, km = Unit.parse("m"), Unit.parse("km")
+        assert bovnar.convert_value(1.0, km, m) == 1000.0
+        assert bovnar.convert_rational(1, km, m) == (Fraction(1000, 1), True)
+        assert bovnar.unit_to_str(km) == "k~m"    # the canonical spelling

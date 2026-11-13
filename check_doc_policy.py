@@ -50,6 +50,24 @@ import subprocess
 import sys
 import tempfile
 
+def _read_text(path):
+    """Read *path* for the gate. A file that is missing or unreadable is a
+    broken checkout, so it says so rather than raising a traceback from the
+    middle of a check."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+    except OSError as e:
+        raise SystemExit("cannot read %s: %s" % (path, e))
+
+
+def _read_bytes(path):
+    try:
+        with open(path, "rb") as f:
+            return f.read()
+    except OSError as e:
+        raise SystemExit("cannot read %s: %s" % (path, e))
+
 REPO = os.path.dirname(os.path.abspath(__file__))
 DOC = "doc/06_bovnar_unit_policy.md"
 
@@ -61,9 +79,8 @@ def header_defines(repo):
         path = os.path.join(repo, rel)
         if not os.path.exists(path):
             continue
-        with open(path, encoding="utf-8") as f:
-            for m in re.finditer(r"^#define\s+(\w+)\s+\(?\s*(\d+)", f.read(),
-                                 re.M):
+        for m in re.finditer(r"^#define\s+(\w+)\s+\(?\s*(\d+)",
+                             _read_text(path), re.M):
                 found.setdefault(m.group(1), int(m.group(2)))
     return found
 
@@ -122,8 +139,8 @@ def check_behaviour(repo, text):
     sys.path.insert(0, os.path.join(repo, "python"))
     try:
         import bovnar
-        from bovnar import UnitPolicy
-        bovnar._ffi.load_library()
+        from bovnar import UnitPolicy, _ffi
+        _ffi.load_library()
     except Exception:                                         # noqa: BLE001
         print("check_doc_policy: no built library; behaviour not checked")
         return [], 0
@@ -197,8 +214,7 @@ def catalogue_symbols(repo):
     path = os.path.join(repo, "src", "gendata", "units.bvnr")
     if not os.path.exists(path):
         return []
-    with open(path, encoding="utf-8") as f:
-        return re.findall(r'\.symbol\s*=\s*"([^"]+)"', f.read())
+    return re.findall(r'\.symbol\s*=\s*"([^"]+)"', _read_text(path))
 
 
 def cli_flags(text):
@@ -307,8 +323,7 @@ def main(argv):
     if not os.path.exists(path):
         print("check_doc_policy: %s is absent" % DOC)
         return 0
-    with open(path, encoding="utf-8") as f:
-        text = f.read()
+    text = _read_text(path)
 
     problems = check_limits(text, header_defines(repo))
     behaviour, checked = check_behaviour(repo, text)

@@ -53,6 +53,23 @@ Exit 0 when every checked cell agrees with src/gendata, 1 with a list when not.
 import os
 import re
 import sys
+def _read_text(path):
+    """Read *path* for the gate. A file that is missing or unreadable is a
+    broken checkout, so it says so rather than raising a traceback from the
+    middle of a check."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+    except OSError as e:
+        raise SystemExit("cannot read %s: %s" % (path, e))
+
+
+def _read_bytes(path):
+    try:
+        with open(path, "rb") as f:
+            return f.read()
+    except OSError as e:
+        raise SystemExit("cannot read %s: %s" % (path, e))
 from fractions import Fraction
 
 REPO = os.path.dirname(os.path.abspath(__file__))
@@ -169,10 +186,11 @@ class Catalogue(object):
     def __init__(self, repo):
         sys.path.insert(0, repo)
         import bvnr_data
-        with open(os.path.join(repo, "src", "gendata", "units.bvnr"), "rb") as f:
-            self.units = bvnr_data.load(f.read())["units"]
-        with open(os.path.join(repo, "src", "gendata", "prefixes.bvnr"), "rb") as f:
-            pfx = bvnr_data.load(f.read())
+        self.units = bvnr_data.load(
+            _read_bytes(os.path.join(repo, "src", "gendata", "units.bvnr")))[
+                "units"]
+        pfx = bvnr_data.load(
+            _read_bytes(os.path.join(repo, "src", "gendata", "prefixes.bvnr")))
         self.by_spelling = {}
         for u in self.units:
             for a in u["aliases"]:
@@ -283,7 +301,7 @@ class Evaluator(object):
         v, d = self.power()
         while True:
             kind, tok = self.peek()
-            if kind == "op" and tok in "*/":
+            if kind == "op" and tok is not None and tok in "*/":
                 self.i += 1
                 rv, rd = self.power()
                 if tok == "*":
@@ -321,10 +339,10 @@ class Evaluator(object):
         kind, tok = self.peek()
         # A leading minus rides in the `sym` token, since `-` is not an operator
         # in this grammar (nothing in these cells subtracts).
-        if kind == "sym" and re.match(r"^-\d+$", tok):
+        if kind == "sym" and tok is not None and re.match(r"^-\d+$", tok):
             self.i += 1
             return int(tok)
-        if kind == "num":
+        if kind == "num" and tok is not None:
             self.i += 1
             return int(tok)
         raise Unparseable("exponent")
@@ -338,7 +356,7 @@ class Evaluator(object):
                 raise Unparseable("unbalanced (")
             self.i += 1
             return v, d
-        if kind == "num":
+        if kind == "num" and tok is not None:
             self.i += 1
             return Val(Fraction(tok)), ZERO_DIM
         if kind == "pi":
@@ -481,8 +499,7 @@ TICK = re.compile(r"`([^`]*)`")
 
 
 def rows(path):
-    with open(path, encoding="utf-8") as f:
-        lines = f.read().split("\n")
+    lines = _read_text(path).split("\n")
     header = None
     for n, line in enumerate(lines, 1):
         if not line.startswith("|"):
@@ -568,8 +585,9 @@ def check_hook_error_codes(repo):
     sys.path.insert(0, os.path.join(repo, "python"))
     try:
         import bovnar
+        from bovnar import _ffi
         from bovnar.enums import ErrorCode
-        bovnar._ffi.load_library()
+        _ffi.load_library()
     except Exception:                                         # noqa: BLE001
         return [], 0
     problems, checked = [], 0
@@ -618,8 +636,9 @@ def check_error_codes(repo):
     sys.path.insert(0, os.path.join(repo, "python"))
     try:
         import bovnar
+        from bovnar import _ffi
         from bovnar.enums import ErrorCode
-        bovnar._ffi.load_library()
+        _ffi.load_library()
     except Exception:
         return [], 0
     problems = []
@@ -802,10 +821,8 @@ def check_api_named(repo):
     doc = os.path.join(repo, API_DOC)
     if not (os.path.exists(header) and os.path.exists(doc)):
         return [], 0
-    with open(header, encoding="utf-8") as f:
-        exported = BVN_API.findall(f.read())
-    with open(doc, encoding="utf-8") as f:
-        text = f.read()
+    exported = BVN_API.findall(_read_text(header))
+    text = _read_text(doc)
     missing = [fn for fn in exported if fn not in text]
     return (["%s exports %s and %s never names it"
              % (API_HEADER, fn, API_DOC) for fn in missing], len(exported))

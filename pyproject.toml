@@ -107,3 +107,12 @@ archs = ["auto64"]
 # (macos-13) hosted runners, which routinely never get picked up. The x86_64
 # slice is build-only — cibuildwheel skips its test phase on an arm host.
 archs = ["arm64", "x86_64"]
+
+# ── Type checking ───────────────────────────────────────────────────────────
+# The gate scripts (check_doc_*.py) and the tests import the package the way
+# they run it -- with python/ put on sys.path at import time -- so the checker
+# needs the same path to resolve `import bovnar` at all. Nothing here is a
+# build input; it is what makes a static check agree with sys.path.
+[tool.pyright]
+extraPaths   = ["python"]
+pythonVersion = "3.10"

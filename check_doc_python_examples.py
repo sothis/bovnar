@@ -47,6 +47,23 @@ import io as _io
 import os
 import re
 import sys
+def _read_text(path, errors="strict"):
+    """Read *path* for the gate. A file that is missing or unreadable is a
+    broken checkout, so it says so rather than raising a traceback from the
+    middle of a check."""
+    try:
+        with open(path, encoding="utf-8", errors=errors) as f:
+            return f.read()
+    except OSError as e:
+        raise SystemExit("cannot read %s: %s" % (path, e))
+
+
+def _read_bytes(path):
+    try:
+        with open(path, "rb") as f:
+            return f.read()
+    except OSError as e:
+        raise SystemExit("cannot read %s: %s" % (path, e))
 
 REPO = os.path.dirname(os.path.abspath(__file__))
 DOC = "doc/09_bovnar_python_bindings.md"
@@ -156,13 +173,13 @@ def check(repo):
     sys.path.insert(0, os.path.join(repo, "python"))
     try:
         import bovnar
-        bovnar._ffi.load_library()
+        from bovnar import _ffi
+        _ffi.load_library()
     except Exception:
         print("check_doc_python_examples: no built library; skipped")
         return [], 0, 0
 
-    with open(path, encoding="utf-8") as f:
-        text = f.read()
+    text = _read_text(path)
     ns = {"bovnar": bovnar}
     problems, checked, skipped = [], 0, 0
 
@@ -277,27 +294,27 @@ def property_calls(repo):
             if name == "CHANGELOG.md" or name.startswith("RELEASE_NOTES"):
                 continue
             path = os.path.join(root, name)
-            with open(path, encoding="utf-8", errors="replace") as f:
-                # Rust bindings call these as methods (`q.decimal()`), so a
-                # fenced block tagged ```rust (also ```rust,ignore and the
-                # like) is not Python and is not checked. Every other line,
-                # Python and untagged blocks included, is checked as before.
-                in_rust = False
-                for lineno, line in enumerate(f, start=1):
-                    fence = line.strip()
-                    if fence.startswith("```"):
-                        tag = fence[3:].split(",")[0].strip()
-                        in_rust = not in_rust and tag == "rust"
-                        continue
-                    if in_rust:
-                        continue
-                    m = pattern.search(line)
-                    if m:
-                        problems.append(
-                            "%s:%d: `.%s()` — %s is a property, not a method; "
-                            "calling it raises TypeError"
-                            % (os.path.relpath(path, repo), lineno,
-                               m.group(1), m.group(1)))
+            text = _read_text(path, errors="replace")
+            # Rust bindings call these as methods (`q.decimal()`), so a
+            # fenced block tagged ```rust (also ```rust,ignore and the
+            # like) is not Python and is not checked. Every other line,
+            # Python and untagged blocks included, is checked as before.
+            in_rust = False
+            for lineno, line in enumerate(text.splitlines(), start=1):
+                fence = line.strip()
+                if fence.startswith("```"):
+                    tag = fence[3:].split(",")[0].strip()
+                    in_rust = not in_rust and tag == "rust"
+                    continue
+                if in_rust:
+                    continue
+                m = pattern.search(line)
+                if m:
+                    problems.append(
+                        "%s:%d: `.%s()` — %s is a property, not a method; "
+                        "calling it raises TypeError"
+                        % (os.path.relpath(path, repo), lineno,
+                           m.group(1), m.group(1)))
     return problems
 
 

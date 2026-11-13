@@ -31,9 +31,48 @@ have 2.1.0, and Zenodo has the source as 10.5281/zenodo.24111262 and the
 documentation and specification as 10.5281/zenodo.24111263 (CITATION.cff and
 README name them). The Downloads menu points at the release (eight links,
 build count 944), `check_release_links.py` passes, and the site and its PDFs
-are published. The wiki article text is in doc/wiki; publish it to the GitHub
-wiki, then restore `-dev` and an [Unreleased] CHANGELOG section for the next
-cycle.
+are published. The wiki article text is in doc/wiki; there is no GitHub wiki to
+publish it to (the repository has none), so the article stays in the tree and
+that step is closed as not applicable. `-dev` is restored and the [Unreleased]
+CHANGELOG section is the next cycle's summary.
+
+## State 2026-11-13 — main after 2.1.0
+
+The tag is where the last full sweep was run. Since it, main carries the work
+of the next cycle, all of it under [Unreleased] and all of it on CI: the Rust
+crate shipping prebuilt C libraries for `x86_64-pc-windows-msvc`,
+`x86_64-apple-darwin` and `aarch64-apple-darwin` (`c/prebuilt/`, `PROVENANCE.json`,
+a `rust_prebuilt` CI job), the Python binding-review follow-ups (`_as_vu` as
+the one door for a unit-shaped argument, `DocumentFeed.set_unit_policy`,
+`canonicalize` reporting the sink's failure first, `FrameFeed`'s callbacks built
+outside the constructor, `DomNode.as_int_str()` reading bytes), and the tooling
+around them: the runner-shortage retry in CI, the rewrapped workflow, the
+link-search separators, the `check_*.py` gates through one helper, the clangd
+include paths, the Downloads pages and the ORCID preference steps.
+
+The last of the binding-review leftovers closed on 2026-11-13: item 6 as a doc
+line in doc/09 §11.6 (`loads`/`load` build and drop their reader, so the count
+is reachable only through `Reader` and the feeds), and item 12 as code -- a
+`float:32`/`float:16` subnormal now prints the digits it has, `2**-149` under
+`float:32` being `1.4e-45` rather than `1.4012985e-45` (CHANGELOG Fixed, doc/08
+and the `format_double` rows). Items 4 and 7 are closed as 3.0 work with the
+reason recorded. `.clangd` gained `build/generated` and `-x c`, without which
+the editor's clang could not parse the unit tables and read the C headers as
+Objective-C++.
+
+Version fields read 2.1.0 with `BVNR_VERSION_SUFFIX` back to `"-dev"`; the suffix
+reaches only the `bovnar version` banner, so no other field moves until the next
+release. CI is green on 7f51b2d (Build & Package, and the runner-shortage
+retry). The sweep the 2.1.0 entry records — `./run_tests.sh`, the ASan build,
+`cargo test`, clippy, fmt — was run at the tag, not on this work.
+
+Verified on this tree for the subnormal change: `ctest` 200/200 after
+regenerating the WASM module, `web/docs`, `web/llms-full.txt` and `web/de`
+(the C change moved the amalgamation and the docs), `cargo test --locked`
+1584/1584, the ASan build's utils/writer/dom suites, the utils fuzz harness at
+5000 iterations, and the reader round-trip of every emitted literal (`1.4e-45`
+under `float:32` reads back as exactly 2^-149, checked with exact rationals).
+clippy and fmt were not re-run: no Rust code changed.
 
 ORCID: DataCite auto-update put both 2.1.0 works on the record, but initially
 the source-code work was not preferred (2.0.2 was, display-index 6 against 1).
@@ -209,6 +248,12 @@ to main; its first real use is the evidence it works.
         return-value or callback change to two of the most-used functions, not a
         doc line, and it is not part of this pass.
 
+        **Closed 2026-11-13:** as a doc line, and the pass's own pattern -- the
+        count belongs to the reader object, and `loads`/`load` build one inside
+        the call and drop it. doc/09 §11.6 says so beside the table: a caller who
+        needs the count reads through `Reader.read_mem`/`read_stream`. Nothing
+        changed in the code.
+
 7. **An exception or panic in `on_error` cannot stop a read by itself.** The C
    `on_error` callback returns nothing, so the binding parks the exception and
    the read stops at the next `on_verified`/`on_unverified`/`want_unit` call,
@@ -297,6 +342,23 @@ Added by the second review pass the same day (also design choices):
         depends on how a reader rounds a `float:32` it reads as a double. The
         current form round-trips, which is the invariant both bindings rely on;
         the shorter one is for the next spec revision to decide, not this pass.
+
+    **Done 2026-11-13.** The digits come from the subnormal's own bit count now:
+        `bvn_format_double` packs the narrowed value into binary16 or binary32 and,
+        when the exponent field is zero and the significand is not, sets the
+        precision to that significand's bit length, so `2**-149` under `float:32`
+        is `1.4e-45` and `2**-24` under `float:16` is `6e-8` where both had eight
+        digits. Two bits are the floor: at one, the round-trip interval of a
+        float with a single significand bit is the whole octave below its value,
+        and the search answers `2e-45` -- 43% off the value it is meant to name,
+        because `1e-45` falls below the octave's midpoint. Normals are untouched:
+        they keep the width's digits, `65504` is still `6.5504e+4`, and the double
+        subnormal path (`5e-324`) was already at its own precision. The reading
+        side is now a rounding step, which every Bovnar reader already takes:
+        doc/08 (bvn_format_double) states it with the `1.4e-45` example, and the
+        `format_double` rows of doc/09 and doc/14 carry the short form. Tests:
+        the subnormal cases in `test_write_float_narrow_widths`. No float vectors
+        encode the old digits, so nothing else moved.
 
 ## Done — incremental streaming for Rust and Python (asked 2026-11-08)
 

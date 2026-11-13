@@ -1342,7 +1342,8 @@ position): the observer writes what it is fed, and the statement a recovery
 leaves without its value would make the output unreadable. A failing `input`
 is an `Error::Io` with `reading_from_source_fd`, a failing `out` one with
 `writing_to_sink`, and a panic in either reaches the caller; after an error
-`out` may hold the start of the output. The observer's C function is the
+`out` may hold the start of the output. When both fail in one call the output's
+error is the one that surfaces: it is what stopped the read. The observer's C function is the
 reader's `on_verified` itself, with the observer as its userdata, so no Rust
 runs per event.
 
@@ -3344,7 +3345,7 @@ fn main() -> Result<(), bovnar::Error> {
 | Constructor / method | Description |
 |---|---|
 | `DomDoc::create()` | An empty document |
-| `doc.add(key, node)` | Add `node` (anything `Into<NewNode>`) as a top-level entry. A parsed document takes one too |
+| `doc.add(key, node)` | Add `node` (anything `Into<NewNode>`) as a top-level entry. A parsed document takes one too. The node is **handed over**: a refused key (a duplicate, a non-identifier) is `Error::Argument` (`DuplicateStructKey` for the duplicate) and the node is dropped with it, as `s.add` does on a `NewStruct`. Python's `DomDoc.add` keeps the node usable instead, because it can (a refused node is still the caller's there, and Rust's `add` takes it by value) — the error code is the same in both |
 | `NewNode::null()` | A null node (`bvn_dom_node_alloc`) |
 | `NewNode::from_i8(v)` … `from_u64(v)` | An integer node of type `sint:8` … `uint:64`, with no unit (`bvn_dom_node_from_i8` … `_u64`) |
 | `NewNode::from_bigint(&value, width, signed, unit)` | An integer node of 65 to 32768 bits, with an `Option<&Unit>` (`bvn_dom_node_from_bigint`); `Signedness::Auto` is `sint` for a negative value and `uint` otherwise, as for `write_bvni`. A value that does not fit the type, another width, or a unit that is not structurally valid is `Error::Argument` |

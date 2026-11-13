@@ -14766,7 +14766,7 @@ All three take the read options of `Reader.read_mem` (`bovnar.READ_OPTIONS`,
 `continue_on_error`, `strict_version`, `text_only` and the rest. Besides those:
 `DocumentFeed` takes `typed`, `want_unit`, `on_error`, `on_unverified` and
 `mirror`, and has the `recovery_count`, `skipped_bytes` and `declared_version`
-of its reader (§11.6); `DemuxFeed(key=None,
+of its reader (§11.6) and its `set_unit_policy` (§5.6); `DemuxFeed(key=None,
 max_message=0, typed=False, view=False)`, whose `recovery_count`,
 `skipped_bytes` and `declared_version` are those of its reader, as on
 `DocumentFeed`; `FrameFeed(parse=False, typed=False, continue_past_failed=False,
@@ -14778,6 +14778,15 @@ max_document_size=0, view=False, return_errors=False)`, where `typed`,
 octet stream of the document, as `mux_load` does, while `mux_dump` and
 `MuxWriter` write under `key="mux"`: a document with any other octet stream —
 a `bytes` value in the preamble, say — needs `key=` on the reader.
+
+`FrameFeed` and `DemuxFeed` take no `want_unit`, `on_error` or `on_unverified`:
+what they hand out is a message or a document, not a value, and an error of
+their own reaches the caller as the exception of the `feed()` it happened in,
+which is the same report. Rust takes the handlers on every feed call
+(`FrameParser::feed_with`, `live::Demux::next_with`); Python keeps them on
+`DocumentFeed` and `Reader`, where there are values to convert and events to
+follow (`live::DocumentFeed` has both). A feed has no `set_unit_policy` of its
+own either, only `DocumentFeed` (§5.6), which is the one that reads values.
 
 `feed(data)` returns the object itself, which iterates over what those bytes
 completed, and `finish()` says the input is over. Running out of input is never
@@ -15082,7 +15091,9 @@ The keywords are the read options of `Reader.read_mem` (`bovnar.READ_OPTIONS`,
 with the first error recovered from: the observer writes what it is fed, and
 the statement a recovery leaves without its value would make the output
 unreadable. An exception the input or `out` raises comes out unchanged; after
-an error `out` may hold the start of the output.
+an error `out` may hold the start of the output. When both sides fail in one
+call the output's error is the one raised — a sink that cannot take the bytes
+is what stopped the read — as in Rust.
 
 The observer's C function is installed as the reader's `on_verified` itself,
 with the observer as its userdata, so no Python runs per event: Python is
@@ -16314,7 +16325,20 @@ point takes its keywords from — `read_*`, `iter_mem`, `loads` / `load`, the
 feeds (§4.7) and the `bovnar.stream` readers — so an option is never reachable
 from one and missing from another. An unknown keyword is a `TypeError`, a value
 outside its C field (a negative one, `max_string_length=70000`) a
-`BovnarArgumentError`. Every option defaults to `0` / `False`.
+`BovnarArgumentError`. Every option defaults to `0` / `False`, and `0` is that
+option's own default in the table below — never "the C field's default", and
+never "unlimited" unless the row says so. The entry points that bound a whole
+input set their own: `read_file` caps at `MAX_FILESIZE_BYTES` (16 MiB, §11.7)
+and `DomDoc.parse_fd` at 256 MiB (§13), where `loads()`, `read_mem` and the
+feeds leave `max_file_size` unlimited (a buffer already in memory needs no
+cap), and a DOM parse has no unlimited mode at all.
+
+The same split holds for every argument in the package: a wrong **type** is a
+`TypeError` (a `str` where a `Unit` or a `ValueUnit` belongs, an int where a
+`ValueTypeSpec` belongs), and a value the library cannot use is a
+`BovnarArgumentError` (an unknown keyword, a length past its C field, a unit
+string that does not parse). Nothing the binding reaches leaves a raw
+`ctypes` error to the caller.
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
@@ -16876,7 +16900,7 @@ doc.to_dict()                   # → {"server": {"port": 8080, "tls": None, "po
 | Constructor / method | Description |
 |---|---|
 | `DomDoc.create()` | An empty document; its `parse_error` is `NONE` |
-| `doc.add(key, node)` | Add `node` as a top-level entry and return it as a `DomNode` of `doc`. A parsed document takes one too |
+| `doc.add(key, node)` | Add `node` as a top-level entry and return it as a `DomNode` of `doc`. A parsed document takes one too. A refused key (a duplicate, or one that is not an identifier) is a `BovnarArgumentError` and **leaves the node with you**, spent but not destroyed, so it can go in elsewhere — Rust's `doc.add` takes the node by value and drops it on the same refusal (doc/14 §12.5) |
 | `NewNode.null()` / `NewNode.struct()` / `NewNode.array()` | An empty node of that kind (`bvn_dom_node_alloc`) |
 | `NewNode.integer(value, *, width=64, signed=None, unit=None)` | An integer node of type `sint:<width>` or `uint:<width>`; `signed=None` is `sint` for a negative value and `uint` otherwise, as for `write_bvni`. A width of 8, 16, 32 or 64 is `bvn_dom_node_from_i8` … `_u64`, which take no unit; a width of 65 to 32768 is `bvn_dom_node_from_bigint`, which takes `unit` (a unit string, `Unit` or `ValueUnit`). A value that does not fit the type, another width, or a unit on a narrow width raises `BovnarArgumentError` |
 | `node.add(key, child)` | Add `child` as a member of a struct node (`bvn_dom_struct_add`) |
@@ -24878,7 +24902,8 @@ position): the observer writes what it is fed, and the statement a recovery
 leaves without its value would make the output unreadable. A failing `input`
 is an `Error::Io` with `reading_from_source_fd`, a failing `out` one with
 `writing_to_sink`, and a panic in either reaches the caller; after an error
-`out` may hold the start of the output. The observer's C function is the
+`out` may hold the start of the output. When both fail in one call the output's
+error is the one that surfaces: it is what stopped the read. The observer's C function is the
 reader's `on_verified` itself, with the observer as its userdata, so no Rust
 runs per event.
 
@@ -26880,7 +26905,7 @@ fn main() -> Result<(), bovnar::Error> {
 | Constructor / method | Description |
 |---|---|
 | `DomDoc::create()` | An empty document |
-| `doc.add(key, node)` | Add `node` (anything `Into<NewNode>`) as a top-level entry. A parsed document takes one too |
+| `doc.add(key, node)` | Add `node` (anything `Into<NewNode>`) as a top-level entry. A parsed document takes one too. The node is **handed over**: a refused key (a duplicate, a non-identifier) is `Error::Argument` (`DuplicateStructKey` for the duplicate) and the node is dropped with it, as `s.add` does on a `NewStruct`. Python's `DomDoc.add` keeps the node usable instead, because it can (a refused node is still the caller's there, and Rust's `add` takes it by value) — the error code is the same in both |
 | `NewNode::null()` | A null node (`bvn_dom_node_alloc`) |
 | `NewNode::from_i8(v)` … `from_u64(v)` | An integer node of type `sint:8` … `uint:64`, with no unit (`bvn_dom_node_from_i8` … `_u64`) |
 | `NewNode::from_bigint(&value, width, signed, unit)` | An integer node of 65 to 32768 bits, with an `Option<&Unit>` (`bvn_dom_node_from_bigint`); `Signedness::Auto` is `sint` for a negative value and `uint` otherwise, as for `write_bvni`. A value that does not fit the type, another width, or a unit that is not structurally valid is `Error::Argument` |

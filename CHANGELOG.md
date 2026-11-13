@@ -16,6 +16,13 @@ API and implements spec 1.2.
 
 ### Added
 
+- **`DocumentFeed.set_unit_policy()`.** The push-fed reader was the one live
+  object with no unit policy of its own — `Reader` and `Writer` have it, and
+  Rust's `live::DocumentFeed` always did — so a fed document was the only way
+  to read a stream with no policy at all. It installs (or, with `None`, clears)
+  the policy of the reader behind the feed, exactly as `Reader.set_unit_policy`
+  does; doc/09 §4.7 and §5.6 name it.
+
 - **The Rust crate ships prebuilt C libraries on Windows MSVC and macOS.**
   `bovnar` on crates.io carried the C sources and compiled them in `build.rs`,
   so it needed a C compiler on every target. It now also carries the static
@@ -28,6 +35,29 @@ API and implements spec 1.2.
   everywhere. `PROVENANCE.json` names each archive's SHA-256 and the artifact it
   came from, and a new `rust_prebuilt` CI job links and tests the packaged crate
   on those targets.
+
+### Fixed
+
+- **A unit-shaped argument of the wrong type, and `convert_rational(True)`.**
+  `convert_value`, `convert_rational`, `unit_to_str`, `units_compatible` and
+  the rest reached ctypes with whatever they were given, so a `str` unit raised
+  `ctypes.ArgumentError: argument 2: <class 'TypeError'>: wrong type` — naming
+  neither the argument nor the type it wanted. One door now (`_as_vu` in
+  `bovnar/unit.py`) answers `TypeError: expected a Unit or a ValueUnit, not
+  str`, and a value the library cannot use stays a `BovnarArgumentError`.
+  `convert_rational(True, …)` was taken as 1, `Fraction(True)` being `Fraction(1,
+  1)`, and is refused as a bad value; `write_array(..., vu=None)` still means
+  "no unit". doc/09 §11.2 states the rule once.
+
+- **`canonicalize` when both sides fail.** Python raised the input's error
+  where Rust raises the output's. It now checks the sink's stashed failure
+  first, as Rust does — a sink that cannot take the bytes is what stopped the
+  read. The case is not constructible (a failing sink stops the read before the
+  source is asked again), so this aligns the intent; doc/09 §4.9 and doc/14
+  §4.10 say so.
+
+- **`DomNode.as_int_str()`** read `c_char_p().value`, which is `str | None`,
+  and decoded it; it reads the pointer with `string_at`, which is bytes.
 
 ## [2.1.0] - 2026-11-10
 

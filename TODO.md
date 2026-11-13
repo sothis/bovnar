@@ -102,12 +102,6 @@ has not moved on (tags always). `.github/scripts/runner-shortage.sh REPO RUN
 [ATTEMPT]` prints its verdict for any run. It takes effect from its first push
 to main; its first real use is the evidence it works.
 
-## Open 2026-11-09 — what the binding review left to the maintainer
-
-The review of the binding work (a7ba940..6ff3ed8; fixes in baa4eb7) found
-these. Each is a design choice rather than a bug: the behaviour is documented
-or harmless, and changing it means picking a side. None blocks 2.1.0.
-
 1. **Feed callbacks differ between the bindings.** Rust's `FrameParser`
    (`feed_with`) and `live::Demux` (`next_with`/`finish_with`) take
    `ReadHandlers` (`on_error`, `want_unit`, `on_unverified`) on each call.
@@ -118,12 +112,30 @@ or harmless, and changing it means picking a side. None blocks 2.1.0.
    remaining choice is whether to add them to the Python feeds later. The other
    way round, Python's `FrameFeed(return_errors=True)` has a Rust equivalent
    only in batch form (`stream::load_documents_results`).
+
+    **Decided:** Python's feeds keep the options-only model; nothing changed.
+        `FrameFeed` and `DemuxFeed` hand out whole messages and documents, not
+        values, and an error of their own reaches the caller as the exception of
+        the `feed()` it happened in, which is the same report `on_error` would be.
+        Rust's per-call `ReadHandlers` stay. doc/09 §4.7 now says so where a
+        reader meets the table, so the difference is stated rather than implied.
+
 2. **Writer limits are not bound.** `WriteOptions` (Rust) and the `Writer.to_*`
    keywords (Python) expose the nesting caps and `on_event`, but not the five
    length caps, `max_array_items`, `max_text_bytes`, `max_file_size`,
    `continue_on_error` or `on_error` of `bvnr_write_flags_t`. The read side now
    binds every flag. `dumps`/`dump` expose neither `on_event` nor the nesting
    caps.
+
+    **Decided:** not bound, on the C header's own word. `include/bovnar.h`
+        says the writer consults only the two nesting caps, `on_event`, `userdata`,
+        `unit_flags` and `emit_version`; the length and count caps,
+        `continue_on_error` and `on_error` "are accepted for struct symmetry but
+        are NOT consulted on the write path". Binding them would expose knobs that
+        do nothing. The two that are consulted are on `Writer` / `WriteOptions`
+        (doc/09 §12.1, doc/14 §11.1); `dumps`/`dump`/`to_string` stay the
+        no-options path, and their docs say where to go for one.
+
 3. **Size-cap defaults and meanings disagree.** `Reader.read_file` defaults to
    `max_file_size=16 MiB` (`MAX_FILESIZE_BYTES`); `read_mem`, `read_fd`,
    `read_stream`, `loads`, `load` and the stream functions default to 0, which
@@ -132,11 +144,31 @@ or harmless, and changing it means picking a side. None blocks 2.1.0.
    `max_file_size` caps one document in `load_documents`/`FrameFeed` but the
    whole stream in `mux_load`/`DemuxFeed` (documented). One meaning for 0, and
    one default, would be easier to explain; either is a behaviour change.
+
+    **Decided:** one rule, stated in doc/09 §11.2 with the options table: `0`
+        is that entry point's own documented default, never "the C field's
+        default", and never "unlimited" unless the row says so. The entry points
+        that bound a whole input keep their cap — `read_file` at 16 MiB,
+        `DomDoc.parse_fd` at 256 MiB with no unlimited mode at all — while the ones
+        handed a buffer already in memory leave `max_file_size` unlimited, because
+        a cap there buys nothing. The defaults stand: loosening a cap is the one
+        direction that costs a caller memory a document could have taken.
+
 4. **A refused DOM builder node.** When `DomDoc::add` refuses a key (a
    duplicate, a non-identifier), Rust destroys the node; Python leaves it with
    the caller, who may add it elsewhere. Rust's `add` returns `()`, Python's the
    new `DomNode`; Rust's duplicate-key error carries `DuplicateStructKey`,
    Python's is a plain `BovnarArgumentError`. Align on one model.
+
+    **Decided:** each binding keeps its model and both are now documented, so
+        the choice is visible at the point of use: Rust's `add` takes the node by
+        value and hands it over (a refused key is `Error::Argument` and the node
+        goes with it, doc/14 §12.5), Python's leaves a refused node with the caller,
+        who may add it elsewhere (doc/09 §13). Aligning on Rust's would drop a real
+        Python feature; aligning on Python's changes a shipped Rust signature, so it
+        waits for 3.0 with the rest of the breakage. The error codes already
+        agree.
+
 5. **Python error types for a wrong argument type are mixed.**
    `BovnarArgumentError` in timekeeping, `datetime_epoch_index`,
    `write_datetime` and the read options; `TypeError` in the literal helpers,
@@ -145,6 +177,20 @@ or harmless, and changing it means picking a side. None blocks 2.1.0.
    unit (and `convert_rational(True, …)` is taken as 1). Pick one rule (likely
    `TypeError` for the wrong type, `BovnarArgumentError` for a bad value) and
    apply it.
+
+    **Done.** One rule, shipped and stated once in doc/09 §11.2: a wrong
+        **type** is a `TypeError`, a value the library cannot use is a
+        `BovnarArgumentError`, and no `ctypes` error reaches the caller. `_as_vu`
+        (unit.py) is now the door for every unit-shaped argument, so
+        `convert_value`, `convert_rational`, `unit_to_str`, `units_compatible` and
+        the rest answer `TypeError: expected a Unit or a ValueUnit, not str`
+        instead of `ctypes.ArgumentError: argument 2: <class 'TypeError'>: wrong
+        type`; the two call sites that carried their own copy of the check (dom.py,
+        writer.py) lost it. `convert_rational(True, …)` is refused as a bad value:
+        `Fraction(True)` is 1, so it had answered as if the caller passed an int.
+        `write_array(..., vu=None)` still means "no unit". Tests:
+        `TestAUnitShapedArgumentIsATypeMatter` in python/tests/test_unit_object.py.
+
 6. **Recovered documents return quietly.** Under `continue_on_error`,
    `parse_with_options`, `parse_embedded_with_options`, the `stream::*_with_options`
    functions and their Python counterparts return what was recovered without
@@ -152,40 +198,105 @@ or harmless, and changing it means picking a side. None blocks 2.1.0.
    `on_error`, where there is one, and `recovery_count` on the reader. Decide
    whether the convenience functions should say so (an error, a flag, or a
    doc line).
+
+    **Decided:** silence is right for the convenience functions — they return
+        what the reader could recover, as the C read does — and the count is
+        reachable where the object survives the call (`Reader`, `DocumentFeed`,
+        `DemuxFeed`), with `canonicalize` the one that refuses a recovered
+        document. Recorded in doc/09 §11.6 beside the table, nothing changed. The
+        one gap left open: `loads` and `load` build and drop their `Reader`, so a
+        caller of those two cannot see the count at all. Closing that is a
+        return-value or callback change to two of the most-used functions, not a
+        doc line, and it is not part of this pass.
+
 7. **An exception or panic in `on_error` cannot stop a read by itself.** The C
    `on_error` callback returns nothing, so the binding parks the exception and
    the read stops at the next `on_verified`/`on_unverified`/`want_unit` call,
    or runs to the end with none installed, then re-raises (documented in
    doc/09 and doc/14). Stopping it at once would need a C change: a `bool`
    return, or a stop flag the reader checks.
+
+    **Decided:** keep, documented (doc/09 §11.2's `on_error` row, doc/14
+        §10.2), and the C change belongs to 3.0. `bvnr_on_error_fn` returns
+        `void`, so a `bool` return changes the callback ABI every existing
+        consumer compiles against. The additive alternative — a `stop_on_error`
+        flag inside the 16 bytes of `bvnr_read_flags_t._reserved[2]`, which needs
+        no size change — was designed and deliberately not taken here: it changes
+        the reader's contract (where a read can stop), and that wants its own
+        review rather than a bindings pass.
+
 8. **Rust `_with` means three things.** `Reader::read_mem_with` takes
    `ReadHandlers`, `Writer::to_mem_with` positional pretty/unit_flags/
    emit_version, `DocumentFeed::feed_with` handlers per call; `_with_options`
    takes an options struct. `DomDoc::parse_reader_capped_with_policy` sits next
    to `parse_reader_with_policy`. Renaming is source-breaking; settle it before
    the names are released in 2.1.0, or leave it.
+
+    **Decided:** leave. 2.1.0 is on crates.io, so every one of these names is
+        public and any rename is a semver break; only additions are compatible, and
+        a second spelling for each call is worse than the inconsistency. The
+        meanings to write down if 3.0 renames them: `_with` = loose scalars or
+        handlers, `_with_options` = an options struct, `_with_policy[_capped]` = a
+        `UnitPolicy`. A 3.0 pass should also fix the word order —
+        `parse_reader_capped_with_policy` is the odd one.
+
 9. **`canonicalize` with both sides failing.** Rust reports the output's error
    first (it is what stopped the read), Python the input's. Both failing in one
    call is near impossible; align if the code is touched again.
 
 Added by the second review pass the same day (also design choices):
 
+    **Done, as alignment rather than behaviour.** Python now checks the
+        output's stashed exception before the input's, as Rust does ("the output's
+        failure first: it is what stopped the read"), and doc/09 §4.9 / doc/14
+        §4.10 say so. The case is not constructible, which is why this had no test:
+        a sink that fails stops the read, so the source is never asked again and
+        `source.exc` stays `None` — verified by reverting the order and re-running
+        the experiment, which produced the same error. The reorder makes the intent
+        match Rust's.
+
 10. **A failing feed and the values before the error.** Rust's
     `ValueFeed::feed` appends the assignments completed before the error;
     Python's `DocumentFeed(values=True)` drops what the failing `feed()`
     completed (doc/09 §4.7). Each is documented; they disagree.
+
+    **Decided:** the difference is inherent to the shape, and doc/09 §4.7
+        states it. Rust's `ValueFeed::feed(&mut out)` keeps what the failing call
+        completed because the caller owns the buffer; Python's `feed()` *returns*
+        its items, so a call that raises cannot also hand them over. Values
+        completed by earlier calls are kept in both, and a fatal error ends the feed
+        either way, so nothing is lost that could have been read.
+
 11. **Parity gaps nothing documents.** Rust `live::DocumentFeed` has
     `set_unit_policy`, Python's `DocumentFeed` no unit policy at all. Rust has
     `stream::parse_embedded_reader`; Python's `parse_embedded` takes bytes
     only. A mux stream's own key comes out of Rust's `ValueBuilder` as an
     empty `Bytes` value, not out of Python's `DemuxFeed(values=True)` (doc/14
     §4.9 says so now).
+
+    **Partly done.** `DocumentFeed.set_unit_policy` now exists in Python
+        (stream.py), so the one live object without a policy has one; doc/09
+        §4.7/§5.6 name it, and `test_document_feed_takes_a_unit_policy` holds the
+        feed to the `Reader` under the same policy. Left as they are, with a doc
+        line each: `parse_embedded` takes bytes or `str` because it has no
+        transport to pull from (`canonicalize` is the entry point that reads a
+        stream), and a mux stream's own key yields no value in Python's
+        `DemuxFeed(values=True)` where Rust's `ValueBuilder` hands out an empty
+        `Bytes` — doc/14 §4.9 records the Rust side, doc/09 §4.7 the difference.
+
 12. **float:16/32 subnormals print more digits than they need.**
     `bvn_format_double` takes the precision of a binary32/binary16 subnormal
     from the format's width (24 or 11 bits), not from the bits the subnormal
     has, so 2⁻¹⁴⁹ as `float:32` is `1.4012984643e-45`. It round-trips; the
     shortest form depends on how a reader rounds a `float:32` it reads as a
     double, which is the open question.
+
+    **Decided:** keep, and it is a spec question rather than a binding one. The
+        extra digits come from taking the precision of the declared width (24 or 11
+        bits) instead of the subnormal's own bit count, and the shorter alternative
+        depends on how a reader rounds a `float:32` it reads as a double. The
+        current form round-trips, which is the invariant both bindings rely on;
+        the shorter one is for the next spec revision to decide, not this pass.
 
 ## Done — incremental streaming for Rust and Python (asked 2026-11-08)
 

@@ -59,6 +59,19 @@ API and implements spec 1.2.
 - **`DomNode.as_int_str()`** read `c_char_p().value`, which is `str | None`,
   and decoded it; it reads the pointer with `string_at`, which is bytes.
 
+- **A `float:32` or `float:16` subnormal printed digits it does not hold.**
+  `bvn_format_double` took the precision of a binary32 or binary16 subnormal
+  from the format's width, so the smallest `float:32` -- which has one
+  significand bit -- came out with the eight digits a full significand needs
+  (`1.4012985e-45`). A subnormal now prints the digits it has: the shortest
+  decimal that reads back as the declared format, `2**-149` under `float:32`
+  being `1.4e-45` and `2**-24` under `float:16` being `6e-8`. A normal is
+  unchanged and keeps the full width (`65504` is still `6.5504e+4`). The
+  shorter form is a rounding step for the reader: it must round the literal to
+  the declared width rather than keep it as the double it parsed into, which is
+  what every Bovnar reader does; doc/08 (bvn_format_double) and the format_double
+  rows of doc/09 and doc/14 say so.
+
 ## [2.1.0] - 2026-11-10
 
 ### Added

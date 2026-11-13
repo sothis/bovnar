@@ -3597,6 +3597,16 @@ static void test_write_float_narrow_widths(void)
 		{ 16u, 0.1,      true,  NULL },
 		{ 32u, 1e-50,    true,  NULL },     /* underflow to 0 is a rounding */
 		{ 16u, INFINITY, true,  ".v=<float:16>inf;" },
+		/* A subnormal prints the digits it has, not the digits its format could
+		 * have held: the shortest decimal that reads back to it as the format,
+		 * so 2**-149 as a float:32 is 1.4e-45 and not the 1.4012985e-45 the
+		 * significand's full width gave. The normal beside it keeps the full
+		 * width -- it has the significand to fill. */
+		{ 32u, 1.40129846432481707092e-45, true, ".v=<float:32>1.4e-45;" },
+		{ 32u, 3.0 * 1.40129846432481707092e-45, true, ".v=<float:32>4e-45;" },
+		{ 32u, 1.17549435082228750797e-38, true, ".v=<float:32>1.175494351e-38;" },
+		{ 16u, 5.96046447753906250000e-08, true, ".v=<float:16>6e-8;" },
+		{ 16u, 6.10351562500000000000e-05, true, ".v=<float:16>6.1035e-5;" },
 	};
 	for (size_t i = 0; i < sizeof C / sizeof C[0]; i++) {
 		uint8_t out[128];

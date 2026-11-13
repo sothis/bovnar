@@ -2727,10 +2727,13 @@ bool bvn_looks_like_double(const char* s)
 }
 /*
  * `value` rounded to the IEEE binary16 or binary32 grid, as a double, through
- * the packer the reader decodes with. False when the packer cannot run or a
- * finite value rounds to infinity: the format cannot hold it.
+ * the packer the reader decodes with, and -- when `bits_out` is given -- the
+ * packed bits it was rounded to, so the caller can see which of the format's
+ * values it became. False when the packer cannot run or a finite value rounds
+ * to infinity: the format cannot hold it.
  */
-static bool bvn_narrow_ieee(double value, uint32_t width, double* out)
+static bool bvn_narrow_ieee(double value, uint32_t width, double* out,
+							  uint64_t* bits_out)
 {
 	bvn_limb_t a[BVN_FLOAT_NLIMBS(64u)], b[BVN_FLOAT_NLIMBS(64u)];
 	bvn_float_t fa, fb;
@@ -2742,10 +2745,12 @@ static bool bvn_narrow_ieee(double value, uint32_t width, double* out)
 		uint16_t bits = 0;
 		bvn_float_to_bin16(&fa, &bits);
 		ok = bvn_float_from_bin16(&fb, bits);
+		if (bits_out) *bits_out = bits;
 	} else {
 		uint32_t bits = 0;
 		bvn_float_to_bin32(&fa, &bits);
 		ok = bvn_float_from_bin32(&fb, bits);
+		if (bits_out) *bits_out = bits;
 	}
 	if (!ok || !bvn_float_to_double(&fb, out)) return false;
 	/* Finite without <math.h>: inf - inf and nan - nan are nan, != 0. */
@@ -2791,11 +2796,38 @@ int32_t bvn_format_double(char* buf, size_t bufsize, double value,
 	 * shortest IEEE spelling: a reader takes the text as a double and does not
 	 * round it to the declared format, so 65504 goes out as 6.5504e+4, which
 	 * reads back as 65504, not as the 6.55e+4 a binary16 reader would also
-	 * accept. A finite value the format cannot hold is refused rather than
-	 * written as the infinity it rounds to. */
+	 * accept. A subnormal is the exception, below: it does not HAVE a full
+	 * significand's worth of bits, and padding it with them invented digits --
+	 * 2**-149 as a float:32 is 1.4012985e-45 where 1.4e-45 reads back to it.
+	 * A finite value the format cannot hold is refused rather than written as
+	 * the infinity it rounds to. */
+	uint64_t packed = 0;
 	if (vt.family == vt_float && (vt.width == 16u || vt.width == 32u) &&
-	    !bvn_narrow_ieee(value, vt.width, &value))
+	    !bvn_narrow_ieee(value, vt.width, &value, &packed))
 		return -1;
+	/* A subnormal holds fewer bits than its format's significand, and padded to
+	 * that width it printed digits it does not hold. Its own bits are its
+	 * precision, counted in the format's own grid: the exponent field is zero
+	 * and the significand is not, so there is no implicit bit to add. Two bits
+	 * are the floor: at one, the value's round-trip interval reaches down to the
+	 * midpoint between 2**-150 and 2**-149, which 1e-45 falls below, and the
+	 * search answers 2e-45 -- 43% off the value it names -- while two keep the
+	 * answer within about a part in 10^3. The text is then the shortest that
+	 * reads back as that value, as the reader takes a float:32 -- which for a
+	 * subnormal is a narrower decimal than the significand's width, and needs the
+	 * reader to round the literal to the declared width rather than keep it as
+	 * the double it parsed into. */
+	if (vt.family == vt_float && (vt.width == 16u || vt.width == 32u)) {
+		uint32_t mbits = (vt.width == 16u) ? 10u : 23u;
+		uint32_t ebits = (vt.width == 16u) ? 5u : 8u;
+		uint32_t man = (uint32_t)(packed & ((1ull << mbits) - 1ull));
+		if (man && ((packed >> mbits) & ((1ull << ebits) - 1ull)) == 0u) {
+			uint32_t sig = 0;
+			while (man) { sig++; man >>= 1; }
+			if (sig < 2u) sig = 2u;
+			if (sig < prec) prec = sig;
+		}
+	}
 	/* For float_fix and float_dec the width is the FIELD (a Q-format integer,
 	 * a decimal interchange format), not a binary significand. Rounding the
 	 * double to `width` bits first and leaving the reader to round again to

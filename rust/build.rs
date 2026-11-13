@@ -297,6 +297,10 @@ fn link_prebuilt(repo: &Path) -> bool {
             .display()
     );
     println!("cargo:rustc-link-lib=static=bvnr");
+    // Said out loud, because it is the one thing CI cannot see otherwise: a
+    // silent fallback to compiling c/ would build, test and ship fine. The
+    // warning reaches the job log at any verbosity.
+    println!("cargo:warning=bovnar: links the prebuilt archive for {target}");
     true
 }
 

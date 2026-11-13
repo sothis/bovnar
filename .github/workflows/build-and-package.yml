@@ -825,21 +825,26 @@ jobs:
             -- --skip abi_tests
 
       # A silent fallback to compiling c/ would build and test fine here and
-      # still ship the crate this job exists to check. build.rs says which way
-      # it went, so read it back for each target.
+      # still ship the crate this job exists to check. The build script says
+      # which way it went, as a cargo warning on every run, so ask cargo and
+      # read its log: where it keeps the artifact tree is cargo's business,
+      # and a path guess is what broke this assertion before.
       - name: It linked the archive, it did not compile the C sources
         working-directory: ${{ runner.temp }}/crate/bovnar
         shell: bash
         run: |
           set -euo pipefail
-          for t in "${{ matrix.build }}" "${{ matrix.test }}"; do
-            out=$(find "target/$t" -path '*/build/bovnar-*/output' | head -1)
-            # \ on Windows, / elsewhere, so match the pieces, not a path.
-            search=$(grep -o 'link-search=native=.*' "$out" || true)
-            case "$search" in
-              *prebuilt*"$t"*) echo "$t links: $search" ;;
-              *) echo "::error::$t compiled c/ instead of linking"; exit 1 ;;
-            esac
+          for t in $(printf '%s\n' "${{ matrix.build }}" \
+                              "${{ matrix.test }}" | sort -u); do
+            # Only this crate, only this target: the build script runs again.
+            cargo clean --package bovnar --target "$t"
+            log="$RUNNER_TEMP/build-$t.log"
+            cargo build --locked --lib --target "$t" 2>&1 | tee "$log"
+            if ! grep -q "links the prebuilt archive for $t" "$log"; then
+              echo "::error::$t compiled c/ instead of linking"
+              exit 1
+            fi
+            echo "$t links the prebuilt archive"
           done
 
   source:

@@ -955,7 +955,10 @@ def _canonicalize(where: str, data, out, pretty: bool, options: dict) -> None:
             lib.bvnr_source_from_mem(ctypes.byref(src), keep, len(data))
         ok = reader._run_read(lambda: lib.bvnr_open_read_source(
             reader._ptr, ctypes.byref(src), None, ctypes.byref(flags)))
-        for exc in (source.exc if source is not None else None, sink.exc):
+        # The output's failure first, as Rust orders it: a sink that cannot take
+        # the bytes is what stopped the read, so it is the cause to report when
+        # both sides failed.
+        for exc in (sink.exc, source.exc if source is not None else None):
             if exc is not None:
                 raise exc
         if not ok:

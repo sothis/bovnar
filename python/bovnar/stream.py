@@ -143,7 +143,7 @@ def _utf8(text: str, what: str) -> bytes:
 def frame_documents(docs: Iterable[bytes], *, file: None = None) -> bytes: ...
 @overload
 def frame_documents(docs: Iterable[bytes], *, file: Any) -> None: ...
-def frame_documents(docs, *, file=None):
+def frame_documents(docs, *, file=None) -> bytes | None:
     """Wrap each already-serialised document in a length-prefixed frame and
     return the concatenated frame stream (``"BVF1" + u64 len + payload`` each).
 
@@ -337,7 +337,7 @@ def mux_dump(messages: Iterable[tuple], *, key: str = 'mux',
 @overload
 def mux_dump(messages: Iterable[tuple], *, key: str = 'mux',
              preamble: dict | None = None, file: Any) -> None: ...
-def mux_dump(messages, *, key: str = 'mux', preamble=None, file=None):
+def mux_dump(messages, *, key: str = 'mux', preamble=None, file=None) -> bytes | None:
     """Serialise ``(channel:int, payload:bytes)`` messages as one multiplexed
     octet-stream document under ``key``. Channels may repeat and interleave;
     messages of any size are split across octet chunks and reassembled by
@@ -619,7 +619,7 @@ def embed_document(inner, *, key: str = 'payload', pretty: bool = True,
 def embed_document(inner, *, key: str = 'payload', pretty: bool = True,
                    file: Any) -> None: ...
 def embed_document(inner, *, key: str = 'payload', pretty: bool = True,
-                   file=None):
+                   file=None) -> bytes | None:
     """Return a complete document that embeds ``inner`` (raw document bytes) as
     the octet-stream payload of ``key``; with ``file`` (a socket or a binary
     file object), write it there and return nothing."""
@@ -1545,7 +1545,9 @@ class DemuxFeed(_Feed):
             self._fed_at = None
         return self
 
-    def __next__(self):
+    def __next__(self) -> Any:
+        # Message, or DocumentEvent when the document's own events are asked
+        # for as well; the docstring above says which and when.
         # The per-message path, kept flat: everything else is _resume's.
         if self._closed:
             raise StopIteration

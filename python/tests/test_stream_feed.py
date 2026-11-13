@@ -28,14 +28,16 @@ import pickle
 import random
 import socket
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from conftest import needs_lib
 import bovnar
 from bovnar import stream, Reader, Event, ErrorCode
 from bovnar.exceptions import BovnarArgumentError, BovnarParseError
 from bovnar.stream import DemuxFeed, DocumentEvent, DocumentFeed, FrameFeed, Message, Value
+
+from conftest import needs_lib
 
 pytestmark = needs_lib
 
@@ -149,7 +151,9 @@ class TestDocumentFeed:
         f = DocumentFeed(events=False, values=True)
         for i in range(200):
             assert list(f.feed(b'.v = %d;' % i)) == [Value('v', i)]
-        assert f._parser._doc == {}
+        parser = f._parser
+        assert parser is not None
+        assert parser._doc == {}
 
     def test_events_and_values_together(self):
         items = list(DocumentFeed(values=True).feed(b'.a = 2;').finish())
@@ -173,7 +177,7 @@ class TestDocumentFeed:
     def test_errors_match_the_reader(self, bad):
         want = _parse_error(lambda: Reader().read_mem(bad))
         for pieces in _splits(bad):
-            assert _parse_error(lambda: _fed_events(pieces)) == want
+            assert _parse_error(lambda p=pieces: _fed_events(p)) == want
 
     def test_running_out_of_input_is_not_an_error(self):
         f = DocumentFeed()
@@ -305,7 +309,8 @@ class TestDemuxFeed:
     def test_vector_codes(self):
         # The codes themselves, so that agreeing with mux_load cannot hide both
         # being wrong.
-        codes = {n: _mux_load_or_error(d) for n, d in _VECTORS.items()}
+        codes: dict[str, Any] = {
+            n: _mux_load_or_error(d) for n, d in _VECTORS.items()}
         assert codes['channels_4097'] == ErrorCode.OCTET_STREAM_OUT_OF_SYNC
         assert codes['truncated_message'] == ErrorCode.OCTET_STREAM_TRUNCATED
         assert codes['overlong_varint'] == ErrorCode.OCTET_STREAM_OUT_OF_SYNC
@@ -698,7 +703,7 @@ class TestReviewFixes:
 
     def test_an_int_is_not_a_payload(self):
         with pytest.raises(BovnarArgumentError):
-            stream.frame_documents([5])
+            stream.frame_documents([5])  # pyright: ignore[reportArgumentType]
 
 
 class TestSecondReviewFixes:
@@ -753,8 +758,9 @@ class TestSecondReviewFixes:
         for action in ('close', 'feed'):
             f = None
 
-            def want(_d):
-                f.close() if action == 'close' else f.feed(b'.b = 2;')
+            def want(_d, action=action):
+                # `f` is bound below, before the feed ever calls this.
+                f.close() if action == 'close' else f.feed(b'.b = 2;')  # pyright: ignore[reportOptionalMemberAccess]
             f = DocumentFeed(want_unit=want)
             with pytest.raises(BovnarArgumentError, match='own callback'):
                 f.feed(b'.a = <float:64,km> 1.0; .c = 3;')
@@ -813,7 +819,9 @@ class TestSecondReviewFixes:
         assert ei.value.code == ErrorCode.OCTET_STREAM_TRUNCATED
         after = list(dm)
         assert Value('n', [1, 2]) in after
-        assert after[-1].event == Event.STREAM_END
+        last = after[-1]
+        assert isinstance(last, DocumentEvent)
+        assert last.event == Event.STREAM_END
 
 
 class TestReadLimits:

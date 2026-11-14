@@ -2618,8 +2618,10 @@ static void test_write_flush_edges(void)
 
 #if !defined(_WIN32)
 	/* An fd sink: the bytes are in the pipe after the flush, not before. */
-	int fds[2];
-	ASSERT_TRUE(pipe(fds) == 0, "pipe");
+	int fds[2] = { -1, -1 };
+	int prc = pipe(fds);
+	ASSERT_TRUE(prc == 0, "pipe");
+	if (prc != 0) { bvnr_writer_destroy(w); return; }
 	fcntl(fds[0], F_SETFL, fcntl(fds[0], F_GETFL) | O_NONBLOCK);
 	bvnr_sink_t fd_sink;
 	bvnr_sink_to_fd(&fd_sink, fds[1]);
@@ -2772,8 +2774,9 @@ static void test_write_finish_incomplete(void)
 
 #if !defined(_WIN32)
 	/* An fd sink gets the whole of it too. */
-	int fds[2];
+	int fds[2] = { -1, -1 };
 	ASSERT_TRUE(pipe(fds) == 0, "pipe");
+	if (fds[0] < 0) { free(mem); return; }
 	fcntl(fds[0], F_SETFL, fcntl(fds[0], F_GETFL) | O_NONBLOCK);
 	bvnr_writer_t* wm = bvnr_writer_create();
 	bvnr_open_write_mem(wm, mem, cap, false, NULL);

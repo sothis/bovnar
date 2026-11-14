@@ -406,7 +406,9 @@ static void test_octet_mux_observer(void)
 	 * varints included. Walk both. */
 	const uint8_t *open = memchr(plain, 0x00, (size_t)n_plain);
 	ASSERT_TRUE(open != NULL, "octet stream opens");
-	if (open && n_plain >= (uint64_t)(open - plain) + 3) {
+	/* n_plain >= 3 is what puts both closing octets in bounds: ASSERT_TRUE does
+	 * not abort, so the checks above can fall through with a short write. */
+	if (n_plain >= 3 && open && n_plain >= (uint64_t)(open - plain) + 3) {
 		const uint8_t *body = open + 1;
 		const uint8_t *end  = plain + n_plain - 2;   /* at the closing NUL */
 		ASSERT_EQ_UINT(plain[n_plain - 2], 0x00, "octet stream closes");

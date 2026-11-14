@@ -1804,11 +1804,14 @@ static JsonNode *json_parse_object(const char **p, int depth)
 				free(tk); free(tv);
 				free(key); json_free_node(val); json_free_node(node); return NULL;
 			}
-			/* Grow both arrays before dropping either: the old buffers are only
-			 * released once the new ones are in place, so the node never
-			 * aliases freed memory. */
+			/* Copy the live entries into the new buffers and install those
+			 * buffers before releasing the old ones. The node then never
+			 * aliases freed memory, and keys from before this growth stay
+			 * reachable. */
 			char     **ok = node->u.obj.keys;
 			JsonNode **ov = node->u.obj.values;
+			memcpy(tk, ok, cap * sizeof(*ok));
+			memcpy(tv, ov, cap * sizeof(*ov));
 			node->u.obj.keys   = tk;
 			node->u.obj.values = tv;
 			free(ok);

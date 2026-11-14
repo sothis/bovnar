@@ -1804,12 +1804,15 @@ static JsonNode *json_parse_object(const char **p, int depth)
 				free(tk); free(tv);
 				free(key); json_free_node(val); json_free_node(node); return NULL;
 			}
-			memcpy(tk, node->u.obj.keys,   cap * sizeof(*node->u.obj.keys));
-			memcpy(tv, node->u.obj.values, cap * sizeof(*node->u.obj.values));
-			free(node->u.obj.keys);
-			free(node->u.obj.values);
+			/* Grow both arrays before dropping either: the old buffers are only
+			 * released once the new ones are in place, so the node never
+			 * aliases freed memory. */
+			char     **ok = node->u.obj.keys;
+			JsonNode **ov = node->u.obj.values;
 			node->u.obj.keys   = tk;
 			node->u.obj.values = tv;
+			free(ok);
+			free(ov);
 			cap = nc;
 		}
 		node->u.obj.keys[node->u.obj.count]   = key;

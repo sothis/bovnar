@@ -23,6 +23,7 @@
  */
 
 #include <stdio.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -34,6 +35,22 @@
 
 static int failures = 0;
 static int tests = 0;
+
+/* snprintf reports the length it *would* have written, so adding its return to
+ * a running offset walks that offset past the buffer as soon as one call
+ * truncates -- and the next call then sizes its write from a negative space.
+ * Clamp instead: a full buffer keeps the offset on its last usable byte. */
+static size_t appendf(char *dst, size_t cap, size_t off, const char *fmt, ...)
+{
+	va_list ap;
+	int w;
+	if (off + 1u >= cap) return off;
+	va_start(ap, fmt);
+	w = vsnprintf(dst + off, cap - off, fmt, ap);
+	va_end(ap);
+	if (w < 0) return off;
+	return (size_t)w >= cap - off ? cap - 1u : off + (size_t)w;
+}
 
 #define ASSERT_TRUE(cond, msg) do {                                   \
 	tests++;                                                          \
@@ -1606,10 +1623,10 @@ static void test_dom_float_magnitude_fast_path(void)
 	char  *big = malloc(cap);
 	ASSERT_NOT_NULL(big, "allocation");
 	if (!big) return;
-	n += (size_t)snprintf(big + n, cap - n, ".a = [");
+	n = appendf(big, cap, n, ".a = [");
 	for (int i = 0; i < N; i++)
-		n += (size_t)snprintf(big + n, cap - n, "%s1e-99999", i ? "," : "");
-	n += (size_t)snprintf(big + n, cap - n, "];");
+		n = appendf(big, cap, n, "%s1e-99999", i ? "," : "");
+	n = appendf(big, cap, n, "];");
 	clock_t t0 = clock();
 	bvn_dom_doc_t *d = bvn_dom_parse(big, (uint32_t)n);
 	double secs = (double)(clock() - t0) / CLOCKS_PER_SEC;

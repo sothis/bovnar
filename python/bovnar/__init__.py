@@ -1490,7 +1490,14 @@ def _emit_octets(w: Writer, payload: bytes) -> None:
 
 # The bytes the C writer refuses inside a string (bvn_validate_string_content):
 # C0 controls other than TAB, LF, VT, FF and CR, and DEL. Neither tier reads them.
-_BAD_TEXT_RX = _re.compile('[\x00-\x08\x0e-\x1f\x7f]')
+#
+# Written out as single characters rather than as the ranges \x00-\x08 and
+# \x0e-\x1f: CodeQL's py/overly-large-range reads those two as one suspicious
+# span across the code-point space and reports this class on every scan. The set
+# is the same either way; keep the two blocks apart here.
+_BAD_TEXT_RX = _re.compile('[\x00\x01\x02\x03\x04\x05\x06\x07\x08'
+                          '\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17'
+                          '\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f\x7f]')
 
 # The reader's default max_identifier_length (bvn_val_impl.h), which loads(),
 # dom_parse() and `bovnar validate` all read with unless told otherwise (the

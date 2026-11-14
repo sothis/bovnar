@@ -17,6 +17,14 @@ concurrency:
   group: build-package-${{ github.ref }}
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
+# Least privilege for every job in this file: nothing here writes to the
+# repository. A job that needs more declares its own block below, and a
+# job-level `permissions:` replaces this one rather than adding to it --
+# `release` takes contents: write, `publish` the PyPI OIDC token,
+# `shortage_retry` actions: write.
+permissions:
+  contents: read
+
 # Builds the library (static + shared) and the CLI on the supported 64-bit
 # targets and publishes each as a downloadable release artifact:
 #   * Windows MSVC  -> bovnar-windows-msvc

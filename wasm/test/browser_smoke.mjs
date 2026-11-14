@@ -124,7 +124,7 @@ const fails = [];
 function ok(cond, msg) { if (cond) pass++; else { fail++; fails.push(msg); } }
 function textOf(id) {
   const m = dom.match(new RegExp(`id="${id}"[^>]*>([\\s\\S]*?)</(?:span|div|b|pre)>`));
-  return m ? m[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim() : '';
+  return m ? m[1].replace(/<[^>]*>?/g, '').replace(/\s+/g, ' ').trim() : '';
 }
 function windowOf(id, len = 2500) {
   const i = dom.indexOf(`id="${id}"`);

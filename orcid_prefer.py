@@ -196,7 +196,10 @@ def cookie_header(path: Path) -> str:
             if len(fields) < 7:
                 continue
             domain = fields[0].removeprefix("#HttpOnly_")
-            if "orcid.org" in domain:
+            # The host, not a substring of one: notorcid.org and
+            # orcid.org.example.net both contain "orcid.org", and only the
+            # first label or the whole field is the site's own cookie.
+            if domain == "orcid.org" or domain.endswith(".orcid.org"):
                 pairs.append(f"{fields[5]}={fields[6]}")
         return "; ".join(pairs)
     header = " ".join(line.strip() for line in lines)

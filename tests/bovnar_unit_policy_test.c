@@ -23,6 +23,7 @@
  */
 
 #include <stdio.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -35,6 +36,22 @@
 
 static int failures = 0;
 static int tests = 0;
+
+/* snprintf reports the length it *would* have written, so adding its return to
+ * a running offset walks that offset past the buffer as soon as one call
+ * truncates -- and the next call then sizes its write from a negative space.
+ * Clamp instead: a full buffer keeps the offset on its last usable byte. */
+static size_t appendf(char *dst, size_t cap, size_t off, const char *fmt, ...)
+{
+	va_list ap;
+	int w;
+	if (off + 1u >= cap) return off;
+	va_start(ap, fmt);
+	w = vsnprintf(dst + off, cap - off, fmt, ap);
+	va_end(ap);
+	if (w < 0) return off;
+	return (size_t)w >= cap - off ? cap - 1u : off + (size_t)w;
+}
 
 #define ASSERT_TRUE(cond, msg) do {                                       \
 	tests++;                                                              \
@@ -1409,11 +1426,11 @@ static void test_rule_refuses_unrepresentable_paths(void)
 	char doc[4096];
 	size_t pos = 0;
 	for (int i = 0; i < 40; i++)
-		pos += (size_t)snprintf(doc + pos, sizeof doc - pos, ".s%d = {", i);
-	pos += (size_t)snprintf(doc + pos, sizeof doc - pos,
-				" .leaf = <float:64,in> 12.0; ");
+		pos = appendf(doc, sizeof doc, pos, ".s%d = {", i);
+	pos = appendf(doc, sizeof doc, pos,
+		      " .leaf = <float:64,in> 12.0; ");
 	for (int i = 0; i < 40; i++)
-		pos += (size_t)snprintf(doc + pos, sizeof doc - pos, "};");
+		pos = appendf(doc, sizeof doc, pos, "};");
 
 	pol_ctx_t c = {0};
 	run_policy(doc, &p, &c, false, error_unit_mismatch);

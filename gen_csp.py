@@ -38,7 +38,7 @@ WEB = ROOT / "web"
 # An attribute value never contains '>' on these pages, so [^>]* is safe; the
 # content is captured verbatim (no entity decoding) because that is what the
 # browser hashes.
-SCRIPT_RE = re.compile(r"<script\b([^>]*)>(.*?)</script>", re.S)
+SCRIPT_RE = re.compile(r"<script\b([^>]*)>(.*?)</script\s*>", re.S | re.I)
 # The page documents its own markup inside HTML comments -- "the init calls below
 # run in an inline end-of-body <script>" is one of several. A bare scan opens a
 # phantom element at that mention and closes it at the next REAL </script>,

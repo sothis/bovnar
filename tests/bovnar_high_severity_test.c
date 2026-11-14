@@ -23,6 +23,7 @@
  */
 
 #include <inttypes.h>
+#include <stdarg.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -35,6 +36,22 @@
 
 static int g_tests    = 0;
 static int g_failures = 0;
+
+/* snprintf reports the length it *would* have written, so adding its return to
+ * a running offset walks that offset past the buffer as soon as one call
+ * truncates -- and the next call then sizes its write from a negative space.
+ * Clamp instead: a full buffer keeps the offset on its last usable byte. */
+static size_t appendf(char *dst, size_t cap, size_t off, const char *fmt, ...)
+{
+	va_list ap;
+	int w;
+	if (off + 1u >= cap) return off;
+	va_start(ap, fmt);
+	w = vsnprintf(dst + off, cap - off, fmt, ap);
+	va_end(ap);
+	if (w < 0) return off;
+	return (size_t)w >= cap - off ? cap - 1u : off + (size_t)w;
+}
 
 #define FAIL(fmt, ...) do { \
 	fprintf(stderr, "  FAIL %s:%d: " fmt "\n", \
@@ -1988,10 +2005,10 @@ static void test_resync_reports_what_it_discarded(void)
 	/* the same single recovery, but a far larger loss — which is the whole
 	 * point: recovery_count cannot tell these two apart, and this can */
 	char big[4096];
-	size_t p = (size_t)snprintf(big, sizeof big, ".big = @@@ [");
+	size_t p = appendf(big, sizeof big, 0, ".big = @@@ [");
 	for (int i = 0; i < 300; i++)
-		p += (size_t)snprintf(big + p, sizeof big - p, "%s%d", i ? ", " : "", i);
-	p += (size_t)snprintf(big + p, sizeof big - p, "];\n.c = 3;\n");
+		p = appendf(big, sizeof big, p, "%s%d", i ? ", " : "", i);
+	p = appendf(big, sizeof big, p, "];\n.c = 3;\n");
 	uint64_t large = skipped_for(big, &rec);
 	ASSERT_EQ_UINT(rec, 1, "skipped: still exactly one recovery");
 	ASSERT_TRUE(large > 500,

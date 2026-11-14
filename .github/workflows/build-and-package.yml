@@ -342,8 +342,8 @@ jobs:
       # library list").
       - name: Sanitizer build
         run: |
-          cmake -B build-asan -DBVNR_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug .
-          cmake --build build-asan -j"$(nproc)"
+          cmake -B build/asan -DBVNR_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug .
+          cmake --build build/asan -j"$(nproc)"
 
       # -LE python, not -E '^bvnr_py_': the thing that cannot run here is
       # "drives the library from a Python interpreter", which is what the label
@@ -351,7 +351,7 @@ jobs:
       # exactly that kind of test under a name the prefix does not match, so it
       # ran, hit the ctypes-into-unsanitized-interpreter wall and failed.
       - name: CTest (ASan + UBSan)
-        run: ctest --test-dir build-asan -j"$(nproc)" -LE python
+        run: ctest --test-dir build/asan -j"$(nproc)" -LE python
           --output-on-failure
 
   linux:

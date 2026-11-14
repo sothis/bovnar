@@ -12,8 +12,8 @@
 # This has been wrong twice. The banner comments that head each inlined fragment
 # carry the fragment's path, and the generated ones live under <build>/generated;
 # the first fix normalised a build tree OUTSIDE the source tree and one named
-# exactly "build", which left `cmake -B build-asan` -- i.e. the sanitizer job --
-# falling through with its directory name baked into the output.
+# exactly "build", which left `cmake -B build-asan` -- the sanitizer job, now
+# `build/asan` -- falling through with its directory name baked into the output.
 #
 # Build the amalgamation twice from byte-identical inputs, differing only in the
 # name of the directory the generated fragments sit in, and require the two to

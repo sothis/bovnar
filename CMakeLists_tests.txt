@@ -1880,7 +1880,7 @@ endif()
 # package, run the CLI and run the per-profile test binaries, and they used to
 # look for all three under <source>/build -- so from a build directory by any
 # other name they printed "no built library; skipped" and passed, and in the
-# sanitizer pass, which CI configures into build-asan, they re-checked the first
+# sanitizer pass, which CI configures into build/asan, they re-checked the first
 # pass's binaries. BVNR_REQUIRE_BUILD turns each of those skips into a failure
 # (bvnr_build_env.py); run by hand, without it, the scripts still skip.
 #
@@ -2287,7 +2287,7 @@ endif()
 # bvnr_wasm_freshness above hashes the amalgamated sources, so it is only a
 # freshness check if that hash depends on the SOURCES and nothing else. Twice now
 # it has also depended on the build directory's name, and the second time the
-# suite was green in build/ while failing in build-asan/ over identical inputs --
+# suite was green in build/ while failing in build/asan/ over identical inputs --
 # a gate accusing the tree of being stale when the tree was fine. Pin the
 # property the gate rests on rather than rediscovering it from the wreckage.
 if(Python3_Interpreter_FOUND AND NOT WIN32)

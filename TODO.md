@@ -652,9 +652,10 @@ All four done on the maintainer's word ("do all"):
 
 ## Setup — picking it up on a new machine
 
-- `build/` and `build-asan/` are git-ignored and do not travel. Configure
-  them again: `cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo .` and
-  `cmake -B build-asan -DBVNR_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug .`, then
+- `build/` (including `build/asan/`, `build/clang/` and `build/mingw/`) is
+  git-ignored and does not travel. Configure them again:
+  `cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo .` and
+  `cmake -B build/asan -DBVNR_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug .`, then
   `./run_tests.sh` (it builds first; `ctest` alone does not). Note that no
   CTest test may carry PASS_REGULAR_EXPRESSION (it replaces the exit status);
   a test that checks output goes through `cmake/cli_expect.cmake`.

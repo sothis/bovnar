@@ -38,6 +38,14 @@ API and implements spec 1.2.
 
 ### Fixed
 
+- **The Linux MinGW cross-build links the Universal CRT.** A distro mingw-w64
+  defaults to `msvcrt.dll`, so `build/mingw` did not match the archive CI
+  builds with MSYS2 UCRT64. The cross toolchain now selects the Universal CRT
+  (`api-ms-win-crt-*.dll`). CI itself is unchanged: the MinGW job still builds
+  natively under UCRT64 into `build/mingw` and publishes the same
+  `bovnar-windows-mingw-*.zip`. The sanitizer tree CI configures is
+  `build/asan` (it was `build-asan`); that job uploads nothing.
+
 - **A unit-shaped argument of the wrong type, and `convert_rational(True)`.**
   `convert_value`, `convert_rational`, `unit_to_str`, `units_compatible` and
   the rest reached ctypes with whatever they were given, so a `str` unit raised

@@ -196,9 +196,9 @@ cmake --build build -j"$(nproc)" && ctest --test-dir build --output-on-failure
 
 # 2. ASan + UBSan. The Python tests cannot run here: they load libbvnr.so
 #    through ctypes into an unsanitized interpreter, which ASan refuses.
-cmake -B build-asan -DBVNR_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug .
-cmake --build build-asan -j"$(nproc)"
-ctest --test-dir build-asan -LE python --output-on-failure
+cmake -B build/asan -DBVNR_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug .
+cmake --build build/asan -j"$(nproc)"
+ctest --test-dir build/asan -LE python --output-on-failure
 
 # 3. The fuzz harnesses, swept at a count you choose (run_tests.sh builds,
 #    runs every registered test, then the sweep).

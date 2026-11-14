@@ -185,8 +185,8 @@ unset(CMAKE_REQUIRED_LINK_OPTIONS)
 # Sanitizer build. Kept as a first-class option rather than a remembered shell
 # incantation, because these runs are only useful if they are repeatable.
 #
-#   cmake -S . -B build-asan -DBVNR_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug
-#   ctest --test-dir build-asan -E '^bvnr_py_'
+#   cmake -S . -B build/asan -DBVNR_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug
+#   ctest --test-dir build/asan -E '^bvnr_py_'
 #
 # -fno-sanitize-recover=all makes a diagnostic a failure instead of a log line.
 # -ftrivial-auto-var-init=pattern is not a sanitizer: it fills uninitialized
@@ -229,10 +229,12 @@ if(BVNR_SANITIZE)
     endif()
 endif()
 
-# MinGW printf maps onto the CRT, whose msvcrt printf lacks the C99 conversions
-# (%zu, %lld, ...). Apply these to EVERY translation unit (library, CLI, and the
-# tests — including the fuzz harnesses that use their own warning set) so the
-# choice of stdio implementation is uniform:
+# MinGW printf maps onto the CRT. msvcrt's printf lacks the C99 conversions
+# (%zu, %lld, ...); the Universal CRT has them, but GCC's ms_printf builtin
+# still warns, and CI's UCRT64 build compiles with the same two flags. Apply
+# them to EVERY translation unit (library, CLI, and the tests — including the
+# fuzz harnesses that use their own warning set) so the choice of stdio
+# implementation is uniform:
 #   * __USE_MINGW_ANSI_STDIO=1 selects MinGW's own ANSI-stdio implementation,
 #     which handles %zu/%lld correctly at runtime.
 #   * -fno-builtin-{printf,fprintf,snprintf} stops GCC from format-checking these
@@ -245,6 +247,27 @@ endif()
 if(MINGW)
     add_compile_definitions(__USE_MINGW_ANSI_STDIO=1)
     add_compile_options(-fno-builtin-printf -fno-builtin-fprintf -fno-builtin-snprintf)
+    # Set by cmake/toolchain-mingw-w64-x86_64.cmake only. The native UCRT64 CI
+    # build does not load that file, so it keeps its compiler's own CRT link
+    # and the archive it publishes does not change.
+    if(BVNR_MINGW_UCRT)
+        add_compile_definitions(_UCRT)
+        if(BVNR_MINGW_UCRT_CRTDL)
+            add_compile_options(-mcrtdll=ucrt)
+            add_link_options(-mcrtdll=ucrt)
+        elseif(BVNR_MINGW_UCRT_SPECS)
+            # -specs= is a driver option, not an ld option, so it must not go
+            # through the LINKER: prefix (that would pass -Wl,-specs=).
+            add_link_options("-specs=${BVNR_MINGW_UCRT_SPECS}")
+        endif()
+        if(BVNR_MINGW_UCRT_CRTDL)
+            message(STATUS "MinGW CRT: Universal (ucrt), via -mcrtdll=ucrt")
+        elseif(BVNR_MINGW_UCRT_SPECS)
+            message(STATUS "MinGW CRT: Universal (ucrt), via ${BVNR_MINGW_UCRT_SPECS}")
+        else()
+            message(STATUS "MinGW CRT: Universal (ucrt), compiler default")
+        endif()
+    endif()
 endif()
 
 # GCC's LTO inliner has now crashed twice on the same function. bvn_init_run_luts

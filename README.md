@@ -394,7 +394,7 @@ Every build also regenerates the single-file amalgamation into `build/amalgamate
 | `bovnar-linux-<version>-<count>.tar.xz` | Linux libraries, CLI and headers, plus `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`, `doc/`, `examples/` and the editor `highlighter/` grammars |
 | `bovnar-freebsd-<version>-<count>.tar.xz` | FreeBSD libraries, CLI and headers, with the same extras |
 | `bovnar-macos-<version>-<count>.tar.xz` | macOS libraries (`libbvnr.a`, `libbvnr.dylib`), CLI and headers as universal binaries (arm64 and x86_64, macOS 11 or later), with the same extras |
-| `bovnar-windows-msvc-<version>-<count>.zip`, `bovnar-windows-mingw-<version>-<count>.zip` | Windows libraries, CLI and headers, one archive per toolchain; both link the Universal CRT (`ucrtbase.dll`, part of Windows 10 and later), the MinGW one being built in MSYS2's UCRT64 environment. The `BVNR_CROSS_MINGW` cross-build on a Linux host makes the MinGW one too, linking whatever CRT the host's mingw-w64 targets (msvcrt on Debian and Ubuntu); each unpacks to a directory of its own name, plus `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`, `doc/`, `examples/` and the editor `highlighter/` grammars |
+| `bovnar-windows-msvc-<version>-<count>.zip`, `bovnar-windows-mingw-<version>-<count>.zip` | Windows libraries, CLI and headers, one archive per toolchain; both link the Universal CRT (part of Windows 10 and later). The MinGW archive is built in MSYS2's UCRT64 environment. The `BVNR_CROSS_MINGW` cross-build on a Linux host makes the same archive into `build/mingw/`, and the toolchain file selects that CRT even when the distro mingw-w64 defaults to msvcrt. Each unpacks to a directory of its own name, plus `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`, `doc/`, `examples/` and the editor `highlighter/` grammars |
 
 Disable with `-DBVNR_PACKAGE=OFF`.
 
@@ -443,11 +443,11 @@ ctypes into an unsanitized interpreter, which ASan refuses outright, so either
 skip them or preload the runtime:
 
 ```bash
-cmake -S . -B build-asan -DBVNR_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug
-ctest --test-dir build-asan -E '^bvnr_py_'          # C suite
+cmake -S . -B build/asan -DBVNR_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug
+ctest --test-dir build/asan -E '^bvnr_py_'          # C suite
 
 LD_PRELOAD=$(gcc -print-file-name=libasan.so) ASAN_OPTIONS=detect_leaks=0 \
-    LIBBOVNAR_PATH=$PWD/build-asan/libbvnr.so python3 -m pytest python
+    LIBBOVNAR_PATH=$PWD/build/asan/libbvnr.so python3 -m pytest python
 ```
 
 `-ftrivial-auto-var-init=pattern` is not a sanitizer and does not report

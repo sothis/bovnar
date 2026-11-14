@@ -250,12 +250,11 @@ def _add_profile_keys(repo, want):
 
 
 def _skip_dir(d):
-    # "build" was skipped by name, but a second build tree is routine here --
-    # CI's own sanitizer pass configures build-asan/ beside it, and the
-    # amalgamation copies the generated headers into it. Those are build
-    # OUTPUT: they restate the catalogue's own numbers, so scanning them
-    # reported a stale artifact as a documentation claim and made the gate
-    # fail on which directories happened to exist.
+    # "build" is skipped by name, which also covers the trees that live under
+    # it (build/asan, build/clang, build/mingw). A sibling left over from the
+    # old layout (build-asan, build-ubsan, ...) is skipped too: those are build
+    # OUTPUT, and scanning them reported a stale artifact as a documentation
+    # claim.
     return d in SKIP_DIRS or d.startswith("build-")
 
 

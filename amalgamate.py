@@ -114,8 +114,8 @@ def expand(path, inlined, sys_inc, out, in_platform_cond=False):
     # called. Matching the literal name "build" covered only two of the three
     # cases -- a build tree outside the source tree, and one named exactly
     # "build" -- and left an in-tree directory under any OTHER name falling
-    # through with its name intact. `cmake -B build-asan` is precisely that, so
-    # the sanitizer build produced a different amalgamation from the ordinary one
+    # through with its name intact. `cmake -B build-asan` (now `build/asan`) was
+    # precisely that, so the sanitizer build produced a different amalgamation
     # over byte-identical sources, and bvnr_wasm_freshness (which hashes it)
     # failed there while passing in build/. Comparing against the generated
     # directory itself has no such blind spot: every build tree, wherever it is

@@ -7,7 +7,7 @@ implementation: they load libbvnr through the Python package, run the CLI, run
 the per-profile test binaries. Each used to look for those under <repo>/build
 and, finding nothing, print "no built library; skipped" and exit 0 -- which is
 right for somebody running a script by hand in a fresh clone, and wrong under
-CTest, where a build directory by any other name (build-asan, out/, a packager's
+CTest, where a build directory by any other name (build/asan, out/, a packager's
 obj-x86_64) made six registered tests pass without having checked anything, or
 check the binaries of a different build.
 

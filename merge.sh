@@ -90,7 +90,7 @@
 # What goes into the zips
 # -----------------------
 # The prune list used to name `build` exactly, so a second build tree -- the
-# build-asan/, build-ubsan/, cmake-build-release/ directories a sanitizer or
+# build/asan/, build-ubsan/, cmake-build-release/ directories a sanitizer or
 # IDE run leaves behind -- was packed into the archive: megabytes of object
 # files and CMake caches shipped as "source". The prune list now covers those
 # by pattern, and on top of that every path git ignores is dropped, which is
@@ -141,7 +141,8 @@ trap 'rm -rf "$TMP"' EXIT
 
 # ---------------------------------------------------------------- file list --
 # Everything that is not a VCS, CI (.github), editor, cache or build
-# artefact.  Build trees are matched by pattern: build/, build-asan/,
+# artefact.  Build trees are matched by pattern: build/ (which holds asan,
+# clang and mingw), build-asan/,
 # build_release/, cmake-build-*/.
 find . \( -type d \( -name .git -o -name .github -o -name .claude \
         -o -name .idea -o -name .cache -o -name .pytest_cache \

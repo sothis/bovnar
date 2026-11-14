@@ -315,18 +315,23 @@ _case(json_truncated_trailing_comma 1 "^$" "Failed to parse JSON" ""
 # CMake cannot put a NUL into a file from a string (file(WRITE) stops at it), so
 # the fixture is written by printf where there is one, and the case is skipped
 # where there is not.
+#
+# The fixture is NOT named nul.json: on Windows "nul" is a reserved device
+# name, and "nul.json" still resolves to the NUL device (8.3 device-name
+# quirk), so the Wine-driven cross build would open \\.\nul, read zero
+# bytes and fail the parse instead of exercising the trailing-content check.
 set(_have_nul FALSE)
 find_program(_printf printf)
 if(_printf AND NOT WIN32)
     execute_process(COMMAND "${_printf}" "{\"a\":1}\\000garbage"
-                    OUTPUT_FILE "${_dir}/nul.json" RESULT_VARIABLE _prc)
+                    OUTPUT_FILE "${_dir}/trailing_nul.json" RESULT_VARIABLE _prc)
     if(_prc EQUAL 0)
         set(_have_nul TRUE)
     endif()
 endif()
 if(_have_nul)
     _case(json_trailing_nul 1 "^$" "trailing content after JSON value \\(a NUL byte\\)" ""
-          convert nul.json)
+          convert trailing_nul.json)
 endif()
 _case(help_says_comments_dropped 0 "Comments are not part of a.*NOT preserved" "" "" --help)
 _case(pretty_drops_comments 0 "^\\.a = <uint:64,_10,no_unit> 1;\n$" "" "comment" pretty-print comment.bvnr)

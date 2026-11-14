@@ -1666,7 +1666,15 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/dist/wasm/index.mjs
     # Registered either way, and DISABLED rather than dropped when there is no
     # node: ctest then reports it as skipped instead of silently not existing,
     # and the registration self-check below keeps one number for both cases.
-    if(NODE_EXECUTABLE)
+    if(CMAKE_CROSSCOMPILING)
+        # The shim drives the built CLI through execFileSync; in a cross build
+        # that binary is a PE/Windows executable the host node cannot run, and
+        # the WASM half of the comparison is checked against the native CLI by
+        # the plain build. Registered and disabled, so the count stays honest.
+        add_test(NAME bvnr_playground_shim COMMAND ${CMAKE_COMMAND} -E echo
+             "cross build: the CLI is a foreign executable, skipping this gate")
+        set_tests_properties(bvnr_playground_shim PROPERTIES DISABLED TRUE)
+    elseif(NODE_EXECUTABLE)
         add_test(
             NAME    bvnr_playground_shim
             COMMAND ${NODE_EXECUTABLE}
@@ -1714,7 +1722,14 @@ endif()
 # module was built from these sources, not that it behaves like them.
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/dist/wasm/index.mjs
    AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/wasm/test/diff_test.mjs)
-    if(NODE_EXECUTABLE)
+    if(CMAKE_CROSSCOMPILING)
+        # As for bvnr_playground_shim: the diff execs the built CLI, which the
+        # cross build produces as a foreign executable. The WASM-vs-native-CLI
+        # comparison belongs to the plain build.
+        add_test(NAME bvnr_wasm_cli_diff COMMAND ${CMAKE_COMMAND} -E echo
+             "cross build: the CLI is a foreign executable, skipping this gate")
+        set_tests_properties(bvnr_wasm_cli_diff PROPERTIES DISABLED TRUE)
+    elseif(NODE_EXECUTABLE)
         add_test(
             NAME    bvnr_wasm_cli_diff
             COMMAND ${NODE_EXECUTABLE}
@@ -1997,12 +2012,21 @@ endif()
 #
 # Needs the built CLI, so it skips rather than fails when there is none.
 if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_examples.py)
-    add_test(NAME bvnr_doc_examples
-             COMMAND ${Python3_EXECUTABLE}
-                     ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_examples.py)
-    set_tests_properties(bvnr_doc_examples PROPERTIES
-        LABELS "docs" TIMEOUT 120
-        ENVIRONMENT "BOVNAR_CLI=$<TARGET_FILE:bovnar>")
+    if(CMAKE_CROSSCOMPILING)
+        # The checker runs the built CLI through subprocess; in a cross build
+        # that is a foreign executable. The examples ARE checked by the plain
+        # build, so this is registered and disabled rather than dropped.
+        add_test(NAME bvnr_doc_examples COMMAND ${CMAKE_COMMAND} -E echo
+             "cross build: the CLI is a foreign executable, skipping this gate")
+        set_tests_properties(bvnr_doc_examples PROPERTIES DISABLED TRUE)
+    else()
+        add_test(NAME bvnr_doc_examples
+                 COMMAND ${Python3_EXECUTABLE}
+                         ${CMAKE_CURRENT_SOURCE_DIR}/check_doc_examples.py)
+        set_tests_properties(bvnr_doc_examples PROPERTIES
+            LABELS "docs" TIMEOUT 120
+            ENVIRONMENT "BOVNAR_CLI=$<TARGET_FILE:bovnar>")
+    endif()
 endif()
 
 # ── The installed header set is self-contained ─────────────────────────────

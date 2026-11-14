@@ -459,7 +459,7 @@ def _sha(js):
 # Same rule gen_csp.py applies to the hand-written pages: mask comment bodies
 # first (a page that mentions "<script>" in prose otherwise opens a phantom
 # element), then skip anything with src= or a non-executable type=.
-_SCRIPT_RE = re.compile(r"<script\b([^>]*)>(.*?)</script\s*>", re.S | re.I)
+_SCRIPT_RE = re.compile(r"<script\b([^>]*)>(.*?)</script[^>]*>", re.S | re.I)
 _COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
 _DATA_TYPE_RE = re.compile(r'type\s*=\s*["\']?(application/(ld\+)?json)', re.I)
 _HAS_SRC_RE = re.compile(r"\bsrc\s*=", re.I)

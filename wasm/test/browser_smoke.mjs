@@ -122,9 +122,23 @@ try {
 let pass = 0, fail = 0;
 const fails = [];
 function ok(cond, msg) { if (cond) pass++; else { fail++; fails.push(msg); } }
+/* Text content of an element: drop every tag. A character scan rather than a
+   regex replace -- one pass of a multi-character pattern is not sanitization
+   ("<<script>" can hand "<script>" back), and the pages keep "<" and ">" out
+   of attribute values, so a tag is exactly "<" to the next ">". */
+function stripTags(html) {
+  let out = '';
+  let inTag = false;
+  for (const ch of html) {
+    if (ch === '<') { inTag = true; continue; }
+    if (ch === '>') { inTag = false; continue; }
+    if (!inTag) out += ch;
+  }
+  return out;
+}
 function textOf(id) {
   const m = dom.match(new RegExp(`id="${id}"[^>]*>([\\s\\S]*?)</(?:span|div|b|pre)>`));
-  return m ? m[1].replace(/<[^>]*>?/g, '').replace(/\s+/g, ' ').trim() : '';
+  return m ? stripTags(m[1]).replace(/\s+/g, ' ').trim() : '';
 }
 function windowOf(id, len = 2500) {
   const i = dom.indexOf(`id="${id}"`);

@@ -675,7 +675,7 @@ BVNRT_CALL = re.compile(r'''\bbvnrT(?:cfg)?\(\s*['"]([^'"]+)['"]''')
 # scanners agree on where the scripts actually are.
 def _script_blocks(src: str):
     """(body, offset-into-src) for every <script> element, comments excluded."""
-    for m in re.finditer(r"<script\b[^>]*>(.*?)</script\s*>",
+    for m in re.finditer(r"<script\b[^>]*>(.*?)</script[^>]*>",
                          gen_csp.mask_comments(src), re.S | re.I):
         yield src[m.start(1):m.end(1)], m.start(1)
 

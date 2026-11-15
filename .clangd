@@ -5,8 +5,15 @@
 # .gen.inc tables the build writes (bvn_unit_impl.h includes them), and without
 # it that translation unit cannot be parsed at all. One flag per entry: a
 # "-I include" with a space is a single argument whose path starts with a space.
+#
+# -x c is here because clang picks a .h file's language from its own table, and
+# for a header it does not recognise it falls back to Objective-C++, which then
+# rejects -std=c11 outright. There is no C++ translation unit in the repo, so
+# pinning the language for every file clangd parses costs nothing, and it is the
+# difference between parsing the headers and refusing to start.
 CompileFlags:
   Add:
+    - -x c
     - -Iinclude
     - -Isrc/utils
     - -Iwasm

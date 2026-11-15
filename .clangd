@@ -10,10 +10,19 @@
 # for a header it does not recognise it falls back to Objective-C++, which then
 # rejects -std=c11 outright. There is no C++ translation unit in the repo, so
 # pinning the language for every file clangd parses costs nothing, and it is the
-# difference between parsing the headers and refusing to start.
+# difference between parsing the headers and refusing to start. The language and
+# its value are two separate argv entries: "-x c" as one entry is read as the
+# language " c" (leading space), which clang rejects.
+#
+# -fanalyzer is a GCC-only flag the build puts in compile_commands.json. clangd
+# parses with its own bundled clang, which rejects it and fails the whole file,
+# so strip it from the compile database (the real GCC build still gets it).
 CompileFlags:
+  Remove:
+    - -fanalyzer
   Add:
-    - -x c
+    - -x
+    - c
     - -Iinclude
     - -Isrc/utils
     - -Iwasm

@@ -298,7 +298,7 @@ BVN_API int64_t bvn_gregorian_date_easter_sunday_mjd(int64_t year);
  * *res untouched and the is_* predicates return false. **/
 
 /* Fill given bvn_gregorian_date_t 'gdate' structure with the gregorian date of
- * easter sunday and all other holidays depanding that date of the given year. */
+ * easter sunday and all other holidays depending on that date of the given year. */
 BVN_API bool bvn_gregorian_date_calc_easter_sunday(bvn_gregorian_date_t* gdate, int64_t year);
 BVN_API bool bvn_gregorian_date_calc_good_friday(bvn_gregorian_date_t *gdate, int64_t year);
 BVN_API bool bvn_gregorian_date_calc_easter_monday(bvn_gregorian_date_t *gdate, int64_t year);

@@ -1,0 +1,28 @@
+# Identifier fragments in the C sources that the typos checker flags as
+# misspellings but which are legitimate names, not typos. Keep this list to
+# evidenced false positives only, each with its provenance.
+#
+# extend-identifiers matches a whole identifier exactly (safest); extend-words
+# matches a single tokenized word, used here only for fragments that are not
+# real English words typos could otherwise correct.
+[default.extend-identifiers]
+clen = "clen"   # local: candidate length (bvn_lexer.c, bvn_profiles.c, bvn_validator.c)
+numer = "numer" # local: numerator in the division helper (bvn_int.c)
+# Carried forward from the pi-lens bundled baseline: a local config replaces it
+# outright, so these evidenced general allowlist entries are kept here.
+dito         = "dito"         # not a misspelling of "ditto"
+unparseable  = "unparseable"  # valid English ("un-parseable"), not "unparsable"
+
+[default.extend-words]
+# nd — short local ("n dims") and the tail of the compound identifier dim_nd;
+# a tokenized-word match catches both the standalone name and the fragment.
+nd    = "nd"
+# Sub-word fragments of bvn_ser_* / BVN_SER_* identifiers (serialize event path).
+ser   = "ser"
+SER   = "SER"
+caf   = "caf"    # in the string "café crème" written with a hex escape (caf\xe9)
+spere = "spere"  # unit name "spere"/"spat" (bu_spere), not "sphere"
+mis   = "mis"    # in the comment "mis-frame", not "miss"/"mist"
+pn    = "pn"     # pointer-to-n output parameter (bvn_float.c); fragment of no English word
+rute  = "rute"   # Prussian unit of length "bu_prussian_rute"; a real unit name
+Juni  = "Juni"   # German for June, in the holiday comment "17. Juni"

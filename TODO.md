@@ -21,9 +21,8 @@ source as 10.5281/zenodo.24250459 and the documentation and specification as
 10.5281/zenodo.24250462 (CITATION.cff and the README). `PRODUCTION_RECORDS`
 names those records. The deposit fetches the release assets from GitHub:
 `32bad0c` had pointed `DOWNLOAD_PREFIX` at the site path `/download/`, which
-is not a URL the deposit can fetch. `orcid_prefer.py` found both works on
-the ORCID record and could not make them preferred: the ORCID session cookie
-is expired. The wiki drafts in `doc/wiki`
+is not a URL the deposit can fetch. `orcid_prefer.py` made both works the preferred source and the featured
+works. The wiki drafts in `doc/wiki`
 carry a 2.2.0 history paragraph; there is still no GitHub wiki to publish
 them to.
 

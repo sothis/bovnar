@@ -79,7 +79,7 @@ extern "C" {
  * bovnar.version() equals it. The suffix is applied where the mistake actually
  * happens: the `bovnar version` banner a human reads.
  */
-#define BVNR_VERSION_SUFFIX		""
+#define BVNR_VERSION_SUFFIX		"-dev"
 #define BVNR_VERSION_STRING_FULL	BVNR_VERSION_STRING BVNR_VERSION_SUFFIX
 /*
  * Highest bovnar *spec* version this build understands. A document may declare

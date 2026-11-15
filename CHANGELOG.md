@@ -12,6 +12,8 @@ implements; the highest spec a build understands is reported by
 numbers were the same. They part at 2.0.0, which breaks the ABI and the Python
 API and implements spec 1.2.
 
+## [Unreleased]
+
 ## [2.2.0] - 2026-11-15
 
 ### Added

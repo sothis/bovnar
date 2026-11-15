@@ -1,5 +1,27 @@
 # TODO
 
+## State 2026-11-15 — 2.2.0 published
+
+v2.2.0 is tag `610809d`. The GitHub release is immutable, so the tag could
+not move when `publish_crate` failed. The failure was `package.py` refusing
+a publish without `--prebuilt`: `7cc7687` gave those archives to
+`rust_package` and not to `publish_crate`, and v2.2.0 was the first tag that
+ran that path. PyPI already had 2.2.0 and the GitHub release was complete.
+The workflow fix is `ce320ad` on main and `bb28b13` on `2.2.x`. The crate
+was published from `610809d` (the tag), with that run's own prebuilt
+archives, by a one-shot `workflow_dispatch` of `build-and-package.yml` on
+`ci/publish-crate-2.2.0`. That branch was deleted once crates.io listed
+2.2.0.
+
+The downloads menu, the JSON-LD `softwareVersion` and
+`web/download/index.html` name 2.2.0 at build count 996 (`275f03a` on main,
+cherry-picked to `2.2.x` as `7299623`). The sizes are the archives' own.
+The live site has not been published: `publish_web.sh` has no destination
+recorded in the tree. Zenodo and `orcid_prefer.py` have not been run.
+
+`BVNR_VERSION_SUFFIX` is `"-dev"` again on main, and `[Unreleased]` is open
+and empty. `2.2.x` stays at 2.2.0.
+
 ## State 2026-11-15 — Wine's tmpfile(), not the writer
 
 The Wine trap from the entry below is closed, and it was never a library bug.

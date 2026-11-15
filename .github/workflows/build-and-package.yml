@@ -1,3 +1,13 @@
+# Bovnar — build, test and package the reference implementation.
+#
+# Lines here are wrapped to 80 columns, and a `run: |` block is where that needs
+# care. YAML strips the block's own indentation, so a continuation line has to
+# sit at EXACTLY the block indent: one space more and a backslash continuation
+# inside a quoted string keeps it, which puts a space inside a URL or a path and
+# fails at runtime with nothing to see in the YAML. Two lines are like that
+# today (the wasi-sdk and wasmtime downloads); leave them at the block indent,
+# or join them back up.
+
 name: Build & Package
 
 on:

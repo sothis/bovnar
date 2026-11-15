@@ -1041,15 +1041,14 @@ jobs:
       url: https://crates.io/crates/bovnar
     permissions:
       contents: read
-      id-token: write   # OIDC token for crates.io Trusted Publishing
     steps:
       - uses: actions/checkout@v5
 
       - uses: dtolnay/rust-toolchain@stable
 
-      # Trusted Publishing cannot create a crate, only add versions to one, so
-      # the first version is published by hand; this job then skips. A re-run
-      # after a successful upload skips too, where `cargo publish` would fail.
+      # A re-run after a successful upload skips, where `cargo publish` would
+      # fail on a version that is already there. The token is the repository
+      # secret CARGO_REGISTRY_TOKEN.
       - name: Is this version already on crates.io?
         id: state
         run: |
@@ -1059,11 +1058,7 @@ jobs:
           crate=$(curl -sS -o /dev/null -w '%{http_code}' -A "$ua" \
           https://crates.io/api/v1/crates/bovnar)
           if [ "$crate" = 404 ]; then
-            echo "::notice::bovnar is not on crates.io yet. Trusted Publishing \
-          cannot create a crate: publish ${version} by hand from this tag \
-          (python3 rust/package.py -- publish), then add this workflow as the \
-          crate's trusted publisher."
-            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "publish=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           [ "$crate" = 200 ] || { echo "::error::crates.io answered HTTP \
@@ -1077,10 +1072,6 @@ jobs:
             404) echo "publish=true" >> "$GITHUB_OUTPUT" ;;
             *)   echo "::error::crates.io answered HTTP ${have}"; exit 1 ;;
           esac
-
-      - uses: rust-lang/crates-io-auth-action@v1
-        if: steps.state.outputs.publish == 'true'
-        id: auth
 
       # package.py refuses a publish without --prebuilt: since 03fb675 the
       # crate links c/prebuilt/<triple> on the targets that have one, and a
@@ -1097,9 +1088,14 @@ jobs:
       - name: cargo publish
         if: steps.state.outputs.publish == 'true'
         env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
-        run: >-
-          python3 rust/package.py --out "$RUNNER_TEMP/crate"
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CARGO_REGISTRY_TOKEN:-}" ]; then
+            echo "::error::repository secret CARGO_REGISTRY_TOKEN is not set"
+            exit 1
+          fi
+          python3 rust/package.py --out "$RUNNER_TEMP/crate" \
           --prebuilt "$RUNNER_TEMP/prebuilt" -- publish --locked
 
   # ── GitHub Release assets ────────────────────────────────────────────────

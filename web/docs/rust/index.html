@@ -303,7 +303,8 @@ python3<span class="w"> </span>rust/package.py<span class="w"> </span>--<span cl
 </code></pre></div>
 
 <p>CI's <code>rust_package</code> job runs that dry run on every push, and <code>publish_crate</code>
-publishes the same way on a <code>vX.Y.Z</code> tag through crates.io Trusted Publishing.</p>
+publishes the same way on a <code>vX.Y.Z</code> tag with the <code>CARGO_REGISTRY_TOKEN</code>
+repository secret.</p>
 <p>The crate carries <code>PROVENANCE.json</code>: the repository, the commit and, on a
 release, the tag it was staged from, and for every file in the crate its
 SHA-256 and the repository path it was copied from (<code>"generated"</code> for the

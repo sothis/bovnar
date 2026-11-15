@@ -370,6 +370,12 @@ Pushing the tag is the publish step. Do not create the GitHub release in the web
 UI first, and do not move a tag: the repository has release immutability on, so
 a published release takes no further assets and its tag name is never reused.
 
+Both branch rules are gated by `bvnr_release_branch` (CTest, `check_release_branch.py`):
+for the tag being pushed it fails when `vX.Y.Z` is not contained in `X.Y.x`, and for
+a maintenance branch it fails when the branch carries a commit that is neither a
+`release:` commit nor a cherry-pick of something `main` already has, or one that
+touches `tests/abi/` or a hand-written header under `include/`.
+
 ### Patch releases
 
 `2.2.x` takes patch releases — 2.2.1, 2.2.2 — and nothing else. A change is

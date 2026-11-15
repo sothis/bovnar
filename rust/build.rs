@@ -389,6 +389,14 @@ fn compile_library(repo: &Path, gen_dir: &Path) {
             .flag("-std=c99")
             .flag("-fno-strict-aliasing")
             .flag("-fvisibility=hidden");
+        // The instruction-set floor upstream's CMakeLists.txt pins
+        // (-march=x86-64-v2: SSE4.2, POPCNT), so the crate's C half and an
+        // upstream build agree on what they run on. x86_64 only, and only when
+        // the compiler takes it -- a clang that does not leaves the build
+        // working rather than failing on a flag nobody asked it for.
+        if env::var("CARGO_CFG_TARGET_ARCH").as_deref() == Ok("x86_64") {
+            build.flag_if_supported("-march=x86-64-v2");
+        }
         if target.contains("windows-gnu") {
             build
                 .define("__USE_MINGW_ANSI_STDIO", "1")

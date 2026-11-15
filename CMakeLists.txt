@@ -270,6 +270,28 @@ if(MINGW)
     endif()
 endif()
 
+# x86-64 instruction-set baseline.
+#
+# An x86_64 build with no -march is a *baseline* binary only by the compiler's
+# default, and the default is not the same thing on every toolchain: GCC and
+# Clang target the original SSE2 baseline, MSVC its own, and a build that picks
+# up -march=native from the environment or a wrapper silently produces a binary
+# for the machine it was built on. Pin the floor here instead, so a local build,
+# the CI legs and the Wine cross tree all produce the same instruction set:
+# x86-64-v2 (SSE4.2, POPCNT, CMPXCHG16B -- the 2009 baseline). Every x86_64 CPU
+# from Nehalem/Bulldozer onwards implements it; a pre-2009 x86_64 CPU is no
+# longer supported, which is what naming a floor rather than inheriting one
+# means.
+#
+# MSVC has no /arch: for this: its x64 baseline is SSE2 and the next step up is
+# /arch:AVX (x86-64-v3), a much wider jump than the one asked for here. The MSVC
+# leg therefore keeps its own baseline, and this note is the record of that
+# difference rather than an oversight.
+if(NOT MSVC AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+    add_compile_options(-march=x86-64-v2)
+    message(STATUS "ISA baseline: x86-64-v2 (SSE4.2/POPCNT) for ${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+
 # GCC's LTO inliner has now crashed twice on the same function. bvn_init_run_luts
 # is the lexer's pre-main constructor: it calls bvn_build_run_lut nine times, and
 # each of those walks all 256 byte values, so inlining them all gives the inliner

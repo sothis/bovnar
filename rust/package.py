@@ -217,7 +217,8 @@ def provenance(crate, origin, root=ROOT):
     dirty = bool(git(root, "status", "--porcelain", "--untracked-files=no").strip())
     files = crate_files(crate)
     return {
-        "schema": 1,        "crate": "bovnar",
+        "schema": 1,
+        "crate": "bovnar",
         "version": version,
         "repository": REPOSITORY,
         "commit": commit,

@@ -16,8 +16,11 @@ The record UI itself calls
 
 with the browser session, and that is what this script calls, after finding
 the new release's works through the public API. Featured positions are
-1-based; a null value removes a work. Only older releases in the same two
-concept groups are removed, so unrelated featured works are left alone.
+1-based; a null value removes a work. Only older releases in the concept
+groups this run updates are removed, so unrelated featured works are left
+alone. A release that did not publish a specification passes --only source.
+A specification record is found by --docs-doi: its title is
+"Bovnar specification <spec>", which is not the title used through 2.2.0.
 
 The cookie file (default ~/.config/bovnar-orcid.cookie) holds either the
 Cookie request header copied from a signed-in orcid.org browser session
@@ -32,6 +35,7 @@ Usage:
   ./orcid_prefer.py --tag v2.1.0 --wait 600
   ./orcid_prefer.py --tag v2.1.0 --source-doi 10.5281/zenodo... \
       --docs-doi 10.5281/zenodo...
+  ./orcid_prefer.py --tag v2.2.1 --only source --source-doi 10.5281/zenodo...
   ./orcid_prefer.py --tag v2.1.0 --no-featured
 
 --check checks the preferred source without a cookie; the featured list lives
@@ -138,18 +142,37 @@ def fetch_works(orcid: str, timeout: float = 30.0) -> list[dict]:
 
 
 def title_for(kind: str, version: str) -> str:
+    """Title of a work deposited on the closed archive, or of an implementation.
+
+    Through 2.2.0 the documentation work is "Bovnar <version> Documentation
+    and Specification". A specification record opened after that is
+    "Bovnar specification <spec>" and is found by DOI, not by this title:
+    the spec number is not the library version, and the same title recurs
+    on every corrigendum.
+    """
     if kind == "source":
         return f"Bovnar {version}"
     return f"Bovnar {version} Documentation and Specification"
 
 
+def doi_key(value: str) -> str:
+    text = value.strip().lower()
+    for prefix in ("https://doi.org/", "http://doi.org/", "doi:"):
+        if text.startswith(prefix):
+            text = text[len(prefix):]
+    return text
+
+
 def find_target(works: list[dict], kind: str, version: str,
                 doi: str | None) -> dict | None:
     if doi:
-        wanted = doi.strip().lower()
+        wanted = doi_key(doi)
         for work in works:
-            if work["self_doi"].lower() == wanted:
+            if work["self_doi"] and doi_key(work["self_doi"]) == wanted:
                 return work
+        # A passed DOI that is not on the record yet must not fall through to
+        # the title. A corrigendum keeps the title of the previous one.
+        return None
     wanted = title_for(kind, version)
     for work in works:
         if work["title"] == wanted:
@@ -327,18 +350,18 @@ def set_featured(order: dict[str, int | None], orcid: str,
 
 
 def featured_plan(featured: list[dict], targets: dict[str, dict],
-                  works: list[dict]) -> tuple[dict[str, int | None], list[str]]:
-    """The PUT body and the titles it removes, for the two release works.
+                  works: list[dict], kinds: tuple[str, ...]) -> tuple[dict[str, int | None], list[str]]:
+    """The PUT body and the titles it removes, for this release's works.
 
-    Positions are 1-based in source/docs order. Only other works in the two
-    target concept groups are removed; a work outside them is left alone.
+    Positions are 1-based in `kinds` order. Only other works in those concept
+    groups are removed; a work outside them is left alone.
     """
-    concepts = {targets[kind]["concept_doi"] for kind in KINDS
+    concepts = {targets[kind]["concept_doi"] for kind in kinds
                 if targets[kind]["concept_doi"]}
     by_put = {work["put_code"]: work for work in works}
     order: dict[str, int | None] = {}
     removed = []
-    for position, kind in enumerate(KINDS, start=1):
+    for position, kind in enumerate(kinds, start=1):
         target = targets[kind]
         order[target["put_code"]] = position
         if target["visibility"] != "public":
@@ -353,10 +376,10 @@ def featured_plan(featured: list[dict], targets: dict[str, dict],
             order[put_code] = None
             removed.append(item["title"])
     kept_others = [item for item in featured if item["put_code"] not in order]
-    if len(KINDS) + len(kept_others) > MAX_FEATURED:
+    if len(kinds) + len(kept_others) > MAX_FEATURED:
         raise ValueError(
-            f"featuring the two release works would leave "
-            f"{len(KINDS) + len(kept_others)} works featured "
+            f"featuring this release would leave "
+            f"{len(kinds) + len(kept_others)} works featured "
             f"(max {MAX_FEATURED}); remove some unrelated featured works first")
     return order, removed
 
@@ -381,6 +404,10 @@ def main() -> int:
     parser.add_argument("--orcid", help="ORCID iD (default: from CITATION.cff)")
     parser.add_argument("--source-doi", help="source work DOI (default: match by title)")
     parser.add_argument("--docs-doi", help="documentation work DOI (default: match by title)")
+    parser.add_argument("--only", choices=KINDS, action="append",
+                        help="update only this kind of work (repeatable). "
+                             "A release that did not publish a specification "
+                             "passes --only source")
     parser.add_argument("--cookie-file", default=str(DEFAULT_COOKIE),
                         help=f"session cookie file (default: {DEFAULT_COOKIE})")
     parser.add_argument("--check", action="store_true",
@@ -404,15 +431,16 @@ def main() -> int:
     if not orcid:
         return fail("orcid_prefer.py: no ORCID iD in CITATION.cff; pass --orcid")
     dois = {"source": args.source_doi, "docs": args.docs_doi}
+    kinds = tuple(args.only) if args.only else KINDS
 
     deadline = time.monotonic() + max(args.wait, 0.0)
     works = fetch_works(orcid)
     targets: dict[str, dict] = {}
-    for kind in KINDS:
+    for kind in kinds:
         target = find_target(works, kind, version, dois[kind])
         while target is None and time.monotonic() < deadline:
-            print(f"waiting for the {kind} work ({title_for(kind, version)}) "
-                  f"to reach ORCID...")
+            label = dois[kind] or title_for(kind, version)
+            print(f"waiting for the {kind} work ({label}) to reach ORCID...")
             time.sleep(max(args.interval, 1.0))
             works = fetch_works(orcid)
             target = find_target(works, kind, version, dois[kind])
@@ -425,7 +453,7 @@ def main() -> int:
         targets[kind] = target
 
     needed: list[tuple[str, dict]] = []
-    for kind in KINDS:
+    for kind in kinds:
         target = targets[kind]
         top = preferred(group_of(works, target))
         print(f"{kind}: target {describe(target)}")
@@ -468,12 +496,13 @@ def main() -> int:
                 f'"{item["title"]}" ({item["put_code"]}, position '
                 f'{item["featured_index"]})' for item in featured) or "none"))
             try:
-                order, removed = featured_plan(featured, targets, works)
+                order, removed = featured_plan(featured, targets, works, kinds)
             except ValueError as error:
                 return fail(f"orcid_prefer.py: {error}")
             featured_changes = featured_needs_update(featured, order)
-            wanted = ", ".join(f'{targets[kind]["title"]} at {position}'
-                               for kind, position in (("source", 1), ("docs", 2)))
+            wanted = ", ".join(
+                f'{targets[kind]["title"]} at {position}'
+                for position, kind in enumerate(kinds, start=1))
             print(f"  desired: {wanted}"
                   + (f"; unfeature {', '.join(removed)}" if removed else ""))
         else:
@@ -484,13 +513,17 @@ def main() -> int:
         if needed:
             print("not preferred: " + ", ".join(kind for kind, _ in needed))
         else:
-            print("preferred: both works are preferred")
+            names = " and ".join(kinds)
+            verb = "are" if len(kinds) != 1 else "is"
+            print(f"preferred: {names} {verb} preferred")
         if featured is not None:
             if featured_changes:
                 print("not featured as desired")
                 ok = False
             else:
-                print("featured: both works are featured as desired")
+                names = " and ".join(kinds)
+                verb = "are" if len(kinds) != 1 else "is"
+                print(f"featured: {names} {verb} featured as desired")
         if ok:
             return 0
         return 1
@@ -528,7 +561,7 @@ def main() -> int:
         print("set the release's works featured")
 
     works = fetch_works(orcid)
-    for kind in KINDS:
+    for kind in kinds:
         target = find_target(works, kind, version, dois[kind])
         if target is None:
             return fail(f"orcid_prefer.py: {kind} work disappeared after the update")

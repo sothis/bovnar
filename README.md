@@ -38,8 +38,8 @@
 - **Website:** https://www.bovnar.io
 - **Prebuilt downloads:** https://www.bovnar.io/download/
 - **IANA media type (`text/vnd.bovnar`):** https://www.iana.org/assignments/media-types/text/vnd.bovnar
-- **DOI — Documentation and Specification (latest):** https://doi.org/10.5281/zenodo.21443295
-- **DOI — Source (latest):** https://doi.org/10.5281/zenodo.21443008
+- **DOI — Documentation (through 2.2.0):** https://doi.org/10.5281/zenodo.21443295
+- **DOI — Source (through 2.2.0):** https://doi.org/10.5281/zenodo.21443008
 
 ---
 
@@ -890,13 +890,15 @@ See [`CHANGELOG.md`](CHANGELOG.md) for what changed between versions (including 
 
 ## Citation
 
-To cite Bovnar in published work, use the concept DOI, which always resolves to the newest archived release:
+Releases through 2.2.0 share two concept DOIs. The source concept resolves to 2.2.0, and so does the documentation concept. Later releases do not extend either series.
 
 > Sonntag, J. *Bovnar*. https://doi.org/10.5281/zenodo.21443008
 
-The documentation and specification are archived separately, under their own concept DOI: https://doi.org/10.5281/zenodo.21443295
+Documentation and specification through 2.2.0: https://doi.org/10.5281/zenodo.21443295
 
-To pin a particular release instead, use its version DOI — [2.2.0 source](https://doi.org/10.5281/zenodo.24250459), [2.2.0 documentation and specification](https://doi.org/10.5281/zenodo.24250462); for 2.1.0, [source](https://doi.org/10.5281/zenodo.24111262) and [documentation and specification](https://doi.org/10.5281/zenodo.24111263); for 2.0.2, [source](https://doi.org/10.5281/zenodo.23963398) and [documentation and specification](https://doi.org/10.5281/zenodo.23963399); for 2.0.1, [source](https://doi.org/10.5281/zenodo.23958544) and [documentation and specification](https://doi.org/10.5281/zenodo.23958545); for 2.0.0, [source](https://doi.org/10.5281/zenodo.23934686) and [documentation and specification](https://doi.org/10.5281/zenodo.23934688); for 1.1.0, [source](https://doi.org/10.5281/zenodo.21443009) and [documentation and specification](https://doi.org/10.5281/zenodo.21443296).
+From the next release on, the specification and the reference implementation are separate concepts. One concept holds one specification number and resolves to the newest corrigendum of that number. One concept holds one library minor and resolves to the newest patch of that minor, which is the version of the C library and of every binding. `zenodo_concepts.json` records those ids when the release is deposited. A document's `#!bovnar` number stays parsable from the spec concept for that number and the implementation concept it points at.
+
+To pin a release already in the closed archive, use its version DOI — [2.2.0 source](https://doi.org/10.5281/zenodo.24250459), [2.2.0 documentation and specification](https://doi.org/10.5281/zenodo.24250462); for 2.1.0, [source](https://doi.org/10.5281/zenodo.24111262) and [documentation and specification](https://doi.org/10.5281/zenodo.24111263); for 2.0.2, [source](https://doi.org/10.5281/zenodo.23963398) and [documentation and specification](https://doi.org/10.5281/zenodo.23963399); for 2.0.1, [source](https://doi.org/10.5281/zenodo.23958544) and [documentation and specification](https://doi.org/10.5281/zenodo.23958545); for 2.0.0, [source](https://doi.org/10.5281/zenodo.23934686) and [documentation and specification](https://doi.org/10.5281/zenodo.23934688); for 1.1.0, [source](https://doi.org/10.5281/zenodo.21443009) and [documentation and specification](https://doi.org/10.5281/zenodo.21443296).
 
 Machine-readable metadata lives in [`CITATION.cff`](CITATION.cff): GitHub's *Cite this repository* button reads it, and `cffconvert` renders it as BibTeX, APA or RIS.
 

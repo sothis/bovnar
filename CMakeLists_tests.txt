@@ -1543,7 +1543,7 @@ set_tests_properties(bvnr_cli_query_array_dims3 PROPERTIES
 # Deliberately NOT a cache variable: a cached value survives an edit to the
 # default here, so bumping the count after adding a test would have no effect in
 # an existing build directory -- the check would keep reporting the old number.
-set(BVNR_EXPECTED_TEST_COUNT 201)   # 134 base + rust_build_sync + canonical_keeps_meaning + interval_array + bench_iterations_zero + sitemap + convert_wide_int + unit_source + 3 for examples/unit_profiles.bvnr + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier) + cli_regressions + wasm_native_shape + web_browser + abi_baseline + crate_provenance + release_branch
+set(BVNR_EXPECTED_TEST_COUNT 202)   # 134 base + rust_build_sync + canonical_keeps_meaning + interval_array + bench_iterations_zero + sitemap + convert_wide_int + unit_source + 3 for examples/unit_profiles.bvnr + i18n_de + wrapper_sync + doc_counts + doc_examples + doc_unit_factors + doc_profile_atoms + doc_ambiguities + doc_python_examples + doc_policy + 9 policy-diagnostic (6 validate + 2 query + 1 document-tier) + cli_regressions + wasm_native_shape + web_browser + abi_baseline + crate_provenance + release_branch + zenodo_concepts
                                     #             + citation
                                     #         + profiles_off_build
                                     # + om_test + cf_test
@@ -2128,6 +2128,18 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_releas
              COMMAND ${Python3_EXECUTABLE}
                      ${CMAKE_CURRENT_SOURCE_DIR}/check_release_branch.py)
     set_tests_properties(bvnr_release_branch PROPERTIES
+        LABELS "packaging" TIMEOUT 60)
+endif()
+
+# ── Zenodo concepts stay on their own line ──────────────────────────────────
+# The closed archive through 2.2.0 is not extended, a patch does not publish
+# a specification record, and a spec move opens its own concept. The rules
+# read the table and the tag; they do not talk to Zenodo.
+if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/zenodo_deposit.py)
+    add_test(NAME bvnr_zenodo_concepts
+             COMMAND ${Python3_EXECUTABLE}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/zenodo_deposit.py --self-test)
+    set_tests_properties(bvnr_zenodo_concepts PROPERTIES
         LABELS "packaging" TIMEOUT 60)
 endif()
 

@@ -2,73 +2,87 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Janos Sonntag
 """
-zenodo_deposit.py — archive a release on Zenodo as a new version of its two
-records: the source, and the documentation and specification.
+zenodo_deposit.py — archive a release on Zenodo without moving the wrong
+concept pointer.
 
-Bovnar has two Zenodo concept DOIs, each a line of versions:
+A Zenodo concept DOI resolves to the record most recently published as a new
+version of that concept, and a published record cannot be deleted or pointed
+back. The two concepts opened for 1.1.0 (source 10.5281/zenodo.21443008,
+documentation 10.5281/zenodo.21443295) therefore stay closed at 2.2.0.
+zenodo_concepts.json lists their record ids, and this script refuses to
+extend them.
 
-  * source         10.5281/zenodo.21443008 (1.1.0: record 21443009)
-  * documentation  10.5281/zenodo.21443295 (1.1.0: record 21443296)
+From here a release opens, or extends, narrower concepts:
 
-A release adds one version to each, so the concept DOIs keep resolving to the
-newest release and every release gets a version DOI of its own. Zenodo's GitHub
-integration is not used: it would start a third concept, archive GitHub's
-snapshot zip instead of the release's own source tarball, and cannot make the
-documentation record at all.
+  * specification — one concept per spec number (`1.2`, then `1.3`). The
+    Zenodo version field is that number. The files are the normative
+    specification and the grammar. A library bugfix does not publish one.
+    The concept is opened the first time that spec number is deposited.
+    A later correction of the same number is a new version only when the
+    run passes --corrigendum.
+  * reference implementation — one concept per library minor (`2.2`, then
+    `2.3`, then `3.0`). The version field is the library triple, which is
+    also the version of every binding. The files are the source tarball
+    and the manuals that describe that implementation. Patches are new
+    versions of that minor's concept, so the pointer means "latest bugfix
+    of this minor" and nothing else.
+
+The spec record's related identifier is the implementation concept of the
+minor that carries that spec, which keeps resolving to the latest patch of
+that minor. A document's `#!bovnar` number therefore keeps a parser: the
+spec concept for the number, then that implementation concept.
 
 What a version holds:
 
-  * source  — `bovnar-<version>-<count>-source.tar.xz` as the release job
-    attached it to the GitHub release, checked against that release's
-    SHA256SUMS, so the archived bytes are the downloaded bytes.
-  * docs    — README.md and every document gen_html_docs.DOCS publishes, read
-    from the tag, plus their PDFs from build/doc/pdf/ (gen_doc_pdfs.py), named
-    with the document's number as in the website's zip. The PDFs are built
-    from the working tree, so the script refuses them unless doc/ and the two
-    generators that render it are what the tag has, and every PDF is newer
-    than the tag's last change to them.
+  * implementation — `bovnar-<version>-<count>-source.tar.xz` as the release
+    job attached it, checked against that release's SHA256SUMS, plus
+    README.md and every gen_html_docs.DOCS document that is not the
+    specification or the grammar, with their PDFs from build/doc/pdf/.
+  * specification — doc/03 and doc/12 and their PDFs, and nothing else.
 
-The new version starts as a copy of the previous one (Zenodo copies its
-metadata), and only what belongs to the release is set: title, version,
-publication date (CITATION.cff's date-released at the tag), description,
-creators (with the ORCID from CITATION.cff), language and the related
-identifiers — the GitHub tag, and each record pointing at the other. License,
-resource type and keywords stay as the previous version has them, except for
-the keywords KEYWORD_FIXES corrects.
+The PDFs are built from the working tree, so the script refuses them unless
+the documents it is about to archive and the two generators that render
+them are what the tag has, and every PDF is newer than the tag's last
+change to those inputs.
 
-Publishing is final: a published Zenodo record cannot be deleted and its files
-cannot be replaced. Without --publish the script stops at two drafts and prints
-their pages to review; run it again with --publish to publish them (the drafts
-are reused, their files uploaded afresh). Try it on sandbox.zenodo.org first:
-sandbox has no copy of the production records, so --make-test-base creates and
-publishes a stand-in 1.1.0 pair there to make a new version of.
+A concept that already exists is extended with new-version, and the record
+id in the table has to still be the newest version of that concept. A
+missing id creates a new deposit. It never falls through to another line
+or to the closed archive. --publish on the production host writes the new
+record and concept ids back into the table; that change is part of the
+release. The sandbox never writes the table.
 
-ORCID: the creators carry the ORCID iD, so with DataCite's ORCID auto-update
-enabled (DataCite Commons, signed in with ORCID) each published version reaches
-the author's ORCID record by itself. The preferred source and featured works
-do not move with it -- ORCID keeps the version and list the researcher
-selected -- and its API cannot raise another client's work, so --orcid-prefer
-runs orcid_prefer.py with the record owner's session cookie after publishing. --resave publishes an edit of
-records deposited before auto-update was enabled, which pushes them too; it
-adds the ORCID iD to a creator that has none, and changes nothing else.
+Publishing is final. Without --publish the script stops at drafts. A second
+run reuses an open draft of the same title and version. Try the sandbox
+first; it creates fresh concepts, since it has none of the production ids.
+--make-test-base still clones the closed 2.2.0 pair for a sandbox
+experiment, and those clones are not concepts this script will extend.
 
-The token is read from ZENODO_TOKEN (scopes deposit:write and deposit:actions);
-sandbox and production tokens are separate.
+ORCID: creators carry the ORCID iD, so DataCite's auto-update can attach a
+published version to the author's record. --orcid-prefer runs
+orcid_prefer.py afterwards, for the records this run published.
+--resave re-publishes an edit of records deposited before auto-update was
+enabled; it adds a missing ORCID iD and changes nothing else.
+
+The token is read from ZENODO_TOKEN (scopes deposit:write and
+deposit:actions); sandbox and production tokens are separate.
 
 Usage:
-    ZENODO_TOKEN=... python3 zenodo_deposit.py --host sandbox --make-test-base
-    ZENODO_TOKEN=... python3 zenodo_deposit.py --host sandbox \\
-        --source-record <id> --docs-record <id> [--publish]
-    ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo [--tag v2.0.2] [--publish]
-    ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo --tag v2.1.0 --publish --orcid-prefer
-    ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo --resave 23934686 23934688
-    ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo --resave 21443009 21443296
+    python3 zenodo_deposit.py --self-test
+    python3 zenodo_deposit.py --plan --tag v2.2.1
+    ZENODO_TOKEN=... python3 zenodo_deposit.py --host sandbox --tag v2.2.1
+    ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo --tag v2.2.1 \\
+        --publish
+    ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo --tag v2.2.4 \\
+        --corrigendum --publish
+    ZENODO_TOKEN=... python3 zenodo_deposit.py --host zenodo --resave 23934686
 """
 import argparse
 import hashlib
 import html
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -80,26 +94,151 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
 
 from check_release_links import (GITHUB_DOWNLOAD_PREFIX, REPO, expected_assets,  # noqa: E402
-                                 git, newest_tag, version_at)
+                                 git, version_at)
 
 HOSTS = {
     "zenodo": "https://zenodo.org/api",
     "sandbox": "https://sandbox.zenodo.org/api",
 }
-# The latest version on each production line, i.e. the record a new version is
-# made from. A sandbox run names its own with --source-record/--docs-record.
-PRODUCTION_RECORDS = {"source": 24250459, "docs": 24250462}
+# The closed archive's last records. --make-test-base clones these into the
+# sandbox; the deposit path does not extend them.
+HISTORICAL_LATEST = {"source": 24250459, "docs": 24250462}
+CONCEPTS_PATH = os.path.join(ROOT, "zenodo_concepts.json")
 WEBSITE = "https://www.bovnar.io"
 USER_AGENT = "bovnar-zenodo-deposit"
 PDF_DIR = os.path.join(ROOT, "build", "doc", "pdf")
+# The normative format. Everything else gen_html_docs.DOCS publishes describes
+# the implementation at a library version and travels with that record.
+SPEC_DOCS = ("03_bovnar_spec.md", "12_bovnar.ebnf")
 # Keywords a new version inherits but that are wrong. 1.1.0 called the format
 # a binary serialization; it is a text one. Once a version is published with the
 # fix, its successors inherit it and the entry does nothing.
 KEYWORD_FIXES = {"Binary Serialization": "Text Serialization"}
+TABLE_KEYS = ("note", "closed_concepts", "closed_records",
+              "archived_library_versions", "spec", "implementation")
 
 
 class ZenodoError(RuntimeError):
     pass
+
+
+def die(msg):
+    raise SystemExit(f"zenodo_deposit.py: {msg}")
+
+
+def concept_doi(concept_id):
+    return f"10.5281/zenodo.{int(concept_id)}"
+
+
+def library_line(version):
+    parts = version.split(".")
+    if len(parts) != 3 or not all(p.isdigit() for p in parts):
+        die(f"{version} is not a library X.Y.Z")
+    return f"{parts[0]}.{parts[1]}"
+
+
+def load_table(path):
+    """The concept table. A record id that also sits in the closed archive is
+    refused here, so a typo cannot extend that series."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            raw = json.load(fh)
+    except (OSError, ValueError) as e:
+        die(f"cannot read {path}: {e}")
+    for key in TABLE_KEYS:
+        if key not in raw:
+            die(f"{path} has no {key}")
+    closed = set(raw["closed_concepts"]) | set(raw["closed_records"])
+    for kind in ("spec", "implementation"):
+        if not isinstance(raw[kind], dict):
+            die(f"{path}: {kind} is not an object")
+        for key, entry in raw[kind].items():
+            if not isinstance(entry, dict):
+                die(f"{path}: {kind} {key} is not a record/concept pair")
+            for field in ("record", "concept"):
+                if not isinstance(entry.get(field), int):
+                    die(f"{path}: {kind} {key} has no integer {field}")
+                if entry[field] in closed:
+                    die(f"{path}: {kind} {key} {field} {entry[field]} is in "
+                        f"the closed archive")
+    return raw
+
+
+def dump_table(table):
+    out = {key: table[key] for key in TABLE_KEYS}
+    return json.dumps(out, indent=2, ensure_ascii=False) + "\n"
+
+
+def bound(entry, table, what):
+    """Refuse a target that belongs to the closed archive."""
+    if entry is None:
+        return
+    closed = set(table["closed_concepts"]) | set(table["closed_records"])
+    for field in ("record", "concept"):
+        if entry[field] in closed:
+            die(f"{what} targets closed record {entry[field]}")
+
+
+def plan_deposits(version, spec, table, corrigendum):
+    """Which concepts this release may touch. No network, no default.
+
+    The implementation concept is the library minor. It is created when the
+    table has no id for that minor. The specification concept is created when
+    the table has no id for that spec number. Once the number is there, a
+    release extends it only with corrigendum, so a bugfix stays a library
+    patch and the spec number does not move.
+    """
+    if not re.fullmatch(r"\d+\.\d+", spec):
+        die(f"{spec} is not a spec major.minor")
+    if version in table["archived_library_versions"]:
+        die(f"{version} is already in the closed archive; it is not deposited again")
+    line = library_line(version)
+    impl = table["implementation"].get(line)
+    bound(impl, table, f"implementation {line}")
+    implementation = {
+        "kind": "implementation",
+        "key": line,
+        "version": version,
+        "record": None if impl is None else impl["record"],
+        "concept": None if impl is None else impl["concept"],
+    }
+    spec_entry = table["spec"].get(spec)
+    bound(spec_entry, table, f"spec {spec}")
+    if corrigendum:
+        if spec_entry is None:
+            die(f"spec {spec} has no concept to correct; the first deposit of "
+                f"that number opens it, without --corrigendum")
+        specification = {
+            "kind": "spec",
+            "key": spec,
+            "version": spec,
+            "record": spec_entry["record"],
+            "concept": spec_entry["concept"],
+        }
+    elif spec_entry is None:
+        specification = {
+            "kind": "spec",
+            "key": spec,
+            "version": spec,
+            "record": None,
+            "concept": None,
+        }
+    else:
+        specification = None
+    return {"implementation": implementation, "spec": specification}
+
+
+def format_plan(plan):
+    lines = []
+    for kind in ("implementation", "spec"):
+        action = plan[kind]
+        if action is None:
+            lines.append(f"{kind}: unchanged")
+            continue
+        target = ("new concept" if action["record"] is None
+                  else f"record {action['record']} (concept {action['concept']})")
+        lines.append(f"{kind}: {action['key']} version {action['version']} -> {target}")
+    return "\n".join(lines)
 
 
 class Zenodo:
@@ -215,40 +354,51 @@ def source_files(tag, version, count, workdir):
     return [(name, path)]
 
 
-def docs_files(tag, workdir, pdf_dir):
-    """README.md, the published documents from the tag, and their PDFs."""
+def docs_for(kind):
+    """Filenames from gen_html_docs.DOCS that this kind of record archives."""
+    from gen_html_docs import DOCS
+    sources = []
+    for src, *_rest in DOCS:
+        normative = src in SPEC_DOCS
+        if normative == (kind == "spec"):
+            sources.append(src)
+    return tuple(sources)
+
+
+def docs_files(tag, workdir, pdf_dir, sources, readme):
+    """The named documents from the tag, and their PDFs. README rides with the
+    implementation record; the specification record does not carry it."""
     from gen_html_docs import DOCS
 
+    by_src = {src: row for src, *row in ((d[0], *d[1:]) for d in DOCS)}
+    missing = [src for src in sources if src not in by_src]
+    if missing:
+        die(f"{missing[0]} is not a document gen_html_docs.py publishes")
     # The PDFs come from the working tree, not the tag. They stand for the tag
     # only if what they were built from is the tag's, and they were built since.
-    # README.md is not among them: it has no PDF, and its deposited copy is
-    # read from the tag like the Markdown documents.
-    # The wiki drafts and the JOSS paper live in doc/ but go into no PDF; the
-    # wiki infobox names the newest release and so changes after every tag.
-    inputs = ["doc", ":(exclude)doc/wiki", ":(exclude)doc/joss_paper",
-              "gen_doc_pdfs.py", "gen_html_docs.py"]
+    # The wiki drafts and the JOSS paper live in doc/ but go into no PDF.
+    inputs = ["gen_doc_pdfs.py", "gen_html_docs.py"] + [f"doc/{src}" for src in sources]
     if subprocess.run(["git", "-C", ROOT, "diff", "--quiet", tag, "--"] + inputs).returncode:
-        raise SystemExit(f"zenodo_deposit.py: doc/, gen_doc_pdfs.py or gen_html_docs.py "
-                         f"differ from {tag}; the PDFs would not be the release's")
-    newest_input = int(git("log", "-1", "--format=%ct", tag, "--", *inputs))
+        die(f"{', '.join(inputs)} differ from {tag}; the PDFs would not be the release's")
+    newest_input = int(git("log", "-1", "--format=%ct", tag, "--", *inputs) or "0")
 
     files = []
-    path = os.path.join(workdir, "README.md")
-    with open(path, "wb") as fh:
-        fh.write(git_bytes(tag, "README.md"))
-    files.append(("README.md", path))
-    for src, _slug, pdf_slug, *_ in DOCS:
+    if readme:
+        path = os.path.join(workdir, "README.md")
+        with open(path, "wb") as fh:
+            fh.write(git_bytes(tag, "README.md"))
+        files.append(("README.md", path))
+    for src in sources:
         path = os.path.join(workdir, src)
         with open(path, "wb") as fh:
             fh.write(git_bytes(tag, f"doc/{src}"))
         files.append((src, path))
-    for src, _slug, pdf_slug, *_ in DOCS:
+        pdf_slug = by_src[src][1]
         pdf = os.path.join(pdf_dir, pdf_slug + ".pdf")
         if not os.path.exists(pdf):
-            raise SystemExit(f"zenodo_deposit.py: {pdf} is missing; run gen_doc_pdfs.py")
+            die(f"{pdf} is missing; run gen_doc_pdfs.py")
         if os.path.getmtime(pdf) < newest_input:
-            raise SystemExit(f"zenodo_deposit.py: {pdf} is older than {tag}'s last "
-                             f"change to the docs; run gen_doc_pdfs.py")
+            die(f"{pdf} is older than {tag}'s last change to the docs; run gen_doc_pdfs.py")
         num = src.split("_", 1)[0]
         files.append((f"{num}-{pdf_slug}.pdf", pdf))
     return files
@@ -261,50 +411,71 @@ def link(url, text=None):
     return f'<a href="{u}">{html.escape(text or url)}</a>'
 
 
-def describe(kind, tag, version, cff, other_doi):
-    if kind == "source":
-        parts = [f"<p>Bovnar {html.escape(version)}</p>",
+def describe(kind, tag, version, cff, other_doi, line):
+    if kind == "implementation":
+        parts = [f"<p>Bovnar {html.escape(version)}, the reference implementation "
+                 f"of library line {html.escape(line)}. This concept resolves to "
+                 f"the newest patch of that line. The C library and every binding "
+                 f"carry this version number.</p>",
                  f"<p>{html.escape(' '.join(cff['abstract'].split()))}</p>"]
         notes = f"RELEASE_NOTES_v{version}.md"
         if git("cat-file", "-e", f"{tag}:{notes}") is not None:
             parts.append("<p>Release notes: "
                          + link(f"https://github.com/{REPO}/blob/{tag}/{notes}") + "</p>")
-        parts.append("<p>Documentation and specification of this release: "
-                     + link(f"https://doi.org/{other_doi}") + "</p>")
+        if other_doi:
+            parts.append("<p>Specification: " + link(f"https://doi.org/{other_doi}") + "</p>")
     else:
-        parts = [f"<p>Bovnar {html.escape(version)} Documentation and Specification of "
-                 "the published source tarball ("
-                 + link(f"https://doi.org/{other_doi}")
-                 + "), as the Markdown sources and as PDF.</p>"]
+        parts = [f"<p>Bovnar specification {html.escape(version)}, the normative "
+                 f"text and the grammar. The reference implementation of the "
+                 f"library line that carries this specification is "
+                 + link(f"https://doi.org/{other_doi}") + ".</p>"]
     parts.append("<p>Website: " + link(WEBSITE) + "</p>")
     return "\n".join(parts)
 
 
-def metadata_for(kind, draft_meta, tag, version, cff, own_doi, other_doi):
+def metadata_for(kind, draft_meta, tag, version, cff, other_doi, line):
     m = dict(draft_meta)
     # Read-only or per-draft keys Zenodo reports but does not take back.
-    for k in ("doi", "prereserve_doi"):
+    for k in ("doi", "prereserve_doi", "resource_type", "relations"):
         m.pop(k, None)
-    m["title"] = (f"Bovnar {version}" if kind == "source"
-                  else f"Bovnar {version} Documentation and Specification")
+    if kind == "implementation":
+        m["title"] = f"Bovnar {version}"
+        m["upload_type"] = "software"
+        m.pop("publication_type", None)
+    else:
+        m["title"] = f"Bovnar specification {version}"
+        m["upload_type"] = "publication"
+        m["publication_type"] = "softwaredocumentation"
     m["version"] = version
     m["publication_date"] = str(cff["date-released"])
-    m["description"] = describe(kind, tag, version, cff, other_doi)
+    m["description"] = describe(kind, tag, version, cff, other_doi, line)
     m["creators"] = creators_from(cff)
     m["language"] = "eng"
+    # The deposit API takes a license id. A copied record reports it as
+    # {"id": "mit-license"}; sending that object back is rejected.
+    lic = m.get("license")
+    if isinstance(lic, dict):
+        lic = lic.get("id")
+    m["license"] = lic or "mit-license"
+    m["access_right"] = m.get("access_right") or "open"
     m["keywords"] = [KEYWORD_FIXES.get(k, k) for k in m.get("keywords", [])]
     tag_url = f"https://github.com/{REPO}/tree/{tag}"
-    if kind == "source":
-        m["related_identifiers"] = [
-            {"identifier": tag_url, "relation": "isSupplementTo", "resource_type": "software"},
-            {"identifier": other_doi, "relation": "isDocumentedBy",
-             "resource_type": "publication-softwaredocumentation"},
+    if kind == "implementation":
+        related = [
+            {"identifier": tag_url, "relation": "isSupplementTo",
+             "resource_type": "software"},
         ]
+        if other_doi:
+            related.append({"identifier": other_doi, "relation": "isDocumentedBy",
+                            "resource_type": "publication-softwaredocumentation"})
     else:
-        m["related_identifiers"] = [
-            {"identifier": other_doi, "relation": "documents", "resource_type": "software"},
-            {"identifier": tag_url, "relation": "isSupplementTo", "resource_type": "software"},
+        related = [
+            {"identifier": other_doi, "relation": "documents",
+             "resource_type": "software"},
+            {"identifier": tag_url, "relation": "isSupplementTo",
+             "resource_type": "software"},
         ]
+    m["related_identifiers"] = related
     return m
 
 
@@ -414,13 +585,20 @@ def datacite_updated(z, record_id):
 
 
 def make_test_base(z):
-    """Sandbox only: publish a stand-in for the production 1.1.0 pair."""
+    """Sandbox only: publish stand-ins of the closed 2.2.0 records.
+
+    The deposit path does not extend these copies. A sandbox deposit opens
+    fresh concepts of its own.
+    """
     prod = HOSTS["zenodo"]
     made = {}
-    for kind, rid in PRODUCTION_RECORDS.items():
+    for kind, rid in HISTORICAL_LATEST.items():
         rec = Zenodo(prod, None).call("GET", f"/records/{rid}", auth=False)
         m = rec["metadata"]
         rt = m["resource_type"]
+        lic = m.get("license")
+        if isinstance(lic, dict):
+            lic = lic.get("id")
         meta = {
             "title": m["title"] + " (sandbox stand-in)",
             "version": m["version"],
@@ -428,7 +606,8 @@ def make_test_base(z):
             "description": m["description"],
             "creators": [{"name": c["name"]} for c in m["creators"]],
             "keywords": m.get("keywords", []),
-            "license": {"mit-license": "MIT"}.get(m["license"]["id"], m["license"]["id"]),
+            # The deposit API takes the license id. "MIT" is rejected.
+            "license": lic or "mit-license",
             "upload_type": rt["type"],
             "access_right": "open",
         }
@@ -441,15 +620,252 @@ def make_test_base(z):
         p = z.call("POST", d["links"]["publish"])
         made[kind] = p["id"]
         print(f"  {kind}: record {p['id']}, DOI {p.get('doi')}")
-    print(f"\nnext: --source-record {made['source']} --docs-record {made['docs']}")
+    print(f"stand-ins of the closed 2.2.0 records: "
+          f"source {made['source']}, docs {made['docs']}")
+    print("A sandbox deposit opens fresh concepts and does not extend these.")
+
+
+def spec_at(tag):
+    text = git("show", f"{tag}:include/bovnar.h")
+    if not text:
+        die(f"{tag} has no include/bovnar.h")
+    found = {}
+    for name in ("MAJOR", "MINOR"):
+        m = re.search(rf"^[ \t]*#define[ \t]+BVNR_SPEC_VERSION_{name}[ \t]+(\d+)\b",
+                      text, re.M)
+        if not m:
+            die(f"{tag} does not define BVNR_SPEC_VERSION_{name}")
+        found[name] = m.group(1)
+    return f"{found['MAJOR']}.{found['MINOR']}"
+
+
+def version_strings(record):
+    """Version labels already published on this concept."""
+    data = record if isinstance(record, list) else None
+    hits = []
+    if isinstance(record, dict):
+        hits = record.get("hits", {}).get("hits", [])
+        if not hits and "metadata" in record:
+            hits = [record]
+    elif data is not None:
+        hits = data
+    out = []
+    for hit in hits:
+        meta = hit.get("metadata") or {}
+        if meta.get("version"):
+            out.append(str(meta["version"]))
+    return out
+
+
+def extend_state(z, action):
+    """'new', 'extend', or 'done'.
+
+    A library version already on its concept is done, so a rerun that
+    published the implementation and then failed on the specification can
+    finish the specification. A spec corrigendum keeps the spec number as
+    its version label, so that label is allowed to recur there.
+    """
+    if action["record"] is None:
+        return "new", None
+    latest = latest_published(z, action["record"])
+    if int(latest["id"]) != int(action["record"]):
+        die(f"{action['kind']} {action['key']} record {action['record']} is not "
+            f"the newest version ({latest['id']} is); update zenodo_concepts.json")
+    concept = latest.get("conceptrecid") or action["concept"]
+    if concept is not None and int(concept) != int(action["concept"]):
+        die(f"{action['kind']} {action['key']} record {action['record']} belongs "
+            f"to concept {concept}, not {action['concept']}")
+    listing = z.call("GET", f"/records/{action['record']}/versions?size=100",
+                     auth=False)
+    if isinstance(listing, dict):
+        hits = listing.get("hits", {})
+        total = hits.get("total") if isinstance(hits, dict) else None
+        seen = len(hits.get("hits", [])) if isinstance(hits, dict) else 0
+        if isinstance(total, int) and total > seen:
+            die(f"{action['kind']} {action['key']} has {total} versions; "
+                f"refusing to guess whether {action['version']} is already published")
+    if (action["kind"] == "implementation"
+            and action["version"] in version_strings(listing)):
+        print(f"==> implementation {action['key']} already has {action['version']}: "
+              f"{latest.get('doi')}")
+        return "done", latest.get("doi")
+    return "extend", None
+
+
+def find_new_draft(z, title, version):
+    """An unpublished deposit already opened for this title and version."""
+    listed = z.call("GET", "/deposit/depositions?status=draft&size=100") or []
+    for brief in listed:
+        if brief.get("submitted") or brief.get("state") != "unsubmitted":
+            continue
+        draft = z.call("GET", brief["links"]["self"])
+        meta = draft.get("metadata") or {}
+        if meta.get("title") == title and str(meta.get("version")) == version:
+            print(f"    reusing open draft {draft['id']}")
+            return draft
+    return None
+
+
+def open_new_draft(z, title, version, creators, upload_type):
+    found = find_new_draft(z, title, version)
+    if found:
+        return found
+    draft = z.call("POST", "/deposit/depositions", body={})
+    meta = {
+        "title": title,
+        "upload_type": upload_type,
+        "description": f"<p>{html.escape(title)}</p>",
+        "creators": creators,
+        "version": version,
+        "license": "mit-license",
+        "access_right": "open",
+    }
+    if upload_type == "publication":
+        meta["publication_type"] = "softwaredocumentation"
+    z.call("PUT", draft["links"]["self"], body={"metadata": meta})
+    return z.call("GET", draft["links"]["self"])
+
+
+def draft_title(action):
+    if action["kind"] == "implementation":
+        return f"Bovnar {action['version']}"
+    return f"Bovnar specification {action['version']}"
+
+
+def remember(table, action, published, draft):
+    concept = (published.get("conceptrecid") or draft.get("conceptrecid")
+               or action["concept"])
+    record = published.get("id") or draft.get("id")
+    if concept is None or record is None:
+        die(f"{action['kind']} {action['key']} published without a record id")
+    table[action["kind"]][action["key"]] = {
+        "record": int(record),
+        "concept": int(concept),
+    }
+
+
+def self_test():
+    """The deposit rules, with no network and no token."""
+    table = load_table(CONCEPTS_PATH)
+    for concept in (21443008, 21443295):
+        if concept not in table["closed_concepts"]:
+            die(f"self-test: closed concept {concept} is not in the table")
+    fresh = json.loads(json.dumps(table))
+    fresh["spec"] = {}
+    fresh["implementation"] = {}
+
+    def refused(version, spec, concepts, corrigendum, text):
+        try:
+            plan_deposits(version, spec, concepts, corrigendum)
+        except SystemExit as exc:
+            if text not in str(exc):
+                die(f"self-test: {version} refused with {exc}, wanted {text!r}")
+            return
+        die(f"self-test: {version} corrigendum={corrigendum} was accepted")
+
+    refused("2.2.0", "1.2", fresh, False, "2.2.0")
+    plan = plan_deposits("2.2.1", "1.2", fresh, False)
+    if plan["implementation"]["record"] is not None or plan["implementation"]["key"] != "2.2":
+        die(f"self-test: 2.2.1 implementation plan is {plan['implementation']}")
+    if plan["implementation"]["version"] != "2.2.1":
+        die("self-test: implementation version is not the library triple")
+    if plan["spec"] is None or plan["spec"]["record"] is not None or plan["spec"]["version"] != "1.2":
+        die(f"self-test: 2.2.1 spec plan is {plan['spec']}")
+
+    opened = json.loads(json.dumps(fresh))
+    opened["spec"]["1.2"] = {"record": 11, "concept": 10}
+    opened["implementation"]["2.2"] = {"record": 21, "concept": 20}
+    plan = plan_deposits("2.2.2", "1.2", opened, False)
+    if plan["spec"] is not None or plan["implementation"]["record"] != 21:
+        die(f"self-test: a patch extended the spec: {plan}")
+    plan = plan_deposits("3.0.0", "1.2", opened, False)
+    if (plan["spec"] is not None or plan["implementation"]["key"] != "3.0"
+            or plan["implementation"]["record"] is not None):
+        die(f"self-test: an ABI major of the same spec reused a concept: {plan}")
+    plan = plan_deposits("2.3.0", "1.3", opened, False)
+    if (plan["implementation"]["key"] != "2.3" or plan["implementation"]["record"] is not None
+            or plan["spec"]["key"] != "1.3" or plan["spec"]["record"] is not None):
+        die(f"self-test: a spec move reused an old concept: {plan}")
+    plan = plan_deposits("2.2.3", "1.2", opened, True)
+    if plan["spec"]["record"] != 11 or plan["spec"]["version"] != "1.2":
+        die(f"self-test: corrigendum did not extend spec 1.2: {plan}")
+    if plan["implementation"]["record"] != 21:
+        die("self-test: corrigendum left the implementation line")
+    refused("2.3.1", "1.3", opened, True, "1.3")
+    bad = json.loads(json.dumps(opened))
+    bad["implementation"]["2.2"] = {"record": 24250459, "concept": 21443008}
+    refused("2.2.4", "1.2", bad, False, "24250459")
+
+    from gen_html_docs import DOCS
+    names = [row[0] for row in DOCS]
+    if SPEC_DOCS != ("03_bovnar_spec.md", "12_bovnar.ebnf"):
+        die(f"self-test: SPEC_DOCS is {SPEC_DOCS}")
+    for src in SPEC_DOCS:
+        if src not in names:
+            die(f"self-test: {src} is not a published document")
+    impl = docs_for("implementation")
+    spec_docs = docs_for("spec")
+    if set(impl) & set(spec_docs) or set(impl) | set(spec_docs) != set(names):
+        die("self-test: spec and implementation documents do not partition DOCS")
+
+    page = {"hits": {"hits": [
+        {"metadata": {"version": "2.2.1"}, "conceptrecid": 20},
+        {"metadata": {"version": "2.2.0"}},
+    ]}}
+    if version_strings(page) != ["2.2.1", "2.2.0"]:
+        die(f"self-test: version page parsed as {version_strings(page)}")
+    if version_strings([{"metadata": {"version": "1.2"}}]) != ["1.2"]:
+        die("self-test: a version list did not yield its labels")
+    if version_strings({"metadata": {"version": "1.2"}}) != ["1.2"]:
+        die("self-test: a single record did not yield its version")
+
+    cff = {
+        "abstract": "A text format.",
+        "date-released": "2026-11-15",
+        "authors": [{"family-names": "Sonntag", "given-names": "Janos",
+                     "orcid": "https://orcid.org/0009-0008-1299-6534"}],
+    }
+    copied = {"license": {"id": "mit-license"},
+              "keywords": ["Binary Serialization"],
+              "doi": "10.5281/zenodo.1",
+              "resource_type": {"type": "software"},
+              "relations": {"version": []}}
+    meta = metadata_for("implementation", copied, "v9.9.9", "9.9.9", cff,
+                        "10.5281/zenodo.10", "9.9")
+    if meta["license"] != "mit-license" or meta["upload_type"] != "software":
+        die(f"self-test: implementation metadata is {meta['license']!r}, "
+            f"{meta['upload_type']!r}")
+    if any(k in meta for k in ("doi", "resource_type", "relations")):
+        die("self-test: metadata echoed a read-only key")
+    if meta["keywords"] != ["Text Serialization"]:
+        die(f"self-test: keyword fix yielded {meta['keywords']}")
+    documented = [r for r in meta["related_identifiers"]
+                  if r["relation"] == "isDocumentedBy"]
+    if documented != [{"identifier": "10.5281/zenodo.10",
+                       "relation": "isDocumentedBy",
+                       "resource_type": "publication-softwaredocumentation"}]:
+        die(f"self-test: implementation does not point at the spec: {documented}")
+    spec_meta = metadata_for("spec", {"license": "mit-license"}, "v9.9.9", "1.2",
+                             cff, "10.5281/zenodo.20", "9.9")
+    if spec_meta["title"] != "Bovnar specification 1.2":
+        die(f"self-test: spec title is {spec_meta['title']!r}")
+    if (spec_meta["upload_type"] != "publication"
+            or spec_meta["publication_type"] != "softwaredocumentation"):
+        die("self-test: spec upload type is not a software document")
+    if spec_meta["related_identifiers"][0] != {
+            "identifier": "10.5281/zenodo.20", "relation": "documents",
+            "resource_type": "software"}:
+        die("self-test: spec does not point at the implementation concept")
+    print("zenodo_deposit.py: self-test ok")
+    return 0
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--host", choices=sorted(HOSTS), required=True)
-    ap.add_argument("--tag", help="release tag (default: the newest v* tag)")
-    ap.add_argument("--source-record", type=int, help="record to make the new source version of")
-    ap.add_argument("--docs-record", type=int, help="record to make the new docs version of")
+    ap.add_argument("--host", choices=sorted(HOSTS))
+    ap.add_argument("--tag", help="release tag (required to deposit or plan)")
+    ap.add_argument("--concepts", default=CONCEPTS_PATH,
+                    help="concept table (default: zenodo_concepts.json)")
     ap.add_argument("--pdf-dir", default=PDF_DIR)
     # v2.0.1 was tagged with CITATION.cff still at version 2.0.0; a tag cannot
     # be moved once its release is published, so the file is read from here.
@@ -457,14 +873,20 @@ def main():
                     help="read CITATION.cff from FILE instead of from the tag "
                          "(for a tag cut with a stale one); its version must still "
                          "be the tag's")
+    ap.add_argument("--corrigendum", action="store_true",
+                    help="also publish a new version of this tag's spec concept")
     ap.add_argument("--publish", action="store_true", help="publish the drafts (final)")
+    ap.add_argument("--plan", action="store_true",
+                    help="print which concepts this tag would touch, and stop")
+    ap.add_argument("--self-test", action="store_true",
+                    help="check the deposit rules and exit")
     ap.add_argument("--make-test-base", action="store_true",
-                    help="sandbox only: publish a stand-in 1.1.0 pair to version from")
+                    help="sandbox only: publish stand-ins of the closed 2.2.0 pair")
     ap.add_argument("--resave", type=int, nargs="+", metavar="RECORD",
                     help="publish an edit of these records (adding a missing creator "
                          "ORCID), so their DOIs reach ORCID through DataCite's auto-update")
     ap.add_argument("--orcid-prefer", action="store_true",
-                    help="after --publish, make the two new works the ORCID preferred "
+                    help="after --publish, make the new works the ORCID preferred "
                          "source and featured works (needs the session cookie file; "
                          "see orcid_prefer.py)")
     ap.add_argument("--orcid-wait", type=float, default=600.0, metavar="SECONDS",
@@ -472,94 +894,171 @@ def main():
                          "auto-update to reach ORCID (default: 600)")
     args = ap.parse_args()
 
+    if args.self_test:
+        return self_test()
+    if args.plan:
+        if not args.tag:
+            die("--plan needs --tag vX.Y.Z")
+        version, _count, _cff = release_info(args.tag, args.citation)
+        plan = plan_deposits(version, spec_at(args.tag), load_table(args.concepts),
+                             args.corrigendum)
+        print(f"==> {args.tag}: library {version}, spec {spec_at(args.tag)}")
+        print(format_plan(plan))
+        return 0
+
+    if not args.host:
+        die("--host is required")
     if args.orcid_prefer and not args.publish:
-        raise SystemExit("zenodo_deposit.py: --orcid-prefer needs --publish")
+        die("--orcid-prefer needs --publish")
     if args.orcid_prefer and args.host != "zenodo":
-        raise SystemExit("zenodo_deposit.py: --orcid-prefer is for the production host")
+        die("--orcid-prefer is for the production host")
 
     token = os.environ.get("ZENODO_TOKEN")
     if not token:
-        raise SystemExit("zenodo_deposit.py: set ZENODO_TOKEN")
+        die("set ZENODO_TOKEN")
     z = Zenodo(HOSTS[args.host], token)
 
     if args.make_test_base:
         if args.host != "sandbox":
-            raise SystemExit("zenodo_deposit.py: --make-test-base is for the sandbox only")
+            die("--make-test-base is for the sandbox only")
         make_test_base(z)
         return 0
     if args.resave:
         resave(z, args.resave)
         return 0
+    if not args.tag:
+        die("pass --tag vX.Y.Z; a maintenance release is not the newest tag")
 
-    records = {"source": args.source_record, "docs": args.docs_record}
-    if args.host == "zenodo":
-        records = {k: v or PRODUCTION_RECORDS[k] for k, v in records.items()}
-    elif None in records.values():
-        raise SystemExit("zenodo_deposit.py: a sandbox run needs --source-record and "
-                         "--docs-record (see --make-test-base)")
+    table = load_table(args.concepts)
+    # The sandbox has none of the production concepts. Depositing there always
+    # opens fresh ones, and the production table is left untouched.
+    if args.host == "sandbox":
+        table = json.loads(json.dumps(table))
+        table["spec"] = {}
+        table["implementation"] = {}
+    version, count, cff = release_info(args.tag, args.citation)
+    spec = spec_at(args.tag)
+    plan = plan_deposits(version, spec, table, args.corrigendum)
+    print(f"==> {args.tag}: library {version}, spec {spec}, build count {count}, "
+          f"host {args.host}")
+    print(format_plan(plan))
 
-    tag = args.tag or newest_tag()
-    version, count, cff = release_info(tag, args.citation)
-    print(f"==> {tag}: version {version}, build count {count}, host {args.host}")
-
-    # A line that already has this version is done; making another would give
-    # the same release a second DOI.
-    for kind, rid in records.items():
-        latest = latest_published(z, rid)
-        if latest["metadata"].get("version") == version:
-            raise SystemExit(f"zenodo_deposit.py: the {kind} line already has {version}: "
-                             f"{latest['doi']}")
-        if latest["id"] != rid:
-            raise SystemExit(f"zenodo_deposit.py: record {rid} is not the newest {kind} "
-                             f"version ({latest['id']} is)")
-
-    with tempfile.TemporaryDirectory(prefix="bovnar-zenodo-") as work:
-        files = {"source": source_files(tag, version, count, work),
-                 "docs": docs_files(tag, work, args.pdf_dir)}
-
-        drafts, dois = {}, {}
-        for kind in ("source", "docs"):
-            draft = open_draft(z, records[kind])
-            drafts[kind], dois[kind] = reserve_doi(z, draft)
-            print(f"==> {kind}: draft {draft['id']}, DOI {dois[kind]}")
-
-        for kind, other in (("source", "docs"), ("docs", "source")):
-            draft = drafts[kind]
-            print(f"==> {kind}: files")
-            replace_files(z, draft, files[kind])
-            meta = metadata_for(kind, draft["metadata"], tag, version, cff,
-                                dois[kind], dois[other])
-            z.call("PUT", draft["links"]["self"], body={"metadata": meta})
-            drafts[kind] = z.call("GET", draft["links"]["self"])
-
+    actions = [plan["implementation"]]
+    if plan["spec"] is not None:
+        actions.append(plan["spec"])
     published = {}
-    for kind in ("source", "docs"):
-        d = drafts[kind]
+    pending = []
+    for action in actions:
+        state, doi = extend_state(z, action)
+        if state == "done":
+            published[action["kind"]] = doi
+            continue
+        pending.append(action)
+    if not pending:
+        print("==> nothing to deposit")
+        if not (args.orcid_prefer and published.get("implementation")):
+            return 0
+    actions = pending
+
+    creators = creators_from(cff)
+    impl_line = plan["implementation"]["key"]
+    drafts, dois = {}, {}
+    if actions:
+        with tempfile.TemporaryDirectory(prefix="bovnar-zenodo-") as work:
+            files = {}
+            wanted = {action["kind"] for action in actions}
+            if "implementation" in wanted:
+                files["implementation"] = (
+                    source_files(args.tag, version, count, work)
+                    + docs_files(args.tag, work, args.pdf_dir,
+                                 docs_for("implementation"), readme=True))
+            if "spec" in wanted:
+                files["spec"] = docs_files(args.tag, work, args.pdf_dir,
+                                           docs_for("spec"), readme=False)
+
+            for action in actions:
+                if action["record"] is None:
+                    draft = open_new_draft(
+                        z, draft_title(action), action["version"], creators,
+                        "software" if action["kind"] == "implementation" else "publication")
+                else:
+                    draft = open_draft(z, action["record"])
+                draft, doi = reserve_doi(z, draft)
+                drafts[action["kind"]], dois[action["kind"]] = draft, doi
+                # A new deposition carries conceptrecid before it is published.
+                # The cross-link has to be that concept: a version DOI would
+                # pin one patch, and the spec would stop finding later bugfixes.
+                concept = draft.get("conceptrecid") or action["concept"]
+                if concept is None:
+                    die(f"{action['kind']} draft {draft['id']} has no concept id")
+                action["draft_concept"] = int(concept)
+                print(f"==> {action['kind']}: draft {draft['id']}, "
+                      f"concept {action['draft_concept']}, DOI {doi}")
+
+            impl_concept = (plan["implementation"]["concept"]
+                            or plan["implementation"].get("draft_concept"))
+            if not impl_concept:
+                die("no implementation concept to link")
+            impl_link = concept_doi(impl_concept)
+            spec_action = plan["spec"]
+            spec_concept = None
+            if spec_action is not None:
+                spec_concept = (spec_action["concept"]
+                                or spec_action.get("draft_concept"))
+            elif table["spec"].get(spec):
+                spec_concept = table["spec"][spec]["concept"]
+            spec_link = concept_doi(spec_concept) if spec_concept else None
+
+            for action in actions:
+                kind = action["kind"]
+                print(f"==> {kind}: files")
+                replace_files(z, drafts[kind], files[kind])
+                other = spec_link if kind == "implementation" else impl_link
+                meta = metadata_for(kind, drafts[kind]["metadata"], args.tag,
+                                    action["version"], cff, other, impl_line)
+                z.call("PUT", drafts[kind]["links"]["self"], body={"metadata": meta})
+                drafts[kind] = z.call("GET", drafts[kind]["links"]["self"])
+
+    for action in actions:
+        kind = action["kind"]
+        draft = drafts[kind]
         if args.publish:
-            p = z.call("POST", d["links"]["publish"])
-            published[kind] = p.get("doi") or dois[kind]
-            print(f"==> {kind}: published {p.get('doi')}  "
-                  f"{p['links'].get('html') or p['links'].get('record_html', '')}")
-            # The cross-links were written with the reserved DOI. If the record
-            # came out under another, they point at nothing -- say so. (The
-            # sandbox does this: it reserves 10.5281/... and mints 10.5072/...)
-            if p.get("doi") != dois[kind]:
+            response = z.call("POST", draft["links"]["publish"])
+            published[kind] = response.get("doi") or dois[kind]
+            page = response["links"].get("html") or response["links"].get("record_html", "")
+            print(f"==> {kind}: published {response.get('doi')}  {page}")
+            # The sandbox reserves 10.5281/... and mints 10.5072/...
+            if response.get("doi") != dois[kind]:
                 print(f"    WARNING: reserved {dois[kind]} but published as "
-                      f"{p.get('doi')}; the other record's link to it is wrong")
+                      f"{response.get('doi')}; the other record's link to it is wrong")
+            # Record this concept before the next publish. A failure on the
+            # specification then leaves the implementation id in the table,
+            # and a rerun skips the version that is already there.
+            if args.host == "zenodo":
+                remember(table, action, response, draft)
+                with open(args.concepts, "w", encoding="utf-8") as fh:
+                    fh.write(dump_table(table))
+                print(f"==> recorded {kind} in {args.concepts}; commit that change")
             time.sleep(1)
         else:
             print(f"==> {kind}: draft ready, DOI {dois[kind]} on publish  "
-                  f"{d['links'].get('html', '')}")
+                  f"{draft['links'].get('html', '')}")
     if not args.publish:
         print("Review the drafts, then run again with --publish.")
         return 0
-    if args.orcid_prefer:
+    if args.host != "zenodo":
+        print("==> sandbox concepts are not written to the table")
+
+    if args.orcid_prefer and published.get("implementation"):
         print("==> ORCID: making the new works the preferred source")
         cmd = [sys.executable, os.path.join(ROOT, "orcid_prefer.py"),
-               "--tag", tag,
-               "--source-doi", published.get("source", dois["source"]),
-               "--docs-doi", published.get("docs", dois["docs"]),
+               "--tag", args.tag,
+               "--source-doi", published["implementation"],
                "--wait", str(args.orcid_wait)]
+        if "spec" in published:
+            cmd += ["--docs-doi", published["spec"]]
+        else:
+            cmd += ["--only", "source"]
         if subprocess.run(cmd).returncode:
             print("    ORCID preference not set; fix the cookie (or run "
                   "orcid_prefer.py later) and rerun that step.", file=sys.stderr)

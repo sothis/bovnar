@@ -1,0 +1,30 @@
+{
+  "note": "Concepts zenodo_deposit.py may extend. closed_concepts and closed_records are the archive through 2.2.0: source 10.5281/zenodo.21443008 and documentation 10.5281/zenodo.21443295, plus every version record in that series. The script never calls new-version on them. spec is one concept per specification number, implementation one concept per library minor. Both start empty. The first deposit of a number creates a concept, and --publish on the production host writes its record and concept ids here. A later patch extends the minor's concept only. A later release of the same spec extends the spec concept only with --corrigendum.",
+  "closed_concepts": [21443008, 21443295],
+  "closed_records": [
+    21443008,
+    21443009,
+    21443295,
+    21443296,
+    23934686,
+    23934688,
+    23958544,
+    23958545,
+    23963398,
+    23963399,
+    24111262,
+    24111263,
+    24250459,
+    24250462
+  ],
+  "archived_library_versions": [
+    "1.1.0",
+    "2.0.0",
+    "2.0.1",
+    "2.0.2",
+    "2.1.0",
+    "2.2.0"
+  ],
+  "spec": {},
+  "implementation": {}
+}

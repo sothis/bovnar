@@ -58,6 +58,14 @@ API and implements spec 1.2.
 
 ### Changed
 
+- **Zenodo archives the specification and the implementation as separate
+  concepts.** The source and documentation concepts that hold 1.1.0 through
+  2.2.0 stay closed. A later release opens, or extends, one concept per
+  specification number and one concept per library minor, so a patch of an
+  older minor cannot become what the current specification's concept
+  resolves to. `zenodo_concepts.json` is the list, and `zenodo_deposit.py`
+  refuses any other target. `--plan` prints the choice.
+
 - **The Rust Windows GNU build uses UCRT64.** A from-source
   `x86_64-pc-windows-gnu` build compiles `c/` with MSYS2 UCRT64, the same
   environment as the MinGW C archive, and `build.rs` refuses a MinGW that

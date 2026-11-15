@@ -30,12 +30,14 @@ doi: 10.5281/zenodo.21443008
 identifiers:
   - type: doi
     value: 10.5281/zenodo.21443008
-    description: Concept DOI, resolving to the latest archived release
+    description: >-
+      Concept DOI of the source archive through 2.2.0. Later releases open
+      their own concepts; zenodo_concepts.json records them.
   - type: doi
     value: 10.5281/zenodo.21443295
     description: >-
-      Concept DOI, resolving to the latest archived documentation and
-      specification
+      Concept DOI of the documentation archive through 2.2.0. Later
+      specification numbers are archived as their own concepts.
   # The version DOIs of this release, 2.2.0; those of earlier releases
   # (2.1.0, 2.0.2, 2.0.1, 2.0.0, 1.1.0) are in README.md.
   - type: doi

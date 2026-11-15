@@ -370,6 +370,16 @@ Pushing the tag is the publish step. Do not create the GitHub release in the web
 UI first, and do not move a tag: the repository has release immutability on, so
 a published release takes no further assets and its tag name is never reused.
 
+The Zenodo deposit follows the tag, and it does not extend the two concept DOIs
+that hold 1.1.0 through 2.2.0. `zenodo_concepts.json` is the list of concepts
+`zenodo_deposit.py` may extend. A release extends the concept of its library
+minor, or opens that concept when the minor is absent. The specification is a
+separate concept per spec number: the first deposit of that number opens it,
+and a later release extends it only with `--corrigendum`. `--publish` on the
+production host writes the new record ids back into the table. Commit that
+change with the release. `python3 zenodo_deposit.py --plan --tag vX.Y.Z` prints
+the choice before anything is uploaded.
+
 Both branch rules are gated by `bvnr_release_branch` (CTest, `check_release_branch.py`):
 for the tag being pushed it fails when `vX.Y.Z` is not contained in `X.Y.x`, and for
 a maintenance branch it fails when the branch carries a commit that is neither a

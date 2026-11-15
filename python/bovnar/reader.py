@@ -502,11 +502,11 @@ class Reader:
                     want, base = res, 0
                 # A Unit is a unit: Quantity.unit and Unit.parse() hand those
                 # out, and refusing one here sent callers hunting for `.raw`.
+                # _as_vu is the door for every unit-shaped argument (unit.py),
+                # so anything else is refused there as the wrong TYPE, with
+                # the type it wanted in the message. Returning None was
+                # handled above; a tuple's second half is a base.
                 want = _as_vu(want)
-                if not isinstance(want, ValueUnit):
-                    raise BovnarArgumentError(
-                        "want_unit callback must return a ValueUnit or Unit, "
-                        "(unit, base), or None")
                 ctypes.memmove(ctypes.addressof(want_ptr.contents),
                                ctypes.addressof(want), unit_size)
                 if want_base_ptr:

@@ -402,7 +402,7 @@ class TestInvalidArguments:
     def test_non_bytes_raises(self):
         with Reader() as r:
             with pytest.raises(BovnarArgumentError):
-                r.read_mem("not bytes")
+                r.read_mem("not bytes")            # type: ignore[arg-type]
 
     def test_invalid_fd(self):
         with Reader() as r:
@@ -542,6 +542,32 @@ def test_a_kept_payload_outlives_the_reader():
     assert after[4][0] == b'x' * 300
     assert [(d.raw_bytes(), d.unit_source_str()) for d, _, _ in wanted] == \
         [(raw, src) for _, raw, src in wanted]
+
+
+@needs_lib
+def test_the_want_unit_callback_refuses_a_wrong_type():
+    # _as_vu is the one door for a unit-shaped argument (unit.py), and it answers
+    # a wrong TYPE with a TypeError naming the type it wanted. A unit string
+    # returned from the callback used to reach ctypes, which raised
+    # ctypes.ArgumentError: argument 2: <class 'TypeError'>: wrong type --
+    # naming neither the argument nor the type. A Unit is accepted, as it is
+    # everywhere else.
+    from bovnar.unit import Unit
+
+    r = Reader()
+    with pytest.raises(TypeError,
+                       match="expected a Unit or a ValueUnit, not str"):
+        r.read_mem(b'.d = 1 m;\n', want_unit=lambda d: 'm')
+    r.close()
+
+    got = []
+    r = Reader()
+    r.read_mem(b'.d = 1 m;\n', want_unit=lambda d: Unit.parse('m'),
+               on_verified=lambda ev, d: (
+                   got.append(d.converted_str()) if ev == Event.DATA else None)
+               or True)
+    assert got == ['1']                       # 1 m, asked for as m
+    r.close()
 
 
 @needs_lib

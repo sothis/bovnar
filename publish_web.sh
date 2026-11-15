@@ -347,7 +347,8 @@ done
 # from GitHub. They are fetched once per tag into build/releases/<version>/ by
 # fetch_release_artifacts.py and uploaded beside the site. They are not under
 # web/, so the staging tree does not contain them and the --delete rsync in
-# step 3 carries an exclude for /download/.
+# step 3 excludes /download/<version>/. The all-releases page is under web/
+# and is not excluded.
 ARTIFACT_DIRS=()
 if [ "$ARTIFACTS" -eq 1 ] && [ -d "$RELEASES_DIR" ]; then
     while IFS= read -r -d '' _dir; do
@@ -419,10 +420,18 @@ RSYNC_OPTS=(-az --human-readable --chmod=D755,F644)
 # --delete prunes everything at the destination that is not in the staging tree,
 # and the staging tree is only what lives under web/. Anything the SERVER owns
 # must be protected explicitly -- above all .well-known/acme-challenge, which is
-# where certbot writes ACME challenges: deleting it breaks TLS renewal. Use
-# --delete-after so a transfer that fails partway does not leave the live site
-# with files already removed.
-[ "$RSYNC_DELETE" -eq 1 ] && RSYNC_OPTS+=(--delete-after --exclude='/.well-known/' --exclude='/download/')
+# where certbot writes ACME challenges: deleting it breaks TLS renewal. The
+# release archives live in /download/<version>/ and are uploaded on their own,
+# so those directories are excluded; /download/index.html is generated into
+# web/ and has to move with the rest of the site. Excluding all of /download/
+# left the all-releases page at the previous release. Use --delete-after so a
+# transfer that fails partway does not leave the live site with files already
+# removed.
+if [ "$RSYNC_DELETE" -eq 1 ]; then
+    RSYNC_OPTS+=(--delete-after
+        --exclude='/.well-known/'
+        --exclude='/download/*/')
+fi
 [ "$DRY_RUN" -eq 1 ] && RSYNC_OPTS+=(--dry-run --itemize-changes)
 
 # Release archives are build outputs, not web/ files, so they are not in the

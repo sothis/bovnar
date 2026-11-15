@@ -79,7 +79,7 @@ import urllib.request
 ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
 
-from check_release_links import (DOWNLOAD_PREFIX, REPO, expected_assets,  # noqa: E402
+from check_release_links import (GITHUB_DOWNLOAD_PREFIX, REPO, expected_assets,  # noqa: E402
                                  git, newest_tag, version_at)
 
 HOSTS = {
@@ -88,7 +88,7 @@ HOSTS = {
 }
 # The latest version on each production line, i.e. the record a new version is
 # made from. A sandbox run names its own with --source-record/--docs-record.
-PRODUCTION_RECORDS = {"source": 23963398, "docs": 23963399}
+PRODUCTION_RECORDS = {"source": 24250459, "docs": 24250462}
 WEBSITE = "https://www.bovnar.io"
 USER_AGENT = "bovnar-zenodo-deposit"
 PDF_DIR = os.path.join(ROOT, "build", "doc", "pdf")
@@ -195,7 +195,10 @@ def source_files(tag, version, count, workdir):
     """The release's source tarball, checked against its SHA256SUMS."""
     name = next(n for n in expected_assets(version, count)
                 if n.endswith("-source.tar.xz"))
-    sums = fetch(f"{DOWNLOAD_PREFIX}{tag}/SHA256SUMS").decode("utf-8")
+    # GitHub's release assets, not the site path. /download/ is where the
+    # website serves them after publish_web.sh, and it does not exist until
+    # that upload; the bytes archived here are the ones the release job attached.
+    sums = fetch(f"{GITHUB_DOWNLOAD_PREFIX}{tag}/SHA256SUMS").decode("utf-8")
     want = None
     for line in sums.splitlines():
         parts = line.split()
@@ -203,7 +206,7 @@ def source_files(tag, version, count, workdir):
             want = parts[0].lower()
     if want is None:
         raise SystemExit(f"zenodo_deposit.py: {name} is not in {tag}'s SHA256SUMS")
-    blob = fetch(f"{DOWNLOAD_PREFIX}{tag}/{name}")
+    blob = fetch(f"{GITHUB_DOWNLOAD_PREFIX}{tag}/{name}")
     if hashlib.sha256(blob).hexdigest() != want:
         raise SystemExit(f"zenodo_deposit.py: {name} does not match SHA256SUMS")
     path = os.path.join(workdir, name)

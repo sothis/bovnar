@@ -238,11 +238,13 @@ jobs:
       # The static library the Rust crate links for x86_64-pc-windows-gnu
       # (rust/build.rs PREBUILT). Same objects as the DLL checked above, so
       # the CRT gate covers it. build.rs links it only when the UCRT64 gcc
-      # is the one rustc will use.
+      # is the one rustc will use. This job is Ninja, so the compile line
+      # is in build.ninja; the Makefile generator's flags.make, which the
+      # linux job greps, is not written here.
       - name: Stage the prebuilt static library for the crate
         run: |
           set -euo pipefail
-          if ! grep -R -q -F -- '-march=x86-64-v2' build/mingw/CMakeFiles; then
+          if ! grep -q -F -- '-march=x86-64-v2' build/mingw/build.ninja; then
             echo "libbvnr.a was not built with -march=x86-64-v2" && exit 1
           fi
           dest=prebuilt/bovnar-prebuilt-x86_64-pc-windows-gnu

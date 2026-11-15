@@ -2,20 +2,29 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Janos Sonntag
 """
-check_release_links.py — the site's Downloads menu points at the newest release.
+check_release_links.py — the site's Downloads menu points at this line's release.
 
-The landing page's nav carries a Downloads menu whose links are the newest
-release's archives, served from this host at /download/<version>/. The archive
-names cannot be generic: CI packs them as `bovnar-<version>-<count>-…`, where
+The landing page's nav carries a Downloads menu whose links are one release's
+archives, served from this host at /download/<version>/. The archive names
+cannot be generic: CI packs them as `bovnar-<version>-<count>-…`, where
 <count> is the tagged commit's total commit count, so the menu is pinned to a
 release by hand — and a hand-written URL set that has to be retyped at every
 release is precisely the thing that gets forgotten. Forgotten here it is
 silent: the links keep resolving, keep downloading, and keep handing out the
 PREVIOUS version to everyone who takes the site at its word.
 
+Which release that is depends on the checkout, so a patch of an older minor
+stays green after a higher minor exists:
+
+  * on main, and on any branch that is not a maintenance line, the highest
+    library version whose tag implements the highest specification;
+  * on an X.Y.x branch, and on a vX.Y.Z tag, the newest tag of that minor;
+  * a line that has no tag yet keeps the main rule, because its menu still
+    names the release it was cut from.
+
 So this recomputes what the release job would have produced and compares:
 
-  * the newest v* tag is the one the menu links to;
+  * that release is the one the menu links to;
   * every asset filename matches what pack_artifacts.cmake names for that tag's
     version and commit count -- derived the way the packer derives them, from
     project() in CMakeLists.txt AT THE TAG and `git rev-list --count <tag>`,
@@ -45,6 +54,8 @@ import sys
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 PAGE = os.path.join(ROOT, "web", "index.html")
+TAG_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
+BRANCH_RE = re.compile(r"^(\d+)\.(\d+)\.x$")
 
 REPO = "sothis/bovnar"
 SITE = "https://www.bovnar.io"
@@ -73,16 +84,159 @@ def git(*args):
     return out.stdout.strip()
 
 
-def newest_tag():
-    """The highest v<major>.<minor>.<patch> tag, or None if there are none.
+def listed_tags():
+    """Every v<major>.<minor>.<patch> tag, highest version first.
 
     --sort=-v:refname orders by version number rather than lexically, so v1.10.0
     sorts above v1.9.0 the way a release does and not the way a string does.
     """
     out = git("tag", "--list", "v[0-9]*", "--sort=-v:refname")
     if not out:
+        return []
+    return [line.strip() for line in out.splitlines() if TAG_RE.match(line.strip())]
+
+
+def newest_tag():
+    """The highest v<major>.<minor>.<patch> tag, or None if there are none."""
+    names = listed_tags()
+    return names[0] if names else None
+
+
+def version_tuple(tag):
+    m = TAG_RE.match(tag)
+    if not m:
         return None
-    return out.splitlines()[0].strip()
+    return tuple(int(p) for p in m.groups())
+
+
+def spec_of(tag):
+    """(major, minor) of BVNR_SPEC_VERSION at `tag`, or None when it has none."""
+    text = git("show", f"{tag}:include/bovnar.h")
+    if not text:
+        return None
+    found = []
+    for name in ("MAJOR", "MINOR"):
+        m = re.search(rf"^[ \t]*#define[ \t]+BVNR_SPEC_VERSION_{name}[ \t]+(\d+)\b",
+                      text, re.M)
+        if not m:
+            return None
+        found.append(int(m.group(1)))
+    return tuple(found)
+
+
+def checkout_ref():
+    """(kind, name) of the ref this run is about.
+
+    kind is 'tag', 'branch', or 'other'. CI's GITHUB_REF wins, because a tag
+    checkout is detached and its abbrev-ref is HEAD.
+    """
+    ref = os.environ.get("GITHUB_REF", "")
+    if ref.startswith("refs/tags/"):
+        return "tag", ref[len("refs/tags/"):]
+    if ref.startswith("refs/heads/"):
+        return "branch", ref[len("refs/heads/"):]
+    name = git("rev-parse", "--abbrev-ref", "HEAD")
+    if name and name not in ("", "HEAD"):
+        return "branch", name
+    tag = git("describe", "--exact-match", "--tags", "HEAD")
+    if tag:
+        return "tag", tag
+    return "other", ""
+
+
+def choose_menu_tag(entries, kind, name):
+    """The tag this checkout's Downloads menu must name. Pure.
+
+    `entries` is (tag, spec) with spec a (major, minor) pair or None. On a
+    maintenance branch or a version tag, that minor's newest tag. A minor
+    with no tag yet, and every other checkout, names the highest library
+    version that implements the highest specification.
+    """
+    parsed = [(t, s) for t, s in entries if version_tuple(t)]
+
+    def line_newest(major, minor):
+        line = [t for t, _s in parsed if version_tuple(t)[:2] == (major, minor)]
+        return max(line, key=version_tuple) if line else None
+
+    if kind == "tag":
+        m = TAG_RE.match(name or "")
+        if m:
+            chosen = line_newest(int(m.group(1)), int(m.group(2)))
+            if chosen:
+                return chosen
+    if kind == "branch":
+        m = BRANCH_RE.match(name or "")
+        if m:
+            chosen = line_newest(int(m.group(1)), int(m.group(2)))
+            if chosen:
+                return chosen
+    with_spec = [(t, s) for t, s in parsed if s is not None]
+    if not with_spec:
+        return max((t for t, _s in parsed), key=version_tuple) if parsed else None
+    best = max(s for _t, s in with_spec)
+    pool = [t for t, s in with_spec if s == best]
+    return max(pool, key=version_tuple)
+
+
+def menu_tag():
+    """The release the Downloads menu of this checkout must name."""
+    names = listed_tags()
+    if not names:
+        return None
+    kind, name = checkout_ref()
+    return choose_menu_tag([(t, spec_of(t)) for t in names], kind, name)
+
+
+def menu_reason(tag, kind, name):
+    """Why `tag` is the release this checkout's menu must name."""
+    line = None
+    if kind == "branch" and BRANCH_RE.match(name or ""):
+        m = BRANCH_RE.match(name)
+        line = (int(m.group(1)), int(m.group(2)))
+    elif kind == "tag" and version_tuple(name or ""):
+        line = version_tuple(name)[:2]
+    if line and tag and version_tuple(tag)[:2] == line:
+        return f"{tag}, the newest tag of {line[0]}.{line[1]}"
+    spec = spec_of(tag) if tag else None
+    if spec:
+        return f"{tag}, the highest release of spec {spec[0]}.{spec[1]}"
+    return tag or ""
+
+
+def _self_test():
+    """The menu's choice of release, with no git and no page."""
+    entries = [
+        ("v3.0.0", (1, 2)),
+        ("v2.3.1", (1, 3)),
+        ("v2.3.0", (1, 3)),
+        ("v2.2.9", (1, 2)),
+        ("v2.2.0", (1, 2)),
+    ]
+    cases = (
+        ("other", "", "v2.3.1"),
+        ("branch", "main", "v2.3.1"),
+        ("branch", "2.2.x", "v2.2.9"),
+        ("tag", "v2.2.9", "v2.2.9"),
+        ("branch", "2.3.x", "v2.3.1"),
+        ("branch", "3.0.x", "v3.0.0"),
+        ("tag", "v3.0.0", "v3.0.0"),
+        ("branch", "2.4.x", "v2.3.1"),
+    )
+    for kind, name, want in cases:
+        got = choose_menu_tag(entries, kind, name)
+        if got != want:
+            return fail(f"check_release_links.py: {kind} {name or '(none)'} "
+                        f"chose {got}, wanted {want}")
+    # The same spec on two majors: the higher library version is the menu.
+    got = choose_menu_tag([("v3.0.0", (1, 3)), ("v2.4.0", (1, 3))], "branch", "main")
+    if got != "v3.0.0":
+        return fail(f"check_release_links.py: the higher library version of a "
+                    f"shared spec chose {got}")
+    # Version order is numeric: v1.10.0 is newer than v1.9.0.
+    got = choose_menu_tag([("v1.9.0", (1, 0)), ("v1.10.0", (1, 0))], "branch", "main")
+    if got != "v1.10.0":
+        return fail(f"check_release_links.py: v1.10.0 sorted as {got}")
+    return 0
 
 
 def version_at(tag):
@@ -139,6 +293,8 @@ def fail(*lines):
 
 def main():
     verbose = "--verbose" in sys.argv[1:]
+    if _self_test():
+        return 1
 
     with open(PAGE, encoding="utf-8") as fh:
         html = fh.read()
@@ -184,7 +340,7 @@ def main():
             f"{', '.join(declared) if declared else 'nothing'}.",
             "They name the same release; move them together.")
 
-    # --- what the tree says the newest release is ---------------------------
+    # --- what this checkout's menu must name ----------------------------------
     # Ask git rather than looking for a .git DIRECTORY: in a `git worktree` it is
     # a file, and the isdir() spelling would have skipped this check entirely
     # from any worktree -- exactly the silent self-disabling it exists to prevent.
@@ -205,12 +361,14 @@ def main():
             "be checked.",
             "Run:  git fetch --unshallow --tags")
 
-    tag = newest_tag()
+    kind, ref_name = checkout_ref()
+    tag = menu_tag()
     if not tag:
         return fail(
             "no v* tag in this clone, so there is no release to check the "
             "downloads menu against.",
             "Run:  git fetch --tags")
+    reason = menu_reason(tag, kind, ref_name)
 
     version = version_at(tag)
     if not version:
@@ -232,7 +390,8 @@ def main():
                 "CMakeLists.txt; the tag and the project version disagree.")
         print(f"check_release_links.py: HEAD is {tag} itself -- its archives "
               "do not exist yet, so the menu is not checked on this commit. "
-              "Update web/index.html once the release job has attached them.")
+              "Update web/index.html once the release job has attached them. "
+              f"This checkout's menu then names {reason}.")
         return 0
     if tag != f"v{version}":
         return fail(
@@ -251,7 +410,7 @@ def main():
 
     if assets != want_prefixed:
         wrong_version = sorted({a.split("/", 1)[0] for a in assets} - {version})
-        lines = [f"web/index.html: the downloads menu does not match {tag} "
+        lines = [f"web/index.html: the downloads menu does not match {reason} "
                  f"(version {version}, build count {count})."]
         if wrong_version:
             lines.append(f"  it links to version(s): {', '.join(wrong_version)}")
@@ -286,9 +445,9 @@ def main():
                     '<div class="nav-dl-head">…<b>version</b> heading.')
     if head.group(1) != tag:
         return fail(f"web/index.html: the downloads panel is headed "
-                    f"\"{head.group(1)}\" but links to {tag}.")
+                    f"\"{head.group(1)}\" but links to {reason}.")
 
-    print(f"check_release_links.py: the downloads menu matches {tag} "
+    print(f"check_release_links.py: the downloads menu matches {reason} "
           f"({len(want)} assets, build count {count})")
     if verbose:
         for a in want_prefixed:

@@ -1851,16 +1851,18 @@ if(Python3_Interpreter_FOUND AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/check_web_li
     set_tests_properties(bvnr_web_links PROPERTIES LABELS "web;docs" TIMEOUT 120)
 endif()
 
-# ── The site's Downloads menu points at the NEWEST release ──────────────────
-# bvnr_web_links deliberately never fetches an external host, so the six links in
-# the landing page's downloads menu are unchecked by it -- and those are the one
-# set of external links on the site that go stale on a schedule. The archives are
-# named bovnar-<version>-<count>-…, with <count> the tagged commit's commit
+# ── The site's Downloads menu points at this line's release ─────────────────
+# bvnr_web_links deliberately never fetches an external host, so the archive
+# links in the landing page's downloads menu are unchecked by it -- and those
+# are the one set of links on the site that go stale on a schedule. The archives
+# are named bovnar-<version>-<count>-…, with <count> the tagged commit's commit
 # count, so there is no generic URL to point at and the menu has to be retyped at
 # every release. Miss it and nothing looks wrong: the links still resolve, still
 # download, and still hand out the previous version to everyone who trusts the
-# site. The names are fully derivable from the tag, so derive them and compare --
-# same recipe as pack_artifacts.cmake, no network.
+# site. The names are fully derivable from the release this checkout publishes
+# -- the highest library version of the highest specification on main, the
+# newest tag of the minor on X.Y.x -- so derive them and compare, the same
+# recipe as pack_artifacts.cmake, no network.
 # ── The unit and currency tables in doc/ match src/gendata ─────────────────
 # doc/04 and doc/05 carry every unit and every currency, twice over, as
 # hand-written markdown -- roughly 1150 rows of symbols, accepted spellings, ISO

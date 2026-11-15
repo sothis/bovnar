@@ -3,8 +3,9 @@
 # Copyright (c) 2026 Janos Sonntag
 """Generate web/download/index.html — the all-releases downloads page.
 
-The Downloads menu serves the newest release's archives from /download/<version>/
-and its "All releases" entry points here. This page lists every release fetched
+The Downloads menu serves one release's archives from /download/<version>/
+(the release check_release_links.py names for this checkout) and its
+"All releases" entry points here. This page lists every release fetched
 into build/releases/ (fetch_release_artifacts.py), newest first, with each
 archive's size and its SHA256SUMS link. The release directory is git-ignored,
 so a checkout without the archives cannot rebuild the page: --check says so and

@@ -18,7 +18,8 @@ by hand. A rerun keeps files whose hash already matches, so only a changed or
 missing asset costs a download.
 
 Usage:
-    python3 fetch_release_artifacts.py             # newest v* tag
+    python3 fetch_release_artifacts.py             # the release this checkout's
+                                                   # Downloads menu must name
     python3 fetch_release_artifacts.py --tag v2.1.0
     python3 fetch_release_artifacts.py --check     # verify only, no network
 """
@@ -34,7 +35,7 @@ import urllib.request
 ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
 
-from check_release_links import (REPO, expected_assets, git, newest_tag,  # noqa: E402
+from check_release_links import (REPO, expected_assets, git, menu_tag,  # noqa: E402
                                  version_at)
 
 DEST_ROOT = os.path.join(ROOT, "build", "releases")
@@ -75,13 +76,14 @@ def download(url, path):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--tag", help="release tag (default: the newest v* tag)")
+    ap.add_argument("--tag", help="release tag (default: the release this "
+                                  "checkout's Downloads menu must name)")
     ap.add_argument("--check", action="store_true",
                     help="verify an existing build/releases/<version> only; "
                          "download nothing")
     a = ap.parse_args()
 
-    tag = a.tag or newest_tag()
+    tag = a.tag or menu_tag()
     if not tag:
         return fail("fetch_release_artifacts.py: no v* tag in this clone.",
                     "Run:  git fetch --tags")

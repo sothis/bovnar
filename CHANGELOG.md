@@ -66,6 +66,14 @@ API and implements spec 1.2.
   resolves to. `zenodo_concepts.json` is the list, and `zenodo_deposit.py`
   refuses any other target. `--plan` prints the choice.
 
+- **The Downloads menu follows the line it is published from.** On `main` it
+  names the highest library version of the highest specification. On an
+  `X.Y.x` branch, and on a `vX.Y.Z` tag, it names the newest tag of that
+  minor, so a maintenance release stays green after a higher minor exists.
+  `check_release_links.py` is the check. `fetch_release_artifacts.py`
+  fetches that same tag. The links on `main` stay on 2.2.0, which is that
+  release today.
+
 - **The Rust Windows GNU build uses UCRT64.** A from-source
   `x86_64-pc-windows-gnu` build compiles `c/` with MSYS2 UCRT64, the same
   environment as the MinGW C archive, and `build.rs` refuses a MinGW that

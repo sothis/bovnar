@@ -305,7 +305,8 @@ Several CTest gates check the documentation:
 - `check_conformance_doc.py` — the worked examples in `doc/13` match what the
   conformance adapter emits.
 - `check_web_links.py`, `check_release_links.py` — internal site links resolve,
-  and the download menu points at the current release.
+  and the download menu names the highest release of the highest specification
+  on `main`, and the newest tag of the minor on an `X.Y.x` branch.
 
 Renumbering a section therefore requires moving the citations that point at it;
 CI reports the ones that were missed.
@@ -364,7 +365,7 @@ the release commit does. `2.2.x` is the first, cut for 2.2.0.
 | 3 | On the branch, the release commit: every version field (the same set the previous `release:` commit moved), the regenerated WASM module, `web/docs`, the LLM views and `web/de`, and `[Unreleased]` becomes `[X.Y.Z] - <date>` with its link ref. |
 | 4 | The branch's run is fully green — the C and Python suites and every Rust leg. The wheel and sdist jobs do not run on a maintenance-branch push; they run on `main` and on the tag, so the tag's own run is the rehearsal. |
 | 5 | `git tag vX.Y.Z` on that commit and push the tag. The tag's run publishes: the GitHub release and its archives, PyPI and crates.io, and the Zenodo deposit follows. |
-| 6 | `git switch main && git merge --ff-only 2.2.x`, so the release commit is on both branches. Then, on `main`: the `-dev` suffix back, a fresh `[Unreleased]` section, the Downloads menu and the DOIs. |
+| 6 | `git switch main && git merge --ff-only 2.2.x`, so the release commit is on both branches. Then, on `main`: the `-dev` suffix back, a fresh `[Unreleased]` section, the Downloads menu and the DOIs. The menu on `main` names this release when it is the highest release of the highest specification. |
 
 Pushing the tag is the publish step. Do not create the GitHub release in the web
 UI first, and do not move a tag: the repository has release immutability on, so
@@ -405,9 +406,12 @@ git tag vX.Y.Z && git push origin vX.Y.Z
 ```
 
 `main` is not fast-forwarded for a patch: it already names the next version, and
-the branch is the only place a patch's version fields move. A fix written on the
-branch instead of on `main` is merged back, so the branch never holds anything
-`main` does not.
+the branch is the only place a patch's version fields move. The branch's
+Downloads menu names the newest tag of that minor. The tag commit may keep the
+previous menu, because its archives do not exist yet; the next commit on the
+branch points the links at the tag. `main`'s menu stays on the highest release
+of the highest specification. A fix written on the branch instead of on `main`
+is merged back, so the branch never holds anything `main` does not.
 
 ## Licensing
 

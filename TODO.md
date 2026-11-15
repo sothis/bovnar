@@ -1,5 +1,49 @@
 # TODO
 
+## State 2026-11-15 — Wine's tmpfile(), not the writer
+
+The Wine trap from the entry below is closed, and it was never a library bug.
+`push_fd`'s counter is exact: across every trapped run the fd position equalled
+`bvnr_writer_bytes_written()` exactly, and the serializer's flush buffer held a
+complete, valid document (`flush: wbuf_pos=19 buf=[.k0 = <uint:32> 0;\n]`) while
+the read came back as a *different* document -- a different `pretty` flag and
+different content. The bytes between the fd and the read were wrong; the writer
+was right. `src/` is unchanged, and the instrumentation used to establish this was
+reverted.
+
+Wine's `tmpfile()` is the culprit, and it needs concurrency: native and serial
+Wine are both clean (200k iterations, and 24 parallel native runs), while two or
+more concurrent processes trap reliably. Probed directly, 8 concurrent processes
+each calling `tmpfile()` in a loop had 7 of 8 fail outright (`tmpfile fail i=29`,
+`i=396`, `i=55`, `i=0`, ...), and the file that does come back is not reliably
+private. That also explains why `rewind()` -- the fix in the entry below, correct
+for the serial case -- could not cover it: there is nothing to rewind when
+`tmpfile()` fails or hands back shared storage.
+
+`harness_fd_stream` now uses one `mkstemp()` file per process instead of
+`tmpfile()`, created once and reused: `mkstemp` gives a name private to this
+process, so there is no collision. The file is truncated (`ftruncate`) and
+rewound before the sink exists, which is what makes reuse safe. It is created
+once rather than per iteration because `unlink()` fails on Wine (it returns -1
+and the directory entry stays), so a per-iteration `mkstemp` leaks an entry every
+time -- 800k entries at 200k x 4, which is what made an earlier attempt look like
+a hang. The cost is one leaked entry per process; where `unlink()` works the file
+has no name at all.
+
+Verified after the change: native `ctest` 200/200, ASan+UBSan 14/14 on the writer
+and fuzz suites, the Wine cross tree 165/165 serially, and 200k iterations x 8
+concurrent processes x 4 rounds with 0 failures -- the configuration that
+previously trapped 4 of 4. Native and Wine serial 200k both pass. One caveat: the
+Wine scratch file leaks one `/tmp` entry per process, unavoidable where
+`unlink()` fails; 32 processes is 32 files.
+
+Two incidental fixes went in with it. `tests/.clangd` is new: clangd resolves a
+relative `-I` against the config file's own directory, so the root `.clangd`'s
+`-Iinclude` meant `tests/include` for files under `tests/`, which is why the
+editor reported `include/bovnar.h` (91 KB, present) as not found. And the stray
+indentation the previous session's diff left on a closing brace in
+`bovnar_fuzz_writer.c` is corrected.
+
 ## State 2026-11-10 — 2.1.0 released
 
 The release commit moves every version field to 2.1.0: CMakeLists.txt,
@@ -36,6 +80,130 @@ publish it to (the repository has none), so the article stays in the tree and
 that step is closed as not applicable. `-dev` is restored and the [Unreleased]
 CHANGELOG section is the next cycle's summary.
 
+## State 2026-11-14 — x86-64-v2 floor, and what the Wine trap was
+
+The instruction set is now pinned rather than inherited. `CMakeLists.txt` adds
+`-march=x86-64-v2` to every x86_64 translation unit (library, CLI, tests, fuzz
+harnesses) and says so at configure time; the Wine cross tree inherits it, so
+local, CI and cross build the same ISA. MSVC keeps its own x64 baseline: it has
+no /arch: for v2 and the next step up is /arch:AVX (v3), a much wider jump than
+the one asked for -- the note in CMakeLists.txt is the record of that.
+`rust/build.rs` adds the same flag for x86_64 targets when the compiler takes it,
+so the crate's C half matches upstream.
+
+Verified after the change: native `ctest` 200/200, ASan+UBSan 174/174, the cross
+tree builds and runs.
+
+The Wine trap turned out to be two things.
+
+**Fixed:** `harness_fd_stream` trusted `tmpfile()` to hand back an empty file at
+position 0. On Wine it does not -- it returns a file with a previous iteration's
+bytes in it and the fd positioned after them, so the fd sink wrote the document
+at a nonzero offset while the read below started at 0. `rewind(f)` before the
+sink exists fixes that, and the comment says why.
+
+**Correction, 2026-11-15 -- that diagnosis was wrong.** The byte count was never
+short. `push_fd` is exact: in every trapped run the fd position equalled
+`bvnr_writer_bytes_written()` exactly, and the serializer's flush buffer held a
+complete, valid document. The library is blameless and `src/` was not touched.
+See "Wine's tmpfile(), not the writer" at the top of this file for what was
+actually happening.
+
+## State 2026-11-14 — main swept, ready to tag 2.1.1
+
+The full sweep ran on this tree (ef0b543 plus the four loose ends below), not
+just CI: `./run_tests.sh` 200/200 with the fuzz sweep at 5000 iterations
+(reader, dom, utils, feed, and the writer smoke); the ASan+UBSan build 174/174
+(`-LE python`, `build/asan`, one skip: `bvnr_alloc_test` needs glibc); `cargo
+fmt --check`, `cargo clippy --locked --all-targets -- -D warnings`, `cargo test
+--locked` all green, `cargo check` on the fuzz targets,
+`test_writers_agree -- --ignored` against the built CLI; the wheel built and
+smoke-tested out of the tree (import, `version()`, a round-trip, `DocumentFeed`
+and `set_unit_policy`); the CLI reports `2.1.0-dev` and the WASM module `2.1.0`
+/ spec 1.2. The two CI legs that were never run locally — wasm32-wasip2 and the
+Wine cross tree — ran afterwards, below.
+
+The wasm32-wasip2 sweep and the Wine cross tree ran on 2026-11-14, the two CI
+legs that had never been run locally.
+
+**wasm32-wasip2** — wasmtime 50.0.1 and wasi-sdk 34.0 were installed under
+`~/.local` (a tarball unpack, no root needed: both are static binaries). Then,
+as the `rust_wasm` job does: `cargo build --locked --target wasm32-wasip2` and
+`cargo test --locked --target wasm32-wasip2 --lib --tests` with
+`CARGO_TARGET_WASM32_WASIP2_RUNNER="wasmtime run --dir <repo>"` and
+`WASI_SDK_PATH=$HOME/.local/wasi-sdk-34.0-x86_64-linux`. **1479 passed, 0
+failed.** The toolchain is `~/.cargo/bin/cargo` (rustup, stable 1.99.1, which
+already has the `wasm32-wasip2` std) — `/usr/bin/cargo` is the distro 1.93.1
+and cannot target it.
+
+**Wine cross tree** — `cmake -B build/mingw
+-DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-mingw-w64-x86_64.cmake
+-DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=ON .`, then `ctest --test-dir
+build/mingw`. Wine 10.0 is installed, and the toolchain file picks it up as
+`CMAKE_CROSSCOMPILING_EMULATOR`, so the cross-built `.exe` tests run. 168 tests
+registered, 3 registered-and-DISABLED (the cross tree's WASM/doc gates, which
+exec the built CLI bare), `bvnr_alloc_test` skipped.
+
+Serial (`-j1`) it is **163 of 164**, and the one failure is not a failure:
+`bvnr_cli_regressions` hits its native-calibrated `TIMEOUT 120` while Wine runs
+its 105 CLI cases. Measured: 6 s with `TMP_DIR=/tmp`, 175 s with `TMP_DIR` on
+this repository's filesystem — the same 105 cases pass either way, so the cost is
+Wine's file I/O on that mount, not the CLI. CTest's `--timeout` does not
+override a per-test `TIMEOUT` property, so the fix is either a cross-aware
+TIMEOUT at that one site or a scratch dir on tmpfs.
+
+In parallel (`-j4`, `-j8`) three tests trap intermittently:
+`bvnr_fuzz_writer`, `bvnr_fuzz_writer_deep`, `bvnr_fuzz_writer_thorough`, all at
+the same place — `readback_validate` refuses the writer's own output, with
+`bvnr_write_finish` true, `bvnr_writer_get_error` `error_none`, and a document
+truncated right after its type annotation (`bw=15`, `.k0 = <uint:32>` for a
+one-byte input). It is Wine-only and does not reproduce in isolation: the same
+input alone passes 20/20, the whole suite passes 20000 iterations serially, and
+the ASan build passes 200000 iterations natively. The failing iteration differs
+run to run, so it depends on run history or heap layout rather than on the
+input. The sink-failure paths that are easy to construct (a callback sink that
+refuses one push and recovers, one that refuses all of them) report correctly:
+the failure is latched and `bvnr_write_finish` returns false. What the source
+does show is that `bvn_ser_push`'s failures reach `bvnr_writer_get_error` only
+where a caller latches them — the emit paths `return false` without one — so a
+failure in a separator-sized emit can still leave `last_error` at `error_none`.
+That is the next thing to chase, and it wants a debug cross build under Wine to
+see the writer's state at the trap; it does not gate the tag, which is green
+natively, under ASan, and on wasm32-wasip2.
+
+Reproduce the two sweeps with:
+    # wasm32-wasip2
+    export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
+    export WASI_SDK_PATH="$HOME/.local/wasi-sdk-34.0-x86_64-linux"
+    export CARGO_TARGET_WASM32_WASIP2_RUNNER="wasmtime run --dir $PWD"
+    cd rust && cargo test --locked --target wasm32-wasip2 --lib --tests
+
+    # Wine cross tree (serial: Wine under -j4 and up is where the writer traps)
+    cmake -B build/mingw -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-mingw-w64-x86_64.cmake \
+          -DCMAKE_BUILD_TYPE=Release -DBVNR_BUILD_TESTS=ON .
+    cmake --build build/mingw -j"$(nproc)"
+    WINEDEBUG=-all ctest --test-dir build/mingw -j1
+
+
+Four loose ends closed on the way: `reader.py`'s `want_unit` callback had an
+unreachable `BovnarArgumentError` guard after `_as_vu` became the one door for a
+unit-shaped argument (it now surfaces `_as_vu`'s `TypeError`, which names the
+type, with a test pinning both halves — a `str` refused, a `Unit` accepted);
+`package.py`'s provenance literal had two keys on one line; the workflow's
+80-column rewrap got a note saying why the two URL continuations must sit at the
+block indent (YAML strips the block's own indent, so one space more puts a space
+inside the URL); and this file's "CI is green on 7f51b2d" line was two builds
+stale.
+
+What is left is the release commit: the version fields (2.1.0 -> 2.1.1,
+`BVNR_VERSION_SUFFIX` back to `""`), `RELEASE_NOTES_v2.1.1.md`, and the
+regeneration that follows a version bump. The CHANGELOG heading is already
+written; `[Unreleased]` becomes 2.1.1. The `### Added` section is a new public
+Python method (`DocumentFeed.set_unit_policy`) — a minor by the rule at the top
+of the CHANGELOG, and 2.0.1/2.0.2 both shipped an `Added` section, so 2.1.1 is
+consistent with the project's own precedent. No C symbol was added, so the ABI
+does not move.
+
 ## State 2026-11-13 — main after 2.1.0
 
 The tag is where the last full sweep was run. Since it, main carries the work
@@ -62,9 +230,16 @@ Objective-C++.
 
 Version fields read 2.1.0 with `BVNR_VERSION_SUFFIX` back to `"-dev"`; the suffix
 reaches only the `bovnar version` banner, so no other field moves until the next
-release. CI is green on 7f51b2d (Build & Package, and the runner-shortage
-retry). The sweep the 2.1.0 entry records — `./run_tests.sh`, the ASan build,
-`cargo test`, clippy, fmt — was run at the tag, not on this work.
+release. CI is green on ef0b543: all 22 jobs of Build & Package (including
+`rust_prebuilt`), and CodeQL.
+
+What CI does NOT run is the local sweep: `./run_tests.sh` (the fuzz sweep at an
+iteration count you choose — CI runs only the pinned registered fuzz tests and
+`cargo check` on the fuzz targets) and the Wine-driven cross tree. The sweep the
+2.1.0 entry records — `./run_tests.sh`, the ASan build, `cargo test`, clippy,
+fmt — was run at the tag, not on this work. clippy and fmt HAVE run on this work
+in CI (`Rust (Linux x64)`), which is worth knowing before re-running them by
+hand: they are green on ef0b543.
 
 Verified on this tree for the subnormal change: `ctest` 200/200 after
 regenerating the WASM module, `web/docs`, `web/llms-full.txt` and `web/de`
@@ -72,7 +247,6 @@ regenerating the WASM module, `web/docs`, `web/llms-full.txt` and `web/de`
 1584/1584, the ASan build's utils/writer/dom suites, the utils fuzz harness at
 5000 iterations, and the reader round-trip of every emitted literal (`1.4e-45`
 under `float:32` reads back as exactly 2^-149, checked with exact rationals).
-clippy and fmt were not re-run: no Rust code changed.
 
 ORCID: DataCite auto-update put both 2.1.0 works on the record, but initially
 the source-code work was not preferred (2.0.2 was, display-index 6 against 1).

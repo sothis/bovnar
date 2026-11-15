@@ -1082,12 +1082,25 @@ jobs:
         if: steps.state.outputs.publish == 'true'
         id: auth
 
+      # package.py refuses a publish without --prebuilt: since 03fb675 the
+      # crate links c/prebuilt/<triple> on the targets that have one, and a
+      # publish that silently compiled the C sources instead would ship a
+      # different crate than rust_package verified. rust_package downloads the
+      # same artifacts for its dry run; this job needs them too.
+      - uses: actions/download-artifact@v8
+        if: steps.state.outputs.publish == 'true'
+        with:
+          pattern: bovnar-prebuilt-*
+          path: ${{ runner.temp }}/prebuilt
+          merge-multiple: true
+
       - name: cargo publish
         if: steps.state.outputs.publish == 'true'
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
-        run: python3 rust/package.py --out "$RUNNER_TEMP/crate" -- publish
-          --locked
+        run: >-
+          python3 rust/package.py --out "$RUNNER_TEMP/crate"
+          --prebuilt "$RUNNER_TEMP/prebuilt" -- publish --locked
 
   # ── GitHub Release assets ────────────────────────────────────────────────
   release:

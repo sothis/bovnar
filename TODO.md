@@ -44,6 +44,41 @@ editor reported `include/bovnar.h` (91 KB, present) as not found. And the stray
 indentation the previous session's diff left on a closing brace in
 `bovnar_fuzz_writer.c` is corrected.
 
+## State 2026-11-15 — 2.2.0, cut but not tagged
+
+Every version field reads 2.2.0 with `BVNR_VERSION_SUFFIX` back to `""`, and
+`[Unreleased]` became `[2.2.0] - 2026-11-15` with its link ref. `RELEASE_NOTES_v2.2.0.md`
+is the summary the release job will attach.
+
+The minor is deliberate and the reasoning is written down because the obvious
+precedent does not support it. The CHANGELOG's rule is that the implementation's
+major moves when a *program* built against it has to change; the additions here
+are callable API (`DocumentFeed.set_unit_policy`) and packaging (prebuilt C
+libraries for MSVC and both macOS targets), so nothing breaks and the ABI does
+not move. 2.0.1 and 2.0.2 shipped `### Added` sections as patches, but those
+sections added *no* API at all -- an ABI baseline file, a wasm test runner, a
+macOS archive, a provenance manifest. 2.1.0 is the last release that added
+callable API, and it took a minor. `DocumentFeed` exists at the `v2.1.0` tag and
+`python/bovnar/stream.py` there has zero occurrences of `set_unit_policy` (it
+landed in ea725d9, contained by no release tag), so this is genuinely new public
+Python API. Diffing the `BVN_API` symbol list against `v2.1.0` confirms the C ABI
+is unchanged.
+
+The full sweep ran on this tree: `./run_tests.sh` 200/200 with the fuzz sweep at
+5000, ASan+UBSan 174/174, `cargo fmt --check`, `clippy -D warnings`, `cargo test
+--locked` 1584/1584, the wasm32-wasip2 leg 1479/1479, `cargo check` on the fuzz
+targets, the Wine cross tree 165/165 serially, the wheel built and smoke-tested
+(import, `version()` == 2.2.0, a round-trip), and 3574 Python tests. The WASM
+module, `web/docs`, `llms-full.txt` and `web/de` are regenerated, and the CLI
+reports 2.2.0.
+
+**Not done, deliberately:** the release commit. The tree is staged and swept but
+uncommitted, because more may be added or changed first. What remains for the
+commit itself: `RELEASE_NOTES_v2.2.0.md` is written, `gen_downloads.py` needs the
+released artifacts under `build/releases/2.2.0/` (fetched after the tag), and the
+Downloads menu in `web/index.html` is hand-maintained and still names 2.1.0 --
+correct until the archives exist.
+
 ## State 2026-11-10 — 2.1.0 released
 
 The release commit moves every version field to 2.1.0: CMakeLists.txt,

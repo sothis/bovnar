@@ -12,7 +12,7 @@ implements; the highest spec a build understands is reported by
 numbers were the same. They part at 2.0.0, which breaks the ABI and the Python
 API and implements spec 1.2.
 
-## [Unreleased]
+## [2.2.0] - 2026-11-15
 
 ### Added
 
@@ -6833,6 +6833,7 @@ arrays (including the homogeneity rules), structs, octet streams, references,
 and the error-code values. See [`RELEASE_NOTES_v1.0.0.md`](RELEASE_NOTES_v1.0.0.md)
 for the full notes.
 
+[2.2.0]: https://github.com/sothis/bovnar/releases/tag/v2.2.0
 [2.1.0]: https://github.com/sothis/bovnar/releases/tag/v2.1.0
 [2.0.2]: https://github.com/sothis/bovnar/releases/tag/v2.0.2
 [2.0.1]: https://github.com/sothis/bovnar/releases/tag/v2.0.1

@@ -425,11 +425,9 @@ python3 rust/package.py -- publish --dry-run     # what CI runs on every push
 On every push the `rust_package` job runs that dry run, with the prebuilt
 archives downloaded, and then builds the package with no unit profiles (which
 cannot use an archive and so compiles `c/`). On a `vX.Y.Z` tag, `publish_crate`
-publishes it through crates.io Trusted Publishing once every Rust job, the C
-suite and the GitHub release have passed. It skips a version that is already on
-crates.io. The very first version is published by hand (Trusted Publishing
-cannot create a crate), with `python3 rust/package.py -- publish` and a
-crates.io token.
+publishes it once every Rust job, the C suite and the GitHub release have
+passed, using the `CARGO_REGISTRY_TOKEN` repository secret. It skips a version
+that is already on crates.io.
 
 The crate carries `PROVENANCE.json`: the repository, commit and release tag it
 was staged from, and every file's SHA-256 and repository origin, so a program

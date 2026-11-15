@@ -1396,8 +1396,19 @@ add_test(
             -DBOVNAR=$<TARGET_FILE:bovnar> -DEMULATOR=${CMAKE_CROSSCOMPILING_EMULATOR}
             -DTMP_DIR=${CMAKE_CURRENT_BINARY_DIR}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cli_regressions.cmake)
-set_tests_properties(bvnr_cli_regressions PROPERTIES
-    LABELS "cli" TIMEOUT 120)
+# The timeout is calibrated natively: 105 CLI invocations take ~8 s there. Under
+# Wine each invocation pays the emulator's process start, and on a filesystem
+# Wine is slow with (a bind-mounted repo rather than tmpfs) the same 105 cases
+# measured 175 s, so a native TIMEOUT makes this the one test that fails in the
+# cross tree without anything being wrong. Only the cross tree is scaled: the
+# native and CI legs keep 120 s, which is already generous.
+if(CMAKE_CROSSCOMPILING)
+    set_tests_properties(bvnr_cli_regressions PROPERTIES
+        LABELS "cli" TIMEOUT 900)
+else()
+    set_tests_properties(bvnr_cli_regressions PROPERTIES
+        LABELS "cli" TIMEOUT 120)
+endif()
 
 _bvnr_convert_fail(bad_key          bad_key.json              "not a valid bovnar identifier")
 # A JSON integer wider than 64 bits is written at a wider width -- except in an

@@ -22,7 +22,7 @@ API and implements spec 1.2.
   `linux` CI job already builds at x86-64-v2, and needs no C compiler there.
   That job refuses the archive unless it was built with `-march=x86-64-v2`
   and the shared library's glibc symbol versions stay within 2.17, the floor
-  of that Rust target. Other Linux targets, Windows GNU, FreeBSD and
+  of that Rust target. Other Linux targets, Windows GNU and
   `wasm32-wasip2` still compile the C sources, as does
   `BOVNAR_BUILD_FROM_SOURCE=1` and a build with a unit-profile feature off.
   `rust_prebuilt` links and tests the packaged crate on Linux as it already
@@ -32,14 +32,16 @@ API and implements spec 1.2.
 
 - **The Rust crate ships a prebuilt C library for FreeBSD x86_64.** On
   `x86_64-unknown-freebsd` the crate from crates.io links
-  `c/prebuilt/x86_64-unknown-freebsd/libbvnr.a`, the static library the
-  `freebsd` CI job already builds with the 15.1 base clang at x86-64-v2, and
-  needs no C compiler there. That job refuses the archive unless it was built
-  with `-march=x86-64-v2` and the shared library's `FBSD_*` symbol versions
-  stay within 1.7, which FreeBSD 14 — the oldest release that Rust target
-  still supports — provides. `rust_prebuilt_freebsd` links and tests the
-  packaged crate in that same 15.1 VM. Other FreeBSD targets still compile
-  the C sources.
+  `c/prebuilt/x86_64-unknown-freebsd/libbvnr.a` and needs no C compiler
+  there. The `freebsd` CI job builds that archive with the 15.1 base clang
+  at x86-64-v2, and without `_FORTIFY_SOURCE`: FreeBSD 15's fortified
+  `memcpy` is `__memcpy_chk@FBSD_1.8`, which FreeBSD 14 does not provide,
+  and 14 is the oldest release that Rust target still supports. The release
+  archive from the same job keeps `_FORTIFY_SOURCE`. The job refuses the
+  crate archive unless it was built with `-march=x86-64-v2` and the shared
+  library's `FBSD_*` symbol versions stay within 1.7.
+  `rust_prebuilt_freebsd` links and tests the packaged crate in that same
+  15.1 VM. Other FreeBSD targets still compile the C sources.
 
 ## [2.2.0] - 2026-11-15
 

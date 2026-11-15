@@ -63,9 +63,10 @@ const PREBUILT: [(&str, &str); 5] = [
     // The linux job's Release archive: -march=x86-64-v2, and a libc surface
     // inside the glibc 2.17 floor of this target. The job checks both.
     ("x86_64-unknown-linux-gnu", "libbvnr.a"),
-    // The freebsd job's Release archive, built with the 15.1 base clang at
-    // the same -march. Its libc versions stay within FBSD_1.7, which FreeBSD
-    // 14 — the oldest release this Rust target still supports — provides.
+    // A second Release build in the freebsd job: the 15.1 base clang at the
+    // same -march, without _FORTIFY_SOURCE. FreeBSD 15's fortified memcpy is
+    // __memcpy_chk@FBSD_1.8, which FreeBSD 14 — the oldest release this Rust
+    // target still supports — does not have. The job checks that floor.
     ("x86_64-unknown-freebsd", "libbvnr.a"),
     ("x86_64-pc-windows-msvc", "bvnr.lib"),
     ("x86_64-apple-darwin", "libbvnr.a"),

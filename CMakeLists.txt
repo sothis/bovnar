@@ -16,6 +16,13 @@ set(CMAKE_C_EXTENSIONS OFF)
 option(BVNR_HARDEN
     "Enable runtime hardening flags (stack protector, FORTIFY, format security)"
     ON)
+# Independent of the rest of BVNR_HARDEN. FreeBSD 15's fortified string
+# symbols (__memcpy_chk and the rest) are versioned FBSD_1.8, which FreeBSD
+# 14 does not provide, so an archive that has to link on 14 sets this off.
+# It has no effect when BVNR_HARDEN is off.
+option(BVNR_FORTIFY
+    "Define _FORTIFY_SOURCE=2 for non-Debug builds when BVNR_HARDEN is on"
+    ON)
 option(BVNR_WERROR
     "Promote all warnings to errors (for CI)"
     OFF)
@@ -123,9 +130,15 @@ else()
             -Wformat-security
         )
         # FORTIFY_SOURCE: cheap runtime checks on libc string/io calls; needs
-        # optimisation to be active, so silently no-op in Debug.
-        list(APPEND BVNR_C_FLAGS
-            $<$<NOT:$<CONFIG:Debug>>:-D_FORTIFY_SOURCE=2>)
+        # optimisation to be active, so silently no-op in Debug. On FreeBSD 15
+        # the checks call __memcpy_chk and the other fortified string symbols,
+        # which are versioned FBSD_1.8 and missing on FreeBSD 14. The prebuilt
+        # crate archive for x86_64-unknown-freebsd sets BVNR_FORTIFY off so
+        # those objects call memcpy and still link there.
+        if(BVNR_FORTIFY)
+            list(APPEND BVNR_C_FLAGS
+                $<$<NOT:$<CONFIG:Debug>>:-D_FORTIFY_SOURCE=2>)
+        endif()
         # Stack protector: ~10-15% slowdown on the parser hot path because the
         # state-machine functions touch local arrays.  Apply it only to the
         # CLI executable (where user input enters via argv / files) instead

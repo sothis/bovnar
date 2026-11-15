@@ -39,11 +39,14 @@ does.
 On `x86_64-unknown-linux-gnu`, `x86_64-unknown-freebsd`,
 `x86_64-pc-windows-msvc` and both macOS targets the crate from crates.io also
 carries a prebuilt `libbvnr` static library (`c/prebuilt/<target>/`), built by
-the same CI job that builds that platform's release archive, from the same
-commit. The Linux, FreeBSD and macOS x86_64 archives are that job's x86-64-v2
-build (`-march=x86-64-v2`); the MSVC archive keeps MSVC's own baseline, which
-has no `/arch` for v2. On those targets the crate links the archive and needs
-no C compiler at all. Everywhere else (other Linux and FreeBSD targets,
+the CI job that builds that platform's release archive, from the same commit.
+The Linux and macOS x86_64 archives are that job's x86-64-v2 release library
+(`-march=x86-64-v2`); the MSVC archive keeps MSVC's own baseline, which has
+no `/arch` for v2. The FreeBSD archive is x86-64-v2 too, but it is a second
+build in that job, compiled without `_FORTIFY_SOURCE`: FreeBSD 15's fortified
+`memcpy` is `__memcpy_chk@FBSD_1.8`, which FreeBSD 14 does not provide, and
+14 is the oldest release `x86_64-unknown-freebsd` still supports. On those
+targets the crate links the archive and needs no C compiler at all. Everywhere else (other Linux and FreeBSD targets,
 Windows GNU, `wasm32-wasip2`, a path or Git dependency) it compiles `c/` as
 before. The archives are Release builds with
 every unit profile compiled in, so a build with any profile feature off
@@ -413,15 +416,16 @@ and links `c/prebuilt/<target>/` when there is one for the target.
 
 The prebuilt archives are not built by a job of their own: the `linux`,
 `freebsd`, `msvc` and `macos` jobs, which build that platform's release
-archive anyway, also stage the static library they produced as a
-`bovnar-prebuilt-<target>` artifact, and `rust_package` and `rust_prebuilt`
+archive anyway, also stage a static library as a `bovnar-prebuilt-<target>`
+artifact, and `rust_package` and `rust_prebuilt`
 download them. `rust_prebuilt` is the gate: it stages the same crate and runs
 the unit tests against the prebuilt library on Linux, FreeBSD, macOS and
 Windows, so a broken or mislabelled archive fails CI rather than a user's
 build. The `linux` job rejects an archive whose shared library needs a glibc
 newer than 2.17, the floor of `x86_64-unknown-linux-gnu`. The `freebsd` job
-rejects one whose shared library needs an `FBSD_*` version newer than 1.7,
-which is what FreeBSD 14 provides. `rust/build.rs`'s `PREBUILT` list is the one place
+rejects the crate archive when its shared library needs an `FBSD_*` version
+newer than 1.7, which is what FreeBSD 14 provides, or when the archive
+references a fortified `__*_chk` symbol. `rust/build.rs`'s `PREBUILT` list is the one place
 that says which targets have one, and `package.py` refuses to stage a crate
 with any of them missing.
 

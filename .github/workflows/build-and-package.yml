@@ -592,26 +592,50 @@ jobs:
             printf '.x = "hi";\n' | ./build/bovnar events -
             ls -l build/bovnar-freebsd-*.tar.xz
             # The static library the Rust crate links instead of compiling
-            # the C sources (rust/build.rs PREBUILT). This Release build is
-            # already -march=x86-64-v2. The objects name libc symbols
-            # unversioned, so a user's link binds whatever version their
-            # libc has; this shared library records the versions 15.1 binds.
-            # FreeBSD 14 is still a supported release of x86_64-unknown-freebsd
-            # and its newest libc version is FBSD_1.7. 15 added FBSD_1.8.
-            if ! grep -R -q -F -- '-march=x86-64-v2' build/CMakeFiles; then
+            # the C sources (rust/build.rs PREBUILT). The release build above
+            # keeps _FORTIFY_SOURCE, and on FreeBSD 15 that redirects memcpy
+            # and the other string calls to __*_chk@FBSD_1.8, which FreeBSD
+            # 14 does not have. 14 is still a supported release of
+            # x86_64-unknown-freebsd, so the crate archive is this second
+            # build: same clang, same -march=x86-64-v2, without
+            # _FORTIFY_SOURCE. The objects name libc symbols unversioned; a
+            # user's link binds whatever version their libc has. This shared
+            # library records the versions 15.1 binds, which is what the
+            # floor check reads. 15 added FBSD_1.8; 14 stops at FBSD_1.7.
+            cmake -B build-prebuilt -DCMAKE_BUILD_TYPE=Release \
+              -DBVNR_BUILD_TESTS=OFF -DBVNR_PACKAGE=OFF -DBVNR_FORTIFY=OFF .
+            cmake --build build-prebuilt -j"$(sysctl -n hw.ncpu)" \
+              --target bvnr_static bvnr_shared
+            if ! grep -R -q -F -- '-march=x86-64-v2' build-prebuilt/CMakeFiles; then
               echo "libbvnr.a was not built with -march=x86-64-v2" >&2
               exit 1
             fi
-            if readelf -V build/libbvnr.so | grep -q 'Name: GLIBC_'; then
+            if grep -R -q -F -- '-D_FORTIFY_SOURCE' build-prebuilt/CMakeFiles; then
+              echo "libbvnr.a was built with _FORTIFY_SOURCE" >&2
+              exit 1
+            fi
+            if readelf -V build-prebuilt/libbvnr.so | grep -q 'Name: GLIBC_'; then
               echo "libbvnr.so needs glibc" >&2
               exit 1
             fi
-            ver=$(readelf -V build/libbvnr.so \
+            # A fortified name in the archive is the FreeBSD 14 break even
+            # when the object leaves it unversioned. __stack_chk_fail is
+            # FBSD_1.0 and is not one of these.
+            if ! readelf -s build-prebuilt/libbvnr.a > /tmp/bvnr-prebuilt-syms; then
+              echo "readelf failed on libbvnr.a" >&2
+              exit 1
+            fi
+            if grep -E 'UND.*(__[A-Za-z0-9]+_chk|__chk_fail)([^A-Za-z0-9_]|$)' \
+                /tmp/bvnr-prebuilt-syms >&2; then
+              echo "libbvnr.a references fortified libc symbols FreeBSD 14 lacks" >&2
+              exit 1
+            fi
+            ver=$(readelf -V build-prebuilt/libbvnr.so \
               | sed -n 's/.*Name: FBSD_\([0-9][0-9.]*\).*/\1/p' \
               | sort -t. -k1,1n -k2,2n | tail -1)
             if [ -z "$ver" ]; then
               echo "libbvnr.so has no FBSD version needs" >&2
-              readelf -V build/libbvnr.so >&2 || true
+              readelf -V build-prebuilt/libbvnr.so >&2 || true
               exit 1
             fi
             major=${ver%%.*}
@@ -619,12 +643,13 @@ jobs:
             minor=${minor%%.*}
             if [ "$major" -gt 1 ] || { [ "$major" -eq 1 ] && [ "$minor" -gt 7 ]; }; then
               echo "libbvnr.so needs FBSD_$ver, above the 1.7 floor of FreeBSD 14" >&2
+              readelf -s build-prebuilt/libbvnr.so | grep 'FBSD_' >&2 || true
               exit 1
             fi
             echo "libbvnr.so libc need: FBSD_$ver (floor is 1.7)"
             dest=prebuilt/bovnar-prebuilt-x86_64-unknown-freebsd
             mkdir -p "$dest"
-            cp build/libbvnr.a "$dest/libbvnr.a"
+            cp build-prebuilt/libbvnr.a "$dest/libbvnr.a"
             ls -lR prebuilt
 
       - name: Upload the Rust prebuilt artifact (FreeBSD)

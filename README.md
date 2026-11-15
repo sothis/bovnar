@@ -421,7 +421,8 @@ xattr -dr com.apple.quarantine bovnar-macos-<version>-<count>
 
 | Option | Default | Effect |
 |---|---|---|
-| `BVNR_HARDEN` | `ON` | Stack protector (CLI), `_FORTIFY_SOURCE=2`, and `-Wformat` security checks. |
+| `BVNR_HARDEN` | `ON` | Stack protector (CLI), `_FORTIFY_SOURCE=2` (see `BVNR_FORTIFY`), and `-Wformat` security checks. |
+| `BVNR_FORTIFY` | `ON` | Pass `-D_FORTIFY_SOURCE=2` on non-Debug builds when `BVNR_HARDEN` is on. The FreeBSD crate archive sets it off: FreeBSD 15's fortified string symbols are `FBSD_1.8`, which FreeBSD 14 does not have. |
 | `BVNR_WERROR` | `OFF` | Promote all warnings to errors (for CI). |
 | `BVNR_FUZZ_TEST` | `ON` | Build the self-contained fuzz harnesses and register them as CTest tests. |
 | `BVNR_FUZZ_EXTERNAL` | `OFF` | Build libFuzzer / AFL++ targets (requires clang or afl-clang-fast). |

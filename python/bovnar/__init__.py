@@ -123,7 +123,7 @@ __all__ = [
     'MAX_FILESIZE_BYTES', 'READ_OPTIONS', 'canonicalize', 'canonicalize_to',
 ]
 
-__version__ = '2.1.0'
+__version__ = '2.2.0'
 
 
 def version() -> str:

@@ -697,7 +697,7 @@ Measured with `bvnr_stream_bench` (`tests/bovnar_stream_bench.c`), an optimized
 build (`RelWithDebInfo`), one core of an Intel i7-2700K (3.5 GHz, 2011); per
 message, the 400 KB message spanning seven chunks. Figures move with the machine
 and with what else runs on it; the ratios are the point. The rows of the table
-were measured together, as the median of five runs, at the 2.1.0 tree. The same
+were measured together, as the median of five runs, at the 2.2.0 tree. The same
 cells are in the CLI: `bovnar bench --stream` runs them after the parse table,
 `--stream-only` runs them alone, and `--stream-seconds <S>` sets the wall-clock
 budget per cell (0.2 s by default). The CLI also measures a raw octet stream on

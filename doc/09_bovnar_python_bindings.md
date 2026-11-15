@@ -5,7 +5,7 @@
 > **Scope:** Installation, the high-level and streaming APIs, the DOM, `Quantity`, and the NumPy and pint bridges.
 
 Pure-`ctypes` Python bindings for the **Bovnar (BVNR)** typed serialisation
-library (library 2.1.0, format spec 1.2).
+library (library 2.2.0, format spec 1.2).
 
 No compiled extension module is needed — the bindings load `libbvnr.so`
 through the standard `ctypes.CDLL` machinery the first time something needs
@@ -2994,7 +2994,7 @@ only invite the bounds check it can no longer support. Use `UNIT_NATIVE_FIRST`
 ## 19. Spec 1.1 additions
 
 These bindings target the **Bovnar spec 1.2**; spec 1.0 remains the frozen
-baseline, and the package's own version (2.1.0) is a separate number
+baseline, and the package's own version (2.2.0) is a separate number
 (`bovnar.version()` against `bovnar.spec_version()`). Spec 1.2's one addition,
 the unit-profile notation, is covered in [§5.1](#51-the-unit-profile-notations-spec-12):
 it is gated on a `#!bovnar 1.2` directive, which `dumps()` prepends when a
@@ -3004,7 +3004,7 @@ exposed as:
 
 - **Version:** `bovnar.version()` (library version string),
   `bovnar.version_number()` (the same as one int, `major * 10000 + minor * 100
-  + patch`: 20100 for 2.1.0), `bovnar.spec_version()`
+  + patch`: 20200 for 2.2.0), `bovnar.spec_version()`
   → `(major, minor)` of the highest spec understood, and
   `bovnar.peek_version(data)` → the `(major, minor)` a document declares, or
   `None`. `Reader.declared_version` gives the same after a read; every reading

@@ -87,13 +87,13 @@ pub enum Value {
     Fraction(num_rational::BigRational),
 }
 
-/// The library version, e.g. `"2.1.0"`.
+/// The library version, e.g. `"2.2.0"`.
 pub fn version() -> String {
     ffi::version_string()
 }
 
 /// The library version as one number, `major * 10000 + minor * 100 +
-/// patch` (`bvnr_version`): 20100 for 2.1.0, for comparing against a
+/// patch` (`bvnr_version`): 20200 for 2.2.0, for comparing against a
 /// minimum.
 pub fn version_number() -> u32 {
     ffi::version_number()

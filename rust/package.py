@@ -25,8 +25,9 @@ they read ../examples and ../src/gendata, which only the repository has, and
 the repository's CI runs them.
 
 c/prebuilt/<triple>/ is the static library the job that builds that platform
-already produces (x86_64 MSVC, both macOS architectures), so a crate on that
-target links it and needs no C compiler at all. `--prebuilt DIR` takes a
+already produces (x86_64 Linux, x86_64 MSVC, both macOS architectures), so a
+crate on that target links it and needs no C compiler at all. `--prebuilt DIR`
+takes a
 directory of the `bovnar-prebuilt-<triple>` Actions artifacts; build.rs's
 PREBUILT list says which. A publish refuses to run without them.
 

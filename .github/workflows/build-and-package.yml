@@ -389,6 +389,48 @@ jobs:
       - name: Build
         run: cmake --build build -j"$(nproc)"
 
+      # The static library the Rust crate links instead of compiling the C
+      # sources (rust/build.rs PREBUILT, staged by rust/package.py). This
+      # job's Release build is already -march=x86-64-v2. The objects name
+      # libc symbols unversioned, so a user's link binds whatever version
+      # their libc has for those names; the shared library records the
+      # versions this toolchain binds, and those have to stay inside the
+      # glibc 2.17 floor of x86_64-unknown-linux-gnu.
+      - name: Stage the prebuilt static library for the crate
+        run: |
+          set -euo pipefail
+          if ! grep -R -q -F -- '-march=x86-64-v2' build/CMakeFiles; then
+            echo "::error::libbvnr.a was not built with -march=x86-64-v2"
+            exit 1
+          fi
+          python3 - << 'PY'
+          import re, subprocess, sys
+          out = subprocess.check_output(
+              ["readelf", "-V", "build/libbvnr.so"], text=True)
+          vers = re.findall(r"Name: GLIBC_([0-9.]+)", out)
+          if not vers:
+              sys.exit("libbvnr.so has no GLIBC version needs")
+          def key(v):
+              return tuple(int(x) for x in v.split("."))
+          hi = max(vers, key=key)
+          if key(hi) > key("2.17"):
+              sys.exit(
+                  f"libbvnr.so needs GLIBC_{hi}, above the 2.17 floor of "
+                  "x86_64-unknown-linux-gnu")
+          print(f"libbvnr.so glibc need: GLIBC_{hi} (floor is 2.17)")
+          PY
+          dest=prebuilt/bovnar-prebuilt-x86_64-unknown-linux-gnu
+          mkdir -p "$dest"
+          cp build/libbvnr.a "$dest/libbvnr.a"
+          ls -lR prebuilt
+
+      - name: Upload the Rust prebuilt artifact (Linux)
+        uses: actions/upload-artifact@v7
+        with:
+          name: bovnar-prebuilt-x86_64-unknown-linux-gnu
+          path: prebuilt/bovnar-prebuilt-*
+          if-no-files-found: error
+
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v7
         with:
@@ -734,11 +776,12 @@ jobs:
   #
   # The prebuilt archives come from the jobs above, which build that platform's
   # library already: the crate carries them in c/prebuilt/ and links one instead
-  # of compiling c/. This leg builds from c/ (there is no Linux archive), which
-  # is what keeps that path honest.
+  # of compiling c/. On this runner the host triple is the Linux one, so the
+  # dry run links that archive. The no-profile build below cannot use an
+  # archive and is what keeps the compile-c/ path honest.
   rust_package:
     name: Rust crate package
-    needs: [msvc, macos]
+    needs: [linux, msvc, macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -791,11 +834,16 @@ jobs:
   # on the runner of each target, with no C compilation in the job at all.
   rust_prebuilt:
     name: Rust crate, prebuilt C (${{ matrix.name }})
-    needs: [msvc, macos]
+    needs: [linux, msvc, macos]
     strategy:
       fail-fast: false
       matrix:
         include:
+          - name: Linux x64
+            os: ubuntu-latest
+            python: python3
+            build: x86_64-unknown-linux-gnu
+            test: x86_64-unknown-linux-gnu
           # The x86_64 slice is built, not run: Rosetta is not on every image,
           # and linking is what the prebuilt archive must prove there.
           - name: macOS

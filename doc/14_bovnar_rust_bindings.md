@@ -99,7 +99,7 @@ library's error kind.
 | Requirement | Notes |
 |---|---|
 | Rust ≥ 1.88 | The crate's `rust-version`; CI builds and tests on it |
-| A C compiler | `build.rs` compiles the C library through the `cc` crate |
+| A C compiler | `build.rs` compiles the C library through the `cc` crate. The crate from crates.io links a prebuilt static library instead on `x86_64-unknown-linux-gnu`, `x86_64-pc-windows-msvc` and both macOS targets ([§3](#3-building-the-c-library)) |
 | Python 3 on `PATH` (only when building from a repository checkout) | In the repository, the build runs the upstream table generator scripts, exactly as CMake does. Set the `PYTHON` environment variable to name a different interpreter. The crate from crates.io carries the generated tables and needs no Python ([§3.3](#33-how-the-published-crate-is-made)) |
 | `num-bigint`, `num-rational`, `num-integer`, `num-traits` | Pulled in by Cargo; they carry the exact numbers (arbitrary-width integers, rational numbers and the coefficient of a `Decimal`) |
 | [wasi-sdk](https://github.com/WebAssembly/wasi-sdk) | **Only** for the `wasm32-wasip2` target — see [§3](#3-building-the-c-library) |
@@ -147,10 +147,17 @@ cargo test
 
 The crate has no shared library to find: `build.rs` compiles the C library into
 the crate. The crate from crates.io carries the C sources and the generated unit
-tables in `c/` and compiles those; in a repository checkout `build.rs` runs the
-table generators and compiles `../src` and `../include` instead. Either way a
-downstream crate needs a C compiler at build time (plus Python 3 in the
-checkout case, [§1](#1-requirements)) and nothing at run time.
+tables in `c/`. It also carries a prebuilt static library for
+`x86_64-unknown-linux-gnu`, `x86_64-pc-windows-msvc`, `x86_64-apple-darwin` and
+`aarch64-apple-darwin`, in `c/prebuilt/<target>/`, and on those targets links
+it, so the build needs no C compiler. The Linux archive and the macOS x86_64
+slice are the x86-64-v2 build. The archives are Release builds with every unit
+profile compiled in, so a build with any profile feature off compiles `c/`;
+`BOVNAR_BUILD_FROM_SOURCE=1` forces that on every target. Every other target
+compiles the C sources and needs a C compiler. In a repository checkout
+`build.rs` runs the table generators and compiles `../src` and `../include`
+instead, which needs a C compiler and Python 3 ([§1](#1-requirements)). Nothing
+is needed at run time.
 
 `build.rs` re-runs when the C sources, the generators, the interpreter override,
 the enabled features or `WASI_SDK_PATH` change.

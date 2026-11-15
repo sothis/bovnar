@@ -14,6 +14,22 @@ API and implements spec 1.2.
 
 ## [Unreleased]
 
+### Added
+
+- **The Rust crate ships a prebuilt C library for Linux x86_64.** On
+  `x86_64-unknown-linux-gnu` the crate from crates.io links
+  `c/prebuilt/x86_64-unknown-linux-gnu/libbvnr.a`, the static library the
+  `linux` CI job already builds at x86-64-v2, and needs no C compiler there.
+  That job refuses the archive unless it was built with `-march=x86-64-v2`
+  and the shared library's glibc symbol versions stay within 2.17, the floor
+  of that Rust target. Other Linux targets, Windows GNU, FreeBSD and
+  `wasm32-wasip2` still compile the C sources, as does
+  `BOVNAR_BUILD_FROM_SOURCE=1` and a build with a unit-profile feature off.
+  `rust_prebuilt` links and tests the packaged crate on Linux as it already
+  does on Windows MSVC and macOS. `BOVNAR_BUILD_FROM_SOURCE` now rebuilds a
+  crate that had already linked a prebuilt archive; the build script tells
+  cargo to watch that variable.
+
 ## [2.2.0] - 2026-11-15
 
 ### Added

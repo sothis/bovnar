@@ -59,7 +59,10 @@ const PROFILES: [(&str, &str); 7] = [
 /// that platform already produces, shipped from the same commit, so a crate on
 /// that target needs no C compiler. rust/package.py requires every one of them;
 /// add a triple only together with the job that uploads it.
-const PREBUILT: [(&str, &str); 3] = [
+const PREBUILT: [(&str, &str); 4] = [
+    // The linux job's Release archive: -march=x86-64-v2, and a libc surface
+    // inside the glibc 2.17 floor of this target. The job checks both.
+    ("x86_64-unknown-linux-gnu", "libbvnr.a"),
     ("x86_64-pc-windows-msvc", "bvnr.lib"),
     ("x86_64-apple-darwin", "libbvnr.a"),
     ("aarch64-apple-darwin", "libbvnr.a"),
@@ -99,6 +102,10 @@ fn main() {
     println!("cargo:rerun-if-changed={}", repo.join("src").display());
     println!("cargo:rerun-if-changed={}", repo.join("include").display());
     println!("cargo:rerun-if-env-changed=WASI_SDK_PATH");
+    // Without this, a build that linked the prebuilt archive stays linked
+    // when the variable appears: cargo does not re-run the script for an
+    // environment variable it was not told about.
+    println!("cargo:rerun-if-env-changed=BOVNAR_BUILD_FROM_SOURCE");
     if from_repo {
         println!(
             "cargo:rerun-if-changed={}",

@@ -36,14 +36,17 @@ a repository checkout (a path or Git dependency), it also needs Python 3 at
 build time: the build then runs the upstream table generators, exactly as CMake
 does.
 
-On `x86_64-pc-windows-msvc` and both macOS targets the crate from crates.io
-also carries a prebuilt `libbvnr` static library (`c/prebuilt/<target>/`), built
-by the same CI job that builds that platform's release archive, from the same
-commit. There it links that archive and needs no C compiler at all; everywhere
-else (Linux, Windows GNU, FreeBSD, `wasm32-wasip2`, a path or Git dependency)
-it compiles `c/` as before. The archives are Release builds with every unit
-profile compiled in, so a build with any profile feature off compiles from
-source; `BOVNAR_BUILD_FROM_SOURCE=1` forces that everywhere:
+On `x86_64-unknown-linux-gnu`, `x86_64-pc-windows-msvc` and both macOS targets
+the crate from crates.io also carries a prebuilt `libbvnr` static library
+(`c/prebuilt/<target>/`), built by the same CI job that builds that platform's
+release archive, from the same commit. The Linux archive and the macOS x86_64
+slice are that job's x86-64-v2 build (`-march=x86-64-v2`); the MSVC archive
+keeps MSVC's own baseline, which has no `/arch` for v2. On those targets the
+crate links the archive and needs no C compiler at all. Everywhere else
+(other Linux targets, Windows GNU, FreeBSD, `wasm32-wasip2`, a path or Git
+dependency) it compiles `c/` as before. The archives are Release builds with
+every unit profile compiled in, so a build with any profile feature off
+compiles from source; `BOVNAR_BUILD_FROM_SOURCE=1` forces that everywhere:
 
 ```sh
 BOVNAR_BUILD_FROM_SOURCE=1 cargo build
@@ -407,15 +410,17 @@ sources, the headers, the generated tables and the prebuilt archives.
 `build.rs` builds from `c/` when it is there, without running the generators,
 and links `c/prebuilt/<target>/` when there is one for the target.
 
-The prebuilt archives are not built by a job of their own: the `msvc` and
-`macos` jobs, which build that platform's release archive anyway, also stage the
-static library they produced as a `bovnar-prebuilt-<target>` artifact, and
-`rust_package` and `rust_prebuilt` download them. `rust_prebuilt` is the gate:
-it stages the same crate and runs the unit tests against the prebuilt library on
-macOS and Windows, with no C compiler involved, so a broken or mislabelled
-archive fails CI rather than a user's build. `rust/build.rs`'s `PREBUILT` list
-is the one place that says which targets have one, and `package.py` refuses to
-stage a crate with any of them missing.
+The prebuilt archives are not built by a job of their own: the `linux`, `msvc`
+and `macos` jobs, which build that platform's release archive anyway, also
+stage the static library they produced as a `bovnar-prebuilt-<target>`
+artifact, and `rust_package` and `rust_prebuilt` download them. `rust_prebuilt`
+is the gate: it stages the same crate and runs the unit tests against the
+prebuilt library on Linux, macOS and Windows, so a broken or mislabelled
+archive fails CI rather than a user's build. The `linux` job rejects an
+archive whose shared library needs a glibc newer than 2.17, the floor of
+`x86_64-unknown-linux-gnu`. `rust/build.rs`'s `PREBUILT` list is the one place
+that says which targets have one, and `package.py` refuses to stage a crate
+with any of them missing.
 
 ```bash
 python3 rust/package.py                          # cargo package: pack and verify

@@ -46,15 +46,22 @@ no `/arch` for v2. The FreeBSD archive is x86-64-v2 too, but it is a second
 build in that job, compiled without `_FORTIFY_SOURCE`: FreeBSD 15's fortified
 `memcpy` is `__memcpy_chk@FBSD_1.8`, which FreeBSD 14 does not provide, and
 14 is the oldest release `x86_64-unknown-freebsd` still supports. On those
-targets the crate links the archive and needs no C compiler at all. Everywhere else (other Linux and FreeBSD targets,
-Windows GNU, `wasm32-wasip2`, a path or Git dependency) it compiles `c/` as
-before. The archives are Release builds with
+targets the crate links the archive and needs no C compiler at all. Everywhere
+else (other Linux and FreeBSD targets, Windows GNU, `wasm32-wasip2`, a path or
+Git dependency) it compiles `c/` as before. The archives are Release builds with
 every unit profile compiled in, so a build with any profile feature off
 compiles from source; `BOVNAR_BUILD_FROM_SOURCE=1` forces that everywhere:
 
 ```sh
 BOVNAR_BUILD_FROM_SOURCE=1 cargo build
 ```
+
+Windows GNU needs a UCRT MinGW on `PATH`: MSYS2 UCRT64
+(`mingw-w64-ucrt-x86_64-gcc`), the same CRT as the C archive. `build.rs`
+refuses a MinGW whose headers do not define `_UCRT`. Rustc still passes
+`-lmsvcrt`; on UCRT64 that import library is the Universal CRT, and with
+`x86_64-w64-mingw32-gcc` from that environment on `PATH` rustc uses it
+instead of the msvcrt libraries shipped in the rustup toolchain.
 
 The crate depends on `num-bigint`, `num-rational`, `num-integer` and
 `num-traits` for exact numbers: wide integers, exact fractions and the
@@ -402,7 +409,7 @@ The Rust jobs run in `.github/workflows/build-and-package.yml`, next to the
 C library's: a version check (crate version = `CMakeLists.txt` version),
 fmt, clippy `-D warnings` and the tests on Linux x64 (with the CLI for
 `test_writers_agree`), Linux aarch64, macOS, Windows MSVC x64 and Windows
-MinGW64, a build and test on Rust 1.88, a `wasm32-wasip2` build with wasi-sdk
+MinGW UCRT64, a build and test on Rust 1.88, a `wasm32-wasip2` build with wasi-sdk
 and its tests under wasmtime, the prebuilt legs below, and the packaging
 rehearsal. The release job waits for all of them.
 

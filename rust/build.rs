@@ -415,6 +415,11 @@ fn compile_library(repo: &Path, gen_dir: &Path) {
                 .flag("-fno-builtin-printf")
                 .flag("-fno-builtin-fprintf")
                 .flag("-fno-builtin-snprintf");
+            // Same CRT as the MinGW release archive (MSYS2 UCRT64). A MINGW64
+            // gcc defines no _UCRT and its libmsvcrt.a imports msvcrt.dll.
+            // UCRT64's libmsvcrt.a is the Universal CRT import library, which
+            // is what rustc's `-lmsvcrt` resolves to once that gcc is on PATH.
+            require_ucrt_mingw(&build.get_compiler());
         }
     }
 
@@ -424,4 +429,44 @@ fn compile_library(repo: &Path, gen_dir: &Path) {
     }
 
     build.compile("bvnr");
+}
+
+/// The MinGW that compiles `c/` has to be a UCRT toolchain. rustc's
+/// `*-windows-gnu` target passes `-lmsvcrt` either way; which DLL that imports
+/// is decided by the gcc on PATH. On MSYS2 UCRT64, `libmsvcrt.a` is the
+/// Universal CRT import library (a copy of `libucrt.a`), and rustc uses that
+/// gcc instead of the msvcrt libraries in its own sysroot.
+fn require_ucrt_mingw(compiler: &cc::Tool) {
+    let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR"));
+    let src = out_dir.join("bvnr_ucrt_probe.c");
+    let obj = out_dir.join("bvnr_ucrt_probe.o");
+    std::fs::write(
+        &src,
+        "#include <_mingw.h>\n\
+         #ifndef _UCRT\n\
+         #error bovnar windows-gnu needs a UCRT MinGW\n\
+         #endif\n\
+         int bvnr_ucrt_probe;\n",
+    )
+    .expect("write the UCRT probe");
+    let output = compiler
+        .to_command()
+        .arg("-c")
+        .arg(&src)
+        .arg("-o")
+        .arg(&obj)
+        .output()
+        .unwrap_or_else(|e| panic!("failed to run the MinGW compiler for the UCRT probe: {e}"));
+    let _ = std::fs::remove_file(&src);
+    let _ = std::fs::remove_file(&obj);
+    if output.status.success() {
+        return;
+    }
+    let err = String::from_utf8_lossy(&output.stderr);
+    panic!(
+        "the Windows GNU build of bovnar needs a UCRT MinGW, the same CRT as \
+         the C archive: MSYS2 UCRT64 (mingw-w64-ucrt-x86_64-gcc), with \
+         x86_64-w64-mingw32-gcc on PATH. {} does not define _UCRT.\n{err}",
+        compiler.path().display()
+    );
 }

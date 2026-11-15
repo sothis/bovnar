@@ -711,7 +711,7 @@ jobs:
           - name: MSVC x64
             os: windows-latest
             toolchain: stable-x86_64-pc-windows-msvc
-          - name: MinGW64
+          - name: MinGW UCRT64
             os: windows-latest
             toolchain: stable-x86_64-pc-windows-gnu
             mingw: true
@@ -721,26 +721,25 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # The GNU toolchain links with its own MinGW runtime but build.rs needs a
-      # MinGW C compiler for the library itself, put on PATH for cargo. It is
-      # MINGW64's, not the UCRT64 one the `mingw` job uses: Rust's
-      # x86_64-pc-windows-gnu links -lmsvcrt, and the C objects must be built
-      # for the same CRT. MSYS2 deprecates MINGW64; the warning is acknowledged
-      # here for that reason, until the Rust target moves to the UCRT.
+      # build.rs compiles c/ and rustc links with x86_64-w64-mingw32-gcc from
+      # PATH. UCRT64, the same environment as the `mingw` job: its libmsvcrt.a
+      # is the Universal CRT import library, so rustc's -lmsvcrt imports
+      # api-ms-win-crt-*.dll. With that gcc on PATH, rustc also leaves its
+      # bundled msvcrt crt objects unused. MINGW64's libmsvcrt.a imports
+      # msvcrt.dll, which this job rejects below.
       - uses: msys2/setup-msys2@v2
         if: matrix.mingw
         id: msys2
         with:
-          msystem: MINGW64
+          msystem: UCRT64
           update: true
-          install: mingw-w64-x86_64-gcc
-          suppress-deprecation-warnings: msystem-mingw64
+          install: mingw-w64-ucrt-x86_64-gcc
 
-      - name: Put MINGW64 gcc on PATH
+      - name: Put UCRT64 gcc on PATH
         if: matrix.mingw
         shell: pwsh
         run: Add-Content $env:GITHUB_PATH "${{
-          steps.msys2.outputs.msys2-location }}\mingw64\bin"
+          steps.msys2.outputs.msys2-location }}\ucrt64\bin"
 
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -756,6 +755,23 @@ jobs:
       - run: cargo clippy --locked --all-targets -- -D warnings
         if: ${{ !matrix.msrv }}
       - run: cargo test --locked
+      # rustc's windows-gnu target passes -lmsvcrt. On UCRT64 that import
+      # library is the Universal CRT; a PATH that still found MINGW64 would
+      # import msvcrt.dll and still build. Same check as the `mingw` job.
+      - name: Linked executables import the Universal CRT
+        if: matrix.mingw
+        shell: msys2 {0}
+        run: |
+          found=0
+          while IFS= read -r -d '' f; do
+            found=1
+            if objdump -p "$f" | grep -iE 'DLL Name: msvcrt\.dll'; then
+              echo "$f links msvcrt.dll, not the UCRT" && exit 1
+            fi
+            objdump -p "$f" | grep -iqE 'DLL Name: (ucrtbase|api-ms-win-crt-)' \
+              || { echo "$f does not link the UCRT" && exit 1; }
+          done < <(find target -name '*.exe' -print0)
+          test "$found" = 1
       # The cargo-fuzz targets need nightly to run, but they type-check on
       # stable; without this they would rot unseen between fuzzing sessions.
       - name: cargo check the fuzz targets

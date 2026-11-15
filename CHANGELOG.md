@@ -43,6 +43,16 @@ API and implements spec 1.2.
   `rust_prebuilt_freebsd` links and tests the packaged crate in that same
   15.1 VM. Other FreeBSD targets still compile the C sources.
 
+### Changed
+
+- **The Rust Windows GNU build uses UCRT64.** `x86_64-pc-windows-gnu`
+  compiles `c/` with MSYS2 UCRT64, the same environment as the MinGW C
+  archive, and `build.rs` refuses a MinGW that does not define `_UCRT`.
+  Rustc's target still passes `-lmsvcrt`; on UCRT64 that import library is
+  the Universal CRT, and the job puts that gcc on `PATH` so rustc links it
+  instead of the msvcrt libraries in the rustup toolchain. The job fails if
+  a linked executable imports `msvcrt.dll`.
+
 ## [2.2.0] - 2026-11-15
 
 ### Added

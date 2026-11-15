@@ -36,7 +36,10 @@ with the reporter credited in `CHANGELOG.md` unless they ask otherwise.
 | 1.0.x | No |
 
 The **format** and the reference implementation are versioned separately, both
-semantically, and a fix lands on the newest release of the implementation only.
+semantically, and a fix lands on the newest release of the implementation only —
+on `main`, and on its maintenance branch where it also affects that release
+line (`2.2.x`); older lines are not patched. See CONTRIBUTING's Releases
+section.
 Within a major version of the format it is additive: a document valid under spec
 1.0 stays valid, and decodes to the same values, under every 1.x spec, so a
 newer reader does not need a document migrated — with the exceptions the

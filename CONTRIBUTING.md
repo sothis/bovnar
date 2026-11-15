@@ -21,6 +21,7 @@ Participants are expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 - [Documentation](#documentation)
 - [Unit profiles](#unit-profiles)
 - [Commit Messages](#commit-messages)
+- [Releases](#releases)
 - [Licensing](#licensing)
 
 ---
@@ -348,6 +349,49 @@ ucum: the profile was missing from the grammar, the corpus and the changelog
 Common scopes: `spec`, `docs`, `cli`, `units`, `profiles`, `web`, `python`,
 `rust`, `tests`, `ietf`, `publish`. Keep one logical change per commit, and put the reasoning in the body
 when the subject cannot carry it.
+
+## Releases
+
+Development happens on `main`, which always carries the next `-dev` version. A
+release is cut on a maintenance branch named after the minor it serves —
+`<major>.<minor>.x`, so the 2.2 line is `2.2.x` — and that branch exists before
+the release commit does. `2.2.x` is the first, cut for 2.2.0.
+
+| Step | What happens |
+|---|---|
+| 1 | The cycle's work is on `main` and green there, and `RELEASE_NOTES_vX.Y.Z.md` is written. |
+| 2 | `git switch -c 2.2.x` at the commit the release will be cut from, then `git push -u origin 2.2.x`. The push is what runs CI against the release tree. |
+| 3 | On the branch, the release commit: every version field (the same set the previous `release:` commit moved), the regenerated WASM module, `web/docs`, the LLM views and `web/de`, and `[Unreleased]` becomes `[X.Y.Z] - <date>` with its link ref. |
+| 4 | The branch's run is fully green — the C and Python suites and every Rust leg. The wheel and sdist jobs do not run on a maintenance-branch push; they run on `main` and on the tag, so the tag's own run is the rehearsal. |
+| 5 | `git tag vX.Y.Z` on that commit and push the tag. The tag's run publishes: the GitHub release and its archives, PyPI and crates.io, and the Zenodo deposit follows. |
+| 6 | `git switch main && git merge --ff-only 2.2.x`, so the release commit is on both branches. Then, on `main`: the `-dev` suffix back, a fresh `[Unreleased]` section, the Downloads menu and the DOIs. |
+
+Pushing the tag is the publish step. Do not create the GitHub release in the web
+UI first, and do not move a tag: the repository has release immutability on, so
+a published release takes no further assets and its tag name is never reused.
+
+### Patch releases
+
+`2.2.x` takes patch releases — 2.2.1, 2.2.2 — and nothing else. A change is
+eligible when it is on `main` **and** it also affects the released minor: a
+security fix or a behaviour fix. A feature, new API, an ABI change or a format
+change takes a minor instead.
+
+The patch is a cherry-pick, not a rewrite:
+
+```bash
+git switch 2.2.x
+git cherry-pick -x <sha>            # the fix as it landed on main
+# then the patch bump, RELEASE_NOTES_vX.Y.Z.md, and [Unreleased] -> [X.Y.Z]
+git push origin 2.2.x
+# CI green on the branch, then:
+git tag vX.Y.Z && git push origin vX.Y.Z
+```
+
+`main` is not fast-forwarded for a patch: it already names the next version, and
+the branch is the only place a patch's version fields move. A fix written on the
+branch instead of on `main` is merged back, so the branch never holds anything
+`main` does not.
 
 ## Licensing
 

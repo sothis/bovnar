@@ -50,6 +50,14 @@ Every version field reads 2.2.0 with `BVNR_VERSION_SUFFIX` back to `""`, and
 `[Unreleased]` became `[2.2.0] - 2026-11-15` with its link ref. `RELEASE_NOTES_v2.2.0.md`
 is the summary the release job will attach.
 
+**Branching, from this release on:** 2.2.0 is cut on `2.2.x`, a maintenance
+branch created from `main` before the release commit and pushed, so the tree the
+tag will name runs CI as a branch before the tag exists. `main` fast-forwards to
+it once the tag is published, and patch releases (2.2.1 and up) are cherry-picks
+onto that branch — only fixes that are on `main` and also affect this line.
+CONTRIBUTING's Releases section is the procedure; `main` stays where development
+happens.
+
 The minor is deliberate and the reasoning is written down because the obvious
 precedent does not support it. The CHANGELOG's rule is that the implementation's
 major moves when a *program* built against it has to change; the additions here

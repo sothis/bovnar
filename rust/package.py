@@ -25,10 +25,12 @@ they read ../examples and ../src/gendata, which only the repository has, and
 the repository's CI runs them.
 
 c/prebuilt/<triple>/ is the static library that platform's CI job produces
-(x86_64 Linux, x86_64 FreeBSD, x86_64 MSVC, both macOS architectures), so a
-crate on that target links it and needs no C compiler at all. `--prebuilt DIR`
-takes a directory of the `bovnar-prebuilt-<triple>` Actions artifacts;
-build.rs's PREBUILT list says which. A publish refuses to run without them.
+(x86_64 Linux, x86_64 FreeBSD, x86_64 MSVC, x86_64 MinGW UCRT64, both macOS
+architectures). A crate on one of those targets links it. The MinGW archive
+is linked only when x86_64-w64-mingw32-gcc on PATH defines _UCRT, the same
+gcc rustc uses for that triple. `--prebuilt DIR` takes a directory of the
+`bovnar-prebuilt-<triple>` Actions artifacts; build.rs's PREBUILT list says
+which. A publish refuses to run without them.
 
 PROVENANCE.json is what a consumer that vendors the C library from the crate
 ties it to: the repository, the commit and (on a release) the tag, and the

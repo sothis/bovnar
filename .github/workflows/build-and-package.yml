@@ -235,6 +235,28 @@ jobs:
               || { echo "$f does not link the UCRT" && exit 1; }
           done
 
+      # The static library the Rust crate links for x86_64-pc-windows-gnu
+      # (rust/build.rs PREBUILT). Same objects as the DLL checked above, so
+      # the CRT gate covers it. build.rs links it only when the UCRT64 gcc
+      # is the one rustc will use.
+      - name: Stage the prebuilt static library for the crate
+        run: |
+          set -euo pipefail
+          if ! grep -R -q -F -- '-march=x86-64-v2' build/mingw/CMakeFiles; then
+            echo "libbvnr.a was not built with -march=x86-64-v2" && exit 1
+          fi
+          dest=prebuilt/bovnar-prebuilt-x86_64-pc-windows-gnu
+          mkdir -p "$dest"
+          cp build/mingw/libbvnr.a "$dest/libbvnr.a"
+          ls -l "$dest"
+
+      - name: Upload the Rust prebuilt artifact (MinGW)
+        uses: actions/upload-artifact@v7
+        with:
+          name: bovnar-prebuilt-x86_64-pc-windows-gnu
+          path: prebuilt/bovnar-prebuilt-*
+          if-no-files-found: error
+
       - name: Prepare sample document
         run: printf '.a = <uint:8> 7;\n.b = <float:64> 3.5;\n' > smoke.bvnr
 
@@ -864,7 +886,7 @@ jobs:
   # archive and is what keeps the compile-c/ path honest.
   rust_package:
     name: Rust crate package
-    needs: [linux, freebsd, msvc, macos]
+    needs: [linux, freebsd, msvc, mingw, macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -911,13 +933,15 @@ jobs:
         run: cargo build --locked --no-default-features
 
   # crates.io gets a crate that, on the targets the jobs above assign a prebuilt
-  # archive, links c/prebuilt/<triple> instead of compiling the fifteen C
-  # sources. An archive is only worth shipping if it links and runs, so this
-  # stages the same crate package.py stages and runs its unit tests against it,
-  # on the runner of each target, with no C compilation in the job at all.
+  # archive, links c/prebuilt/<triple> instead of compiling the C sources. An
+  # archive is only worth shipping if it links and runs, so this stages the
+  # same crate package.py stages and runs its unit tests against it, on the
+  # runner of each target. The MinGW row puts the UCRT64 gcc on PATH, which is
+  # the linker rustc uses and the probe build.rs runs; the job still does not
+  # compile the library's C sources.
   rust_prebuilt:
     name: Rust crate, prebuilt C (${{ matrix.name }})
-    needs: [linux, freebsd, msvc, macos]
+    needs: [linux, freebsd, msvc, mingw, macos]
     strategy:
       fail-fast: false
       matrix:
@@ -939,12 +963,37 @@ jobs:
             python: python
             build: x86_64-pc-windows-msvc
             test: x86_64-pc-windows-msvc
+          # build.rs links this archive only when UCRT64 gcc is on PATH, which
+          # is also the linker rustc uses. The row checks the linked tests
+          # import the Universal CRT.
+          - name: MinGW UCRT64
+            os: windows-latest
+            python: python
+            toolchain: stable-x86_64-pc-windows-gnu
+            build: x86_64-pc-windows-gnu
+            test: x86_64-pc-windows-gnu
+            mingw: true
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
 
+      - uses: msys2/setup-msys2@v2
+        if: matrix.mingw
+        id: msys2
+        with:
+          msystem: UCRT64
+          update: true
+          install: mingw-w64-ucrt-x86_64-gcc
+
+      - name: Put UCRT64 gcc on PATH
+        if: matrix.mingw
+        shell: pwsh
+        run: Add-Content $env:GITHUB_PATH "${{
+          steps.msys2.outputs.msys2-location }}\ucrt64\bin"
+
       - uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: ${{ matrix.toolchain || 'stable' }}
           targets: ${{ matrix.build }} ${{ matrix.test }}
 
       - uses: actions/download-artifact@v8
@@ -976,6 +1025,25 @@ jobs:
           cargo test --locked --lib --target "${{ matrix.test }}" \
             -- --skip abi_tests
 
+      # The MinGW archive is UCRT64 objects. The tests just linked it with
+      # that gcc; this is the same import check the `mingw` job runs on its
+      # DLL. It has to run before the step below deletes the executables.
+      - name: Linked tests import the Universal CRT
+        if: matrix.mingw
+        working-directory: ${{ runner.temp }}/crate/bovnar
+        shell: msys2 {0}
+        run: |
+          found=0
+          while IFS= read -r -d '' f; do
+            found=1
+            if objdump -p "$f" | grep -iE 'DLL Name: msvcrt\.dll'; then
+              echo "$f links msvcrt.dll, not the UCRT" && exit 1
+            fi
+            objdump -p "$f" | grep -iqE 'DLL Name: (ucrtbase|api-ms-win-crt-)' \
+              || { echo "$f does not link the UCRT" && exit 1; }
+          done < <(find target -name '*.exe' -print0)
+          test "$found" = 1
+
       # A silent fallback to compiling c/ would build and test fine here and
       # still ship the crate this job exists to check. The build script says
       # which way it went, as a cargo warning on every run, so ask cargo and
@@ -1005,7 +1073,7 @@ jobs:
   # that is missing one of the triples build.rs names.
   rust_prebuilt_freebsd:
     name: Rust crate, prebuilt C (FreeBSD x64)
-    needs: [linux, freebsd, msvc, macos]
+    needs: [linux, freebsd, msvc, mingw, macos]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:

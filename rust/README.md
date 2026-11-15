@@ -37,31 +37,36 @@ build time: the build then runs the upstream table generators, exactly as CMake
 does.
 
 On `x86_64-unknown-linux-gnu`, `x86_64-unknown-freebsd`,
-`x86_64-pc-windows-msvc` and both macOS targets the crate from crates.io also
-carries a prebuilt `libbvnr` static library (`c/prebuilt/<target>/`), built by
-the CI job that builds that platform's release archive, from the same commit.
-The Linux and macOS x86_64 archives are that job's x86-64-v2 release library
-(`-march=x86-64-v2`); the MSVC archive keeps MSVC's own baseline, which has
-no `/arch` for v2. The FreeBSD archive is x86-64-v2 too, but it is a second
-build in that job, compiled without `_FORTIFY_SOURCE`: FreeBSD 15's fortified
-`memcpy` is `__memcpy_chk@FBSD_1.8`, which FreeBSD 14 does not provide, and
-14 is the oldest release `x86_64-unknown-freebsd` still supports. On those
-targets the crate links the archive and needs no C compiler at all. Everywhere
-else (other Linux and FreeBSD targets, Windows GNU, `wasm32-wasip2`, a path or
-Git dependency) it compiles `c/` as before. The archives are Release builds with
-every unit profile compiled in, so a build with any profile feature off
-compiles from source; `BOVNAR_BUILD_FROM_SOURCE=1` forces that everywhere:
+`x86_64-pc-windows-msvc`, `x86_64-pc-windows-gnu` and both macOS targets the
+crate from crates.io also carries a prebuilt `libbvnr` static library
+(`c/prebuilt/<target>/`), built by the CI job that builds that platform's
+release archive, from the same commit. The Linux, macOS x86_64 and Windows
+GNU archives are that job's x86-64-v2 release library (`-march=x86-64-v2`);
+the MSVC archive keeps MSVC's own baseline, which has no `/arch` for v2. The
+FreeBSD archive is x86-64-v2 too, but it is a second build in that job,
+compiled without `_FORTIFY_SOURCE`: FreeBSD 15's fortified `memcpy` is
+`__memcpy_chk@FBSD_1.8`, which FreeBSD 14 does not provide, and 14 is the
+oldest release `x86_64-unknown-freebsd` still supports. On the Linux,
+FreeBSD, MSVC and macOS targets the crate links the archive and needs no C
+compiler. On `x86_64-pc-windows-gnu` it links the MinGW archive when
+`x86_64-w64-mingw32-gcc` on `PATH` is the UCRT64 gcc that archive was built
+with; that is also the linker rustc uses for the triple. Without that gcc
+the build compiles `c/` and refuses a MinGW whose headers do not define
+`_UCRT`. Everywhere else (other Linux, FreeBSD and Windows GNU targets,
+`wasm32-wasip2`, a path or Git dependency) it compiles `c/` as before. The
+archives are Release builds with every unit profile compiled in, so a build
+with any profile feature off compiles from source;
+`BOVNAR_BUILD_FROM_SOURCE=1` forces that everywhere:
 
 ```sh
 BOVNAR_BUILD_FROM_SOURCE=1 cargo build
 ```
 
-Windows GNU needs a UCRT MinGW on `PATH`: MSYS2 UCRT64
-(`mingw-w64-ucrt-x86_64-gcc`), the same CRT as the C archive. `build.rs`
-refuses a MinGW whose headers do not define `_UCRT`. Rustc still passes
-`-lmsvcrt`; on UCRT64 that import library is the Universal CRT, and with
-`x86_64-w64-mingw32-gcc` from that environment on `PATH` rustc uses it
-instead of the msvcrt libraries shipped in the rustup toolchain.
+Windows GNU needs that UCRT MinGW on `PATH`: MSYS2 UCRT64
+(`mingw-w64-ucrt-x86_64-gcc`). Rustc still passes `-lmsvcrt`; on UCRT64 that
+import library is the Universal CRT, so with `x86_64-w64-mingw32-gcc` from
+that environment on `PATH` rustc uses it instead of the msvcrt libraries
+shipped in the rustup toolchain.
 
 The crate depends on `num-bigint`, `num-rational`, `num-integer` and
 `num-traits` for exact numbers: wide integers, exact fractions and the
@@ -422,19 +427,20 @@ sources, the headers, the generated tables and the prebuilt archives.
 and links `c/prebuilt/<target>/` when there is one for the target.
 
 The prebuilt archives are not built by a job of their own: the `linux`,
-`freebsd`, `msvc` and `macos` jobs, which build that platform's release
-archive anyway, also stage a static library as a `bovnar-prebuilt-<target>`
-artifact, and `rust_package` and `rust_prebuilt`
+`freebsd`, `msvc`, `mingw` and `macos` jobs, which build that platform's
+release archive anyway, also stage a static library as a
+`bovnar-prebuilt-<target>` artifact, and `rust_package` and `rust_prebuilt`
 download them. `rust_prebuilt` is the gate: it stages the same crate and runs
-the unit tests against the prebuilt library on Linux, FreeBSD, macOS and
-Windows, so a broken or mislabelled archive fails CI rather than a user's
-build. The `linux` job rejects an archive whose shared library needs a glibc
-newer than 2.17, the floor of `x86_64-unknown-linux-gnu`. The `freebsd` job
-rejects the crate archive when its shared library needs an `FBSD_*` version
-newer than 1.7, which is what FreeBSD 14 provides, or when the archive
-references a fortified `__*_chk` symbol. `rust/build.rs`'s `PREBUILT` list is the one place
-that says which targets have one, and `package.py` refuses to stage a crate
-with any of them missing.
+the unit tests against the prebuilt library on Linux, FreeBSD, macOS, Windows
+MSVC and Windows MinGW UCRT64, so a broken or mislabelled archive fails CI
+rather than a user's build. The MinGW leg fails if a linked executable
+imports `msvcrt.dll`. The `linux` job rejects an archive whose shared library
+needs a glibc newer than 2.17, the floor of `x86_64-unknown-linux-gnu`. The
+`freebsd` job rejects the crate archive when its shared library needs an
+`FBSD_*` version newer than 1.7, which is what FreeBSD 14 provides, or when
+the archive references a fortified `__*_chk` symbol. `rust/build.rs`'s
+`PREBUILT` list is the one place that says which targets have one, and
+`package.py` refuses to stage a crate with any of them missing.
 
 ```bash
 python3 rust/package.py                          # cargo package: pack and verify

@@ -56,10 +56,12 @@ const PROFILES: [(&str, &str); 7] = [
 
 /// The prebuilt archives the published crate may carry: (target triple, archive
 /// in `c/prebuilt/<triple>`). Each is the static library the CI job that builds
-/// that platform already produces, shipped from the same commit, so a crate on
-/// that target needs no C compiler. rust/package.py requires every one of them;
-/// add a triple only together with the job that uploads it.
-const PREBUILT: [(&str, &str); 5] = [
+/// that platform already produces, shipped from the same commit. A crate on one
+/// of these targets links that archive instead of compiling `c/`. The MinGW
+/// archive is linked only when the UCRT64 gcc is on PATH; the others need no C
+/// compiler. rust/package.py requires every one of them; add a triple only
+/// together with the job that uploads it.
+const PREBUILT: [(&str, &str); 6] = [
     // The linux job's Release archive: -march=x86-64-v2, and a libc surface
     // inside the glibc 2.17 floor of this target. The job checks both.
     ("x86_64-unknown-linux-gnu", "libbvnr.a"),
@@ -69,6 +71,11 @@ const PREBUILT: [(&str, &str); 5] = [
     // target still supports — does not have. The job checks that floor.
     ("x86_64-unknown-freebsd", "libbvnr.a"),
     ("x86_64-pc-windows-msvc", "bvnr.lib"),
+    // The mingw job's Release archive: MSYS2 UCRT64, -march=x86-64-v2.
+    // link_prebuilt uses it only when x86_64-w64-mingw32-gcc on PATH defines
+    // _UCRT. That is the gcc rustc links with; without it, rustc links the
+    // msvcrt libraries in its sysroot, and this archive must not join that.
+    ("x86_64-pc-windows-gnu", "libbvnr.a"),
     ("x86_64-apple-darwin", "libbvnr.a"),
     ("aarch64-apple-darwin", "libbvnr.a"),
 ];
@@ -301,6 +308,12 @@ fn link_prebuilt(repo: &Path) -> bool {
     if !all_profiles || env::var_os("BOVNAR_BUILD_FROM_SOURCE").is_some() || !file.is_file() {
         return false;
     }
+    // The MinGW archive is the UCRT64 library. Stock windows-gnu rustc, with
+    // no such gcc on PATH, links its own msvcrt; compiling c/ below then
+    // refuses that compiler. A missing linker is the same outcome.
+    if target == "x86_64-pc-windows-gnu" && !gnu_linker_is_ucrt() {
+        return false;
+    }
     println!("cargo:rerun-if-changed={}", file.display());
     println!(
         "cargo:rustc-link-search=native={}",
@@ -431,12 +444,31 @@ fn compile_library(repo: &Path, gen_dir: &Path) {
     build.compile("bvnr");
 }
 
+/// Whether `x86_64-w64-mingw32-gcc` on PATH is a UCRT toolchain. That is the
+/// linker rustc uses for `x86_64-pc-windows-gnu`. On MSYS2 UCRT64 its
+/// `libmsvcrt.a` is the Universal CRT import library; when the program is
+/// absent, rustc links the msvcrt libraries in its own sysroot.
+fn gnu_linker_is_ucrt() -> bool {
+    ucrt_probe(&mut Command::new("x86_64-w64-mingw32-gcc")).is_ok()
+}
+
 /// The MinGW that compiles `c/` has to be a UCRT toolchain. rustc's
 /// `*-windows-gnu` target passes `-lmsvcrt` either way; which DLL that imports
-/// is decided by the gcc on PATH. On MSYS2 UCRT64, `libmsvcrt.a` is the
-/// Universal CRT import library (a copy of `libucrt.a`), and rustc uses that
-/// gcc instead of the msvcrt libraries in its own sysroot.
+/// is decided by the gcc on PATH.
 fn require_ucrt_mingw(compiler: &cc::Tool) {
+    let mut cmd = compiler.to_command();
+    if let Err(err) = ucrt_probe(&mut cmd) {
+        panic!(
+            "the Windows GNU build of bovnar needs a UCRT MinGW, the same CRT as \
+             the C archive: MSYS2 UCRT64 (mingw-w64-ucrt-x86_64-gcc), with \
+             x86_64-w64-mingw32-gcc on PATH. {} does not define _UCRT.\n{err}",
+            compiler.path().display()
+        );
+    }
+}
+
+/// Compiles a one-line probe. `Ok` means the compiler's headers define `_UCRT`.
+fn ucrt_probe(cmd: &mut Command) -> Result<(), String> {
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR"));
     let src = out_dir.join("bvnr_ucrt_probe.c");
     let obj = out_dir.join("bvnr_ucrt_probe.o");
@@ -449,24 +481,14 @@ fn require_ucrt_mingw(compiler: &cc::Tool) {
          int bvnr_ucrt_probe;\n",
     )
     .expect("write the UCRT probe");
-    let output = compiler
-        .to_command()
-        .arg("-c")
-        .arg(&src)
-        .arg("-o")
-        .arg(&obj)
-        .output()
-        .unwrap_or_else(|e| panic!("failed to run the MinGW compiler for the UCRT probe: {e}"));
+    let output = cmd.arg("-c").arg(&src).arg("-o").arg(&obj).output();
     let _ = std::fs::remove_file(&src);
     let _ = std::fs::remove_file(&obj);
-    if output.status.success() {
-        return;
+    match output {
+        Ok(output) if output.status.success() => Ok(()),
+        Ok(output) => Err(String::from_utf8_lossy(&output.stderr).into_owned()),
+        Err(e) => Err(format!(
+            "failed to run the MinGW compiler for the UCRT probe: {e}"
+        )),
     }
-    let err = String::from_utf8_lossy(&output.stderr);
-    panic!(
-        "the Windows GNU build of bovnar needs a UCRT MinGW, the same CRT as \
-         the C archive: MSYS2 UCRT64 (mingw-w64-ucrt-x86_64-gcc), with \
-         x86_64-w64-mingw32-gcc on PATH. {} does not define _UCRT.\n{err}",
-        compiler.path().display()
-    );
 }

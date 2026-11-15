@@ -99,7 +99,7 @@ library's error kind.
 | Requirement | Notes |
 |---|---|
 | Rust ≥ 1.88 | The crate's `rust-version`; CI builds and tests on it |
-| A C compiler | `build.rs` compiles the C library through the `cc` crate. The crate from crates.io links a prebuilt static library instead on `x86_64-unknown-linux-gnu`, `x86_64-unknown-freebsd`, `x86_64-pc-windows-msvc` and both macOS targets ([§3](#3-building-the-c-library)) |
+| A C compiler | `build.rs` compiles the C library through the `cc` crate. The crate from crates.io links a prebuilt static library instead on `x86_64-unknown-linux-gnu`, `x86_64-unknown-freebsd`, `x86_64-pc-windows-msvc`, `x86_64-pc-windows-gnu` and both macOS targets. The Windows GNU archive is linked only when `x86_64-w64-mingw32-gcc` on `PATH` is the UCRT64 toolchain it was built with ([§3](#3-building-the-c-library)) |
 | Python 3 on `PATH` (only when building from a repository checkout) | In the repository, the build runs the upstream table generator scripts, exactly as CMake does. Set the `PYTHON` environment variable to name a different interpreter. The crate from crates.io carries the generated tables and needs no Python ([§3.3](#33-how-the-published-crate-is-made)) |
 | `num-bigint`, `num-rational`, `num-integer`, `num-traits` | Pulled in by Cargo; they carry the exact numbers (arbitrary-width integers, rational numbers and the coefficient of a `Decimal`) |
 | [wasi-sdk](https://github.com/WebAssembly/wasi-sdk) | **Only** for the `wasm32-wasip2` target — see [§3](#3-building-the-c-library) |
@@ -149,10 +149,15 @@ The crate has no shared library to find: `build.rs` compiles the C library into
 the crate. The crate from crates.io carries the C sources and the generated unit
 tables in `c/`. It also carries a prebuilt static library for
 `x86_64-unknown-linux-gnu`, `x86_64-unknown-freebsd`,
-`x86_64-pc-windows-msvc`, `x86_64-apple-darwin` and `aarch64-apple-darwin`, in
-`c/prebuilt/<target>/`, and on those targets links it, so the build needs no
-C compiler. The Linux, FreeBSD and macOS x86_64 archives are the x86-64-v2
-build. The archives are Release builds with every unit
+`x86_64-pc-windows-msvc`, `x86_64-pc-windows-gnu`, `x86_64-apple-darwin` and
+`aarch64-apple-darwin`, in `c/prebuilt/<target>/`. On the Linux, FreeBSD,
+MSVC and macOS targets it links that archive, so the build needs no C
+compiler. On `x86_64-pc-windows-gnu` it links the archive when
+`x86_64-w64-mingw32-gcc` on `PATH` defines `_UCRT` (MSYS2 UCRT64, the
+toolchain that built it, and the linker rustc uses for the triple);
+otherwise that target compiles `c/` and refuses a MinGW that does not define
+`_UCRT`. The Linux, FreeBSD, macOS x86_64 and Windows GNU archives are the
+x86-64-v2 build. The archives are Release builds with every unit
 profile compiled in, so a build with any profile feature off compiles `c/`;
 `BOVNAR_BUILD_FROM_SOURCE=1` forces that on every target. Every other target
 compiles the C sources and needs a C compiler. In a repository checkout

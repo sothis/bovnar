@@ -22,7 +22,7 @@ API and implements spec 1.2.
   `linux` CI job already builds at x86-64-v2, and needs no C compiler there.
   That job refuses the archive unless it was built with `-march=x86-64-v2`
   and the shared library's glibc symbol versions stay within 2.17, the floor
-  of that Rust target. Other Linux targets, Windows GNU and
+  of that Rust target. Other Linux targets and
   `wasm32-wasip2` still compile the C sources, as does
   `BOVNAR_BUILD_FROM_SOURCE=1` and a build with a unit-profile feature off.
   `rust_prebuilt` links and tests the packaged crate on Linux as it already
@@ -43,15 +43,29 @@ API and implements spec 1.2.
   `rust_prebuilt_freebsd` links and tests the packaged crate in that same
   15.1 VM. Other FreeBSD targets still compile the C sources.
 
+- **The Rust crate ships a prebuilt C library for Windows MinGW x86_64.**
+  On `x86_64-pc-windows-gnu` the crate from crates.io links
+  `c/prebuilt/x86_64-pc-windows-gnu/libbvnr.a`, the static library the
+  `mingw` CI job already builds with MSYS2 UCRT64 at x86-64-v2, beside the
+  MSVC archive. `build.rs` links it only when `x86_64-w64-mingw32-gcc` on
+  `PATH` defines `_UCRT`, which is the gcc rustc uses for that triple; a
+  windows-gnu rustc with its own msvcrt libraries compiles `c/` instead,
+  and that compile refuses a MinGW that does not define `_UCRT`. The job
+  refuses the archive unless it was built with `-march=x86-64-v2`, and
+  `rust_prebuilt` links and tests it on UCRT64 and fails if a linked
+  executable imports `msvcrt.dll`. Other Windows GNU targets still compile
+  the C sources.
+
 ### Changed
 
-- **The Rust Windows GNU build uses UCRT64.** `x86_64-pc-windows-gnu`
-  compiles `c/` with MSYS2 UCRT64, the same environment as the MinGW C
-  archive, and `build.rs` refuses a MinGW that does not define `_UCRT`.
-  Rustc's target still passes `-lmsvcrt`; on UCRT64 that import library is
-  the Universal CRT, and the job puts that gcc on `PATH` so rustc links it
-  instead of the msvcrt libraries in the rustup toolchain. The job fails if
-  a linked executable imports `msvcrt.dll`.
+- **The Rust Windows GNU build uses UCRT64.** A from-source
+  `x86_64-pc-windows-gnu` build compiles `c/` with MSYS2 UCRT64, the same
+  environment as the MinGW C archive, and `build.rs` refuses a MinGW that
+  does not define `_UCRT`. Rustc's target still passes `-lmsvcrt`; on
+  UCRT64 that import library is the Universal CRT, and the job puts that
+  gcc on `PATH` so rustc links it instead of the msvcrt libraries in the
+  rustup toolchain. The job fails if a linked executable imports
+  `msvcrt.dll`.
 
 ## [2.2.0] - 2026-11-15
 

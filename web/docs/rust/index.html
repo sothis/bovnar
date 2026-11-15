@@ -161,7 +161,7 @@ library's error kind.</p>
 </tr>
 <tr>
 <td>A C compiler</td>
-<td><code>build.rs</code> compiles the C library through the <code>cc</code> crate. The crate from crates.io links a prebuilt static library instead on <code>x86_64-unknown-linux-gnu</code>, <code>x86_64-unknown-freebsd</code>, <code>x86_64-pc-windows-msvc</code> and both macOS targets (<a href="#3-building-the-c-library">§3</a>)</td>
+<td><code>build.rs</code> compiles the C library through the <code>cc</code> crate. The crate from crates.io links a prebuilt static library instead on <code>x86_64-unknown-linux-gnu</code>, <code>x86_64-unknown-freebsd</code>, <code>x86_64-pc-windows-msvc</code>, <code>x86_64-pc-windows-gnu</code> and both macOS targets. The Windows GNU archive is linked only when <code>x86_64-w64-mingw32-gcc</code> on <code>PATH</code> is the UCRT64 toolchain it was built with (<a href="#3-building-the-c-library">§3</a>)</td>
 </tr>
 <tr>
 <td>Python 3 on <code>PATH</code> (only when building from a repository checkout)</td>
@@ -211,10 +211,15 @@ cargo<span class="w"> </span><span class="nb">test</span>
 the crate. The crate from crates.io carries the C sources and the generated unit
 tables in <code>c/</code>. It also carries a prebuilt static library for
 <code>x86_64-unknown-linux-gnu</code>, <code>x86_64-unknown-freebsd</code>,
-<code>x86_64-pc-windows-msvc</code>, <code>x86_64-apple-darwin</code> and <code>aarch64-apple-darwin</code>, in
-<code>c/prebuilt/&lt;target&gt;/</code>, and on those targets links it, so the build needs no
-C compiler. The Linux, FreeBSD and macOS x86_64 archives are the x86-64-v2
-build. The archives are Release builds with every unit
+<code>x86_64-pc-windows-msvc</code>, <code>x86_64-pc-windows-gnu</code>, <code>x86_64-apple-darwin</code> and
+<code>aarch64-apple-darwin</code>, in <code>c/prebuilt/&lt;target&gt;/</code>. On the Linux, FreeBSD,
+MSVC and macOS targets it links that archive, so the build needs no C
+compiler. On <code>x86_64-pc-windows-gnu</code> it links the archive when
+<code>x86_64-w64-mingw32-gcc</code> on <code>PATH</code> defines <code>_UCRT</code> (MSYS2 UCRT64, the
+toolchain that built it, and the linker rustc uses for the triple);
+otherwise that target compiles <code>c/</code> and refuses a MinGW that does not define
+<code>_UCRT</code>. The Linux, FreeBSD, macOS x86_64 and Windows GNU archives are the
+x86-64-v2 build. The archives are Release builds with every unit
 profile compiled in, so a build with any profile feature off compiles <code>c/</code>;
 <code>BOVNAR_BUILD_FROM_SOURCE=1</code> forces that on every target. Every other target
 compiles the C sources and needs a C compiler. In a repository checkout

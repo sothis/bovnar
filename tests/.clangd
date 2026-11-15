@@ -1,0 +1,10 @@
+# Tests compile from tests/, so the include paths in the root .clangd have to be
+# written relative to THIS directory: clangd resolves a relative -I against the
+# directory of the config file, so "-Iinclude" here means tests/include, which is
+# not where the headers are. One flag per entry.
+CompileFlags:
+  Add:
+    - -I..
+    - -I../include
+    - -I../src/utils
+    - -I../build/generated

@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "bovnar.h"
 #include "bvn_internal_dims.h"
 
@@ -459,6 +460,48 @@ static void harness_write_flags(const uint8_t *data, size_t len)
 	bvnr_writer_destroy(w);
 }
 
+/* One scratch file per process, created on first use and reused for every
+ * iteration after that.
+ *
+ * tmpfile() cannot be used here. The C standard only says it opens "wb+": it
+ * does not promise an empty file or position 0, and Wine's does not keep even
+ * that much of a promise under load -- concurrent processes fail tmpfile()
+ * outright (7 of 8 in one run) and the file that does come back is not
+ * reliably private, so the fd sink's document is read back as some other
+ * iteration's. The writer is blameless: push_fd's counter is exact (fdpos ==
+ * bytes_written in every trapped run) and the serializer's buffer holds a
+ * complete, valid document. Only the transport between the fd and the read
+ * was wrong.
+ *
+ * mkstemp() gives a name that is private to this process, so there is no
+ * collision. The file is created once, not per iteration: unlink() fails on
+ * Wine (it returns -1 and the directory entry stays), so a per-iteration
+ * mkstemp() would leak an entry every time -- 800k entries at 200k x 4 procs,
+ * which is what made an earlier attempt look like a hang. Reusing one file
+ * costs one entry per process.
+ *
+ * ftruncate() + rewind() is what makes the reuse safe: the file is emptied and
+ * the position reset before the sink exists, so the writer's first byte is the
+ * file's first and the read below starts where the document does.
+ */
+static FILE *fd_stream_file(void)
+{
+	static FILE *f;
+	if (f) return f;
+
+	char tpl[] = "/tmp/bvnr_fdstreamXXXXXX";
+	int fd = mkstemp(tpl);
+	if (fd < 0) return NULL;
+	/* Unlink now, while the name is still private to us. Where unlink() works
+	 * the file has no name at all and nothing to clean up; on Wine it returns
+	 * -1 and the entry stays, which is the one leaked file per process the
+	 * comment above accounts for. Either way the fd stays valid. */
+	(void)unlink(tpl);
+	f = fdopen(fd, "wb+");
+	if (!f) { close(fd); return NULL; }
+	return f;
+}
+
 static void harness_fd_stream(const uint8_t *data, size_t len)
 {
 	cursor_t cur = { data, len };
@@ -467,8 +510,10 @@ static void harness_fd_stream(const uint8_t *data, size_t len)
 	bool     pretty = (cfg >> 0) & 1u;
 	uint8_t  n_keys = (cur_u8(&cur) & 0x0Fu) + 1u;
 
-	FILE *f = tmpfile();
+	FILE *f = fd_stream_file();
 	if (!f) return;
+	if (ftruncate(fileno(f), 0)) return;
+	rewind(f);
 
 	bvnr_writer_t *w = bvnr_writer_create();
 	if (!w) { fclose(f); return; }

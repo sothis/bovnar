@@ -16,8 +16,16 @@ archives, by a one-shot `workflow_dispatch` of `build-and-package.yml` on
 The downloads menu, the JSON-LD `softwareVersion` and
 `web/download/index.html` name 2.2.0 at build count 996 (`275f03a` on main,
 cherry-picked to `2.2.x` as `7299623`). The sizes are the archives' own.
-The live site has not been published: `publish_web.sh` has no destination
-recorded in the tree. Zenodo and `orcid_prefer.py` have not been run.
+The live site is published to `json@bovnar.io:/var/www/html`. Zenodo has the
+source as 10.5281/zenodo.24250459 and the documentation and specification as
+10.5281/zenodo.24250462 (CITATION.cff and the README). `PRODUCTION_RECORDS`
+names those records. The deposit fetches the release assets from GitHub:
+`32bad0c` had pointed `DOWNLOAD_PREFIX` at the site path `/download/`, which
+is not a URL the deposit can fetch. `orcid_prefer.py` found both works on
+the ORCID record and could not make them preferred: the ORCID session cookie
+is expired. The wiki drafts in `doc/wiki`
+carry a 2.2.0 history paragraph; there is still no GitHub wiki to publish
+them to.
 
 `BVNR_VERSION_SUFFIX` is `"-dev"` again on main, and `[Unreleased]` is open
 and empty. `2.2.x` stays at 2.2.0.

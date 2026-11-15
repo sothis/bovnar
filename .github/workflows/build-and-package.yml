@@ -591,6 +591,48 @@ jobs:
             printf '%s\n' "$out" | grep -q '<uint:8>'
             printf '.x = "hi";\n' | ./build/bovnar events -
             ls -l build/bovnar-freebsd-*.tar.xz
+            # The static library the Rust crate links instead of compiling
+            # the C sources (rust/build.rs PREBUILT). This Release build is
+            # already -march=x86-64-v2. The objects name libc symbols
+            # unversioned, so a user's link binds whatever version their
+            # libc has; this shared library records the versions 15.1 binds.
+            # FreeBSD 14 is still a supported release of x86_64-unknown-freebsd
+            # and its newest libc version is FBSD_1.7. 15 added FBSD_1.8.
+            if ! grep -R -q -F -- '-march=x86-64-v2' build/CMakeFiles; then
+              echo "libbvnr.a was not built with -march=x86-64-v2" >&2
+              exit 1
+            fi
+            if readelf -V build/libbvnr.so | grep -q 'Name: GLIBC_'; then
+              echo "libbvnr.so needs glibc" >&2
+              exit 1
+            fi
+            ver=$(readelf -V build/libbvnr.so \
+              | sed -n 's/.*Name: FBSD_\([0-9][0-9.]*\).*/\1/p' \
+              | sort -t. -k1,1n -k2,2n | tail -1)
+            if [ -z "$ver" ]; then
+              echo "libbvnr.so has no FBSD version needs" >&2
+              readelf -V build/libbvnr.so >&2 || true
+              exit 1
+            fi
+            major=${ver%%.*}
+            minor=${ver#*.}
+            minor=${minor%%.*}
+            if [ "$major" -gt 1 ] || { [ "$major" -eq 1 ] && [ "$minor" -gt 7 ]; }; then
+              echo "libbvnr.so needs FBSD_$ver, above the 1.7 floor of FreeBSD 14" >&2
+              exit 1
+            fi
+            echo "libbvnr.so libc need: FBSD_$ver (floor is 1.7)"
+            dest=prebuilt/bovnar-prebuilt-x86_64-unknown-freebsd
+            mkdir -p "$dest"
+            cp build/libbvnr.a "$dest/libbvnr.a"
+            ls -lR prebuilt
+
+      - name: Upload the Rust prebuilt artifact (FreeBSD)
+        uses: actions/upload-artifact@v7
+        with:
+          name: bovnar-prebuilt-x86_64-unknown-freebsd
+          path: prebuilt/bovnar-prebuilt-*
+          if-no-files-found: error
 
       - name: Upload FreeBSD artifact
         uses: actions/upload-artifact@v7
@@ -781,7 +823,7 @@ jobs:
   # archive and is what keeps the compile-c/ path honest.
   rust_package:
     name: Rust crate package
-    needs: [linux, msvc, macos]
+    needs: [linux, freebsd, msvc, macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -834,7 +876,7 @@ jobs:
   # on the runner of each target, with no C compilation in the job at all.
   rust_prebuilt:
     name: Rust crate, prebuilt C (${{ matrix.name }})
-    needs: [linux, msvc, macos]
+    needs: [linux, freebsd, msvc, macos]
     strategy:
       fail-fast: false
       matrix:
@@ -915,6 +957,56 @@ jobs:
             fi
             echo "$t links the prebuilt archive"
           done
+
+  # GitHub has no FreeBSD runner, and a Linux linker cannot consume the
+  # FreeBSD archive, so this is its own VM rather than a rust_prebuilt row.
+  # It needs every prebuilt artifact: package.py refuses to stage a crate
+  # that is missing one of the triples build.rs names.
+  rust_prebuilt_freebsd:
+    name: Rust crate, prebuilt C (FreeBSD x64)
+    needs: [linux, freebsd, msvc, macos]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      # Inside the workspace, so the VM syncs it. Untracked files do not
+      # make package.py call the tree dirty.
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: bovnar-prebuilt-*
+          path: prebuilt
+          merge-multiple: true
+
+      - name: Link the prebuilt archive and run the unit tests
+        uses: vmactions/freebsd-vm@v1.6.0
+        with:
+          release: "15.1"
+          arch: x86_64
+          prepare: |
+            pkg install -y rust python3 git
+          run: |
+            set -eu
+            git config --global --add safe.directory "$PWD"
+            rustc --version
+            python3 rust/package.py --out /tmp/bvnr-crate \
+              --prebuilt "$PWD/prebuilt" --no-cargo
+            mkdir -p /tmp/bvnr-crate/tests
+            cp -R tests/json /tmp/bvnr-crate/tests/
+            cd /tmp/bvnr-crate/bovnar
+            cargo test --locked --lib -- --skip abi_tests
+            cargo clean --package bovnar
+            cargo build --locked --lib > /tmp/bvnr-prebuilt-link.log 2>&1
+            if ! grep -q \
+                "links the prebuilt archive for x86_64-unknown-freebsd" \
+                /tmp/bvnr-prebuilt-link.log; then
+              cat /tmp/bvnr-prebuilt-link.log
+              echo "compiled c/ instead of linking the FreeBSD archive" >&2
+              exit 1
+            fi
+            echo "x86_64-unknown-freebsd links the prebuilt archive"
 
   source:
     name: Source tarball
@@ -1079,8 +1171,8 @@ jobs:
     name: Publish to crates.io
     # Gated like `publish`: a crates.io version is immutable (yanking only hides
     # it), so it waits for every Rust job, the C suite and the GitHub release.
-    needs: [rust_version, rust, rust_wasm, rust_package, rust_prebuilt, tests,
-            release]
+    needs: [rust_version, rust, rust_wasm, rust_package, rust_prebuilt,
+            rust_prebuilt_freebsd, tests, release]
     runs-on: ubuntu-latest
     # Only publish on a version tag (e.g. v2.0.1).
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
@@ -1161,8 +1253,8 @@ jobs:
     # rehearsal, hence the explicit `if:`: every need succeeded, or was one of
     # the two that may be skipped.
     needs: [msvc, mingw, linux, macos, freebsd, source, tests, rust_version,
-            rust, rust_wasm, rust_package, rust_prebuilt, build_wheels,
-            build_sdist]
+            rust, rust_wasm, rust_package, rust_prebuilt, rust_prebuilt_freebsd,
+            build_wheels, build_sdist]
     if: >-
       !cancelled() &&
       needs.msvc.result == 'success' &&
@@ -1177,6 +1269,7 @@ jobs:
       needs.rust_wasm.result == 'success' &&
       needs.rust_package.result == 'success' &&
       needs.rust_prebuilt.result == 'success' &&
+      needs.rust_prebuilt_freebsd.result == 'success' &&
       (needs.build_wheels.result == 'success' || needs.build_wheels.result ==
       'skipped') &&
       (needs.build_sdist.result == 'success' || needs.build_sdist.result ==

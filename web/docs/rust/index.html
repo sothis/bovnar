@@ -161,7 +161,7 @@ library's error kind.</p>
 </tr>
 <tr>
 <td>A C compiler</td>
-<td><code>build.rs</code> compiles the C library through the <code>cc</code> crate</td>
+<td><code>build.rs</code> compiles the C library through the <code>cc</code> crate. The crate from crates.io links a prebuilt static library instead on <code>x86_64-unknown-linux-gnu</code>, <code>x86_64-unknown-freebsd</code>, <code>x86_64-pc-windows-msvc</code> and both macOS targets (<a href="#3-building-the-c-library">§3</a>)</td>
 </tr>
 <tr>
 <td>Python 3 on <code>PATH</code> (only when building from a repository checkout)</td>
@@ -209,10 +209,18 @@ cargo<span class="w"> </span><span class="nb">test</span>
 <h2 id="3-building-the-c-library">3. Building the C library</h2>
 <p>The crate has no shared library to find: <code>build.rs</code> compiles the C library into
 the crate. The crate from crates.io carries the C sources and the generated unit
-tables in <code>c/</code> and compiles those; in a repository checkout <code>build.rs</code> runs the
-table generators and compiles <code>../src</code> and <code>../include</code> instead. Either way a
-downstream crate needs a C compiler at build time (plus Python 3 in the
-checkout case, <a href="#1-requirements">§1</a>) and nothing at run time.</p>
+tables in <code>c/</code>. It also carries a prebuilt static library for
+<code>x86_64-unknown-linux-gnu</code>, <code>x86_64-unknown-freebsd</code>,
+<code>x86_64-pc-windows-msvc</code>, <code>x86_64-apple-darwin</code> and <code>aarch64-apple-darwin</code>, in
+<code>c/prebuilt/&lt;target&gt;/</code>, and on those targets links it, so the build needs no
+C compiler. The Linux, FreeBSD and macOS x86_64 archives are the x86-64-v2
+build. The archives are Release builds with every unit
+profile compiled in, so a build with any profile feature off compiles <code>c/</code>;
+<code>BOVNAR_BUILD_FROM_SOURCE=1</code> forces that on every target. Every other target
+compiles the C sources and needs a C compiler. In a repository checkout
+<code>build.rs</code> runs the table generators and compiles <code>../src</code> and <code>../include</code>
+instead, which needs a C compiler and Python 3 (<a href="#1-requirements">§1</a>). Nothing
+is needed at run time.</p>
 <p><code>build.rs</code> re-runs when the C sources, the generators, the interpreter override,
 the enabled features or <code>WASI_SDK_PATH</code> change.</p>
 <h3 id="31-webassembly-wasm32-wasip2">3.1 WebAssembly (<code>wasm32-wasip2</code>)</h3>

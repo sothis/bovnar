@@ -59,10 +59,14 @@ const PROFILES: [(&str, &str); 7] = [
 /// that platform already produces, shipped from the same commit, so a crate on
 /// that target needs no C compiler. rust/package.py requires every one of them;
 /// add a triple only together with the job that uploads it.
-const PREBUILT: [(&str, &str); 4] = [
+const PREBUILT: [(&str, &str); 5] = [
     // The linux job's Release archive: -march=x86-64-v2, and a libc surface
     // inside the glibc 2.17 floor of this target. The job checks both.
     ("x86_64-unknown-linux-gnu", "libbvnr.a"),
+    // The freebsd job's Release archive, built with the 15.1 base clang at
+    // the same -march. Its libc versions stay within FBSD_1.7, which FreeBSD
+    // 14 — the oldest release this Rust target still supports — provides.
+    ("x86_64-unknown-freebsd", "libbvnr.a"),
     ("x86_64-pc-windows-msvc", "bvnr.lib"),
     ("x86_64-apple-darwin", "libbvnr.a"),
     ("aarch64-apple-darwin", "libbvnr.a"),

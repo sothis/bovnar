@@ -58,7 +58,7 @@ bvnr.toJSON('.speed = 9.81 m/s;\n.name = "probe";');
 bvnr.events('.x = <uint:16> 7;');
 // { ok: true, events: [ { seq: 0, ev: 'stream_start', ... }, ... ] }
 
-bvnr.version();  // "2.1.0"
+bvnr.version();  // "2.2.0"
 ```
 
 `input` is a string (UTF-8 encoded for you), a `Uint8Array` or an

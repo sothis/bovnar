@@ -2,7 +2,7 @@
 title: "The Bovnar (BVNR) Unit-Safe Serialization Format"
 abbrev: "The Bovnar Format"
 docname: draft-sonntag-bovnar-00
-date: 2026-11-10
+date: 2026-11-15
 category: info
 submissiontype: independent
 ipr: trust200902

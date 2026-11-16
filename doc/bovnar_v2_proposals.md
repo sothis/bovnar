@@ -1,10 +1,14 @@
 # Bovnar — Spec 2.0 Grammar Proposals (Design Note)
 
-> **Spec version:** 2.0 (proposed; every item here is a break the spec reserves for a major revision)
-> **Status:** **Proposal.** Nothing here is built, scheduled, or decided. It is a list of the places
-> the grammar says one thing twice, or says it in only one of the two places it should.
-> **Scope:** Breaking changes to the grammar and lexical structure. Not the unit registry, not the
+> **Spec version:** 2.0 (proposed; a major revision of the *format*, not of the library)
+> **Status:** **Proposal.** Nothing here is built, scheduled, or decided. As of 2026-11-16 the
+> spec is still 1.2 and the library 2.2.0. This note is the list of places the grammar says one
+> thing twice, or says it in only one of the two places it should.
+> **Scope:** Breaking changes to the grammar and lexical structure, plus the one conformance-tier
+> change and the one 1.x loosening that belong with them. Not the unit registry, not the
 > C API, not the profiles — those grow additively inside 1.x and need no major revision.
+> Section 14 is the exception to the "breaking" rule: it is a loosening that could ship in a 1.x
+> revision.
 
 ## Table of Contents
 
@@ -21,7 +25,7 @@
 11. [A number in any base is a number](#11-a-number-in-any-base-is-a-number)
 12. [Three changes in the unit sub-grammar](#12-three-changes-in-the-unit-sub-grammar)
 13. [Octet streams: declared, bounded, checked](#13-octet-streams-declared-bounded-checked)
-14. [A comment may start after any token](#14-a-comment-may-start-after-any-token)
+14. [A comment may start after any token (1.x candidate)](#14-a-comment-may-start-after-any-token-1x-candidate)
 15. [Priority, and the test a breaking change has to pass](#15-priority-and-the-test-a-breaking-change-has-to-pass)
 
 - [See also](#see-also)
@@ -43,7 +47,9 @@ implementation rather than from the prose; where the two disagree the disagreeme
 Three of the items are not preferences. **One conformance tier** (section 3) and **the inline unit**
 (section 6) are correctness defects that happen to be spelled as design, and **the bare-word
 namespace** (section 8) is the only item on the list that becomes unfixable once spec 2.0 ships. If the
-list has to be cut, it is cut down to those.
+list has to be cut, it is cut down to those. Section 14 is the one item that is not a break: it is a
+loosening the spec could take in a 1.x revision, and it is listed only because un-stating a rule the
+spec now states deserves the same deliberateness.
 
 ---
 
@@ -66,9 +72,9 @@ unchanged:
 ## 3. One conformance tier
 
 **Today.** Element homogeneity, sibling rectangularity, struct shape and duplicate keys are enforced
-by `bvn_dom_parse` and **not** by the streaming reader. The EBNF says so in its own words under
-constraint (g) of doc/12_bovnar.ebnf: "only a DOM parse rejects ragged siblings, mixed kinds, and
-duplicate keys; the streaming reader accepts them."
+by `bvn_dom_parse` and **not** by the streaming reader. The EBNF says so under constraint (b) of
+doc/12_bovnar.ebnf: "only a DOM parse rejects ragged siblings, mixed kinds, and duplicate keys; the
+streaming reader accepts them."
 
 **Why it is a problem.** "Is this a valid Bovnar document" has no answer that does not name an API.
 A producer can emit a file that `bvnr_reader` (and `loads()`, which is built on it) blesses and `bvn_dom_parse` / `dom_parse()` refuses, and both are conforming.
@@ -85,9 +91,11 @@ Duplicate keys are the one honest exception: detecting them in a stream is unbou
 width of a struct. So they become an explicit reader **policy** — `reject_duplicate_keys`, defaulting
 on — rather than a rule that silently exists in one tier and not the other.
 
-**Cost.** A streaming consumer that today accepts `[1, "two"]` starts failing. That is the point, but
-it is a real break for anyone using the SAX API as a permissive front end, and it needs a flag to opt
-back out.
+**Cost.** The structural checks (homogeneity, rectangularity, shape) are unconditional: a streaming
+consumer that today accepts `[1, "two"]` starts failing. That is the point — there is no opt-out for
+them, or the two tiers would still exist. Duplicate keys are the exception: they get the
+`reject_duplicate_keys` flag, defaulting on, with an opt-out for a consumer that must keep the old
+behaviour. Either way this is a real break for anyone using the SAX API as a permissive front end.
 
 ---
 
@@ -116,7 +124,8 @@ the flat buffer, and is a *declaration a reader can check* rather than a structu
 also survives the JSON round-trip as metadata instead of vanishing.
 
 **Cost.** Every document using `/` needs rewriting, and the DOM's flat-plus-`dims` representation
-becomes a shape-annotation detail rather than a syntax. The transcoder is mechanical (section 14).
+becomes a shape-annotation detail rather than a syntax. The transcoder is mechanical (the
+transcodability test in section 15).
 
 ---
 
@@ -276,7 +285,8 @@ are null, and `[1,,3]` is a sparse array with a hole (spec §7.2).
 most common editing accident in a bracketed list — is a silent change in element count rather than a
 parse error, and element count is exactly what the `/`-row and rectangularity rules are built to
 police. The format already concedes the short form is not the real one: the canonical writer expands
-every hole back to an explicit `null` on output.
+every *array* hole (`[1,,3]` becomes `[1, null, 3]`); the empty right-hand side is written as an empty
+slot today, not as `null`.
 
 **Proposed.** `null` is written `null`. A **single trailing comma** is permitted and ignored, as in
 every format written since JSON's was regretted. Every other empty element position is
@@ -340,11 +350,12 @@ A bare literal made only of digits of the declared base is accepted and read **i
 So whether `e` is a digit or an exponent marker in one and the same token depends on a parameter two
 tokens to its left, and the value of `99` depends on it too.
 
-**Why it is a problem.** It costs three things at once. Five families must accept "a number **or** a
-string" as their value, which is the loosest type/value rule in the format. It is what makes a
-string-carrying-a-unit reachable at all, and so is upstream of the `utf8` hole in section 6. And it is
-an attack surface the spec documents in §18.1: a 32768-bit base-2 literal is a 32768-character string,
-comfortably inside the default `max_string_length`, and base conversion is superlinear.
+**Why it is a problem.** It costs three things at once. Five families (uint, sint, float, float_fix,
+float_dec) must accept "a number **or** a string" as their value, which is the loosest type/value rule
+in the format. It is what makes a string-carrying-a-unit reachable at all, and so is upstream of the
+`utf8` hole in section 6. And it is an attack surface the spec documents in §18.1: a 32768-bit base-2
+literal is a 32768-character string, comfortably inside the default `max_string_length`, and base
+conversion is superlinear.
 
 **Proposed.** Give the base a lexical form — `0x`, `0b`, `0o` for the common cases, and a general
 radix form for the exotic ones the registry supports:
@@ -383,11 +394,12 @@ removes the question instead of documenting the answer.
 **Pick one prefix spelling.** Since compact prefixes were accepted, every prefixed unit has two
 spellings — `k~g` and `kg` — held apart by the longest-alias-suffix rule plus a hand-maintained
 `compact_exceptions` list (`usb`, `kt`, `ppt`) for the tokens where the rule gives the wrong answer.
-Two spellings and a patch list is the shape of a rule that keeps needing one more entry. This one is a genuine
-trade-off, and either resolution is defensible: compact-only with a normative collision table (my
-preference — `~` is the most alien thing in the format to a first-time reader, and it exists only
-because the registry has collisions), or `~`-mandatory, which is what the writer already emits. What
-is not defensible for another decade is both.
+Two spellings and a patch list is the shape of a rule that keeps needing one more entry. The list today
+is eight entries in `src/gendata/units.bvnr` (`usb`, `kt`, `ppt`, `MBtu`, `MBTU`, `Mbtu`, `Mlb`,
+`Mlbs`). This one is a genuine trade-off, and either resolution is defensible: compact-only with a
+normative collision table (my preference — `~` is the most alien thing in the format to a first-time
+reader, and it exists only because the registry has collisions), or `~`-mandatory, which is what the
+writer already emits. What is not defensible for another decade is both.
 
 ---
 
@@ -428,7 +440,7 @@ anything.
 
 ---
 
-## 14. A comment may start after any token
+## 14. A comment may start after any token (1.x candidate)
 
 **Today.** "Whitespace and comments are freely interleaved between all tokens" is true of whitespace
 and not quite of comments. `#` is not a terminator of a bare token (spec §4.1): directly after a key,
@@ -455,14 +467,17 @@ shares. A generator that emits `value# provenance` produces a document that fail
 not on others, by token kind. And it is the kind of divergence a second implementation gets "wrong"
 by following the grammar.
 
+**This one is not a spec 2.0 break.** It is a pure loosening of accepted input, so it could ship as a
+spec 1.3 revision (and a library 2.3.0) without waiting for a major. It is listed here because the
+restriction is now *stated* in 1.2, and un-stating a rule deserves the same deliberateness as stating
+one.
+
 **Proposed.** `#` terminates every bare token, exactly as whitespace does: the lexer's number, symbol,
 reference, datetime and key-outro states take `#` as "end of token, begin comment". One rule, and the
 `ws` production becomes true as written.
 
-**Cost.** Purely a loosening — no valid 1.x document changes, which is why this one could also ship in
-a 1.x revision as an accepted-input extension rather than wait for a major. It is listed here because
-the restriction is now *stated* in 1.2, and un-stating a rule deserves the same deliberateness as
-stating one. The only loss is the early error on `.x = 42#oops`, which becomes a comment.
+**Cost.** Purely a loosening — no valid 1.x document changes. The only loss is the early error on
+`.x = 42#oops`, which becomes a comment.
 
 ---
 
@@ -479,8 +494,9 @@ contents.
 **The order.** If the whole list ships, the order that minimises rework is: section 10 (the directive,
 because everything else needs a way to be declared), then section 7 (named parameters) and section 6
 (the inline unit) together, since the second is defined in terms of the first, then sections 8, 9, 11,
-5, 4, 12, 13 and 14 in any order, and section 3 last — it is the only one whose blast radius is other
-people's *readers* rather than other people's *documents*.
+5, 4, 12 and 13 in any order, and section 3 last — it is the only one whose blast radius is other
+people's *readers* rather than other people's *documents*. Section 14 is not in this order: it is a
+1.x loosening and can ship on its own.
 
 **If it is cut to three:** sections 3, 6 and 8. The first two are defects, and the third is the only
 door that closes for good.
